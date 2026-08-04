@@ -1,0 +1,34 @@
+# ==========================
+# Laoo Standard .gitignore
+# Flutter + VS Code + Windows
+# ==========================
+
+# Flutter / Dart
+.dart_tool/
+.packages
+.pub/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Logs
+*.log
+
+# Environment / Secrets
+.env
+.env.*
+*.p12
+*.jks
+*.keystore
+
+# Generated
+coverage/
