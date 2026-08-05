@@ -75,8 +75,8 @@ Flutter Foundation
 - Riverpod
 - Go Router
 - Theme
-- Splash
-- Login Screen
+- Landing Page MVP
+- Login Screen (Deferred until Data Entry Design Gate)
 
 Status
 
@@ -199,6 +199,8 @@ PERMISSION_STANDARD.md
 เป้าหมายปัจจุบัน
 
 Project แรกชื่อ Laoo และใช้ Landing Page เป็นหน้าเริ่มต้นของระบบหลัก
+
+Landing Page MVP แสดงข้อความ `Laoo Solutions` เท่านั้น
 
 Landing Page
 

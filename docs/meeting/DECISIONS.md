@@ -286,6 +286,8 @@ User เลือก Theme เป็นชุด ไม่ปรับสีท�
 
 เมื่อเปลี่ยน Theme ระบบต้อง Refresh และใช้งานทันที
 
+**Review 2026-08-05:** นโยบายนี้ยังมีผลใช้งาน สถานะ Implementation ปัจจุบันเป็น Prototype โดยมี Theme สีเขียวและสีฟ้า พร้อม Local Storage แล้ว แต่ Application Root และ Router ยังไม่ได้เชื่อม Theme Engine ให้ใช้งานจริงทั้งระบบ และยังต้องปรับแนวคิดจาก User Preference เป็น Employee Preference ตาม Decision #035 ก่อนเชื่อม API และ SQL Server
+
 ---
 
 ## Decision #014 — Favorite Menu
@@ -790,6 +792,78 @@ Workspace นี้ต้องประกอบด้วยอย่างน�
 - `Laoo Shared Standards` — เอกสารมาตรฐานกลางจาก `C:\laoo\docs`
 
 ก่อนเริ่มงาน CI และ AI ต้องตรวจสอบว่าเปิด Workspace ถูกต้อง และอ่านเอกสารตามลำดับใน `AGENTS.md`
+
+---
+
+## Decision #041 — Theme Expansion Deferred to Employee Profile
+
+**Status:** Approved
+
+- Employee ต้องสามารถเลือก Theme ได้มากกว่าสีเขียวและสีฟ้า
+- สีเขียวและสีฟ้ายังคงเป็นชุดเริ่มต้นของ Prototype เท่านั้น
+- ยังไม่กำหนดจำนวน Theme รายชื่อ Theme หรือค่าสีเพิ่มเติมในขั้นตอนนี้
+- ให้ออกแบบตัวเลือก Theme พร้อมหน้า Employee Profile
+- ก่อนออกแบบต้องสอบถามมนต์ตาม Data Entry Design Gate และห้ามทีมเดาชุดสีเอง
+- ยังไม่แก้ Theme Code จนกว่าจะได้รับ Requirement ของหน้า Employee Profile
+
+---
+
+## Decision #042 — Expert Participation and Review Gates
+
+**Status:** Approved
+
+CI ต้องคัดเลือกผู้เชี่ยวชาญที่เกี่ยวข้องเข้าร่วมทุกขั้นตอนสำคัญ และแจ้งมนต์ก่อนเริ่มงานว่าใครทำหน้าที่ใด
+
+แต่ละงานต้องกำหนดอย่างน้อย
+
+- Primary Owner — ผู้รับผิดชอบหลัก
+- Collaborating Experts — ผู้เชี่ยวชาญที่ร่วมวิเคราะห์หรือออกแบบ
+- Reviewer — ผู้ตรวจสอบผลกระทบและความถูกต้อง
+- QA/Security Gate — ผู้ตรวจสอบคุณภาพหรือความปลอดภัยตามความเสี่ยงของงาน
+
+แนวทางเลือกผู้เชี่ยวชาญ
+
+- Requirement: System Analyst, Software Architect และผู้เชี่ยวชาญ Business Domain
+- UI/UX: UI/UX Designer, Flutter Architect, Senior Flutter Developer และ QA Engineer
+- Flutter Foundation: Flutter Architect, Senior Flutter Developer, Code Reviewer และ QA Engineer
+- Backend/API: Backend API Developer, Software Architect, Security Specialist และ QA Engineer
+- Database: SQL Server Database Designer, Backend API Developer, Security Specialist และ Code Reviewer
+- Authentication/Permission: Security Specialist, Backend API Developer, Database Designer, Flutter Architect และ QA Engineer
+- Deployment: DevOps Engineer, Security Specialist และ QA Engineer
+
+ไม่จำเป็นต้องเรียกผู้เชี่ยวชาญทุกคนในงานย่อยที่ไม่เกี่ยวข้อง แต่ห้ามข้ามผู้เชี่ยวชาญที่จำเป็นต่อความเสี่ยงของงาน
+
+ก่อนสรุปงาน CI ต้องรายงาน
+
+- ผู้เชี่ยวชาญที่เข้าร่วม
+- ข้อสรุปและเหตุผล
+- ความเสี่ยงที่พบ
+- ผล Review, Test และ Security Check
+- Git Checkpoint เมื่อเป็นการแก้ไขที่สำคัญ
+
+---
+
+## Decision #043 — Laoo Landing Page MVP
+
+**Status:** Approved
+
+Landing Page ระยะแรกของ Product Laoo แสดงข้อความต่อไปนี้เท่านั้น
+
+```text
+Laoo Solutions
+```
+
+- Landing Page เปิดโดยตรงที่ Route `/`
+- ไม่แสดง Splash หรือ Welcome ก่อน Landing Page
+- ไม่ Redirect อัตโนมัติไป Login
+- ยังไม่มี Product List, Product Link, Login Button, Admin Button หรือ Register Button
+- ยังไม่มีช่องกรอกข้อมูล รูปภาพ เมนู Footer หรือข้อความอื่น
+- Route `/login` คงไว้สำหรับ Milestone Authentication แต่ยังไม่แก้ Login Form จนกว่าจะผ่าน Data Entry Design Gate
+- การเชื่อม Product Domain และองค์ประกอบ Landing เพิ่มเติมเป็นงานระยะถัดไป
+- ขอบเขต MVP นี้ไม่ยกเลิกเป้าหมายระยะยาวใน Decision #034
+- ห้ามเพิ่มองค์ประกอบอื่นโดยไม่ได้รับ Requirement จากมนต์
+
+ผู้เชี่ยวชาญที่ร่วม Review: System Analyst, UI/UX Designer, Flutter Architect, CA และ QA/Security Reviewer
 
 ---
 

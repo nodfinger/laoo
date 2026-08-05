@@ -1,6 +1,6 @@
 # ROUTING_STANDARD
 
-Version: 1.0\
+Version: 1.1\
 Last Update: 2026-08-05
 
 Project: Laoo Solutions
@@ -50,15 +50,7 @@ Status: Approved
 
 # Routing Architecture
 
-Splash
-
-↓
-
-Welcome Popup
-
-↓
-
-Marketplace / Home
+Landing
 
 ↓
 
@@ -74,8 +66,7 @@ Protected Feature
 
   Route         Path
   ------------- ----------------
-  Splash        `/`
-  Welcome       `/welcome`
+  Landing       `/`
   Marketplace   `/marketplace`
   Login         `/login`
   Product       `/product/:id`
@@ -99,6 +90,10 @@ Protected Feature
 -   POS Device
 
 Guest สามารถเข้าหน้า Marketplace และ Product ได้
+
+สำหรับ Product Laoo หน้า Landing เป็น Guest Route และต้องเปิดโดยตรงเมื่อเข้า `/` โดยไม่มี Splash, Welcome หรือ Redirect อัตโนมัติไป Login
+
+Marketplace เป็น Feature ทางธุรกิจในอนาคตและไม่ใช่ Landing Page ของ Product Laoo
 
 ------------------------------------------------------------------------
 
@@ -160,3 +155,4 @@ AI ทุกตัวต้องสร้าง Route ตามมาตรฐ�
   Version   Date         Description
   --------- ------------ -----------------
   1.0       2026-08-05   Initial Release
+  1.1       2026-08-05   Set Laoo Landing as initial route and defer Splash and Welcome
