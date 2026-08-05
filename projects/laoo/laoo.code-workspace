@@ -1,0 +1,13 @@
+{
+  "folders": [
+    {
+      "name": "Laoo Product",
+      "path": "."
+    },
+    {
+      "name": "Laoo Shared Standards",
+      "path": "../../docs"
+    }
+  ],
+  "settings": {}
+}

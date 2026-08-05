@@ -48,6 +48,24 @@ Project Source Code
 projects/
 ```
 
+แต่ละ Product ต้องแยกเป็น
+
+```text
+projects/<product-name>/
+├── app/        Flutter
+├── api/        ASP.NET Core Web API
+├── database/   SQL Server scripts and migrations
+└── docs/       เอกสารเฉพาะ Product
+```
+
+เมื่อทำงานใน Product Laoo ต้องเปิด VS Code ผ่าน
+
+```text
+C:\laoo\projects\laoo\laoo.code-workspace
+```
+
+เพื่อให้ Workspace แสดงทั้ง Product และเอกสารมาตรฐานกลาง ห้ามใช้ `projects/laoo/app` เป็น Workspace หลักของทีม
+
 Platform Documentation
 
 ```text

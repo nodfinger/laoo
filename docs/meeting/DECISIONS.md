@@ -738,6 +738,61 @@ Review
 
 ---
 
+## Decision #039 — Product Folder Layout
+
+**Status:** Approved
+
+วันที่ทบทวน: 2026-08-05
+
+ผลการตรวจโครงสร้าง Repository ปัจจุบัน
+
+- `C:\laoo` ใช้เก็บเอกสารและเครื่องมือส่วนกลาง ถูกต้องตามมาตรฐาน
+- `C:\laoo\projects\laoo` เป็น Product แรก ถูกต้องตามหลัก Product Isolation
+- Product ใหม่ควรเป็น Folder ระดับเดียวกันภายใต้ `projects/<product-name>`
+- `docs/`, `tools/` และ `scripts/` เป็นทรัพยากรส่วนกลาง ไม่ควรคัดลอกแยกในแต่ละ Product
+- Folder มาตรฐานที่ยังไม่มีเนื้อหาใช้ `.gitkeep` เพื่อให้ Git เก็บโครงสร้างไว้แล้ว
+
+โครงสร้างมาตรฐานของแต่ละ Product
+
+```text
+projects/<product-name>/
+├── app/        Flutter application
+├── api/        ASP.NET Core Web API
+├── database/   SQL Server scripts and migrations
+├── docs/       Product-specific documentation
+└── <product-name>.code-workspace
+```
+
+- Product workspace ต้องเปิด Product พร้อม `docs/` ส่วนกลางได้
+- Flutter Project ของ Laoo ย้ายไปที่ `projects/laoo/app`
+- `create_laoo_project.ps1` อยู่ใน `app/` เพราะเป็นเครื่องมือสร้าง Flutter Foundation และต้องรันจาก Flutter root
+- Root `gitignore` เปลี่ยนชื่อเป็น `.gitignore` เพื่อให้ Git ใช้งานจริง
+- `projects/laoo/README.md` เป็นเอกสารภาพรวมเฉพาะ Product
+- ตรวจสอบหลังย้ายแล้ว: `dart format .`, `flutter analyze`, `flutter test` และ `flutter build web` ผ่าน
+
+---
+
+## Decision #040 — Laoo VS Code Workspace Entry
+
+**Status:** Approved
+
+เมื่อเริ่มหรือกลับมาทำงานใน Product Laoo ต้องเปิด VS Code ด้วยไฟล์ต่อไปนี้
+
+```text
+C:\laoo\projects\laoo\laoo.code-workspace
+```
+
+ห้ามใช้ `projects/laoo/app` เป็น Workspace หลักของทีม เพราะจะไม่เห็นเอกสารมาตรฐานกลางใน `C:\laoo\docs` ภายใน Workspace เดียวกัน
+
+Workspace นี้ต้องประกอบด้วยอย่างน้อย
+
+- `Laoo Product` — Source Code และไฟล์เฉพาะ Product
+- `Laoo Shared Standards` — เอกสารมาตรฐานกลางจาก `C:\laoo\docs`
+
+ก่อนเริ่มงาน CI และ AI ต้องตรวจสอบว่าเปิด Workspace ถูกต้อง และอ่านเอกสารตามลำดับใน `AGENTS.md`
+
+---
+
 # Pending Decisions
 
 หัวข้อที่ยังต้องตัดสินใจภายหลัง

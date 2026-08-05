@@ -65,6 +65,10 @@ laoo/
 ├── projects/
 │
 │   └── laoo/
+│       ├── app/
+│       ├── api/
+│       ├── database/
+│       └── docs/
 │
 ├── tools/
 │

@@ -71,6 +71,7 @@ Completed
 Flutter Foundation
 
 - Project Structure
+- Product Layout (`app`, `api`, `database`, `docs`)
 - Riverpod
 - Go Router
 - Theme

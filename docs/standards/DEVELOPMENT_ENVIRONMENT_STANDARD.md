@@ -202,8 +202,16 @@ C:\laoo\projects
 Flutter Project
 
 ```
-C:\laoo\projects\laoo
+C:\laoo\projects\laoo\app
 ```
+
+VS Code Workspace สำหรับ Product Laoo
+
+```text
+C:\laoo\projects\laoo\laoo.code-workspace
+```
+
+ให้เปิดไฟล์ `.code-workspace` นี้เมื่อเริ่มงาน เพื่อให้เห็น Source Code ของ Product และเอกสารมาตรฐานกลางใน Workspace เดียวกัน
 
 ---
 
