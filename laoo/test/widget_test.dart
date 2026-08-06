@@ -1,4 +1,4 @@
-// This is a basic Flutter widget test.
+﻿// This is a basic Flutter widget test.
 //
 // To perform an interaction with a widget in your test, use the WidgetTester
 // utility in the flutter_test package. For example, you can send tap and scroll
@@ -12,7 +12,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:laoo/app/app.dart';
 import 'package:laoo/app/router/app_router.dart';
 import 'package:laoo/app/router/route_paths.dart';
-import 'package:laoo/features/authentication/presentation/pages/login_page.dart';
+import 'package:laoo/features/auth/presentation/pages/login_page.dart';
 import 'package:laoo/features/landing/presentation/pages/landing_page.dart';
 
 void main() {
@@ -64,3 +64,4 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 }
+

@@ -1,6 +1,6 @@
-import 'package:go_router/go_router.dart';
+﻿import 'package:go_router/go_router.dart';
 
-import '../../features/authentication/presentation/pages/login_page.dart';
+import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/landing/presentation/pages/landing_page.dart';
 import 'route_names.dart';
 import 'route_paths.dart';
@@ -20,3 +20,4 @@ final GoRouter appRouter = GoRouter(
     ),
   ],
 );
+

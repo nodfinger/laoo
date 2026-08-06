@@ -1,17 +1,23 @@
-# laoo
+# Laoo Login — Unified Block Update
 
-A new Flutter project.
+นำไฟล์นี้ไปวางทับ:
 
-## Getting Started
+`C:\laoo\laoo\lib\features\authentication\presentation\pages\login_page.dart`
 
-This project is a starting point for a Flutter application.
+จากนั้นรัน:
 
-A few resources to get you started if this is your first Flutter project:
+```powershell
+cd C:\laoo\laoo
+flutter clean
+flutter pub get
+flutter run -d chrome
+```
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+การเปลี่ยนแปลง:
+- Logo และ Login อยู่ในกรอบเดียวกัน
+- มี Border รอบกรอบหลัก
+- มีเงาและมุมโค้ง
+- Desktop/Web แบ่งซ้าย-ขวา
+- Mobile เรียงบน-ล่าง
+- มี Fade + Slide animation เบา ๆ
+- คง Username, Password, ลืมรหัสผ่าน และปุ่มเข้าสู่ระบบ
