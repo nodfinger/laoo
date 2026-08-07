@@ -36,10 +36,7 @@ class AuthSessionService {
       _expiresAtKey,
       result.expiresAt?.toIso8601String() ?? '',
     );
-    await preferences.setString(
-      _userKey,
-      jsonEncode(user.toJson()),
-    );
+    await preferences.setString(_userKey, jsonEncode(user.toJson()));
   }
 
   Future<AuthSession?> read() async {
@@ -71,16 +68,10 @@ class AuthSessionService {
     }
 
     final user = LoginUser.fromJson(
-      decoded.map(
-        (key, value) => MapEntry(key.toString(), value),
-      ),
+      decoded.map((key, value) => MapEntry(key.toString(), value)),
     );
 
-    return AuthSession(
-      accessToken: token,
-      expiresAt: expiresAt,
-      user: user,
-    );
+    return AuthSession(accessToken: token, expiresAt: expiresAt, user: user);
   }
 
   Future<void> clear() async {

@@ -1,33 +1,27 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
-import '../../../../app/laoo_app.dart';
+import '../../../../app/router/route_names.dart';
+import '../../../../app/theme/laoo_design_tokens.dart';
 
 class LandingPage extends StatelessWidget {
   const LandingPage({super.key});
 
-  static const Color _primaryGreen = Color(0xFF32C766);
-  static const Color _darkGreen = Color(0xFF166534);
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       body: SafeArea(
         child: Column(
           children: [
-            _TopNavigation(
-              onLoginPressed: () {
-                Navigator.pushNamed(context, LaooApp.loginRoute);
+            _Header(
+              onLogin: () {
+                context.goNamed(RouteNames.login);
               },
             ),
-            Expanded(
+            const Expanded(
               child: SingleChildScrollView(
-                child: Column(
-                  children: const [
-                    _HeroSection(),
-                    _SolutionsSection(),
-                    _Footer(),
-                  ],
-                ),
+                child: Column(children: [_Hero(), _Benefits(), _Footer()]),
               ),
             ),
           ],
@@ -37,214 +31,156 @@ class LandingPage extends StatelessWidget {
   }
 }
 
-class _TopNavigation extends StatelessWidget {
-  const _TopNavigation({
-    required this.onLoginPressed,
-  });
+class _Header extends StatelessWidget {
+  const _Header({required this.onLogin});
 
-  final VoidCallback onLoginPressed;
+  final VoidCallback onLogin;
 
   @override
   Widget build(BuildContext context) {
+    final wide = MediaQuery.sizeOf(context).width >= 760;
+
     return Container(
-      height: 72,
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      height: 76,
+      padding: const EdgeInsets.symmetric(horizontal: 28),
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(
-          bottom: BorderSide(color: Color(0xFFE8EFEA)),
-        ),
+        border: Border(bottom: BorderSide(color: LaooColors.border)),
       ),
       child: Row(
         children: [
-          const _BrandLogo(),
-          const Spacer(),
-          FilledButton.icon(
-            onPressed: onLoginPressed,
-            icon: const Icon(Icons.login_rounded, size: 20),
-            label: const Text('Login'),
-            style: FilledButton.styleFrom(
-              backgroundColor: LandingPage._primaryGreen,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 22,
-                vertical: 14,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
+          Image.asset(
+            'assets/images/laoo_logo_new.png',
+            width: 150,
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) {
+              return const Text(
+                'LAOO SOLUTIONS',
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  color: LaooColors.greenDark,
+                ),
+              );
+            },
           ),
+          const Spacer(),
+          if (wide) ...[
+            const _NavText('หน้าหลัก'),
+            const _NavText('โซลูชัน'),
+            const _NavText('เกี่ยวกับเรา'),
+            const _NavText('ติดต่อเรา'),
+            const SizedBox(width: 18),
+          ],
+          FilledButton(onPressed: onLogin, child: const Text('เข้าสู่ระบบ')),
         ],
       ),
     );
   }
 }
 
-class _BrandLogo extends StatelessWidget {
-  const _BrandLogo();
+class _NavText extends StatelessWidget {
+  const _NavText(this.text);
+
+  final String text;
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      label: 'Laoo Solutions',
-      image: true,
-      child: Image.asset(
-        'assets/images/laoo_logo.png',
-        width: 190,
-        height: 58,
-        fit: BoxFit.contain,
-        filterQuality: FilterQuality.high,
-        errorBuilder: (context, error, stackTrace) {
-          return const Text(
-            'Laoo Solutions',
-            style: TextStyle(
-              fontSize: 19,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF16351F),
-            ),
-          );
-        },
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: LaooColors.textSecondary,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }
 }
 
-class _HeroSection extends StatelessWidget {
-  const _HeroSection();
+class _Hero extends StatelessWidget {
+  const _Hero();
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: double.infinity,
-      constraints: const BoxConstraints(minHeight: 420),
-      padding: const EdgeInsets.symmetric(
-        horizontal: 24,
-        vertical: 64,
-      ),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            Color(0xFFEFFFF3),
-            Color(0xFFF9FCFA),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
+      color: Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 64),
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1100),
+          constraints: const BoxConstraints(maxWidth: 1180),
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final isNarrow = constraints.maxWidth < 760;
+              final compact = constraints.maxWidth < 820;
 
               final textContent = Column(
-                crossAxisAlignment: isNarrow
+                crossAxisAlignment: compact
                     ? CrossAxisAlignment.center
                     : CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(
-                        color: const Color(0xFFCFE9D6),
-                      ),
-                    ),
-                    child: const Text(
-                      'ระบบที่ออกแบบให้ใช้งานง่ายบนทุกอุปกรณ์',
-                      style: TextStyle(
-                        color: LandingPage._darkGreen,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 22),
                   Text(
-                    'Laoo Solutions',
-                    textAlign: isNarrow ? TextAlign.center : TextAlign.left,
+                    'ระบบที่ช่วยให้ธุรกิจของคุณ',
+                    textAlign: compact ? TextAlign.center : TextAlign.left,
                     style: TextStyle(
-                      fontSize: isNarrow ? 42 : 58,
-                      height: 1.05,
+                      fontSize: compact ? 34 : 46,
                       fontWeight: FontWeight.w900,
-                      color: const Color(0xFF16351F),
+                      color: LaooColors.textPrimary,
                     ),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 8),
                   Text(
-                    'Simple Today. Ready Tomorrow.',
-                    textAlign: isNarrow ? TextAlign.center : TextAlign.left,
+                    'เติบโตได้อย่างมั่นคง',
+                    textAlign: compact ? TextAlign.center : TextAlign.left,
                     style: TextStyle(
-                      fontSize: isNarrow ? 21 : 25,
-                      fontWeight: FontWeight.w600,
-                      color: LandingPage._primaryGreen,
+                      fontSize: compact ? 34 : 46,
+                      fontWeight: FontWeight.w900,
+                      color: LaooColors.green,
                     ),
                   ),
                   const SizedBox(height: 20),
-                  Text(
-                    'แพลตฟอร์มสำหรับรวบรวมโซลูชันของ Laoo '
-                    'เริ่มต้นจากระบบที่ใช้งานได้จริง และขยายต่อได้ในอนาคต',
-                    textAlign: isNarrow ? TextAlign.center : TextAlign.left,
-                    style: const TextStyle(
-                      fontSize: 17,
+                  const Text(
+                    'แพลตฟอร์มรวมโซลูชันสำหรับธุรกิจ '
+                    'ออกแบบให้ใช้งานง่าย รองรับทุกอุปกรณ์ '
+                    'และพร้อมขยายตามการเติบโตขององค์กร',
+                    style: TextStyle(
                       height: 1.7,
-                      color: Color(0xFF5D7062),
+                      fontSize: 16,
+                      color: LaooColors.textSecondary,
                     ),
+                  ),
+                  const SizedBox(height: 28),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: [
+                      FilledButton.icon(
+                        onPressed: () {},
+                        icon: const Icon(Icons.rocket_launch_outlined),
+                        label: const Text('ดูโซลูชันของเรา'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: () {},
+                        icon: const Icon(Icons.chat_bubble_outline),
+                        label: const Text('ติดต่อเรา'),
+                      ),
+                    ],
                   ),
                 ],
               );
 
-              final visual = Container(
-                width: isNarrow ? double.infinity : 440,
-                height: isNarrow ? 290 : 310,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(28),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x14000000),
-                      blurRadius: 30,
-                      offset: Offset(0, 14),
-                    ),
-                  ],
-                ),
-                child: Image.asset(
-                  'assets/images/laoo_logo.png',
-                  fit: BoxFit.contain,
-                  filterQuality: FilterQuality.high,
-                  errorBuilder: (context, error, stackTrace) {
-                    return const Center(
-                      child: Icon(
-                        Icons.image_not_supported_outlined,
-                        size: 64,
-                        color: Color(0xFF6B7F70),
-                      ),
-                    );
-                  },
-                ),
-              );
+              const visual = _ProductPreview();
 
-              if (isNarrow) {
+              if (compact) {
                 return Column(
-                  children: [
-                    textContent,
-                    const SizedBox(height: 42),
-                    visual,
-                  ],
+                  children: [textContent, const SizedBox(height: 48), visual],
                 );
               }
 
               return Row(
                 children: [
                   Expanded(child: textContent),
-                  const SizedBox(width: 56),
-                  visual,
+                  const SizedBox(width: 48),
+                  const Expanded(child: visual),
                 ],
               );
             },
@@ -255,206 +191,84 @@ class _HeroSection extends StatelessWidget {
   }
 }
 
-class _SolutionsSection extends StatelessWidget {
-  const _SolutionsSection();
+class _ProductPreview extends StatelessWidget {
+  const _ProductPreview();
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 24,
-        vertical: 64,
+    return Container(
+      height: 360,
+      decoration: BoxDecoration(
+        color: LaooColors.surfaceSoft,
+        borderRadius: BorderRadius.circular(32),
+        border: Border.all(color: LaooColors.border),
       ),
+      child: const Center(
+        child: Icon(Icons.devices_rounded, size: 140, color: LaooColors.green),
+      ),
+    );
+  }
+}
+
+class _Benefits extends StatelessWidget {
+  const _Benefits();
+
+  @override
+  Widget build(BuildContext context) {
+    const items = [
+      (Icons.edit_note_rounded, 'ใช้งานง่าย', 'ออกแบบมาเพื่อทุกคน'),
+      (Icons.verified_user_outlined, 'ปลอดภัย', 'รองรับการกำหนดสิทธิ์'),
+      (Icons.sync_rounded, 'ยืดหยุ่น', 'ปรับเข้ากับธุรกิจของคุณ'),
+      (Icons.devices_rounded, 'ทุกอุปกรณ์', 'Desktop / Tablet / Mobile'),
+    ];
+
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(28, 0, 28, 60),
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1100),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          constraints: const BoxConstraints(maxWidth: 1180),
+          child: Wrap(
+            spacing: 14,
+            runSpacing: 14,
             children: [
-              const Text(
-                'Laoo Solutions',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
-                  color: LandingPage._primaryGreen,
+              for (final item in items)
+                SizedBox(
+                  width: 270,
+                  child: Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Row(
+                        children: [
+                          Icon(item.$1, color: LaooColors.green),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  item.$2,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                Text(
+                                  item.$3,
+                                  style: const TextStyle(
+                                    color: LaooColors.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'ตัวอย่างระบบของเรา',
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w900,
-                  color: Color(0xFF16351F),
-                ),
-              ),
-              const SizedBox(height: 10),
-              const Text(
-                'เริ่มจาก Project ตัวอย่างก่อน และเพิ่ม Solution อื่นได้ในภายหลัง',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Color(0xFF6B7F70),
-                ),
-              ),
-              const SizedBox(height: 30),
-              const _MeetingSolutionCard(),
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _MeetingSolutionCard extends StatelessWidget {
-  const _MeetingSolutionCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(28),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: const Color(0xFFE1EAE4),
-        ),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x0D000000),
-            blurRadius: 24,
-            offset: Offset(0, 10),
-          ),
-        ],
-      ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final isNarrow = constraints.maxWidth < 680;
-
-          final iconBox = Container(
-            width: 116,
-            height: 116,
-            decoration: BoxDecoration(
-              color: const Color(0xFFE9F9ED),
-              borderRadius: BorderRadius.circular(26),
-            ),
-            child: const Icon(
-              Icons.meeting_room_rounded,
-              size: 58,
-              color: LandingPage._primaryGreen,
-            ),
-          );
-
-          final details = const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Laoo Meeting',
-                style: TextStyle(
-                  fontSize: 27,
-                  fontWeight: FontWeight.w900,
-                  color: Color(0xFF16351F),
-                ),
-              ),
-              SizedBox(height: 10),
-              Text(
-                'ระบบตัวอย่างสำหรับแสดงชื่อห้องประชุม '
-                'ตารางการใช้งาน และข้อมูลการประชุมหน้าห้อง',
-                style: TextStyle(
-                  fontSize: 16,
-                  height: 1.6,
-                  color: Color(0xFF607064),
-                ),
-              ),
-              SizedBox(height: 18),
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: [
-                  _FeatureChip(
-                    icon: Icons.calendar_month_rounded,
-                    label: 'ตารางประชุม',
-                  ),
-                  _FeatureChip(
-                    icon: Icons.tv_rounded,
-                    label: 'หน้าจอหน้าห้อง',
-                  ),
-                  _FeatureChip(
-                    icon: Icons.devices_rounded,
-                    label: 'รองรับหลายอุปกรณ์',
-                  ),
-                ],
-              ),
-            ],
-          );
-
-          if (isNarrow) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                iconBox,
-                const SizedBox(height: 24),
-                details,
-              ],
-            );
-          }
-
-          return Row(
-            children: [
-              iconBox,
-              const SizedBox(width: 28),
-              Expanded(child: details),
-              const SizedBox(width: 24),
-              OutlinedButton(
-                onPressed: null,
-                child: Text('ตัวอย่าง Project'),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _FeatureChip extends StatelessWidget {
-  const _FeatureChip({
-    required this.icon,
-    required this.label,
-  });
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 12,
-        vertical: 8,
-      ),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF3F8F4),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            size: 17,
-            color: LandingPage._primaryGreen,
-          ),
-          const SizedBox(width: 7),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Color(0xFF42604A),
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -467,17 +281,14 @@ class _Footer extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(
-        horizontal: 24,
-        vertical: 24,
-      ),
-      color: const Color(0xFF15351E),
+      color: LaooColors.surfaceSoft,
+      padding: const EdgeInsets.all(24),
       child: const Text(
-        '© Laoo Solutions',
+        '© Laoo Solutions • Simple Today. Ready Tomorrow.',
         textAlign: TextAlign.center,
         style: TextStyle(
-          color: Color(0xFFCFE7D5),
-          fontWeight: FontWeight.w500,
+          color: LaooColors.textSecondary,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );

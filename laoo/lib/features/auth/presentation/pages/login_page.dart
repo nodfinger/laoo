@@ -1,8 +1,10 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
-import '../../../../app/laoo_app.dart';
-import '../../data/services/auth_api_service.dart';
-import '../../data/services/auth_session_service.dart';
+import '../../../../app/router/app_router.dart';
+import '../../../../app/router/route_names.dart';
+import '../../../../app/theme/laoo_design_tokens.dart';
+import '../../../../core/api/api_exception.dart';
+import '../../../../core/auth/app_auth_controller.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -15,78 +17,76 @@ class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _apiService = AuthApiService();
-  final _sessionService = AuthSessionService();
 
   bool _obscurePassword = true;
   bool _isSubmitting = false;
-  String? _errorMessage;
 
   @override
   void dispose() {
     _usernameController.dispose();
     _passwordController.dispose();
-    _apiService.dispose();
     super.dispose();
   }
 
-  void _goToLandingPage() {
-    Navigator.pushNamedAndRemoveUntil(
-      context,
-      LaooApp.landingRoute,
-      (route) => false,
-    );
-  }
-
-  Future<void> _submit() async {
+  Future<void> _submitLogin() async {
     FocusScope.of(context).unfocus();
 
-    if (_isSubmitting || !_formKey.currentState!.validate()) {
+    if (!(_formKey.currentState?.validate() ?? false)) {
       return;
     }
 
     setState(() {
       _isSubmitting = true;
-      _errorMessage = null;
     });
 
     try {
-      final result = await _apiService.login(
-        username: _usernameController.text,
+      final session = await appAuthController.login(
+        username: _usernameController.text.trim(),
         password: _passwordController.text,
+        projectCode: 'LAOO',
       );
-
-      if (!result.success) {
-        throw AuthApiException(result.message);
-      }
-
-      await _sessionService.save(result);
 
       if (!mounted) {
         return;
       }
 
-      Navigator.pushNamedAndRemoveUntil(
+      if (session.userType == 'LAOO_SUPPORT') {
+        appRouter.goNamed(RouteNames.supportHome);
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'เข้าสู่ระบบสำเร็จ แต่ Workspace สำหรับ '
+            '${session.userType ?? 'ผู้ใช้งาน'} อยู่ระหว่างพัฒนา',
+          ),
+        ),
+      );
+    } on ApiException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(
         context,
-        LaooApp.homeRoute,
-        (route) => false,
+      ).showSnackBar(SnackBar(content: Text(_apiErrorMessage(error))));
+    } on StateError catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('ไม่สามารถเข้าสู่ระบบได้: $error')),
       );
-    } on AuthApiException catch (error) {
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _errorMessage = error.message;
-      });
-    } catch (_) {
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _errorMessage = 'เกิดข้อผิดพลาดที่ไม่คาดคิด กรุณาลองใหม่';
-      });
     } finally {
       if (mounted) {
         setState(() {
@@ -96,223 +96,191 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  String _apiErrorMessage(ApiException error) {
+    switch (error.statusCode) {
+      case 400:
+        return error.message;
+      case 401:
+        return 'Username หรือ Password ไม่ถูกต้อง';
+      case 403:
+        return 'ผู้ใช้งานไม่มีสิทธิ์เข้าสู่ Project นี้';
+      case 404:
+        return 'ไม่พบข้อมูลผู้ใช้งานหรือ Project';
+      default:
+        return error.message;
+    }
+  }
+
+  void _forgotPassword() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('ระบบลืมรหัสผ่านจะพัฒนาในขั้นตอนถัดไป')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isCompact = MediaQuery.sizeOf(context).width < 780;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F8F5),
+      backgroundColor: Colors.white,
       body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(24, 32, 24, 48),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 410),
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(30, 28, 30, 28),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(
-                    color: const Color(0xFFDCE7DF),
-                  ),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x12000000),
-                      blurRadius: 28,
-                      offset: Offset(0, 12),
-                    ),
+        child: isCompact
+            ? SingleChildScrollView(
+                child: Column(
+                  children: [
+                    const SizedBox(height: 250, child: _BrandPanel()),
+                    _buildLoginPanel(),
                   ],
                 ),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    children: [
-                      Image.asset(
-                        'assets/images/laoo_logo.png',
-                        width: 290,
-                        height: 190,
+              )
+            : Row(
+                children: [
+                  const Expanded(flex: 4, child: _BrandPanel()),
+                  Expanded(flex: 6, child: _buildLoginPanel()),
+                ],
+              ),
+      ),
+    );
+  }
+
+  Widget _buildLoginPanel() {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 28),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 500),
+          child: Form(
+            key: _formKey,
+            child: AutofillGroup(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SizedBox(
+                    height: 170,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: Image.asset(
+                        'assets/images/laoo_logo_new.png',
                         fit: BoxFit.contain,
                         filterQuality: FilterQuality.high,
                         errorBuilder: (context, error, stackTrace) {
-                          return const SizedBox(
-                            height: 100,
-                            child: Center(
-                              child: Text(
-                                'Laoo Solutions',
-                                style: TextStyle(
-                                  fontSize: 26,
-                                  fontWeight: FontWeight.w900,
-                                  color: Color(0xFF16351F),
-                                ),
+                          return const Center(
+                            child: Text(
+                              'LAOO SOLUTIONS',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: LaooColors.greenDark,
+                                fontSize: 34,
+                                fontWeight: FontWeight.w900,
                               ),
                             ),
                           );
                         },
                       ),
-                      const SizedBox(height: 10),
-                      const Text(
-                        'เข้าสู่ระบบเพื่อเริ่มใช้งาน',
-                        style: TextStyle(
-                          color: Color(0xFF6B7F70),
-                        ),
-                      ),
-                      const SizedBox(height: 26),
-                      TextFormField(
-                        controller: _usernameController,
-                        enabled: !_isSubmitting,
-                        textInputAction: TextInputAction.next,
-                        autofillHints: const [AutofillHints.username],
-                        decoration: const InputDecoration(
-                          labelText: 'Username',
-                          prefixIcon: Icon(Icons.person_outline_rounded),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'กรุณากรอก Username';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _passwordController,
-                        enabled: !_isSubmitting,
-                        obscureText: _obscurePassword,
-                        textInputAction: TextInputAction.done,
-                        autofillHints: const [AutofillHints.password],
-                        onFieldSubmitted: (_) => _submit(),
-                        decoration: InputDecoration(
-                          labelText: 'Password',
-                          prefixIcon: const Icon(Icons.lock_outline_rounded),
-                          suffixIcon: IconButton(
-                            tooltip: _obscurePassword
-                                ? 'แสดงรหัสผ่าน'
-                                : 'ซ่อนรหัสผ่าน',
-                            onPressed: _isSubmitting
-                                ? null
-                                : () {
-                                    setState(() {
-                                      _obscurePassword =
-                                          !_obscurePassword;
-                                    });
-                                  },
-                            icon: Icon(
-                              _obscurePassword
-                                  ? Icons.visibility_off_outlined
-                                  : Icons.visibility_outlined,
-                            ),
-                          ),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'กรุณากรอก Password';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 8),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton(
-                          onPressed: _isSubmitting
-                              ? null
-                              : () {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'ฟังก์ชันลืมรหัสผ่านจะพัฒนาในขั้นถัดไป',
-                                      ),
-                                    ),
-                                  );
-                                },
-                          child: const Text('ลืมรหัสผ่าน'),
-                        ),
-                      ),
-                      if (_errorMessage != null) ...[
-                        Container(
-                          width: double.infinity,
-                          margin: const EdgeInsets.only(bottom: 14),
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFFF1F1),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: const Color(0xFFF2C3C3),
-                            ),
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Icon(
-                                Icons.error_outline_rounded,
-                                color: Color(0xFFB42318),
-                                size: 20,
-                              ),
-                              const SizedBox(width: 9),
-                              Expanded(
-                                child: Text(
-                                  _errorMessage!,
-                                  style: const TextStyle(
-                                    color: Color(0xFF912018),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                      SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: FilledButton(
-                          onPressed: _isSubmitting ? null : _submit,
-                          style: FilledButton.styleFrom(
-                            backgroundColor: const Color(0xFF32C766),
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                          ),
-                          child: _isSubmitting
-                              ? const SizedBox(
-                                  width: 22,
-                                  height: 22,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2.5,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : const Text(
-                                  'เข้าสู่ระบบ',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 48,
-                        child: OutlinedButton.icon(
-                          onPressed:
-                              _isSubmitting ? null : _goToLandingPage,
-                          icon: const Icon(Icons.home_outlined),
-                          label: const Text('กลับไปหน้าแรก'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFF166534),
-                            side: const BorderSide(
-                              color: Color(0xFFBFD9C5),
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 18),
+                  const Text(
+                    'เข้าสู่ระบบ',
+                    style: TextStyle(
+                      fontSize: 30,
+                      fontWeight: FontWeight.w900,
+                      color: LaooColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'กรุณาเข้าสู่ระบบเพื่อดำเนินการต่อ',
+                    style: TextStyle(color: LaooColors.textSecondary),
+                  ),
+                  const SizedBox(height: 30),
+                  const Text(
+                    'ชื่อผู้ใช้ (Username)',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _usernameController,
+                    enabled: !_isSubmitting,
+                    autofillHints: const [AutofillHints.username],
+                    textInputAction: TextInputAction.next,
+                    decoration: const InputDecoration(
+                      hintText: 'กรอกชื่อผู้ใช้',
+                      prefixIcon: Icon(Icons.person_outline),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'กรุณากรอก Username';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 18),
+                  const Text(
+                    'รหัสผ่าน (Password)',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _passwordController,
+                    enabled: !_isSubmitting,
+                    obscureText: _obscurePassword,
+                    autofillHints: const [AutofillHints.password],
+                    textInputAction: TextInputAction.done,
+                    onFieldSubmitted: (_) {
+                      if (!_isSubmitting) {
+                        _submitLogin();
+                      }
+                    },
+                    decoration: InputDecoration(
+                      hintText: 'กรอกรหัสผ่าน',
+                      prefixIcon: const Icon(Icons.lock_outline),
+                      suffixIcon: IconButton(
+                        onPressed: _isSubmitting
+                            ? null
+                            : () {
+                                setState(() {
+                                  _obscurePassword = !_obscurePassword;
+                                });
+                              },
+                        icon: Icon(
+                          _obscurePassword
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
+                        ),
+                      ),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'กรุณากรอก Password';
+                      }
+                      return null;
+                    },
+                  ),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: _isSubmitting ? null : _forgotPassword,
+                      child: const Text('ลืมรหัสผ่าน?'),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  SizedBox(
+                    height: 50,
+                    child: FilledButton(
+                      onPressed: _isSubmitting ? null : _submitLogin,
+                      child: _isSubmitting
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text('เข้าสู่ระบบ'),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -322,3 +290,73 @@ class _LoginPageState extends State<LoginPage> {
   }
 }
 
+class _BrandPanel extends StatelessWidget {
+  const _BrandPanel();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: LaooColors.greenDark,
+      padding: const EdgeInsets.all(44),
+      child: Stack(
+        children: [
+          Positioned(
+            right: -60,
+            bottom: -60,
+            child: Icon(
+              Icons.location_city_rounded,
+              size: 310,
+              color: Colors.white.withValues(alpha: 0.06),
+            ),
+          ),
+          const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'LAOO',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 34,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 2,
+                ),
+              ),
+              Text(
+                'SOLUTIONS',
+                style: TextStyle(
+                  color: Color(0xFF8EE6B5),
+                  letterSpacing: 4,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              Spacer(),
+              Text(
+                'ยินดีต้อนรับ\nกลับเข้าสู่ระบบ',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 32,
+                  height: 1.2,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              SizedBox(height: 14),
+              Text(
+                'เข้าใช้งานแพลตฟอร์มของ Laoo Solutions\n'
+                'ได้อย่างปลอดภัยบนทุกอุปกรณ์',
+                style: TextStyle(color: Color(0xFFCFE7DA), height: 1.6),
+              ),
+              SizedBox(height: 36),
+              Text(
+                'Simple Today. Ready Tomorrow.',
+                style: TextStyle(
+                  color: Color(0xFF8EE6B5),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}

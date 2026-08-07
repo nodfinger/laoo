@@ -11,9 +11,9 @@ class LoginRequest {
 
   Map<String, dynamic> toJson() {
     return {
-      'username': username,
-      'password': password,
-      'projectCode': projectCode,
+      'Username': username,
+      'Password': password,
+      'ProjectCode': projectCode,
     };
   }
 }
@@ -127,12 +127,10 @@ class LoginResult {
       user: userJson is Map<String, dynamic>
           ? LoginUser.fromJson(userJson)
           : userJson is Map
-              ? LoginUser.fromJson(
-                  userJson.map(
-                    (key, value) => MapEntry(key.toString(), value),
-                  ),
-                )
-              : null,
+          ? LoginUser.fromJson(
+              userJson.map((key, value) => MapEntry(key.toString(), value)),
+            )
+          : null,
     );
   }
 }

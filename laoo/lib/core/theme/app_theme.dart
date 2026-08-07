@@ -32,10 +32,7 @@ abstract final class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(
-            color: primaryGreen,
-            width: 1.8,
-          ),
+          borderSide: const BorderSide(color: primaryGreen, width: 1.8),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
@@ -43,10 +40,7 @@ abstract final class AppTheme {
         ),
         focusedErrorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(
-            color: Colors.red,
-            width: 1.8,
-          ),
+          borderSide: const BorderSide(color: Colors.red, width: 1.8),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
@@ -58,10 +52,7 @@ abstract final class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),
-          textStyle: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-          ),
+          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
         ),
       ),
     );
