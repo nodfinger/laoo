@@ -23,18 +23,18 @@ class SupportHomePage extends StatelessWidget {
       body: SafeArea(
         child: Row(
           children: [
-            if (!compact) const SizedBox(width: 188, child: _Sidebar()),
+            if (!compact) const SizedBox(width: 184, child: _Sidebar()),
             Expanded(
               child: Column(
                 children: [
                   if (!compact) const _TopBar(),
                   Expanded(
                     child: SingleChildScrollView(
-                      padding: EdgeInsets.all(24),
+                      padding: const EdgeInsets.all(22),
                       child: Center(
                         child: ConstrainedBox(
-                          constraints: BoxConstraints(maxWidth: 1250),
-                          child: _WorkspaceContent(),
+                          constraints: const BoxConstraints(maxWidth: 1250),
+                          child: const _WorkspaceContent(),
                         ),
                       ),
                     ),
@@ -49,64 +49,142 @@ class SupportHomePage extends StatelessWidget {
   }
 }
 
-class _Sidebar extends StatelessWidget {
+class _Sidebar extends StatefulWidget {
   const _Sidebar();
+
+  @override
+  State<_Sidebar> createState() => _SidebarState();
+}
+
+class _SidebarState extends State<_Sidebar> {
+  final Set<String> _expandedGroups = <String>{'organization'};
+
+  void _toggleGroup(String key) {
+    setState(() {
+      if (_expandedGroups.contains(key)) {
+        _expandedGroups.remove(key);
+      } else {
+        _expandedGroups.add(key);
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Container(
       color: LaooColors.greenDark,
-      padding: const EdgeInsets.fromLTRB(12, 16, 12, 14),
+      padding: const EdgeInsets.fromLTRB(10, 14, 10, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
+          const _BrandBlock(),
+          const SizedBox(height: 10),
+          const _UserBlock(),
+          const SizedBox(height: 10),
+          const _HomeItem(),
+          const SizedBox(height: 3),
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  _MenuGroup(
+                    title: 'จัดการองค์กร',
+                    icon: Icons.business_outlined,
+                    expanded: _expandedGroups.contains('organization'),
+                    onToggle: () => _toggleGroup('organization'),
+                    children: [
+                      _SubMenuItem(
+                        label: 'Partner',
+                        icon: Icons.handshake_outlined,
+                        onTap: () {
+                          appRouter.goNamed(RouteNames.partner);
+                        },
+                      ),
+                      const _SubMenuItem(
+                        label: 'Company',
+                        icon: Icons.apartment_outlined,
+                      ),
+                    ],
+                  ),
+                  _MenuGroup(
+                    title: 'ระบบและผู้ใช้งาน',
+                    icon: Icons.apps_outlined,
+                    expanded: _expandedGroups.contains('system'),
+                    onToggle: () => _toggleGroup('system'),
+                    children: const [
+                      _SubMenuItem(
+                        label: 'Project',
+                        icon: Icons.account_tree_outlined,
+                      ),
+                      _SubMenuItem(label: 'User', icon: Icons.person_outline),
+                      _SubMenuItem(
+                        label: 'Permission',
+                        icon: Icons.admin_panel_settings_outlined,
+                      ),
+                    ],
+                  ),
+                  _MenuGroup(
+                    title: 'ตรวจสอบระบบ',
+                    icon: Icons.fact_check_outlined,
+                    expanded: _expandedGroups.contains('audit'),
+                    onToggle: () => _toggleGroup('audit'),
+                    children: const [
+                      _SubMenuItem(
+                        label: 'Audit Log',
+                        icon: Icons.receipt_long_outlined,
+                      ),
+                    ],
+                  ),
+                  _MenuGroup(
+                    title: 'ตั้งค่าระบบ',
+                    icon: Icons.settings_outlined,
+                    expanded: _expandedGroups.contains('settings'),
+                    onToggle: () => _toggleGroup('settings'),
+                    children: const [
+                      _SubMenuItem(label: 'Setting', icon: Icons.tune_rounded),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BrandBlock extends StatelessWidget {
+  const _BrandBlock();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.symmetric(horizontal: 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
             'LAOO',
             style: TextStyle(
               color: Colors.white,
-              fontSize: 22,
+              fontSize: 20,
+              height: 1,
               fontWeight: FontWeight.w900,
-              letterSpacing: 2,
+              letterSpacing: 1.8,
             ),
           ),
-          const Text(
+          SizedBox(height: 2),
+          Text(
             'SOLUTIONS',
             style: TextStyle(
               color: Color(0xFF8EE6B5),
-              letterSpacing: 2.4,
-              fontSize: 9.5,
-              fontWeight: FontWeight.w800,
+              fontSize: 8.8,
+              height: 1,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 2.1,
             ),
           ),
-          const SizedBox(height: 14),
-          const _UserBlock(),
-          const SizedBox(height: 12),
-          const _SideItem(
-            icon: Icons.home_outlined,
-            label: 'หน้าหลัก',
-            selected: true,
-          ),
-          const _SideItem(icon: Icons.star_outline_rounded, label: 'Favorite'),
-          _SideItem(
-            icon: Icons.handshake_outlined,
-            label: 'Partner',
-            onTap: () {
-              appRouter.goNamed(RouteNames.partner);
-            },
-          ),
-          const _SideItem(icon: Icons.apartment_outlined, label: 'Company'),
-          const _SideItem(icon: Icons.account_tree_outlined, label: 'Project'),
-          const _SideItem(icon: Icons.person_outline, label: 'User'),
-          const _SideItem(
-            icon: Icons.admin_panel_settings_outlined,
-            label: 'Permission',
-          ),
-          const _SideItem(
-            icon: Icons.receipt_long_outlined,
-            label: 'Audit Log',
-          ),
-          const Spacer(),
-          const _SideItem(icon: Icons.settings_outlined, label: 'ตั้งค่า'),
         ],
       ),
     );
@@ -118,80 +196,190 @@ class _UserBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Row(
-      children: [
-        CircleAvatar(
-          radius: 16,
-          backgroundColor: LaooColors.greenLight,
-          child: Icon(Icons.support_agent_rounded, color: LaooColors.greenDark),
-        ),
-        SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Admin Support',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              Text(
-                'Laoo Support',
-                style: TextStyle(color: Color(0xFFA8CBBB), fontSize: 10.5),
-              ),
-            ],
+    return const Padding(
+      padding: EdgeInsets.symmetric(horizontal: 4),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 14,
+            backgroundColor: LaooColors.greenLight,
+            child: Icon(
+              Icons.support_agent_rounded,
+              size: 16,
+              color: LaooColors.greenDark,
+            ),
           ),
-        ),
-      ],
+          SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Admin Support',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 11.5,
+                    height: 1.05,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Laoo Support',
+                  style: TextStyle(
+                    color: Color(0xFFA8CBBB),
+                    fontSize: 9.5,
+                    height: 1,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
-class _SideItem extends StatelessWidget {
-  const _SideItem({
+class _HomeItem extends StatelessWidget {
+  const _HomeItem();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 29,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(7),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: const Row(
+        children: [
+          Icon(Icons.home_outlined, size: 15, color: LaooColors.greenDark),
+          SizedBox(width: 7),
+          Text(
+            'หน้าหลัก',
+            style: TextStyle(
+              color: LaooColors.greenDark,
+              fontSize: 11.8,
+              height: 1,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MenuGroup extends StatelessWidget {
+  const _MenuGroup({
+    required this.title,
     required this.icon,
-    required this.label,
-    this.selected = false,
-    this.onTap,
+    required this.expanded,
+    required this.onToggle,
+    required this.children,
   });
 
+  final String title;
   final IconData icon;
-  final String label;
-  final bool selected;
-  final VoidCallback? onTap;
+  final bool expanded;
+  final VoidCallback onToggle;
+  final List<Widget> children;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 2),
-      child: Material(
-        color: selected ? Colors.white : Colors.transparent,
-        borderRadius: BorderRadius.circular(10),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(8),
+      child: Column(
+        children: [
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onToggle,
+              borderRadius: BorderRadius.circular(7),
+              child: SizedBox(
+                height: 30,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 7),
+                  child: Row(
+                    children: [
+                      Icon(icon, size: 15, color: const Color(0xFFE3EFE9)),
+                      const SizedBox(width: 7),
+                      Expanded(
+                        child: Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11.8,
+                            height: 1,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      Icon(
+                        expanded
+                            ? Icons.keyboard_arrow_down_rounded
+                            : Icons.keyboard_arrow_right_rounded,
+                        size: 16,
+                        color: const Color(0xFFBBD4C8),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 150),
+            curve: Curves.easeOut,
+            child: expanded
+                ? Column(children: children)
+                : const SizedBox.shrink(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SubMenuItem extends StatelessWidget {
+  const _SubMenuItem({required this.label, required this.icon, this.onTap});
+
+  final String label;
+  final IconData icon;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(6),
+        child: SizedBox(
+          height: 25,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+            padding: const EdgeInsets.only(left: 24, right: 6),
             child: Row(
               children: [
-                Icon(
-                  icon,
-                  size: 17,
-                  color: selected
-                      ? LaooColors.greenDark
-                      : const Color(0xFFD2E5DC),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: selected ? LaooColors.greenDark : Colors.white,
-                    fontSize: 12.5,
-                    height: 1.05,
-                    fontWeight: FontWeight.w600,
+                Icon(icon, size: 13, color: const Color(0xFFAED0C0)),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFFDCEAE3),
+                      fontSize: 10.8,
+                      height: 1,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
               ],
@@ -209,8 +397,8 @@ class _TopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 72,
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      height: 66,
+      padding: const EdgeInsets.symmetric(horizontal: 22),
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(bottom: BorderSide(color: LaooColors.border)),
@@ -219,11 +407,11 @@ class _TopBar extends StatelessWidget {
         children: [
           const Text(
             'หน้าหลัก',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
           ),
           const Spacer(),
           SizedBox(
-            width: 320,
+            width: 300,
             child: TextField(
               decoration: const InputDecoration(
                 hintText: 'ค้นหาเมนู, ข้อมูล...',
@@ -232,10 +420,10 @@ class _TopBar extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 10),
           IconButton(
             onPressed: () {},
-            icon: const Icon(Icons.notifications_none_rounded),
+            icon: const Icon(Icons.notifications_none_rounded, size: 21),
           ),
         ],
       ),
@@ -253,12 +441,12 @@ class _WorkspaceContent extends StatelessWidget {
       children: [
         const Text(
           'Favorite Menu',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 8),
         Wrap(
-          spacing: 8,
-          runSpacing: 8,
+          spacing: 7,
+          runSpacing: 7,
           children: [
             _Favorite(
               icon: Icons.handshake_outlined,
@@ -275,12 +463,12 @@ class _WorkspaceContent extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 22),
         const Text(
           'Main Menu',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         LayoutBuilder(
           builder: (context, constraints) {
             final width = constraints.maxWidth;
@@ -289,7 +477,7 @@ class _WorkspaceContent extends StatelessWidget {
                 : width >= 720
                 ? 3
                 : 2;
-            const gap = 14.0;
+            const gap = 12.0;
             final itemWidth = (width - (gap * (columns - 1))) / columns;
 
             final cards = <Widget>[
@@ -339,7 +527,7 @@ class _WorkspaceContent extends StatelessWidget {
               runSpacing: gap,
               children: [
                 for (final card in cards)
-                  SizedBox(width: itemWidth, height: 180, child: card),
+                  SizedBox(width: itemWidth, height: 170, child: card),
               ],
             );
           },
@@ -359,27 +547,27 @@ class _Favorite extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 94,
-      height: 72,
+      width: 82,
+      height: 64,
       child: Card(
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(10),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(
-                  width: 30,
-                  height: 30,
+                  width: 26,
+                  height: 26,
                   decoration: BoxDecoration(
                     color: LaooColors.greenLight,
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(7),
                   ),
-                  child: Icon(icon, size: 17, color: LaooColors.green),
+                  child: Icon(icon, size: 15, color: LaooColors.green),
                 ),
-                const SizedBox(height: 5),
+                const SizedBox(height: 4),
                 Flexible(
                   child: Text(
                     label,
@@ -387,7 +575,7 @@ class _Favorite extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.center,
                     style: const TextStyle(
-                      fontSize: 11.5,
+                      fontSize: 10.2,
                       height: 1,
                       fontWeight: FontWeight.w700,
                     ),
@@ -424,39 +612,39 @@ class _MetricCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(LaooRadius.lg),
         child: Padding(
-          padding: const EdgeInsets.all(18),
+          padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                width: 44,
-                height: 44,
+                width: 40,
+                height: 40,
                 decoration: BoxDecoration(
                   color: LaooColors.greenLight,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(icon, color: LaooColors.green),
+                child: Icon(icon, size: 21, color: LaooColors.green),
               ),
               const Spacer(),
               Text(
                 title,
                 style: const TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w900,
+                  fontSize: 15.5,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
               Text(
                 subtitle,
                 style: const TextStyle(
                   color: LaooColors.textSecondary,
-                  fontSize: 12,
+                  fontSize: 11,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Text(
                 value,
                 style: const TextStyle(
-                  fontSize: 23,
+                  fontSize: 21,
                   fontWeight: FontWeight.w900,
                 ),
               ),
