@@ -6,6 +6,8 @@ import '../../../../app/router/route_names.dart';
 import '../../../../app/theme/laoo_design_tokens.dart';
 import '../../../../core/api/api_exception.dart';
 import '../../../../core/auth/app_auth_controller.dart';
+import '../../../../core/company_setup/company_setup_controller.dart';
+import '../../../../core/platform/window_title_service.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -47,6 +49,14 @@ class _LoginPageState extends State<LoginPage> {
         password: _passwordController.text,
         projectCode: 'LAOO',
       );
+
+      // Company Setup is the runtime configuration source after login.
+      await companySetupController.load();
+
+      // On Windows, MaterialApp.title does not update the native title bar
+      // caption by itself. Update the native window caption after Company
+      // Setup is loaded.
+      WindowTitleService.setTitle(companySetupController.appTitle);
 
       TextInput.finishAutofillContext(shouldSave: _rememberLogin);
 

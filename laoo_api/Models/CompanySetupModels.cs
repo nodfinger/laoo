@@ -1,0 +1,52 @@
+namespace LaooApi.Models;
+
+public sealed record CompanySetupResponse(
+    long? PKValue,
+    string OwnerType,
+    long? PartnerID,
+    long? CompanyID,
+    string OwnerCode,
+    string OwnerName,
+    string Name,
+    string TitleHeader,
+    int RowSTD,
+    int RowCardSTD,
+    int TimeAlert,
+    string? YearFormat,
+    string? VersionID,
+    string? EmailHost,
+    int? EmailPort,
+    string? EmailCenter,
+    string? EmailAdmin,
+    bool IsActive,
+    DateTime? CreateDate,
+    long? CreateBy,
+    DateTime? UpdateDate,
+    long? UpdateBy,
+    bool HasSuperUser,
+    bool HasPasswordCry,
+    bool HasEmailPasswordCenter,
+    bool HasPasswordEmpDefault,
+    bool HasPasswordDirect);
+
+public sealed class CompanySetupUpdateRequest
+{
+    public string Name { get; init; } = string.Empty;
+    public string TitleHeader { get; init; } = string.Empty;
+    public int RowSTD { get; init; }
+    public int RowCardSTD { get; init; }
+    public int TimeAlert { get; init; }
+    public string? YearFormat { get; init; }
+    public string? VersionID { get; init; }
+    public string? EmailHost { get; init; }
+    public int? EmailPort { get; init; }
+    public string? EmailCenter { get; init; }
+    public string? EmailAdmin { get; init; }
+
+    // Write-only: blank means keep existing.
+    public string? SuperUserName { get; init; }
+    public string? PasswordCry { get; init; }
+    public string? EmailPasswordCenter { get; init; }
+    public string? PasswordEmpDefault { get; init; }
+    public string? PasswordDirect { get; init; }
+}

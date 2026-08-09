@@ -10,4 +10,6 @@ abstract class PartnerRepository {
   Future<void> updatePartner(int partnerId, PartnerUpsertInput input);
 
   Future<void> changeStatus(int partnerId, bool isActive);
+
+  Future<void> deletePartner(int partnerId);
 }

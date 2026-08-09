@@ -193,25 +193,15 @@ Workspace
 C:\laoo
 ```
 
-Project
-
-```
-C:\laoo\projects
-```
-
-Flutter Project
-
-```
-C:\laoo\projects\laoo\app
-```
-
-VS Code Workspace สำหรับ Product Laoo
+Project หลักอยู่ที่ Root โดยตรง
 
 ```text
-C:\laoo\projects\laoo\laoo.code-workspace
+C:\laoo\laoo
+C:\laoo\laoo_meeting
+C:\laoo\laoo_api
 ```
 
-ให้เปิดไฟล์ `.code-workspace` นี้เมื่อเริ่มงาน เพื่อให้เห็น Source Code ของ Product และเอกสารมาตรฐานกลางใน Workspace เดียวกัน
+ห้ามสร้างหรือย้าย Project กลับไปไว้ใต้ `C:\laoo\projects`
 
 ---
 
@@ -251,13 +241,7 @@ flutter run
 
 # AI Development
 
-AI ทุกตัวในทีมต้องอ่านเอกสารต่อไปนี้ก่อนเริ่มงาน
-
-1. VISION.md
-2. AGENTS.md
-3. DEVELOPMENT_ENVIRONMENT_STANDARD.md
-4. GIT_STANDARD.md
-5. เอกสารมาตรฐานที่เกี่ยวข้องกับ Feature
+สมาชิกทีมและ AI ต้องเริ่มจาก `DOCUMENTATION_GUIDE.md` แล้วอ่านเอกสารบังคับของงานนั้น
 
 ---
 

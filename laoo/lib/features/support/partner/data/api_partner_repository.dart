@@ -56,4 +56,9 @@ class ApiPartnerRepository implements PartnerRepository {
       body: {'isActive': isActive},
     );
   }
+  @override
+  Future<void> deletePartner(int partnerId) async {
+    await _apiClient.delete('/api/support/partners/$partnerId');
+  }
+
 }

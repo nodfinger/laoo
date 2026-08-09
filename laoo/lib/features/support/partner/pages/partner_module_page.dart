@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../presentation/widgets/support_workspace_shell.dart';
 import '../data/api_partner_repository.dart';
 import '../data/core_partner_api_client.dart';
 import '../models/partner.dart';
@@ -19,50 +20,66 @@ class _PartnerModulePageState extends State<PartnerModulePage> {
   @override
   void initState() {
     super.initState();
-
     _repository = ApiPartnerRepository(CorePartnerApiClient());
   }
 
   @override
   Widget build(BuildContext context) {
-    return PartnerListPage(
-      loadPartners: ({String? search, bool? isActive}) {
-        return _repository.getPartners(search: search, isActive: isActive);
-      },
-      openCreate: _openCreate,
-      openEdit: _openEdit,
-      changeStatus: (partner, isActive) {
-        return _repository.changeStatus(partner.partnerId, isActive);
-      },
+    return SupportWorkspaceShell(
+      pageTitle: 'Partner',
+      activeMenu: 'partner',
+      child: PartnerListPage(
+        loadPartners: ({String? search, bool? isActive}) {
+          return _repository.getPartners(search: search, isActive: isActive);
+        },
+        openCreate: _openCreate,
+        openEdit: _openEdit,
+        changeStatus: (partner, isActive) {
+          return _repository.changeStatus(partner.partnerId, isActive);
+        },
+        deletePartner: (partner) {
+          return _repository.deletePartner(partner.partnerId);
+        },
+      ),
     );
   }
 
   Future<void> _openCreate() async {
-    await Navigator.of(context).push<bool>(
+    await Navigator.of(context).push<void>(
       MaterialPageRoute(
-        builder: (context) => PartnerFormPage(
-          onSave: (input) async {
-            await _repository.createPartner(input);
-          },
+        builder: (context) => SupportWorkspaceShell(
+          pageTitle: 'Partner > เพิ่ม',
+          activeMenu: 'partner',
+          child: PartnerFormPage(
+            onSave: (input) async {
+              await _repository.createPartner(input);
+            },
+          ),
         ),
       ),
     );
   }
 
-  Future<void> _openEdit(Partner partner) async {
+  Future<bool> _openEdit(Partner partner) async {
     final fresh = await _repository.getPartner(partner.partnerId);
 
-    if (!mounted) return;
+    if (!mounted) return false;
 
-    await Navigator.of(context).push<bool>(
+    final updated = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
-        builder: (context) => PartnerFormPage(
-          partner: fresh,
-          onSave: (input) async {
-            await _repository.updatePartner(fresh.partnerId, input);
-          },
+        builder: (context) => SupportWorkspaceShell(
+          pageTitle: 'Partner > แก้ไข',
+          activeMenu: 'partner',
+          child: PartnerFormPage(
+            partner: fresh,
+            onSave: (input) async {
+              await _repository.updatePartner(fresh.partnerId, input);
+            },
+          ),
         ),
       ),
     );
+
+    return updated == true;
   }
 }

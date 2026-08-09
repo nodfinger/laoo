@@ -21,5 +21,13 @@ class ApiClient {
     return _http.put(path, body: body, authenticated: authenticated);
   }
 
+  Future<dynamic> delete(
+    String path, {
+    Object? body,
+    bool authenticated = true,
+  }) {
+    return _http.delete(path, body: body, authenticated: authenticated);
+  }
+
   void dispose() => _http.dispose();
 }

@@ -65,6 +65,24 @@ class HttpService {
     return _decode(response);
   }
 
+  Future<dynamic> delete(
+    String path, {
+    Object? body,
+    bool authenticated = true,
+  }) async {
+    final uri = _buildUri(path);
+
+    final response = await _client
+        .delete(
+          uri,
+          headers: await _headers(authenticated: authenticated),
+          body: body == null ? null : jsonEncode(body),
+        )
+        .timeout(ApiConfig.requestTimeout);
+
+    return _decode(response);
+  }
+
   Uri _buildUri(String path, [Map<String, String>? query]) {
     final base = Uri.parse(ApiConfig.baseUrl);
     final uri = base.resolve(path);

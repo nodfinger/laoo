@@ -1,0 +1,7 @@
+C:\laoo\laoo_api
+
+
+run
+cd C:\laoo\laoo_api
+powershell -ExecutionPolicy Bypass -File .\setup_laoo_api.ps1
+dotnet run

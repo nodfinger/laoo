@@ -1,14 +1,6 @@
-# Build
 bin/
 obj/
 .vs/
-
-# User
+local.json
 *.user
 *.suo
-
-# Local secrets
-appsettings.Local.json
-
-# Logs
-*.log

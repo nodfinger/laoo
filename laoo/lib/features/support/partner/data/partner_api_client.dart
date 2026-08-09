@@ -4,4 +4,6 @@ abstract class PartnerApiClient {
   Future<dynamic> post(String path, {Object? body});
 
   Future<dynamic> put(String path, {Object? body});
+
+  Future<dynamic> delete(String path, {Object? body});
 }

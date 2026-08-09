@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../../../app/theme/laoo_design_tokens.dart';
+import '../../presentation/widgets/support_workspace_shell.dart';
+import '../../../../core/company_setup/company_setup_controller.dart';
 import '../models/partner.dart';
-
-enum PartnerViewMode { table, card }
 
 class PartnerListPage extends StatefulWidget {
   const PartnerListPage({
@@ -12,14 +12,15 @@ class PartnerListPage extends StatefulWidget {
     required this.openCreate,
     required this.openEdit,
     required this.changeStatus,
+    required this.deletePartner,
   });
 
   final Future<List<Partner>> Function({String? search, bool? isActive})
   loadPartners;
-
   final Future<void> Function() openCreate;
-  final Future<void> Function(Partner partner) openEdit;
+  final Future<bool> Function(Partner partner) openEdit;
   final Future<void> Function(Partner partner, bool isActive) changeStatus;
+  final Future<void> Function(Partner partner) deletePartner;
 
   @override
   State<PartnerListPage> createState() => _PartnerListPageState();
@@ -28,11 +29,30 @@ class PartnerListPage extends StatefulWidget {
 class _PartnerListPageState extends State<PartnerListPage> {
   final _searchController = TextEditingController();
 
-  bool? _activeFilter = true;
+  bool? _activeFilter;
   bool _loading = true;
   Object? _error;
   List<Partner> _partners = const [];
-  PartnerViewMode _viewMode = PartnerViewMode.table;
+  int? _sortColumnIndex = 1;
+  bool _sortAscending = true;
+  String? _message;
+  bool _messageIsError = false;
+  int _currentPage = 0;
+
+  int get _pageSize {
+    final value = companySetupController.pageSize;
+    return value > 0 ? value : 30;
+  }
+
+  int get _pageCount =>
+      _partners.isEmpty ? 1 : (_partners.length / _pageSize).ceil();
+
+  List<Partner> get _visiblePartners {
+    final safePage = _currentPage.clamp(0, _pageCount - 1);
+    final start = safePage * _pageSize;
+    final end = (start + _pageSize).clamp(0, _partners.length);
+    return _partners.sublist(start, end);
+  }
 
   @override
   void initState() {
@@ -54,75 +74,124 @@ class _PartnerListPageState extends State<PartnerListPage> {
 
     try {
       final partners = await widget.loadPartners(
-        search: _searchController.text,
+        search: _searchController.text.trim(),
         isActive: _activeFilter,
       );
 
-      if (!mounted) {
-        return;
-      }
-
+      if (!mounted) return;
       setState(() {
         _partners = partners;
+        _currentPage = 0;
       });
+      _applyCurrentSort();
     } catch (error) {
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _error = error;
-      });
+      if (!mounted) return;
+      setState(() => _error = error);
     } finally {
-      if (mounted) {
-        setState(() {
-          _loading = false;
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  void _showMessage(String message, {bool error = false}) {
+    setState(() {
+      _message = message;
+      _messageIsError = error;
+    });
+  }
+
+  void _clearFilters() {
+    _searchController.clear();
+    setState(() => _activeFilter = null);
+    _load();
+  }
+
+  void _sortBy(
+    int columnIndex,
+    Comparable Function(Partner partner) selector,
+    bool ascending,
+  ) {
+    setState(() {
+      _sortColumnIndex = columnIndex;
+      _sortAscending = ascending;
+      _partners = [..._partners]
+        ..sort((a, b) {
+          final av = selector(a);
+          final bv = selector(b);
+          final result = av.compareTo(bv);
+          return ascending ? result : -result;
         });
-      }
+    });
+  }
+
+  void _applyCurrentSort() {
+    final index = _sortColumnIndex;
+    if (index == null) return;
+
+    if (index == 1) {
+      _sortBy(1, (p) => p.partnerCode.toLowerCase(), _sortAscending);
+    } else if (index == 2) {
+      _sortBy(2, (p) => p.partnerNameTh.toLowerCase(), _sortAscending);
+    } else if (index == 3) {
+      _sortBy(3, (p) => (p.contactName1 ?? '').toLowerCase(), _sortAscending);
+    } else if (index == 4) {
+      _sortBy(4, (p) => (p.contactPhone1 ?? '').toLowerCase(), _sortAscending);
+    } else if (index == 5) {
+      _sortBy(5, (p) => p.isActive ? 1 : 0, _sortAscending);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
+    final accent = Theme.of(context).colorScheme.primary;
+
+    return ColoredBox(
+      color: Theme.of(context).scaffoldBackgroundColor,
+      child: Padding(
+        padding: const EdgeInsets.all(24),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _PageHeader(
-              onCreate: () async {
-                await widget.openCreate();
-                await _load();
-              },
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 18, 24, 24),
-                child: Column(
-                  children: [
-                    _Toolbar(
-                      searchController: _searchController,
-                      activeFilter: _activeFilter,
-                      viewMode: _viewMode,
-                      onSearch: _load,
-                      onActiveChanged: (value) {
-                        setState(() {
-                          _activeFilter = value;
-                        });
-                        _load();
-                      },
-                      onViewModeChanged: (mode) {
-                        setState(() {
-                          _viewMode = mode;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    Expanded(child: _buildBody(context)),
-                  ],
+            Row(
+              children: [
+                const Expanded(
+                  child: WorkspacePageTitle(
+                    title: 'Partner',
+                    favoriteKey: 'Partner',
+                  ),
                 ),
-              ),
+                FilledButton.icon(
+                  onPressed: () async {
+                    await widget.openCreate();
+                    await _load();
+                  },
+                  icon: const Icon(Icons.add_rounded),
+                  label: const Text('เพิ่ม'),
+                ),
+              ],
             ),
+            const SizedBox(height: 16),
+            if (_message != null) ...[
+              _TopMessage(
+                message: _message!,
+                error: _messageIsError,
+                onClose: () => setState(() => _message = null),
+              ),
+              const SizedBox(height: 12),
+            ],
+            _Toolbar(
+              searchController: _searchController,
+              activeFilter: _activeFilter,
+              accent: accent,
+              onSearch: _load,
+              onActiveChanged: (value) {
+                setState(() => _activeFilter = value);
+                _load();
+              },
+              onClear: _clearFilters,
+              onRefresh: _load,
+            ),
+            const SizedBox(height: 14),
+            Expanded(child: _buildBody(context)),
           ],
         ),
       ),
@@ -135,236 +204,603 @@ class _PartnerListPageState extends State<PartnerListPage> {
     }
 
     if (_error != null) {
-      return Center(
-        child: FilledButton.icon(
-          onPressed: _load,
-          icon: const Icon(Icons.refresh_rounded),
-          label: const Text('โหลดใหม่'),
-        ),
+      return _StateCard(
+        icon: Icons.error_outline,
+        title: 'ไม่สามารถโหลดข้อมูล Partner ได้',
+        actionLabel: 'ลองใหม่',
+        onAction: _load,
       );
     }
 
     if (_partners.isEmpty) {
-      return const Center(
-        child: Text(
-          'ยังไม่มีข้อมูล Partner',
-          style: TextStyle(color: LaooColors.textSecondary),
-        ),
+      return _StateCard(
+        icon: Icons.search_off_rounded,
+        title: _searchController.text.trim().isEmpty && _activeFilter == null
+            ? 'ยังไม่มีข้อมูล Partner'
+            : 'ไม่พบข้อมูลตามเงื่อนไขที่ค้นหา',
       );
     }
 
-    if (_viewMode == PartnerViewMode.card ||
-        MediaQuery.sizeOf(context).width < 800) {
-      return _cardView();
+    if (MediaQuery.sizeOf(context).width < 760) {
+      return Column(
+        children: [
+          Expanded(child: _mobileList()),
+          const SizedBox(height: 10),
+          _paginationBar(),
+        ],
+      );
     }
 
-    return _tableView();
-  }
-
-  Widget _tableView() {
-    return Card(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(8),
-        child: SizedBox(
-          width: double.infinity,
-          child: DataTable(
-            headingRowColor: WidgetStateProperty.all(LaooColors.surfaceSoft),
-            columns: const [
-              DataColumn(label: Text('รหัส Partner')),
-              DataColumn(label: Text('ชื่อ Partner')),
-              DataColumn(label: Text('ผู้ติดต่อ')),
-              DataColumn(label: Text('เบอร์โทรศัพท์')),
-              DataColumn(label: Text('สถานะ')),
-              DataColumn(label: Text('จัดการ')),
-            ],
-            rows: _partners.map((partner) {
-              return DataRow(
-                cells: [
-                  DataCell(Text(partner.partnerCode)),
-                  DataCell(Text(partner.partnerNameTh)),
-                  DataCell(Text(partner.contactName1 ?? '-')),
-                  DataCell(Text(partner.contactPhone1 ?? '-')),
-                  DataCell(_StatusChip(active: partner.isActive)),
-                  DataCell(
-                    Row(
-                      children: [
-                        IconButton(
-                          tooltip: 'แก้ไข',
-                          onPressed: () async {
-                            await widget.openEdit(partner);
-                            await _load();
-                          },
-                          icon: const Icon(Icons.edit_outlined, size: 20),
-                        ),
-                        PopupMenuButton<String>(
-                          onSelected: (value) async {
-                            if (value == 'status') {
-                              await widget.changeStatus(
-                                partner,
-                                !partner.isActive,
-                              );
-                              await _load();
-                            }
-                          },
-                          itemBuilder: (context) {
-                            return [
-                              PopupMenuItem(
-                                value: 'status',
-                                child: Text(
-                                  partner.isActive
-                                      ? 'ระงับการใช้งาน'
-                                      : 'เปิดใช้งาน',
-                                ),
-                              ),
-                            ];
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              );
-            }).toList(),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: SizedBox(width: double.infinity, child: _tableView()),
           ),
         ),
-      ),
+        const SizedBox(height: 10),
+        Align(alignment: Alignment.centerLeft, child: _paginationBar()),
+      ],
     );
   }
 
-  Widget _cardView() {
+  Widget _tableView() {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final width = constraints.maxWidth;
-        final columns = width >= 1100
-            ? 3
-            : width >= 700
-            ? 2
-            : 1;
+        const minTableWidth = 820.0;
+        const horizontalMargin = 6.0;
+        const columnSpacing = 6.0;
 
-        const gap = 14.0;
+        final availableWidth = constraints.maxWidth;
+        final tableWidth = availableWidth < minTableWidth
+            ? minTableWidth
+            : availableWidth;
 
-        final itemWidth = (width - gap * (columns - 1)) / columns;
+        // Fixed columns are intentionally compact so the last Status column
+        // always stays inside the visible table area.
+        const actionWidth = 70.0;
+        const codeWidth = 112.0;
+        const statusWidth = 82.0;
 
-        return SingleChildScrollView(
-          child: Wrap(
-            spacing: gap,
-            runSpacing: gap,
-            children: [
-              for (final partner in _partners)
-                SizedBox(
-                  width: itemWidth,
-                  child: Card(
-                    child: InkWell(
-                      onTap: () async {
-                        await widget.openEdit(partner);
-                        await _load();
-                      },
-                      borderRadius: BorderRadius.circular(LaooRadius.lg),
-                      child: Padding(
-                        padding: const EdgeInsets.all(18),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                const CircleAvatar(
-                                  backgroundColor: LaooColors.greenLight,
-                                  child: Icon(
-                                    Icons.business_outlined,
-                                    color: LaooColors.green,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        partner.partnerCode,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w900,
-                                        ),
-                                      ),
-                                      Text(
-                                        partner.partnerNameTh,
-                                        style: const TextStyle(
-                                          color: LaooColors.textSecondary,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                _StatusChip(active: partner.isActive),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            _Info(
-                              icon: Icons.person_outline,
-                              text: partner.contactName1 ?? '-',
-                            ),
-                            const SizedBox(height: 7),
-                            _Info(
-                              icon: Icons.phone_outlined,
-                              text: partner.contactPhone1 ?? '-',
-                            ),
-                            const SizedBox(height: 7),
-                            _Info(
-                              icon: Icons.location_on_outlined,
-                              text: partner.province ?? '-',
-                            ),
-                          ],
+        // DataTable also consumes width for margins, inter-column spacing,
+        // sortable-column arrow/padding and small internal layout overhead.
+        const sortAndInternalReserve = 86.0;
+        final tableOverhead =
+            (horizontalMargin * 2) +
+            (columnSpacing * 5) +
+            sortAndInternalReserve;
+
+        final flexibleWidth =
+            (tableWidth - actionWidth - codeWidth - statusWidth - tableOverhead)
+                .clamp(360.0, double.infinity);
+
+        final nameWidth = flexibleWidth * 0.45;
+        final contactWidth = flexibleWidth * 0.31;
+        final phoneWidth = flexibleWidth * 0.24;
+
+        Widget cellText(String text, double width) {
+          return SizedBox(
+            width: width,
+            child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis),
+          );
+        }
+
+        Widget headerText(String text, double width) {
+          return SizedBox(
+            width: width,
+            child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis),
+          );
+        }
+
+        return Align(
+          alignment: Alignment.topLeft,
+          child: Card(
+            margin: EdgeInsets.zero,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(LaooRadius.md),
+              side: const BorderSide(color: LaooColors.border),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: SizedBox(
+                width: tableWidth,
+                child: SingleChildScrollView(
+                  child: DataTable(
+                    horizontalMargin: horizontalMargin,
+                    columnSpacing: columnSpacing,
+                    sortColumnIndex: _sortColumnIndex,
+                    sortAscending: _sortAscending,
+                    headingRowColor: WidgetStateProperty.all(
+                      Theme.of(
+                        context,
+                      ).colorScheme.primary.withValues(alpha: 0.12),
+                    ),
+                    headingTextStyle: TextStyle(
+                      color: Theme.of(context).colorScheme.primary,
+                      fontWeight: FontWeight.normal,
+                    ),
+                    dataRowMinHeight: 52,
+                    dataRowMaxHeight: 60,
+                    columns: [
+                      const DataColumn(
+                        label: SizedBox(
+                          width: actionWidth,
+                          child: Center(child: Text('Action')),
                         ),
                       ),
-                    ),
+                      DataColumn(
+                        label: headerText('รหัส Partner', codeWidth),
+                        onSort: (index, ascending) => _sortBy(
+                          index,
+                          (p) => p.partnerCode.toLowerCase(),
+                          ascending,
+                        ),
+                      ),
+                      DataColumn(
+                        label: headerText('ชื่อ Partner', nameWidth),
+                        onSort: (index, ascending) => _sortBy(
+                          index,
+                          (p) => p.partnerNameTh.toLowerCase(),
+                          ascending,
+                        ),
+                      ),
+                      DataColumn(
+                        label: headerText('ผู้ติดต่อ', contactWidth),
+                        onSort: (index, ascending) => _sortBy(
+                          index,
+                          (p) => (p.contactName1 ?? '').toLowerCase(),
+                          ascending,
+                        ),
+                      ),
+                      DataColumn(
+                        label: headerText('เบอร์โทรศัพท์', phoneWidth),
+                        onSort: (index, ascending) => _sortBy(
+                          index,
+                          (p) => (p.contactPhone1 ?? '').toLowerCase(),
+                          ascending,
+                        ),
+                      ),
+                      DataColumn(
+                        label: headerText('สถานะ', statusWidth),
+                        onSort: (index, ascending) => _sortBy(
+                          index,
+                          (p) => p.isActive ? 1 : 0,
+                          ascending,
+                        ),
+                      ),
+                    ],
+                    rows: _visiblePartners.map((partner) {
+                      return DataRow(
+                        cells: [
+                          DataCell(
+                            SizedBox(
+                              width: actionWidth,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    tooltip: 'แก้ไข',
+                                    visualDensity: VisualDensity.compact,
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(
+                                      minWidth: 32,
+                                      minHeight: 32,
+                                    ),
+                                    onPressed: () async {
+                                      final updated = await widget.openEdit(
+                                        partner,
+                                      );
+                                      if (updated) {
+                                        await _load();
+                                        if (mounted) {
+                                          _showMessage(
+                                            'แก้ไขข้อมูล Partner สำเร็จ',
+                                          );
+                                        }
+                                      }
+                                    },
+                                    icon: Icon(
+                                      Icons.edit_outlined,
+                                      size: 18,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.primary,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  IconButton(
+                                    tooltip: 'ลบ',
+                                    visualDensity: VisualDensity.compact,
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(
+                                      minWidth: 32,
+                                      minHeight: 32,
+                                    ),
+                                    onPressed: () => _confirmDelete(partner),
+                                    icon: const Icon(
+                                      Icons.delete_outline_rounded,
+                                      size: 18,
+                                      color: LaooColors.error,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          DataCell(cellText(partner.partnerCode, codeWidth)),
+                          DataCell(cellText(partner.partnerNameTh, nameWidth)),
+                          DataCell(
+                            cellText(partner.contactName1 ?? '-', contactWidth),
+                          ),
+                          DataCell(
+                            cellText(partner.contactPhone1 ?? '-', phoneWidth),
+                          ),
+                          DataCell(
+                            SizedBox(
+                              width: statusWidth,
+                              child: Align(
+                                alignment: Alignment.centerLeft,
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  alignment: Alignment.centerLeft,
+                                  child: _StatusChip(active: partner.isActive),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    }).toList(),
                   ),
                 ),
-            ],
+              ),
+            ),
           ),
         );
       },
     );
   }
-}
 
-class _PageHeader extends StatelessWidget {
-  const _PageHeader({required this.onCreate});
+  Widget _paginationBar() {
+    final pageCount = _pageCount;
+    final page = _currentPage.clamp(0, pageCount - 1);
+    final firstRow = _partners.isEmpty ? 0 : (page * _pageSize) + 1;
+    final lastRow = _partners.isEmpty
+        ? 0
+        : ((page + 1) * _pageSize).clamp(0, _partners.length);
 
-  final VoidCallback onCreate;
+    final accent = Theme.of(context).colorScheme.primary;
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 18),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(bottom: BorderSide(color: LaooColors.border)),
-      ),
-      child: Row(
-        children: [
-          const Expanded(
-            child: Column(
+    final pageIndexes = <int>[];
+    if (pageCount <= 7) {
+      for (var i = 0; i < pageCount; i++) {
+        pageIndexes.add(i);
+      }
+    } else {
+      final start = (page - 2).clamp(0, pageCount - 5);
+      final end = (start + 5).clamp(0, pageCount);
+      for (var i = start; i < end; i++) {
+        pageIndexes.add(i);
+      }
+    }
+
+    return Wrap(
+      spacing: 6,
+      runSpacing: 8,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        OutlinedButton(
+          onPressed: page > 0
+              ? () => setState(() => _currentPage = page - 1)
+              : null,
+          style: OutlinedButton.styleFrom(
+            foregroundColor: accent,
+            side: BorderSide(color: accent.withValues(alpha: 0.45)),
+            visualDensity: VisualDensity.compact,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          ),
+          child: const Text('ก่อนหน้า'),
+        ),
+        if (pageCount > 7 && pageIndexes.first > 0) ...[
+          _pageNumberButton(0, page, accent),
+          if (pageIndexes.first > 1)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 2),
+              child: Text('...'),
+            ),
+        ],
+        for (final index in pageIndexes) _pageNumberButton(index, page, accent),
+        if (pageCount > 7 && pageIndexes.last < pageCount - 1) ...[
+          if (pageIndexes.last < pageCount - 2)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 2),
+              child: Text('...'),
+            ),
+          _pageNumberButton(pageCount - 1, page, accent),
+        ],
+        OutlinedButton(
+          onPressed: page + 1 < pageCount
+              ? () => setState(() => _currentPage = page + 1)
+              : null,
+          style: OutlinedButton.styleFrom(
+            foregroundColor: accent,
+            side: BorderSide(color: accent.withValues(alpha: 0.45)),
+            visualDensity: VisualDensity.compact,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          ),
+          child: const Text('ถัดไป'),
+        ),
+        Text(
+          'แสดง $firstRow-$lastRow จาก ${_partners.length} รายการ',
+          style: const TextStyle(color: LaooColors.textSecondary),
+        ),
+      ],
+    );
+  }
+
+  Widget _pageNumberButton(int index, int currentPage, Color accent) {
+    final selected = index == currentPage;
+
+    return SizedBox(
+      width: 36,
+      height: 34,
+      child: selected
+          ? FilledButton(
+              onPressed: () {},
+              style: FilledButton.styleFrom(
+                padding: EdgeInsets.zero,
+                backgroundColor: accent,
+                foregroundColor: Colors.white,
+                visualDensity: VisualDensity.compact,
+              ),
+              child: Text('${index + 1}'),
+            )
+          : OutlinedButton(
+              onPressed: () => setState(() => _currentPage = index),
+              style: OutlinedButton.styleFrom(
+                padding: EdgeInsets.zero,
+                foregroundColor: accent,
+                side: BorderSide(color: accent.withValues(alpha: 0.35)),
+                visualDensity: VisualDensity.compact,
+              ),
+              child: Text('${index + 1}'),
+            ),
+    );
+  }
+
+  Future<void> _confirmDelete(Partner partner) async {
+    final accent = Theme.of(context).colorScheme.primary;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: Theme.of(dialogContext).colorScheme.surface,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: LaooColors.error.withValues(alpha: 0.28),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.12),
+                    blurRadius: 22,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 34,
+                          height: 34,
+                          decoration: BoxDecoration(
+                            color: LaooColors.error.withValues(alpha: 0.10),
+                            borderRadius: BorderRadius.circular(9),
+                          ),
+                          child: const Icon(
+                            Icons.delete_outline_rounded,
+                            color: LaooColors.error,
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        const Expanded(
+                          child: Text(
+                            'ยืนยันการลบ Partner',
+                            style: TextStyle(
+                              color: LaooColors.error,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: LaooColors.error.withValues(alpha: 0.055),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text.rich(
+                        TextSpan(
+                          style: TextStyle(
+                            color: Theme.of(
+                              dialogContext,
+                            ).colorScheme.onSurface,
+                            fontSize: 12,
+                            height: 1.45,
+                          ),
+                          children: [
+                            const TextSpan(text: 'ต้องการลบ '),
+                            TextSpan(
+                              text: partner.partnerCode,
+                              style: TextStyle(
+                                color: accent,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const TextSpan(text: ' - '),
+                            TextSpan(
+                              text: partner.partnerNameTh,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const TextSpan(text: ' หรือไม่?'),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'ข้อมูลที่ลบแล้วไม่สามารถเรียกคืนจากหน้าจอนี้ได้',
+                      style: TextStyle(
+                        color: LaooColors.textSecondary,
+                        fontSize: 11,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () =>
+                              Navigator.of(dialogContext).pop(false),
+                          child: const Text(
+                            'ยกเลิก',
+                            style: TextStyle(fontSize: 12),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        FilledButton.icon(
+                          onPressed: () =>
+                              Navigator.of(dialogContext).pop(true),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: LaooColors.error,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 9,
+                            ),
+                          ),
+                          icon: const Icon(
+                            Icons.delete_outline_rounded,
+                            size: 16,
+                          ),
+                          label: const Text(
+                            'ลบ',
+                            style: TextStyle(fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await widget.deletePartner(partner);
+      await _load();
+      if (mounted) {
+        _showMessage('ลบ Partner สำเร็จ');
+      }
+    } catch (error) {
+      if (!mounted) return;
+      _showMessage('ไม่สามารถลบ Partner ได้: $error', error: true);
+    }
+  }
+
+  Widget _mobileList() {
+    return ListView.separated(
+      itemCount: _visiblePartners.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 10),
+      itemBuilder: (context, index) {
+        final partner = _visiblePartners[index];
+        return Card(
+          margin: EdgeInsets.zero,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(LaooRadius.md),
+            side: const BorderSide(color: LaooColors.border),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Partner',
-                  style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900),
+                IconButton(
+                  tooltip: 'แก้ไข',
+                  onPressed: () async {
+                    final updated = await widget.openEdit(partner);
+                    if (updated) {
+                      await _load();
+                      if (mounted) {
+                        _showMessage('แก้ไขข้อมูล Partner สำเร็จ');
+                      }
+                    }
+                  },
+                  icon: Icon(
+                    Icons.edit_outlined,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
                 ),
-                SizedBox(height: 3),
-                Text(
-                  'จัดการข้อมูลผู้แทนจำหน่าย',
-                  style: TextStyle(color: LaooColors.textSecondary),
+                IconButton(
+                  tooltip: 'ลบ',
+                  onPressed: () => _confirmDelete(partner),
+                  icon: const Icon(
+                    Icons.delete_outline_rounded,
+                    color: LaooColors.error,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        partner.partnerNameTh,
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        partner.partnerCode,
+                        style: const TextStyle(color: LaooColors.textSecondary),
+                      ),
+                      const SizedBox(height: 8),
+                      _StatusChip(active: partner.isActive),
+                    ],
+                  ),
                 ),
               ],
             ),
           ),
-          FilledButton.icon(
-            onPressed: onCreate,
-            icon: const Icon(Icons.add_rounded),
-            label: const Text('เพิ่ม Partner'),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -373,18 +809,20 @@ class _Toolbar extends StatelessWidget {
   const _Toolbar({
     required this.searchController,
     required this.activeFilter,
-    required this.viewMode,
+    required this.accent,
     required this.onSearch,
     required this.onActiveChanged,
-    required this.onViewModeChanged,
+    required this.onClear,
+    required this.onRefresh,
   });
 
   final TextEditingController searchController;
   final bool? activeFilter;
-  final PartnerViewMode viewMode;
+  final Color accent;
   final VoidCallback onSearch;
   final ValueChanged<bool?> onActiveChanged;
-  final ValueChanged<PartnerViewMode> onViewModeChanged;
+  final VoidCallback onClear;
+  final VoidCallback onRefresh;
 
   @override
   Widget build(BuildContext context) {
@@ -394,52 +832,92 @@ class _Toolbar extends StatelessWidget {
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         SizedBox(
-          width: 340,
+          width: 330,
           child: TextField(
             controller: searchController,
-            onSubmitted: (value) {
-              onSearch();
-            },
-            decoration: const InputDecoration(
+            onSubmitted: (_) => onSearch(),
+            decoration: InputDecoration(
               hintText: 'ค้นหา Partner...',
-              prefixIcon: Icon(Icons.search_rounded),
+              hintStyle: const TextStyle(fontSize: 11),
+              prefixIcon: const Icon(Icons.search_rounded),
+              suffixIcon: IconButton(
+                tooltip: 'ค้นหา',
+                onPressed: onSearch,
+                icon: const Icon(Icons.arrow_forward_rounded),
+              ),
               isDense: true,
             ),
           ),
         ),
-        DropdownButton<bool?>(
-          value: activeFilter,
-          items: const [
-            DropdownMenuItem(value: true, child: Text('เปิดใช้งาน')),
-            DropdownMenuItem(value: false, child: Text('ระงับใช้งาน')),
-            DropdownMenuItem(value: null, child: Text('ทั้งหมด')),
-          ],
-          onChanged: onActiveChanged,
+        SizedBox(
+          width: 180,
+          child: DropdownButtonFormField<bool?>(
+            initialValue: activeFilter,
+            decoration: const InputDecoration(
+              labelText: 'สถานะ',
+              isDense: true,
+            ),
+            items: const [
+              DropdownMenuItem(value: null, child: Text('ทั้งหมด')),
+              DropdownMenuItem(value: true, child: Text('เปิดใช้งาน')),
+              DropdownMenuItem(value: false, child: Text('ระงับใช้งาน')),
+            ],
+            onChanged: onActiveChanged,
+          ),
         ),
-        SegmentedButton<PartnerViewMode>(
-          segments: const [
-            ButtonSegment(
-              value: PartnerViewMode.table,
-              icon: Icon(Icons.table_rows_outlined),
-              label: Text('แบบตาราง'),
-            ),
-            ButtonSegment(
-              value: PartnerViewMode.card,
-              icon: Icon(Icons.grid_view_outlined),
-              label: Text('แบบการ์ด'),
-            ),
-          ],
-          selected: {viewMode},
-          onSelectionChanged: (value) {
-            onViewModeChanged(value.first);
-          },
+        OutlinedButton.icon(
+          onPressed: onClear,
+          icon: const Icon(Icons.filter_alt_off_outlined, size: 18),
+          label: const Text('ล้าง Filter'),
         ),
         IconButton(
           tooltip: 'Refresh',
-          onPressed: onSearch,
-          icon: const Icon(Icons.refresh_rounded),
+          onPressed: onRefresh,
+          icon: Icon(Icons.refresh_rounded, color: accent),
         ),
       ],
+    );
+  }
+}
+
+class _TopMessage extends StatelessWidget {
+  const _TopMessage({
+    required this.message,
+    required this.error,
+    required this.onClose,
+  });
+
+  final String message;
+  final bool error;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = error ? LaooColors.error : LaooColors.success;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.24)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            error ? Icons.error_outline : Icons.check_circle_outline,
+            color: color,
+            size: 20,
+          ),
+          const SizedBox(width: 9),
+          Expanded(child: Text(message)),
+          IconButton(
+            tooltip: 'ปิด',
+            onPressed: onClose,
+            visualDensity: VisualDensity.compact,
+            icon: const Icon(Icons.close_rounded, size: 18),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -451,16 +929,17 @@ class _StatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final color = active ? LaooColors.success : LaooColors.error;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: active ? const Color(0xFFE8F7EF) : const Color(0xFFFFECEC),
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         active ? 'เปิดใช้งาน' : 'ระงับใช้งาน',
         style: TextStyle(
-          color: active ? LaooColors.success : LaooColors.error,
+          color: color,
           fontSize: 12,
           fontWeight: FontWeight.w800,
         ),
@@ -469,25 +948,34 @@ class _StatusChip extends StatelessWidget {
   }
 }
 
-class _Info extends StatelessWidget {
-  const _Info({required this.icon, required this.text});
+class _StateCard extends StatelessWidget {
+  const _StateCard({
+    required this.icon,
+    required this.title,
+    this.actionLabel,
+    this.onAction,
+  });
 
   final IconData icon;
-  final String text;
+  final String title;
+  final String? actionLabel;
+  final VoidCallback? onAction;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, size: 18, color: LaooColors.textSecondary),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            text,
-            style: const TextStyle(color: LaooColors.textSecondary),
-          ),
-        ),
-      ],
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 38, color: LaooColors.textSecondary),
+          const SizedBox(height: 10),
+          Text(title, style: const TextStyle(color: LaooColors.textSecondary)),
+          if (actionLabel != null && onAction != null) ...[
+            const SizedBox(height: 12),
+            OutlinedButton(onPressed: onAction, child: Text(actionLabel!)),
+          ],
+        ],
+      ),
     );
   }
 }

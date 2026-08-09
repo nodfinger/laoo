@@ -1,0 +1,155 @@
+class CompanySetupModel {
+  const CompanySetupModel({
+    required this.ownerType,
+    required this.ownerCode,
+    required this.ownerName,
+    required this.name,
+    required this.titleHeader,
+    required this.rowStd,
+    required this.rowCardStd,
+    required this.timeAlert,
+    required this.isActive,
+    required this.hasSuperUser,
+    required this.hasPasswordCry,
+    required this.hasEmailPasswordCenter,
+    required this.hasPasswordEmpDefault,
+    required this.hasPasswordDirect,
+    this.pkValue,
+    this.partnerId,
+    this.companyId,
+    this.yearFormat,
+    this.versionId,
+    this.emailHost,
+    this.emailPort,
+    this.emailCenter,
+    this.emailAdmin,
+    this.createDate,
+    this.createBy,
+    this.updateDate,
+    this.updateBy,
+  });
+
+  final int? pkValue;
+  final String ownerType;
+  final int? partnerId;
+  final int? companyId;
+  final String ownerCode;
+  final String ownerName;
+  final String name;
+  final String titleHeader;
+  final int rowStd;
+  final int rowCardStd;
+  final int timeAlert;
+  final String? yearFormat;
+  final String? versionId;
+  final String? emailHost;
+  final int? emailPort;
+  final String? emailCenter;
+  final String? emailAdmin;
+  final bool isActive;
+  final String? createDate;
+  final int? createBy;
+  final String? updateDate;
+  final int? updateBy;
+  final bool hasSuperUser;
+  final bool hasPasswordCry;
+  final bool hasEmailPasswordCenter;
+  final bool hasPasswordEmpDefault;
+  final bool hasPasswordDirect;
+
+  factory CompanySetupModel.fromJson(Map<String, dynamic> json) {
+    int? asInt(dynamic value) =>
+        value == null ? null : int.tryParse(value.toString());
+
+    bool asBool(dynamic value) =>
+        value == true || value?.toString().toLowerCase() == 'true';
+
+    return CompanySetupModel(
+      pkValue: asInt(json['pkValue']),
+      ownerType: json['ownerType']?.toString() ?? '',
+      partnerId: asInt(json['partnerID']) ?? asInt(json['partnerId']),
+      companyId: asInt(json['companyID']) ?? asInt(json['companyId']),
+      ownerCode: json['ownerCode']?.toString() ?? '',
+      ownerName: json['ownerName']?.toString() ?? '',
+      name: json['name']?.toString() ?? '',
+      titleHeader: json['titleHeader']?.toString() ?? '',
+      rowStd: asInt(json['rowSTD']) ?? asInt(json['rowStd']) ?? 30,
+      rowCardStd:
+          asInt(json['rowCardSTD']) ?? asInt(json['rowCardStd']) ?? 30,
+      timeAlert: asInt(json['timeAlert']) ?? 30,
+      yearFormat: json['yearFormat']?.toString(),
+      versionId: json['versionID']?.toString() ?? json['versionId']?.toString(),
+      emailHost: json['emailHost']?.toString(),
+      emailPort: asInt(json['emailPort']),
+      emailCenter: json['emailCenter']?.toString(),
+      emailAdmin: json['emailAdmin']?.toString(),
+      isActive: asBool(json['isActive']),
+      createDate: json['createDate']?.toString(),
+      createBy: asInt(json['createBy']),
+      updateDate: json['updateDate']?.toString(),
+      updateBy: asInt(json['updateBy']),
+      hasSuperUser: asBool(json['hasSuperUser']),
+      hasPasswordCry: asBool(json['hasPasswordCry']),
+      hasEmailPasswordCenter: asBool(json['hasEmailPasswordCenter']),
+      hasPasswordEmpDefault: asBool(json['hasPasswordEmpDefault']),
+      hasPasswordDirect: asBool(json['hasPasswordDirect']),
+    );
+  }
+}
+
+class CompanySetupUpdateInput {
+  const CompanySetupUpdateInput({
+    required this.name,
+    required this.titleHeader,
+    required this.rowStd,
+    required this.rowCardStd,
+    required this.timeAlert,
+    this.yearFormat,
+    this.versionId,
+    this.emailHost,
+    this.emailPort,
+    this.emailCenter,
+    this.emailAdmin,
+    this.superUserName,
+    this.passwordCry,
+    this.emailPasswordCenter,
+    this.passwordEmpDefault,
+    this.passwordDirect,
+  });
+
+  final String name;
+  final String titleHeader;
+  final int rowStd;
+  final int rowCardStd;
+  final int timeAlert;
+  final String? yearFormat;
+  final String? versionId;
+  final String? emailHost;
+  final int? emailPort;
+  final String? emailCenter;
+  final String? emailAdmin;
+  final String? superUserName;
+  final String? passwordCry;
+  final String? emailPasswordCenter;
+  final String? passwordEmpDefault;
+  final String? passwordDirect;
+
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'titleHeader': titleHeader,
+        'rowSTD': rowStd,
+        'rowCardSTD': rowCardStd,
+        'timeAlert': timeAlert,
+        'yearFormat': yearFormat,
+        'versionID': versionId,
+        'emailHost': emailHost,
+        'emailPort': emailPort,
+        'emailCenter': emailCenter,
+        'emailAdmin': emailAdmin,
+        'superUserName': superUserName,
+        'passwordCry': passwordCry,
+        'emailPasswordCenter': emailPasswordCenter,
+        'passwordEmpDefault': passwordEmpDefault,
+        'passwordDirect': passwordDirect,
+      };
+}

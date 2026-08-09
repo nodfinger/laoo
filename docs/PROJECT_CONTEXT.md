@@ -1,252 +1,55 @@
-# DEVELOPMENT ROADMAP
+# Project Context
 
-Version: 2.0
+Version: 1.0  
+Updated: 2026-08-09
 
-Project: Laoo Solutions
+## เป้าหมาย
 
-Status: Approved
+Laoo Solutions พัฒนาระบบที่ใช้งานจริงแบบ Simple First, Scalable Later โดยใช้ Flutter, ASP.NET Core Web API และ SQL Server
 
-Last Update: 2026-08-05
-
----
-
-# Purpose
-
-กำหนดลำดับการพัฒนาระบบของ Laoo Solutions
-
-เป้าหมายหลักคือ
-
-สร้างระบบที่สามารถใช้งานจริงได้เร็วที่สุด
-โดยใช้เอกสารมาตรฐาน (Standards) เป็นแนวทาง
-แต่ไม่สร้างเอกสารมากเกินไปจนขาดการทดลองใช้งานจริง
-
----
-
-# Development Principle
-
-การพัฒนาทุก Feature ต้องใช้หลักการดังนี้
-
-Standard
-
-↓
-
-Implementation
-
-↓
-
-Run
-
-↓
-
-Review
-
-↓
-
-Update Standard
-
-ไม่สร้าง Standard ต่อเนื่องจำนวนมาก
-โดยไม่มีการทดลองใช้งานจริง
-
----
-
-# Current Roadmap
-
-## Phase 1
-
-Foundation
-
-- PROJECT_CONTEXT.md
-- ARCHITECTURE.md
-- STATE_MANAGEMENT_STANDARD.md
-- ROUTING_STANDARD.md
-
-Status
-
-Completed
-
----
-
-## Phase 2
-
-Flutter Foundation
-
-- Project Structure
-- Product Layout (`app`, `api`, `database`, `docs`)
-- Riverpod
-- Go Router
-- Theme
-- Landing Page MVP
-- Login Screen (Deferred until Data Entry Design Gate)
-
-Status
-
-In Progress
-
----
-
-## Phase 3
-
-Backend API
-
-สร้าง ASP.NET Core Web API
-
-ประกอบด้วย
-
-- Authentication API
-- Authenticated Business Context API
-- Current User API
-- Health Check API
-
-เชื่อมต่อ
-
-SQL Server
-
-ใช้
-
-Dapper
-
----
-
-## Phase 4
-
-Flutter Login
-
-Flutter
-
-↓
-
-REST API
-
-↓
-
-SQL Server
-
-สามารถ
-
-- Login
-- ระบุ Partner, Customer และ Employee Context
-- รับ JWT / Token
-- อ่านข้อมูล Current Employee
-- Logout
-
----
-
-## Phase 5
-
-Marketplace
-
-- Home
-- Product
-- Category
-- Search
-- Cart
-
----
-
-## Phase 6
-
-Order
-
-- Checkout
-- Payment
-- Order History
-
----
-
-## Phase 7
-
-Admin
-
-- Dashboard
-- Product Management
-- Customer Management
-- Reports
-
----
-
-# Documentation Rule
-
-สร้าง Standard เพิ่ม
-เมื่อเริ่มพัฒนา Module นั้น
-
-ตัวอย่าง
-
-เริ่ม Login
-
-↓
-
-AUTHENTICATION_STANDARD.md
-
-เริ่ม API
-
-↓
-
-API_STANDARD.md
-
-เริ่ม Permission
-
-↓
-
-PERMISSION_STANDARD.md
-
-ไม่จำเป็นต้องสร้างเอกสารทุกไฟล์
-ก่อนเริ่มเขียนโปรแกรม
-
----
-
-# Current Target
-
-เป้าหมายปัจจุบัน
-
-Project แรกชื่อ Laoo และใช้ Landing Page เป็นหน้าเริ่มต้นของระบบหลัก
-
-Landing Page MVP แสดงข้อความ `Laoo Solutions` เท่านั้น
-
-Landing Page
-
-↓
-
-Flutter Login
-
-↓
-
-ASP.NET Core Web API
-
-↓
-
-SQL Server
-
-หลัง Login ต้องระบุ Business Context ได้ครบ
+## Workspace
 
 ```text
-Laoo
-→ Partner
-→ Customer
-→ Employee
+C:\laoo\laoo
+C:\laoo\laoo_meeting
+C:\laoo\laoo_api
+C:\laoo\docs
+C:\laoo\tools
+C:\laoo\scripts
+C:\laoo\publish
+C:\laoo\backup
+C:\laoo\archive
 ```
 
-Flutter ห้ามเชื่อมต่อ SQL Server โดยตรง และต้องไม่เก็บ Connection String จริงไว้ในแอปหรือ Git Repository
+ไม่มีโฟลเดอร์ `C:\laoo\projects` ในโครงสร้างปัจจุบัน
 
-หน้าสมัครสมาชิกไม่อยู่ในขอบเขตปัจจุบัน
+## ระบบที่กำลังพัฒนา
 
-ก่อนออกแบบ Login และ Database Table ต้องได้รับข้อสรุปการออกแบบข้อมูลจากมนต์
+LaOO Plaza ใช้แอป API และฐานข้อมูลของตนเอง โดยฐานข้อมูลปัจจุบันคือ `DBTDLaoo` ภายในระบบนี้ไม่มี Project Master, Project selection ตอน Login หรือ Project-based database routing
 
----
+โครงสร้างธุรกิจหลัก:
 
-# Success Criteria
+```text
+Laoo → Partner → Customer/Company → Branch → User
+```
 
-ถือว่า Foundation สำเร็จ เมื่อ
+## สถานะปัจจุบัน
 
-- Flutter Run ได้
-- API Run ได้
-- SQL Server เชื่อมต่อได้
-- Laoo เปิด Landing Page เป็นหน้าเริ่มต้นได้
-- Login ผ่าน API ได้
-- หลัง Login ระบุ Partner, Customer และ Employee ได้ถูกต้อง
-- Customer แต่ละรายเห็นเฉพาะข้อมูลตาม Tenant และ Data Scope ของตนเอง
-- รหัสผ่านไม่ถูกจัดเก็บเป็นข้อความปกติ (Plain Text)
-- Connection String จริงไม่อยู่ใน Git Repository
+- Flutter Landing และ Login ใช้งานได้
+- Login ผ่าน ASP.NET Core API และ SQL Server ได้
+- Company Setup และ Theme Runtime อยู่ระหว่างเชื่อมใช้งานจริงให้ครบ
+- ตาราง Partner User, Module Master และ Company Module ถูกสร้างแล้ว
+- งานถัดไปคือปรับ API และ Flutter ให้รองรับ Partner User, Customer ownership และ Customer Module ตาม Baseline ใหม่
 
-หลังจากนั้น
+## หลักการพัฒนา
 
-เริ่มพัฒนา Product Navigation, Permission และ Feature ทางธุรกิจต่อไป
+```text
+Requirement → Standard → Implementation → Run → Verify → Update Documentation
+```
+
+- Flutter ห้ามเชื่อม SQL Server โดยตรง
+- API เป็นผู้ตรวจ Authentication, Permission, Data Scope และ Record Ownership
+- ไม่มีสิทธิ์ให้ซ่อนเมนู ปุ่ม และ Action เป็นค่าเริ่มต้น
+- ก่อนสร้างหรือแก้ UX/UI ต้องสรุปให้ Product Owner อนุมัติ เว้นแต่ Product Owner สั่งให้ลง Code จริงทันที
+- งานฐานข้อมูลทุกครั้งต้องส่ง SQL, Excel Data Dictionary และ PDF Data Dictionary
+
