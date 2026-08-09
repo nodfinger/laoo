@@ -6,6 +6,7 @@ import '../../../../app/router/route_names.dart';
 import '../../../../app/theme/laoo_design_tokens.dart';
 import '../../../../core/api/api_exception.dart';
 import '../../../../core/auth/app_auth_controller.dart';
+import '../../../../core/auth/auth_storage.dart';
 import '../../../../core/company_setup/company_setup_controller.dart';
 import '../../../../core/platform/window_title_service.dart';
 
@@ -24,6 +25,26 @@ class _LoginPageState extends State<LoginPage> {
   bool _obscurePassword = true;
   bool _isSubmitting = false;
   bool _rememberLogin = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _restoreRememberedUsername();
+  }
+
+  Future<void> _restoreRememberedUsername() async {
+    final username = await AuthStorage().readRememberedUsername();
+    final password = await AuthStorage().readRememberedPassword();
+    if (!mounted) {
+      return;
+    }
+    if (username != null && username.isNotEmpty) {
+      _usernameController.text = username;
+    }
+    if (password != null && password.isNotEmpty) {
+      _passwordController.text = password;
+    }
+  }
 
   @override
   void dispose() {
@@ -47,7 +68,7 @@ class _LoginPageState extends State<LoginPage> {
       final session = await appAuthController.login(
         username: _usernameController.text.trim(),
         password: _passwordController.text,
-        projectCode: 'LAOO',
+        rememberLogin: _rememberLogin,
       );
 
       // Company Setup is the runtime configuration source after login.
@@ -69,14 +90,8 @@ class _LoginPageState extends State<LoginPage> {
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'เข้าสู่ระบบสำเร็จ แต่ Workspace สำหรับ '
-            '${session.userType ?? 'ผู้ใช้งาน'} อยู่ระหว่างพัฒนา',
-          ),
-        ),
-      );
+      appRouter.goNamed(RouteNames.authenticatedHome);
+      return;
     } on ApiException catch (error) {
       if (!mounted) {
         return;

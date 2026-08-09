@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/auth/app_auth_controller.dart';
 import '../core/company_setup/company_setup_controller.dart';
+import '../core/platform/window_title_service.dart';
 import 'router/app_router.dart';
 import 'theme/laoo_theme.dart';
 import 'theme/workspace_theme_presets.dart';
@@ -29,7 +30,8 @@ class _LaooAppState extends State<LaooApp> {
 
     if (appAuthController.isAuthenticated) {
       try {
-        await companySetupController.load();
+          await companySetupController.load();
+          WindowTitleService.setTitle(companySetupController.appTitle);
       } catch (error) {
         debugPrint('Unable to load Company Setup: $error');
       }

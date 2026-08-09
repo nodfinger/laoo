@@ -1,5 +1,7 @@
 # LAOO SOLUTIONS --- UX/UI STANDARD
 
+> Workspace หลัง Login ทุก Role ต้องใช้ Shared Shell เดียวกันตาม `docs/standards/WORKSPACE_STANDARD.md`
+
 **Document Type:** Central Standard\
 **Scope:** All Laoo Solutions systems and projects\
 **Version:** 1.0\
@@ -317,6 +319,14 @@ Technical Error, Exception, SQL Error และ Stack Trace ให้บัน�
 -   Frontend Permission เป็น UX Layer ไม่ใช่ Security Layer
 -   API/Backend ต้องตรวจ Permission ซ้ำเสมอ
 -   Direct URL/Route ต้องไม่สามารถข้าม Permission ได้
+
+## 14.1 Implemented Role and Workspace UX
+
+- Support, Partner และ Company ใช้ Sidebar, Top Bar, Font, spacing, Favorite และ Theme control จาก Shared Shell เดียวกัน
+- เมนูที่ไม่มีสิทธิ์ต้องถูกซ่อนทั้งกลุ่มและรายการย่อยที่ไม่เหลือรายการใช้งาน
+- Admin เห็นเมนูทั้งหมดของประเภทผู้ใช้ตนเองโดยอัตโนมัติ
+- Header ด้านขวาต้องแสดงชื่อผู้ใช้และประเภท/บริบทจาก Login จริง
+- Title Bar ใช้ชื่อเจ้าของระบบจาก `TDSTCompanySetUp`; ชื่อหน้าจอใน Content ใช้ `menuName`
 
 ------------------------------------------------------------------------
 

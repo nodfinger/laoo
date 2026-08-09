@@ -26,12 +26,14 @@ public sealed class JwtTokenService
             new(JwtRegisteredClaimNames.Sub, user.SubjectId),
             new(JwtRegisteredClaimNames.UniqueName, user.Username),
             new("display_name", user.DisplayName),
+            new("user_type", user.UserType),
             new("login_mode", user.LoginMode),
             new("project_id", user.ProjectId.ToString()),
             new("project_code", user.ProjectCode)
         };
 
         AddIfValue(claims, "laoo_user_id", user.LaooUserId);
+        AddIfValue(claims, "partner_id", user.PartnerId);
         AddIfValue(claims, "user_id", user.UserId);
         AddIfValue(claims, "company_id", user.CompanyId);
         AddIfValue(claims, "branch_id", user.BranchId);

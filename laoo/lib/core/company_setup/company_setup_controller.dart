@@ -16,7 +16,7 @@ class CompanySetupController extends ChangeNotifier {
   CompanySetupContext? get current => _current;
 
   String get appTitle {
-    final value = _current?.titleHeader.trim() ?? '';
+    final value = _current?.name.trim() ?? '';
     return value.isEmpty ? 'Laoo Solutions' : value;
   }
 

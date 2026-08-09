@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../../app/router/route_names.dart';
 import '../../../../app/theme/workspace_theme_presets.dart';
 import '../../../../core/api/api_exception.dart';
 import '../../../../core/company_setup/company_setup_controller.dart';
+import '../../../../core/platform/window_title_service.dart';
 import '../data/company_setup_api.dart';
 import '../models/company_setup_model.dart';
 import '../../presentation/widgets/support_workspace_shell.dart';
@@ -155,6 +158,7 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
       );
 
       await companySetupController.load();
+      WindowTitleService.setTitle(companySetupController.appTitle);
 
       if (!mounted) return;
 
@@ -194,7 +198,7 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
   }
 
   void _cancel() {
-    Navigator.of(context).maybePop();
+    context.goNamed(RouteNames.supportHome);
   }
 
   @override
@@ -216,8 +220,8 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
                     children: [
                       const Expanded(
                         child: WorkspacePageTitle(
-                          title: 'Company Setup',
-                          favoriteKey: 'Company Setup',
+                          title: 'กำหนดค่าระบบ',
+                          favoriteKey: 'กำหนดค่าระบบ',
                         ),
                       ),
                       _TopActions(
@@ -268,9 +272,9 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
                                 TextFormField(
                                   controller: _name,
                                   decoration: const InputDecoration(
-                                    label: _RequiredLabel('ชื่อระบบ'),
+                                    label: _RequiredLabel('ชื่อเจ้าของระบบ (แสดงที่ Title Bar)'),
                                   ),
-                                  validator: _required('กรุณาระบุชื่อระบบ'),
+                                  validator: _required('กรุณาระบุชื่อเจ้าของระบบ'),
                                 ),
                                 const SizedBox(height: 12),
                                 TextFormField(

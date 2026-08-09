@@ -10,6 +10,8 @@ import '../../../../core/company_setup/company_setup_controller.dart';
 final ValueNotifier<Set<String>> supportFavoritePages =
     ValueNotifier<Set<String>>(<String>{});
 
+enum WorkspaceMenuScope { support, partner, company }
+
 class WorkspacePageTitle extends StatelessWidget {
   const WorkspacePageTitle({super.key, required this.title, this.favoriteKey});
 
@@ -68,11 +70,13 @@ class SupportWorkspaceShell extends StatelessWidget {
     required this.pageTitle,
     required this.child,
     this.activeMenu,
+    this.menuScope = WorkspaceMenuScope.support,
   });
 
   final String pageTitle;
   final String? activeMenu;
   final Widget child;
+  final WorkspaceMenuScope menuScope;
 
   @override
   Widget build(BuildContext context) {
@@ -110,7 +114,7 @@ class SupportWorkspaceShell extends StatelessWidget {
               drawer: compact
                   ? Drawer(
                       backgroundColor: preset.sidebarBackground,
-                      child: _Sidebar(activeMenu: activeMenu, preset: preset),
+                      child: _Sidebar(activeMenu: activeMenu, preset: preset, menuScope: menuScope),
                     )
                   : null,
               appBar: compact
@@ -124,12 +128,13 @@ class SupportWorkspaceShell extends StatelessWidget {
                         IconButton(
                           tooltip: 'กลับหน้าหลัก',
                           onPressed: () =>
-                              context.goNamed(RouteNames.supportHome),
+                              context.goNamed(RouteNames.authenticatedHome),
                           icon: Icon(
                             Icons.home_outlined,
                             color: preset.primary,
                           ),
                         ),
+                        _LogoutButton(color: preset.primary),
                         _CompactUserMenu(preset: preset),
                         const SizedBox(width: 8),
                       ],
@@ -141,7 +146,7 @@ class SupportWorkspaceShell extends StatelessWidget {
                     if (!compact)
                       SizedBox(
                         width: 220,
-                        child: _Sidebar(activeMenu: activeMenu, preset: preset),
+                        child: _Sidebar(activeMenu: activeMenu, preset: preset, menuScope: menuScope),
                       ),
                     Expanded(
                       child: Column(
@@ -180,12 +185,13 @@ class _TopBar extends StatelessWidget {
         children: [
           IconButton(
             tooltip: 'กลับหน้าหลัก',
-            onPressed: () => context.goNamed(RouteNames.supportHome),
+            onPressed: () => context.goNamed(RouteNames.authenticatedHome),
             icon: Icon(
               Icons.home_outlined,
               color: Theme.of(context).colorScheme.primary,
             ),
           ),
+          _LogoutButton(color: Theme.of(context).colorScheme.primary),
           const SizedBox(width: 4),
           _ThemeButton(preset: preset),
           const SizedBox(width: 4),
@@ -194,6 +200,26 @@ class _TopBar extends StatelessWidget {
           _UserMenu(preset: preset),
         ],
       ),
+    );
+  }
+}
+
+class _LogoutButton extends StatelessWidget {
+  const _LogoutButton({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      tooltip: 'ออกจากระบบ',
+      onPressed: () async {
+        await appAuthController.logout();
+        if (context.mounted) {
+          context.goNamed(RouteNames.login);
+        }
+      },
+      icon: Icon(Icons.logout_outlined, color: color),
     );
   }
 }
@@ -548,7 +574,8 @@ class _UserMenu extends StatelessWidget {
         ? Colors.white.withValues(alpha: 0.68)
         : preset.textSecondary;
     final session = appAuthController.session;
-    final project = session?.projectCode ?? 'LAOO';
+    final userName = session?.displayName ?? session?.username ?? '-';
+    final userContext = session?.username ?? session?.userType ?? '-';
 
     return PopupMenuButton<String>(
       tooltip: 'เมนูผู้ใช้งาน',
@@ -584,7 +611,7 @@ class _UserMenu extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Laoo Support',
+                  userName,
                   style: TextStyle(
                     fontSize: LaooTypography.userName,
                     fontWeight: LaooTypography.strongWeight,
@@ -592,7 +619,7 @@ class _UserMenu extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  project,
+                  userContext,
                   style: TextStyle(
                     fontSize: LaooTypography.userContext,
                     color: secondary,
@@ -614,10 +641,11 @@ class _UserMenu extends StatelessWidget {
 }
 
 class _Sidebar extends StatelessWidget {
-  const _Sidebar({required this.activeMenu, required this.preset});
+  const _Sidebar({required this.activeMenu, required this.preset, required this.menuScope});
 
   final String? activeMenu;
   final WorkspaceThemePreset preset;
+  final WorkspaceMenuScope menuScope;
 
   @override
   Widget build(BuildContext context) {
@@ -663,6 +691,16 @@ class _Sidebar extends StatelessWidget {
         : isHybrid
         ? Colors.white
         : const Color(0xFFF9FAFB);
+
+    if (menuScope != WorkspaceMenuScope.support) {
+      return _RoleScopedSidebar(
+        menuScope: menuScope,
+        activeMenu: activeMenu,
+        preset: preset,
+        itemForeground: itemForeground,
+        selectedForeground: selectedForeground,
+      );
+    }
 
     return Material(
       color: preset.sidebarBackground,
@@ -805,6 +843,82 @@ class _Sidebar extends StatelessWidget {
                       selectedAccent: accent,
                       selectedForeground: selectedForeground,
                       onTap: () => context.goNamed(RouteNames.companySetup),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RoleScopedSidebar extends StatelessWidget {
+  const _RoleScopedSidebar({
+    required this.menuScope,
+    required this.activeMenu,
+    required this.preset,
+    required this.itemForeground,
+    required this.selectedForeground,
+  });
+
+  final WorkspaceMenuScope menuScope;
+  final String? activeMenu;
+  final WorkspaceThemePreset preset;
+  final Color itemForeground;
+  final Color selectedForeground;
+
+  @override
+  Widget build(BuildContext context) {
+    final isPartner = menuScope == WorkspaceMenuScope.partner;
+    return Material(
+      color: preset.sidebarBackground,
+      child: Column(
+        children: [
+          _BrandHeader(accent: preset.primary, preset: preset),
+          Divider(height: 1, color: preset.border),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
+              children: [
+                _MenuItem(
+                  label: 'หน้าหลัก',
+                  icon: Icons.home_outlined,
+                  selected: activeMenu == 'home',
+                  accent: itemForeground,
+                  selectedAccent: preset.primary,
+                  selectedForeground: selectedForeground,
+                  onTap: () => context.goNamed(RouteNames.authenticatedHome),
+                ),
+                const SizedBox(height: 2),
+                _MenuGroup(
+                  title: isPartner ? 'จัดการบริษัท' : 'ระบบสินค้า',
+                  accent: preset.primary,
+                  initiallyExpanded: true,
+                  children: isPartner
+                      ? [
+                          _MenuItem(label: 'ข้อมูลบริษัท', icon: Icons.apartment_outlined, selected: activeMenu == 'partnerCompanies', accent: itemForeground, selectedAccent: preset.primary, selectedForeground: selectedForeground, onTap: () => context.goNamed(RouteNames.partnerCompanies)),
+                          _MenuItem(label: 'ข้อมูลสาขา', icon: Icons.account_tree_outlined, selected: activeMenu == 'partnerBranches', accent: itemForeground, selectedAccent: preset.primary, selectedForeground: selectedForeground, onTap: () => context.goNamed(RouteNames.partnerBranches)),
+                        ]
+                      : [
+                          _MenuItem(label: 'ข้อมูลสินค้า', icon: Icons.inventory_2_outlined, selected: activeMenu == 'companyProducts', accent: itemForeground, selectedAccent: preset.primary, selectedForeground: selectedForeground, onTap: () => context.goNamed(RouteNames.companyProducts)),
+                        ],
+                ),
+                _MenuGroup(
+                  title: isPartner ? 'จัดการผู้ใช้งาน' : 'ระบบขาย',
+                  accent: preset.primary,
+                  initiallyExpanded: true,
+                  children: [
+                    _MenuItem(
+                      label: isPartner ? 'ผู้ใช้งานบริษัท' : 'ข้อมูลลูกค้า',
+                      icon: isPartner ? Icons.people_outline : Icons.people_alt_outlined,
+                      selected: activeMenu == (isPartner ? 'partnerUsers' : 'companyCustomers'),
+                      accent: itemForeground,
+                      selectedAccent: preset.primary,
+                      selectedForeground: selectedForeground,
+                      onTap: () => context.goNamed(isPartner ? RouteNames.partnerUsers : RouteNames.companyCustomers),
                     ),
                   ],
                 ),

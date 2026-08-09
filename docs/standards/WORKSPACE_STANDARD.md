@@ -1,66 +1,45 @@
-# WORKSPACE_STANDARD.md
+# WORKSPACE STANDARD
 
-# Laoo Solutions Workspace Standard
+## Single Shared Shell Rule
 
-Version: 1.0
-Status: Core Standard
+- ผู้ใช้ทุกประเภท `LAOO_SUPPORT`, `PARTNER_USER` และ `COMPANY_USER` ต้องใช้ Workspace Shell ตัวเดียวกัน
+- ห้ามสร้าง `Scaffold`, Top Bar, Sidebar, Theme Selector, Favorite หรือ User Menu แยกตาม Role
+- Role และ Permission เปลี่ยนได้เฉพาะข้อมูลกลุ่มเมนู เมนูย่อย เส้นทาง และ Content
+- ทุกหน้าหลัง Login ต้องคง Shell ไว้เมื่อเปลี่ยนเมนู
 
-## Vision
-Workspace เป็นศูนย์กลางการใช้งานของ Laoo Solutions ไม่ใช่เพียงเมนู
+## Visual Baseline
 
-Simple Today. Ready Tomorrow.
+- ใช้หน้าจอของ `LAOO_SUPPORT` เป็น UX/UI Baseline
+- Default Theme คือ `STYLE01`
+- Font ใช้ `LaooTypography`
+- Sidebar กว้าง 220px บน Desktop และเปลี่ยนเป็น Drawer เมื่อความกว้างต่ำกว่า 900px
+- Brand Header สูง 72px, Top Bar สูง 64px และ Menu Item สูง 30px
+- Menu Group และ Submenu ต้องใช้ spacing, visual density และ selected state จาก Shared Shell เท่านั้น
 
-## Core Principles
-1. Authentication → Permission → Workspace
-2. เมนูทั้งหมดมาจาก API
-3. Flutter Render ตามข้อมูลจาก API
-4. รองรับ Windows, Web, Android, iOS และจอสัมผัส
+## Permission Rule
 
-## Workspace
-Support Workspace
-- Partner
-- Company
-- Branch
-- User
-- Permission
-- Project
-- Audit
-- System
+- ไม่มีสิทธิ์ต้องไม่ render เมนู
+- เข้า URL ตรงโดยไม่มีสิทธิ์ต้องถูก redirect กลับหน้าที่ได้รับอนุญาต
+- Admin เห็นทุกเมนูภายในประเภท Login ของตัวเองโดยอัตโนมัติ
+- Partner/Company menu ต้องมาจาก Permission API; config ชั่วคราวต้องแยกจาก Shell และถอดออกเมื่อ API พร้อม
 
-Business Workspace
-- Meeting
-- SmartMarket
-- POS
-- Inventory
-- CRM
+## Acceptance
 
-## Layout Modes
-- Classic
-- Touch
-- Favorite
-- Card
-- Tile
-- Compact
+- ทดสอบบัญชี `t`, `p`, `c` ด้วย `STYLE01` และ Theme อื่นอย่างน้อยหนึ่งชุด
+- ตรวจ Wide Desktop และความกว้างต่ำกว่า 900px
+- Top Bar, Sidebar, Font, Spacing, Theme, Favorite และ User Menu ต้องเหมือนกันทั้งสาม Role
 
-## Favorite
-เป็นแนวทางหลักของ Laoo Solutions
-- ผู้ใช้เลือกเมนูเอง
-- ปุ่มใหญ่สำหรับ Touch
-- ใช้ Permission เดียวกับเมนูปกติ
+## Implemented Baseline (2026-08-09)
 
-## Device Profile
-Desktop -> Classic
-Tablet -> Touch
-POS -> Favorite
-Meeting -> Kiosk
+- `t` ใช้ `LAOO_SUPPORT`, `p` ใช้ `PARTNER_USER`, `c` ใช้ `COMPANY_USER` สำหรับการทดสอบปัจจุบัน
+- ทุก Role ใช้ Shared Workspace Shell เดียวกัน; เปลี่ยนได้เฉพาะ menu scope, active route และ content
+- Partner menu เริ่มต้น: จัดการบริษัท (ข้อมูลบริษัท/ข้อมูลสาขา) และจัดการผู้ใช้งาน (ผู้ใช้งานบริษัท)
+- Company menu เริ่มต้น: ระบบสินค้า (ข้อมูลสินค้า) และระบบขาย (ข้อมูลลูกค้า)
+- หน้า module ต้องคง Sidebar และ Top Bar ไว้ทุก route ไม่สร้าง Shell ซ้ำในแต่ละหน้า
+- ชื่อผู้ใช้/ประเภทผู้ใช้/บริบท Partner หรือ Company ต้องแสดงจาก Auth Session จริง ห้าม hard-code ชื่อ Support
 
-## Dynamic Menu
-Permission -> Menu API -> Workspace API -> Flutter Render
+## Onboarding Workflow
 
-## Search
-- Search Everywhere
-- Recent
-- Favorite
+`LAOO Support สร้าง Partner → Partner สร้าง Customer/Company → Company สร้าง Branch และ User → Company ใช้งาน Modules`
 
-## Rule
-ทุก Module ใหม่ต้องเชื่อมผ่าน Workspace และปฏิบัติตามมาตรฐานนี้
+คำว่า Customer เป็นคำทางธุรกิจ ส่วน `Company` เป็น entity หลักในฐานข้อมูลและ API

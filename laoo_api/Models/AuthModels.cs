@@ -13,8 +13,10 @@ public sealed record LoginResponse(
     LoginUserResponse? User);
 
 public sealed record LoginUserResponse(
+    string UserType,
     string LoginMode,
     long? LaooUserId,
+    long? PartnerId,
     long? UserId,
     long? CompanyId,
     long? BranchId,
@@ -27,8 +29,10 @@ public sealed record LoginUserResponse(
 
 public sealed record AuthenticatedUser(
     string SubjectId,
+    string UserType,
     string LoginMode,
     long? LaooUserId,
+    long? PartnerId,
     long? UserId,
     long? CompanyId,
     long? BranchId,

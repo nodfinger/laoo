@@ -1,6 +1,12 @@
 abstract final class RouteNames {
   static const String landing = 'landing';
   static const String login = 'login';
+  static const String authenticatedHome = 'authenticated-home';
+  static const String companyProducts = 'company-products';
+  static const String companyCustomers = 'company-customers';
+  static const String partnerCompanies = 'partner-companies';
+  static const String partnerBranches = 'partner-branches';
+  static const String partnerUsers = 'partner-users';
   static const String supportHome = 'support-home';
   static const String partner = 'partner';
   static const String company = 'company';

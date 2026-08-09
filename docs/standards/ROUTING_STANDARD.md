@@ -13,3 +13,9 @@ Updated: 2026-08-09
 - Route name/path ใช้ค่าคงที่ส่วนกลางและชื่อสื่อความหมาย
 - ห้ามใช้ `projectCode` เพื่อเลือก Router tree ของ Laoo Plaza
 
+## Implemented Role Routes (2026-08-09)
+
+- Partner: `/partner/companies`, `/partner/branches`, `/partner/users`
+- Company: `/company/products`, `/company/customers`
+- ทุก protected route ต้องตรวจประเภทผู้ใช้และ Permission ก่อนเปิด
+- เมื่อกด Home ให้กลับหน้าแรกของ Workspace และเมื่อ Logout ให้กลับ Login โดยล้าง Sensitive Session ตามนโยบาย

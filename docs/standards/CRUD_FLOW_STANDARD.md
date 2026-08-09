@@ -361,6 +361,18 @@ Flow ที่อนุมัติ:
 ผลลัพธ์:
 
 - ไม่มีข้อมูลอ้างอิง → Delete → Refresh → `ลบ Partner สำเร็จ`
+
+## 15. LAOO Partner-to-Customer Workflow
+
+ลำดับธุรกิจหลักของระบบคือ:
+
+`LAOO Support Create Partner → Partner Create Customer/Company → Company Create Branch/User`
+
+- Support มีสิทธิ์จัดการ Partner ในขอบเขตระบบ LAOO
+- Partner เห็นและจัดการเฉพาะ Customer/Company ของ Partner ตนเอง
+- Company เห็นและจัดการเฉพาะข้อมูล Company/Branch ของตนเอง
+- หลังสร้าง entity สำเร็จ ระบบต้องสร้างบริบทและผู้ดูแลเริ่มต้นตามกติกา ก่อนเปิดให้ใช้งาน Module
+- หน้าจอ CRUD ต้องซ่อนปุ่มและเมนูเมื่อไม่มี Permission แต่ Backend ต้องตรวจซ้ำทุก Action
 - มีข้อมูลอ้างอิง → HTTP 409 → ไม่ลบ → แสดงเหตุผล
 
 Action Column:

@@ -3,6 +3,7 @@ namespace Laoo.Api.Models.Auth;
 public static class AuthUserTypes
 {
     public const string LaooSupport = "LAOO_SUPPORT";
+    public const string PartnerUser = "PARTNER_USER";
     public const string CompanyUser = "COMPANY_USER";
 }
 
@@ -11,6 +12,8 @@ public sealed class PostLoginContextResponse
     public string UserType { get; init; } = string.Empty;
 
     public long UserId { get; init; }
+
+    public long? PartnerId { get; init; }
 
     public string Username { get; init; } = string.Empty;
 

@@ -14,15 +14,20 @@ class AuthService {
   Future<AuthSession> login({
     required String username,
     required String password,
-    String projectCode = 'LAOO',
+    bool rememberLogin = true,
   }) async {
+    if (rememberLogin) {
+      await _authStorage.saveRememberedUsername(username);
+      await _authStorage.saveRememberedPassword(password);
+    } else {
+      await _authStorage.clearRememberedUsername();
+    }
     final result = await _apiClient.post(
       ApiEndpoints.login,
       authenticated: false,
       body: {
         'username': username,
         'password': password,
-        'projectCode': projectCode,
       },
     );
 
@@ -46,7 +51,10 @@ class AuthService {
       accessToken: token,
       expiresAt: DateTime.parse(expiresAtText),
       projectCode: user?['projectCode'] as String?,
+      username: user?['username'] as String?,
+      displayName: user?['displayName'] as String?,
       projectId: _toInt(user?['projectId']),
+      partnerId: _toInt(user?['partnerId']),
       companyId: _toInt(user?['companyId']),
       branchId: _toInt(user?['branchId']),
       userId: _toInt(user?['userId']),
@@ -54,7 +62,7 @@ class AuthService {
     );
 
     // Save the token first so the next API request can send Bearer auth.
-    await _authStorage.save(session);
+    await _authStorage.save(session, rememberLogin: rememberLogin);
 
     session = await _refreshContext(session);
 
@@ -83,8 +91,10 @@ class AuthService {
     }
   }
 
-  Future<void> logout() {
-    return _authStorage.clear();
+  Future<void> logout({bool preserveRememberedSession = false}) {
+    return _authStorage.clear(
+      preserveRememberedSession: preserveRememberedSession,
+    );
   }
 
   Future<AuthSession> _refreshContext(AuthSession session) async {
@@ -93,6 +103,7 @@ class AuthService {
             as Map<String, dynamic>;
 
     final projects = context['projects'];
+    final contextPartnerId = _toInt(context['partnerId']);
 
     String? projectCode = session.projectCode;
     int? projectId = session.projectId;
@@ -109,6 +120,7 @@ class AuthService {
       userType: context['userType'] as String?,
       projectCode: projectCode,
       projectId: projectId,
+      partnerId: contextPartnerId ?? session.partnerId,
     );
   }
 

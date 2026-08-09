@@ -64,6 +64,8 @@ class CompanyContextService {
       userId: current.userId,
       laooUserId: current.laooUserId,
       userType: current.userType,
+      username: current.username,
+      displayName: current.displayName,
     );
 
     await _storage.save(updatedSession);

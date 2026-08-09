@@ -1,77 +1,111 @@
 import 'package:flutter/material.dart';
 
-import '../../../../app/router/app_router.dart';
-import '../../../../app/router/route_names.dart';
 import '../../../../core/auth/app_auth_controller.dart';
+import '../../../support/presentation/widgets/support_workspace_shell.dart';
 
-/// Compatibility page retained during the navigation migration.
-///
-/// The active Laoo Support flow now uses SupportHomePage.
-/// This page intentionally contains no legacy MaterialApp named-route calls.
 class AuthenticatedHomePage extends StatelessWidget {
   const AuthenticatedHomePage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final session = appAuthController.session;
+    final scope = appAuthController.isPartnerUser
+        ? WorkspaceMenuScope.partner
+        : WorkspaceMenuScope.company;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Laoo Solutions'),
-        actions: [
-          TextButton.icon(
-            onPressed: () async {
-              await appAuthController.logout();
-              appRouter.goNamed(RouteNames.landing);
-            },
-            icon: const Icon(Icons.logout_rounded),
-            label: const Text('ออกจากระบบ'),
+    return SupportWorkspaceShell(
+      pageTitle: 'หน้าหลัก',
+      activeMenu: 'home',
+      menuScope: scope,
+      child: const _DashboardContent(),
+    );
+  }
+}
+
+class _DashboardContent extends StatelessWidget {
+  const _DashboardContent();
+
+  @override
+  Widget build(BuildContext context) {
+    final session = appAuthController.session;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('หน้าหลัก', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800)),
+          const SizedBox(height: 8),
+          Text('ยินดีต้อนรับ ${session?.displayName ?? session?.username ?? '-'}'),
+          const SizedBox(height: 24),
+          Wrap(
+            spacing: 16,
+            runSpacing: 16,
+            children: [
+              _InfoCard(icon: Icons.badge_outlined, label: 'ประเภทผู้ใช้งาน', value: session?.userType ?? '-'),
+              _InfoCard(
+                icon: Icons.business_outlined,
+                label: 'บริษัท / Partner',
+                value: session?.partnerId != null
+                    ? 'Partner #${session!.partnerId}'
+                    : 'Company #${session?.companyId ?? '-'}',
+              ),
+              _InfoCard(icon: Icons.folder_outlined, label: 'Project', value: session?.projectCode ?? '-'),
+            ],
           ),
-          const SizedBox(width: 12),
         ],
       ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 650),
-          child: Card(
-            child: Padding(
-              padding: const EdgeInsets.all(28),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.check_circle_rounded,
-                    size: 72,
-                    color: Color(0xFF32C766),
-                  ),
-                  const SizedBox(height: 18),
-                  const Text(
-                    'เข้าสู่ระบบแล้ว',
-                    style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900),
-                  ),
-                  const SizedBox(height: 18),
-                  Text(
-                    'User Type: '
-                    '${session?.userType ?? '-'}',
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Project: '
-                    '${session?.projectCode ?? '-'}',
-                  ),
-                  const SizedBox(height: 24),
-                  FilledButton(
-                    onPressed: () {
-                      appRouter.goNamed(RouteNames.supportHome);
-                    },
-                    child: const Text('ไป Support Workspace'),
-                  ),
-                ],
+    );
+  }
+}
+
+class _InfoCard extends StatelessWidget {
+  const _InfoCard({required this.icon, required this.label, required this.value});
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 280,
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Row(
+            children: [
+              Icon(icon, size: 32, color: Theme.of(context).colorScheme.primary),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(label, style: Theme.of(context).textTheme.bodySmall),
+                    const SizedBox(height: 4),
+                    Text(value, style: const TextStyle(fontWeight: FontWeight.w700)),
+                  ],
+                ),
               ),
-            ),
+            ],
           ),
         ),
       ),
+    );
+  }
+}
+
+class CompanyModulePlaceholderPage extends StatelessWidget {
+  const CompanyModulePlaceholderPage({required this.title, required this.menuScope, required this.activeMenu, super.key});
+
+  final String title;
+  final WorkspaceMenuScope menuScope;
+  final String activeMenu;
+
+  @override
+  Widget build(BuildContext context) {
+    return SupportWorkspaceShell(
+      pageTitle: title,
+      activeMenu: activeMenu,
+      menuScope: menuScope,
+      child: Center(child: Text('$title จะพัฒนาต่อในขั้นตอนถัดไป')),
     );
   }
 }

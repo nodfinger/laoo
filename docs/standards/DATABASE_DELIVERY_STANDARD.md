@@ -26,3 +26,10 @@ Excel and PDF must come from the same schema definition and must agree on names,
 - `TDCMCompanyModule`: Module entitlement, Partner/Laoo state and Laoo lock per Customer.
 
 It does not create a Project Master or any Partner/Customer-to-Project mapping.
+
+## Current Identity and Onboarding Data
+
+- `TDADPartnerUser` เก็บบัญชีผู้ใช้ของ Partner และต้องผูก `PartnerID`
+- `TDADUser` เก็บบัญชีผู้ใช้ของ Company และต้องผูก `CompanyID`
+- บัญชีทดสอบปัจจุบัน: Partner `p/p`, Company `c/c`, Support `t/t` (ใช้เฉพาะ Development)
+- Customer ใน workflow หมายถึง Company ที่อยู่ภายใต้ Partner; การสร้างจริงต้องรักษา Foreign Key และ Data Scope

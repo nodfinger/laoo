@@ -672,11 +672,13 @@ final List<WorkspaceThemePreset> workspaceThemePresets = [
 WorkspaceThemePreset workspaceThemeByCode(String code) =>
     workspaceThemePresets.firstWhere(
       (item) => item.code == code,
-      orElse: () => workspaceThemePresets.first,
+      orElse: () => workspaceThemePresets.firstWhere(
+        (item) => item.code == 'STYLE01',
+      ),
     );
 
 class WorkspaceThemeController extends ValueNotifier<WorkspaceThemePreset> {
-  WorkspaceThemeController() : super(workspaceThemePresets.first);
+  WorkspaceThemeController() : super(workspaceThemeByCode('STYLE01'));
 
   static const _preferenceKey = 'workspace.theme.code';
 

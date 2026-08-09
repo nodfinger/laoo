@@ -40,6 +40,13 @@ public sealed class DatabaseSeeder
         try
         {
             var partnerId = await EnsurePartnerAsync(connection, transaction, cancellationToken);
+            await EnsurePartnerUserAsync(
+                connection,
+                transaction,
+                partnerId,
+                _configuration["SeedData:DemoPartnerUsername"] ?? "p",
+                _configuration["SeedData:DemoPartnerPassword"] ?? "p",
+                cancellationToken);
             var companyId = await EnsureCompanyAsync(connection, transaction, partnerId, cancellationToken);
             var branchId = await EnsureBranchAsync(connection, transaction, companyId, cancellationToken);
             var projectIds = await LoadProjectsAsync(connection, transaction, cancellationToken);
@@ -50,6 +57,28 @@ public sealed class DatabaseSeeder
                 username,
                 password,
                 cancellationToken);
+
+            var demoUsername = _configuration["SeedData:DemoNormalUsername"] ?? "c";
+            var demoPassword = _configuration["SeedData:DemoNormalPassword"] ?? "c";
+            var demoUserId = await EnsureNormalUserAsync(
+                connection,
+                transaction,
+                companyId,
+                branchId,
+                demoUsername,
+                demoPassword,
+                cancellationToken);
+
+            foreach (var projectId in projectIds.Values)
+            {
+                await EnsureNormalUserProjectAsync(
+                    connection,
+                    transaction,
+                    demoUserId,
+                    companyId,
+                    projectId,
+                    cancellationToken);
+            }
 
             foreach (var projectId in projectIds.Values)
             {
@@ -72,6 +101,149 @@ public sealed class DatabaseSeeder
             await transaction.RollbackAsync(cancellationToken);
             throw;
         }
+    }
+
+    private async Task EnsurePartnerUserAsync(
+        SqlConnection connection,
+        SqlTransaction transaction,
+        long partnerId,
+        string username,
+        string password,
+        CancellationToken cancellationToken)
+    {
+        const string sql = """
+        IF NOT EXISTS
+        (
+            SELECT 1 FROM dbo.TDADPartnerUser WHERE NormalizedUsername = @NormalizedUsername
+        )
+        BEGIN
+            INSERT INTO dbo.TDADPartnerUser
+            (
+                PartnerID, Username, NormalizedUsername, PasswordHash, DisplayName,
+                IsPartnerAdmin, IsActive, FailedLoginCount, CreatedUtc, CreatedBy
+            )
+            VALUES
+            (
+                @PartnerID, @Username, @NormalizedUsername, @PasswordHash, N'Demo Partner Admin',
+                1, 1, 0, SYSUTCDATETIME(), N'DatabaseSeeder'
+            );
+        END;
+        """;
+
+        var normalized = username.Trim().ToUpperInvariant();
+        await ExecuteAsync(
+            connection,
+            transaction,
+            sql,
+            [
+                new SqlParameter("@PartnerID", partnerId),
+                new SqlParameter("@Username", username.Trim()),
+                new SqlParameter("@NormalizedUsername", normalized),
+                new SqlParameter("@PasswordHash", _passwordService.HashPassword(normalized, password))
+            ],
+            cancellationToken);
+    }
+
+    private async Task<long> EnsureNormalUserAsync(
+        SqlConnection connection,
+        SqlTransaction transaction,
+        long companyId,
+        long branchId,
+        string username,
+        string password,
+        CancellationToken cancellationToken)
+    {
+        const string sql = """
+        IF NOT EXISTS
+        (
+            SELECT 1 FROM dbo.TDADUser WHERE NormalizedUsername = @NormalizedUsername
+        )
+        BEGIN
+            INSERT INTO dbo.TDADUser
+            (
+                CompanyID, Username, NormalizedUsername, PasswordHash, DisplayName,
+                IsActive, FailedLoginCount, LastPasswordChangeDate, CreateDate
+            )
+            VALUES
+            (
+                @CompanyID, @Username, @NormalizedUsername, @PasswordHash, N'Demo Admin',
+                1, 0, SYSUTCDATETIME(), SYSUTCDATETIME()
+            );
+        END;
+        SELECT UserID FROM dbo.TDADUser WHERE NormalizedUsername = @NormalizedUsername;
+        """;
+
+        var normalized = username.Trim().ToUpperInvariant();
+        var userId = await ScalarIdAsync(
+            connection,
+            transaction,
+            sql,
+            [
+                new SqlParameter("@CompanyID", companyId),
+                new SqlParameter("@Username", username.Trim()),
+                new SqlParameter("@NormalizedUsername", normalized),
+                new SqlParameter("@PasswordHash", _passwordService.HashPassword(normalized, password))
+            ],
+            cancellationToken);
+
+        const string branchSql = """
+        IF NOT EXISTS
+        (
+            SELECT 1 FROM dbo.TDADUserBranch
+            WHERE UserID = @UserID AND CompanyID = @CompanyID AND BranchID = @BranchID
+        )
+        BEGIN
+            INSERT INTO dbo.TDADUserBranch
+            (UserID, CompanyID, BranchID, IsDefault, IsActive, CreateDate)
+            VALUES (@UserID, @CompanyID, @BranchID, 1, 1, SYSUTCDATETIME());
+        END;
+        """;
+
+        await ExecuteAsync(
+            connection,
+            transaction,
+            branchSql,
+            [
+                new SqlParameter("@UserID", userId),
+                new SqlParameter("@CompanyID", companyId),
+                new SqlParameter("@BranchID", branchId)
+            ],
+            cancellationToken);
+
+        return userId;
+    }
+
+    private static async Task EnsureNormalUserProjectAsync(
+        SqlConnection connection,
+        SqlTransaction transaction,
+        long userId,
+        long companyId,
+        long projectId,
+        CancellationToken cancellationToken)
+    {
+        const string sql = """
+        IF NOT EXISTS
+        (
+            SELECT 1 FROM dbo.TDADUserProject
+            WHERE UserID = @UserID AND CompanyID = @CompanyID AND ProjectID = @ProjectID
+        )
+        BEGIN
+            INSERT INTO dbo.TDADUserProject
+            (CompanyID, UserID, ProjectID, IsDefault, IsActive, CreateDate)
+            VALUES (@CompanyID, @UserID, @ProjectID, 1, 1, SYSUTCDATETIME());
+        END;
+        """;
+
+        await ExecuteAsync(
+            connection,
+            transaction,
+            sql,
+            [
+                new SqlParameter("@UserID", userId),
+                new SqlParameter("@CompanyID", companyId),
+                new SqlParameter("@ProjectID", projectId)
+            ],
+            cancellationToken);
     }
 
     private static async Task<long> EnsurePartnerAsync(
@@ -330,6 +502,18 @@ public sealed class DatabaseSeeder
         return value is null || value is DBNull
             ? throw new InvalidOperationException("SQL ไม่คืนค่า ID")
             : Convert.ToInt64(value);
+    }
+
+    private static async Task ExecuteAsync(
+        SqlConnection connection,
+        SqlTransaction transaction,
+        string sql,
+        IEnumerable<SqlParameter> parameters,
+        CancellationToken cancellationToken)
+    {
+        await using var command = new SqlCommand(sql, connection, transaction);
+        command.Parameters.AddRange(parameters.ToArray());
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private static async Task<long?> OptionalIdAsync(

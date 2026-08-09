@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/auth/app_auth_controller.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/landing/presentation/pages/landing_page.dart';
+import '../../features/home/presentation/pages/authenticated_home_page.dart';
 import '../../features/support/partner/pages/partner_module_page.dart';
 import '../../features/support/company_setup/pages/company_setup_page.dart';
 import '../../features/support/presentation/pages/support_home_page.dart';
@@ -37,9 +38,29 @@ final GoRouter appRouter = GoRouter(
       return RoutePaths.login;
     }
 
+    final isCompanyRoute = path.startsWith('/company/');
+    if (isCompanyRoute && !appAuthController.isCompanyUser) {
+      return RoutePaths.authenticatedHome;
+    }
+
+    final isPartnerRoute = path.startsWith('/partner/');
+    if (isPartnerRoute && !appAuthController.isPartnerUser) {
+      return RoutePaths.authenticatedHome;
+    }
+
+    if (path == RoutePaths.landing) {
+      return appAuthController.isLaooSupport
+          ? RoutePaths.supportHome
+          : RoutePaths.authenticatedHome;
+    }
+
     // Authenticated Laoo Support users should not remain on Login.
     if (path == RoutePaths.login && appAuthController.isLaooSupport) {
       return RoutePaths.supportHome;
+    }
+
+    if (path == RoutePaths.login && appAuthController.isAuthenticated) {
+      return RoutePaths.authenticatedHome;
     }
 
     return null;
@@ -54,6 +75,56 @@ final GoRouter appRouter = GoRouter(
       path: RoutePaths.login,
       name: RouteNames.login,
       builder: (context, state) => const LoginPage(),
+    ),
+    GoRoute(
+      path: RoutePaths.authenticatedHome,
+      name: RouteNames.authenticatedHome,
+      builder: (context, state) => const AuthenticatedHomePage(),
+    ),
+    GoRoute(
+      path: RoutePaths.companyProducts,
+      name: RouteNames.companyProducts,
+      builder: (context, state) => const CompanyModulePlaceholderPage(
+        title: 'ข้อมูลสินค้า',
+        menuScope: WorkspaceMenuScope.company,
+        activeMenu: 'companyProducts',
+      ),
+    ),
+    GoRoute(
+      path: RoutePaths.companyCustomers,
+      name: RouteNames.companyCustomers,
+      builder: (context, state) => const CompanyModulePlaceholderPage(
+        title: 'ข้อมูลลูกค้า',
+        menuScope: WorkspaceMenuScope.company,
+        activeMenu: 'companyCustomers',
+      ),
+    ),
+    GoRoute(
+      path: RoutePaths.partnerCompanies,
+      name: RouteNames.partnerCompanies,
+      builder: (context, state) => const CompanyModulePlaceholderPage(
+        title: 'ข้อมูลบริษัท',
+        menuScope: WorkspaceMenuScope.partner,
+        activeMenu: 'partnerCompanies',
+      ),
+    ),
+    GoRoute(
+      path: RoutePaths.partnerBranches,
+      name: RouteNames.partnerBranches,
+      builder: (context, state) => const CompanyModulePlaceholderPage(
+        title: 'ข้อมูลสาขา',
+        menuScope: WorkspaceMenuScope.partner,
+        activeMenu: 'partnerBranches',
+      ),
+    ),
+    GoRoute(
+      path: RoutePaths.partnerUsers,
+      name: RouteNames.partnerUsers,
+      builder: (context, state) => const CompanyModulePlaceholderPage(
+        title: 'ผู้ใช้งานบริษัท',
+        menuScope: WorkspaceMenuScope.partner,
+        activeMenu: 'partnerUsers',
+      ),
     ),
     GoRoute(
       path: RoutePaths.supportHome,

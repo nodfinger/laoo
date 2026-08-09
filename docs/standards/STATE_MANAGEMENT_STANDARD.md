@@ -194,6 +194,13 @@ AI ทุกตัวต้องใช้มาตรฐานนี้เป�
 
 # 35. Version History
 
+## 36. Authentication Session Baseline (2026-08-09)
+
+- Auth Session เก็บ token, username, display name, user type และบริบท Partner/Company ที่ได้รับจาก API
+- เมื่อผู้ใช้เลือกจำการเข้าสู่ระบบ ให้ restore username/password และ session ตามนโยบายของระบบ
+- Logout ต้องกลับหน้า Login และล้าง token ที่หมดอายุ; remembered session ใช้ได้เฉพาะเมื่อผู้ใช้เลือกไว้
+- UI ต้องอ่านชื่อและบริบทจาก Session/Company Setup จริง ไม่กำหนดชื่อ Support แบบถาวร
+
   -----------------------------------------------------------------------
   Version                Date            Description
   ---------------------- --------------- --------------------------------

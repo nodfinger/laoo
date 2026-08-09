@@ -14,3 +14,9 @@ Default คือ `STYLE01` การสลับรหัส Group ไม่เ
 
 พื้นขาวใช้ตัวอักษรดำหรือสีโทนที่อ่านชัด พื้น Dark ใช้ตัวอักษรขาวหรือสีอ่อน Card/Container ใช้เส้นกรอบตาม Theme และ Action สีตาม Theme ยกเว้น Delete เป็นสีแดง
 
+## Implemented UI Baseline (2026-08-09)
+
+- `STYLE01` เป็นค่าเริ่มต้นของ Workspace
+- สีทั้งหมดของ Sidebar, Menu, Selected State, Card, Border, Button และ Pagination ต้องอ่านจาก Theme/Design Token กลาง
+- ห้ามกำหนดสีเฉพาะ Role หรือ Module แบบ hard-coded
+- การเปลี่ยน Theme ต้องมีผลกับ Support, Partner และ Company โดยคงโครงสร้างและ spacing เดียวกัน

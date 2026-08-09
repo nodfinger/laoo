@@ -25,6 +25,10 @@ class AppAuthController extends ChangeNotifier {
 
   bool get isLaooSupport => _session?.userType == 'LAOO_SUPPORT';
 
+  bool get isPartnerUser => _session?.userType == 'PARTNER_USER';
+
+  bool get isCompanyUser => _session?.userType == 'COMPANY_USER';
+
   Future<void> initialize() async {
     _status = AppAuthStatus.checking;
     _lastError = null;
@@ -52,7 +56,7 @@ class AppAuthController extends ChangeNotifier {
   Future<AuthSession> login({
     required String username,
     required String password,
-    String projectCode = 'LAOO',
+    bool rememberLogin = true,
   }) async {
     _lastError = null;
 
@@ -60,7 +64,7 @@ class AppAuthController extends ChangeNotifier {
       final session = await _authService.login(
         username: username,
         password: password,
-        projectCode: projectCode,
+        rememberLogin: rememberLogin,
       );
 
       _session = session;
@@ -75,7 +79,7 @@ class AppAuthController extends ChangeNotifier {
   }
 
   Future<void> logout() async {
-    await _authService.logout();
+    await _authService.logout(preserveRememberedSession: true);
 
     _session = null;
     _status = AppAuthStatus.unauthenticated;

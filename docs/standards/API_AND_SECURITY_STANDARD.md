@@ -32,3 +32,10 @@ Updated: 2026-08-09
 
 การเปลี่ยนข้อมูลสำคัญต้องเก็บ Actor, Actor Type, Target, Action, Before/After ที่เหมาะสม, Reason, Timestamp, Correlation ID และ Source/IP เท่าที่นโยบายอนุญาต
 
+## Implemented Identity and Scope Baseline (2026-08-09)
+
+- Login รองรับ `LAOO_SUPPORT`, `PARTNER_USER` และ `COMPANY_USER`
+- Token/Session ต้องส่ง user type และบริบท `PartnerID` หรือ `CompanyID` เมื่อมี
+- Server เป็นผู้กำหนด Data Scope จาก Session ห้ามเชื่อ identifier จาก Client เป็นหลักฐานสิทธิ์
+- Admin เห็นเมนูทั้งหมดของประเภท Login ตนเองโดยอัตโนมัติ; User ปกติเห็นตาม Permission ที่ได้รับ
+- Frontend ใช้ Permission เพื่อซ่อนเมนู/Action เท่านั้น; API ต้องตรวจ Permission, Scope และ Ownership ซ้ำ

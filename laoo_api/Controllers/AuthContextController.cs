@@ -68,7 +68,7 @@ public sealed class AuthContextController : ControllerBase
             normalizedUsername,
             cancellationToken);
 
-        if (laooUser is not null)
+        if (laooUser is not null && laooUser.IsSupportUser)
         {
             var projects = await LoadLaooProjectsAsync(
                 connection,
@@ -84,6 +84,31 @@ public sealed class AuthContextController : ControllerBase
                 IsSupportUser = laooUser.IsSupportUser,
                 CanLoginAsUser = laooUser.CanLoginAsUser,
                 Projects = projects
+            });
+        }
+
+        var partnerUser = await FindPartnerUserAsync(
+            connection,
+            normalizedUsername,
+            cancellationToken);
+
+        if (partnerUser is not null)
+        {
+            var partnerCompanies = await LoadPartnerCompaniesAsync(
+                connection,
+                partnerUser.PartnerID,
+                cancellationToken);
+
+            return Ok(new PostLoginContextResponse
+            {
+                UserType = AuthUserTypes.PartnerUser,
+                UserId = partnerUser.PartnerUserID,
+                PartnerId = partnerUser.PartnerID,
+                Username = partnerUser.Username,
+                DisplayName = partnerUser.DisplayName,
+                IsSupportUser = false,
+                CanLoginAsUser = false,
+                Companies = partnerCompanies
             });
         }
 
@@ -228,6 +253,83 @@ public sealed class AuthContextController : ControllerBase
             reader.GetInt64(reader.GetOrdinal("UserID")),
             reader.GetString(reader.GetOrdinal("Username")),
             reader.GetString(reader.GetOrdinal("DisplayName")));
+    }
+
+    private static async Task<PartnerUserRow?> FindPartnerUserAsync(
+        SqlConnection connection,
+        string normalizedUsername,
+        CancellationToken cancellationToken)
+    {
+        const string sql = """
+            SELECT TOP (1)
+                U.PartnerUserID,
+                U.PartnerID,
+                U.Username,
+                U.DisplayName
+            FROM dbo.TDADPartnerUser AS U
+            INNER JOIN dbo.TDADPartner AS P
+                ON P.PartnerID = U.PartnerID
+               AND P.IsActive = 1
+            WHERE U.NormalizedUsername = @NormalizedUsername
+              AND U.IsActive = 1
+              AND (U.LockedUntilUtc IS NULL OR U.LockedUntilUtc <= SYSUTCDATETIME());
+            """;
+
+        await using var command = new SqlCommand(sql, connection);
+        command.Parameters.Add(
+            new SqlParameter("@NormalizedUsername", SqlDbType.NVarChar, 100)
+            {
+                Value = normalizedUsername
+            });
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken))
+        {
+            return null;
+        }
+
+        return new PartnerUserRow(
+            reader.GetInt64(0),
+            reader.GetInt64(1),
+            reader.GetString(2),
+            reader.GetString(3));
+    }
+
+    private static async Task<List<AuthCompanyItem>> LoadPartnerCompaniesAsync(
+        SqlConnection connection,
+        long partnerId,
+        CancellationToken cancellationToken)
+    {
+        const string sql = """
+            SELECT CompanyID, CompanyCode, CompanyNameTH, CompanyNameEN
+            FROM dbo.TDADCompany
+            WHERE PartnerID = @PartnerID
+              AND IsActive = 1
+            ORDER BY CompanyCode;
+            """;
+
+        await using var command = new SqlCommand(sql, connection);
+        command.Parameters.Add(new SqlParameter("@PartnerID", SqlDbType.BigInt)
+        {
+            Value = partnerId
+        });
+
+        var result = new List<AuthCompanyItem>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            result.Add(new AuthCompanyItem
+            {
+                CompanyId = reader.GetInt64(0),
+                CompanyCode = reader.GetString(1),
+                CompanyNameTh = reader.GetString(2),
+                CompanyNameEn = reader.IsDBNull(3) ? null : reader.GetString(3),
+                IsDefault = false
+            });
+        }
+
+        return result;
     }
 
     private static async Task<List<AuthProjectItem>> LoadLaooProjectsAsync(
@@ -487,6 +589,12 @@ public sealed class AuthContextController : ControllerBase
 
     private sealed record NormalUserRow(
         long UserID,
+        string Username,
+        string DisplayName);
+
+    private sealed record PartnerUserRow(
+        long PartnerUserID,
+        long PartnerID,
         string Username,
         string DisplayName);
 }

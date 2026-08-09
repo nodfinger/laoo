@@ -58,6 +58,7 @@ public sealed class AuthenticationService
         AuthenticatedUser authenticated;
 
         if (laooUser is not null &&
+            laooUser.IsSupportUser &&
             laooUser.IsActive &&
             laooUser.CanAccessProject &&
             _passwordService.VerifyPassword(
@@ -67,8 +68,10 @@ public sealed class AuthenticationService
         {
             authenticated = new AuthenticatedUser(
                 SubjectId: $"laoo:{laooUser.LaooUserId}",
+                UserType: "LAOO_SUPPORT",
                 LoginMode: "LAOO",
                 LaooUserId: laooUser.LaooUserId,
+                PartnerId: null,
                 UserId: null,
                 CompanyId: null,
                 BranchId: null,
@@ -82,33 +85,69 @@ public sealed class AuthenticationService
         }
         else
         {
-            var companyUser = await FindCompanyUserAsync(
+            var partnerUser = await FindPartnerUserAsync(
                 connection,
                 normalizedUsername,
-                project.Value.ProjectId,
                 cancellationToken);
 
-            if (companyUser is null ||
+            if (partnerUser is not null &&
                 !_passwordService.VerifyPassword(
-                    companyUser.Username,
-                    companyUser.PasswordHash,
+                    partnerUser.Username,
+                    partnerUser.PasswordHash,
                     request.Password))
             {
                 return Failed("Username หรือ Password ไม่ถูกต้อง");
             }
 
-            authenticated = new AuthenticatedUser(
-                SubjectId: $"user:{companyUser.UserId}",
-                LoginMode: "USER",
-                LaooUserId: null,
-                UserId: companyUser.UserId,
-                CompanyId: companyUser.CompanyId,
-                BranchId: companyUser.BranchId,
-                ProjectId: project.Value.ProjectId,
-                ProjectCode: project.Value.ProjectCode,
-                Username: companyUser.Username,
-                DisplayName: companyUser.DisplayName,
-                CanLoginAsUser: false);
+            if (partnerUser is not null)
+            {
+                authenticated = new AuthenticatedUser(
+                    SubjectId: $"partner:{partnerUser.PartnerUserId}",
+                    UserType: "PARTNER_USER",
+                    LoginMode: "PARTNER",
+                    LaooUserId: null,
+                    PartnerId: partnerUser.PartnerId,
+                    UserId: null,
+                    CompanyId: null,
+                    BranchId: null,
+                    ProjectId: project.Value.ProjectId,
+                    ProjectCode: project.Value.ProjectCode,
+                    Username: partnerUser.Username,
+                    DisplayName: partnerUser.DisplayName,
+                    CanLoginAsUser: false);
+            }
+            else
+            {
+                var companyUser = await FindCompanyUserAsync(
+                    connection,
+                    normalizedUsername,
+                    project.Value.ProjectId,
+                    cancellationToken);
+
+                if (companyUser is null ||
+                    !_passwordService.VerifyPassword(
+                        companyUser.Username,
+                        companyUser.PasswordHash,
+                        request.Password))
+                {
+                    return Failed("Username หรือ Password ไม่ถูกต้อง");
+                }
+
+                authenticated = new AuthenticatedUser(
+                    SubjectId: $"user:{companyUser.UserId}",
+                    UserType: "COMPANY_USER",
+                    LoginMode: "USER",
+                    LaooUserId: null,
+                    PartnerId: companyUser.PartnerId,
+                    UserId: companyUser.UserId,
+                    CompanyId: companyUser.CompanyId,
+                    BranchId: companyUser.BranchId,
+                    ProjectId: project.Value.ProjectId,
+                    ProjectCode: project.Value.ProjectCode,
+                    Username: companyUser.Username,
+                    DisplayName: companyUser.DisplayName,
+                    CanLoginAsUser: false);
+            }
         }
 
         var token = _jwtTokenService.CreateToken(authenticated);
@@ -119,8 +158,10 @@ public sealed class AuthenticationService
             token.AccessToken,
             token.ExpiresAt,
             new LoginUserResponse(
+                authenticated.UserType,
                 authenticated.LoginMode,
                 authenticated.LaooUserId,
+                authenticated.PartnerId,
                 authenticated.UserId,
                 authenticated.CompanyId,
                 authenticated.BranchId,
@@ -175,6 +216,7 @@ public sealed class AuthenticationService
             u.Username,
             u.PasswordHash,
             u.DisplayName,
+            u.IsSupportUser,
             u.IsActive,
             u.CanLoginAsUser,
             CAST(CASE WHEN up.LaooUserProjectID IS NULL
@@ -208,7 +250,46 @@ public sealed class AuthenticationService
             reader.GetBoolean(4),
             reader.GetBoolean(5),
             reader.GetBoolean(6),
-            reader.GetBoolean(7));
+            reader.GetBoolean(7),
+            reader.GetBoolean(8));
+    }
+
+    private static async Task<PartnerUserRow?> FindPartnerUserAsync(
+        SqlConnection connection,
+        string normalizedUsername,
+        CancellationToken cancellationToken)
+    {
+        const string sql = """
+        SELECT TOP (1)
+            u.PartnerUserID,
+            u.PartnerID,
+            u.Username,
+            u.PasswordHash,
+            u.DisplayName
+        FROM dbo.TDADPartnerUser AS u
+        INNER JOIN dbo.TDADPartner AS p
+            ON p.PartnerID = u.PartnerID
+           AND p.IsActive = 1
+        WHERE u.NormalizedUsername = @NormalizedUsername
+          AND u.IsActive = 1
+          AND (u.LockedUntilUtc IS NULL OR u.LockedUntilUtc <= SYSUTCDATETIME());
+        """;
+
+        await using var command = new SqlCommand(sql, connection);
+        command.Parameters.AddWithValue("@NormalizedUsername", normalizedUsername);
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken))
+        {
+            return null;
+        }
+
+        return new PartnerUserRow(
+            reader.GetInt64(0),
+            reader.GetInt64(1),
+            reader.GetString(2),
+            reader.GetString(3),
+            reader.GetString(4));
     }
 
     private static async Task<CompanyUserRow?> FindCompanyUserAsync(
@@ -221,6 +302,7 @@ public sealed class AuthenticationService
         SELECT TOP (1)
             u.UserID,
             u.CompanyID,
+            c.PartnerID,
             b.BranchID,
             u.Username,
             u.PasswordHash,
@@ -237,7 +319,6 @@ public sealed class AuthenticationService
            AND up.CompanyID = u.CompanyID
            AND up.ProjectID = @ProjectID
            AND up.IsActive = 1
-           AND up.CanAccess = 1
         OUTER APPLY
         (
             SELECT TOP (1) ub.BranchID
@@ -269,10 +350,11 @@ public sealed class AuthenticationService
         return new CompanyUserRow(
             reader.GetInt64(0),
             reader.GetInt64(1),
-            reader.IsDBNull(2) ? null : reader.GetInt64(2),
-            reader.GetString(3),
+            reader.GetInt64(2),
+            reader.IsDBNull(3) ? null : reader.GetInt64(3),
             reader.GetString(4),
-            reader.GetString(5));
+            reader.GetString(5),
+            reader.GetString(6));
     }
 
     private sealed record LaooUserRow(
@@ -280,13 +362,22 @@ public sealed class AuthenticationService
         string Username,
         string PasswordHash,
         string DisplayName,
+        bool IsSupportUser,
         bool IsActive,
         bool CanLoginAsUser,
         bool CanAccessProject,
         bool CanLoginAsUserForProject);
 
+    private sealed record PartnerUserRow(
+        long PartnerUserId,
+        long PartnerId,
+        string Username,
+        string PasswordHash,
+        string DisplayName);
+
     private sealed record CompanyUserRow(
         long UserId,
+        long PartnerId,
         long CompanyId,
         long? BranchId,
         string Username,

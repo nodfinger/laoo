@@ -30,7 +30,6 @@ class AuthApiService {
     final request = LoginRequest(
       username: username.trim(),
       password: password,
-      projectCode: AppConfig.projectCode,
     );
 
     try {
