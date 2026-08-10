@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'laoo_design_tokens.dart';
+import 'laoo_typography.dart';
 
 enum LaooThemeKey {
   green,
@@ -46,24 +47,16 @@ abstract final class LaooTheme {
           : LaooColors.background,
     );
 
-    const thaiFontFamily = 'Leelawadee UI';
-    const thaiFallback = <String>[
-      'Noto Sans Thai',
-      'Tahoma',
-      'Arial',
-      'sans-serif',
-    ];
-
     return base.copyWith(
       textTheme: base.textTheme.apply(
-        fontFamily: thaiFontFamily,
-        fontFamilyFallback: thaiFallback,
+        fontFamily: LaooTypography.fontFamily,
+        fontFamilyFallback: LaooTypography.fontFallback,
         bodyColor: darkMode ? Colors.white : LaooColors.textPrimary,
         displayColor: darkMode ? Colors.white : LaooColors.textPrimary,
       ),
       primaryTextTheme: base.primaryTextTheme.apply(
-        fontFamily: thaiFontFamily,
-        fontFamilyFallback: thaiFallback,
+        fontFamily: LaooTypography.fontFamily,
+        fontFamilyFallback: LaooTypography.fontFallback,
       ),
       cardTheme: CardThemeData(
         color: darkMode ? const Color(0xFF1B2422) : Colors.white,

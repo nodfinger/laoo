@@ -10,6 +10,7 @@ import '../../features/support/company_setup/pages/company_setup_page.dart';
 import '../../features/support/presentation/pages/support_home_page.dart';
 import '../../features/support/presentation/pages/support_placeholder_page.dart';
 import '../../features/support/presentation/widgets/support_workspace_shell.dart';
+import '../../features/support/technical_info/pages/technical_info_page.dart';
 import 'route_names.dart';
 import 'route_paths.dart';
 
@@ -167,6 +168,11 @@ final List<GoRoute> _placeholderRoutes = [
   _placeholder(RoutePaths.permission, RouteNames.permission, 'Role / Permission', 'permission'),
   _placeholder(RoutePaths.audit, RouteNames.audit, 'Audit Log', 'audit'),
   _placeholder(RoutePaths.loginLog, RouteNames.loginLog, 'Login Log', 'loginLog'),
+  GoRoute(
+    path: RoutePaths.technicalInfo,
+    name: RouteNames.technicalInfo,
+    builder: (context, state) => const TechnicalInfoPage(),
+  ),
 ];
 
 GoRoute _placeholder(

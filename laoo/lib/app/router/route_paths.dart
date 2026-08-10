@@ -20,4 +20,5 @@ abstract final class RoutePaths {
   static const String audit = '/support/audit';
   static const String loginLog = '/support/login-log';
   static const String companySetup = '/support/company-setup';
+  static const String technicalInfo = '/support/technical-info';
 }

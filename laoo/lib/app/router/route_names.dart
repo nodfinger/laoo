@@ -20,4 +20,5 @@ abstract final class RouteNames {
   static const String audit = 'audit';
   static const String loginLog = 'loginLog';
   static const String companySetup = 'companySetup';
+  static const String technicalInfo = 'technicalInfo';
 }

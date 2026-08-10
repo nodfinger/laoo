@@ -736,7 +736,7 @@ class _Sidebar extends StatelessWidget {
                   accent: groupAccent,
                   initiallyExpanded: const {
                     'partner',
-                    'company', 'branch',
+                    'company', 'branch', 'technicalInfo',
                   }.contains(activeMenu),
                   children: [
                     _MenuItem(
@@ -765,6 +765,15 @@ class _Sidebar extends StatelessWidget {
                       selectedAccent: accent,
                       selectedForeground: selectedForeground,
                       onTap: () => context.goNamed(RouteNames.branch),
+                    ),
+                    _MenuItem(
+                      label: 'ข้อมูลด้านเทคนิค',
+                      icon: Icons.developer_mode_outlined,
+                      selected: activeMenu == 'technicalInfo',
+                      accent: itemForeground,
+                      selectedAccent: accent,
+                      selectedForeground: selectedForeground,
+                      onTap: () => context.goNamed(RouteNames.technicalInfo),
                     ),
                   ],
                 ),
@@ -910,6 +919,30 @@ class _ApiRoleScopedSidebarState extends State<_ApiRoleScopedSidebar> {
     BuildContext context,
     List<NavigationMenuGroup> groups,
   ) {
+    final menuGroups = groups.map((group) {
+      if (widget.menuScope != WorkspaceMenuScope.support ||
+          group.code != '01' ||
+          group.items.any((item) => item.code == '01004')) {
+        return group;
+      }
+      return NavigationMenuGroup(
+        code: group.code,
+        name: group.name,
+        iconName: group.iconName,
+        isExpandedDefault: group.isExpandedDefault,
+        items: [
+          ...group.items,
+          const NavigationMenuItem(
+            code: '01004',
+            name: 'ข้อมูลด้านเทคนิค',
+            routeName: 'technicalInfo',
+            routePath: '/support/technical-info',
+            featureCode: 'TECHNICAL_INFO',
+            iconName: 'developer_mode',
+          ),
+        ],
+      );
+    }).toList();
     return Material(
       color: widget.preset.sidebarBackground,
       child: Column(
@@ -930,7 +963,7 @@ class _ApiRoleScopedSidebarState extends State<_ApiRoleScopedSidebar> {
                   onTap: () => context.goNamed(RouteNames.authenticatedHome),
                 ),
                 const SizedBox(height: 2),
-                ...groups.where((group) => group.items.isNotEmpty).map(
+                ...menuGroups.where((group) => group.items.isNotEmpty).map(
                   (group) => _MenuGroup(
                     title: group.name,
                     accent: widget.preset.primary,
@@ -969,6 +1002,7 @@ class _ApiRoleScopedSidebarState extends State<_ApiRoleScopedSidebar> {
       'inventory_2' => Icons.inventory_2_outlined,
       'sell' => Icons.sell_outlined,
       'settings' => Icons.settings_outlined,
+      'developer_mode' => Icons.developer_mode_outlined,
       _ => Icons.menu_outlined,
     };
   }
@@ -1041,6 +1075,23 @@ class _RoleScopedSidebar extends StatelessWidget {
                     ),
                   ],
                 ),
+                if (menuScope == WorkspaceMenuScope.support)
+                  _MenuGroup(
+                    title: 'ข้อมูลด้านเทคนิค',
+                    accent: preset.primary,
+                    initiallyExpanded: true,
+                    children: [
+                      _MenuItem(
+                        label: 'ข้อมูลด้านเทคนิค',
+                        icon: Icons.developer_mode_outlined,
+                        selected: activeMenu == 'technicalInfo',
+                        accent: itemForeground,
+                        selectedAccent: preset.primary,
+                        selectedForeground: selectedForeground,
+                        onTap: () => context.goNamed(RouteNames.technicalInfo),
+                      ),
+                    ],
+                  ),
               ],
             ),
           ),

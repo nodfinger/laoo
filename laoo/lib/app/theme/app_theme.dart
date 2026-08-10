@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'app_theme_key.dart';
+import 'laoo_typography.dart';
 
 abstract final class AppTheme {
   static ThemeData fromKey(AppThemeKey key) {
@@ -35,7 +36,8 @@ abstract final class AppTheme {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          minimumSize: const Size(120, 48),
+          minimumSize: const Size(120, LaooTypography.buttonHeight),
+          maximumSize: const Size(double.infinity, LaooTypography.buttonHeight),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),

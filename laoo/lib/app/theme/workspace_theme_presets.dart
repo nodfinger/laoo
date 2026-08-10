@@ -47,25 +47,35 @@ class WorkspaceThemePreset {
       dividerColor: border,
     );
 
+    final themedText = baseTheme.textTheme.apply(
+      fontFamily: LaooTypography.fontFamily,
+      fontFamilyFallback: LaooTypography.fontFallback,
+    );
+
     return baseTheme.copyWith(
-      textTheme: baseTheme.textTheme.copyWith(
-        bodyLarge: baseTheme.textTheme.bodyLarge?.copyWith(
+      textTheme: themedText.copyWith(
+        bodyLarge: themedText.bodyLarge?.copyWith(
           fontSize: LaooTypography.body,
+          height: LaooTypography.bodyLineHeight,
           color: textPrimary,
         ),
-        bodyMedium: baseTheme.textTheme.bodyMedium?.copyWith(
+        bodyMedium: themedText.bodyMedium?.copyWith(
           fontSize: LaooTypography.body,
+          height: LaooTypography.bodyLineHeight,
           color: textPrimary,
         ),
-        bodySmall: baseTheme.textTheme.bodySmall?.copyWith(
+        bodySmall: themedText.bodySmall?.copyWith(
           fontSize: LaooTypography.bodySmall,
+          height: LaooTypography.bodyLineHeight,
           color: textSecondary,
         ),
-        labelLarge: baseTheme.textTheme.labelLarge?.copyWith(
+        labelLarge: themedText.labelLarge?.copyWith(
           fontSize: LaooTypography.button,
+          height: LaooTypography.bodyLineHeight,
         ),
-        labelMedium: baseTheme.textTheme.labelMedium?.copyWith(
+        labelMedium: themedText.labelMedium?.copyWith(
           fontSize: LaooTypography.inputLabel,
+          height: LaooTypography.bodyLineHeight,
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -75,22 +85,38 @@ class WorkspaceThemePreset {
           vertical: 12,
         ),
         labelStyle: TextStyle(
-          fontSize: LaooTypography.inputLabel,
+          fontFamily: LaooTypography.fontFamily,
+          fontFamilyFallback: LaooTypography.fontFallback,
+          fontSize: LaooTypography.inputHint,
+          height: LaooTypography.bodyLineHeight,
           color: textSecondary,
         ),
         floatingLabelStyle: TextStyle(
+          fontFamily: LaooTypography.fontFamily,
+          fontFamilyFallback: LaooTypography.fontFallback,
           fontSize: LaooTypography.inputLabel,
+          height: LaooTypography.bodyLineHeight,
           color: primary,
         ),
         hintStyle: TextStyle(
+          fontFamily: LaooTypography.fontFamily,
+          fontFamilyFallback: LaooTypography.fontFallback,
           fontSize: LaooTypography.inputHint,
+          height: LaooTypography.inputLineHeight,
           color: textSecondary,
         ),
         helperStyle: TextStyle(
+          fontFamily: LaooTypography.fontFamily,
+          fontFamilyFallback: LaooTypography.fontFallback,
           fontSize: LaooTypography.validation,
+          height: LaooTypography.bodyLineHeight,
           color: textSecondary,
         ),
-        errorStyle: const TextStyle(fontSize: LaooTypography.validation),
+        errorStyle: const TextStyle(
+          fontFamily: LaooTypography.fontFamily,
+          fontSize: LaooTypography.validation,
+          height: LaooTypography.bodyLineHeight,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
           borderSide: BorderSide(color: border),
@@ -104,26 +130,72 @@ class WorkspaceThemePreset {
           borderSide: BorderSide(color: primary, width: 1.5),
         ),
       ),
+      dialogTheme: DialogThemeData(
+        titleTextStyle: TextStyle(
+          fontFamily: LaooTypography.fontFamily,
+          fontFamilyFallback: LaooTypography.fontFallback,
+          fontSize: LaooTypography.sectionTitle,
+          height: LaooTypography.titleLineHeight,
+          fontWeight: FontWeight.w700,
+          color: textPrimary,
+        ),
+        contentTextStyle: TextStyle(
+          fontFamily: LaooTypography.fontFamily,
+          fontFamilyFallback: LaooTypography.fontFallback,
+          fontSize: LaooTypography.inputText,
+          height: LaooTypography.bodyLineHeight,
+          color: textPrimary,
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(18, 4, 18, 10),
+      ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           textStyle: const TextStyle(
+            fontFamily: LaooTypography.fontFamily,
             fontSize: LaooTypography.button,
+            height: LaooTypography.bodyLineHeight,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          alignment: Alignment.center,
+          minimumSize: const Size(0, LaooTypography.buttonHeight),
+          maximumSize: const Size(double.infinity, LaooTypography.buttonHeight),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+          textStyle: const TextStyle(
+            fontFamily: LaooTypography.fontFamily,
+            fontSize: LaooTypography.button,
+            height: LaooTypography.bodyLineHeight,
             fontWeight: FontWeight.w700,
           ),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
+          alignment: Alignment.center,
+          minimumSize: const Size(0, LaooTypography.buttonHeight),
+          maximumSize: const Size(double.infinity, LaooTypography.buttonHeight),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
           textStyle: const TextStyle(
+            fontFamily: LaooTypography.fontFamily,
             fontSize: LaooTypography.button,
+            height: LaooTypography.bodyLineHeight,
             fontWeight: FontWeight.w700,
           ),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
+          alignment: Alignment.center,
+          minimumSize: const Size(0, LaooTypography.buttonHeight),
+          maximumSize: const Size(double.infinity, LaooTypography.buttonHeight),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
           textStyle: const TextStyle(
+            fontFamily: LaooTypography.fontFamily,
             fontSize: LaooTypography.button,
+            height: LaooTypography.bodyLineHeight,
             fontWeight: FontWeight.w700,
           ),
         ),
