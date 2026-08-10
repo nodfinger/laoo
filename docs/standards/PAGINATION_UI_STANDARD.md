@@ -132,6 +132,10 @@ Pagination ต้องรองรับ Theme/STYLE ของ Laoo Solutions
 9.  ห้ามกระทบ Business Logic ของ List
 10. ห้ามกำหนดสีที่ขัดกับ Theme/STYLE
 
+## 13. Reference Screen Contract
+
+ทุกหน้ารายการใหม่ต้องตรวจเทียบกับ Partner List ก่อนส่งมอบ: ตารางเต็มพื้นที่, Action Column, เส้นแบ่งแถว, Search/Clear Filter และจำนวนแถวต่อหน้าจาก `TDSTCompanySetUp.RowSTD`
+
 ------------------------------------------------------------------------
 
 **Laoo Solutions --- Pagination UI Standard**

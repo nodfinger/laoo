@@ -373,6 +373,16 @@ Flow ที่อนุมัติ:
 - Company เห็นและจัดการเฉพาะข้อมูล Company/Branch ของตนเอง
 - หลังสร้าง entity สำเร็จ ระบบต้องสร้างบริบทและผู้ดูแลเริ่มต้นตามกติกา ก่อนเปิดให้ใช้งาน Module
 - หน้าจอ CRUD ต้องซ่อนปุ่มและเมนูเมื่อไม่มี Permission แต่ Backend ต้องตรวจซ้ำทุก Action
+
+## 16. List/Form Reference UI
+
+- หน้า List/Table ต้องยึด Partner List เป็น Reference Implementation
+- Action Column อยู่ซ้ายสุด; Header และ Icon ของทุกแถวจัดกึ่งกลาง
+- ต้องมีเส้นแบ่งระหว่างแถวเพื่ออ่านรายการได้ชัดเจน
+- Search Toolbar ต้องมีปุ่ม `ล้าง Filter` และปุ่ม Refresh ตามความเหมาะสม
+- List ที่มีหลายรายการต้องใช้ Pagination ตาม `RowSTD` จาก `TDSTCompanySetUp`
+- Add/Edit ใช้หน้าเต็ม Content Area ของ Shared Workspace ไม่ใช้ Popup สำหรับฟอร์มหลาย Field
+- Caption ต้องเรียงรูปแบบ `{ชื่อหน้าจอ} > {ประเภท Action}` เช่น `ข้อมูลผู้ใช้บริการ > เพิ่ม` และ `ข้อมูลผู้ใช้บริการ > แก้ไข`
 - มีข้อมูลอ้างอิง → HTTP 409 → ไม่ลบ → แสดงเหตุผล
 
 Action Column:

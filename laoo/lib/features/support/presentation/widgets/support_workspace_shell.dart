@@ -6,6 +6,8 @@ import '../../../../app/theme/laoo_typography.dart';
 import '../../../../app/theme/workspace_theme_presets.dart';
 import '../../../../core/auth/app_auth_controller.dart';
 import '../../../../core/company_setup/company_setup_controller.dart';
+import '../../../../core/navigation/navigation_menu.dart';
+import '../../../../core/navigation/navigation_menu_repository.dart';
 
 final ValueNotifier<Set<String>> supportFavoritePages =
     ValueNotifier<Set<String>>(<String>{});
@@ -30,8 +32,8 @@ class WorkspacePageTitle extends StatelessWidget {
           child: Text(
             title,
             style: TextStyle(
-              fontSize: LaooTypography.pageTitle,
-              fontWeight: LaooTypography.pageTitleWeight,
+              fontSize: LaooTypography.workspaceCaption,
+              fontWeight: LaooTypography.workspaceCaptionWeight,
               color: accent,
             ),
           ),
@@ -84,33 +86,40 @@ class SupportWorkspaceShell extends StatelessWidget {
       valueListenable: workspaceThemeController,
       builder: (context, preset, _) {
         final compact = MediaQuery.sizeOf(context).width < 900;
-        final isHybrid = preset.group == 'Hybrid Dark Menu';
         final baseTheme = preset.toThemeData();
-        final workspaceTheme = isHybrid
-            ? baseTheme.copyWith(
-                scaffoldBackgroundColor: Colors.white,
-                cardColor: Colors.white,
-                colorScheme: baseTheme.colorScheme.copyWith(
-                  surface: Colors.white,
-                ),
-                cardTheme: baseTheme.cardTheme.copyWith(
-                  color: Colors.white,
-                  surfaceTintColor: Colors.transparent,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(
-                      color: preset.primary.withValues(alpha: 0.55),
-                      width: 1,
-                    ),
-                  ),
-                ),
-              )
-            : baseTheme;
+        // Theme changes the navigation chrome and accent colors. The content
+        // workspace is intentionally white for every STYLE for readability.
+        final workspaceTheme = baseTheme.copyWith(
+          brightness: Brightness.light,
+          scaffoldBackgroundColor: Colors.white,
+          cardColor: Colors.white,
+          colorScheme: baseTheme.colorScheme.copyWith(
+            brightness: Brightness.light,
+            surface: Colors.white,
+            onSurface: Colors.black87,
+            onSurfaceVariant: Colors.black54,
+          ),
+          textTheme: baseTheme.textTheme.apply(
+            bodyColor: Colors.black87,
+            displayColor: Colors.black87,
+          ),
+          cardTheme: baseTheme.cardTheme.copyWith(
+            color: Colors.white,
+            surfaceTintColor: Colors.transparent,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(
+                color: preset.primary.withValues(alpha: 0.55),
+                width: 1,
+              ),
+            ),
+          ),
+        );
         return Theme(
           data: workspaceTheme,
           child: Builder(
             builder: (context) => Scaffold(
-              backgroundColor: isHybrid ? Colors.white : preset.background,
+              backgroundColor: Colors.white,
               drawer: compact
                   ? Drawer(
                       backgroundColor: preset.sidebarBackground,
@@ -119,8 +128,8 @@ class SupportWorkspaceShell extends StatelessWidget {
                   : null,
               appBar: compact
                   ? AppBar(
-                      backgroundColor: preset.surface,
-                      surfaceTintColor: preset.surface,
+                      backgroundColor: Colors.white,
+                      surfaceTintColor: Colors.transparent,
                       titleSpacing: 0,
                       actions: [
                         _ThemeButton(compact: true, preset: preset),
@@ -693,7 +702,7 @@ class _Sidebar extends StatelessWidget {
         : const Color(0xFFF9FAFB);
 
     if (menuScope != WorkspaceMenuScope.support) {
-      return _RoleScopedSidebar(
+      return _ApiRoleScopedSidebar(
         menuScope: menuScope,
         activeMenu: activeMenu,
         preset: preset,
@@ -740,7 +749,7 @@ class _Sidebar extends StatelessWidget {
                       onTap: () => context.goNamed(RouteNames.partner),
                     ),
                     _MenuItem(
-                      label: 'Company',
+                      label: 'ข้อมูลผู้ใช้บริการ',
                       icon: Icons.apartment_outlined,
                       selected: activeMenu == 'company',
                       accent: itemForeground,
@@ -852,6 +861,116 @@ class _Sidebar extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _ApiRoleScopedSidebar extends StatefulWidget {
+  const _ApiRoleScopedSidebar({
+    required this.menuScope,
+    required this.activeMenu,
+    required this.preset,
+    required this.itemForeground,
+    required this.selectedForeground,
+  });
+
+  final WorkspaceMenuScope menuScope;
+  final String? activeMenu;
+  final WorkspaceThemePreset preset;
+  final Color itemForeground;
+  final Color selectedForeground;
+
+  @override
+  State<_ApiRoleScopedSidebar> createState() => _ApiRoleScopedSidebarState();
+}
+
+class _ApiRoleScopedSidebarState extends State<_ApiRoleScopedSidebar> {
+  late final Future<List<NavigationMenuGroup>> _menus =
+      NavigationMenuRepository().getMenus();
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<NavigationMenuGroup>>(
+      future: _menus,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return _RoleScopedSidebar(
+            menuScope: widget.menuScope,
+            activeMenu: widget.activeMenu,
+            preset: widget.preset,
+            itemForeground: widget.itemForeground,
+            selectedForeground: widget.selectedForeground,
+          );
+        }
+        return _buildSidebar(context, snapshot.data ?? const []);
+      },
+    );
+  }
+
+  Widget _buildSidebar(
+    BuildContext context,
+    List<NavigationMenuGroup> groups,
+  ) {
+    return Material(
+      color: widget.preset.sidebarBackground,
+      child: Column(
+        children: [
+          _BrandHeader(accent: widget.preset.primary, preset: widget.preset),
+          Divider(height: 1, color: widget.preset.border),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
+              children: [
+                _MenuItem(
+                  label: 'หน้าหลัก',
+                  icon: Icons.home_outlined,
+                  selected: widget.activeMenu == 'home',
+                  accent: widget.itemForeground,
+                  selectedAccent: widget.preset.primary,
+                  selectedForeground: widget.selectedForeground,
+                  onTap: () => context.goNamed(RouteNames.authenticatedHome),
+                ),
+                const SizedBox(height: 2),
+                ...groups.where((group) => group.items.isNotEmpty).map(
+                  (group) => _MenuGroup(
+                    title: group.name,
+                    accent: widget.preset.primary,
+                    initiallyExpanded: group.isExpandedDefault ||
+                        group.items.any(
+                          (item) => item.routeName == widget.activeMenu,
+                        ),
+                    children: group.items.map((item) {
+                      return _MenuItem(
+                        label: item.name,
+                        icon: _iconFor(item.iconName),
+                        selected: item.routeName == widget.activeMenu,
+                        accent: widget.itemForeground,
+                        selectedAccent: widget.preset.primary,
+                        selectedForeground: widget.selectedForeground,
+                        onTap: item.routePath == null
+                            ? null
+                            : () => context.go(item.routePath!),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  IconData _iconFor(String? name) {
+    return switch (name) {
+      'apartment' => Icons.apartment_outlined,
+      'account_tree' => Icons.account_tree_outlined,
+      'people' => Icons.people_outline,
+      'inventory_2' => Icons.inventory_2_outlined,
+      'sell' => Icons.sell_outlined,
+      'settings' => Icons.settings_outlined,
+      _ => Icons.menu_outlined,
+    };
   }
 }
 

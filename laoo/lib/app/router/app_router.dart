@@ -5,6 +5,7 @@ import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/landing/presentation/pages/landing_page.dart';
 import '../../features/home/presentation/pages/authenticated_home_page.dart';
 import '../../features/support/partner/pages/partner_module_page.dart';
+import '../../features/partner/pages/partner_company_page.dart';
 import '../../features/support/company_setup/pages/company_setup_page.dart';
 import '../../features/support/presentation/pages/support_home_page.dart';
 import '../../features/support/presentation/pages/support_placeholder_page.dart';
@@ -136,6 +137,13 @@ final GoRouter appRouter = GoRouter(
       name: RouteNames.partner,
       builder: (context, state) => const PartnerModulePage(),
     ),
+    GoRoute(
+      path: RoutePaths.company,
+      name: RouteNames.company,
+      builder: (context, state) => const PartnerCompanyPage(
+        menuScope: WorkspaceMenuScope.support,
+      ),
+    ),
     ..._placeholderRoutes,
     GoRoute(
       path: RoutePaths.companySetup,
@@ -150,7 +158,6 @@ final GoRouter appRouter = GoRouter(
 );
 
 final List<GoRoute> _placeholderRoutes = [
-  _placeholder(RoutePaths.company, RouteNames.company, 'Company', 'company'),
   _placeholder(RoutePaths.branch, RouteNames.branch, 'Branch', 'branch'),
   _placeholder(RoutePaths.laooUser, RouteNames.laooUser, 'Laoo User', 'laooUser'),
   _placeholder(RoutePaths.partnerUser, RouteNames.partnerUser, 'Partner User', 'partnerUser'),

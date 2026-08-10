@@ -29,6 +29,8 @@ Desktop.ini
 *.p12
 *.jks
 *.keystore
+/api_token
 
 # Generated
 coverage/
+/.build/

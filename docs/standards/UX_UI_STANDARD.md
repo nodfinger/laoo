@@ -328,6 +328,15 @@ Technical Error, Exception, SQL Error และ Stack Trace ให้บัน�
 - Header ด้านขวาต้องแสดงชื่อผู้ใช้และประเภท/บริบทจาก Login จริง
 - Title Bar ใช้ชื่อเจ้าของระบบจาก `TDSTCompanySetUp`; ชื่อหน้าจอใน Content ใช้ `menuName`
 
+## 14.2 List/Table and Add/Edit Baseline
+
+- Action Column อยู่ซ้ายสุด และหัวคอลัมน์/ปุ่ม Edit/Delete จัดกึ่งกลาง
+- DataTable ต้องมีเส้นแบ่งแต่ละแถว และใช้ความกว้าง Content ให้เต็มพื้นที่อย่างเหมาะสม
+- Search ด้านบนต้องมี `ค้นหา`, `ล้าง Filter` และ Refresh เมื่อหน้าจอรองรับ
+- Pagination ต้องใช้ `RowSTD` จาก `TDSTCompanySetUp` และวางชิดซ้ายใต้ Table ตาม `PAGINATION_UI_STANDARD.md`
+- Add/Edit ที่มีหลาย Field ต้องเปิดเป็นหน้าเต็ม Content Area ไม่ใช้ Popup
+- Caption ต้องเรียง `{ชื่อหน้าจอ} > {ประเภท Action}`
+
 ------------------------------------------------------------------------
 
 ## 15. Authentication Navigation Standard
@@ -526,7 +535,7 @@ Background/Surface - Sidebar Background/Text - Selected Menu - Page
 Caption - Card Border/Caption - Table Header/Text - Primary/Action
 Button - Input Focus - Favorite Active
 
-ทุก Hybrid Style 01–10 ต้องใช้ Workspace, Content และ Title Bar เป็นพื้นสีขาว สี Theme ใช้กับ Sidebar และเส้นกรอบ Card/Container เป็นหลัก ส่วน Style ที่ไม่ใช่ Dark ให้ Content / Action / Form ใช้พื้นสีขาวเป็นหลัก
+ทุก STYLE ต้องใช้ Content Workspace, DataTable, List, Card, Form และ Dialog เป็นพื้นสีขาวเสมอ สี Theme ใช้กับ Sidebar, Navigation, Selected State, เส้นกรอบ และ Action เป็นหลัก ส่วน Dark STYLE ห้ามทำให้พื้นข้อมูลหรือข้อความข้อมูลกลายเป็นสีมืดที่อ่านยาก
 
 ### 19.3 Semantic Colors
 

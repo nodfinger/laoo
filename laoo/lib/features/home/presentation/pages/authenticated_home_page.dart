@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/auth/app_auth_controller.dart';
 import '../../../support/presentation/widgets/support_workspace_shell.dart';
+import '../../../partner/pages/partner_company_page.dart';
 
 class AuthenticatedHomePage extends StatelessWidget {
   const AuthenticatedHomePage({super.key});
@@ -101,6 +102,9 @@ class CompanyModulePlaceholderPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (menuScope == WorkspaceMenuScope.partner && activeMenu == 'partnerCompanies') {
+      return const PartnerCompanyPage();
+    }
     return SupportWorkspaceShell(
       pageTitle: title,
       activeMenu: activeMenu,

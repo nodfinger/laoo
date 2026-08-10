@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 abstract final class LaooTypography {
   // Page hierarchy
   static const double pageTitle = 28;
+  static const double workspaceCaption = 18;
   static const double sectionTitle = 16;
   static const double subsectionTitle = 14;
 
@@ -40,6 +41,7 @@ abstract final class LaooTypography {
 
   // Weight standards
   static const FontWeight pageTitleWeight = FontWeight.w900;
+  static const FontWeight workspaceCaptionWeight = FontWeight.w700;
   static const FontWeight strongWeight = FontWeight.w800;
   static const FontWeight emphasizedWeight = FontWeight.w700;
   static const FontWeight normalWeight = FontWeight.w400;
