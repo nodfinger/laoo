@@ -17,10 +17,21 @@ abstract final class AppTheme {
       brightness: Brightness.light,
     );
 
-    return ThemeData(
+    final base = ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
       scaffoldBackgroundColor: colorScheme.surface,
+    );
+
+    return base.copyWith(
+      textTheme: base.textTheme.apply(
+        fontFamily: LaooTypography.fontFamily,
+        fontFamilyFallback: LaooTypography.fontFallback,
+      ),
+      primaryTextTheme: base.primaryTextTheme.apply(
+        fontFamily: LaooTypography.fontFamily,
+        fontFamilyFallback: LaooTypography.fontFallback,
+      ),
       appBarTheme: AppBarTheme(
         centerTitle: false,
         backgroundColor: colorScheme.primary,

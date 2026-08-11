@@ -11,8 +11,8 @@ Baseline: 2026-08-09
 | เปิด–ปิด Module | `business/ORGANIZATION_AND_MODULE_STANDARD.md` | `standards/API_AND_SECURITY_STANDARD.md` |
 | ออกแบบฐานข้อมูล | `architecture/DATABASE_STRUCTURE.md` | `standards/DATABASE_DELIVERY_STANDARD.md` |
 | สร้างหรือแก้ API | `standards/API_AND_SECURITY_STANDARD.md` | Contract ใน `api/` |
-| UX/UI และ Workspace | `standards/UX_UI_STANDARD.md` | `standards/CRUD_FLOW_STANDARD.md`, `standards/TYPOGRAPHY_STANDARD.md` |
-| Pagination/List | `standards/PAGINATION_UI_STANDARD.md` | `standards/CRUD_FLOW_STANDARD.md` |
+| UX/UI, Workspace และ Screen Flow | `standards/UX_UI_STANDARD.md` | `standards/TYPOGRAPHY_STANDARD.md` |
+| Pagination/List | `standards/PAGINATION_UI_STANDARD.md` | `standards/UX_UI_STANDARD.md` |
 | Theme | `standards/THEME_STANDARD.md` | `standards/UX_UI_STANDARD.md`, `standards/WORKSPACE_STANDARD.md` |
 | Routing/Route Guard | `standards/ROUTING_STANDARD.md` | `architecture/AUTHENTICATION_STRUCTURE.md` |
 | Flutter State | `standards/STATE_MANAGEMENT_STANDARD.md` | `architecture/ARCHITECTURE.md` |

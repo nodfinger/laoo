@@ -26,14 +26,15 @@ public sealed class SupportCompanyController : ControllerBase
         await using var connection = new SqlConnection(_configuration.GetConnectionString("LaooDatabase"));
         await connection.OpenAsync(cancellationToken);
         const string sql = """
-SELECT CompanyID, PartnerID, CompanyCode, CompanyNameTH, CompanyNameEN, TaxID,
-       Email, Telephone, AddressText, IsActive, CreateDate, CreateBy, UpdateDate,
-       UpdateBy, ThemeName
-FROM dbo.TDADCompany
-WHERE (@PartnerID IS NULL OR PartnerID = @PartnerID)
-  AND (@Search IS NULL OR CompanyCode LIKE N'%' + @Search + N'%' OR CompanyNameTH LIKE N'%' + @Search + N'%' OR ISNULL(CompanyNameEN,N'') LIKE N'%' + @Search + N'%')
-  AND (@IsActive IS NULL OR IsActive = @IsActive)
-ORDER BY CompanyCode;
+SELECT C.CompanyID, C.PartnerID, C.CompanyCode, C.CompanyNameTH, C.CompanyNameEN, C.TaxID,
+       C.Email, C.Telephone, C.AddressText, C.IsActive, C.CreateDate, C.CreateBy, C.UpdateDate,
+       C.UpdateBy, C.ThemeName, P.PartnerNameTH
+FROM dbo.TDADCompany AS C
+INNER JOIN dbo.TDADPartner AS P ON P.PartnerID = C.PartnerID
+WHERE (@PartnerID IS NULL OR C.PartnerID = @PartnerID)
+  AND (@Search IS NULL OR C.CompanyCode LIKE N'%' + @Search + N'%' OR C.CompanyNameTH LIKE N'%' + @Search + N'%' OR ISNULL(C.CompanyNameEN,N'') LIKE N'%' + @Search + N'%')
+  AND (@IsActive IS NULL OR C.IsActive = @IsActive)
+ORDER BY C.CompanyCode;
 """;
         await using var command = new SqlCommand(sql, connection);
         command.Parameters.Add("@PartnerID", SqlDbType.BigInt).Value = partnerId ?? (object)DBNull.Value;
@@ -45,11 +46,59 @@ ORDER BY CompanyCode;
         return Ok(result);
     }
 
+    [HttpPut("{companyId:long}")]
+    public async Task<IActionResult> Update(long companyId, PartnerCompanyUpsertRequest request, CancellationToken cancellationToken)
+    {
+        if (!IsSupport()) return Forbid();
+        if (string.IsNullOrWhiteSpace(request.CompanyNameTh))
+            return BadRequest(new { message = "กรุณาระบุชื่อผู้ใช้บริการ" });
+
+        await using var connection = new SqlConnection(_configuration.GetConnectionString("LaooDatabase"));
+        await connection.OpenAsync(cancellationToken);
+        const string sql = """
+UPDATE dbo.TDADCompany SET CompanyNameTH=@CompanyNameTH, CompanyNameEN=@CompanyNameEN, TaxID=@TaxID, IsActive=@IsActive,
+Email=@Email, Telephone=@Telephone, AddressText=@AddressText, ThemeName=@ThemeName,
+UpdateDate=SYSUTCDATETIME()
+WHERE CompanyID=@CompanyID;
+""";
+        await using var command = new SqlCommand(sql, connection);
+        command.Parameters.Add("@CompanyID", SqlDbType.BigInt).Value = companyId;
+        Add(command, "@CompanyNameTH", SqlDbType.NVarChar, request.CompanyNameTh.Trim(), 200);
+        Add(command, "@CompanyNameEN", SqlDbType.NVarChar, Null(request.CompanyNameEn), 200);
+        Add(command, "@TaxID", SqlDbType.NVarChar, Null(request.TaxId), 20);
+        Add(command, "@Email", SqlDbType.NVarChar, Null(request.Email), 320);
+        Add(command, "@Telephone", SqlDbType.NVarChar, Null(request.Telephone), 50);
+        Add(command, "@AddressText", SqlDbType.NVarChar, Null(request.AddressText), 1000);
+        command.Parameters.Add("@IsActive", SqlDbType.Bit).Value = request.IsActive;
+        Add(command, "@ThemeName", SqlDbType.NVarChar, Null(request.ThemeName), 100);
+        return await command.ExecuteNonQueryAsync(cancellationToken) == 0 ? NotFound() : NoContent();
+    }
+
+    [HttpDelete("{companyId:long}")]
+    public async Task<IActionResult> Delete(long companyId, CancellationToken cancellationToken)
+    {
+        if (!IsSupport()) return Forbid();
+        await using var connection = new SqlConnection(_configuration.GetConnectionString("LaooDatabase"));
+        await connection.OpenAsync(cancellationToken);
+        const string dependencySql = "SELECT CASE WHEN EXISTS (SELECT 1 FROM dbo.TDADBranch WHERE CompanyID=@CompanyID) OR EXISTS (SELECT 1 FROM dbo.TDADUser WHERE CompanyID=@CompanyID) THEN CAST(1 AS BIGINT) ELSE CAST(0 AS BIGINT) END;";
+        await using var dependency = new SqlCommand(dependencySql, connection);
+        dependency.Parameters.Add("@CompanyID", SqlDbType.BigInt).Value = companyId;
+        if (Convert.ToInt64(await dependency.ExecuteScalarAsync(cancellationToken)) > 0)
+            return Conflict(new { code = "COMPANY_IN_USE", message = "ไม่สามารถลบผู้ใช้บริการที่มีสาขาหรือผู้ใช้งานอยู่ได้" });
+        await using var command = new SqlCommand("DELETE FROM dbo.TDADCompany WHERE CompanyID=@CompanyID", connection);
+        command.Parameters.Add("@CompanyID", SqlDbType.BigInt).Value = companyId;
+        return await command.ExecuteNonQueryAsync(cancellationToken) == 0 ? NotFound() : NoContent();
+    }
+
+    private bool IsSupport() => string.Equals(User.FindFirstValue("user_type"), "LAOO_SUPPORT", StringComparison.OrdinalIgnoreCase);
+    private static string? Null(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    private static void Add(SqlCommand c, string name, SqlDbType type, string? value, int size) => c.Parameters.Add(name, type, size).Value = (object?)value ?? DBNull.Value;
+
     private static PartnerCompanyResponse Read(SqlDataReader r) => new()
     {
         CompanyId = r.GetInt64(0), PartnerId = r.GetInt64(1), CompanyCode = r.GetString(2), CompanyNameTh = r.GetString(3),
         CompanyNameEn = N(r, 4), TaxId = N(r, 5), Email = N(r, 6), Telephone = N(r, 7), AddressText = N(r, 8),
-        IsActive = r.GetBoolean(9), CreateDate = r.GetDateTime(10), CreateBy = L(r, 11), UpdateDate = D(r, 12), UpdateBy = L(r, 13), ThemeName = N(r, 14)
+        IsActive = r.GetBoolean(9), CreateDate = r.GetDateTime(10), CreateBy = L(r, 11), UpdateDate = D(r, 12), UpdateBy = L(r, 13), ThemeName = N(r, 14), PartnerNameTh = r.GetString(15)
     };
     private static string? N(SqlDataReader r, int i) => r.IsDBNull(i) ? null : r.GetString(i);
     private static long? L(SqlDataReader r, int i) => r.IsDBNull(i) ? null : r.GetInt64(i);

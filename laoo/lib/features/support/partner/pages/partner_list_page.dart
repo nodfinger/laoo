@@ -321,7 +321,7 @@ class _PartnerListPageState extends State<PartnerListPage> {
                     ),
                     headingTextStyle: TextStyle(
                       color: Theme.of(context).colorScheme.primary,
-                      fontWeight: FontWeight.normal,
+                      fontWeight: FontWeight.w700,
                     ),
                     dataRowMinHeight: 52,
                     dataRowMaxHeight: 60,

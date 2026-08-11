@@ -86,7 +86,7 @@ Baseline date: 2026-08-09
 | `standards/API_ENDPOINT_STANDARD.md` | MERGE/RETIRE | `เอกสาร Baseline ที่เกี่ยวข้อง` | ไม่เก็บเป็นไฟล์แยกเพื่อลดความซ้ำซ้อน |
 | `standards/COMPANY_PARTNER_BRANCH_STANDARD.md` | MERGE/RETIRE | `เอกสาร Baseline ที่เกี่ยวข้อง` | ไม่เก็บเป็นไฟล์แยกเพื่อลดความซ้ำซ้อน |
 | `standards/CONNECTION_PROFILE_STANDARD.md` | MERGE/RETIRE | `เอกสาร Baseline ที่เกี่ยวข้อง` | ไม่เก็บเป็นไฟล์แยกเพื่อลดความซ้ำซ้อน |
-| `standards/CRUD_FLOW_STANDARD.md` | KEEP/UPDATE | `standards/CRUD_FLOW_STANDARD.md` | เก็บไว้ใน Baseline และตรวจ/แก้จุดที่เกี่ยวข้องแล้ว |
+| `standards/CRUD_FLOW_STANDARD.md` | MERGE/RETIRE | `standards/UX_UI_STANDARD.md` | รวม CRUD, UpdateOnly และ ShowOnly ไว้ใน UX/UI Standard ไฟล์เดียว |
 | `standards/DATABASE_DELIVERY_STANDARD.md` | KEEP/UPDATE | `standards/DATABASE_DELIVERY_STANDARD.md` | เก็บไว้ใน Baseline และตรวจ/แก้จุดที่เกี่ยวข้องแล้ว |
 | `standards/DATABASE_ROUTING_STANDARD.md` | MERGE/RETIRE | `เอกสาร Baseline ที่เกี่ยวข้อง` | ไม่เก็บเป็นไฟล์แยกเพื่อลดความซ้ำซ้อน |
 | `standards/DEVELOPMENT_ENVIRONMENT_STANDARD.md` | KEEP/UPDATE | `standards/DEVELOPMENT_ENVIRONMENT_STANDARD.md` | เก็บไว้ใน Baseline และตรวจ/แก้จุดที่เกี่ยวข้องแล้ว |
@@ -99,7 +99,7 @@ Baseline date: 2026-08-09
 | `standards/ROUTING_STANDARD_v1.0.md` | MERGE/RETIRE | `เอกสาร Baseline ที่เกี่ยวข้อง` | ไม่เก็บเป็นไฟล์แยกเพื่อลดความซ้ำซ้อน |
 | `standards/STATE_MANAGEMENT_STANDARD.md` | KEEP/UPDATE | `standards/STATE_MANAGEMENT_STANDARD.md` | เก็บไว้ใน Baseline และตรวจ/แก้จุดที่เกี่ยวข้องแล้ว |
 | `standards/TYPOGRAPHY_STANDARD.md` | KEEP/UPDATE | `standards/TYPOGRAPHY_STANDARD.md` | เก็บไว้ใน Baseline และตรวจ/แก้จุดที่เกี่ยวข้องแล้ว |
-| `standards/UX_UI_STANDARD.md` | KEEP/UPDATE | `standards/UX_UI_STANDARD.md` | เก็บไว้ใน Baseline และตรวจ/แก้จุดที่เกี่ยวข้องแล้ว |
+| `standards/UX_UI_STANDARD.md` | KEEP/UPDATE | `standards/UX_UI_STANDARD.md` | เป็น Source of Truth เดียวของ UX/UI และ Screen Flow |
 | `standards/WORKSPACE_STANDARD.md` | KEEP/UPDATE | `standards/WORKSPACE_STANDARD.md` | เก็บไว้ใน Baseline และตรวจ/แก้จุดที่เกี่ยวข้องแล้ว |
 | `templates/PROJECT_TEMPLATE.md` | KEEP/UPDATE | `templates/PROJECT_TEMPLATE.md` | เก็บไว้ใน Baseline และตรวจ/แก้จุดที่เกี่ยวข้องแล้ว |
 

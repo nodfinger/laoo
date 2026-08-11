@@ -11,6 +11,7 @@ import '../../features/support/presentation/pages/support_home_page.dart';
 import '../../features/support/presentation/pages/support_placeholder_page.dart';
 import '../../features/support/presentation/widgets/support_workspace_shell.dart';
 import '../../features/support/technical_info/pages/technical_info_page.dart';
+import '../../features/support/branch/pages/branch_page.dart';
 import 'route_names.dart';
 import 'route_paths.dart';
 
@@ -104,20 +105,14 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: RoutePaths.partnerCompanies,
       name: RouteNames.partnerCompanies,
-      builder: (context, state) => const CompanyModulePlaceholderPage(
-        title: 'ข้อมูลบริษัท',
-        menuScope: WorkspaceMenuScope.partner,
-        activeMenu: 'partnerCompanies',
-      ),
+      builder: (context, state) =>
+          const PartnerCompanyPage(menuScope: WorkspaceMenuScope.partner),
     ),
     GoRoute(
       path: RoutePaths.partnerBranches,
       name: RouteNames.partnerBranches,
-      builder: (context, state) => const CompanyModulePlaceholderPage(
-        title: 'ข้อมูลสาขา',
-        menuScope: WorkspaceMenuScope.partner,
-        activeMenu: 'partnerBranches',
-      ),
+      builder: (context, state) =>
+          const BranchPage(menuScope: WorkspaceMenuScope.partner),
     ),
     GoRoute(
       path: RoutePaths.partnerUsers,
@@ -141,9 +136,8 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: RoutePaths.company,
       name: RouteNames.company,
-      builder: (context, state) => const PartnerCompanyPage(
-        menuScope: WorkspaceMenuScope.support,
-      ),
+      builder: (context, state) =>
+          const PartnerCompanyPage(menuScope: WorkspaceMenuScope.support),
     ),
     ..._placeholderRoutes,
     GoRoute(
@@ -159,15 +153,49 @@ final GoRouter appRouter = GoRouter(
 );
 
 final List<GoRoute> _placeholderRoutes = [
-  _placeholder(RoutePaths.branch, RouteNames.branch, 'Branch', 'branch'),
-  _placeholder(RoutePaths.laooUser, RouteNames.laooUser, 'Laoo User', 'laooUser'),
-  _placeholder(RoutePaths.partnerUser, RouteNames.partnerUser, 'Partner User', 'partnerUser'),
-  _placeholder(RoutePaths.companyUser, RouteNames.companyUser, 'Company User', 'companyUser'),
+  GoRoute(
+    path: RoutePaths.branch,
+    name: RouteNames.branch,
+    builder: (context, state) => const BranchPage(),
+  ),
+  _placeholder(
+    RoutePaths.laooUser,
+    RouteNames.laooUser,
+    'Laoo User',
+    'laooUser',
+  ),
+  _placeholder(
+    RoutePaths.partnerUser,
+    RouteNames.partnerUser,
+    'Partner User',
+    'partnerUser',
+  ),
+  _placeholder(
+    RoutePaths.companyUser,
+    RouteNames.companyUser,
+    'Company User',
+    'companyUser',
+  ),
   _placeholder(RoutePaths.module, RouteNames.module, 'Module', 'module'),
-  _placeholder(RoutePaths.customerModule, RouteNames.customerModule, 'Customer Module', 'customerModule'),
-  _placeholder(RoutePaths.permission, RouteNames.permission, 'Role / Permission', 'permission'),
+  _placeholder(
+    RoutePaths.customerModule,
+    RouteNames.customerModule,
+    'Customer Module',
+    'customerModule',
+  ),
+  _placeholder(
+    RoutePaths.permission,
+    RouteNames.permission,
+    'Role / Permission',
+    'permission',
+  ),
   _placeholder(RoutePaths.audit, RouteNames.audit, 'Audit Log', 'audit'),
-  _placeholder(RoutePaths.loginLog, RouteNames.loginLog, 'Login Log', 'loginLog'),
+  _placeholder(
+    RoutePaths.loginLog,
+    RouteNames.loginLog,
+    'Login Log',
+    'loginLog',
+  ),
   GoRoute(
     path: RoutePaths.technicalInfo,
     name: RouteNames.technicalInfo,
@@ -184,9 +212,7 @@ GoRoute _placeholder(
   return GoRoute(
     path: path,
     name: name,
-    builder: (context, state) => SupportPlaceholderPage(
-      title: title,
-      activeMenu: activeMenu,
-    ),
+    builder: (context, state) =>
+        SupportPlaceholderPage(title: title, activeMenu: activeMenu),
   );
 }

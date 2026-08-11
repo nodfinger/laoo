@@ -4,6 +4,7 @@ public sealed class PartnerCompanyResponse
 {
     public long CompanyId { get; init; }
     public long PartnerId { get; init; }
+    public string? PartnerNameTh { get; init; }
     public string CompanyCode { get; init; } = string.Empty;
     public string CompanyNameTh { get; init; } = string.Empty;
     public string? CompanyNameEn { get; init; }
@@ -21,6 +22,7 @@ public sealed class PartnerCompanyResponse
 
 public sealed class PartnerCompanyUpsertRequest
 {
+    public bool IsActive { get; init; } = true;
     public string CompanyNameTh { get; init; } = string.Empty;
     public string? CompanyNameEn { get; init; }
     public string? TaxId { get; init; }

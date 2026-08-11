@@ -7,7 +7,8 @@ import 'package:flutter/material.dart';
 /// application's central theme layer.
 abstract final class LaooTypography {
   // Font system
-  static const String fontFamily = 'Leelawadee UI';
+  /// Bundled font family declared in pubspec.yaml.
+  static const String fontFamily = 'NotoSansThai';
   static const List<String> fontFallback = <String>[
     'Noto Sans Thai',
     'Tahoma',
@@ -38,6 +39,7 @@ abstract final class LaooTypography {
 
   // Buttons / menus
   static const double button = 13;
+
   /// Shared button height keeps icon and text buttons visually aligned.
   static const double buttonHeight = 36;
   static const double menuGroup = 14;

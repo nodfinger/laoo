@@ -72,6 +72,16 @@ Feature ใหม่ต้องอ้าง `LaooTypography` แทน hard-cod
 
 Font Family ต้องควบคุมจาก Theme กลาง ห้ามแต่ละ Form เลือกเอง เว้นแต่ได้รับอนุมัติเป็นกรณีพิเศษ
 
+มาตรฐานที่อนุมัติปัจจุบัน:
+
+- Font หลัก = `Noto Sans Thai`
+- Flutter family key = `NotoSansThai`
+- Font asset = `C:\laoo\laoo\assets\fonts\NotoSansThai-Variable.ttf`
+- Font license = `C:\laoo\laoo\assets\fonts\OFL.txt`
+- Font fallback = `Noto Sans Thai`, `Tahoma`, `Arial`, `sans-serif`
+- ทุกหน้าจอต้องรับ Font จาก `LaooTypography`, `LaooTheme` หรือ `WorkspaceThemePreset` ห้ามระบุชื่อ Font ตายตัวใน Feature
+- Font ถูก bundle ไปกับ Application เพื่อรองรับ Windows, Mobile และ Web โดยเครื่องปลายทางไม่ต้องติดตั้ง Font เพิ่ม
+
 ---
 
 ## 6. ThemeData Integration

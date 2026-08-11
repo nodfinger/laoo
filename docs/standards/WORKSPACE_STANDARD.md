@@ -6,6 +6,7 @@
 - ห้ามสร้าง `Scaffold`, Top Bar, Sidebar, Theme Selector, Favorite หรือ User Menu แยกตาม Role
 - Role และ Permission เปลี่ยนได้เฉพาะข้อมูลกลุ่มเมนู เมนูย่อย เส้นทาง และ Content
 - ทุกหน้าหลัง Login ต้องคง Shell ไว้เมื่อเปลี่ยนเมนู
+- หน้าจอ Add/Edit/View/Custom Action ต้องเปิดเต็มพื้นที่ Content Area ภายใน Shell เดิม ไม่เปิดเป็น Dialog สำหรับ Form หลักและไม่สร้าง Shell ซ้ำ
 
 ## Visual Baseline
 
@@ -36,6 +37,7 @@
 - Partner menu เริ่มต้น: จัดการบริษัท (ข้อมูลบริษัท/ข้อมูลสาขา) และจัดการผู้ใช้งาน (ผู้ใช้งานบริษัท)
 - Company menu เริ่มต้น: ระบบสินค้า (ข้อมูลสินค้า) และระบบขาย (ข้อมูลลูกค้า)
 - หน้า module ต้องคง Sidebar และ Top Bar ไว้ทุก route ไม่สร้าง Shell ซ้ำในแต่ละหน้า
+- Route ของ CRUD Action Screen ต้องคง Sidebar, Top Bar, Theme และ User Context เดิม และเปลี่ยนเฉพาะ Content Area
 - ชื่อผู้ใช้/ประเภทผู้ใช้/บริบท Partner หรือ Company ต้องแสดงจาก Auth Session จริง ห้าม hard-code ชื่อ Support
 
 ## Onboarding Workflow

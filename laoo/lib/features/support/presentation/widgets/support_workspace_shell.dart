@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../app/router/app_menu_route_registry.dart';
 import '../../../../app/router/route_names.dart';
+import '../../../../app/router/route_paths.dart';
 import '../../../../app/theme/laoo_typography.dart';
 import '../../../../app/theme/workspace_theme_presets.dart';
 import '../../../../core/auth/app_auth_controller.dart';
@@ -123,7 +125,11 @@ class SupportWorkspaceShell extends StatelessWidget {
               drawer: compact
                   ? Drawer(
                       backgroundColor: preset.sidebarBackground,
-                      child: _Sidebar(activeMenu: activeMenu, preset: preset, menuScope: menuScope),
+                      child: _Sidebar(
+                        activeMenu: activeMenu,
+                        preset: preset,
+                        menuScope: menuScope,
+                      ),
                     )
                   : null,
               appBar: compact
@@ -155,7 +161,11 @@ class SupportWorkspaceShell extends StatelessWidget {
                     if (!compact)
                       SizedBox(
                         width: 220,
-                        child: _Sidebar(activeMenu: activeMenu, preset: preset, menuScope: menuScope),
+                        child: _Sidebar(
+                          activeMenu: activeMenu,
+                          preset: preset,
+                          menuScope: menuScope,
+                        ),
                       ),
                     Expanded(
                       child: Column(
@@ -650,7 +660,11 @@ class _UserMenu extends StatelessWidget {
 }
 
 class _Sidebar extends StatelessWidget {
-  const _Sidebar({required this.activeMenu, required this.preset, required this.menuScope});
+  const _Sidebar({
+    required this.activeMenu,
+    required this.preset,
+    required this.menuScope,
+  });
 
   final String? activeMenu;
   final WorkspaceThemePreset preset;
@@ -658,18 +672,9 @@ class _Sidebar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent = preset.primary;
     final isWhiteMenu = preset.group == 'White Menu';
     final isLightColored = preset.group == 'Light';
     final isHybrid = preset.group == 'Hybrid Dark Menu';
-
-    final groupAccent = isWhiteMenu
-        ? preset.primary
-        : isLightColored
-        ? (preset.sidebarBackground.computeLuminance() < 0.45
-              ? Color.lerp(preset.sidebarText, preset.primary, 0.35)!
-              : preset.primary)
-        : preset.primary;
 
     const blackSubmenuStyles = {
       'STYLE11',
@@ -701,189 +706,26 @@ class _Sidebar extends StatelessWidget {
         ? Colors.white
         : const Color(0xFFF9FAFB);
 
-    if (menuScope != WorkspaceMenuScope.support) {
-      return _ApiRoleScopedSidebar(
-        menuScope: menuScope,
-        activeMenu: activeMenu,
-        preset: preset,
-        itemForeground: itemForeground,
-        selectedForeground: selectedForeground,
-      );
-    }
-
-    return Material(
-      color: preset.sidebarBackground,
-      child: Column(
-        children: [
-          _BrandHeader(accent: accent, preset: preset),
-          Divider(height: 1, color: preset.border),
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
-              children: [
-                _MenuItem(
-                  label: 'หน้าหลัก',
-                  icon: Icons.home_outlined,
-                  selected: activeMenu == 'home',
-                  accent: itemForeground,
-                  selectedAccent: accent,
-                  selectedForeground: selectedForeground,
-                  onTap: () => context.goNamed(RouteNames.supportHome),
-                ),
-                const SizedBox(height: 2),
-                _MenuGroup(
-                  title: 'จัดการองค์กร',
-                  accent: groupAccent,
-                  initiallyExpanded: const {
-                    'partner',
-                    'company', 'branch', 'technicalInfo',
-                  }.contains(activeMenu),
-                  children: [
-                    _MenuItem(
-                      label: 'Partner',
-                      icon: Icons.handshake_outlined,
-                      selected: activeMenu == 'partner',
-                      accent: itemForeground,
-                      selectedAccent: accent,
-                      selectedForeground: selectedForeground,
-                      onTap: () => context.goNamed(RouteNames.partner),
-                    ),
-                    _MenuItem(
-                      label: 'ข้อมูลผู้ใช้บริการ',
-                      icon: Icons.apartment_outlined,
-                      selected: activeMenu == 'company',
-                      accent: itemForeground,
-                      selectedAccent: accent,
-                      selectedForeground: selectedForeground,
-                      onTap: () => context.goNamed(RouteNames.company),
-                    ),
-                    _MenuItem(
-                      label: 'Branch',
-                      icon: Icons.account_tree_outlined,
-                      selected: activeMenu == 'branch',
-                      accent: itemForeground,
-                      selectedAccent: accent,
-                      selectedForeground: selectedForeground,
-                      onTap: () => context.goNamed(RouteNames.branch),
-                    ),
-                    _MenuItem(
-                      label: 'ข้อมูลด้านเทคนิค',
-                      icon: Icons.developer_mode_outlined,
-                      selected: activeMenu == 'technicalInfo',
-                      accent: itemForeground,
-                      selectedAccent: accent,
-                      selectedForeground: selectedForeground,
-                      onTap: () => context.goNamed(RouteNames.technicalInfo),
-                    ),
-                  ],
-                ),
-                _MenuGroup(
-                  title: 'จัดการผู้ใช้งาน',
-                  accent: groupAccent,
-                  initiallyExpanded: const {
-                    'laooUser', 'partnerUser', 'companyUser',
-                  }.contains(activeMenu),
-                  children: [
-                    _MenuItem(
-                      label: 'Laoo User',
-                      icon: Icons.support_agent_outlined,
-                      selected: activeMenu == 'laooUser',
-                      accent: itemForeground,
-                      selectedAccent: accent,
-                      selectedForeground: selectedForeground,
-                      onTap: () => context.goNamed(RouteNames.laooUser),
-                    ),
-                    _MenuItem(
-                      label: 'Partner User',
-                      icon: Icons.person_outline,
-                      selected: activeMenu == 'partnerUser',
-                      accent: itemForeground,
-                      selectedAccent: accent,
-                      selectedForeground: selectedForeground,
-                      onTap: () => context.goNamed(RouteNames.partnerUser),
-                    ),
-                    _MenuItem(
-                      label: 'Company User',
-                      icon: Icons.people_outline,
-                      selected: activeMenu == 'companyUser',
-                      accent: itemForeground,
-                      selectedAccent: accent,
-                      selectedForeground: selectedForeground,
-                      onTap: () => context.goNamed(RouteNames.companyUser),
-                    ),
-                  ],
-                ),
-                _MenuGroup(
-                  title: 'Module และสิทธิ์',
-                  accent: groupAccent,
-                  initiallyExpanded: const {'module', 'customerModule', 'permission'}.contains(activeMenu),
-                  children: [
-                    _MenuItem(label: 'Module', icon: Icons.widgets_outlined, selected: activeMenu == 'module', accent: itemForeground, selectedAccent: accent, selectedForeground: selectedForeground, onTap: () => context.goNamed(RouteNames.module)),
-                    _MenuItem(label: 'Customer Module', icon: Icons.extension_outlined, selected: activeMenu == 'customerModule', accent: itemForeground, selectedAccent: accent, selectedForeground: selectedForeground, onTap: () => context.goNamed(RouteNames.customerModule)),
-                    _MenuItem(label: 'Role / Permission', icon: Icons.admin_panel_settings_outlined, selected: activeMenu == 'permission', accent: itemForeground, selectedAccent: accent, selectedForeground: selectedForeground, onTap: () => context.goNamed(RouteNames.permission)),
-                  ],
-                ),
-                _MenuGroup(
-                  title: 'ตรวจสอบระบบ',
-                  accent: groupAccent,
-                  initiallyExpanded: activeMenu == 'audit',
-                  children: [
-                    _MenuItem(
-                      label: 'Audit Log',
-                      icon: Icons.receipt_long_outlined,
-                      selected: activeMenu == 'audit',
-                      accent: itemForeground,
-                      selectedAccent: accent,
-                      selectedForeground: selectedForeground,
-                      onTap: () => context.goNamed(RouteNames.audit),
-                    ),
-                    _MenuItem(
-                      label: 'Login Log',
-                      icon: Icons.login_outlined,
-                      selected: activeMenu == 'loginLog',
-                      accent: itemForeground,
-                      selectedAccent: accent,
-                      selectedForeground: selectedForeground,
-                      onTap: () => context.goNamed(RouteNames.loginLog),
-                    ),
-                  ],
-                ),
-                _MenuGroup(
-                  title: 'ตั้งค่าระบบ',
-                  accent: groupAccent,
-                  initiallyExpanded: activeMenu == 'companySetup',
-                  children: [
-                    _MenuItem(
-                      label: 'กำหนดค่าระบบ',
-                      icon: Icons.settings_outlined,
-                      selected: activeMenu == 'companySetup',
-                      accent: itemForeground,
-                      selectedAccent: accent,
-                      selectedForeground: selectedForeground,
-                      onTap: () => context.goNamed(RouteNames.companySetup),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+    return _ApiRoleScopedSidebar(
+      key: ValueKey(activeMenu),
+      menuScope: menuScope,
+      preset: preset,
+      itemForeground: itemForeground,
+      selectedForeground: selectedForeground,
     );
   }
 }
 
 class _ApiRoleScopedSidebar extends StatefulWidget {
   const _ApiRoleScopedSidebar({
+    super.key,
     required this.menuScope,
-    required this.activeMenu,
     required this.preset,
     required this.itemForeground,
     required this.selectedForeground,
   });
 
   final WorkspaceMenuScope menuScope;
-  final String? activeMenu;
   final WorkspaceThemePreset preset;
   final Color itemForeground;
   final Color selectedForeground;
@@ -893,8 +735,19 @@ class _ApiRoleScopedSidebar extends StatefulWidget {
 }
 
 class _ApiRoleScopedSidebarState extends State<_ApiRoleScopedSidebar> {
-  late final Future<List<NavigationMenuGroup>> _menus =
-      NavigationMenuRepository().getMenus();
+  late final NavigationMenuRepository _repository;
+  late Future<List<NavigationMenuGroup>> _menus;
+
+  @override
+  void initState() {
+    super.initState();
+    _repository = NavigationMenuRepository();
+    _menus = _repository.getMenus();
+  }
+
+  void _reload() {
+    setState(() => _menus = _repository.getMenus(refresh: true));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -902,47 +755,50 @@ class _ApiRoleScopedSidebarState extends State<_ApiRoleScopedSidebar> {
       future: _menus,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return _RoleScopedSidebar(
-            menuScope: widget.menuScope,
-            activeMenu: widget.activeMenu,
-            preset: widget.preset,
-            itemForeground: widget.itemForeground,
-            selectedForeground: widget.selectedForeground,
+          return _buildLoadState(
+            context,
+            message: 'ไม่สามารถโหลดเมนูตามสิทธิ์ได้',
+            onRetry: _reload,
           );
         }
-        return _buildSidebar(context, snapshot.data ?? const []);
+        if (!snapshot.hasData) {
+          return _buildLoadState(context);
+        }
+        return _buildSidebar(context, snapshot.data!);
       },
     );
   }
 
-  Widget _buildSidebar(
-    BuildContext context,
-    List<NavigationMenuGroup> groups,
-  ) {
-    final menuGroups = groups.map((group) {
-      if (widget.menuScope != WorkspaceMenuScope.support ||
-          group.code != '01' ||
-          group.items.any((item) => item.code == '01004')) {
-        return group;
-      }
-      return NavigationMenuGroup(
-        code: group.code,
-        name: group.name,
-        iconName: group.iconName,
-        isExpandedDefault: group.isExpandedDefault,
-        items: [
-          ...group.items,
-          const NavigationMenuItem(
-            code: '01004',
-            name: 'ข้อมูลด้านเทคนิค',
-            routeName: 'technicalInfo',
-            routePath: '/support/technical-info',
-            featureCode: 'TECHNICAL_INFO',
-            iconName: 'developer_mode',
+  Widget _buildSidebar(BuildContext context, List<NavigationMenuGroup> groups) {
+    final currentPath = GoRouter.of(
+      context,
+    ).routerDelegate.currentConfiguration.uri.path;
+    final expectedScope = switch (widget.menuScope) {
+      WorkspaceMenuScope.support => AppMenuScope.support,
+      WorkspaceMenuScope.partner => AppMenuScope.partner,
+      WorkspaceMenuScope.company => AppMenuScope.company,
+    };
+    final menuGroups = groups
+        .map(
+          (group) => NavigationMenuGroup(
+            code: group.code,
+            name: group.name,
+            iconName: group.iconName,
+            isExpandedDefault: group.isExpandedDefault,
+            items: group.items.where((item) {
+              final spec = AppMenuRouteRegistry.byMenuCode(item.code);
+              return spec != null && spec.scope == expectedScope;
+            }).toList(),
           ),
-        ],
-      );
-    }).toList();
+        )
+        .where((group) => group.items.isNotEmpty)
+        .toList();
+    final homeRoute = widget.menuScope == WorkspaceMenuScope.support
+        ? RouteNames.supportHome
+        : RouteNames.authenticatedHome;
+    final homePath = widget.menuScope == WorkspaceMenuScope.support
+        ? RoutePaths.supportHome
+        : RoutePaths.authenticatedHome;
     return Material(
       color: widget.preset.sidebarBackground,
       child: Column(
@@ -956,37 +812,91 @@ class _ApiRoleScopedSidebarState extends State<_ApiRoleScopedSidebar> {
                 _MenuItem(
                   label: 'หน้าหลัก',
                   icon: Icons.home_outlined,
-                  selected: widget.activeMenu == 'home',
+                  selected: currentPath == homePath,
                   accent: widget.itemForeground,
                   selectedAccent: widget.preset.primary,
                   selectedForeground: widget.selectedForeground,
-                  onTap: () => context.goNamed(RouteNames.authenticatedHome),
+                  onTap: () => context.goNamed(homeRoute),
                 ),
                 const SizedBox(height: 2),
-                ...menuGroups.where((group) => group.items.isNotEmpty).map(
-                  (group) => _MenuGroup(
-                    title: group.name,
-                    accent: widget.preset.primary,
-                    initiallyExpanded: group.isExpandedDefault ||
-                        group.items.any(
-                          (item) => item.routeName == widget.activeMenu,
-                        ),
-                    children: group.items.map((item) {
-                      return _MenuItem(
-                        label: item.name,
-                        icon: _iconFor(item.iconName),
-                        selected: item.routeName == widget.activeMenu,
-                        accent: widget.itemForeground,
-                        selectedAccent: widget.preset.primary,
-                        selectedForeground: widget.selectedForeground,
-                        onTap: item.routePath == null
-                            ? null
-                            : () => context.go(item.routePath!),
-                      );
-                    }).toList(),
-                  ),
-                ),
+                ...menuGroups
+                    .where((group) => group.items.isNotEmpty)
+                    .map(
+                      (group) => _MenuGroup(
+                        title: group.name,
+                        accent: widget.preset.primary,
+                        initiallyExpanded:
+                            group.isExpandedDefault ||
+                            group.items.any((item) {
+                              final spec = AppMenuRouteRegistry.byMenuCode(
+                                item.code,
+                              );
+                              return spec?.path == currentPath;
+                            }),
+                        children: group.items.map((item) {
+                          final spec = AppMenuRouteRegistry.byMenuCode(
+                            item.code,
+                          );
+                          return _MenuItem(
+                            label: item.name,
+                            icon: _iconFor(item.iconName),
+                            selected: spec?.path == currentPath,
+                            accent: widget.itemForeground,
+                            selectedAccent: widget.preset.primary,
+                            selectedForeground: widget.selectedForeground,
+                            onTap: spec == null
+                                ? null
+                                : () => context.goNamed(spec.goRouteName),
+                          );
+                        }).toList(),
+                      ),
+                    ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLoadState(
+    BuildContext context, {
+    String? message,
+    VoidCallback? onRetry,
+  }) {
+    return Material(
+      color: widget.preset.sidebarBackground,
+      child: Column(
+        children: [
+          _BrandHeader(accent: widget.preset.primary, preset: widget.preset),
+          Divider(height: 1, color: widget.preset.border),
+          Expanded(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: message == null
+                    ? CircularProgressIndicator(color: widget.preset.primary)
+                    : Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.error_outline,
+                            color: widget.itemForeground,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            message,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: widget.itemForeground),
+                          ),
+                          const SizedBox(height: 8),
+                          TextButton(
+                            onPressed: onRetry,
+                            child: const Text('ลองใหม่'),
+                          ),
+                        ],
+                      ),
+              ),
             ),
           ),
         ],
@@ -1005,99 +915,6 @@ class _ApiRoleScopedSidebarState extends State<_ApiRoleScopedSidebar> {
       'developer_mode' => Icons.developer_mode_outlined,
       _ => Icons.menu_outlined,
     };
-  }
-}
-
-class _RoleScopedSidebar extends StatelessWidget {
-  const _RoleScopedSidebar({
-    required this.menuScope,
-    required this.activeMenu,
-    required this.preset,
-    required this.itemForeground,
-    required this.selectedForeground,
-  });
-
-  final WorkspaceMenuScope menuScope;
-  final String? activeMenu;
-  final WorkspaceThemePreset preset;
-  final Color itemForeground;
-  final Color selectedForeground;
-
-  @override
-  Widget build(BuildContext context) {
-    final isPartner = menuScope == WorkspaceMenuScope.partner;
-    return Material(
-      color: preset.sidebarBackground,
-      child: Column(
-        children: [
-          _BrandHeader(accent: preset.primary, preset: preset),
-          Divider(height: 1, color: preset.border),
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
-              children: [
-                _MenuItem(
-                  label: 'หน้าหลัก',
-                  icon: Icons.home_outlined,
-                  selected: activeMenu == 'home',
-                  accent: itemForeground,
-                  selectedAccent: preset.primary,
-                  selectedForeground: selectedForeground,
-                  onTap: () => context.goNamed(RouteNames.authenticatedHome),
-                ),
-                const SizedBox(height: 2),
-                _MenuGroup(
-                  title: isPartner ? 'จัดการบริษัท' : 'ระบบสินค้า',
-                  accent: preset.primary,
-                  initiallyExpanded: true,
-                  children: isPartner
-                      ? [
-                          _MenuItem(label: 'ข้อมูลบริษัท', icon: Icons.apartment_outlined, selected: activeMenu == 'partnerCompanies', accent: itemForeground, selectedAccent: preset.primary, selectedForeground: selectedForeground, onTap: () => context.goNamed(RouteNames.partnerCompanies)),
-                          _MenuItem(label: 'ข้อมูลสาขา', icon: Icons.account_tree_outlined, selected: activeMenu == 'partnerBranches', accent: itemForeground, selectedAccent: preset.primary, selectedForeground: selectedForeground, onTap: () => context.goNamed(RouteNames.partnerBranches)),
-                        ]
-                      : [
-                          _MenuItem(label: 'ข้อมูลสินค้า', icon: Icons.inventory_2_outlined, selected: activeMenu == 'companyProducts', accent: itemForeground, selectedAccent: preset.primary, selectedForeground: selectedForeground, onTap: () => context.goNamed(RouteNames.companyProducts)),
-                        ],
-                ),
-                _MenuGroup(
-                  title: isPartner ? 'จัดการผู้ใช้งาน' : 'ระบบขาย',
-                  accent: preset.primary,
-                  initiallyExpanded: true,
-                  children: [
-                    _MenuItem(
-                      label: isPartner ? 'ผู้ใช้งานบริษัท' : 'ข้อมูลลูกค้า',
-                      icon: isPartner ? Icons.people_outline : Icons.people_alt_outlined,
-                      selected: activeMenu == (isPartner ? 'partnerUsers' : 'companyCustomers'),
-                      accent: itemForeground,
-                      selectedAccent: preset.primary,
-                      selectedForeground: selectedForeground,
-                      onTap: () => context.goNamed(isPartner ? RouteNames.partnerUsers : RouteNames.companyCustomers),
-                    ),
-                  ],
-                ),
-                if (menuScope == WorkspaceMenuScope.support)
-                  _MenuGroup(
-                    title: 'ข้อมูลด้านเทคนิค',
-                    accent: preset.primary,
-                    initiallyExpanded: true,
-                    children: [
-                      _MenuItem(
-                        label: 'ข้อมูลด้านเทคนิค',
-                        icon: Icons.developer_mode_outlined,
-                        selected: activeMenu == 'technicalInfo',
-                        accent: itemForeground,
-                        selectedAccent: preset.primary,
-                        selectedForeground: selectedForeground,
-                        onTap: () => context.goNamed(RouteNames.technicalInfo),
-                      ),
-                    ],
-                  ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }
 

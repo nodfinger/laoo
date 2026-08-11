@@ -1,626 +1,300 @@
-# LAOO SOLUTIONS --- UX/UI STANDARD
+# LAOO UX/UI AND SCREEN FLOW STANDARD
 
-> Workspace หลัง Login ทุก Role ต้องใช้ Shared Shell เดียวกันตาม `docs/standards/WORKSPACE_STANDARD.md`
-
-**Document Type:** Central Standard\
-**Scope:** All Laoo Solutions systems and projects\
-**Version:** 1.0\
-**Status:** Approved Baseline (Merged)\
+**Document Type:** Central Standard
+**Scope:** All Laoo Solutions systems and projects
+**Status:** Approved Baseline
 **Standard Path:** `C:\laoo\docs\standards\UX_UI_STANDARD.md`
 
-------------------------------------------------------------------------
+เอกสารนี้เป็น Source of Truth เพียงไฟล์เดียวสำหรับ UX/UI และ Flow ของหน้าจอ
+รวมกติกาเดิมจาก `CRUD_FLOW_STANDARD.md` และ `UX_UI_STANDARD.md` เพื่อไม่ให้แต่ละเอกสารกำหนดพฤติกรรมขัดกัน
 
-## 1. Purpose
+---
 
-เอกสารนี้กำหนดมาตรฐาน UX/UI กลางสำหรับทุกระบบของ Laoo Solutions เพื่อให้ทุก
-Project และทุก Feature มีพฤติกรรมที่สอดคล้องกัน
-ผู้ใช้สามารถคาดเดาได้ว่าปุ่มแต่ละชนิดทำอะไร กดแล้วไปที่ใด บันทึกสำเร็จแล้วเกิดอะไรขึ้น
-และเมื่อเกิดข้อผิดพลาดระบบต้องตอบสนองอย่างไร
+## 1. หลัก UX กลาง
 
-มาตรฐานนี้ใช้กับทุกระบบ เช่น `laoo`, `laoo_meeting` และ Project/Solution
-ที่พัฒนาเพิ่มในอนาคต เว้นแต่มีข้อกำหนดเฉพาะของ Project ที่ได้รับอนุมัติอย่างชัดเจน
+- Menu Caption Source of Truth: Sidebar, List และ Action Form ต้องใช้ Menu Resolver ส่วนกลางเพื่ออ่าน `MenuName` จาก Navigation API/`TDADMainMenu` ด้วย `MenuCode` หรือ `RouteName` ห้ามกำหนดชื่อ fallback แยกกันจนแสดงไม่ตรงกัน
 
-------------------------------------------------------------------------
+- **Simple First:** แสดงข้อมูลและคำสั่งที่จำเป็นกับงานปัจจุบัน
+- **Predictable:** ปุ่มและ Flow เดียวกันต้องทำงานเหมือนกันทุกหน้าจอ
+- **Safe by Default:** ป้องกันการกดซ้ำ ข้อมูลสูญหาย และการลบโดยไม่ตั้งใจ
+- **Responsive:** รองรับ Web, Windows, Tablet และ Mobile
+- **Permission First:** Frontend ซ่อน Action ที่ไม่มีสิทธิ์ และ Backend ต้องตรวจซ้ำทุกครั้ง
+- Business Rule และผลลัพธ์สุดท้ายต้องตัดสินที่ API/Backend ไม่ใช่ Flutter
 
-## 2. Core UX Principles
+---
 
-1.  **Simple First** --- แสดงเฉพาะข้อมูลและคำสั่งที่จำเป็นกับงานปัจจุบัน
-2.  **Predictable** --- ปุ่มและ Flow เดียวกันต้องทำงานเหมือนกันทุกระบบ
-3.  **Safe by Default** --- งานที่มีผลต่อข้อมูลต้องป้องกันการกดซ้ำ การสูญหาย
-    และการลบโดยไม่ตั้งใจ
-4.  **Responsive** --- รองรับ Web, Windows, Tablet และ Mobile
-5.  **Permission Aware** --- สิ่งที่ผู้ใช้ไม่มีสิทธิ์ต้องซ่อนเป็นค่าเริ่มต้น
-6.  **Reusable** --- ใช้ Theme, Component และ Shared Widget กลาง
-    หลีกเลี่ยงการสร้าง Style ซ้ำในแต่ละ Feature
-7.  **Clear Feedback** --- ทุก Action ต้องมีผลตอบกลับที่ผู้ใช้เข้าใจได้
+## 2. ประเภทหน้าจอ
 
-------------------------------------------------------------------------
+ก่อนสร้างหน้าจอใหม่ ผู้สั่งงานต้องแจ้ง `MenuCode` และ `ScreenType` ให้ชัดเจน โดยระบบอ่านชื่อหน้าจอจาก `MenuName` หนึ่งหน้าจออาจมี List และ Form แต่ต้องมี ScreenType หลักเพียงแบบเดียว
 
-## 3. Standard Screen Structure
+### 2.1 CRUD
 
-หน้าจอจัดการข้อมูลมาตรฐานแบ่งเป็น:
+สำหรับหน้าผู้ใช้บริการของ Support ที่ดูข้อมูลข้ามหลาย Partner:
 
--   Page Header
-    -   ชื่อหน้าจอ
-    -   คำอธิบายสั้นเมื่อจำเป็น
-    -   Primary Action เช่น `+ เพิ่ม`
--   Search / Filter Area เมื่อจำเป็น
--   Main Content
-    -   Table / List / Card / Form ตามประเภทงาน
--   Action Area
-    -   ปุ่มหลักและปุ่มรองตามมาตรฐานนี้
--   Feedback Area
-    -   Loading / Empty / Error / Success
+- Caption ของ Shell, List และ Action Screen ต้องใช้ `MenuName` เดียวกันจาก `TDADMainMenu`
+- ตารางต้องวางคอลัมน์ `Partner` ถัดจาก `Action` เพื่อระบุเจ้าของผู้ใช้บริการ และต้องมี Partner Filter ด้านบน
 
-บน Mobile สามารถปรับตำแหน่งองค์ประกอบตามพื้นที่ แต่ความหมายและ Flow ต้องเหมือน
-Desktop/Web
+ใช้กับข้อมูล Master/Setup ที่ผู้ใช้มีสิทธิ์ **เพิ่ม แก้ไข และลบ**
 
-------------------------------------------------------------------------
+ต้องมี:
 
-## 4. List / Management Screen Standard
+- List พร้อม Search/Filter, Sort และ Pagination
+- ปุ่ม `+ เพิ่ม` ตาม Permission
+- Action Column อยู่ Column 2 ตามมาตรฐาน List
+- Edit และ Delete ตาม Permission
+- Form เพิ่ม/แก้ไข พร้อมปุ่ม `ยกเลิก` และ `บันทึก` ด้านบนและล่างชิดขวา
+- Dialog ยืนยันการลบก่อนเรียก DELETE API
 
-หน้าจอรายการข้อมูล เช่น Partner, Company, Branch, User หรือข้อมูล Master อื่น
-ใช้แนวทางเดียวกัน
+Flow มาตรฐาน:
 
-### 4.1 Standard Actions
+```text
+List → + เพิ่ม → Add Form → Validate → Save → Success → ล้าง Form → Add Form เดิม
+List → Edit → Edit Form → Validate → Save → Success → กลับ List → Refresh
+List → Delete → Confirm → DELETE API → Success → กลับ List → Refresh
+```
 
-  Action         Label แนะนำ                   ผลลัพธ์
-  -------------- ----------------------------- -------------------------------
-  Create         `+ เพิ่ม` หรือ `+ เพิ่ม{ชื่อข้อมูล}`   เปิดหน้า/ฟอร์มสร้างรายการใหม่
-  View           `ดู`                           เปิดรายละเอียดแบบอ่านข้อมูล
-  Edit           `แก้ไข`                        เปิดฟอร์มแก้ไขรายการที่เลือก
-  Delete         `ลบ`                          เปิด Confirmation ก่อนลบ
-  Search         `ค้นหา`                        กรองรายการโดยไม่เปลี่ยนหน้าหลัก
-  Clear Filter   `ล้าง`                         คืนค่าการค้นหา/Filter เป็นค่าเริ่มต้น
-  Refresh        `รีเฟรช`                       โหลดข้อมูลใหม่โดยอยู่หน้าเดิม
+ผลลัพธ์หลัง Action:
 
-### 4.2 เมื่อกด "เพิ่ม"
+- เพิ่มสำเร็จ: แสดง `เพิ่มข้อมูล {ชื่อหน้าจอ} สำเร็จ`, ล้าง Form และอยู่หน้า Add Form เดิม
+- แก้ไขสำเร็จ: กลับ List, Refresh และแสดง `แก้ไขข้อมูล {ชื่อหน้าจอ} สำเร็จ`
+- ลบสำเร็จ: กลับ/คงอยู่ List, Refresh และแสดง `ลบ {ชื่อหน้าจอ} สำเร็จ`
+- Save/Delete ไม่สำเร็จ: อยู่หน้าเดิม เก็บค่าที่กรอกไว้ และแสดงเหตุผลที่แก้ไขได้
 
-Default Flow:
+#### 2.1.1 CRUD Action Screen
 
-`List → Add Form`
+มาตรฐานเพิ่มเติม:
 
-กฎ: - เปิดฟอร์มใหม่ที่ไม่มีข้อมูลเดิม - Focus ช่องแรกที่เหมาะสมเมื่อ Platform รองรับ -
-ปุ่มหลักคือ `บันทึก` - ปุ่มรองคือ `ยกเลิก` - ห้ามสร้างข้อมูลใน Database จนกว่าผู้ใช้กด
-`บันทึก`
+- Caption และชุดปุ่ม `ยกเลิก`/`บันทึก` ต้องอยู่บรรทัดเดียวกันเสมอ โดย Caption อยู่ด้านซ้ายและปุ่มอยู่ด้านขวา ทั้งตำแหน่งด้านบนและด้านล่างของ Form หากมีการแสดงซ้ำ
+- หลัง Add, Edit, Delete หรือ Action สำเร็จทุกครั้ง ต้องแสดง Success Notification หลังจบรายการ โดยมีไอคอนสำเร็จ ข้อความสรุปผล และปุ่มปิด
 
-### 4.3 บันทึกข้อมูลใหม่สำเร็จ
+`CRUD Action Screen` เป็นหน้าจอลูกที่เปิดจาก Add, Edit, View หรือ Custom Action ของหน้าจอ CRUD ไม่ใช่ ScreenType ตัวที่ 4
 
-Default Flow:
+กติกา:
 
-`Add Form → Save → Success → Clear Form → Add Form`
+- สืบทอด `MenuCode`, `ScreenType` และ Permission Context จากหน้าจอแม่
+- Action ที่มี Form, หลาย Field, Table ย่อย หรือ Business Flow ต่อเนื่อง ต้องเปิดเต็มพื้นที่ Content Area ภายใน Shared Workspace
+- ต้องคง Sidebar, Top Bar, User Context, Theme และ Favorite ของ Shared Shell เดิม
+- ห้ามเปิด Action หลักเป็น Dialog/Popup และห้ามสร้าง Scaffold/Shell ชุดใหม่
+- Caption ใช้ `{MenuName} > {Action}` เช่น `Partner > เพิ่ม`, `Partner > แก้ไข`, `Partner > จัดการ Module`
+- ปุ่ม Save/Cancel หรือปุ่มของ Action ต้องอยู่ด้านบนและล่างชิดขวาและเรียก Logic เดียวกัน
+- Save สำเร็จให้ไปปลายทางตาม Flow ที่กำหนด; ถ้า Feature ไม่ระบุ ให้ใช้ Create อยู่หน้าเดิมและล้าง Form, Edit/Custom Action กลับ List แล้ว Refresh
+- Cancel ต้องกลับหน้าก่อนหน้าโดยไม่บันทึก และต้องยืนยันก่อนออกเมื่อมีข้อมูลที่แก้แล้วยังไม่บันทึก
+- Dialog ใช้เฉพาะ Confirm Delete, Confirm Action หรือ Lookup ขนาดเล็ก ไม่ใช้แทน Action Screen หลัก
+- Action แต่ละรายการต้องมี ActionCode และ Permission ที่ชัดเจน; ถ้าไม่พบข้อกำหนดให้หยุดถามผู้สั่งงานก่อน Coding
 
-หลังบันทึกสำเร็จ: 1. แสดง Notification ด้านบนของ Content Area 2. ใช้ข้อความ
-`เพิ่มข้อมูล {ชื่อหน้าจอ} สำเร็จ` 3. ล้างค่าข้อมูลใน Form 4. อยู่หน้า Add เดิม
-เพื่อให้ผู้ใช้เพิ่มข้อมูลรายการถัดไปได้ทันที 5. ห้ามกลับ List อัตโนมัติสำหรับ Master Data
-Standard
+### 2.2 UpdateOnly
 
-**Exception:** ถ้า Feature มี Workflow เฉพาะ เช่น Wizard หรือ Transaction
-หลายขั้น สามารถไปขั้นถัดไปได้ แต่ต้องกำหนดไว้ใน Feature Specification
+ใช้กับข้อมูลที่ระบบอนุญาตให้ **แก้ไขข้อมูลเดิมเท่านั้น** ไม่อนุญาตให้สร้างหรือลบจากหน้าจอนี้
 
-### 4.4 เมื่อกด "แก้ไข"
+ต้องมี:
 
-Default Flow:
+- List หรือ Form เดียวที่มี Search/Filter และ Pagination เมื่อมีหลายรายการ
+- ไม่มีปุ่ม `+ เพิ่ม`
+- ไม่มี Delete Action
+- มี Edit หรือเปิดให้แก้ไขในแถว/หน้าเดียวตาม Design ที่อนุมัติ
+- ปุ่ม `บันทึก` และ `ยกเลิก` ด้านบนและล่างชิดขวาเมื่อใช้ Form
 
-`List → Edit Form`
+Flow มาตรฐาน:
 
--   โหลดข้อมูลรายการที่เลือก
--   แสดง Loading ระหว่างโหลด
--   หากไม่พบข้อมูล ให้แจ้ง Error และให้กลับ List
--   ปุ่มหลัก `บันทึก`
--   ปุ่มรอง `ยกเลิก`
+```text
+List → Edit → Update Form → Validate → Save → Success → กลับ List → Refresh
+List → Inline Edit → Save → Success → Refresh แถวเดิม
+```
 
-### 4.5 บันทึกการแก้ไขสำเร็จ
+ผลลัพธ์:
 
-Default Flow:
+- บันทึกสำเร็จ: แสดง `แก้ไขข้อมูล {ชื่อหน้าจอ} สำเร็จ` และกลับ List หรือ Refresh แถวเดิมตามรูปแบบที่อนุมัติ
+- ยกเลิก: กลับ List หรือคืนค่าก่อนแก้ไข โดยต้องไม่บันทึกข้อมูล
+- บันทึกไม่สำเร็จ: อยู่หน้าเดิม เก็บค่าที่กรอกไว้ และแสดง Error
+
+### 2.3 ShowOnly
+
+ใช้กับข้อมูลที่ผู้ใช้มีสิทธิ์ดูเท่านั้น ไม่มีการเปลี่ยนข้อมูลจากหน้าจอ
+
+ต้องมี:
 
-`Edit Form → Save → Success → List`
+- List/Detail พร้อม Search/Filter, Sort และ Pagination เมื่อเหมาะสม
+- ไม่มี `+ เพิ่ม`, Edit, Delete, Save หรือ Change Status
+- อาจมี Copy, Export หรือเปิดเอกสารได้ ถ้าเป็น Read-only และได้รับอนุมัติ
 
-หลังสำเร็จให้กลับ List และ Refresh ข้อมูลล่าสุด
+Flow มาตรฐาน:
 
-ถ้า Feature ถูกเปิดมาจาก Detail Screen และ UX ของ Feature กำหนดชัดเจน
-สามารถกลับ Detail Screen เดิมแทน List ได้
+```text
+Open → Load → Search / Filter / Sort / Pagination → View
+```
 
-------------------------------------------------------------------------
+---
 
-## 5. Form Standard
+## 3. โครงสร้างหน้าจอร่วม
 
-### 5.1 Standard Buttons
+ทุกหน้าจอหลัง Login ใช้ Shared Workspace เดียวกัน:
 
-ฟอร์มสร้าง/แก้ไขข้อมูลใช้: - `บันทึก` --- Primary - `ยกเลิก` --- Secondary
+- Logo อยู่ซ้ายบน, User อยู่ขวาบน, Sidebar อยู่ซ้ายบน Desktop/Web
+- Content และ Action Screen ใช้เต็มความกว้างตามพื้นที่ที่เหลือภายใน Shared Workspace
+- Caption อ่านจาก `MenuName` และ Action ใช้รูปแบบ `{MenuName} > {Action}`
+- ระยะ Caption ถึง Form กระชับประมาณ `8px`
+- สี Caption, Border, Header และ Action มาจาก Theme/Design Token กลาง
+- Font และ Typography ใช้ `LaooTypography`, `LaooTheme` และ `WorkspaceThemePreset`
 
-ไม่ควรใช้คำหลายแบบสำหรับความหมายเดียวกัน เช่น `ตกลง`, `Submit`, `Save`
-สลับกันโดยไม่มีเหตุผล
+### 3.1 List
 
-### 5.2 Required Fields
+- ต้องมีช่อง Filter แบบ TextBox สำหรับพิมพ์ค้นหา
+- ไม่ใช้ Auto Search เป็นค่าเริ่มต้น เพราะอาจเรียก API ถี่และทำให้ระบบช้า
+- ช่อง Filter ต้องมีไอคอนแว่นขยายอยู่ด้านซ้าย และไอคอนลูกศรค้นหาอยู่ด้านขวาสุด
+- ให้ค้นหาเมื่อผู้ใช้กดไอคอนลูกศร หรือกด `Enter` เท่านั้น
+- เมื่อ Filter เป็นค่าว่าง ให้โหลดข้อมูลทั้งหมดตาม Sort และ Pagination ปัจจุบันเมื่อสั่งค้นหา
+- ปุ่ม Refresh ต้องเรียกข้อมูลใหม่ทันทีโดยใช้ Filter, Sort และ Pagination ปัจจุบัน
+- ช่อง Filter ต้องมีความกว้างกระชับ และไม่ยืดเต็มแถวโดยไม่จำเป็น
+- มีปุ่ม `ล้าง Filter` และ Refresh ตามความเหมาะสม
+- ข้อมูลต้องแสดงเป็น Table และใช้เส้นขอบ สีพื้น Header สีเส้นแบ่งแถว และระยะห่างตาม User Style/Theme ที่ผู้ใช้เลือก
+- Table ต้องมีเส้นบรรทัดแบ่งแถวและคอลัมน์ให้เห็นชัดเจนเสมอ เพื่อให้ผู้ใช้จับคู่ Header กับข้อมูลได้ถูกต้อง
+- อักษรที่หัวคอลัมน์ต้องเป็นตัวหนา และใช้สีหลักตาม Style/Theme ที่ผู้ใช้เลือก
+- รูปดินสอสำหรับแก้ไขต้องใช้สีหลักตาม Style/Theme ที่ผู้ใช้เลือก ห้ามกำหนดสีตายตัวเฉพาะหน้าจอ
+- ห้ามกำหนดสี Table แบบตายตัวเฉพาะหน้าจอ
+- ลำดับ Column มาตรฐาน: Column 1 = `ID`, Column 2 = `Action`, จากนั้นจึงเป็น Column ข้อมูล
+- `ID` ใน List ใช้เลข Run ลำดับ 1, 2, 3 ตามข้อมูลที่แสดงในหน้า/หน้า Pagination ไม่ใช่ Database Key
+- หัว Column ใช้สีตัวอักษรจาก User Style/Theme, ตัวหนา และ Column ที่รองรับต้อง Sort ได้เมื่อกดหัว Column
+- หัว `ID` และ `Action` ไม่ต้อง Sort เว้นแต่ Feature Specification ระบุเป็นกรณีพิเศษ
+- Empty State แยก `ยังไม่มีข้อมูล` กับ `ไม่พบข้อมูลตามเงื่อนไข`
+- ใช้ Pagination ตามมาตรฐาน `RowSTD` เมื่อระบบกำหนดไว้
 
--   ช่องบังคับต้องระบุให้ชัดเจน
--   Label ใช้สีปกติ และให้เฉพาะเครื่องหมาย `*` เป็นสีแดง
--   เมื่อ Validation ไม่ผ่าน ให้แสดงข้อความใต้ Field
--   ไม่ทำให้ Label ทั้งข้อความเป็นสีแดงโดยไม่จำเป็น
--   Validation ต้องบอกว่าผิดตรงไหนและต้องแก้อย่างไร
--   Validation ที่ตรวจได้บน Client ควรตรวจโดยไม่ต้องรอ API
--   Validation ฝั่ง Server/API ยังต้องมีเสมอสำหรับ Business Rule และ Security
+#### 3.1.1 Action Column
 
-### 5.3 เมื่อกดบันทึก
+- `Action` อยู่ Column ที่ 2 และจัดปุ่มให้อยู่กึ่งกลางทั้งแนวนอนและแนวตั้ง
+- ปุ่ม `Edit` ใช้ไอคอนรูปดินสอ สี Primary/สีหลักจาก User Style
+- ปุ่ม `Delete` ใช้ไอคอนรูปถังขยะ สีแดงเสมอ
+- ทั้ง Edit และ Delete ต้องมี Tooltip หรือ Semantic Label
+- ไม่มี Permission `EDIT` ให้ซ่อนปุ่ม Edit
+- ไม่มี Permission `DELETE` ให้ซ่อนปุ่ม Delete
+- การซ่อน Action ต้องคำนวณจากสิทธิ์ของผู้ใช้ที่ Login แล้ว ไม่ใช่ซ่อนเพียงที่ UI; Backend ต้องตรวจ Permission ซ้ำ
+- ถ้าไม่มี Action ที่ผู้ใช้มีสิทธิ์ ให้แสดง Cell ว่างตาม Layout และยังคงลำดับ Column มาตรฐาน
 
-ลำดับมาตรฐาน:
+### 3.2 Form
 
-`Validate → Loading → API/Service → Result`
+- Form แบ่ง Card ตามกลุ่มข้อมูล
+- Label, Hint, Validation และ Button ใช้ Typography กลาง
+- ปุ่มชุดเดียวกันสูง `LaooTypography.buttonHeight` เดียวกัน (`36px`)
+- ปุ่ม `ยกเลิก` จัดข้อความกึ่งกลางและใช้ความสูงเดียวกับ `บันทึก`
+- Required Field แสดง `*` และตรวจซ้ำที่ API
+- เพิ่ม/แก้ไขต้องมี Caption และสถานะ Action ชัดเจน
 
-ระหว่างบันทึก: - ป้องกัน Double Submit - ปุ่มบันทึกต้องไม่ส่งคำขอซ้ำ - แสดง Loading
-ที่เห็นได้ชัด - ห้ามล้างข้อมูลในฟอร์มก่อนทราบผลจาก Server
+---
 
-### 5.4 บันทึกไม่สำเร็จ
+## 4. Action และ Permission
 
-เมื่อ API/Database Error: - อยู่หน้า Form เดิม - เก็บค่าที่ผู้ใช้กรอกไว้ - แสดงข้อความ
-Error ที่เข้าใจได้ - เปิดให้ผู้ใช้แก้ไขและกดบันทึกใหม่ - ห้ามกลับ List อัตโนมัติ - ห้ามแสดง
-Technical Stack Trace ต่อ End User
+Permission หลัก:
 
-### 5.5 ยกเลิก
+- `VIEW` แสดงหน้าจอ
+- `CREATE` เพิ่มข้อมูล
+- `EDIT` แก้ไขข้อมูล
+- `DELETE` ลบข้อมูล
+- `CHANGE_STATUS` เปลี่ยนสถานะ
 
-ถ้าไม่มีการแก้ไข: `Cancel → Previous/List`
+กฎ:
 
-ถ้ามี Unsaved Changes: `Cancel/Back → Confirm Discard → Previous/List`
+- ไม่มี Permission ให้ซ่อน Action ใน Frontend
+- Backend ต้องตรวจ Authentication, Scope, Permission และ Business Rule ซ้ำ
+- Double Click ต้องไม่ส่ง Request ซ้ำ
+- Edit ใช้สี Primary/สีหลักของ Theme
+- Delete ใช้สีแดงเสมอและมี Tooltip
+- Change Status ไม่ใช่ Delete; ถ้าข้อมูลยังต้องอยู่ระบบให้ใช้ Status
 
-ข้อความแนะนำ: `มีข้อมูลที่ยังไม่ได้บันทึก ต้องการออกจากหน้านี้หรือไม่?`
+### 4.1 Delete Confirmation
 
-ปุ่ม: - `อยู่หน้านี้` - `ออกโดยไม่บันทึก`
+Pattern บังคับของ Delete Confirmation:
 
-------------------------------------------------------------------------
+- แสดงไอคอนถังขยะสีแดงด้านบนและหัวข้อโทนสีแดง
+- แสดงข้อความรายการในกล่องพื้นแดงอ่อน โดยต้องมี Key/รหัสและชื่อรายการ
+- แสดงข้อความเตือนว่าข้อมูลที่ลบแล้วไม่สามารถเรียกคืนได้
+- ปุ่ม `ยกเลิก` เป็น TextButton และปุ่ม `ลบ` เป็นสีแดงพร้อมไอคอนถังขยะ
+- Action Form ต้องวางช่อง `สถานะ` ไว้ด้านบนสุดก่อน Field อื่น โดยวางข้อความกับตัวเลื่อนเปิด/ปิดไว้ติดกันในกลุ่มเดียวกัน และใช้ระยะห่างระหว่างแถว TextBox ประมาณ `12px` เพื่อไม่ให้ช่องกรอกชิดกันเกินไป
 
-## 6. Back Navigation Standard
+ต้องแสดงชื่อ/Key ของข้อมูล ข้อความเตือน ปุ่ม `ยกเลิก` และปุ่ม `ลบ` สีแดง
 
-ปุ่ม Back ต้องกลับไปยังหน้าที่สมเหตุสมผลใน Workflow ไม่ควรส่งผู้ใช้ไปหน้า Login หรือ
-Landing โดยไม่เกี่ยวข้อง
+- หัวข้อและกรอบใช้โทนแดง
+- ปุ่มลบต้องไม่เป็น Default Focus
+- ห้ามนำรายการออกจาก List ก่อน API ยืนยันสำเร็จ
+- ถ้ามี Referential Integrity ให้ API คืน `409 Conflict` และคงรายการไว้
 
-Priority: 1. กลับ Parent/Previous Screen ของ Feature 2. กลับ List ของ
-Feature 3. กลับ Module Home 4. ใช้ Browser/System Back เฉพาะเมื่อไม่ทำให้ Flow
-ผิด
+---
 
-ถ้ามี Unsaved Changes ต้องใช้ Confirmation ก่อนออก
+## 5. API และสถานะการทำงาน
 
-------------------------------------------------------------------------
+ทุก Request ต้องมี Loading, Error, Empty และ Success State ที่เหมาะสม
 
-## 7. Delete Standard
+HTTP Result มาตรฐาน:
 
-การลบเป็น Destructive Action และต้องไม่ลบทันทีจากการกดครั้งแรก
+- `200/204` สำเร็จ
+- `400` Request ไม่ถูกต้อง
+- `401` ไม่ Login/Token ไม่ถูกต้อง
+- `403` ไม่มี Permission
+- `404` ไม่พบข้อมูล
+- `409` ขัดกับ Business Rule หรือ Referential Integrity
+- `500` Unexpected Error; ห้ามแสดง SQL Exception/Stack Trace ให้ผู้ใช้
 
-Flow:
+Success Notification ใช้กล่องด้านบน Content Area โทนเขียวอ่อน มีไอคอนสำเร็จ ข้อความสรุป และปุ่มปิด
 
-`Delete → Confirmation → Delete Request → Success → Refresh List`
+---
 
-Confirmation ต้อง: - ระบุสิ่งที่กำลังจะลบเมื่อทำได้ - ใช้ปุ่ม `ลบ` เป็น Danger
-Action - มีปุ่ม `ยกเลิก` - Default focus ไม่ควรอยู่ที่ปุ่มลบเมื่อมีความเสี่ยงจากการกด
-Enter
+## 6. Responsive และ Accessibility
 
-ลบสำเร็จ: - ปิด Dialog - แจ้ง `ลบข้อมูลเรียบร้อย` - อยู่หน้า List - Refresh List
+- Desktop/Web ใช้ Table และ Sidebar เมื่อเหมาะสม
+- Tablet ลด Sidebar เป็น Drawer ได้ และไม่ให้ Form กว้างจนอ่านยาก
+- Mobile ใช้ Card/List หรือ Horizontal Table Strategy ได้ แต่ Business Flow ต้องเหมือน Desktop
+- Action สำคัญต้องกดง่ายและยังเห็น Edit/Delete ตามสิทธิ์
+- Contrast ต้องอ่านได้ชัด
+- Icon ที่ไม่ชัดต้องมี Tooltip หรือ Label
+- Error ห้ามสื่อด้วยสีเพียงอย่างเดียว
+- Desktop/Web ควรรองรับ Keyboard Navigation
 
-ลบไม่สำเร็จ: - ไม่เอารายการออกจากหน้าจอแบบหลอกว่าลบแล้ว -
-แจ้งเหตุผลที่ผู้ใช้เข้าใจได้ - หากติด Referential/Business Rule
-ให้แจ้งว่ารายการถูกใช้งานอยู่เมื่อเหมาะสม
+---
 
-------------------------------------------------------------------------
+## 7. Authentication Navigation
 
-## 8. Detail Screen Standard
+- Sidebar อ่าน Menu Group/Menu Item จาก Navigation API ซึ่งคัดจาก `TDADMainMenu` ตาม `user_type`, Project และสิทธิ์ `VIEW` เท่านั้น ห้ามเติมรายการ hard-code เมื่อ API ผิดพลาด
+- ใช้ `MenuCode` เป็น Primary Identity สำหรับจับคู่เมนูกับ Route Registry ส่วนกลาง; `RouteName` จากฐานข้อมูลเป็น metadata และไม่ส่งเข้า Router โดยตรง
+- Menu cache ต้องผูกกับ Session/User และต้องถูกสร้างใหม่เมื่อเปลี่ยนผู้ Login เพื่อไม่ให้สิทธิ์หรือรายการเมนูรั่วข้ามบัญชี
 
-Detail Screen ใช้เมื่อข้อมูลมีรายละเอียดมากหรือไม่เหมาะกับการแก้ไขทันที
+```text
+Not Logged In → Landing/Login
+Login Success → Authorized Home
+Session Expired → Login
+Logout → Landing/Login
+```
 
-Standard Actions: - `กลับ` - `แก้ไข` ถ้ามีสิทธิ์ - `ลบ` ถ้ามีสิทธิ์และ Feature อนุญาต
+Protected Screen ต้องไม่เปิดข้อมูลเมื่อไม่มี Session หรือ Permission
 
-Flow: - `List → Detail` - `Detail → Edit → Save → Detail`
-เป็นรูปแบบที่อนุญาต - ถ้าลบจาก Detail สำเร็จ → กลับ List
+---
 
-------------------------------------------------------------------------
+## 8. Shared Components และ Theme
 
-## 9. Search, Filter and Pagination
+เมื่อรูปแบบ UX ถูกใช้ซ้ำตั้งแต่ 2–3 จุด ให้พิจารณาใช้ Shared Component เช่น Search Bar, Form Field, Confirm Dialog, Loading, Empty State, Error State, Page Header และ DataTable Wrapper
 
--   หน้าจอ List ต้องรองรับ Pagination
--   Default Page Size ต้องอ่านจาก Setup ส่วนกลาง เช่น `RowSTD` ไม่ Hard-code
-    ในแต่ละหน้าจอ
--   Page Size Option ควรกำหนดจากมาตรฐาน/Setup กลางตามที่ระบบอนุมัติ
--   Search ต้องไม่ล้าง Filter อื่นโดยไม่แจ้ง
--   Clear Filter คืนค่า Filter ทั้งหมดเป็น Default
--   เมื่อเปิด Add/Edit แล้วกลับ List ควรรักษา Search/Filter/Page เดิมถ้าทำได้
--   เมื่อ Filter เปลี่ยนและใช้ Pagination ให้กลับ Page 1
--   Empty Result ต้องแยกระหว่าง:
-    -   ยังไม่มีข้อมูล
-    -   ไม่พบข้อมูลจากเงื่อนไขค้นหา
+Theme กลางต้องควบคุม:
 
-ตัวอย่าง: - `ยังไม่มีข้อมูล Partner` - `ไม่พบข้อมูลตามเงื่อนไขที่ค้นหา`
+- Primary/Accent, Surface, Background และ Border
+- Sidebar, Selected Menu และ Page Caption
+- Table Header, Card, Button, Input Focus และ Semantic Colors
+- Delete/Error = แดง, Success = เขียว, Warning = สีเตือน
 
-------------------------------------------------------------------------
+ห้ามกำหนดสีหรือ Font ตายตัวใน Feature โดยไม่จำเป็น
 
-## 10. Loading Standard
+---
 
-ทุก Operation ที่รอข้อมูลต้องมี Loading State
+## 9. Development และ Governance
 
-### Page Loading
+ก่อน Coding ต้องตรวจ Source ล่าสุดและระบุ Screen Mode (`CRUD`, `UpdateOnly`, `ShowOnly`)
 
-ใช้เมื่อเปิดหน้าที่ต้องโหลดข้อมูลหลัก
+ถ้า Feature ต้องใช้ Flow ต่างจากเอกสารนี้:
 
-### Inline Loading
+1. ระบุเหตุผลและผลกระทบ
+2. บันทึกใน Feature Specification
+3. ขออนุมัติก่อนเปลี่ยน UX/Business Flow
+4. ถ้าเป็นรูปแบบ UX/ScreenType ที่ใช้ได้หลาย Feature ให้ยกระดับกลับมาแก้ Standard นี้
 
-ใช้เมื่อโหลดเฉพาะบางส่วน
+เอกสารนี้เป็น Source of Truth เพียงไฟล์เดียว ห้ามสร้างกติกาซ้ำในไฟล์ Standard อื่น
 
-### Action Loading
+---
 
-ใช้เมื่อ Save/Delete/Submit
-
-กฎ: - ห้ามปล่อยให้ผู้ใช้กด Action ซ้ำขณะ Request เดิมยังไม่เสร็จ - ไม่ควร Block
-ทั้งหน้าถ้า Request กระทบเพียง Component เดียว
-
-------------------------------------------------------------------------
-
-## 11. Action Result Notification Standard
-
-ทุก Action เมื่อทำรายการเสร็จต้องแจ้งผลให้ผู้ใช้ทราบ โดยแสดงบริเวณด้านบนของ Content
-Area/หน้าจอปัจจุบัน และไม่ใช้ Popup `OK` สำหรับผลสำเร็จทั่วไป
-
-### 11.1 Success Message Format
-
--   Add: `เพิ่มข้อมูล {ชื่อหน้าจอ} สำเร็จ`
--   Edit: `แก้ไขข้อมูล {ชื่อหน้าจอ} สำเร็จ`
--   Delete: `ลบ {ชื่อหน้าจอ} สำเร็จ`
-
-ตัวอย่างหน้า Partner: - `เพิ่มข้อมูล Partner สำเร็จ` -
-`แก้ไขข้อมูล Partner สำเร็จ` - `ลบ Partner สำเร็จ`
-
-### 11.2 Notification Behavior
-
--   Add สำเร็จ → Notification ด้านบน → ล้าง Form → อยู่หน้า Add เดิม
--   Edit สำเร็จ → กลับ List → Refresh → Notification ด้านบน
--   Delete สำเร็จ → กลับ/คงอยู่หน้า List → Refresh → Notification ด้านบน
--   Error → อยู่หน้าปัจจุบันและคงข้อมูลที่ผู้ใช้กรอกไว้เมื่อเหมาะสม
--   Warning/Validation → แสดงข้อความที่สัมพันธ์กับสิ่งที่ต้องแก้
--   Notification ทั่วไปสามารถ Auto-hide ได้
--   เวลา Auto-hide ควรอ่านจาก Setup ส่วนกลาง เช่น `TimeAlert`
--   Error สำคัญควรคงอยู่จนผู้ใช้รับรู้หรือแก้ไข
-
-### 11.3 Semantic Color
-
--   Success = สีเขียว
--   Warning = สีเตือน
--   Error = สีแดง
--   Info = สีข้อมูลมาตรฐานของระบบ
--   Semantic Color ไม่เปลี่ยนตาม Theme จนทำให้ความหมายสับสน
-
-------------------------------------------------------------------------
-
-## 12. Error Message Standard
-
-ข้อความ Error สำหรับผู้ใช้ต้องตอบอย่างน้อยหนึ่งเรื่อง: - เกิดอะไรขึ้น - ผู้ใช้ควรทำอะไรต่อ
-
-ตัวอย่าง: - `ไม่สามารถบันทึกข้อมูลได้ กรุณาตรวจสอบข้อมูลแล้วลองอีกครั้ง` -
-`ไม่สามารถเชื่อมต่อระบบได้ กรุณาลองใหม่` - `Session หมดอายุ กรุณาเข้าสู่ระบบใหม่`
-
-Technical Error, Exception, SQL Error และ Stack Trace ให้บันทึกใน Log
-ตามมาตรฐานระบบ ไม่แสดงต่อ End User
-
-------------------------------------------------------------------------
-
-## 13. Confirmation Standard
-
-ใช้ Confirmation เฉพาะ Action ที่: - ลบข้อมูล - ยกเลิกงานที่มี Unsaved Changes -
-เปลี่ยนสถานะสำคัญ - ส่ง/อนุมัติ/ยืนยัน Transaction ที่ย้อนกลับไม่ได้หรือมีผลธุรกิจ
-
-ไม่ใช้ Confirmation กับ Action ปกติทุกครั้ง เพราะทำให้ UX ช้าโดยไม่จำเป็น
-
-------------------------------------------------------------------------
-
-## 14. Permission UX Standard
-
-กฎกลางของ Laoo Solutions:
-
-> ถ้าผู้ใช้ไม่มีสิทธิ์ ให้ซ่อน Menu / Button / Action นั้นเป็นค่าเริ่มต้น
-
--   ไม่ใช้ Disabled เพื่อบอกว่าไม่มีสิทธิ์ เว้นแต่ Feature Specification
-    อนุมัติเป็นกรณีพิเศษ
--   Frontend Permission เป็น UX Layer ไม่ใช่ Security Layer
--   API/Backend ต้องตรวจ Permission ซ้ำเสมอ
--   Direct URL/Route ต้องไม่สามารถข้าม Permission ได้
-
-## 14.1 Implemented Role and Workspace UX
-
-- Support, Partner และ Company ใช้ Sidebar, Top Bar, Font, spacing, Favorite และ Theme control จาก Shared Shell เดียวกัน
-- เมนูที่ไม่มีสิทธิ์ต้องถูกซ่อนทั้งกลุ่มและรายการย่อยที่ไม่เหลือรายการใช้งาน
-- Admin เห็นเมนูทั้งหมดของประเภทผู้ใช้ตนเองโดยอัตโนมัติ
-- Header ด้านขวาต้องแสดงชื่อผู้ใช้และประเภท/บริบทจาก Login จริง
-- Title Bar ใช้ชื่อเจ้าของระบบจาก `TDSTCompanySetUp`; ชื่อหน้าจอใน Content ใช้ `menuName`
-
-## 14.2 List/Table and Add/Edit Baseline
-
-- Action Column อยู่ซ้ายสุด และหัวคอลัมน์/ปุ่ม Edit/Delete จัดกึ่งกลาง
-- DataTable ต้องมีเส้นแบ่งแต่ละแถว และใช้ความกว้าง Content ให้เต็มพื้นที่อย่างเหมาะสม
-- Search ด้านบนต้องมี `ค้นหา`, `ล้าง Filter` และ Refresh เมื่อหน้าจอรองรับ
-- Pagination ต้องใช้ `RowSTD` จาก `TDSTCompanySetUp` และวางชิดซ้ายใต้ Table ตาม `PAGINATION_UI_STANDARD.md`
-- Add/Edit ที่มีหลาย Field ต้องเปิดเป็นหน้าเต็ม Content Area ไม่ใช้ Popup
-- Caption ต้องเรียง `{ชื่อหน้าจอ} > {ประเภท Action}`
-
-------------------------------------------------------------------------
-
-## 15. Authentication Navigation Standard
-
-### Not Logged In
-
--   Public/Landing Screen ใช้งานตามสิทธิ์ Guest
--   Protected Screen → Redirect Login
-
-### Login Success
-
-ระบบต้องอ่าน Session/User Context และกำหนดปลายทางตาม
-Role/Project/Permission ที่ได้รับ ไม่ hard-code ให้ทุก User
-ไปหน้าเดียวหากระบบกำหนด Home ต่างกัน
-
-### Session Expired
-
--   ยุติ Protected Session
--   แจ้งผู้ใช้แบบเหมาะสม
--   Redirect Login
--   ไม่แสดง Protected Data ต่อ
-
-### Logout
-
--   Clear Auth State/Token/Session ที่เกี่ยวข้อง
--   Redirect ไปยัง Landing หรือ Login ตาม Application Flow ที่กำหนด
--   Router และ Authentication State ต้องใช้ Source of Truth เดียวกัน
-
-------------------------------------------------------------------------
-
-## 16. Button Hierarchy
-
-### Primary
-
-ใช้กับ Action หลักของหน้าจอ เช่น: - บันทึก - เข้าสู่ระบบ - เพิ่ม - ยืนยัน
-
-หนึ่ง Action Area ควรมี Primary ที่เด่นเพียงหนึ่งตัวเมื่อเป็นไปได้
-
-### Secondary
-
-เช่น: - ยกเลิก - กลับ - ล้าง Filter
-
-### Danger
-
-เช่น: - ลบ - ยกเลิก Transaction สำคัญ
-
-### Icon Button
-
-ใช้เมื่อความหมายเป็นมาตรฐานและเข้าใจง่าย หากอาจกำกวมต้องมี Tooltip/Label
-
-------------------------------------------------------------------------
-
-## 17. Standard Action Matrix
-
-  -----------------------------------------------------------------------
-  Current Screen    User Action       Success           Failure
-                                      Destination       Destination
-  ----------------- ----------------- ----------------- -----------------
-  List              เพิ่ม               Add Form          List
-
-  Add Form          บันทึก              Add Form เดิม      Add Form เดิม
-
-  Add Form          ยกเลิก             List/Previous     Add Form
-                                                        ถ้ายังไม่ยืนยัน
-                                                        discard
-
-  List              แก้ไข              Edit Form         List
-
-  Edit Form         บันทึก              List หรือ Detail   Edit Form เดิม
-                                      ตาม Flow          
-
-  Edit Form         ยกเลิก             List/Previous     Edit Form
-                                                        ถ้ายังไม่ยืนยัน
-                                                        discard
-
-  List              ดู                 Detail            List
-
-  Detail            แก้ไข              Edit Form         Detail
-
-  Detail            ลบ                List              Detail
-
-  List              ลบ                List + Refresh    List
-
-  Any Protected     Session Expired   Login             Current screen
-  Screen                                                only until
-                                                        redirect
-
-  Login             Login Success     Authorized Home   Login
-
-  Protected Screen  Logout            Landing/Login     Current screen
-                                                        until logout
-                                                        result
-  -----------------------------------------------------------------------
-
-ตารางนี้เป็น Default Behavior ของทุก Project หาก Feature ใดต้องต่างจากนี้
-ต้องบันทึกเหตุผลใน Feature Specification
-
-------------------------------------------------------------------------
-
-## 17.1 Approved Workspace / List / Action Layout
-
-### Workspace
-
--   Logo อยู่ซ้ายบน
--   User อยู่ขวาบน
--   Title Bar มีปุ่มกลับหน้าหลัก, Favorite และ Theme
--   Sidebar อยู่ซ้ายและคงอยู่เมื่อเข้าแต่ละเมนูบน Desktop/Web
--   กลุ่มเมนู Expand/Collapse ได้
--   ระยะห่างเมนูกระชับ
--   หัวกลุ่มเมนูไม่ใช้ตัวหนา
--   Caption ชื่อหน้าจอแสดงใน Content Area ไม่แสดงซ้ำบน Title Bar
-
-### List
-
--   Search และ Dropdown Filter อยู่ด้านบนตามความเหมาะสมของหน้าจอ
--   ปุ่ม `เพิ่ม` อยู่มุมขวาบน และซ่อนเมื่อไม่มี Permission
--   Action Column อยู่ซ้ายสุด
--   หัว Column ไม่ใช้ตัวหนา
--   หัว Column ใช้สีตาม Theme
--   Column ที่เหมาะสมรองรับ Sort และแสดงทิศทางการ Sort
-
-### Action / Form
-
--   Caption ต้องบอก Action ปัจจุบัน เช่น `Partner > เพิ่ม`, `Partner > แก้ไข`
--   Form แบ่งเป็น Card ตามกลุ่มข้อมูล
--   Border และ Caption ของ Card ใช้สีตาม Theme
--   ปุ่ม Action ใช้สีตาม Theme ยกเว้น Delete ใช้สีแดง
--   หน้า Add/Edit มี `ยกเลิก` และ `บันทึก` ทั้งด้านบนขวาและด้านล่างขวา
--   ปุ่มบนและล่างต้องเรียก Logic เดียวกัน
-
-### Favorite
-
--   Favorite อยู่บน Title Bar และเข้าถึงได้ทุกหน้าหลัง Login
--   Caption ของหน้าจอมี `☆ / ★` สำหรับเพิ่ม/นำหน้าปัจจุบันออกจาก Favorite
--   Favorite เป็นของแต่ละ User
--   Favorite ต้องเคารพ Permission และห้ามแสดงหน้าที่ User ไม่มีสิทธิ์
-
-------------------------------------------------------------------------
-
-## 18. Responsive Standard
-
-### Desktop / Web Wide
-
--   ใช้พื้นที่ได้เต็มประสิทธิภาพ
--   Table และ Side Navigation ใช้ได้เมื่อเหมาะสม
-
-### Tablet
-
--   ลดความกว้าง Sidebar หรือเปลี่ยนเป็น Drawer
--   Form ไม่ควรกว้างจนอ่านยาก
-
-### Mobile
-
--   Layout เป็นแนวตั้ง
--   Action สำคัญต้องกดง่าย
--   Table ที่มีหลาย Column ควรใช้ Responsive List/Card หรือ Horizontal
-    Strategy ที่ออกแบบไว้
--   ห้ามลดขนาดตัวอักษรจนอ่านยากเพื่อยัดข้อมูลลงหน้าจอ
-
-Business Flow ต้องเหมือนกันทุก Platform
-
-------------------------------------------------------------------------
-
-## 19. Theme and Styling
-
-สีต้องมาจาก Theme/Design Token กลาง หลีกเลี่ยง Hard-coded Color ใน Feature
-
-### 19.1 Theme Preset Version 1
-
-Theme ใช้ Preset สำเร็จรูป ผู้ใช้ไม่เลือกสีทีละองค์ประกอบ
-
--   `STYLE01–STYLE10` = Hybrid Soft Dark (Workspace/Content/Title Bar เป็นพื้นขาว)
--   `STYLE11–STYLE20` = Light / Colored Sidebar
--   `STYLE21–STYLE30` = Dark
--   `STYLE31–STYLE40` = White Menu
--   `STYLE01` เป็น Default Theme ของ Laoo Solutions
--   การสลับรหัส Theme Group ไม่เปลี่ยนค่าสีเดิมของแต่ละชุด
--   White Menu ใช้สี Theme กับ Main Menu และใช้สีดำกับ Submenu
--   Light/Colored Style 11, 14, 16, 17, 18 และ 19 ใช้สีดำกับ Submenu
--   Dark Style 21–30 ใช้ตัวอักษรเมนูสีขาวหรือสีอ่อน
--   โครงสร้าง Theme ต้องเพิ่ม STYLE31 เป็นต้นไปได้โดยไม่แก้ Logic หลัก
-
-Theme Selector Flow:
-
-`เลือก Style → Preview → ใช้ Theme นี้ / ยกเลิก`
-
--   Preview ต้องเปลี่ยนหน้าจอจริงทันที
--   กด `ใช้ Theme นี้` จึง Apply ค่า
--   กด `ยกเลิก` ต้องกลับ Theme เดิม
--   เมื่อมี User Preference จริง ให้บันทึก Theme ต่อ User
-
-### 19.2 Theme Tokens
-
-Preset ควรกำหนดค่ากลางสำหรับองค์ประกอบ เช่น: - Primary/Accent -
-Background/Surface - Sidebar Background/Text - Selected Menu - Page
-Caption - Card Border/Caption - Table Header/Text - Primary/Action
-Button - Input Focus - Favorite Active
-
-ทุก STYLE ต้องใช้ Content Workspace, DataTable, List, Card, Form และ Dialog เป็นพื้นสีขาวเสมอ สี Theme ใช้กับ Sidebar, Navigation, Selected State, เส้นกรอบ และ Action เป็นหลัก ส่วน Dark STYLE ห้ามทำให้พื้นข้อมูลหรือข้อความข้อมูลกลายเป็นสีมืดที่อ่านยาก
-
-### 19.3 Semantic Colors
-
-สีที่มีความหมายเฉพาะไม่ควรถูก Theme เปลี่ยน: - Delete / Error = สีแดง - Success =
-สีเขียว - Warning = สีเตือน - Required `*` = สีแดง
-
-### 19.4 General Styling
-
--   Typography ใช้มาตรฐานกลาง
--   Spacing, Radius, Border และ Shadow ใช้ Shared Standard
--   Brand Default ใช้ภาพลักษณ์ Laoo Solutions
-
-------------------------------------------------------------------------
-
-## 20. Shared Components Rule
-
-เมื่อ Pattern ถูกใช้ซ้ำตั้งแต่ 2--3 จุดขึ้นไป ให้พิจารณาสร้าง Shared Component เช่น: -
-Primary Button - Confirm Dialog - Loading Indicator - Empty State -
-Error State - Search Bar - Standard Form Field - Page Header - Data
-List/Table Wrapper
-
-ไม่ควรสร้าง Shared Component ก่อนมี Use Case จริงเพียงเพื่อคาดการณ์อนาคต
-
-------------------------------------------------------------------------
-
-## 21. Accessibility and Usability
-
--   ข้อความต้องอ่านได้ชัดเจน
--   Contrast ต้องเพียงพอ
--   Interactive Element ต้องมีพื้นที่กดเหมาะสม
--   Keyboard Navigation ควรทำงานบน Desktop/Web
--   Error ต้องไม่สื่อด้วยสีเพียงอย่างเดียว
--   Icon ที่กำกวมต้องมี Tooltip หรือ Label
-
-------------------------------------------------------------------------
-
-## 22. UX Change Control
-
-ก่อนสร้างหรือแก้ UX/UI ของ Feature ใหม่: 1. สรุป Purpose 2. สรุป Layout 3. ระบุ
-Controls / Inputs 4. ระบุ User Flow 5. ระบุ Validation / States 6. ระบุ
-Responsive Behavior 7. ตรวจเทียบกับ `UX_UI_STANDARD.md` 8. ขออนุมัติก่อน
-Coding เมื่อเป็นการเปลี่ยน UX
-
-ถ้า Feature ใช้ Standard Flow เดิมทั้งหมด ไม่จำเป็นต้องออกแบบ Pattern ใหม่
-
-------------------------------------------------------------------------
-
-## 23. Coding Responsibility
-
-Mhon เป็น Coding Expert หลักของทีมในการนำมาตรฐานนี้ไปใช้ใน Code โดย: - ตรวจว่ามี
-Shared Component เดิมหรือไม่ก่อนสร้างใหม่ - หลีกเลี่ยง Style และ Navigation Logic
-ซ้ำ - Review ว่า Save/Cancel/Delete/Back ทำงานตาม Standard - ไม่เปลี่ยน
-Business Flow หรือ UX ที่อนุมัติแล้วโดยพลการ - แก้เฉพาะส่วนที่จำเป็นเมื่อเป็น Bug Fix
-
-------------------------------------------------------------------------
-
-## 24. Reference Flow --- Master Data
-
-มาตรฐานเริ่มต้นสำหรับ Master Data ทุกประเภท:
-
-`List` → กด `+ เพิ่ม` → `Add Form` → Validate → Save → Success Message →
-ล้าง Form → อยู่ `Add Form` เพื่อเพิ่มรายการต่อ
-
-การแก้ไข:
-
-`List` → `แก้ไข` → `Edit Form` → Save → Success Message → กลับ `List` →
-Refresh
-
-การลบ:
-
-`List/Detail` → `ลบ` → Confirm → Delete → Success Message → กลับ/คงอยู่
-`List` → Refresh
-
-------------------------------------------------------------------------
-
-## 25. Standard Governance
-
-เอกสารนี้เป็น **Central UX/UI Standard** ของ Laoo Solutions
-
-Project-specific UX สามารถเพิ่มเติมได้ แต่: -
-ห้ามขัดกับมาตรฐานกลางโดยไม่มีการอนุมัติ - ถ้า Pattern ใหม่มีประโยชน์กับหลาย Project
-ให้ยกระดับกลับมาเป็น Central Standard - การแก้มาตรฐานกลางต้องพิจารณาผลกระทบต่อทุก
-Project - ทุก Feature ใหม่ควรตรวจเอกสารนี้ก่อนออกแบบและ Coding
-
-------------------------------------------------------------------------
-
-**Laoo Solutions**\
+**Laoo Solutions**
 *Simple Today. Ready Tomorrow.*
