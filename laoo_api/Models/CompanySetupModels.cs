@@ -7,6 +7,12 @@ public sealed record CompanySetupResponse(
     long? CompanyID,
     string OwnerCode,
     string OwnerName,
+    string? CustomerNameTh,
+    string? CustomerNameEn,
+    string? AddressText,
+    string? Telephone,
+    string? TaxID,
+    string? CustomerEmail,
     string Name,
     string TitleHeader,
     int RowSTD,
@@ -31,6 +37,12 @@ public sealed record CompanySetupResponse(
 
 public sealed class CompanySetupUpdateRequest
 {
+    public string? CustomerNameTh { get; init; }
+    public string? CustomerNameEn { get; init; }
+    public string? AddressText { get; init; }
+    public string? Telephone { get; init; }
+    public string? TaxID { get; init; }
+    public string? CustomerEmail { get; init; }
     public string Name { get; init; } = string.Empty;
     public string TitleHeader { get; init; } = string.Empty;
     public int RowSTD { get; init; }

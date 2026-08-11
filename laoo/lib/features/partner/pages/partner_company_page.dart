@@ -316,7 +316,7 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
   String? _message;
   String _menuName = '';
   int _currentPage = 0;
-  int _sortColumnIndex = 1;
+  int _sortColumnIndex = 3;
   bool _sortAscending = true;
 
   String get _menuCode => widget.menuScope == WorkspaceMenuScope.support
@@ -394,11 +394,12 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
         partnerId: _partnerFilterId,
         support: widget.menuScope == WorkspaceMenuScope.support,
       );
-      if (mounted)
+      if (mounted) {
         setState(() {
           _items = result;
           _currentPage = 0;
         });
+      }
     } catch (error) {
       if (mounted) setState(() => _error = error.toString());
     } finally {
@@ -795,14 +796,24 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
               ),
             ],
             const SizedBox(height: 16),
-            Row(
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                Expanded(
+                SizedBox(
+                  width: 330,
                   child: TextField(
                     controller: _search,
                     onSubmitted: (_) => _load(),
-                    decoration: const InputDecoration(
-                      prefixIcon: Icon(Icons.search),
+                    decoration: InputDecoration(
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: IconButton(
+                        tooltip: 'เธเนเธเธซเธฒ',
+                        onPressed: _load,
+                        icon: const Icon(Icons.arrow_forward_rounded),
+                      ),
+                      isDense: true,
                       labelText: 'ค้นหาชื่อ รหัส หรือเลขผู้เสียภาษี',
                     ),
                   ),
@@ -812,7 +823,7 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
                   SizedBox(
                     width: 240,
                     child: DropdownButtonFormField<int?>(
-                      value: _partnerFilterId,
+                      initialValue: _partnerFilterId,
                       decoration: const InputDecoration(
                         labelText: 'Partner',
                         prefixIcon: Icon(Icons.business_outlined),
@@ -840,7 +851,7 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
                 SizedBox(
                   width: 150,
                   child: DropdownButtonFormField<String>(
-                    value: _statusFilter,
+                    initialValue: _statusFilter,
                     decoration: const InputDecoration(labelText: 'สถานะ'),
                     items: const [
                       DropdownMenuItem(
@@ -889,8 +900,9 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
   Widget _buildBody() {
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_error != null) return Center(child: Text(_error!));
-    if (_items.isEmpty)
+    if (_items.isEmpty) {
       return const Center(child: Text('ยังไม่มีข้อมูลลูกค้า'));
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -922,6 +934,12 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
                         fontWeight: FontWeight.w700,
                       ),
                       columns: [
+                        const DataColumn(
+                          label: SizedBox(
+                            width: 28,
+                            child: Center(child: Text('ID')),
+                          ),
+                        ),
                         DataColumn(
                           label: SizedBox(
                             width: 82,
@@ -967,6 +985,16 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
                           .map(
                             (item) => DataRow(
                               cells: [
+                                DataCell(
+                                  SizedBox(
+                                    width: 28,
+                                    child: Center(
+                                      child: Text(
+                                        '${_visibleItems.indexOf(item) + 1 + (_currentPage * _pageSize)}',
+                                      ),
+                                    ),
+                                  ),
+                                ),
                                 DataCell(
                                   SizedBox(
                                     width: 82,
@@ -1062,6 +1090,13 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
     final last = _items.isEmpty
         ? 0
         : ((page + 1) * _pageSize).clamp(0, _items.length);
+    final pageIndexes = <int>[];
+    if (_pageCount <= 7) {
+      pageIndexes.addAll(List<int>.generate(_pageCount, (index) => index));
+    } else {
+      final start = (page - 2).clamp(0, _pageCount - 5);
+      pageIndexes.addAll(List<int>.generate(5, (index) => start + index));
+    }
     return Wrap(
       spacing: 6,
       crossAxisAlignment: WrapCrossAlignment.center,
@@ -1070,13 +1105,15 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
           onPressed: page == 0 ? null : () => setState(() => _currentPage--),
           child: const Text('ก่อนหน้า'),
         ),
-        for (var i = 0; i < _pageCount; i++)
-          i == page
-              ? FilledButton(onPressed: null, child: Text('${i + 1}'))
-              : OutlinedButton(
-                  onPressed: () => setState(() => _currentPage = i),
-                  child: Text('${i + 1}'),
-                ),
+        if (_pageCount > 7 && pageIndexes.first > 0) ...[
+          _pageNumberButton(0, page),
+          if (pageIndexes.first > 1) const Text('...'),
+        ],
+        for (final i in pageIndexes) _pageNumberButton(i, page),
+        if (_pageCount > 7 && pageIndexes.last < _pageCount - 1) ...[
+          if (pageIndexes.last < _pageCount - 2) const Text('...'),
+          _pageNumberButton(_pageCount - 1, page),
+        ],
         OutlinedButton(
           onPressed: page >= _pageCount - 1
               ? null
@@ -1085,6 +1122,24 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
         ),
         Text('แสดง $first-$last จาก ${_items.length} รายการ'),
       ],
+    );
+  }
+
+  Widget _pageNumberButton(int index, int currentPage) {
+    return SizedBox(
+      width: 36,
+      height: LaooTypography.buttonHeight,
+      child: index == currentPage
+          ? FilledButton(
+              onPressed: () {},
+              style: FilledButton.styleFrom(padding: EdgeInsets.zero),
+              child: Text('${index + 1}'),
+            )
+          : OutlinedButton(
+              onPressed: () => setState(() => _currentPage = index),
+              style: OutlinedButton.styleFrom(padding: EdgeInsets.zero),
+              child: Text('${index + 1}'),
+            ),
     );
   }
 }

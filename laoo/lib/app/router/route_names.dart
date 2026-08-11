@@ -21,4 +21,16 @@ abstract final class RouteNames {
   static const String loginLog = 'loginLog';
   static const String companySetup = 'companySetup';
   static const String technicalInfo = 'technicalInfo';
+  static const String masterData = 'masterData';
+  static const String companyEmployees = 'companyEmployees';
+  static const String companyUsers = 'companyUsers';
+  static const String companyRoleGroups = 'companyRoleGroups';
+  static const String companyMenuPermissions = 'companyMenuPermissions';
+  static const String partnerEmployees = 'partnerEmployees';
+  static const String partnerRoleGroups = 'partnerRoleGroups';
+  static const String partnerMenuPermissions = 'partnerMenuPermissions';
+  static const String laooEmployees = 'laooEmployees';
+  static const String laooUsers = 'laooUsers';
+  static const String laooRoleGroups = 'laooRoleGroups';
+  static const String laooMenuPermissions = 'laooMenuPermissions';
 }

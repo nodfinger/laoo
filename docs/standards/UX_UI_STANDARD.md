@@ -8,6 +8,15 @@
 เอกสารนี้เป็น Source of Truth เพียงไฟล์เดียวสำหรับ UX/UI และ Flow ของหน้าจอ
 รวมกติกาเดิมจาก `CRUD_FLOW_STANDARD.md` และ `UX_UI_STANDARD.md` เพื่อไม่ให้แต่ละเอกสารกำหนดพฤติกรรมขัดกัน
 
+##ถ้า หน้าจอมี DataList
+ตารางเต็มพื้นที่ Content
+ไม่มีเส้นแนวตั้ง มีเฉพาะเส้นแบ่งแถว
+
+เปลี่ยนหัวคอลัมน์เป็น รหัส, ชื่อ, เรียงลำดับแสดง
+คลิกหัวคอลัมน์เพื่อ Sort ได้
+เพิ่ม Pagination ด้านล่าง
+##ถ้า หน้าจอ CRUD หัว Action อยู่กึ่งกลาง
+
 ---
 
 ## 1. หลัก UX กลาง
@@ -267,6 +276,12 @@ Protected Screen ต้องไม่เปิดข้อมูลเมื่
 ---
 
 ## 8. Shared Components และ Theme
+
+### 8.1 TDSTMaster ComboBox และ MasterGroupCode
+
+- ComboBox ที่อ่านข้อมูลจาก `TDSTMaster` ต้องมีปุ่มเปิด Popup สำหรับเพิ่ม แก้ไข และลบข้อมูลตาม Permission ของผู้ใช้ โดย Backend ต้องตรวจสอบ Permission ซ้ำทุก Action
+- การอ่านข้อมูลจาก `TDSTMaster` ต้องระบุ `MasterGroupCode` ผ่านตัวแปรกลาง ห้ามฝังรหัสเป็น String ในหน้าจอหรือ Repository
+- ตัวแปรกลางของ Master Group ต้องใช้ Prefix `Ms` ตามความหมาย เช่น `001 = MsProv` และ `002 = MsUnit`; เมื่อเรียกใช้ข้อมูลหน่วยบรรจุต้องอ้าง `MsUnit` เพื่อได้ `MasterGroupCode='002'`
 
 เมื่อรูปแบบ UX ถูกใช้ซ้ำตั้งแต่ 2–3 จุด ให้พิจารณาใช้ Shared Component เช่น Search Bar, Form Field, Confirm Dialog, Loading, Empty State, Error State, Page Header และ DataTable Wrapper
 

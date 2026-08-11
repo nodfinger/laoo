@@ -3,6 +3,12 @@ class CompanySetupModel {
     required this.ownerType,
     required this.ownerCode,
     required this.ownerName,
+    this.customerNameTh,
+    this.customerNameEn,
+    this.addressText,
+    this.telephone,
+    this.taxId,
+    this.customerEmail,
     required this.name,
     required this.titleHeader,
     required this.rowStd,
@@ -35,6 +41,12 @@ class CompanySetupModel {
   final int? companyId;
   final String ownerCode;
   final String ownerName;
+  final String? customerNameTh;
+  final String? customerNameEn;
+  final String? addressText;
+  final String? telephone;
+  final String? taxId;
+  final String? customerEmail;
   final String name;
   final String titleHeader;
   final int rowStd;
@@ -71,6 +83,12 @@ class CompanySetupModel {
       companyId: asInt(json['companyID']) ?? asInt(json['companyId']),
       ownerCode: json['ownerCode']?.toString() ?? '',
       ownerName: json['ownerName']?.toString() ?? '',
+      customerNameTh: json['customerNameTh']?.toString(),
+      customerNameEn: json['customerNameEn']?.toString(),
+      addressText: json['addressText']?.toString(),
+      telephone: json['telephone']?.toString(),
+      taxId: json['taxID']?.toString() ?? json['taxId']?.toString(),
+      customerEmail: json['customerEmail']?.toString(),
       name: json['name']?.toString() ?? '',
       titleHeader: json['titleHeader']?.toString() ?? '',
       rowStd: asInt(json['rowSTD']) ?? asInt(json['rowStd']) ?? 30,
@@ -99,6 +117,12 @@ class CompanySetupModel {
 
 class CompanySetupUpdateInput {
   const CompanySetupUpdateInput({
+    this.customerNameTh,
+    this.customerNameEn,
+    this.addressText,
+    this.telephone,
+    this.taxId,
+    this.customerEmail,
     required this.name,
     required this.titleHeader,
     required this.rowStd,
@@ -117,6 +141,12 @@ class CompanySetupUpdateInput {
     this.passwordDirect,
   });
 
+  final String? customerNameTh;
+  final String? customerNameEn;
+  final String? addressText;
+  final String? telephone;
+  final String? taxId;
+  final String? customerEmail;
   final String name;
   final String titleHeader;
   final int rowStd;
@@ -135,6 +165,12 @@ class CompanySetupUpdateInput {
   final String? passwordDirect;
 
   Map<String, dynamic> toJson() => {
+        'customerNameTh': customerNameTh,
+        'customerNameEn': customerNameEn,
+        'addressText': addressText,
+        'telephone': telephone,
+        'taxID': taxId,
+        'customerEmail': customerEmail,
         'name': name,
         'titleHeader': titleHeader,
         'rowSTD': rowStd,

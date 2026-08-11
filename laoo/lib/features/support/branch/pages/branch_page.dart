@@ -186,7 +186,7 @@ class _BranchPageState extends State<BranchPage> {
                     SizedBox(
                       width: 150,
                       child: DropdownButtonFormField<String>(
-                        value: _status,
+                        initialValue: _status,
                         decoration: const InputDecoration(labelText: 'สถานะ'),
                         items: const [
                           DropdownMenuItem(
@@ -212,7 +212,7 @@ class _BranchPageState extends State<BranchPage> {
                     SizedBox(
                       width: 220,
                       child: DropdownButtonFormField<int?>(
-                        value: _companyFilterId,
+                        initialValue: _companyFilterId,
                         decoration: const InputDecoration(labelText: 'ลูกค้า'),
                         items: [
                           const DropdownMenuItem<int?>(
@@ -566,7 +566,7 @@ class _BranchPageState extends State<BranchPage> {
                         ),
                         const SizedBox(height: 12),
                         DropdownButtonFormField<int>(
-                          value: _actionCompanyId,
+                          initialValue: _actionCompanyId,
                           decoration: const InputDecoration(
                             labelText: 'ลูกค้า *',
                           ),

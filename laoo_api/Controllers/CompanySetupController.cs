@@ -73,6 +73,32 @@ public sealed class CompanySetupController : ControllerBase
 
         await using var connection = CreateConnection();
         await connection.OpenAsync(cancellationToken);
+        await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(cancellationToken);
+
+        if (owner.Value.CompanyID is not null)
+        {
+            const string companySql = """
+UPDATE dbo.TDADCompany
+SET CompanyNameTH=@CompanyNameTH, CompanyNameEN=@CompanyNameEN,
+    AddressText=@AddressText, Telephone=@Telephone, TaxID=@TaxID,
+    Email=@Email, UpdateDate=SYSUTCDATETIME(), UpdateBy=@ActorID
+WHERE CompanyID=@CompanyID;
+""";
+            await using var companyCommand = new SqlCommand(companySql, connection, transaction);
+            Add(companyCommand, "@CompanyNameTH", SqlDbType.NVarChar, NullIfBlank(request.CustomerNameTh), 200);
+            Add(companyCommand, "@CompanyNameEN", SqlDbType.NVarChar, NullIfBlank(request.CustomerNameEn), 200);
+            Add(companyCommand, "@AddressText", SqlDbType.NVarChar, NullIfBlank(request.AddressText), 1000);
+            Add(companyCommand, "@Telephone", SqlDbType.NVarChar, NullIfBlank(request.Telephone), 50);
+            Add(companyCommand, "@TaxID", SqlDbType.NVarChar, NullIfBlank(request.TaxID), 20);
+            Add(companyCommand, "@Email", SqlDbType.NVarChar, NullIfBlank(request.CustomerEmail), 320);
+            Add(companyCommand, "@CompanyID", SqlDbType.BigInt, owner.Value.CompanyID);
+            Add(companyCommand, "@ActorID", SqlDbType.BigInt, actorId);
+            if (await companyCommand.ExecuteNonQueryAsync(cancellationToken) == 0)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return NotFound(new { message = "ไม่พบข้อมูลลูกค้าที่กำลังแก้ไข" });
+            }
+        }
 
         const string sql = """
 UPDATE dbo.TDSTCompanySetUp
@@ -106,7 +132,7 @@ WHERE OwnerType = @OwnerType
       );
 """;
 
-        await using var command = new SqlCommand(sql, connection);
+        await using var command = new SqlCommand(sql, connection, transaction);
         Add(command, "@Name", SqlDbType.NVarChar, request.Name.Trim(), 200);
         Add(command, "@TitleHeader", SqlDbType.NVarChar, request.TitleHeader.Trim(), 300);
         Add(command, "@RowSTD", SqlDbType.Int, request.RowSTD);
@@ -128,6 +154,8 @@ WHERE OwnerType = @OwnerType
         Add(command, "@CompanyID", SqlDbType.BigInt, owner.Value.CompanyID);
 
         var affected = await command.ExecuteNonQueryAsync(cancellationToken);
+        if (affected > 0)
+            await transaction.CommitAsync(cancellationToken);
         if (affected == 0)
             return NotFound(new { message = "ไม่พบ Setup ของเจ้าของที่ Login อยู่" });
 
@@ -181,6 +209,12 @@ SELECT
         WHEN S.OwnerType = 'P' THEN P.PartnerCode
         ELSE COALESCE(NULLIF(C.CompanyNameTH, N''), C.CompanyCode)
     END AS OwnerName,
+    C.CompanyNameTH AS CustomerNameTh,
+    C.CompanyNameEN AS CustomerNameEn,
+    C.AddressText,
+    C.Telephone,
+    C.TaxID,
+    C.Email AS CustomerEmail,
     S.Name,
     S.TitleHeader,
     S.RowSTD,
@@ -255,6 +289,12 @@ WHERE S.OwnerType = @OwnerType
             NLong("CompanyID"),
             reader.GetString(reader.GetOrdinal("OwnerCode")),
             reader.GetString(reader.GetOrdinal("OwnerName")),
+            NString("CustomerNameTh"),
+            NString("CustomerNameEn"),
+            NString("AddressText"),
+            NString("Telephone"),
+            NString("TaxID"),
+            NString("CustomerEmail"),
             reader.GetString(reader.GetOrdinal("Name")),
             reader.GetString(reader.GetOrdinal("TitleHeader")),
             reader.GetInt32(reader.GetOrdinal("RowSTD")),

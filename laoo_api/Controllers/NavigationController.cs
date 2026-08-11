@@ -22,9 +22,9 @@ public sealed class NavigationController : ControllerBase
         var userType = User.FindFirstValue("user_type");
         var groupCodes = userType switch
         {
-            "PARTNER_USER" => new[] { "06", "07" },
-            "COMPANY_USER" => new[] { "08", "09" },
-            "LAOO_SUPPORT" => new[] { "01", "02", "03", "04", "05" },
+            "PARTNER_USER" => new[] { "05", "06", "07", "11" },
+            "COMPANY_USER" => new[] { "05", "08", "09", "10" },
+            "LAOO_SUPPORT" => new[] { "01", "02", "03", "04", "05", "12" },
             _ => Array.Empty<string>()
         };
         if (groupCodes.Length == 0) return Forbid();
@@ -39,7 +39,7 @@ SELECT G.MenuGroupCode, G.MenuGroupName, G.IconName AS GroupIconName, G.SortOrde
        M.IconName, M.SortOrder, M.IsFavoriteAllowed
 FROM dbo.TDADMenuGroup G
 INNER JOIN dbo.TDADMainMenu M ON M.MenuGroupCode = G.MenuGroupCode AND M.IsActive = 1 AND M.IsVisible = 1
-WHERE G.IsActive = 1 AND G.MenuGroupCode IN ('01','02','03','04','05','06','07','08','09')
+WHERE G.IsActive = 1 AND G.MenuGroupCode IN ('01','02','03','04','05','06','07','08','09','10','11','12')
 ORDER BY G.SortOrder, M.SortOrder, M.MenuCode;
 """;
         await using var command = new SqlCommand(sql, connection);

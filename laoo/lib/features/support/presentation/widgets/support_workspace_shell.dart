@@ -787,7 +787,8 @@ class _ApiRoleScopedSidebarState extends State<_ApiRoleScopedSidebar> {
             isExpandedDefault: group.isExpandedDefault,
             items: group.items.where((item) {
               final spec = AppMenuRouteRegistry.byMenuCode(item.code);
-              return spec != null && spec.scope == expectedScope;
+              return spec != null &&
+                  (spec.scope == expectedScope || spec.scope == AppMenuScope.shared);
             }).toList(),
           ),
         )

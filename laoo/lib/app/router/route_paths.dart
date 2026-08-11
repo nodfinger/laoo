@@ -21,4 +21,16 @@ abstract final class RoutePaths {
   static const String loginLog = '/support/login-log';
   static const String companySetup = '/support/company-setup';
   static const String technicalInfo = '/support/technical-info';
+  static const String masterData = '/master-data';
+  static const String companyEmployees = '/company/employees';
+  static const String companyUsers = '/company/users';
+  static const String companyRoleGroups = '/company/role-groups';
+  static const String companyMenuPermissions = '/company/menu-permissions';
+  static const String partnerEmployees = '/partner/employees';
+  static const String partnerRoleGroups = '/partner/role-groups';
+  static const String partnerMenuPermissions = '/partner/menu-permissions';
+  static const String laooEmployees = '/support/employees';
+  static const String laooUsers = '/support/users';
+  static const String laooRoleGroups = '/support/role-groups';
+  static const String laooMenuPermissions = '/support/menu-permissions';
 }
