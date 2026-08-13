@@ -135,13 +135,15 @@ class AuthStorage {
 
   Future<void> clear({bool preserveRememberedSession = false}) async {
     final prefs = await SharedPreferences.getInstance();
+    final preserveRememberedCredentials =
+        preserveRememberedSession &&
+        prefs.getBool(_rememberLoginKey) == true;
+    await _clearSessionKeys(prefs);
 
-    if (preserveRememberedSession &&
-        prefs.getBool(_rememberLoginKey) == true) {
+    if (preserveRememberedCredentials) {
       return;
     }
 
-    await _clearSessionKeys(prefs);
     await prefs.remove(_rememberLoginKey);
     await prefs.remove(_rememberedUsernameKey);
     await prefs.remove(_rememberedPasswordKey);

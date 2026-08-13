@@ -22,11 +22,13 @@ abstract final class RouteNames {
   static const String companySetup = 'companySetup';
   static const String technicalInfo = 'technicalInfo';
   static const String masterData = 'masterData';
+  static const String organizationStructure = 'organizationStructure';
   static const String companyEmployees = 'companyEmployees';
   static const String companyUsers = 'companyUsers';
   static const String companyRoleGroups = 'companyRoleGroups';
   static const String companyMenuPermissions = 'companyMenuPermissions';
   static const String partnerEmployees = 'partnerEmployees';
+  static const String customerEmployees = 'customerEmployees';
   static const String partnerRoleGroups = 'partnerRoleGroups';
   static const String partnerMenuPermissions = 'partnerMenuPermissions';
   static const String laooEmployees = 'laooEmployees';

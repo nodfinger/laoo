@@ -24,9 +24,10 @@ class ApiClient {
   Future<dynamic> delete(
     String path, {
     Object? body,
+    Map<String, String>? query,
     bool authenticated = true,
   }) {
-    return _http.delete(path, body: body, authenticated: authenticated);
+    return _http.delete(path, body: body, query: query, authenticated: authenticated);
   }
 
   void dispose() => _http.dispose();

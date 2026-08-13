@@ -61,4 +61,33 @@ class ApiPartnerRepository implements PartnerRepository {
     await _apiClient.delete('/api/support/partners/$partnerId');
   }
 
+  Future<void> createPartnerAdmin(int partnerId, {
+    required String username,
+    required String password,
+  }) async {
+    await _apiClient.post(
+      '/api/support/partner-users?partnerId=$partnerId',
+      body: {
+        'username': username,
+        'password': password,
+        'displayName': '$username Admin',
+        'isPartnerAdmin': true,
+        'isActive': true,
+      },
+    );
+  }
+
+  Future<void> updatePartnerAdmin(int userId, {
+    required String username,
+    required String password,
+  }) async {
+    await _apiClient.put('/api/support/partner-users/$userId', body: {
+      'username': username,
+      if (password.isNotEmpty) 'password': password,
+      'displayName': '$username Admin',
+      'isPartnerAdmin': true,
+      'isActive': true,
+    });
+  }
+
 }

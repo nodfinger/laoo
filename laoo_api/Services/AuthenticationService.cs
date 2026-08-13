@@ -314,7 +314,7 @@ public sealed class AuthenticationService
         INNER JOIN dbo.TDADPartner AS p
             ON p.PartnerID = c.PartnerID
            AND p.IsActive = 1
-        INNER JOIN dbo.TDADUserProject AS up
+        LEFT JOIN dbo.TDADUserProject AS up
             ON up.UserID = u.UserID
            AND up.CompanyID = u.CompanyID
            AND up.ProjectID = @ProjectID
@@ -334,6 +334,7 @@ public sealed class AuthenticationService
         ) AS b
         WHERE u.NormalizedUsername = @NormalizedUsername
           AND u.IsActive = 1
+          AND (up.UserID IS NOT NULL OR u.IsCompanyAdmin = 1)
           AND (u.LockedUntil IS NULL OR u.LockedUntil <= SYSUTCDATETIME());
         """;
 
@@ -349,8 +350,8 @@ public sealed class AuthenticationService
 
         return new CompanyUserRow(
             reader.GetInt64(0),
-            reader.GetInt64(1),
             reader.GetInt64(2),
+            reader.GetInt64(1),
             reader.IsDBNull(3) ? null : reader.GetInt64(3),
             reader.GetString(4),
             reader.GetString(5),

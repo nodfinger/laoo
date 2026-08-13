@@ -80,19 +80,29 @@ ORDER BY M.MDCode;
         }
 
         const string tableSql = """
-SELECT TableName, MAX(Name) AS TableMeaning
+SELECT TableName, MAX(Name) AS TableMeaning, ColName, DataType, Remark
 FROM dbo.TDSTTableName
 WHERE CompanyCode='TD' AND (@q='' OR TableName LIKE @like OR Name LIKE @like)
-GROUP BY TableName
-ORDER BY TableName;
+GROUP BY TableName, ColName, DataType, Remark
+ORDER BY TableName, ColName;
 """;
         await using (var command = new SqlCommand(tableSql, connection))
         {
             command.Parameters.AddWithValue("@q", term);
             command.Parameters.AddWithValue("@like", $"%{term}%");
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            var tables = new Dictionary<string, TechnicalTable>(StringComparer.OrdinalIgnoreCase);
             while (await reader.ReadAsync(cancellationToken))
-                result.Tables.Add(new TechnicalTable(reader.GetString(0), reader.IsDBNull(1) ? string.Empty : reader.GetString(1)));
+            {
+                var tableName = reader.GetString(0);
+                if (!tables.TryGetValue(tableName, out var table))
+                {
+                    table = new TechnicalTable(tableName, reader.IsDBNull(1) ? string.Empty : reader.GetString(1));
+                    tables[tableName] = table;
+                    result.Tables.Add(table);
+                }
+                table.Fields.Add(new TechnicalTableField(reader.GetString(2), reader.GetString(3), reader.IsDBNull(4) ? string.Empty : reader.GetString(4)));
+            }
         }
 
         return Ok(result);
@@ -154,4 +164,10 @@ public sealed class TechnicalMd(string mdCode, string mdName, string mdPath, str
     public List<TechnicalMdPart> Parts { get; } = [];
 }
 public sealed record TechnicalMdPart(int Line, string Text);
-public sealed record TechnicalTable(string TableName, string TableMeaning);
+public sealed class TechnicalTable(string tableName, string tableMeaning)
+{
+    public string TableName { get; } = tableName;
+    public string TableMeaning { get; } = tableMeaning;
+    public List<TechnicalTableField> Fields { get; } = [];
+}
+public sealed record TechnicalTableField(string ColName, string DataType, string Remark);

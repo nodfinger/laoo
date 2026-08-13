@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/auto_dismiss_message.dart';
 
 import '../../../../app/theme/laoo_design_tokens.dart';
 import '../../../../app/theme/laoo_typography.dart';
@@ -187,7 +188,7 @@ class _PartnerFormPageState extends State<PartnerFormPage> {
                   ),
                   const SizedBox(height: 16),
                   if (_message != null) ...[
-                    _TopMessage(
+                    AutoDismissMessage(
                       message: _message!,
                       error: _messageIsError,
                       onClose: () => setState(() => _message = null),

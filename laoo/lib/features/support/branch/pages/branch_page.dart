@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/auto_dismiss_message.dart';
+import '../../../../core/widgets/combo_box_text.dart';
 
 import '../../../../app/theme/laoo_typography.dart';
 import '../../../partner/data/partner_company_repository.dart';
@@ -165,7 +167,9 @@ class _BranchPageState extends State<BranchPage> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                Row(
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
                   children: [
                     SizedBox(
                       width: 330,
@@ -191,15 +195,15 @@ class _BranchPageState extends State<BranchPage> {
                         items: const [
                           DropdownMenuItem(
                             value: 'ทั้งหมด',
-                            child: Text('ทั้งหมด'),
+                            child: LaooComboBoxText('ทั้งหมด'),
                           ),
                           DropdownMenuItem(
                             value: 'เปิดใช้งาน',
-                            child: Text('เปิดใช้งาน'),
+                            child: LaooComboBoxText('เปิดใช้งาน'),
                           ),
                           DropdownMenuItem(
                             value: 'ปิดใช้งาน',
-                            child: Text('ปิดใช้งาน'),
+                            child: LaooComboBoxText('ปิดใช้งาน'),
                           ),
                         ],
                         onChanged: (v) => setState(() {
@@ -217,12 +221,12 @@ class _BranchPageState extends State<BranchPage> {
                         items: [
                           const DropdownMenuItem<int?>(
                             value: null,
-                            child: Text('ทั้งหมด'),
+                            child: LaooComboBoxText('ทั้งหมด'),
                           ),
                           ..._companies.map(
                             (c) => DropdownMenuItem<int?>(
                               value: c.companyId,
-                              child: Text(c.companyNameTh),
+                              child: LaooComboBoxText(c.companyNameTh),
                             ),
                           ),
                         ],
@@ -249,7 +253,7 @@ class _BranchPageState extends State<BranchPage> {
                 ),
                 const SizedBox(height: 12),
                 if (_listMessage != null) ...[
-                  _SuccessMessage(
+                  AutoDismissMessage(
                     message: _listMessage!,
                     onClose: () => setState(() => _listMessage = null),
                   ),
@@ -271,6 +275,11 @@ class _BranchPageState extends State<BranchPage> {
                             elevation: 0,
                             clipBehavior: Clip.antiAlias,
                             child: DataTable(
+                              border: TableBorder(
+                                top: BorderSide(color: Theme.of(context).dividerColor, width: .5),
+                                bottom: BorderSide(color: Theme.of(context).dividerColor, width: .5),
+                                horizontalInside: BorderSide(color: Theme.of(context).dividerColor, width: .5),
+                              ),
                               horizontalMargin: 8,
                               columnSpacing: 12,
                               dividerThickness: 1,
@@ -536,7 +545,7 @@ class _BranchPageState extends State<BranchPage> {
           ),
           const SizedBox(height: 8),
           if (_actionMessage != null) ...[
-            _SuccessMessage(
+            AutoDismissMessage(
               message: _actionMessage!,
               onClose: () => setState(() => _actionMessage = null),
             ),
@@ -574,7 +583,7 @@ class _BranchPageState extends State<BranchPage> {
                               .map(
                                 (c) => DropdownMenuItem(
                                   value: c.companyId,
-                                  child: Text(c.companyNameTh),
+                                  child: LaooComboBoxText(c.companyNameTh),
                                 ),
                               )
                               .toList(),

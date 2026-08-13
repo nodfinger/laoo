@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/auto_dismiss_message.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/route_names.dart';
@@ -6,6 +7,7 @@ import '../../../../app/theme/workspace_theme_presets.dart';
 import '../../../../core/api/api_exception.dart';
 import '../../../../core/company_setup/company_setup_controller.dart';
 import '../../../../core/platform/window_title_service.dart';
+import '../../../../core/widgets/combo_box_text.dart';
 import '../data/company_setup_api.dart';
 import '../models/company_setup_constants.dart';
 import '../models/company_setup_model.dart';
@@ -45,6 +47,7 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
   bool _loading = true;
   bool _messageIsError = false;
   String _yearFormat = CompanySetupConstants.yearFormatAd;
+  int _orgStructureType = 1;
 
   bool _saving = false;
   String? _message;
@@ -62,7 +65,7 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
       _ownerCode.text = setup.ownerCode;
       _ownerName.text = setup.name;
       _titleHeader.text = setup.titleHeader;
-      _customerNameTh.text = setup.customerNameTh ?? setup.name;
+      _customerNameTh.text = setup.customerNameTh ?? '';
       _customerNameEn.text = setup.customerNameEn ?? '';
       _address.text = setup.addressText ?? '';
       _telephone.text = setup.telephone ?? '';
@@ -71,6 +74,7 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
       _rowStd.text = setup.rowStd.toString();
       _rowCardStd.text = setup.rowCardStd.toString();
       _timeAlert.text = setup.timeAlert.toString();
+      _orgStructureType = setup.orgStructureType;
       _versionId.text = setup.versionId ?? '';
       _emailHost.text = setup.emailHost ?? '';
       _emailPort.text = setup.emailPort?.toString() ?? '';
@@ -145,6 +149,7 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
             rowStd: int.tryParse(_rowStd.text) ?? 30,
             rowCardStd: int.tryParse(_rowCardStd.text) ?? 30,
             timeAlert: int.tryParse(_timeAlert.text) ?? 30,
+            orgStructureType: _orgStructureType,
             yearFormat: _yearFormat,
             versionId: _versionId.text,
             emailHost: _emailHost.text,
@@ -201,70 +206,85 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
       color: preset.isDark ? preset.background : Colors.white,
       child: Form(
         key: _formKey,
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : ListView(
-          padding: const EdgeInsets.all(24),
+        child: Stack(
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                const Expanded(
-                  child: WorkspacePageTitle(
-                    title: 'กำหนดค่าระบบ',
-                    favoriteKey: 'กำหนดค่าระบบ',
+            _loading
+                ? const Center(child: CircularProgressIndicator())
+                : ListView(
+                padding: const EdgeInsets.all(24),
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      const Expanded(
+                        child: WorkspacePageTitle(
+                          title: 'กำหนดค่าระบบ',
+                          favoriteKey: 'กำหนดค่าระบบ',
+                        ),
+                      ),
+                      _TopActions(
+                        saving: _saving,
+                        onCancel: _cancel,
+                        onSave: _save,
+                      ),
+                    ],
                   ),
+                  const SizedBox(height: 8),
+                  _CompanySetupUxForm(
+                    ownerCode: _ownerCode,
+                    ownerName: _ownerName,
+                    titleHeader: _titleHeader,
+                    customerNameTh: _customerNameTh,
+                    customerNameEn: _customerNameEn,
+                    address: _address,
+                    telephone: _telephone,
+                    taxId: _taxId,
+                    email: _email,
+                  ),
+                  const SizedBox(height: 16),
+                  _LegacySetupCards(
+                    controllers: {
+                      'rowStd': _rowStd,
+                      'rowCardStd': _rowCardStd,
+                      'timeAlert': _timeAlert,
+                      'versionId': _versionId,
+                      'emailHost': _emailHost,
+                      'emailPort': _emailPort,
+                      'emailCenter': _emailCenter,
+                      'emailAdmin': _emailAdmin,
+                      'superUserName': _superUserName,
+                      'passwordCry': _passwordCry,
+                      'passwordEmpDefault': _passwordEmpDefault,
+                    },
+                    yearFormat: _yearFormat,
+                    onYearFormatChanged: (value) =>
+                        setState(() => _yearFormat = value),
+                    orgStructureType: _orgStructureType,
+                    onOrgStructureTypeChanged: (value) =>
+                        setState(() => _orgStructureType = value),
+                  ),
+                  const SizedBox(height: 20),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: _TopActions(
+                      saving: _saving,
+                      onCancel: _cancel,
+                      onSave: _save,
+                    ),
+                  ),
+                ],
+              ),
+            if (_message != null)
+              Positioned(
+                top: 12,
+                right: 24,
+                child: AutoDismissMessage(
+                  key: ValueKey(_message),
+                  message: _message!,
+                  error: _messageIsError,
+                  onClose: () => setState(() => _message = null),
                 ),
-                _TopActions(saving: _saving, onCancel: _cancel, onSave: _save),
-              ],
-            ),
-            const SizedBox(height: 8),
-            if (_message != null) ...[
-              _InlineMessage(
-                message: _message!,
-                error: _messageIsError,
-                onClose: () => setState(() => _message = null),
               ),
-              const SizedBox(height: 12),
-            ],
-            _CompanySetupUxForm(
-              ownerCode: _ownerCode,
-              ownerName: _ownerName,
-              titleHeader: _titleHeader,
-              customerNameTh: _customerNameTh,
-              customerNameEn: _customerNameEn,
-              address: _address,
-              telephone: _telephone,
-              taxId: _taxId,
-              email: _email,
-            ),
-            const SizedBox(height: 16),
-            _LegacySetupCards(
-              controllers: {
-                'rowStd': _rowStd,
-                'rowCardStd': _rowCardStd,
-                'timeAlert': _timeAlert,
-                'versionId': _versionId,
-                'emailHost': _emailHost,
-                'emailPort': _emailPort,
-                'emailCenter': _emailCenter,
-                'emailAdmin': _emailAdmin,
-                'superUserName': _superUserName,
-                'passwordCry': _passwordCry,
-                'passwordEmpDefault': _passwordEmpDefault,
-              },
-              yearFormat: _yearFormat,
-              onYearFormatChanged: (value) => setState(() => _yearFormat = value),
-            ),
-            const SizedBox(height: 20),
-            Align(
-              alignment: Alignment.centerRight,
-              child: _TopActions(
-                saving: _saving,
-                onCancel: _cancel,
-                onSave: _save,
-              ),
-            ),
           ],
         ),
       ),
@@ -277,11 +297,15 @@ class _LegacySetupCards extends StatelessWidget {
     required this.controllers,
     required this.yearFormat,
     required this.onYearFormatChanged,
+    required this.orgStructureType,
+    required this.onOrgStructureTypeChanged,
   });
 
   final Map<String, TextEditingController> controllers;
   final String yearFormat;
   final ValueChanged<String> onYearFormatChanged;
+  final int orgStructureType;
+  final ValueChanged<int> onOrgStructureTypeChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -299,6 +323,19 @@ class _LegacySetupCards extends StatelessWidget {
           spacing: gap,
           runSpacing: gap,
           children: [
+            SizedBox(
+              width: width,
+              child: _SetupCard(
+                title: 'โครงสร้างองค์กร',
+                icon: Icons.account_tree_outlined,
+                children: [
+                  _OrgStructureField(
+                    value: orgStructureType,
+                    onChanged: onOrgStructureTypeChanged,
+                  ),
+                ],
+              ),
+            ),
             if (DateTime.now().millisecondsSinceEpoch < 0)
               SizedBox(
                 width: width,
@@ -318,9 +355,21 @@ class _LegacySetupCards extends StatelessWidget {
                 title: 'การแสดงผล',
                 icon: Icons.monitor_outlined,
                 children: [
-                  _LegacyField(label: 'จำนวนแถว List', value: '30', controller: controllers['rowStd']),
-                  _LegacyField(label: 'จำนวน Card', value: '30', controller: controllers['rowCardStd']),
-                  _LegacyField(label: 'เวลา Alert (วินาที)', value: '30', controller: controllers['timeAlert']),
+                  _LegacyField(
+                    label: 'จำนวนแถว List',
+                    value: '30',
+                    controller: controllers['rowStd'],
+                  ),
+                  _LegacyField(
+                    label: 'จำนวน Card',
+                    value: '30',
+                    controller: controllers['rowCardStd'],
+                  ),
+                  _LegacyField(
+                    label: 'เวลา Alert (วินาที)',
+                    value: '30',
+                    controller: controllers['timeAlert'],
+                  ),
                 ],
               ),
             ),
@@ -330,8 +379,15 @@ class _LegacySetupCards extends StatelessWidget {
                 title: 'ข้อมูลการแสดงผลระบบ',
                 icon: Icons.palette_outlined,
                 children: [
-                  _YearFormatField(value: yearFormat, onChanged: onYearFormatChanged),
-                  _LegacyField(label: 'Version', value: '1.0.0', controller: controllers['versionId']),
+                  _YearFormatField(
+                    value: yearFormat,
+                    onChanged: onYearFormatChanged,
+                  ),
+                  _LegacyField(
+                    label: 'Version',
+                    value: '1.0.0',
+                    controller: controllers['versionId'],
+                  ),
                   _LegacyField(label: 'Theme', value: 'ตาม Theme Standard'),
                 ],
               ),
@@ -354,8 +410,16 @@ class _LegacySetupCards extends StatelessWidget {
                 title: 'Email Configuration',
                 icon: Icons.mail_outline_rounded,
                 children: [
-                  _LegacyField(label: 'Email Host', value: 'smtp.gmail.com', controller: controllers['emailHost']),
-                  _LegacyField(label: 'Email Port', value: '587', controller: controllers['emailPort']),
+                  _LegacyField(
+                    label: 'Email Host',
+                    value: 'smtp.gmail.com',
+                    controller: controllers['emailHost'],
+                  ),
+                  _LegacyField(
+                    label: 'Email Port',
+                    value: '587',
+                    controller: controllers['emailPort'],
+                  ),
                   _LegacyField(
                     label: 'Email Center (ส่งออกอัตโนมัติ)',
                     value: 'nodfinger@gmail.com',
@@ -375,8 +439,16 @@ class _LegacySetupCards extends StatelessWidget {
                 title: 'Security / Secret',
                 icon: Icons.lock_outline_rounded,
                 children: [
-                  _LegacyField(label: 'Super User', value: 'ตั้งค่าแล้ว', controller: controllers['superUserName']),
-                  _LegacyField(label: 'PasswordCry', value: 'ตั้งค่าแล้ว', controller: controllers['passwordCry']),
+                  _LegacyField(
+                    label: 'Super User',
+                    value: 'ตั้งค่าแล้ว',
+                    controller: controllers['superUserName'],
+                  ),
+                  _LegacyField(
+                    label: 'PasswordCry',
+                    value: 'ตั้งค่าแล้ว',
+                    controller: controllers['passwordCry'],
+                  ),
                   _LegacyField(
                     label: 'Password พนักงาน',
                     value: 'ยังไม่ตั้งค่า',
@@ -452,7 +524,11 @@ class _SetupCard extends StatelessWidget {
 }
 
 class _LegacyField extends StatelessWidget {
-  const _LegacyField({required this.label, required this.value, this.controller});
+  const _LegacyField({
+    required this.label,
+    required this.value,
+    this.controller,
+  });
 
   final String label;
   final String value;
@@ -476,6 +552,26 @@ class _LegacyField extends StatelessWidget {
   }
 }
 
+class _OrgStructureField extends StatelessWidget {
+  const _OrgStructureField({required this.value, required this.onChanged});
+
+  final int value;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) => DropdownButtonFormField<int>(
+    initialValue: value,
+    decoration: const InputDecoration(labelText: 'โครงสร้างองค์กร'),
+    items: const [
+      DropdownMenuItem(value: 1, child: LaooComboBoxText('แผนกเท่านั้น')),
+      DropdownMenuItem(value: 2, child: LaooComboBoxText('ฝ่าย > แผนก')),
+    ],
+    onChanged: (next) {
+      if (next != null) onChanged(next);
+    },
+  );
+}
+
 class _YearFormatField extends StatelessWidget {
   const _YearFormatField({required this.value, required this.onChanged});
 
@@ -487,7 +583,7 @@ class _YearFormatField extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: DropdownButtonFormField<String>(
-        value: CompanySetupConstants.yearFormatOptions.contains(value)
+        initialValue: CompanySetupConstants.yearFormatOptions.contains(value)
             ? value
             : CompanySetupConstants.yearFormatAd,
         decoration: const InputDecoration(labelText: 'รูปแบบปี'),
@@ -495,7 +591,9 @@ class _YearFormatField extends StatelessWidget {
             .map(
               (item) => DropdownMenuItem<String>(
                 value: item,
-                child: Text(CompanySetupConstants.yearFormatLabel(item)),
+                child: LaooComboBoxText(
+                  CompanySetupConstants.yearFormatLabel(item),
+                ),
               ),
             )
             .toList(),
@@ -550,10 +648,7 @@ class _CompanySetupUxForm extends StatelessWidget {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const _SectionHeader(
-                  title: 'ข้อมูลพื้นฐานลูกค้า',
-                  description: 'UX Draft สำหรับกำหนดค่าระบบของลูกค้า',
-                ),
+                const _SectionHeader(title: 'ข้อมูลพื้นฐาน'),
                 const SizedBox(height: 18),
                 Wrap(
                   spacing: gap,
@@ -564,7 +659,7 @@ class _CompanySetupUxForm extends StatelessWidget {
                       threeColumns ? thirdWidth : constraints.maxWidth,
                     ),
                     field(
-                      _text(ownerName, 'ข้อความแสดง Title Bar'),
+                      _text(ownerName, 'ข้อความแสดง title bar'),
                       threeColumns ? thirdWidth : constraints.maxWidth,
                     ),
                     field(
@@ -669,10 +764,10 @@ class _RequiredLabel extends StatelessWidget {
 }
 
 class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.title, required this.description});
+  const _SectionHeader({required this.title}) : description = null;
 
   final String title;
-  final String description;
+  final String? description;
 
   @override
   Widget build(BuildContext context) {
@@ -690,17 +785,19 @@ class _SectionHeader extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(width: 16),
-        Flexible(
-          child: Text(
-            description,
-            textAlign: TextAlign.right,
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-              fontSize: 12,
+        if (description?.trim().isNotEmpty == true) ...[
+          const SizedBox(width: 16),
+          Flexible(
+            child: Text(
+              description!,
+              textAlign: TextAlign.right,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontSize: 12,
+              ),
             ),
           ),
-        ),
+        ],
       ],
     );
   }
@@ -744,7 +841,8 @@ class _TopActions extends StatelessWidget {
 }
 
 class _InlineMessage extends StatelessWidget {
-  const _InlineMessage({required this.message, required this.onClose, this.error = false});
+  const _InlineMessage({required this.message, required this.onClose})
+    : error = false;
 
   final String message;
   final VoidCallback onClose;
@@ -752,7 +850,9 @@ class _InlineMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = error ? Theme.of(context).colorScheme.error : Theme.of(context).colorScheme.primary;
+    final color = error
+        ? Theme.of(context).colorScheme.error
+        : Theme.of(context).colorScheme.primary;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
       decoration: BoxDecoration(
@@ -762,7 +862,12 @@ class _InlineMessage extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(error ? Icons.error_outline_rounded : Icons.check_circle_outline_rounded, color: color),
+          Icon(
+            error
+                ? Icons.error_outline_rounded
+                : Icons.check_circle_outline_rounded,
+            color: color,
+          ),
           const SizedBox(width: 9),
           Expanded(child: Text(message)),
           IconButton(

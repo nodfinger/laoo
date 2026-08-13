@@ -103,11 +103,17 @@ WHERE CompanyID=@CompanyID;
         const string sql = """
 UPDATE dbo.TDSTCompanySetUp
 SET
+    CustomerNameTH = @CustomerNameTH,
+    CustomerNameEN = @CustomerNameEN,
+    AddressText = @CustomerAddressText,
+    Telephone = @CustomerTelephone,
+    TaxID = @CustomerTaxID,
     Name = @Name,
     TitleHeader = @TitleHeader,
     RowSTD = @RowSTD,
     RowCardSTD = @RowCardSTD,
     TimeAlert = @TimeAlert,
+    OrgStructureType = @OrgStructureType,
     YearFormat = @YearFormat,
     VersionID = @VersionID,
     EmailHost = @EmailHost,
@@ -133,11 +139,17 @@ WHERE OwnerType = @OwnerType
 """;
 
         await using var command = new SqlCommand(sql, connection, transaction);
+        Add(command, "@CustomerNameTH", SqlDbType.NVarChar, NullIfBlank(request.CustomerNameTh), 200);
+        Add(command, "@CustomerNameEN", SqlDbType.NVarChar, NullIfBlank(request.CustomerNameEn), 200);
+        Add(command, "@CustomerAddressText", SqlDbType.NVarChar, NullIfBlank(request.AddressText), 1000);
+        Add(command, "@CustomerTelephone", SqlDbType.NVarChar, NullIfBlank(request.Telephone), 50);
+        Add(command, "@CustomerTaxID", SqlDbType.NVarChar, NullIfBlank(request.TaxID), 20);
         Add(command, "@Name", SqlDbType.NVarChar, request.Name.Trim(), 200);
         Add(command, "@TitleHeader", SqlDbType.NVarChar, request.TitleHeader.Trim(), 300);
         Add(command, "@RowSTD", SqlDbType.Int, request.RowSTD);
         Add(command, "@RowCardSTD", SqlDbType.Int, request.RowCardSTD);
         Add(command, "@TimeAlert", SqlDbType.Int, request.TimeAlert);
+        Add(command, "@OrgStructureType", SqlDbType.Int, request.OrgStructureType);
         Add(command, "@YearFormat", SqlDbType.NVarChar, NullIfBlank(request.YearFormat), 10);
         Add(command, "@VersionID", SqlDbType.NVarChar, NullIfBlank(request.VersionID), 50);
         Add(command, "@EmailHost", SqlDbType.NVarChar, NullIfBlank(request.EmailHost), 255);
@@ -209,17 +221,18 @@ SELECT
         WHEN S.OwnerType = 'P' THEN P.PartnerCode
         ELSE COALESCE(NULLIF(C.CompanyNameTH, N''), C.CompanyCode)
     END AS OwnerName,
-    C.CompanyNameTH AS CustomerNameTh,
-    C.CompanyNameEN AS CustomerNameEn,
-    C.AddressText,
-    C.Telephone,
-    C.TaxID,
+    COALESCE(C.CompanyNameTH, S.CustomerNameTH) AS CustomerNameTh,
+    COALESCE(C.CompanyNameEN, S.CustomerNameEN) AS CustomerNameEn,
+    COALESCE(C.AddressText, S.AddressText) AS AddressText,
+    COALESCE(C.Telephone, S.Telephone) AS Telephone,
+    COALESCE(C.TaxID, S.TaxID) AS TaxID,
     C.Email AS CustomerEmail,
     S.Name,
     S.TitleHeader,
     S.RowSTD,
     S.RowCardSTD,
     S.TimeAlert,
+    S.OrgStructureType,
     S.YearFormat,
     S.VersionID,
     S.EmailHost,
@@ -300,6 +313,7 @@ WHERE S.OwnerType = @OwnerType
             reader.GetInt32(reader.GetOrdinal("RowSTD")),
             reader.GetInt32(reader.GetOrdinal("RowCardSTD")),
             reader.GetInt32(reader.GetOrdinal("TimeAlert")),
+            reader.GetInt32(reader.GetOrdinal("OrgStructureType")),
             NString("YearFormat"),
             NString("VersionID"),
             NString("EmailHost"),
@@ -375,6 +389,8 @@ WHERE S.OwnerType = @OwnerType
             return "จำนวน Card ต้องมากกว่า 0";
         if (request.TimeAlert <= 0)
             return "เวลา Alert ต้องมากกว่า 0";
+        if (request.OrgStructureType is not (1 or 2))
+            return "รูปแบบโครงสร้างองค์กรต้องเป็น 1 หรือ 2";
         if (request.EmailPort is < 1 or > 65535)
             return "Email Port ต้องอยู่ระหว่าง 1 ถึง 65535";
         if (!string.IsNullOrWhiteSpace(request.PasswordCry)

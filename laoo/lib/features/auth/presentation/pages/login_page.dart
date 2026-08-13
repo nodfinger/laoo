@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../../../app/router/app_router.dart';
 import '../../../../app/router/route_names.dart';
 import '../../../../app/theme/laoo_design_tokens.dart';
+import '../../../../app/theme/laoo_typography.dart';
 import '../../../../core/api/api_exception.dart';
 import '../../../../core/auth/app_auth_controller.dart';
 import '../../../../core/auth/auth_storage.dart';
@@ -25,6 +26,7 @@ class _LoginPageState extends State<LoginPage> {
   bool _obscurePassword = true;
   bool _isSubmitting = false;
   bool _rememberLogin = true;
+  String? _loginError;
 
   @override
   void initState() {
@@ -62,6 +64,7 @@ class _LoginPageState extends State<LoginPage> {
 
     setState(() {
       _isSubmitting = true;
+      _loginError = null;
     });
 
     try {
@@ -97,25 +100,19 @@ class _LoginPageState extends State<LoginPage> {
         return;
       }
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(_apiErrorMessage(error))));
+      setState(() => _loginError = _apiErrorMessage(error));
     } on StateError catch (error) {
       if (!mounted) {
         return;
       }
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(error.message)));
+      setState(() => _loginError = error.message);
     } catch (error) {
       if (!mounted) {
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('ไม่สามารถเข้าสู่ระบบได้: $error')),
-      );
+      setState(() => _loginError = 'ไม่สามารถเข้าสู่ระบบได้: $error');
     } finally {
       if (mounted) {
         setState(() {
@@ -130,7 +127,7 @@ class _LoginPageState extends State<LoginPage> {
       case 400:
         return error.message;
       case 401:
-        return 'Username หรือ Password ไม่ถูกต้อง';
+        return 'ไม่พบ Username หรือ Password ไม่ถูกต้อง';
       case 403:
         return 'ผู้ใช้งานไม่มีสิทธิ์เข้าสู่ Project นี้';
       case 404:
@@ -268,6 +265,33 @@ class _LoginPageState extends State<LoginPage> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  if (_loginError != null) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade50,
+                        border: Border.all(color: Colors.red.shade300),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(Icons.error_outline, color: Colors.red),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _loginError!,
+                              style: TextStyle(color: Colors.red.shade800),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   Text(
                     'Welcome Back',
                     textAlign: TextAlign.center,
@@ -397,7 +421,7 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   const SizedBox(height: 11),
                   SizedBox(
-                    height: 44,
+                    height: LaooTypography.buttonHeight,
                     child: FilledButton(
                       onPressed: _isSubmitting ? null : _submitLogin,
                       child: _isSubmitting
@@ -428,7 +452,7 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   const SizedBox(height: 10),
                   SizedBox(
-                    height: 42,
+                    height: LaooTypography.buttonHeight,
                     child: OutlinedButton(
                       onPressed: _isSubmitting ? null : _openRegister,
                       style: OutlinedButton.styleFrom(

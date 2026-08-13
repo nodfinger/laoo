@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import '../core/auth/app_auth_controller.dart';
 import '../core/company_setup/company_setup_controller.dart';
 import '../core/platform/window_title_service.dart';
@@ -46,6 +47,15 @@ class _LaooAppState extends State<LaooApp> {
         title: companySetupController.appTitle,
         debugShowCheckedModeBanner: false,
         theme: LaooTheme.fromKey(LaooThemeKey.green),
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: const [
+          Locale('th', 'TH'),
+          Locale('en', 'US'),
+        ],
         routerConfig: appRouter,
       ),
     );

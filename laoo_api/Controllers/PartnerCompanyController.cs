@@ -1,6 +1,7 @@
 using System.Data;
 using System.Security.Claims;
 using LaooApi.Models.Partner;
+using LaooApi.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
@@ -13,8 +14,13 @@ namespace LaooApi.Controllers;
 public sealed class PartnerCompanyController : ControllerBase
 {
     private readonly IConfiguration _configuration;
+    private readonly PasswordService _passwordService;
 
-    public PartnerCompanyController(IConfiguration configuration) => _configuration = configuration;
+    public PartnerCompanyController(IConfiguration configuration, PasswordService passwordService)
+    {
+        _configuration = configuration;
+        _passwordService = passwordService;
+    }
 
     [HttpGet]
     public async Task<ActionResult<List<PartnerCompanyResponse>>> GetAll(
@@ -26,11 +32,12 @@ public sealed class PartnerCompanyController : ControllerBase
         const string sql = """
 SELECT C.CompanyID, C.PartnerID, C.CompanyCode, C.CompanyNameTH, C.CompanyNameEN, C.TaxID,
        C.Email, C.Telephone, C.AddressText, C.IsActive, C.CreateDate, C.CreateBy,
-       C.UpdateDate, C.UpdateBy, C.ThemeName, P.PartnerNameTH
+       C.UpdateDate, C.UpdateBy, C.ThemeName, P.PartnerNameTH,
+       (SELECT TOP 1 U.Username FROM dbo.TDADUser U WHERE U.CompanyID = C.CompanyID AND U.IsCompanyAdmin = 1 AND U.IsActive = 1 ORDER BY U.UserID) AS AdminUsername
 FROM dbo.TDADCompany C
 INNER JOIN dbo.TDADPartner P ON P.PartnerID = C.PartnerID
 WHERE C.PartnerID = @PartnerID
-  AND (@Search IS NULL OR C.CompanyCode LIKE N'%' + @Search + N'%' OR C.CompanyNameTH LIKE N'%' + @Search + N'%')
+  AND (@Search IS NULL OR C.CompanyNameTH LIKE N'%' + @Search + N'%' OR ISNULL(C.Telephone, N'') LIKE N'%' + @Search + N'%')
   AND (@IsActive IS NULL OR C.IsActive = @IsActive)
 ORDER BY CompanyCode;
 """;
@@ -51,6 +58,10 @@ ORDER BY CompanyCode;
     {
         if (string.IsNullOrWhiteSpace(request.CompanyNameTh))
             return BadRequest(new { message = "กรุณาระบุชื่อ Customer/Company" });
+        if (string.IsNullOrWhiteSpace(request.AdminUsername) || string.IsNullOrWhiteSpace(request.AdminPassword))
+            return BadRequest(new { message = "กรุณาระบุ Username และ Password ผู้ดูแลระบบ" });
+        if (request.AdminUsername.Trim().Length > 100 || request.AdminPassword.Trim().Length < 1)
+            return BadRequest(new { message = "Username หรือ Password ผู้ดูแลระบบไม่ถูกต้อง" });
         var partnerId = PartnerId();
         if (partnerId is null || !string.Equals(User.FindFirstValue("user_type"), "PARTNER_USER", StringComparison.OrdinalIgnoreCase))
             return Forbid();
@@ -61,7 +72,7 @@ ORDER BY CompanyCode;
         {
             const string codeSql = """
 SELECT N'C' + RIGHT(N'000000' + CAST(ISNULL(MAX(TRY_CONVERT(INT, SUBSTRING(CompanyCode, 2, 20))), 0) + 1 AS NVARCHAR(20)), 6)
-FROM dbo.TDADCompany WITH (UPDLOCK, HOLDLOCK) WHERE PartnerID = @PartnerID AND CompanyCode LIKE N'C%';
+FROM dbo.TDADCompany WITH (UPDLOCK, HOLDLOCK) WHERE CompanyCode LIKE N'C%';
 """;
             await using var codeCommand = new SqlCommand(codeSql, connection, transaction);
             codeCommand.Parameters.Add("@PartnerID", SqlDbType.BigInt).Value = partnerId.Value;
@@ -82,8 +93,34 @@ SELECT CAST(SCOPE_IDENTITY() AS BIGINT);
             Add(insert, "@AddressText", SqlDbType.NVarChar, Null(request.AddressText), 1000);
             Add(insert, "@ThemeName", SqlDbType.NVarChar, Null(request.ThemeName), 100);
             var companyId = Convert.ToInt64(await insert.ExecuteScalarAsync(cancellationToken));
+            const string userSql = """
+IF EXISTS (SELECT 1 FROM dbo.TDADUser WHERE NormalizedUsername=@NormalizedUsername)
+    THROW 50010, 'DUPLICATE_ADMIN_USERNAME', 1;
+INSERT INTO dbo.TDADUser
+    (CompanyID, Username, NormalizedUsername, PasswordHash, DisplayName, IsCompanyAdmin, IsActive, FailedLoginCount, LastPasswordChangeDate, CreateDate)
+VALUES
+    (@CompanyID, @Username, @NormalizedUsername, @PasswordHash, @DisplayName, 1, 1, 0, SYSUTCDATETIME(), SYSUTCDATETIME());
+""";
+            await using var user = new SqlCommand(userSql, connection, transaction);
+            var adminUsername = request.AdminUsername.Trim();
+            user.Parameters.Add("@CompanyID", SqlDbType.BigInt).Value = companyId;
+            Add(user, "@Username", SqlDbType.NVarChar, adminUsername, 100);
+            Add(user, "@NormalizedUsername", SqlDbType.NVarChar, adminUsername.ToUpperInvariant(), 100);
+            Add(user, "@PasswordHash", SqlDbType.NVarChar, _passwordService.HashPassword(adminUsername, request.AdminPassword), 500);
+            Add(user, "@DisplayName", SqlDbType.NVarChar, $"{request.CompanyNameTh.Trim()} Admin", 200);
+            await user.ExecuteNonQueryAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             return Created($"/api/partner/companies/{companyId}", new PartnerCompanyResponse { CompanyId = companyId, PartnerId = partnerId.Value, CompanyCode = code, CompanyNameTh = request.CompanyNameTh.Trim(), CompanyNameEn = Null(request.CompanyNameEn), TaxId = Null(request.TaxId), Email = Null(request.Email), Telephone = Null(request.Telephone), AddressText = Null(request.AddressText), IsActive = true, CreateDate = DateTime.UtcNow, ThemeName = Null(request.ThemeName) });
+        }
+        catch (SqlException ex) when (ex.Number is 2601 or 2627)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return Conflict(new { message = "รหัสลูกค้าซ้ำ กรุณากดบันทึกอีกครั้ง" });
+        }
+        catch (SqlException ex) when (ex.Number == 50010)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return Conflict(new { message = "Username ผู้ดูแลระบบซ้ำ กรุณาใช้ Username อื่น" });
         }
         catch { await transaction.RollbackAsync(cancellationToken); throw; }
     }
@@ -116,6 +153,39 @@ WHERE CompanyID=@CompanyID AND PartnerID=@PartnerID;
         return await command.ExecuteNonQueryAsync(cancellationToken) == 0 ? NotFound() : NoContent();
     }
 
+    [HttpPut("{companyId:long}/admin")]
+    public async Task<IActionResult> UpdateAdmin(long companyId, PartnerCompanyAdminUpsertRequest request, CancellationToken cancellationToken)
+    {
+        var username = request.Username.Trim();
+        if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(request.Password))
+            return BadRequest(new { message = "กรุณาระบุ Username และ Password ผู้ดูแลระบบ" });
+        var partnerId = PartnerId();
+        if (partnerId is null) return Forbid();
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        if (!await IsPartnerAdminAsync(connection, cancellationToken)) return Forbid();
+        const string sql = """
+IF NOT EXISTS (SELECT 1 FROM dbo.TDADCompany WHERE CompanyID=@CompanyID AND PartnerID=@PartnerID)
+    THROW 50011, 'COMPANY_NOT_FOUND', 1;
+IF EXISTS (SELECT 1 FROM dbo.TDADUser WHERE NormalizedUsername=@NormalizedUsername AND CompanyID<>@CompanyID)
+    THROW 50010, 'DUPLICATE_ADMIN_USERNAME', 1;
+IF EXISTS (SELECT 1 FROM dbo.TDADUser WHERE CompanyID=@CompanyID AND IsCompanyAdmin=1)
+    UPDATE dbo.TDADUser SET Username=@Username, NormalizedUsername=@NormalizedUsername, PasswordHash=@PasswordHash, IsActive=1,
+        LastPasswordChangeDate=SYSUTCDATETIME() WHERE CompanyID=@CompanyID AND IsCompanyAdmin=1;
+ELSE
+    INSERT INTO dbo.TDADUser (CompanyID, Username, NormalizedUsername, PasswordHash, DisplayName, IsCompanyAdmin, IsActive, FailedLoginCount, LastPasswordChangeDate, CreateDate)
+    VALUES (@CompanyID, @Username, @NormalizedUsername, @PasswordHash, N'ผู้ดูแลระบบ', 1, 1, 0, SYSUTCDATETIME(), SYSUTCDATETIME());
+""";
+        await using var command = new SqlCommand(sql, connection);
+        command.Parameters.Add("@CompanyID", SqlDbType.BigInt).Value = companyId;
+        command.Parameters.Add("@PartnerID", SqlDbType.BigInt).Value = partnerId.Value;
+        Add(command, "@Username", SqlDbType.NVarChar, username, 100);
+        Add(command, "@NormalizedUsername", SqlDbType.NVarChar, username.ToUpperInvariant(), 100);
+        Add(command, "@PasswordHash", SqlDbType.NVarChar, _passwordService.HashPassword(username, request.Password), 500);
+        try { await command.ExecuteNonQueryAsync(cancellationToken); return NoContent(); }
+        catch (SqlException ex) when (ex.Number == 50010) { return Conflict(new { message = "Username ผู้ดูแลระบบซ้ำ กรุณาใช้ Username อื่น" }); }
+        catch (SqlException ex) when (ex.Number == 50011) { return NotFound(); }
+    }
+
     [HttpDelete("{companyId:long}")]
     public async Task<IActionResult> Delete(long companyId, CancellationToken cancellationToken)
     {
@@ -138,8 +208,9 @@ WHERE CompanyID=@CompanyID AND PartnerID=@PartnerID;
     {
         var partnerId = PartnerId();
         if (partnerId is null) return false;
-        await using var command = new SqlCommand("SELECT CASE WHEN EXISTS (SELECT 1 FROM dbo.TDADPartnerUser WHERE PartnerID = @PartnerID AND IsPartnerAdmin = 1 AND IsActive = 1) THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END", connection);
+        await using var command = new SqlCommand("SELECT CASE WHEN EXISTS (SELECT 1 FROM dbo.TDADPartnerUser WHERE PartnerID=@PartnerID AND NormalizedUsername=@Username AND IsPartnerAdmin=1 AND IsActive=1) THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END", connection);
         command.Parameters.Add("@PartnerID", SqlDbType.BigInt).Value = partnerId.Value;
+        command.Parameters.Add("@Username", SqlDbType.NVarChar, 100).Value = (User.Identity?.Name ?? User.FindFirstValue("unique_name") ?? string.Empty).Trim().ToUpperInvariant();
         return Convert.ToBoolean(await command.ExecuteScalarAsync(cancellationToken));
     }
 
@@ -147,7 +218,7 @@ WHERE CompanyID=@CompanyID AND PartnerID=@PartnerID;
     private async Task<SqlConnection> OpenConnectionAsync(CancellationToken token) { var c = new SqlConnection(_configuration.GetConnectionString("LaooDatabase")); await c.OpenAsync(token); return c; }
     private static string? Null(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     private static void Add(SqlCommand c, string name, SqlDbType type, string? value, int size) => c.Parameters.Add(name, type, size).Value = (object?)value ?? DBNull.Value;
-    private static PartnerCompanyResponse Read(SqlDataReader r) => new() { CompanyId = r.GetInt64(0), PartnerId = r.GetInt64(1), CompanyCode = r.GetString(2), CompanyNameTh = r.GetString(3), CompanyNameEn = N(r, 4), TaxId = N(r, 5), Email = N(r, 6), Telephone = N(r, 7), AddressText = N(r, 8), IsActive = r.GetBoolean(9), CreateDate = r.GetDateTime(10), CreateBy = L(r, 11), UpdateDate = D(r, 12), UpdateBy = L(r, 13), ThemeName = N(r, 14), PartnerNameTh = N(r, 15) };
+    private static PartnerCompanyResponse Read(SqlDataReader r) => new() { CompanyId = r.GetInt64(0), PartnerId = r.GetInt64(1), CompanyCode = r.GetString(2), CompanyNameTh = r.GetString(3), CompanyNameEn = N(r, 4), TaxId = N(r, 5), Email = N(r, 6), Telephone = N(r, 7), AddressText = N(r, 8), IsActive = r.GetBoolean(9), CreateDate = r.GetDateTime(10), CreateBy = L(r, 11), UpdateDate = D(r, 12), UpdateBy = L(r, 13), ThemeName = N(r, 14), PartnerNameTh = N(r, 15), AdminUsername = N(r, 16) };
     private static string? N(SqlDataReader r, int i) => r.IsDBNull(i) ? null : r.GetString(i);
     private static long? L(SqlDataReader r, int i) => r.IsDBNull(i) ? null : r.GetInt64(i);
     private static DateTime? D(SqlDataReader r, int i) => r.IsDBNull(i) ? null : r.GetDateTime(i);

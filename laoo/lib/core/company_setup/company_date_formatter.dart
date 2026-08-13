@@ -9,7 +9,11 @@ abstract final class CompanyDateFormatter {
     DateTime value,
     CompanySetupContext setup,
   ) {
-    final year = _useBuddhistEra(setup.yearFormat)
+    return formatDateByYearFormat(value, setup.yearFormat);
+  }
+
+  static String formatDateByYearFormat(DateTime value, String yearFormat) {
+    final year = _useBuddhistEra(yearFormat)
         ? value.year + 543
         : value.year;
 

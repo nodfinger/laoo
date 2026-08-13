@@ -48,6 +48,11 @@ abstract final class LaooTheme {
     );
 
     return base.copyWith(
+      progressIndicatorTheme: ProgressIndicatorThemeData(
+        color: base.colorScheme.primary,
+        linearTrackColor: base.colorScheme.primary.withValues(alpha: 0.14),
+        circularTrackColor: base.colorScheme.primary.withValues(alpha: 0.14),
+      ),
       textTheme: base.textTheme.apply(
         fontFamily: LaooTypography.fontFamily,
         fontFamilyFallback: LaooTypography.fontFallback,

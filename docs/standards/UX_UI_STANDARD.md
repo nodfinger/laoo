@@ -182,7 +182,7 @@ Open → Load → Search / Filter / Sort / Pagination → View
 
 - Form แบ่ง Card ตามกลุ่มข้อมูล
 - Label, Hint, Validation และ Button ใช้ Typography กลาง
-- ปุ่มชุดเดียวกันสูง `LaooTypography.buttonHeight` เดียวกัน (`36px`)
+- ปุ่มชุดเดียวกันสูง `LaooTypography.buttonHeight` เดียวกัน (`48px`)
 - ปุ่ม `ยกเลิก` จัดข้อความกึ่งกลางและใช้ความสูงเดียวกับ `บันทึก`
 - Required Field แสดง `*` และตรวจซ้ำที่ API
 - เพิ่ม/แก้ไขต้องมี Caption และสถานะ Action ชัดเจน
@@ -313,3 +313,5 @@ Theme กลางต้องควบคุม:
 
 **Laoo Solutions**
 *Simple Today. Ready Tomorrow.*
+
+- Alert ทุกหน้าจอต้องใช้ค่า TimeAlert จาก CompanySetupContext เป็นเวลาหายอัตโนมัติ และต้องมีปุ่มปิดเอง

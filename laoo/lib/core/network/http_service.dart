@@ -68,9 +68,10 @@ class HttpService {
   Future<dynamic> delete(
     String path, {
     Object? body,
+    Map<String, String>? query,
     bool authenticated = true,
   }) async {
-    final uri = _buildUri(path);
+    final uri = _buildUri(path, query);
 
     final response = await _client
         .delete(

@@ -78,6 +78,19 @@ class AppAuthController extends ChangeNotifier {
     }
   }
 
+  Future<AuthSession> reloadSessionFromStorage() async {
+    final session = await _authService.restoreSession();
+    if (session == null) {
+      throw StateError('ไม่พบ Login Session ในเครื่อง');
+    }
+
+    _session = session;
+    _status = AppAuthStatus.authenticated;
+    _lastError = null;
+    notifyListeners();
+    return session;
+  }
+
   Future<void> logout() async {
     await _authService.logout(preserveRememberedSession: true);
 

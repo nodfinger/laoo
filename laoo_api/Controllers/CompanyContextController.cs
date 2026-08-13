@@ -171,8 +171,67 @@ SET
                 expiresAt));
     }
 
+    [HttpDelete]
+    public async Task<ActionResult<CompanyContextResponse>> ClearAsync(
+        CancellationToken cancellationToken)
+    {
+        if (!IsLaooSupport())
+        {
+            return Forbid();
+        }
+
+        var laooUserId = GetLongClaim("laoo_user_id");
+        var projectId = GetLongClaim("project_id");
+        if (laooUserId is null || projectId is null)
+        {
+            return Forbid();
+        }
+
+        await using var connection = CreateConnection();
+        await connection.OpenAsync(cancellationToken);
+
+        const string sessionSql = """
+;WITH CurrentSession AS
+(
+    SELECT TOP (1) *
+    FROM dbo.TDADLoginSession
+    WHERE ActualLaooUserID = @LaooUserID
+      AND ProjectID = @ProjectID
+      AND LoginMode = 'S'
+      AND IsActive = 1
+    ORDER BY LoginDate DESC
+)
+UPDATE CurrentSession
+SET
+    CompanyID = NULL,
+    ContextSelectedDate = NULL,
+    LastActivityDate = SYSUTCDATETIME();
+""";
+
+        await using (var sessionCommand = new SqlCommand(sessionSql, connection))
+        {
+            sessionCommand.Parameters.Add("@LaooUserID", SqlDbType.BigInt).Value =
+                laooUserId.Value;
+            sessionCommand.Parameters.Add("@ProjectID", SqlDbType.BigInt).Value =
+                projectId.Value;
+            await sessionCommand.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        var expiresAt = DateTime.UtcNow.AddMinutes(_jwtOptions.AccessTokenMinutes);
+        var token = CreateContextToken(null, expiresAt);
+
+        return Ok(
+            new CompanyContextResponse(
+                true,
+                null,
+                null,
+                null,
+                token,
+                expiresAt));
+    }
+
     private string CreateContextToken(
-        CompanyContextCompany company,
+        CompanyContextCompany? company,
         DateTime expiresAt)
     {
         var claims = User.Claims
@@ -186,8 +245,11 @@ SET
             .Select(c => new Claim(c.Type, c.Value))
             .ToList();
 
-        claims.Add(new Claim("company_id", company.CompanyID.ToString()));
-        claims.Add(new Claim("company_code", company.CompanyCode));
+        if (company is not null)
+        {
+            claims.Add(new Claim("company_id", company.CompanyID.ToString()));
+            claims.Add(new Claim("company_code", company.CompanyCode));
+        }
 
         var key = new SymmetricSecurityKey(
             Encoding.UTF8.GetBytes(_jwtOptions.SecretKey));

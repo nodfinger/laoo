@@ -46,31 +46,64 @@ class CompanyContextService {
       throw StateError('API ไม่ได้คืน Access Token ใหม่');
     }
 
+    final selected = CompanyContextItem.fromJson(result);
+    await _replaceSession(
+      token: token,
+      expiresAtText: expiresAtText,
+      companyId: selected.companyId,
+    );
+
+    return selected;
+  }
+
+  Future<void> clearCompany() async {
+    final result = await _api.delete('/api/company-context');
+    if (result is! Map<String, dynamic>) {
+      throw StateError('รูปแบบ Company Context ไม่ถูกต้อง');
+    }
+
+    final token = result['accessToken']?.toString();
+    final expiresAtText = result['expiresAt']?.toString();
+    if (token == null ||
+        token.isEmpty ||
+        expiresAtText == null ||
+        expiresAtText.isEmpty) {
+      throw StateError('API ไม่ได้คืน Access Token ใหม่');
+    }
+
+    await _replaceSession(
+      token: token,
+      expiresAtText: expiresAtText,
+      companyId: null,
+    );
+  }
+
+  Future<void> _replaceSession({
+    required String token,
+    required String expiresAtText,
+    required int? companyId,
+  }) async {
     final current = await _storage.read();
     if (current == null) {
       throw StateError('ไม่พบ Login Session ในเครื่อง');
     }
 
-    final selected = CompanyContextItem.fromJson(result);
-    final expiresAt = DateTime.parse(expiresAtText);
-
-    final updatedSession = AuthSession(
-      accessToken: token,
-      expiresAt: expiresAt,
-      projectCode: current.projectCode,
-      projectId: current.projectId,
-      companyId: selected.companyId,
-      branchId: current.branchId,
-      userId: current.userId,
-      laooUserId: current.laooUserId,
-      userType: current.userType,
-      username: current.username,
-      displayName: current.displayName,
+    await _storage.save(
+      AuthSession(
+        accessToken: token,
+        expiresAt: DateTime.parse(expiresAtText),
+        projectCode: current.projectCode,
+        projectId: current.projectId,
+        partnerId: current.partnerId,
+        companyId: companyId,
+        branchId: current.branchId,
+        userId: current.userId,
+        laooUserId: current.laooUserId,
+        userType: current.userType,
+        username: current.username,
+        displayName: current.displayName,
+      ),
     );
-
-    await _storage.save(updatedSession);
-
-    return selected;
   }
 
   void dispose() => _api.dispose();

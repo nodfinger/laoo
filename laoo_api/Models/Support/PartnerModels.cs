@@ -27,6 +27,8 @@ public sealed class PartnerResponse
 
     public string? Remark { get; init; }
     public bool IsActive { get; init; }
+    public string? PartnerAdminUsername { get; init; }
+    public long? PartnerAdminUserId { get; init; }
 }
 
 public sealed class PartnerUpsertRequest

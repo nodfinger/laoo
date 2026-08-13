@@ -4,6 +4,8 @@ class Partner {
     required this.partnerCode,
     required this.partnerNameTh,
     required this.isActive,
+    this.partnerAdminUsername,
+    this.partnerAdminUserId,
     this.partnerNameEn,
     this.email,
     this.telephone,
@@ -47,6 +49,8 @@ class Partner {
 
   final String? remark;
   final bool isActive;
+  final String? partnerAdminUsername;
+  final int? partnerAdminUserId;
 
   factory Partner.fromJson(Map<String, dynamic> json) {
     return Partner(
@@ -72,6 +76,8 @@ class Partner {
       contactEmail2: json['contactEmail2'] as String?,
       remark: json['remark'] as String?,
       isActive: json['isActive'] as bool? ?? true,
+      partnerAdminUsername: json['partnerAdminUsername'] as String?,
+      partnerAdminUserId: (json['partnerAdminUserId'] as num?)?.toInt(),
     );
   }
 }

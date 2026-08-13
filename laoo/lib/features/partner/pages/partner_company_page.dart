@@ -1,12 +1,15 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../../core/widgets/combo_box_text.dart';
+import '../../../core/widgets/auto_dismiss_message.dart';
 
 import '../../../app/theme/laoo_typography.dart';
+import '../../../core/company_setup/company_setup_controller.dart';
 import '../../../core/navigation/navigation_menu_repository.dart';
 import '../../support/presentation/widgets/support_workspace_shell.dart';
 import '../../support/partner/data/api_partner_repository.dart';
 import '../../support/partner/data/core_partner_api_client.dart';
 import '../../support/partner/models/partner.dart';
-import '../../../core/company_setup/company_setup_controller.dart';
 import '../data/partner_company_repository.dart';
 import '../models/partner_company.dart';
 
@@ -48,6 +51,8 @@ class _PartnerCompanyFormPageState extends State<_PartnerCompanyFormPage> {
   late final TextEditingController _email;
   late final TextEditingController _telephone;
   late final TextEditingController _address;
+  late final TextEditingController _adminUsername;
+  late final TextEditingController _adminPassword;
   bool _saving = false;
   bool _isActive = true;
   String? _error;
@@ -62,6 +67,8 @@ class _PartnerCompanyFormPageState extends State<_PartnerCompanyFormPage> {
     _email = TextEditingController(text: item?.email ?? '');
     _telephone = TextEditingController(text: item?.telephone ?? '');
     _address = TextEditingController(text: item?.addressText ?? '');
+    _adminUsername = TextEditingController();
+    _adminPassword = TextEditingController();
     _isActive = item?.isActive ?? true;
   }
 
@@ -74,6 +81,8 @@ class _PartnerCompanyFormPageState extends State<_PartnerCompanyFormPage> {
       _email,
       _telephone,
       _address,
+      _adminUsername,
+      _adminPassword,
     ]) {
       controller.dispose();
     }
@@ -95,6 +104,8 @@ class _PartnerCompanyFormPageState extends State<_PartnerCompanyFormPage> {
         email: _optional(_email),
         telephone: _optional(_telephone),
         addressText: _optional(_address),
+        adminUsername: _optional(_adminUsername),
+        adminPassword: _optional(_adminPassword),
       );
       final repository = PartnerCompanyRepository();
       if (widget.existing == null) {
@@ -227,6 +238,10 @@ class _PartnerCompanyFormPageState extends State<_PartnerCompanyFormPage> {
                           keyboardType: TextInputType.phone,
                         ),
                         _formField(_address, 'ที่อยู่', maxLines: 4),
+                        if (!editing) ...[
+                          _formField(_adminUsername, 'Username ผู้ดูแลระบบ *', required: true),
+                          _formField(_adminPassword, 'Password ผู้ดูแลระบบ *', required: true, obscureText: true),
+                        ],
                       ],
                     ),
                   ),
@@ -267,6 +282,7 @@ class _PartnerCompanyFormPageState extends State<_PartnerCompanyFormPage> {
     bool required = false,
     TextInputType? keyboardType,
     int maxLines = 1,
+    bool obscureText = false,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
@@ -274,6 +290,7 @@ class _PartnerCompanyFormPageState extends State<_PartnerCompanyFormPage> {
         controller: controller,
         keyboardType: keyboardType,
         maxLines: maxLines,
+        obscureText: obscureText,
         style: const TextStyle(
           fontFamily: LaooTypography.fontFamily,
           fontSize: LaooTypography.inputText,
@@ -318,6 +335,7 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
   int _currentPage = 0;
   int _sortColumnIndex = 3;
   bool _sortAscending = true;
+  Timer? _messageTimer;
 
   String get _menuCode => widget.menuScope == WorkspaceMenuScope.support
       ? 'company'
@@ -379,8 +397,17 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
 
   @override
   void dispose() {
+    _messageTimer?.cancel();
     _search.dispose();
     super.dispose();
+  }
+
+  void _scheduleMessageDismiss() {
+    if (_message == null || _messageTimer != null) return;
+    _messageTimer = Timer(Duration(seconds: companySetupController.current?.timeAlert ?? 30), () {
+      if (mounted) setState(() => _message = null);
+      _messageTimer = null;
+    });
   }
 
   Future<void> _load() async {
@@ -507,15 +534,10 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
               ? 'เพิ่มข้อมูลลูกค้าสำเร็จ'
               : 'แก้ไขข้อมูลลูกค้าสำเร็จ',
         );
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(_message!)));
       }
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('บันทึกไม่สำเร็จ: $error')));
+        setState(() => _error = 'บันทึกไม่สำเร็จ: $error');
       }
     } finally {
       for (final controller in [
@@ -548,9 +570,6 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
             ? 'เพิ่มข้อมูลลูกค้าสำเร็จ'
             : 'แก้ไขข้อมูลลูกค้าสำเร็จ',
       );
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(_message!)));
     }
   }
 
@@ -674,9 +693,6 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
       await _load();
       if (mounted) {
         setState(() => _message = 'ลบข้อมูลลูกค้าสำเร็จ');
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(_message!)));
       }
     } catch (error) {
       if (mounted) setState(() => _error = 'ลบข้อมูลไม่สำเร็จ: $error');
@@ -737,9 +753,11 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
       activeMenu: _menuCode,
       child: Padding(
         padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+        child: Stack(
           children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
             Row(
               children: [
                 Expanded(
@@ -758,46 +776,9 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
                   ),
               ],
             ),
-            if (_message != null) ...[
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.green.shade50,
-                  border: Border.all(color: Colors.green.shade200),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.check_circle_outline,
-                      color: Colors.green.shade700,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        _message!,
-                        style: const TextStyle(
-                          fontFamily: LaooTypography.fontFamily,
-                          fontSize: LaooTypography.inputText,
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      tooltip: 'ปิด',
-                      onPressed: () => setState(() => _message = null),
-                      icon: const Icon(Icons.close),
-                    ),
-                  ],
-                ),
-              ),
-            ],
             const SizedBox(height: 16),
             Wrap(
-              spacing: 10,
+              spacing: 0,
               runSpacing: 10,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
@@ -814,7 +795,7 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
                         icon: const Icon(Icons.arrow_forward_rounded),
                       ),
                       isDense: true,
-                      labelText: 'ค้นหาชื่อ รหัส หรือเลขผู้เสียภาษี',
+                      labelText: 'ค้นหาชื่อ และเบอร์โทรศัพท์',
                     ),
                   ),
                 ),
@@ -831,12 +812,12 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
                       items: [
                         const DropdownMenuItem<int?>(
                           value: null,
-                          child: Text('ทุก Partner'),
+                          child: LaooComboBoxText('ทุก Partner'),
                         ),
                         ..._partners.map(
                           (partner) => DropdownMenuItem<int?>(
                             value: partner.partnerId,
-                            child: Text(partner.partnerNameTh),
+                            child: LaooComboBoxText(partner.partnerNameTh),
                           ),
                         ),
                       ],
@@ -847,7 +828,7 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
                     ),
                   ),
                 ],
-                const SizedBox(width: 10),
+                const SizedBox(width: 4),
                 SizedBox(
                   width: 150,
                   child: DropdownButtonFormField<String>(
@@ -856,15 +837,15 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
                     items: const [
                       DropdownMenuItem(
                         value: 'ทั้งหมด',
-                        child: Text('ทั้งหมด'),
+                        child: LaooComboBoxText('ทั้งหมด'),
                       ),
                       DropdownMenuItem(
                         value: 'เปิดใช้งาน',
-                        child: Text('เปิดใช้งาน'),
+                        child: LaooComboBoxText('เปิดใช้งาน'),
                       ),
                       DropdownMenuItem(
                         value: 'ปิดใช้งาน',
-                        child: Text('ปิดใช้งาน'),
+                        child: LaooComboBoxText('ปิดใช้งาน'),
                       ),
                     ],
                     onChanged: (value) {
@@ -875,13 +856,12 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
                     },
                   ),
                 ),
-                const SizedBox(width: 8),
-                IconButton(
+                if (false) IconButton(
                   tooltip: 'รีเฟรช',
                   onPressed: _load,
                   icon: const Icon(Icons.refresh),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 4),
                 OutlinedButton.icon(
                   onPressed: _clearFilters,
                   icon: const Icon(Icons.clear_all, size: 18),
@@ -891,6 +871,19 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
             ),
             const SizedBox(height: 16),
             Expanded(child: _buildBody()),
+              ],
+            ),
+            if (_message != null)
+              Positioned(
+                top: 0,
+                right: 0,
+                child: AutoDismissMessage(
+                  key: ValueKey(_message),
+                  message: _message!,
+                  error: false,
+                  onClose: () => setState(() => _message = null),
+                ),
+              ),
           ],
         ),
       ),
@@ -898,6 +891,7 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
   }
 
   Widget _buildBody() {
+    _scheduleMessageDismiss();
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_error != null) return Center(child: Text(_error!));
     if (_items.isEmpty) {
@@ -919,6 +913,11 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
                   constraints: BoxConstraints(minWidth: constraints.maxWidth),
                   child: SingleChildScrollView(
                     child: DataTable(
+                      border: TableBorder(
+                        top: BorderSide(color: Theme.of(context).dividerColor, width: .5),
+                        bottom: BorderSide(color: Theme.of(context).dividerColor, width: .5),
+                        horizontalInside: BorderSide(color: Theme.of(context).dividerColor, width: .5),
+                      ),
                       sortColumnIndex: _sortColumnIndex,
                       sortAscending: _sortAscending,
                       horizontalMargin: 12,
@@ -937,7 +936,7 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
                         const DataColumn(
                           label: SizedBox(
                             width: 28,
-                            child: Center(child: Text('ID')),
+                            child: Text('ID'),
                           ),
                         ),
                         DataColumn(
@@ -948,7 +947,8 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
                         ),
                         if (widget.menuScope == WorkspaceMenuScope.support)
                           const DataColumn(label: Text('Partner')),
-                        DataColumn(
+                        if (false)
+                          DataColumn(
                           label: Text('รหัสลูกค้า'),
                           onSort: (i, a) => _sortBy(i, (x) => x.companyCode, a),
                         ),
@@ -958,25 +958,20 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
                               _sortBy(i, (x) => x.companyNameTh, a),
                         ),
                         DataColumn(
-                          label: Text('ชื่อภาษาอังกฤษ'),
-                          onSort: (i, a) =>
-                              _sortBy(i, (x) => x.companyNameEn ?? "", a),
-                        ),
-                        DataColumn(
                           label: Text('เลขผู้เสียภาษี'),
                           onSort: (i, a) => _sortBy(i, (x) => x.taxId ?? "", a),
                         ),
                         DataColumn(
-                          label: Text('Email'),
+                          label: const SizedBox(width: 110, child: Text('Email')),
                           onSort: (i, a) => _sortBy(i, (x) => x.email ?? "", a),
                         ),
                         DataColumn(
-                          label: Text('โทรศัพท์'),
+                          label: const SizedBox(width: 110, child: Text('โทรศัพท์')),
                           onSort: (i, a) =>
                               _sortBy(i, (x) => x.telephone ?? "", a),
                         ),
                         DataColumn(
-                          label: Text('สถานะ'),
+                          label: const SizedBox(width: 110, child: Text('สถานะ')),
                           onSort: (i, a) =>
                               _sortBy(i, (x) => x.isActive ? 1 : 0, a),
                         ),
@@ -997,11 +992,25 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
                                 ),
                                 DataCell(
                                   SizedBox(
-                                    width: 82,
+                                    width: 120,
                                     child: Center(
                                       child: Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
+                                          IconButton(
+                                            tooltip: 'กำหนดผู้ดูแลระบบ',
+                                            visualDensity:
+                                                VisualDensity.compact,
+                                            onPressed: () =>
+                                                _openAdminCredentials(item),
+                                            icon: Icon(
+                                              Icons.admin_panel_settings_outlined,
+                                              size: 18,
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .primary,
+                                            ),
+                                          ),
                                           IconButton(
                                             tooltip: 'แก้ไข',
                                             visualDensity:
@@ -1036,14 +1045,61 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
                                 if (widget.menuScope ==
                                     WorkspaceMenuScope.support)
                                   DataCell(Text(item.partnerNameTh ?? '-')),
-                                DataCell(Text(item.companyCode)),
-                                DataCell(Text(item.companyNameTh)),
-                                DataCell(Text(item.companyNameEn ?? '-')),
+                                DataCell(
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      if (item.adminUsername != null &&
+                                          item.adminUsername!.trim().isNotEmpty)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 3,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .primary
+                                                .withValues(alpha: 0.12),
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                Icons.person_outline,
+                                                size: 14,
+                                                color: Theme.of(context)
+                                                    .colorScheme
+                                                    .primary,
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                item.adminUsername!,
+                                                style: TextStyle(
+                                                  color: Theme.of(context)
+                                                      .colorScheme
+                                                      .primary,
+                                                  fontWeight: FontWeight.w700,
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      if (item.adminUsername != null &&
+                                          item.adminUsername!.trim().isNotEmpty)
+                                        const SizedBox(width: 8),
+                                      Text(item.companyNameTh),
+                                    ],
+                                  ),
+                                ),
                                 DataCell(Text(item.taxId ?? '-')),
                                 DataCell(Text(item.email ?? '-')),
                                 DataCell(Text(item.telephone ?? '-')),
                                 DataCell(
-                                  Container(
+                                  SizedBox(width: 110, child: Center(child: Container(
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 10,
                                       vertical: 6,
@@ -1065,7 +1121,7 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
                                         fontWeight: FontWeight.w700,
                                       ),
                                     ),
-                                  ),
+                                  ))),
                                 ),
                               ],
                             ),
@@ -1101,9 +1157,11 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
       spacing: 6,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        OutlinedButton(
-          onPressed: page == 0 ? null : () => setState(() => _currentPage--),
-          child: const Text('ก่อนหน้า'),
+        _pagerArrow(
+          icon: Icons.chevron_left_rounded,
+          tooltip: 'หน้าก่อนหน้า',
+          enabled: page > 0,
+          onPressed: () => setState(() => _currentPage--),
         ),
         if (_pageCount > 7 && pageIndexes.first > 0) ...[
           _pageNumberButton(0, page),
@@ -1114,30 +1172,194 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
           if (pageIndexes.last < _pageCount - 2) const Text('...'),
           _pageNumberButton(_pageCount - 1, page),
         ],
-        OutlinedButton(
-          onPressed: page >= _pageCount - 1
-              ? null
-              : () => setState(() => _currentPage++),
-          child: const Text('ถัดไป'),
+        _pagerArrow(
+          icon: Icons.chevron_right_rounded,
+          tooltip: 'หน้าถัดไป',
+          enabled: page < _pageCount - 1,
+          onPressed: () => setState(() => _currentPage++),
         ),
         Text('แสดง $first-$last จาก ${_items.length} รายการ'),
       ],
     );
   }
 
+  Future<void> _openAdminCredentials(PartnerCompany item) async {
+    final formKey = GlobalKey<FormState>();
+    final username = TextEditingController();
+    final password = TextEditingController();
+    username.text = item.adminUsername ?? '';
+    try {
+      final saved = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) {
+          final primary = Theme.of(dialogContext).colorScheme.primary;
+          String? dialogError;
+          return StatefulBuilder(
+            builder: (context, setDialogState) => AlertDialog(
+            backgroundColor: Colors.white,
+            surfaceTintColor: Colors.transparent,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24),
+            ),
+            titlePadding: EdgeInsets.zero,
+            contentPadding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+            actionsPadding: const EdgeInsets.fromLTRB(24, 8, 24, 18),
+            title: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
+              decoration: const BoxDecoration(
+                color: Color(0xFFF1F3F2),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Text(
+                'กำหนดผู้ดูแลระบบ - ${item.companyNameTh}',
+                style: TextStyle(
+                  color: primary,
+                  fontSize: LaooTypography.sectionTitle,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            content: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                  Divider(color: primary.withValues(alpha: 0.25), height: 1),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: username,
+                    decoration: const InputDecoration(labelText: 'Username *'),
+                    validator: (v) => v!.trim().isEmpty
+                        ? 'กรุณาระบุ Username'
+                        : null,
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: password,
+                    obscureText: true,
+                    decoration: const InputDecoration(labelText: 'Password *'),
+                    validator: (v) => v!.isEmpty
+                        ? 'กรุณาระบุ Password'
+                        : null,
+                  ),
+                    ],
+                  ),
+                ),
+                if (dialogError != null)
+                  Positioned(
+                    top: -10,
+                    right: -8,
+                    child: AutoDismissMessage(
+                      key: ValueKey(dialogError),
+                      message: dialogError!,
+                      error: true,
+                      onClose: () => setDialogState(() => dialogError = null),
+                    ),
+                  ),
+              ],
+            ),
+            actions: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(dialogContext, false),
+                    child: Text('ยกเลิก', style: TextStyle(color: primary)),
+                  ),
+                  const SizedBox(width: 10),
+                  FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: primary,
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: () async {
+                      if (!formKey.currentState!.validate()) return;
+                      try {
+                        await _repository.updateAdmin(
+                          item.companyId,
+                          username.text.trim(),
+                          password.text,
+                        );
+                        if (dialogContext.mounted) {
+                          Navigator.pop(dialogContext, true);
+                        }
+                      } catch (error) {
+                        if (dialogContext.mounted) {
+                          setDialogState(
+                            () => dialogError = error.toString().contains(
+                                  'ซ้ำ',
+                                )
+                                ? 'Username นี้มีในระบบแล้ว กรุณาใช้ Username อื่น'
+                                : 'บันทึกไม่สำเร็จ กรุณาตรวจสอบข้อมูลอีกครั้ง',
+                          );
+                        }
+                      }
+                    },
+                    child: const Text('บันทึก'),
+                  ),
+                ],
+              ),
+            ],
+            ),
+          );
+        },
+      );
+      if (saved == true && mounted) {
+        await _load();
+        if (mounted) setState(() => _message = 'กำหนดผู้ดูแลระบบสำเร็จ');
+      }
+    } finally {
+      username.dispose();
+      password.dispose();
+    }
+  }
+
+  Widget _pagerArrow({
+    required IconData icon,
+    required String tooltip,
+    required bool enabled,
+    required VoidCallback onPressed,
+  }) {
+    return SizedBox(
+      width: 34,
+      height: 34,
+      child: FilledButton(
+        onPressed: enabled ? onPressed : null,
+        style: FilledButton.styleFrom(
+          shape: const CircleBorder(),
+          padding: EdgeInsets.zero,
+          minimumSize: const Size.square(34),
+          maximumSize: const Size.square(34),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+        child: Tooltip(message: tooltip, child: Icon(icon)),
+      ),
+    );
+  }
+
   Widget _pageNumberButton(int index, int currentPage) {
     return SizedBox(
-      width: 36,
-      height: LaooTypography.buttonHeight,
+      width: 34,
+      height: 34,
       child: index == currentPage
           ? FilledButton(
               onPressed: () {},
-              style: FilledButton.styleFrom(padding: EdgeInsets.zero),
+              style: FilledButton.styleFrom(
+                padding: EdgeInsets.zero,
+                shape: const CircleBorder(),
+              ),
               child: Text('${index + 1}'),
             )
           : OutlinedButton(
               onPressed: () => setState(() => _currentPage = index),
-              style: OutlinedButton.styleFrom(padding: EdgeInsets.zero),
+              style: OutlinedButton.styleFrom(
+                padding: EdgeInsets.zero,
+                shape: const CircleBorder(),
+              ),
               child: Text('${index + 1}'),
             ),
     );

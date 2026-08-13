@@ -18,6 +18,7 @@ public sealed record CompanySetupResponse(
     int RowSTD,
     int RowCardSTD,
     int TimeAlert,
+    int OrgStructureType,
     string? YearFormat,
     string? VersionID,
     string? EmailHost,
@@ -48,6 +49,7 @@ public sealed class CompanySetupUpdateRequest
     public int RowSTD { get; init; }
     public int RowCardSTD { get; init; }
     public int TimeAlert { get; init; }
+    public int OrgStructureType { get; init; } = 1;
     public string? YearFormat { get; init; }
     public string? VersionID { get; init; }
     public string? EmailHost { get; init; }

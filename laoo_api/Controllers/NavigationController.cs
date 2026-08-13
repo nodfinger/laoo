@@ -24,7 +24,7 @@ public sealed class NavigationController : ControllerBase
         {
             "PARTNER_USER" => new[] { "05", "06", "07", "11" },
             "COMPANY_USER" => new[] { "05", "08", "09", "10" },
-            "LAOO_SUPPORT" => new[] { "01", "02", "03", "04", "05", "12" },
+            "LAOO_SUPPORT" => new[] { "01", "02", "03", "04", "05" },
             _ => Array.Empty<string>()
         };
         if (groupCodes.Length == 0) return Forbid();

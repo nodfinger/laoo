@@ -8,7 +8,7 @@ class CompanySetupService {
   final ApiClient _apiClient;
 
   Future<CompanySetupContext> loadRuntime() async {
-    final result = await _apiClient.get('/api/company-setup');
+    final result = await _apiClient.get('/api/system/company-setup/runtime');
 
     if (result is! Map<String, dynamic>) {
       throw StateError('Company Setup API ไม่ได้คืนข้อมูลในรูปแบบที่ถูกต้อง');

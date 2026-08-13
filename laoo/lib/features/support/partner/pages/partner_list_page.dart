@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import '../../../../core/widgets/auto_dismiss_message.dart';
+import '../../../../core/widgets/combo_box_text.dart';
 
 import '../../../../app/theme/laoo_design_tokens.dart';
 import '../../presentation/widgets/support_workspace_shell.dart';
 import '../../../../core/company_setup/company_setup_controller.dart';
+import '../../../../core/api/api_exception.dart';
 import '../models/partner.dart';
 
 class PartnerListPage extends StatefulWidget {
@@ -13,6 +16,8 @@ class PartnerListPage extends StatefulWidget {
     required this.openEdit,
     required this.changeStatus,
     required this.deletePartner,
+    required this.createPartnerAdmin,
+    required this.updatePartnerAdmin,
   });
 
   final Future<List<Partner>> Function({String? search, bool? isActive})
@@ -21,6 +26,10 @@ class PartnerListPage extends StatefulWidget {
   final Future<bool> Function(Partner partner) openEdit;
   final Future<void> Function(Partner partner, bool isActive) changeStatus;
   final Future<void> Function(Partner partner) deletePartner;
+  final Future<void> Function(Partner partner, String username, String password)
+  createPartnerAdmin;
+  final Future<void> Function(Partner partner, String username, String password)
+  updatePartnerAdmin;
 
   @override
   State<PartnerListPage> createState() => _PartnerListPageState();
@@ -105,6 +114,32 @@ class _PartnerListPageState extends State<PartnerListPage> {
     _load();
   }
 
+  Future<void> _manageAdmin(Partner partner) async {
+    final editing = partner.partnerAdminUserId != null;
+    final result = await showDialog<(String, String)>(
+      context: context,
+      builder: (_) => _PartnerAdminDialog(
+        initialUsername: partner.partnerAdminUsername,
+        editing: editing,
+      ),
+    );
+    if (result == null) return;
+    try {
+      if (editing) {
+        await widget.updatePartnerAdmin(partner, result.$1, result.$2);
+      } else {
+        await widget.createPartnerAdmin(partner, result.$1, result.$2);
+      }
+      await _load();
+      if (mounted) _showMessage(editing ? 'แก้ไข Partner Admin สำเร็จ' : 'สร้าง Partner Admin สำเร็จ');
+    } catch (error) {
+      if (mounted) {
+        final message = error is ApiException ? error.message : 'ไม่สามารถสร้าง Partner Admin ได้';
+        _showMessage(message, error: true);
+      }
+    }
+  }
+
   void _sortBy(
     int columnIndex,
     Comparable Function(Partner partner) selector,
@@ -171,7 +206,7 @@ class _PartnerListPageState extends State<PartnerListPage> {
             ),
             const SizedBox(height: 16),
             if (_message != null) ...[
-              _TopMessage(
+              AutoDismissMessage(
                 message: _message!,
                 error: _messageIsError,
                 onClose: () => setState(() => _message = null),
@@ -249,7 +284,7 @@ class _PartnerListPageState extends State<PartnerListPage> {
   Widget _tableView() {
     return LayoutBuilder(
       builder: (context, constraints) {
-        const minTableWidth = 820.0;
+        const minTableWidth = 920.0;
         const horizontalMargin = 6.0;
         const columnSpacing = 6.0;
 
@@ -260,8 +295,9 @@ class _PartnerListPageState extends State<PartnerListPage> {
 
         // Fixed columns are intentionally compact so the last Status column
         // always stays inside the visible table area.
-        const actionWidth = 70.0;
+        const actionWidth = 124.0;
         const codeWidth = 112.0;
+        const adminWidth = 118.0;
         const statusWidth = 82.0;
 
         // DataTable also consumes width for margins, inter-column spacing,
@@ -273,7 +309,7 @@ class _PartnerListPageState extends State<PartnerListPage> {
             sortAndInternalReserve;
 
         final flexibleWidth =
-            (tableWidth - actionWidth - codeWidth - statusWidth - tableOverhead)
+            (tableWidth - actionWidth - codeWidth - adminWidth - statusWidth - tableOverhead)
                 .clamp(360.0, double.infinity);
 
         final nameWidth = flexibleWidth * 0.45;
@@ -348,6 +384,12 @@ class _PartnerListPageState extends State<PartnerListPage> {
                           ascending,
                         ),
                       ),
+                      const DataColumn(
+                        label: SizedBox(
+                          width: adminWidth,
+                          child: Text('admin'),
+                        ),
+                      ),
                       DataColumn(
                         label: headerText('ผู้ติดต่อ', contactWidth),
                         onSort: (index, ascending) => _sortBy(
@@ -383,6 +425,16 @@ class _PartnerListPageState extends State<PartnerListPage> {
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
+                                  TextButton(
+                                    style: TextButton.styleFrom(
+                                      padding: EdgeInsets.zero,
+                                      minimumSize: const Size(38, 32),
+                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    ),
+                                    onPressed: () => _manageAdmin(partner),
+                                    child: const Text('admin'),
+                                  ),
+                                  const SizedBox(width: 4),
                                   IconButton(
                                     tooltip: 'แก้ไข',
                                     visualDensity: VisualDensity.compact,
@@ -434,6 +486,7 @@ class _PartnerListPageState extends State<PartnerListPage> {
                           ),
                           DataCell(cellText(partner.partnerCode, codeWidth)),
                           DataCell(cellText(partner.partnerNameTh, nameWidth)),
+                          DataCell(cellText(partner.partnerAdminUsername ?? '-', adminWidth)),
                           DataCell(
                             cellText(partner.contactName1 ?? '-', contactWidth),
                           ),
@@ -791,6 +844,10 @@ class _PartnerListPageState extends State<PartnerListPage> {
                         partner.partnerCode,
                         style: const TextStyle(color: LaooColors.textSecondary),
                       ),
+                      if (partner.partnerAdminUsername != null) ...[
+                        const SizedBox(height: 4),
+                        Text('Admin: ${partner.partnerAdminUsername}'),
+                      ],
                       const SizedBox(height: 8),
                       _StatusChip(active: partner.isActive),
                     ],
@@ -858,9 +915,9 @@ class _Toolbar extends StatelessWidget {
               isDense: true,
             ),
             items: const [
-              DropdownMenuItem(value: null, child: Text('ทั้งหมด')),
-              DropdownMenuItem(value: true, child: Text('เปิดใช้งาน')),
-              DropdownMenuItem(value: false, child: Text('ระงับใช้งาน')),
+              DropdownMenuItem(value: null, child: LaooComboBoxText('ทั้งหมด')),
+              DropdownMenuItem(value: true, child: LaooComboBoxText('เปิดใช้งาน')),
+              DropdownMenuItem(value: false, child: LaooComboBoxText('ระงับใช้งาน')),
             ],
             onChanged: onActiveChanged,
           ),
@@ -976,6 +1033,118 @@ class _StateCard extends StatelessWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+class _PartnerAdminDialog extends StatefulWidget {
+  const _PartnerAdminDialog({this.initialUsername, required this.editing});
+
+  final String? initialUsername;
+  final bool editing;
+
+  @override
+  State<_PartnerAdminDialog> createState() => _PartnerAdminDialogState();
+}
+
+class _PartnerAdminDialogState extends State<_PartnerAdminDialog> {
+  late final TextEditingController _username;
+  final _password = TextEditingController();
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _username = TextEditingController(text: widget.initialUsername ?? 'admin');
+  }
+
+  @override
+  void dispose() {
+    _username.dispose();
+    _password.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Dialog(
+      clipBehavior: Clip.antiAlias,
+      insetPadding: const EdgeInsets.all(24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 460),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
+              color: theme.colorScheme.primaryContainer,
+              child: Text(
+                widget.editing ? 'แก้ไข Partner Admin' : 'สร้าง Partner Admin',
+                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
+              child: Column(
+                children: [
+                  TextField(controller: _username, decoration: _fieldDecoration('Username Admin')),
+                  const SizedBox(height: 12),
+                  TextField(controller: _password, obscureText: true, decoration: _fieldDecoration(widget.editing ? 'Password ใหม่ (เว้นว่างได้)' : 'Password')),
+                  const SizedBox(height: 8),
+                  const Align(alignment: Alignment.centerLeft, child: Text('แนะนำให้ใช้รหัสชั่วคราวและเปลี่ยนหลัง Login ครั้งแรก')),
+                  if (_error != null) ...[
+                    const SizedBox(height: 8),
+                    Align(alignment: Alignment.centerLeft, child: Text(_error!, style: TextStyle(color: Colors.red))),
+                  ],
+                ],
+              ),
+            ),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
+              decoration: BoxDecoration(border: Border(top: BorderSide(color: theme.dividerColor))),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(onPressed: () => Navigator.pop(context), child: const Text('ยกเลิก')),
+                  const SizedBox(width: 12),
+                  FilledButton(onPressed: _submit, child: Text(widget.editing ? 'บันทึก' : 'สร้าง Admin')),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _submit() {
+    final username = _username.text.trim();
+    final password = _password.text;
+    if (username.isEmpty || (!widget.editing && password.isEmpty)) {
+      setState(() => _error = 'กรุณากรอก Username และ Password');
+      return;
+    }
+    Navigator.pop(context, (username, password));
+  }
+
+  InputDecoration _fieldDecoration(String label) {
+    final color = Theme.of(context).colorScheme;
+    final border = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: BorderSide(color: color.outline),
+    );
+    return InputDecoration(
+      labelText: label,
+      border: border,
+      enabledBorder: border,
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(color: color.primary, width: 2),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
     );
   }
 }

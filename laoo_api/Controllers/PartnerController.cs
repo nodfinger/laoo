@@ -64,7 +64,19 @@ SELECT
     ContactPhone2,
     ContactEmail2,
     Remark,
-    IsActive
+    IsActive,
+    (SELECT TOP (1) U.PartnerUserID
+     FROM dbo.TDADPartnerUser AS U
+     WHERE U.PartnerID = P.PartnerID
+       AND U.IsPartnerAdmin = 1
+       AND U.IsActive = 1
+     ORDER BY U.PartnerUserID) AS PartnerAdminUserID,
+    (SELECT TOP (1) U.Username
+     FROM dbo.TDADPartnerUser AS U
+     WHERE U.PartnerID = P.PartnerID
+       AND U.IsPartnerAdmin = 1
+       AND U.IsActive = 1
+     ORDER BY U.PartnerUserID) AS PartnerAdminUsername
 FROM dbo.TDADPartner AS P
 WHERE
     (
@@ -163,7 +175,19 @@ SELECT
     ContactPhone2,
     ContactEmail2,
     Remark,
-    IsActive
+    IsActive,
+    (SELECT TOP (1) U.PartnerUserID
+     FROM dbo.TDADPartnerUser AS U
+     WHERE U.PartnerID = P.PartnerID
+       AND U.IsPartnerAdmin = 1
+       AND U.IsActive = 1
+     ORDER BY U.PartnerUserID) AS PartnerAdminUserID,
+    (SELECT TOP (1) U.Username
+     FROM dbo.TDADPartnerUser AS U
+     WHERE U.PartnerID = P.PartnerID
+       AND U.IsPartnerAdmin = 1
+       AND U.IsActive = 1
+     ORDER BY U.PartnerUserID) AS PartnerAdminUsername
 FROM dbo.TDADPartner AS P
 WHERE P.PartnerID = @RequestedPartnerID
   AND (
@@ -284,7 +308,6 @@ INSERT INTO dbo.TDADPartner
     CreateDate,
     CreateBy
 )
-OUTPUT INSERTED.PartnerID
 VALUES
 (
     @PartnerCode,
@@ -308,7 +331,8 @@ VALUES
     1,
     SYSUTCDATETIME(),
     @CreateBy
-);";
+);
+SELECT CAST(SCOPE_IDENTITY() AS BIGINT);";
 
             await using var insert =
                 new SqlCommand(insertSql, connection, transaction);
@@ -736,6 +760,17 @@ END;";
 
     private PartnerScope? ResolveScope()
     {
+        var loginMode = User.FindFirstValue("login_mode");
+        var laooUserId = ReadLongClaim("laoo_user_id");
+        if (string.Equals(
+                loginMode,
+                "LAOO",
+                StringComparison.OrdinalIgnoreCase)
+            && laooUserId.HasValue)
+        {
+            return new PartnerScope(true, null, null);
+        }
+
         var companyId = ReadLongClaim("company_id");
         if (companyId.HasValue)
         {
@@ -748,16 +783,7 @@ END;";
             return new PartnerScope(false, partnerId, null);
         }
 
-        var loginMode = User.FindFirstValue("login_mode");
-        var laooUserId = ReadLongClaim("laoo_user_id");
-
-        return string.Equals(
-                   loginMode,
-                   "LAOO",
-                   StringComparison.OrdinalIgnoreCase)
-               && laooUserId.HasValue
-            ? new PartnerScope(true, null, null)
-            : null;
+        return null;
     }
 
     private static void AddScopeParameters(
@@ -921,7 +947,10 @@ END;";
             Remark = N("Remark"),
 
             IsActive =
-                reader.GetBoolean(reader.GetOrdinal("IsActive"))
+                reader.GetBoolean(reader.GetOrdinal("IsActive")),
+
+            PartnerAdminUsername = N("PartnerAdminUsername")
+            ,PartnerAdminUserId = reader.IsDBNull(reader.GetOrdinal("PartnerAdminUserID")) ? null : reader.GetInt64(reader.GetOrdinal("PartnerAdminUserID"))
         };
     }
 

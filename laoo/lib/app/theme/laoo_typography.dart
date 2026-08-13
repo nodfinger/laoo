@@ -17,7 +17,7 @@ abstract final class LaooTypography {
   ];
 
   // Page hierarchy
-  static const double pageTitle = 28;
+  static const double pageTitle = 18;
   static const double workspaceCaption = 18;
   static const double sectionTitle = 16;
   static const double subsectionTitle = 14;
@@ -32,6 +32,7 @@ abstract final class LaooTypography {
   static const double inputLabel = 16;
   static const double inputHint = 12;
   static const double validation = 12;
+  static const double comboBox = 12;
 
   // Table
   static const double tableHeader = 13;
@@ -41,7 +42,7 @@ abstract final class LaooTypography {
   static const double button = 13;
 
   /// Shared button height keeps icon and text buttons visually aligned.
-  static const double buttonHeight = 36;
+  static const double buttonHeight = 48;
   static const double menuGroup = 14;
   static const double menuItem = 12;
   static const double popupMenu = 12;
@@ -58,7 +59,7 @@ abstract final class LaooTypography {
   static const double inputLineHeight = 1.45;
 
   // Weight standards
-  static const FontWeight pageTitleWeight = FontWeight.w900;
+  static const FontWeight pageTitleWeight = FontWeight.w700;
   static const FontWeight workspaceCaptionWeight = FontWeight.w700;
   static const FontWeight strongWeight = FontWeight.w800;
   static const FontWeight emphasizedWeight = FontWeight.w700;

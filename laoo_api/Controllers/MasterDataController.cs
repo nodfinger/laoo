@@ -81,7 +81,7 @@ ORDER BY Seq, Name;";
     {
         if (string.IsNullOrWhiteSpace(request.Name)) return BadRequest(new { message = "กรุณาระบุชื่อ" });
         await using var connection = await OpenConnectionAsync(cancellationToken);
-        var action = existingCode is null ? "CREATE" : "UPDATE";
+        var action = existingCode is null ? "CREATE" : "EDIT";
         if (!await HasPermissionAsync(connection, action, cancellationToken)) return Forbid();
         var scope = ResolveOwner();
         var code = existingCode?.Trim();
@@ -92,11 +92,11 @@ ORDER BY Seq, Name;";
             AddScope(next, scope); next.Parameters.Add("@GroupCode", SqlDbType.NVarChar, 10).Value = groupCode.Trim();
             code = Convert.ToString(await next.ExecuteScalarAsync(cancellationToken)) ?? "00001";
         }
-        const string duplicateSql = "SELECT COUNT(1) FROM dbo.TDSTMaster WHERE MasterGroupCode=@GroupCode AND Name=@Name AND MasterCode<>@Code AND OwnerType=@OwnerType AND ISNULL(OwnerPartnerID,0)=ISNULL(@PartnerID,0) AND ISNULL(OwnerCompanyID,0)=ISNULL(@CompanyID,0);";
+        const string duplicateSql = "SELECT COUNT(1) FROM dbo.TDSTMaster WHERE MasterGroupCode=@GroupCode AND LOWER(REPLACE(Name, N' ', N''))=LOWER(REPLACE(@Name, N' ', N'')) AND MasterCode<>@Code AND OwnerType=@OwnerType AND ISNULL(OwnerPartnerID,0)=ISNULL(@PartnerID,0) AND ISNULL(OwnerCompanyID,0)=ISNULL(@CompanyID,0);";
         await using var duplicate = new SqlCommand(duplicateSql, connection);
         AddScope(duplicate, scope); duplicate.Parameters.Add("@GroupCode", SqlDbType.NVarChar, 10).Value = groupCode.Trim(); duplicate.Parameters.Add("@Name", SqlDbType.NVarChar, 250).Value = request.Name.Trim(); duplicate.Parameters.Add("@Code", SqlDbType.NVarChar, 10).Value = code;
         if (Convert.ToInt32(await duplicate.ExecuteScalarAsync(cancellationToken)) > 0) return Conflict(new { message = "ชื่อซ้ำในกลุ่มข้อมูลนี้" });
-        const string sql = "IF EXISTS (SELECT 1 FROM dbo.TDSTMaster WHERE MasterGroupCode=@GroupCode AND MasterCode=@Code AND OwnerType=@OwnerType AND ISNULL(OwnerPartnerID,0)=ISNULL(@PartnerID,0) AND ISNULL(OwnerCompanyID,0)=ISNULL(@CompanyID,0)) UPDATE dbo.TDSTMaster SET Name=@Name, Seq=@Seq, ShortCode=@ShortCode WHERE MasterGroupCode=@GroupCode AND MasterCode=@Code AND OwnerType=@OwnerType AND ISNULL(OwnerPartnerID,0)=ISNULL(@PartnerID,0) AND ISNULL(OwnerCompanyID,0)=ISNULL(@CompanyID,0); ELSE INSERT dbo.TDSTMaster(CompanyID,MasterGroupCode,MasterCode,Name,Seq,OrderBy,ShortCode,OwnerType,OwnerPartnerID,OwnerCompanyID) VALUES(NULL,@GroupCode,@Code,@Name,@Seq,N'Seq',@ShortCode,@OwnerType,@PartnerID,@CompanyID);";
+        const string sql = "IF EXISTS (SELECT 1 FROM dbo.TDSTMaster WHERE MasterGroupCode=@GroupCode AND MasterCode=@Code AND OwnerType=@OwnerType AND ISNULL(OwnerPartnerID,0)=ISNULL(@PartnerID,0) AND ISNULL(OwnerCompanyID,0)=ISNULL(@CompanyID,0)) UPDATE dbo.TDSTMaster SET Name=@Name, Seq=@Seq, ShortCode=@ShortCode, UpdateDate=SYSUTCDATETIME() WHERE MasterGroupCode=@GroupCode AND MasterCode=@Code AND OwnerType=@OwnerType AND ISNULL(OwnerPartnerID,0)=ISNULL(@PartnerID,0) AND ISNULL(OwnerCompanyID,0)=ISNULL(@CompanyID,0); ELSE INSERT dbo.TDSTMaster(MasterGroupCode,MasterCode,Name,Seq,OrderBy,ShortCode,OwnerType,OwnerPartnerID,OwnerCompanyID) VALUES(@GroupCode,@Code,@Name,@Seq,N'Seq',@ShortCode,@OwnerType,@PartnerID,@CompanyID);";
         await using var command = new SqlCommand(sql, connection); AddScope(command, scope);
         command.Parameters.Add("@GroupCode", SqlDbType.NVarChar, 10).Value = groupCode.Trim(); command.Parameters.Add("@Code", SqlDbType.NVarChar, 10).Value = code; command.Parameters.Add("@Name", SqlDbType.NVarChar, 250).Value = request.Name.Trim(); command.Parameters.Add("@Seq", SqlDbType.Int).Value = request.Seq; command.Parameters.Add("@ShortCode", SqlDbType.NVarChar, 50).Value = string.IsNullOrWhiteSpace(request.ShortCode) ? DBNull.Value : request.ShortCode.Trim();
         await command.ExecuteNonQueryAsync(cancellationToken);
@@ -116,12 +116,29 @@ ORDER BY Seq, Name;";
 
     private async Task<bool> HasPermissionAsync(SqlConnection connection, string action, CancellationToken cancellationToken)
     {
+        if (string.Equals(User.FindFirstValue("user_type"), "PARTNER_USER", StringComparison.OrdinalIgnoreCase))
+        {
+            var partnerProject = User.FindFirstValue("project_id");
+            var partnerClaim = User.FindFirstValue("partner_id");
+            if (!long.TryParse(partnerProject, out var partnerProjectId) ||
+                !long.TryParse(partnerClaim, out var partnerId)) return false;
+            const string partnerSql = "SELECT CASE WHEN EXISTS (SELECT 1 FROM dbo.TDADPartnerUser U WHERE U.PartnerID=@PartnerID AND U.NormalizedUsername=@Username AND U.IsPartnerAdmin=1 AND U.IsActive=1) OR EXISTS (SELECT 1 FROM dbo.TDADPartnerUserPermission UP INNER JOIN dbo.TDADPermission P ON P.PermissionID=UP.PermissionID AND P.ProjectID=UP.ProjectID INNER JOIN dbo.TDADPartnerUser U ON U.PartnerUserID=UP.PartnerUserID WHERE U.PartnerID=@PartnerID AND U.NormalizedUsername=@Username AND U.IsActive=1 AND UP.ProjectID=@ProjectID AND UP.IsAllowed=1 AND UP.IsActive=1 AND P.IsActive=1 AND P.ScreenCode=@ScreenCode AND P.ActionCode=@Action) THEN 1 ELSE 0 END";
+            await using var partnerCommand = new SqlCommand(partnerSql, connection);
+            partnerCommand.Parameters.Add("@PartnerID", SqlDbType.BigInt).Value = partnerId;
+            partnerCommand.Parameters.Add("@Username", SqlDbType.NVarChar, 100).Value = (User.Identity?.Name ?? User.FindFirstValue("username") ?? string.Empty).ToUpperInvariant();
+            partnerCommand.Parameters.AddWithValue("@ProjectID", partnerProjectId);
+            partnerCommand.Parameters.AddWithValue("@ScreenCode", ScreenCode);
+            partnerCommand.Parameters.AddWithValue("@Action", action);
+            return Convert.ToBoolean(await partnerCommand.ExecuteScalarAsync(cancellationToken));
+        }
         var user = User.FindFirstValue("laoo_user_id") ?? User.FindFirstValue("user_id");
         var project = User.FindFirstValue("project_id");
         if (!long.TryParse(user, out var userId) || !long.TryParse(project, out var projectId)) return false;
         var table = User.FindFirstValue("laoo_user_id") is not null ? "TDADLaooUserPermission" : "TDADUserPermission";
         var key = User.FindFirstValue("laoo_user_id") is not null ? "LaooUserID" : "UserID";
-        var sql = $"SELECT CASE WHEN EXISTS (SELECT 1 FROM dbo.{table} UP INNER JOIN dbo.TDADPermission P ON P.PermissionID=UP.PermissionID AND P.ProjectID=UP.ProjectID WHERE UP.{key}=@UserID AND UP.ProjectID=@ProjectID AND UP.IsAllowed=1 AND UP.IsActive=1 AND P.IsActive=1 AND P.ScreenCode=@ScreenCode AND P.ActionCode=@Action) THEN 1 ELSE 0 END";
+        var sql = User.FindFirstValue("laoo_user_id") is not null
+            ? $"SELECT CASE WHEN EXISTS (SELECT 1 FROM dbo.{table} UP INNER JOIN dbo.TDADPermission P ON P.PermissionID=UP.PermissionID AND P.ProjectID=UP.ProjectID WHERE UP.{key}=@UserID AND UP.ProjectID=@ProjectID AND UP.IsAllowed=1 AND UP.IsActive=1 AND P.IsActive=1 AND P.ScreenCode=@ScreenCode AND P.ActionCode=@Action) THEN 1 ELSE 0 END"
+            : $"SELECT CASE WHEN EXISTS (SELECT 1 FROM dbo.TDADUser U WHERE U.UserID=@UserID AND U.IsActive=1 AND U.IsCompanyAdmin=1) OR EXISTS (SELECT 1 FROM dbo.{table} UP INNER JOIN dbo.TDADPermission P ON P.PermissionID=UP.PermissionID AND P.ProjectID=UP.ProjectID WHERE UP.{key}=@UserID AND UP.ProjectID=@ProjectID AND UP.IsAllowed=1 AND UP.IsActive=1 AND P.IsActive=1 AND P.ScreenCode=@ScreenCode AND P.ActionCode=@Action) THEN 1 ELSE 0 END";
         await using var command = new SqlCommand(sql, connection); command.Parameters.AddWithValue("@UserID", userId); command.Parameters.AddWithValue("@ProjectID", projectId); command.Parameters.AddWithValue("@ScreenCode", ScreenCode); command.Parameters.AddWithValue("@Action", action);
         return Convert.ToBoolean(await command.ExecuteScalarAsync(cancellationToken));
     }

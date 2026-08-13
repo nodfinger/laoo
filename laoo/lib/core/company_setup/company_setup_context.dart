@@ -5,6 +5,7 @@ class CompanySetupContext {
     required this.rowStd,
     required this.rowCardStd,
     required this.timeAlert,
+    required this.orgStructureType,
     required this.yearFormat,
     required this.versionId,
     required this.themeName,
@@ -17,6 +18,7 @@ class CompanySetupContext {
   final int rowStd;
   final int rowCardStd;
   final int timeAlert;
+  final int orgStructureType;
   final String yearFormat;
   final String versionId;
   final String? themeName;
@@ -30,6 +32,7 @@ class CompanySetupContext {
       rowStd: _positiveInt(json['rowSTD'] ?? json['rowStd'], 50),
       rowCardStd: _positiveInt(json['rowCardSTD'] ?? json['rowCardStd'], 12),
       timeAlert: _positiveInt(json['timeAlert'], 30),
+      orgStructureType: (json['orgStructureType'] as num?)?.toInt() ?? int.tryParse('${json['orgStructureType']}') ?? 1,
       yearFormat: _text(json['yearFormat'], 'C').toUpperCase(),
       versionId: _text(json['versionID'] ?? json['versionId'], ''),
       themeName: _nullableText(json['themeName']),

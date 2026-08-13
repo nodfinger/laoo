@@ -44,13 +44,21 @@ class _TechnicalInfoPageState extends State<TechnicalInfoPage> {
       if (_error != null) Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
       if (_loading) const LinearProgressIndicator(),
       if (_result != null && !_loading) ...[
-        Expanded(child: SelectionArea(child: ListView(children: [_section('ข้อมูลเมนู', 'รายละเอียดเมนูที่ใช้งาน', _result!.menus.map((x) => '${x['menuName']} (${x['menuCode']})').toList()), _dartFileSection(), _mdSection(), _section('Table ที่ใช้จัดเก็บข้อมูล', 'แสดงเฉพาะชื่อ Table และความหมายของ Table', _result!.tables.map((x) => '${x['tableName']} — ${x['tableMeaning']}').toList())]))),
+        Expanded(child: SelectionArea(child: ListView(children: [_section('ข้อมูลเมนู', 'รายละเอียดเมนูที่ใช้งาน', _result!.menus.map((x) => '${x['menuName']} (${x['menuCode']})').toList()), _dartFileSection(), _mdSection(), _tableSection()])))
       ],
     ])),
   );
 
   Widget _section(String title, String meaning, List<String> values) => Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [Row(children: [Expanded(child: Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.w700))), if (values.isNotEmpty) OutlinedButton(onPressed: () => _copyText(values.join('\n')), child: const Text('Copy'))]), Text(meaning, style: const TextStyle(fontSize: LaooTypography.inputHint)), const SizedBox(height: 10), if (values.isEmpty) const Text('ไม่พบข้อมูล') else ...values.map((v) => Padding(padding: const EdgeInsets.only(bottom: 7), child: Text(v)))])));
 
+  Widget _tableSection() {
+    final tables = _result!.tables;
+    return Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Row(children: [Expanded(child: Text('Table ที่ใช้จัดเก็บข้อมูล', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.w700))), if (tables.isNotEmpty) OutlinedButton(onPressed: () => _copyText(tables.map((t) => '${t['tableName']} — ${t['tableMeaning']}').join('\n')), child: const Text('Copy'))]),
+      const Text('แสดงชื่อ Table และกดขยายเพื่อดู Fields'),
+      if (tables.isEmpty) const Text('ไม่พบข้อมูล') else ...tables.map((table) => ExpansionTile(title: Text('${table['tableName']} — ${table['tableMeaning']}'), children: [SingleChildScrollView(scrollDirection: Axis.horizontal, child: DataTable(columns: const [DataColumn(label: Text('ชื่อคอลัมน์')), DataColumn(label: Text('ประเภทข้อมูล')), DataColumn(label: Text('ความหมาย'))], rows: ((table['fields'] as List?) ?? const []).map((field) => DataRow(cells: [DataCell(Text('${field['colName']}')), DataCell(Text('${field['dataType']}')), DataCell(Text('${field['remark']}'))])).toList()))]))
+    ])));
+  }
   Widget _mdSection() {
     final mds = _result!.mds;
     final scheme = Theme.of(context).colorScheme;

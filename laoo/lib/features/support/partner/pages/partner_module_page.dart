@@ -40,6 +40,18 @@ class _PartnerModulePageState extends State<PartnerModulePage> {
         deletePartner: (partner) {
           return _repository.deletePartner(partner.partnerId);
         },
+        createPartnerAdmin: (partner, username, password) =>
+            _repository.createPartnerAdmin(
+              partner.partnerId,
+              username: username,
+              password: password,
+            ),
+        updatePartnerAdmin: (partner, username, password) =>
+            _repository.updatePartnerAdmin(
+              partner.partnerAdminUserId!,
+              username: username,
+              password: password,
+            ),
       ),
     );
   }

@@ -14,6 +14,11 @@ abstract final class AppTheme {
     return ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
+      progressIndicatorTheme: ProgressIndicatorThemeData(
+        color: colorScheme.primary,
+        linearTrackColor: colorScheme.primary.withValues(alpha: 0.14),
+        circularTrackColor: colorScheme.primary.withValues(alpha: 0.14),
+      ),
       scaffoldBackgroundColor: background,
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
@@ -45,7 +50,7 @@ abstract final class AppTheme {
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          minimumSize: const Size.fromHeight(52),
+          minimumSize: const Size.fromHeight(48),
           backgroundColor: primaryGreen,
           foregroundColor: Colors.white,
           elevation: 0,

@@ -7,9 +7,9 @@ public sealed record CompanyContextCompany(
 
 public sealed record CompanyContextResponse(
     bool Success,
-    long CompanyID,
-    string CompanyCode,
-    string CompanyName,
+    long? CompanyID,
+    string? CompanyCode,
+    string? CompanyName,
     string AccessToken,
     DateTime ExpiresAt);
 

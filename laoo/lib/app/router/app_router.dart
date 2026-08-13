@@ -13,6 +13,9 @@ import '../../features/support/presentation/widgets/support_workspace_shell.dart
 import '../../features/support/technical_info/pages/technical_info_page.dart';
 import '../../features/support/branch/pages/branch_page.dart';
 import '../../features/support/master_data/pages/master_data_page.dart';
+import '../../features/support/organization/pages/organization_structure_page.dart';
+import '../../features/support/employee/pages/employee_ux_page.dart';
+import '../../features/support/partner_user/pages/partner_user_page.dart';
 import 'route_names.dart';
 import 'route_paths.dart';
 
@@ -179,14 +182,15 @@ final GoRouter appRouter = GoRouter(
 );
 
 final List<GoRoute> _placeholderRoutes = [
-  _scopePlaceholder(RoutePaths.companyEmployees, RouteNames.companyEmployees, 'พนักงาน', WorkspaceMenuScope.company, 'companyEmployees'),
+  GoRoute(path: RoutePaths.companyEmployees, name: RouteNames.companyEmployees, builder: (context, state) => const EmployeeUxPage(customer: true, companyScoped: true, menuScope: WorkspaceMenuScope.company)),
   _scopePlaceholder(RoutePaths.companyUsers, RouteNames.companyUsers, 'ผู้ใช้งาน', WorkspaceMenuScope.company, 'companyUsers'),
   _scopePlaceholder(RoutePaths.companyRoleGroups, RouteNames.companyRoleGroups, 'กลุ่มสิทธิ์', WorkspaceMenuScope.company, 'companyRoleGroups'),
   _scopePlaceholder(RoutePaths.companyMenuPermissions, RouteNames.companyMenuPermissions, 'สิทธิ์เมนู', WorkspaceMenuScope.company, 'companyMenuPermissions'),
   _scopePlaceholder(RoutePaths.partnerEmployees, RouteNames.partnerEmployees, 'พนักงาน', WorkspaceMenuScope.partner, 'partnerEmployees'),
   _scopePlaceholder(RoutePaths.partnerRoleGroups, RouteNames.partnerRoleGroups, 'กลุ่มสิทธิ์', WorkspaceMenuScope.partner, 'partnerRoleGroups'),
   _scopePlaceholder(RoutePaths.partnerMenuPermissions, RouteNames.partnerMenuPermissions, 'สิทธิ์เมนู', WorkspaceMenuScope.partner, 'partnerMenuPermissions'),
-  _scopePlaceholder(RoutePaths.laooEmployees, RouteNames.laooEmployees, 'พนักงาน', WorkspaceMenuScope.support, 'laooEmployees'),
+  GoRoute(path: RoutePaths.customerEmployees, name: RouteNames.customerEmployees, builder: (context, state) => const EmployeeUxPage(customer: true, menuScope: WorkspaceMenuScope.partner)),
+  GoRoute(path: RoutePaths.laooEmployees, name: RouteNames.laooEmployees, builder: (context, state) => const EmployeeUxPage()),
   _scopePlaceholder(RoutePaths.laooUsers, RouteNames.laooUsers, 'ผู้ใช้งาน', WorkspaceMenuScope.support, 'laooUsers'),
   _scopePlaceholder(RoutePaths.laooRoleGroups, RouteNames.laooRoleGroups, 'กลุ่มสิทธิ์', WorkspaceMenuScope.support, 'laooRoleGroups'),
   _scopePlaceholder(RoutePaths.laooMenuPermissions, RouteNames.laooMenuPermissions, 'สิทธิ์เมนู', WorkspaceMenuScope.support, 'laooMenuPermissions'),
@@ -201,11 +205,10 @@ final List<GoRoute> _placeholderRoutes = [
     'Laoo User',
     'laooUser',
   ),
-  _placeholder(
-    RoutePaths.partnerUser,
-    RouteNames.partnerUser,
-    'Partner User',
-    'partnerUser',
+  GoRoute(
+    path: RoutePaths.partnerUser,
+    name: RouteNames.partnerUser,
+    builder: (context, state) => const PartnerUserPage(),
   ),
   _placeholder(
     RoutePaths.companyUser,
@@ -238,6 +241,11 @@ final List<GoRoute> _placeholderRoutes = [
     name: RouteNames.technicalInfo,
     builder: (context, state) => const TechnicalInfoPage(),
   ),
+  GoRoute(
+    path: RoutePaths.organizationStructure,
+    name: RouteNames.organizationStructure,
+    builder: (context, state) => const OrganizationStructurePage(),
+  ),
 ];
 
 GoRoute _scopePlaceholder(
@@ -249,7 +257,9 @@ GoRoute _scopePlaceholder(
 ) => GoRoute(
   path: path,
   name: name,
-  builder: (context, state) => CompanyModulePlaceholderPage(
+  builder: (context, state) => path == RoutePaths.partnerEmployees
+      ? const EmployeeUxPage(menuScope: WorkspaceMenuScope.partner)
+      : CompanyModulePlaceholderPage(
     title: title,
     menuScope: scope,
     activeMenu: activeMenu,

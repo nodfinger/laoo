@@ -27,6 +27,8 @@ class CompanySetupController extends ChangeNotifier {
 
   int get pageSize => _current?.rowStd ?? 50;
 
+  int get orgStructureType => _current?.orgStructureType ?? 1;
+
   Future<CompanySetupContext> load() async {
     final setup = await _service.loadRuntime();
     _current = setup;

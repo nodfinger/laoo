@@ -53,4 +53,11 @@ class PartnerCompanyRepository {
         : '/api/partner/companies/$companyId';
     await _api.delete(path);
   }
+
+  Future<void> updateAdmin(int companyId, String username, String password) async {
+    await _api.put('/api/partner/companies/$companyId/admin', body: {
+      'username': username,
+      'password': password,
+    });
+  }
 }
