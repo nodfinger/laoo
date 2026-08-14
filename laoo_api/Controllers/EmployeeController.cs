@@ -17,7 +17,7 @@ public sealed class EmployeeController(IConfiguration configuration) : Controlle
 
     [HttpGet]
     public async Task<IActionResult> List(
-        [FromQuery] string? search, [FromQuery] long? divisionId, [FromQuery] long? departmentId, [FromQuery] long? companyId,
+        [FromQuery] string? search, [FromQuery] long? divisionId, [FromQuery] long? departmentId, [FromQuery] bool? isActive, [FromQuery] long? companyId,
         [FromQuery] int page = 1, [FromQuery] int pageSize = 20,
         CancellationToken token = default)
     {
@@ -33,7 +33,7 @@ public sealed class EmployeeController(IConfiguration configuration) : Controlle
                    E.DepartmentOrgUnitID,DP.NameTH,E.EmployeeCode,E.FullName,
                    E.NickName,E.PositionCode,E.Email,E.Telephone,E.PersonalTelephone,
                    E.ContName1,E.ContRelation1,E.ContPhone1,E.ContName2,E.ContRelation2,E.ContPhone2,
-                   E.StartWorkDate,CASE WHEN E.ImageData IS NULL THEN 0 ELSE 1 END,E.IsActive
+                   E.StartWorkDate,CASE WHEN EXISTS (SELECT 1 FROM dbo.TDADEmployeeImage EI WHERE EI.EmployeeID=E.EmployeeID AND EI.ImageType=N'FORMAL' AND ISNULL(EI.IsActive,1)=1 AND DATALENGTH(EI.ImageData)>0) THEN 1 ELSE 0 END,E.IsActive
                    ,E.CarID1,E.CarColor1,E.CarTypeCode1,E.CarOilType1,E.CarID2,E.CarColor2,E.CarTypeCode2,E.CarOilType2
             FROM dbo.TDADEmployee E
             LEFT JOIN dbo.TDADOrganizationUnit DV ON DV.OrgUnitID=E.DivisionOrgUnitID
@@ -42,6 +42,7 @@ public sealed class EmployeeController(IConfiguration configuration) : Controlle
               AND (@q=N'' OR E.EmployeeCode LIKE @like OR E.FullName LIKE @like OR E.NickName LIKE @like OR E.Email LIKE @like)
               AND (@division IS NULL OR E.DivisionOrgUnitID=@division)
               AND (@department IS NULL OR E.DepartmentOrgUnitID=@department)
+              AND (@isActive IS NULL OR E.IsActive=@isActive)
             ORDER BY E.EmployeeID
             OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY;
             """;
@@ -52,6 +53,7 @@ public sealed class EmployeeController(IConfiguration configuration) : Controlle
         cmd.Parameters.Add("@like", SqlDbType.NVarChar, 210).Value = $"%{q}%";
         cmd.Parameters.Add("@division", SqlDbType.BigInt).Value = divisionId ?? (object)DBNull.Value;
         cmd.Parameters.Add("@department", SqlDbType.BigInt).Value = departmentId ?? (object)DBNull.Value;
+        cmd.Parameters.Add("@isActive", SqlDbType.Bit).Value = isActive ?? (object)DBNull.Value;
         cmd.Parameters.Add("@offset", SqlDbType.Int).Value = (page - 1) * pageSize;
         cmd.Parameters.Add("@pageSize", SqlDbType.Int).Value = pageSize;
         await using var r = await cmd.ExecuteReaderAsync(token);
@@ -95,6 +97,7 @@ public sealed class EmployeeController(IConfiguration configuration) : Controlle
             IF @department IS NOT NULL AND NOT EXISTS(SELECT 1 FROM dbo.TDADOrganizationUnit WHERE OrgUnitID=@department AND UnitType='DEP' AND IsActive=1 AND ((@company IS NULL AND OwnerType='P' AND PartnerID=@partner) OR (@company IS NOT NULL AND OwnerType='C' AND CompanyID=@company))) THROW 50003,'INVALID_DEPARTMENT',1;
             IF @id IS NULL INSERT dbo.TDADEmployee(PartnerID,CompanyID,DivisionOrgUnitID,DepartmentOrgUnitID,EmployeeCode,FullName,NickName,PositionCode,Email,Telephone,PersonalTelephone,ContName1,ContRelation1,ContPhone1,ContName2,ContRelation2,ContPhone2,StartWorkDate,CarID1,CarColor1,CarTypeCode1,CarOilType1,CarID2,CarColor2,CarTypeCode2,CarOilType2,IsActive) VALUES(@partner,@company,@division,@department,@code,@name,@nick,@position,@email,@tel,@personal,@contName1,@contRelation1,@contPhone1,@contName2,@contRelation2,@contPhone2,@start,@carId1,@carColor1,@carType1,@carOil1,@carId2,@carColor2,@carType2,@carOil2,@active);
             ELSE UPDATE dbo.TDADEmployee SET PartnerID=@partner,CompanyID=@company,DivisionOrgUnitID=@division,DepartmentOrgUnitID=@department,EmployeeCode=@code,FullName=@name,NickName=@nick,PositionCode=@position,Email=@email,Telephone=@tel,PersonalTelephone=@personal,ContName1=@contName1,ContRelation1=@contRelation1,ContPhone1=@contPhone1,ContName2=@contName2,ContRelation2=@contRelation2,ContPhone2=@contPhone2,StartWorkDate=@start,CarID1=@carId1,CarColor1=@carColor1,CarTypeCode1=@carType1,CarOilType1=@carOil1,CarID2=@carId2,CarColor2=@carColor2,CarTypeCode2=@carType2,CarOilType2=@carOil2,IsActive=@active,UpdateDate=SYSUTCDATETIME() WHERE EmployeeID=@id AND PartnerID=@partner AND ((@company IS NULL AND CompanyID IS NULL) OR CompanyID=@company);
+            SELECT CAST(CASE WHEN @id IS NULL THEN SCOPE_IDENTITY() ELSE @id END AS BIGINT);
             """;
         await using var cmd = new SqlCommand(sql, c);
         cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = id ?? (object)DBNull.Value;
@@ -109,9 +112,98 @@ public sealed class EmployeeController(IConfiguration configuration) : Controlle
         Add(cmd, "@carId1", SqlDbType.NVarChar, x.CarID1, 50); Add(cmd, "@carColor1", SqlDbType.NVarChar, x.CarColor1, 100); Add(cmd, "@carType1", SqlDbType.NVarChar, x.CarTypeCode1, 50); Add(cmd, "@carOil1", SqlDbType.NVarChar, x.CarOilType1, 50);
         Add(cmd, "@carId2", SqlDbType.NVarChar, x.CarID2, 50); Add(cmd, "@carColor2", SqlDbType.NVarChar, x.CarColor2, 100); Add(cmd, "@carType2", SqlDbType.NVarChar, x.CarTypeCode2, 50); Add(cmd, "@carOil2", SqlDbType.NVarChar, x.CarOilType2, 50);
         cmd.Parameters.Add("@active", SqlDbType.Bit).Value = x.IsActive;
-        try { await cmd.ExecuteNonQueryAsync(token); return NoContent(); }
+        try { var savedId = Convert.ToInt64(await cmd.ExecuteScalarAsync(token)); return Ok(new { employeeId = savedId }); }
         catch (SqlException ex) when (ex.Number == 50001) { return Conflict(new { message = "รหัสพนักงานซ้ำ" }); }
         catch (SqlException ex) when (ex.Number is 50002 or 50003) { return BadRequest(new { message = "ฝ่ายหรือแผนกไม่ถูกต้อง" }); }
+    }
+
+    [HttpGet("{id:long}/image")]
+    public async Task<IActionResult> GetImage(long id, [FromQuery] long? companyId, CancellationToken token)
+    {
+        var scope = ResolveScope(companyId); if (scope is null) return Forbid();
+        await using var c = await Open(token);
+        const string sql = "SELECT TOP 1 I.ImageData,I.ContentType,I.FileName,I.ImageWidth,I.ImageHeight FROM dbo.TDADEmployeeImage I INNER JOIN dbo.TDADEmployee E ON E.EmployeeID=I.EmployeeID WHERE I.EmployeeID=@id AND I.ImageType=N'FORMAL' AND ISNULL(I.IsActive,1)=1 AND DATALENGTH(I.ImageData)>0 AND E.EmployeeID=@id AND E.PartnerID=@partner AND ((@company IS NULL AND E.CompanyID IS NULL) OR E.CompanyID=@company)";
+        await using var cmd = new SqlCommand(sql, c);
+        cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = id;
+        cmd.Parameters.Add("@partner", SqlDbType.BigInt).Value = scope.Value.PartnerId;
+        cmd.Parameters.Add("@company", SqlDbType.BigInt).Value = scope.Value.CompanyId ?? (object)DBNull.Value;
+        await using var r = await cmd.ExecuteReaderAsync(token);
+        if (!await r.ReadAsync(token)) return NotFound();
+        return Ok(new { imageDataBase64 = Convert.ToBase64String((byte[])r[0]), contentType = r.IsDBNull(1) ? "image/jpeg" : r.GetString(1), fileName = r.IsDBNull(2) ? null : r.GetString(2), imageWidth = r.IsDBNull(3) ? 0 : r.GetInt32(3), imageHeight = r.IsDBNull(4) ? 0 : r.GetInt32(4) });
+    }
+
+    [HttpPut("{id:long}/image")]
+    public async Task<IActionResult> SaveImage(long id, EmployeeImageUpsertRequest request, CancellationToken token)
+    {
+        var scope = ResolveScope(request.CompanyId); if (scope is null) return Forbid();
+        if (!string.Equals(request.ImageType, "FORMAL", StringComparison.OrdinalIgnoreCase)) return BadRequest(new { message = "รองรับเฉพาะรูปแบบเป็นทางการ" });
+        byte[] bytes;
+        try { bytes = Convert.FromBase64String(request.ImageDataBase64); } catch (FormatException) { return BadRequest(new { message = "ข้อมูลรูปภาพไม่ถูกต้อง" }); }
+        if (bytes.Length == 0 || bytes.Length > 102400) return BadRequest(new { message = "รูปภาพต้องมีขนาดไม่เกิน 100 KB" });
+        await using var c = await Open(token); if (!await Allowed(c, "EDIT", token)) return Forbid();
+        const string sql = """
+IF NOT EXISTS (SELECT 1 FROM dbo.TDADEmployee WHERE EmployeeID=@id AND PartnerID=@partner AND ((@company IS NULL AND CompanyID IS NULL) OR CompanyID=@company)) THROW 50006,'EMPLOYEE_NOT_FOUND',1;
+UPDATE dbo.TDADEmployeeImage SET ImageData=@data,ContentType=@type,FileName=@name,FileSize=@size,ImageWidth=@width,ImageHeight=@height,IsActive=1,UpdateDate=SYSUTCDATETIME()
+WHERE EmployeeID=@id AND ImageType=N'FORMAL';
+IF @@ROWCOUNT=0 INSERT dbo.TDADEmployeeImage(EmployeeID,ImageType,ImageData,ContentType,FileName,FileSize,ImageWidth,ImageHeight,IsActive,CreateDate)
+VALUES(@id,N'FORMAL',@data,@type,@name,@size,@width,@height,1,SYSUTCDATETIME());
+""";
+        await using var cmd = new SqlCommand(sql, c);
+        cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = id; cmd.Parameters.Add("@partner", SqlDbType.BigInt).Value = scope.Value.PartnerId; cmd.Parameters.Add("@company", SqlDbType.BigInt).Value = scope.Value.CompanyId ?? (object)DBNull.Value;
+        cmd.Parameters.Add("@data", SqlDbType.VarBinary, -1).Value = bytes; cmd.Parameters.Add("@type", SqlDbType.NVarChar, 100).Value = request.ContentType; cmd.Parameters.Add("@name", SqlDbType.NVarChar, 250).Value = (object?)request.FileName ?? DBNull.Value; cmd.Parameters.Add("@size", SqlDbType.Int).Value = bytes.Length; cmd.Parameters.Add("@width", SqlDbType.Int).Value = request.ImageWidth; cmd.Parameters.Add("@height", SqlDbType.Int).Value = request.ImageHeight;
+        try { await cmd.ExecuteNonQueryAsync(token); return NoContent(); } catch (SqlException ex) when (ex.Number == 50006) { return NotFound(); }
+    }
+
+    [HttpGet("{id:long}/car-image/{carNo:int}")]
+    public async Task<IActionResult> GetCarImage(long id, int carNo, [FromQuery] long? companyId, CancellationToken token)
+    {
+        if (carNo is < 1 or > 2) return BadRequest(new { message = "CarNo ต้องเป็น 1 หรือ 2" });
+        var scope = ResolveScope(companyId); if (scope is null) return Forbid();
+        await using var c = await Open(token);
+        const string sql = "SELECT TOP 1 I.ImageData,I.ContentType,I.FileName,I.ImageWidth,I.ImageHeight FROM dbo.TDADEmployeeCarImage I INNER JOIN dbo.TDADEmployee E ON E.EmployeeID=I.EmployeeID WHERE I.EmployeeID=@id AND I.CarNo=@carNo AND ISNULL(I.IsActive,1)=1 AND DATALENGTH(I.ImageData)>0 AND E.PartnerID=@partner AND ((@company IS NULL AND E.CompanyID IS NULL) OR E.CompanyID=@company)";
+        await using var cmd = new SqlCommand(sql, c);
+        cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = id;
+        cmd.Parameters.Add("@carNo", SqlDbType.TinyInt).Value = carNo;
+        cmd.Parameters.Add("@partner", SqlDbType.BigInt).Value = scope.Value.PartnerId;
+        cmd.Parameters.Add("@company", SqlDbType.BigInt).Value = scope.Value.CompanyId ?? (object)DBNull.Value;
+        await using var r = await cmd.ExecuteReaderAsync(token);
+        if (!await r.ReadAsync(token)) return NotFound();
+        return Ok(new { imageDataBase64 = Convert.ToBase64String((byte[])r[0]), contentType = r.IsDBNull(1) ? "image/jpeg" : r.GetString(1), fileName = r.IsDBNull(2) ? null : r.GetString(2), imageWidth = r.IsDBNull(3) ? 0 : r.GetInt32(3), imageHeight = r.IsDBNull(4) ? 0 : r.GetInt32(4) });
+    }
+
+    [HttpPut("{id:long}/car-image/{carNo:int}")]
+    public async Task<IActionResult> SaveCarImage(long id, int carNo, EmployeeCarImageUpsertRequest request, CancellationToken token)
+    {
+        if (carNo is < 1 or > 2 || request.CarNo != carNo) return BadRequest(new { message = "CarNo ต้องเป็น 1 หรือ 2" });
+        var scope = ResolveScope(request.CompanyId); if (scope is null) return Forbid();
+        byte[] bytes;
+        try { bytes = Convert.FromBase64String(request.ImageDataBase64); } catch (FormatException) { return BadRequest(new { message = "ข้อมูลรูปรถไม่ถูกต้อง" }); }
+        if (bytes.Length == 0 || bytes.Length > 102400) return BadRequest(new { message = "รูปรถต้องมีขนาดไม่เกิน 100 KB" });
+        await using var c = await Open(token); if (!await Allowed(c, "EDIT", token)) return Forbid();
+        const string sql = """
+IF NOT EXISTS (SELECT 1 FROM dbo.TDADEmployee WHERE EmployeeID=@id AND PartnerID=@partner AND ((@company IS NULL AND CompanyID IS NULL) OR CompanyID=@company)) THROW 50006,'EMPLOYEE_NOT_FOUND',1;
+UPDATE dbo.TDADEmployeeCarImage SET ImageData=@data,ContentType=@type,FileName=@name,FileSize=@size,ImageWidth=@width,ImageHeight=@height,IsActive=1,UpdateDate=SYSUTCDATETIME()
+WHERE EmployeeID=@id AND CarNo=@carNo;
+IF @@ROWCOUNT=0 INSERT dbo.TDADEmployeeCarImage(EmployeeID,CarNo,ImageData,ContentType,FileName,FileSize,ImageWidth,ImageHeight,IsActive,CreateDate)
+VALUES(@id,@carNo,@data,@type,@name,@size,@width,@height,1,SYSUTCDATETIME());
+""";
+        await using var cmd = new SqlCommand(sql, c);
+        cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = id; cmd.Parameters.Add("@carNo", SqlDbType.TinyInt).Value = carNo; cmd.Parameters.Add("@partner", SqlDbType.BigInt).Value = scope.Value.PartnerId; cmd.Parameters.Add("@company", SqlDbType.BigInt).Value = scope.Value.CompanyId ?? (object)DBNull.Value;
+        cmd.Parameters.Add("@data", SqlDbType.VarBinary, -1).Value = bytes; cmd.Parameters.Add("@type", SqlDbType.NVarChar, 100).Value = request.ContentType; cmd.Parameters.Add("@name", SqlDbType.NVarChar, 250).Value = (object?)request.FileName ?? DBNull.Value; cmd.Parameters.Add("@size", SqlDbType.Int).Value = bytes.Length; cmd.Parameters.Add("@width", SqlDbType.Int).Value = request.ImageWidth; cmd.Parameters.Add("@height", SqlDbType.Int).Value = request.ImageHeight;
+        try { await cmd.ExecuteNonQueryAsync(token); return NoContent(); } catch (SqlException ex) when (ex.Number == 50006) { return NotFound(); }
+    }
+
+    [HttpDelete("{id:long}/car-image/{carNo:int}")]
+    public async Task<IActionResult> DeleteCarImage(long id, int carNo, [FromQuery] long? companyId, CancellationToken token)
+    {
+        if (carNo is < 1 or > 2) return BadRequest(new { message = "CarNo ต้องเป็น 1 หรือ 2" });
+        var scope = ResolveScope(companyId); if (scope is null) return Forbid();
+        await using var c = await Open(token); if (!await Allowed(c, "EDIT", token)) return Forbid();
+        const string sql = "DELETE I FROM dbo.TDADEmployeeCarImage I INNER JOIN dbo.TDADEmployee E ON E.EmployeeID=I.EmployeeID WHERE I.EmployeeID=@id AND I.CarNo=@carNo AND E.PartnerID=@partner AND ((@company IS NULL AND E.CompanyID IS NULL) OR E.CompanyID=@company)";
+        await using var cmd = new SqlCommand(sql, c);
+        cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = id; cmd.Parameters.Add("@carNo", SqlDbType.TinyInt).Value = carNo; cmd.Parameters.Add("@partner", SqlDbType.BigInt).Value = scope.Value.PartnerId; cmd.Parameters.Add("@company", SqlDbType.BigInt).Value = scope.Value.CompanyId ?? (object)DBNull.Value;
+        await cmd.ExecuteNonQueryAsync(token);
+        return NoContent();
     }
 
     private static EmployeeResponse Read(SqlDataReader r) => new()

@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'dart:typed_data';
+import 'dart:convert';
+import 'package:file_picker/file_picker.dart';
+import 'package:image/image.dart' as img;
 import '../../../../core/api/api_exception.dart';
 import '../../../../core/company_setup/company_setup_controller.dart';
 import '../../../../core/company_setup/company_date_formatter.dart';
@@ -54,7 +58,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
   bool isActive = true;
   String? _alertMessage;
   bool _alertIsError = false;
-  int sortColumn = 3;
+  int sortColumn = 4;
   bool sortAscending = true;
   final OrganizationRepository _organizationRepository =
       OrganizationRepository();
@@ -72,6 +76,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
   int? selectedDepartmentId;
   int? filterDivisionId;
   int? filterDepartmentId;
+  bool? filterIsActive;
   DateTime? startDate;
   int? editingEmployeeId;
   final searchController = TextEditingController();
@@ -94,15 +99,23 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
   List<Map<String, dynamic>> carTypes = [];
   List<Map<String, dynamic>> oilTypes = [];
   String? carType1, carOilType1, carType2, carOilType2;
+  Uint8List? _formalImageBytes;
+  String? _formalImageName;
+  bool _formalImageBusy = false;
+  Uint8List? _carImage1Bytes;
+  Uint8List? _carImage2Bytes;
+  String? _carImage1Name;
+  String? _carImage2Name;
+  bool _carImageBusy = false;
+  final Map<int, Future<Uint8List?>> _listImageFutures = {};
+  int _editRequestToken = 0;
 
-  List<(String, String, String, String, String, String)> rows = [
-    ('1', 'บริหาร', 'EMP0001', 'สมชาย ใจดี', 'ชาย', '081-234-5678'),
-    ('2', 'ปฏิบัติการ', 'EMP0002', 'สุดา รักงาน', 'ดา', '089-876-5432'),
-  ];
-  List<(String, String, String, String, String, String)> allRows = [];
+  List<(String, String, String, String, String, String, String)> rows = [];
+  List<(String, String, String, String, String, String, String)> allRows = [];
   final Map<String, int> _employeeIdsByCode = {};
   int _currentPage = 1;
   int _totalCount = 0;
+  bool _employeesLoading = false;
 
   int get _pageSize => companySetupController.pageSize > 0
       ? companySetupController.pageSize
@@ -116,7 +129,6 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
   void initState() {
     super.initState();
     _resetEmployeeFilters();
-    allRows = List.of(rows);
     _loadOrganizationUnits();
     _loadVehicleMasters();
     if (widget.customer && !widget.companyScoped) _loadCompanies();
@@ -127,6 +139,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
     searchController.clear();
     filterDivisionId = null;
     filterDepartmentId = null;
+    filterIsActive = null;
     _currentPage = 1;
     showEmployeeImage = false;
   }
@@ -145,6 +158,283 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
       }
     } catch (_) {}
   }
+
+  Future<void> _pickFormalImage() async {
+    final picked = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      withData: true,
+    );
+    final source = picked?.files.single.bytes;
+    if (source == null) return;
+    setState(() => _formalImageBusy = true);
+    try {
+      final decoded = img.decodeImage(source);
+      if (decoded == null) throw StateError('ไม่สามารถอ่านไฟล์รูปภาพได้');
+      var quality = 85;
+      Uint8List compressed = Uint8List.fromList(img.encodeJpg(decoded, quality: quality));
+      while (compressed.length > 102400 && quality > 20) {
+        quality -= 10;
+        compressed = Uint8List.fromList(img.encodeJpg(decoded, quality: quality));
+      }
+      if (compressed.length > 102400) {
+        throw StateError('ไม่สามารถลดขนาดรูปให้ไม่เกิน 100 KB ได้');
+      }
+      if (mounted) setState(() { _formalImageBytes = compressed; _formalImageName = picked!.files.single.name; });
+    } catch (error) {
+      if (mounted) setState(() { _alertMessage = '$error'; _alertIsError = true; });
+    } finally {
+      if (mounted) setState(() => _formalImageBusy = false);
+    }
+  }
+
+  Future<void> _pickCarImage(int carNo) async {
+    final picked = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      withData: true,
+    );
+    final source = picked?.files.single.bytes;
+    if (source == null) return;
+    setState(() => _carImageBusy = true);
+    try {
+      final decoded = img.decodeImage(source);
+      if (decoded == null) throw StateError('ไม่สามารถอ่านไฟล์รูปรถได้');
+      var quality = 85;
+      Uint8List compressed = Uint8List.fromList(
+        img.encodeJpg(decoded, quality: quality),
+      );
+      while (compressed.length > 102400 && quality > 20) {
+        quality -= 10;
+        compressed = Uint8List.fromList(
+          img.encodeJpg(decoded, quality: quality),
+        );
+      }
+      if (compressed.length > 102400) {
+        throw StateError('ไม่สามารถลดขนาดรูปรถให้ไม่เกิน 100 KB ได้');
+      }
+      if (mounted) {
+        setState(() {
+          if (carNo == 1) {
+            _carImage1Bytes = compressed;
+            _carImage1Name = picked!.files.single.name;
+          } else {
+            _carImage2Bytes = compressed;
+            _carImage2Name = picked!.files.single.name;
+          }
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _alertMessage = '$error';
+          _alertIsError = true;
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _carImageBusy = false);
+    }
+  }
+
+  Future<void> _loadFormalImage(int employeeId) async {
+    final result = await _employeeRepository.getFormalImage(
+      employeeId,
+      companyId: selectedCompanyId,
+      customer: widget.customer,
+      company: widget.companyScoped,
+    );
+    final encoded = result?['imageDataBase64'];
+    if (encoded is String &&
+        encoded.isNotEmpty &&
+        mounted &&
+        editingEmployeeId == employeeId) {
+      setState(() {
+        _formalImageBytes = base64Decode(encoded);
+        _formalImageName = result?['fileName']?.toString();
+      });
+    }
+  }
+
+  Future<void> _loadCarImages(int employeeId) async {
+    final images = await Future.wait([
+      _employeeRepository.getCarImage(
+        employeeId,
+        1,
+        companyId: selectedCompanyId,
+        customer: widget.customer,
+        company: widget.companyScoped,
+      ),
+      _employeeRepository.getCarImage(
+        employeeId,
+        2,
+        companyId: selectedCompanyId,
+        customer: widget.customer,
+        company: widget.companyScoped,
+      ),
+    ]);
+    if (!mounted || editingEmployeeId != employeeId) return;
+    Uint8List? decode(Map<String, dynamic>? result) {
+      final encoded = result?['imageDataBase64'];
+      if (encoded is! String || encoded.isEmpty) return null;
+      try {
+        return base64Decode(encoded);
+      } catch (_) {
+        return null;
+      }
+    }
+    setState(() {
+      _carImage1Bytes = decode(images[0]);
+      _carImage1Name = images[0]?['fileName']?.toString();
+      _carImage2Bytes = decode(images[1]);
+      _carImage2Name = images[1]?['fileName']?.toString();
+    });
+  }
+
+  Future<Uint8List?> _loadListFormalImage(int employeeId) async {
+    final result = await _employeeRepository.getFormalImage(
+      employeeId,
+      companyId: selectedCompanyId,
+      customer: widget.customer,
+      company: widget.companyScoped,
+    );
+    final encoded = result?['imageDataBase64'];
+    if (encoded is! String || encoded.isEmpty) return null;
+    try {
+      return base64Decode(encoded);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Widget _employeeImageThumbnail(int employeeId) {
+    if (employeeId <= 0) {
+      return const SizedBox(width: 34, height: 42);
+    }
+    final future = _listImageFutures.putIfAbsent(
+      employeeId,
+      () => _loadListFormalImage(employeeId),
+    );
+    return FutureBuilder<Uint8List?>(
+      future: future,
+      builder: (context, snapshot) {
+        final bytes = snapshot.data;
+        final thumbnail = SizedBox(
+          width: 34,
+          height: 42,
+          child: Center(
+            child: bytes == null
+                ? CircleAvatar(
+                    radius: 14,
+                    backgroundColor: Theme.of(context)
+                        .colorScheme
+                        .primary
+                        .withValues(alpha: 0.2),
+                    child: Icon(
+                      Icons.person_outline,
+                      size: 17,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  )
+                : ClipOval(
+                    child: SizedBox(
+                      width: 28,
+                      height: 28,
+                      child: Image.memory(
+                        bytes,
+                        fit: BoxFit.cover,
+                        filterQuality: FilterQuality.low,
+                      ),
+                    ),
+                  ),
+          ),
+        );
+        if (bytes == null) return thumbnail;
+        return InkWell(
+          onTap: () => _showEmployeeImagePreview(bytes),
+          borderRadius: BorderRadius.circular(4),
+          child: thumbnail,
+        );
+      },
+    );
+  }
+
+  void _showEmployeeImagePreview(Uint8List bytes) {
+    showDialog<void>(
+      context: context,
+      builder: (context) => Dialog(
+        child: InteractiveViewer(
+          minScale: 0.5,
+          maxScale: 4,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Image.memory(bytes, fit: BoxFit.contain),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _formalImageCard() => Column(
+    mainAxisSize: MainAxisSize.min,
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Row(
+        children: [
+          Expanded(
+            child: Text(
+              'รูปพนักงาน',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+          ),
+          IconButton(
+            tooltip: _formalImageBusy ? 'กำลังประมวลผล...' : 'เลือกรูป',
+            onPressed: _formalImageBusy ? null : _pickFormalImage,
+            icon: const Icon(Icons.image_outlined, size: 28),
+            color: Theme.of(context).colorScheme.primary,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+          ),
+          IconButton(
+            tooltip: 'ลบรูป',
+            onPressed: _formalImageBytes == null
+                ? null
+                : () => setState(() {
+                    _formalImageBytes = null;
+                    _formalImageName = null;
+                  }),
+            icon: const Icon(Icons.delete_outline, size: 28),
+            color: Theme.of(context).colorScheme.error,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+          ),
+        ],
+      ),
+      const SizedBox(height: 4),
+      AspectRatio(
+        aspectRatio: 4 / 5,
+        child: GestureDetector(
+          onTap: _formalImageBusy ? null : _pickFormalImage,
+          child: Container(
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            child: _formalImageBytes == null
+                ? const Icon(Icons.person_outline, size: 32)
+                : Image.memory(
+                    _formalImageBytes!,
+                    fit: BoxFit.contain,
+                    filterQuality: FilterQuality.medium,
+                  ),
+          ),
+        ),
+      ),
+      const SizedBox(height: 4),
+      Text(
+        'ไม่เกิน 100 KB ระบบลดขนาดให้อัตโนมัติ',
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 10),
+      ),
+    ],
+  );
 
   @override
   void dispose() {
@@ -170,11 +460,20 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
   }
 
   Future<void> _loadEmployees() async {
+    if (mounted) {
+      setState(() {
+        _employeesLoading = true;
+        rows = [];
+        allRows = [];
+        _totalCount = 0;
+      });
+    }
     try {
       final result = await _employeeRepository.list(
         search: searchController.text.trim(),
         divisionId: filterDivisionId,
         departmentId: _selectedFilterDepartmentId,
+        isActive: filterIsActive,
         companyId: selectedCompanyId,
         customer: widget.customer,
         company: widget.companyScoped,
@@ -185,11 +484,26 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
       final items = result['items'] is List
           ? result['items'] as List
           : const [];
-      final loadedRows = items
+      final rawTotal = result['totalCount'];
+      final totalCount = rawTotal is num ? rawTotal.toInt() : items.length;
+      final activeFilteredItems = filterIsActive == null
+          ? items
+          : items
+                .whereType<Map>()
+                .where((item) => _isActive(item['isActive']) == filterIsActive)
+                .toList();
+      final visibleItems = activeFilteredItems.length > _pageSize
+          ? activeFilteredItems
+                .skip((_currentPage - 1) * _pageSize)
+                .take(_pageSize)
+                .toList()
+          : activeFilteredItems.take(_pageSize).toList();
+      final loadedRows = visibleItems
           .whereType<Map>()
           .map(
             (item) => (
               _value(item['employeeId']),
+              _isActive(item['isActive']) ? 'ปกติ' : 'หยุดใช้งาน',
               _value(item['departmentName']),
               _value(item['employeeCode']),
               _value(item['fullName']),
@@ -199,10 +513,12 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
           )
           .toList();
       setState(() {
+        _employeesLoading = false;
+        _listImageFutures.clear();
         _employeeIdsByCode
           ..clear()
           ..addEntries(
-            items.whereType<Map>().map((item) {
+            visibleItems.whereType<Map>().map((item) {
               final code = _value(item['employeeCode']);
               final rawId = item['employeeId'];
               final id = rawId is num ? rawId.toInt() : int.tryParse('$rawId');
@@ -211,10 +527,13 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
           );
         allRows = loadedRows;
         rows = loadedRows;
-        final total = result['totalCount'];
-        _totalCount = total is num ? total.toInt() : loadedRows.length;
+        _totalCount = filterIsActive != null &&
+                activeFilteredItems.length != items.length
+            ? activeFilteredItems.length
+            : totalCount;
       });
     } catch (_) {
+      if (mounted) setState(() => _employeesLoading = false);
       _applyLocalSearch();
     }
   }
@@ -236,6 +555,12 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
       : value is num
       ? value.toString()
       : '';
+
+  static bool _isActive(dynamic value) => value is bool
+      ? value
+      : value is num
+      ? value != 0
+      : value?.toString().toLowerCase() == 'true';
 
   static String? _optionalText(TextEditingController controller) =>
       controller.text.trim().isEmpty ? null : controller.text.trim();
@@ -280,7 +605,8 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
             row.$3.toLowerCase().contains(query) ||
             row.$4.toLowerCase().contains(query) ||
             row.$5.toLowerCase().contains(query) ||
-            row.$6.toLowerCase().contains(query);
+            row.$6.toLowerCase().contains(query) ||
+            row.$7.toLowerCase().contains(query);
       }).toList();
     });
   }
@@ -397,7 +723,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           SizedBox(
-            width: 300,
+            width: 220,
             child: TextField(
               controller: searchController,
               onSubmitted: (_) => _searchEmployees(),
@@ -462,6 +788,31 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
               },
             ),
           ),
+          SizedBox(
+            width: 160,
+            child: DropdownButtonFormField<bool>(
+              initialValue: filterIsActive,
+              decoration: const InputDecoration(labelText: 'สถานะ'),
+              items: const [
+                DropdownMenuItem<bool>(
+                  value: null,
+                  child: LaooComboBoxText('ทั้งหมด'),
+                ),
+                DropdownMenuItem<bool>(
+                  value: true,
+                  child: LaooComboBoxText('ปกติ'),
+                ),
+                DropdownMenuItem<bool>(
+                  value: false,
+                  child: LaooComboBoxText('หยุดใช้งาน'),
+                ),
+              ],
+              onChanged: (value) {
+                setState(() => filterIsActive = value);
+                _searchEmployees();
+              },
+            ),
+          ),
           if (widget.customer && !widget.companyScoped)
             SizedBox(
               width: 240,
@@ -491,6 +842,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
               setState(() {
                 filterDivisionId = null;
                 filterDepartmentId = null;
+                filterIsActive = null;
               });
               _searchEmployees();
             },
@@ -597,16 +949,19 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
         final tableWidth = constraints.maxWidth < minTableWidth
             ? minTableWidth
             : constraints.maxWidth;
-        const idWidth = 40.0;
+        const idWidth = 16.0;
+        const statusWidth = 110.0;
+        const tableRightPadding = 16.0;
         const actionWidth = 92.0;
         const phoneWidth = 140.0;
         const horizontalMargin = 16.0;
         const columnSpacing = 16.0;
         final remainingWidth =
             tableWidth -
-            (idWidth + actionWidth + phoneWidth) -
+            (idWidth + statusWidth + actionWidth + phoneWidth +
+                tableRightPadding) -
             (horizontalMargin * 2) -
-            (columnSpacing * 6);
+            (columnSpacing * 8);
         final departmentWidth = remainingWidth * 0.18;
         final employeeCodeWidth = remainingWidth * 0.18;
         final employeeNameWidth = remainingWidth * 0.34;
@@ -634,8 +989,8 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
             clipBehavior: Clip.antiAlias,
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
-              child: SizedBox(
-                width: tableWidth,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minWidth: tableWidth),
                 child: DataTable(
                   horizontalMargin: horizontalMargin,
                   columnSpacing: columnSpacing,
@@ -648,8 +1003,8 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
                     color: primary,
                     fontWeight: FontWeight.w700,
                   ),
-                  dataRowMinHeight: 52,
-                  dataRowMaxHeight: 60,
+                  dataRowMinHeight: 42,
+                  dataRowMaxHeight: 48,
                   columns: [
                     DataColumn(
                       label: headerText('ID', idWidth),
@@ -681,6 +1036,14 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
                       label: headerText('โทรศัพท์', phoneWidth),
                       onSort: (index, ascending) => _sortBy(index, ascending),
                     ),
+                    DataColumn(
+                      label: SizedBox(
+                        width: statusWidth,
+                        child: const Center(child: Text('สถานะ')),
+                      ),
+                      onSort: (index, ascending) => _sortBy(index, ascending),
+                    ),
+                    const DataColumn(label: SizedBox(width: tableRightPadding)),
                   ],
                   rows: rows.asMap().entries
                       .map(
@@ -704,8 +1067,14 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
                                   children: [
                                     IconButton(
                                       tooltip: 'แก้ไข',
+                                      visualDensity: VisualDensity.compact,
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(
+                                        minWidth: 32,
+                                        minHeight: 32,
+                                      ),
                                       onPressed: () =>
-                                          _openEmployeeEdit(row.$3),
+                                          _openEmployeeEdit(row.$4),
                                       icon: Icon(
                                         Icons.edit_outlined,
                                         color: primary,
@@ -713,7 +1082,13 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
                                     ),
                                     IconButton(
                                       tooltip: 'ลบ',
-                                      onPressed: () => _deleteEmployee(row.$3),
+                                      visualDensity: VisualDensity.compact,
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(
+                                        minWidth: 32,
+                                        minHeight: 32,
+                                      ),
+                                      onPressed: () => _deleteEmployee(row.$4),
                                       icon: const Icon(
                                         Icons.delete_outline,
                                         color: Colors.red,
@@ -723,26 +1098,22 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
                                 ),
                               ),
                             ),
-                            DataCell(cellText(row.$2, departmentWidth)),
-                            DataCell(cellText(row.$3, employeeCodeWidth)),
+                            DataCell(cellText(row.$3, departmentWidth)),
+                            DataCell(cellText(row.$4, employeeCodeWidth)),
                             DataCell(
                               SizedBox(
                                 width: employeeNameWidth,
                                 child: Row(
                                   children: [
                                     if (showEmployeeImage) ...[
-                                      const CircleAvatar(
-                                        radius: 14,
-                                        child: Icon(
-                                          Icons.person_outline,
-                                          size: 16,
-                                        ),
+                                      _employeeImageThumbnail(
+                                        int.tryParse(row.$1) ?? 0,
                                       ),
                                       const SizedBox(width: 8),
                                     ],
                                     Flexible(
                                       child: Text(
-                                        row.$4,
+                                        row.$5,
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                       ),
@@ -751,8 +1122,37 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
                                 ),
                               ),
                             ),
-                            DataCell(cellText(row.$5, nicknameWidth)),
-                            DataCell(cellText(row.$6, phoneWidth)),
+                            DataCell(cellText(row.$6, nicknameWidth)),
+                            DataCell(cellText(row.$7, phoneWidth)),
+                            DataCell(
+                              Center(
+                                child: Container(
+                                  width: statusWidth - 12,
+                                  height: 24,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                  ),
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    color: row.$2 == 'ปกติ'
+                                        ? primary.withValues(alpha: 0.12)
+                                        : Colors.red.withValues(alpha: 0.16),
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                  child: Text(
+                                    row.$2,
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: row.$2 == 'ปกติ'
+                                          ? primary
+                                          : Colors.red.shade800,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const DataCell(SizedBox(width: tableRightPadding)),
                           ],
                           );
                         },
@@ -788,7 +1188,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
         runSpacing: 8,
         children: [
           const SizedBox(
-            width: 300,
+            width: 220,
             child: TextField(
               decoration: InputDecoration(
                 prefixIcon: Icon(Icons.search),
@@ -956,15 +1356,16 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
   }
 
   String _sortValue(
-    (String, String, String, String, String, String) row,
+    (String, String, String, String, String, String, String) row,
     int column,
   ) => switch (column) {
     0 => row.$1,
-    2 => row.$2,
+    1 => row.$2,
     3 => row.$3,
     4 => row.$4,
     5 => row.$5,
     6 => row.$6,
+    7 => row.$7,
     _ => '',
   };
 
@@ -983,12 +1384,14 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
             _sortableHeaderRow(),
             Divider(height: 1, color: Colors.grey.shade300),
             Expanded(
-              child: ListView.separated(
-                itemCount: rows.length,
-                separatorBuilder: (_, _) =>
-                    Divider(height: 1, color: Colors.grey.shade300),
-                itemBuilder: (_, i) => _sortableEmployeeRow(i),
-              ),
+              child: _employeesLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : ListView.separated(
+                      itemCount: rows.length,
+                      separatorBuilder: (_, _) =>
+                          Divider(height: 1, color: Colors.grey.shade300),
+                      itemBuilder: (_, i) => _sortableEmployeeRow(i),
+                    ),
             ),
           ],
         ),
@@ -1059,7 +1462,24 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
         ),
         Expanded(flex: 2, child: Text(rows[index].$2)),
         Expanded(flex: 2, child: Text(rows[index].$3)),
-        Expanded(flex: 3, child: Text(rows[index].$4)),
+        Expanded(
+          flex: 3,
+          child: Row(
+            children: [
+              if (showEmployeeImage) ...[
+                _employeeImageThumbnail(int.tryParse(rows[index].$1) ?? 0),
+                const SizedBox(width: 8),
+              ],
+              Expanded(
+                child: Text(
+                  rows[index].$4,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
         Expanded(flex: 2, child: Text(rows[index].$5)),
         Expanded(flex: 3, child: Text(rows[index].$6)),
       ],
@@ -1095,97 +1515,161 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
-                    'ข้อมูลส่วนตัว',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      SizedBox(
-                        width: 180,
-                        child: Row(
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            const Text('สถานะ'),
-                            const SizedBox(width: 8),
-                            Switch(
-                              value: isActive,
-                              onChanged: (value) =>
-                                  setState(() => isActive = value),
+                            Text(
+                              'ข้อมูลส่วนตัว',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Text('สถานะ'),
+                                        const SizedBox(width: 8),
+                                        Switch(
+                                          value: isActive,
+                                          onChanged: (value) => setState(
+                                            () => isActive = value,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(width: 4),
+                                    _actionField(
+                                      'รหัสพนักงาน *',
+                                      employeeCodeController,
+                                      width: 180,
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: _actionField(
+                                    'ชื่อ-นามสกุล *',
+                                    fullNameController,
+                                    width: double.infinity,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                _actionField(
+                                  'ชื่อเล่น',
+                                  nickNameController,
+                                  width: 150,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Wrap(
+                              spacing: 12,
+                              runSpacing: 12,
+                              children: [
+                                if (organizationMode == 2)
+                                  SizedBox(
+                                    width: 320,
+                                    child: DropdownButtonFormField<int>(
+                                      key: ValueKey(selectedDivisionId),
+                                      initialValue: selectedDivisionId,
+                                      decoration: const InputDecoration(
+                                        labelText: 'ฝ่าย',
+                                      ),
+                                      items: divisions
+                                          .map(
+                                            (unit) => DropdownMenuItem<int>(
+                                              value: _unitId(unit),
+                                              child: LaooComboBoxText(
+                                                _unitLabel(unit),
+                                              ),
+                                            ),
+                                          )
+                                          .toList(),
+                                      onChanged: (value) {
+                                        setState(() {
+                                          selectedDivisionId = value;
+                                          selectedDepartmentId =
+                                              departments.isNotEmpty
+                                              ? _unitId(departments.first)
+                                              : null;
+                                        });
+                                      },
+                                    ),
+                                  ),
+                                SizedBox(
+                                  width: 320,
+                                  child: DropdownButtonFormField<int>(
+                                    key: ValueKey(
+                                      '${organizationMode}_$selectedDivisionId',
+                                    ),
+                                    initialValue:
+                                        departments.any(
+                                          (unit) =>
+                                              unit['orgUnitId'] ==
+                                              selectedDepartmentId,
+                                        )
+                                        ? selectedDepartmentId
+                                        : null,
+                                    decoration: const InputDecoration(
+                                      labelText: 'แผนก',
+                                    ),
+                                    items: departments
+                                        .map(
+                                          (unit) => DropdownMenuItem<int>(
+                                            value: _unitId(unit),
+                                            child: LaooComboBoxText(
+                                              _unitLabel(unit),
+                                            ),
+                                          ),
+                                        )
+                                        .toList(),
+                                    onChanged: (value) => setState(
+                                      () => selectedDepartmentId = value,
+                                    ),
+                                  ),
+                                ),
+                                _actionField('ตำแหน่ง', positionController),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _actionField(
+                                    'Email',
+                                    emailController,
+                                    width: double.infinity,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _actionField(
+                                    'โทรศัพท์',
+                                    telephoneController,
+                                    width: double.infinity,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(child: _startDateField()),
+                              ],
                             ),
                           ],
                         ),
                       ),
-                      _actionField(
-                        'รหัสพนักงาน *',
-                        employeeCodeController,
-                        width: 220,
-                      ),
-                      _actionField('ชื่อ-นามสกุล *', fullNameController),
-                      _startDateField(),
-                      _actionField('ชื่อเล่น', nickNameController),
-                      if (organizationMode == 2)
-                        SizedBox(
-                          width: 320,
-                          child: DropdownButtonFormField<int>(
-                            key: ValueKey(selectedDivisionId),
-                            initialValue: selectedDivisionId,
-                            decoration: const InputDecoration(
-                              labelText: 'ฝ่าย',
-                            ),
-                            items: divisions
-                                .map(
-                                  (unit) => DropdownMenuItem<int>(
-                                    value: _unitId(unit),
-                                    child: LaooComboBoxText(_unitLabel(unit)),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: (value) {
-                              setState(() {
-                                selectedDivisionId = value;
-                                selectedDepartmentId = departments.isNotEmpty
-                                    ? _unitId(departments.first)
-                                    : null;
-                              });
-                            },
-                          ),
-                        ),
-                      SizedBox(
-                        width: 320,
-                        child: DropdownButtonFormField<int>(
-                          key: ValueKey(
-                            '${organizationMode}_$selectedDivisionId',
-                          ),
-                          initialValue:
-                              departments.any(
-                                (unit) =>
-                                    unit['orgUnitId'] == selectedDepartmentId,
-                              )
-                              ? selectedDepartmentId
-                              : null,
-                          decoration: const InputDecoration(labelText: 'แผนก'),
-                          items: departments
-                              .map(
-                                (unit) => DropdownMenuItem<int>(
-                                  value: _unitId(unit),
-                                  child: LaooComboBoxText(_unitLabel(unit)),
-                                ),
-                              )
-                              .toList(),
-                          onChanged: (value) =>
-                              setState(() => selectedDepartmentId = value),
-                        ),
-                      ),
-                      _actionField('ตำแหน่ง', positionController),
-                      _actionField('Email', emailController),
-                      _actionField('โทรศัพท์', telephoneController),
+                      const SizedBox(width: 8),
+                      SizedBox(width: 150, child: _formalImageCard()),
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -1260,7 +1744,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
       );
 
   Widget _startDateField() => SizedBox(
-    width: 220,
+    width: double.infinity,
     child: GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: _pickStartDate,
@@ -1290,15 +1774,15 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
         children: [
           Text('ยานพาหนะที่ใช้', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Theme.of(context).colorScheme.primary)),
           const SizedBox(height: 12),
-          _vehicleRow(carId1Controller, carColor1Controller, carType1, carOilType1, (v) => setState(() => carType1 = v), (v) => setState(() => carOilType1 = v)),
+          _vehicleRow(1, carId1Controller, carColor1Controller, carType1, carOilType1, (v) => setState(() => carType1 = v), (v) => setState(() => carOilType1 = v)),
           const SizedBox(height: 12),
-          _vehicleRow(carId2Controller, carColor2Controller, carType2, carOilType2, (v) => setState(() => carType2 = v), (v) => setState(() => carOilType2 = v)),
+          _vehicleRow(2, carId2Controller, carColor2Controller, carType2, carOilType2, (v) => setState(() => carType2 = v), (v) => setState(() => carOilType2 = v)),
         ],
       ),
     ),
   );
 
-  Widget _vehicleRow(TextEditingController id, TextEditingController color, String? type, String? oil, ValueChanged<String?> onType, ValueChanged<String?> onOil) => Row(
+  Widget _vehicleRow(int carNo, TextEditingController id, TextEditingController color, String? type, String? oil, ValueChanged<String?> onType, ValueChanged<String?> onOil) => Row(
     children: [
       Expanded(child: _actionField('ทะเบียนรถ', id)),
       const SizedBox(width: 12),
@@ -1307,8 +1791,110 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
       Expanded(child: DropdownButtonFormField<String>(initialValue: type, decoration: const InputDecoration(labelText: 'ประเภทรถ'), items: carTypes.map((x) => DropdownMenuItem(value: _value(x['code']), child: LaooComboBoxText(_value(x['name'])))).toList(), onChanged: onType)),
       const SizedBox(width: 12),
       Expanded(child: DropdownButtonFormField<String>(initialValue: oil, decoration: const InputDecoration(labelText: 'เชื้อเพลิง'), items: oilTypes.map((x) => DropdownMenuItem(value: _value(x['code']), child: LaooComboBoxText(_value(x['name'])))).toList(), onChanged: onOil)),
+      const SizedBox(width: 12),
+      _carImageBox(carNo),
     ],
   );
+
+  Widget _carImageBox(int carNo) {
+    final bytes = carNo == 1 ? _carImage1Bytes : _carImage2Bytes;
+    return SizedBox(
+      width: 92,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'รูปรถคันที่ $carNo',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 4),
+          GestureDetector(
+            onTap: _carImageBusy ? null : () => _pickCarImage(carNo),
+            child: Container(
+              width: 72,
+              height: 48,
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: bytes == null
+                  ? Icon(
+                      Icons.directions_car_outlined,
+                      color: Theme.of(context).colorScheme.primary,
+                    )
+                  : Image.memory(bytes, fit: BoxFit.cover),
+            ),
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              IconButton(
+                tooltip: 'เลือกรูปรถ',
+                onPressed: _carImageBusy
+                    ? null
+                    : () => _pickCarImage(carNo),
+                icon: const Icon(Icons.image_outlined, size: 18),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(
+                  minWidth: 28,
+                  minHeight: 28,
+                ),
+              ),
+              IconButton(
+                tooltip: 'ลบรูปรถ',
+                onPressed: bytes == null
+                    ? null
+                    : () => _removeCarImage(carNo),
+                icon: Icon(
+                  Icons.delete_outline,
+                  size: 18,
+                  color: Theme.of(context).colorScheme.error,
+                ),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(
+                  minWidth: 28,
+                  minHeight: 28,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _removeCarImage(int carNo) async {
+    if (editingEmployeeId != null) {
+      try {
+        await _employeeRepository.deleteCarImage(
+          editingEmployeeId!,
+          carNo,
+          companyId: widget.customer ? selectedCompanyId : null,
+          customer: widget.customer,
+          company: widget.companyScoped,
+        );
+      } on ApiException catch (error) {
+        if (mounted) {
+          setState(() {
+            _alertMessage = 'ลบรูปรถไม่สำเร็จ: ${error.message}';
+            _alertIsError = true;
+          });
+        }
+        return;
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      if (carNo == 1) {
+        _carImage1Bytes = null;
+        _carImage1Name = null;
+      } else {
+        _carImage2Bytes = null;
+        _carImage2Name = null;
+      }
+    });
+  }
 
   Widget _emergencyRow(
     TextEditingController name,
@@ -1402,16 +1988,44 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
     };
     try {
       body['companyId'] = widget.customer ? selectedCompanyId : null;
+      int savedEmployeeId;
       if (editingEmployeeId == null) {
-        await _employeeRepository.create(
+        savedEmployeeId = await _employeeRepository.create(
           body,
           customer: widget.customer,
           company: widget.companyScoped,
         );
       } else {
-        await _employeeRepository.update(
+        savedEmployeeId = await _employeeRepository.update(
           editingEmployeeId!,
           body,
+          customer: widget.customer,
+          company: widget.companyScoped,
+        );
+      }
+      if (_formalImageBytes != null) {
+        await _employeeRepository.saveFormalImage(
+          savedEmployeeId,
+          _formalImageBytes!,
+          _formalImageName ?? 'employee-formal.jpg',
+          companyId: widget.customer ? selectedCompanyId : null,
+          customer: widget.customer,
+          company: widget.companyScoped,
+        );
+      }
+      final carImages = <int, (Uint8List, String)>{
+        if (_carImage1Bytes != null)
+          1: (_carImage1Bytes!, _carImage1Name ?? 'employee-car-1.jpg'),
+        if (_carImage2Bytes != null)
+          2: (_carImage2Bytes!, _carImage2Name ?? 'employee-car-2.jpg'),
+      };
+      for (final entry in carImages.entries) {
+        await _employeeRepository.saveCarImage(
+          savedEmployeeId,
+          entry.key,
+          entry.value.$1,
+          entry.value.$2,
+          companyId: widget.customer ? selectedCompanyId : null,
           customer: widget.customer,
           company: widget.companyScoped,
         );
@@ -1445,6 +2059,12 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
       contRelation2Controller.clear();
       contPhone2Controller.clear();
       carId1Controller.clear(); carColor1Controller.clear(); carId2Controller.clear(); carColor2Controller.clear();
+      _formalImageBytes = null;
+      _formalImageName = null;
+      _carImage1Bytes = null;
+      _carImage2Bytes = null;
+      _carImage1Name = null;
+      _carImage2Name = null;
     setState(() {
       startDate = null;
       selectedDivisionId = null;
@@ -1463,6 +2083,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
   }
 
   void _startAddEmployee() {
+    _editRequestToken++;
     employeeCodeController.clear();
     fullNameController.clear();
     nickNameController.clear();
@@ -1476,6 +2097,12 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
     contRelation2Controller.clear();
       contPhone2Controller.clear();
       carId1Controller.clear(); carColor1Controller.clear(); carId2Controller.clear(); carColor2Controller.clear();
+      _formalImageBytes = null;
+      _formalImageName = null;
+      _carImage1Bytes = null;
+      _carImage2Bytes = null;
+      _carImage1Name = null;
+      _carImage2Name = null;
     setState(() {
       editingEmployeeId = null;
       startDate = null;
@@ -1490,6 +2117,18 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
   Future<void> _openEmployeeEdit(String value) async {
     final id = _employeeIdsByCode[value] ?? int.tryParse(value);
     if (id == null) return;
+    final requestToken = ++_editRequestToken;
+    if (mounted) {
+      setState(() {
+        editingEmployeeId = id;
+        _formalImageBytes = null;
+        _formalImageName = null;
+        _carImage1Bytes = null;
+        _carImage2Bytes = null;
+        _carImage1Name = null;
+        _carImage2Name = null;
+      });
+    }
     final result = await _employeeRepository.list(
       page: _currentPage,
       pageSize: _pageSize,
@@ -1502,7 +2141,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
       (row) => row['employeeId'] == id,
       orElse: () => <String, dynamic>{},
     );
-    if (item.isEmpty || !mounted) return;
+    if (item.isEmpty || !mounted || requestToken != _editRequestToken) return;
     setState(() {
       editingEmployeeId = id;
       employeeCodeController.text = _value(item['employeeCode']);
@@ -1532,6 +2171,8 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
       startDate = rawDate is String ? DateTime.tryParse(rawDate) : null;
       form = true;
     });
+    await _loadFormalImage(id);
+    await _loadCarImages(id);
   }
 
   Future<void> _deleteEmployee(String value) async {
@@ -1539,8 +2180,8 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
     if (id == null) return;
     var employeeName = value;
     for (final row in rows) {
-      if (row.$3 == value) {
-        employeeName = row.$4;
+      if (row.$4 == value) {
+        employeeName = row.$5;
         break;
       }
     }

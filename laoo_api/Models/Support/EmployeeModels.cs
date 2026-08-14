@@ -64,3 +64,25 @@ public sealed class EmployeeUpsertRequest
     public string? CarTypeCode2 { get; init; }
     public string? CarOilType2 { get; init; }
 }
+
+public sealed class EmployeeImageUpsertRequest
+{
+    public long? CompanyId { get; init; }
+    public string ImageType { get; init; } = "FORMAL";
+    public string ContentType { get; init; } = "image/jpeg";
+    public string? FileName { get; init; }
+    public string ImageDataBase64 { get; init; } = string.Empty;
+    public int ImageWidth { get; init; }
+    public int ImageHeight { get; init; }
+}
+
+public sealed class EmployeeCarImageUpsertRequest
+{
+    public long? CompanyId { get; init; }
+    public int CarNo { get; init; }
+    public string ContentType { get; init; } = "image/jpeg";
+    public string? FileName { get; init; }
+    public string ImageDataBase64 { get; init; } = string.Empty;
+    public int ImageWidth { get; init; }
+    public int ImageHeight { get; init; }
+}
