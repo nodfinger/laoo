@@ -34,6 +34,8 @@ public sealed class CompanySetupController : ControllerBase
 
         await using var connection = CreateConnection();
         await connection.OpenAsync(cancellationToken);
+        if (!await AllowedAsync(connection, "VIEW", cancellationToken))
+            return Forbid();
 
         var response = await LoadOwnerSetupAsync(
             connection, owner.Value, cancellationToken);
@@ -73,6 +75,8 @@ public sealed class CompanySetupController : ControllerBase
 
         await using var connection = CreateConnection();
         await connection.OpenAsync(cancellationToken);
+        if (!await AllowedAsync(connection, "EDIT", cancellationToken))
+            return Forbid();
         await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(cancellationToken);
 
         if (owner.Value.CompanyID is not null)
@@ -177,6 +181,39 @@ WHERE OwnerType = @OwnerType
         return response is null
             ? NotFound(new { message = "ไม่พบข้อมูลหลังบันทึก" })
             : Ok(response);
+    }
+
+    [HttpGet("actions")]
+    public async Task<ActionResult<object>> Actions(CancellationToken cancellationToken)
+    {
+        await using var connection = CreateConnection();
+        await connection.OpenAsync(cancellationToken);
+        return Ok(new { view = await AllowedAsync(connection, "VIEW", cancellationToken), edit = await AllowedAsync(connection, "EDIT", cancellationToken) });
+    }
+
+    private async Task<bool> AllowedAsync(SqlConnection connection, string action, CancellationToken token)
+    {
+        if (!long.TryParse(User.FindFirstValue("project_id"), out var projectId)) return false;
+        var userType = User.FindFirstValue("user_type") ?? string.Empty;
+        var isPartner = userType.Equals("PARTNER_USER", StringComparison.OrdinalIgnoreCase);
+        var isLaoo = userType.Equals("LAOO_SUPPORT", StringComparison.OrdinalIgnoreCase);
+        const string menuCode = "05001";
+        var sql = isPartner ? """
+            SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADPartnerUser U WHERE U.PartnerID=@partner AND U.NormalizedUsername=@username AND U.IsPartnerAdmin=1 AND U.IsActive=1)
+              OR EXISTS(SELECT 1 FROM dbo.TDADPartnerUser U INNER JOIN dbo.TDADPartnerUserPermission UP ON UP.PartnerUserID=U.PartnerUserID INNER JOIN dbo.TDADPermission P ON P.PermissionID=UP.PermissionID AND P.ProjectID=UP.ProjectID WHERE U.PartnerID=@partner AND U.NormalizedUsername=@username AND U.IsActive=1 AND UP.ProjectID=@project AND UP.IsAllowed=1 AND UP.IsActive=1 AND P.IsActive=1 AND P.ScreenCode=@menu AND P.ActionCode=@action)
+              OR EXISTS(SELECT 1 FROM dbo.TDADPartnerUser U INNER JOIN dbo.TDADPartnerUserEmployee PUE ON PUE.PartnerUserID=U.PartnerUserID INNER JOIN dbo.TDADEmployeeRoleGroup ERG ON ERG.EmployeeID=PUE.EmployeeID INNER JOIN dbo.TDADRoleGroup RG ON RG.RoleGroupID=ERG.RoleGroupID AND RG.ScopeType='P' AND RG.PartnerID=U.PartnerID AND RG.ProjectID=@project INNER JOIN dbo.TDADRoleGroupPermission RP ON RP.RoleGroupID=RG.RoleGroupID AND RP.ProjectID=@project AND RP.MenuCode=@menu AND RP.ActionCode=@action AND RP.IsAllowed=1 WHERE U.PartnerID=@partner AND U.NormalizedUsername=@username AND U.IsActive=1 AND ERG.IsActive=1 AND ERG.EffectiveFrom<=CONVERT(date,SYSUTCDATETIME()) AND (ERG.EffectiveTo IS NULL OR ERG.EffectiveTo>=CONVERT(date,SYSUTCDATETIME()))) THEN 1 ELSE 0 END
+            """ : isLaoo ? """
+            SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADLaooUserPermission UP INNER JOIN dbo.TDADPermission P ON P.PermissionID=UP.PermissionID AND P.ProjectID=UP.ProjectID WHERE UP.LaooUserID=@user AND UP.ProjectID=@project AND UP.IsAllowed=1 AND UP.IsActive=1 AND P.IsActive=1 AND P.ScreenCode=@menu AND P.ActionCode=@action) THEN 1 ELSE 0 END
+            """ : """
+            SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADUser U WHERE U.UserID=@user AND U.IsActive=1 AND U.IsCompanyAdmin=1)
+              OR EXISTS(SELECT 1 FROM dbo.TDADUserPermission UP INNER JOIN dbo.TDADPermission P ON P.PermissionID=UP.PermissionID AND P.ProjectID=UP.ProjectID WHERE UP.UserID=@user AND UP.ProjectID=@project AND UP.IsAllowed=1 AND UP.IsActive=1 AND P.IsActive=1 AND P.ScreenCode=@menu AND P.ActionCode=@action)
+              OR EXISTS(SELECT 1 FROM dbo.TDADUser U INNER JOIN dbo.TDADUserEmployee UE ON UE.UserID=U.UserID INNER JOIN dbo.TDADEmployeeRoleGroup ERG ON ERG.EmployeeID=UE.EmployeeID INNER JOIN dbo.TDADRoleGroup RG ON RG.RoleGroupID=ERG.RoleGroupID AND RG.ScopeType='C' AND RG.CompanyID=U.CompanyID AND RG.ProjectID=@project INNER JOIN dbo.TDADRoleGroupPermission RP ON RP.RoleGroupID=RG.RoleGroupID AND RP.ProjectID=@project AND RP.MenuCode=@menu AND RP.ActionCode=@action AND RP.IsAllowed=1 WHERE U.UserID=@user AND U.IsActive=1 AND ERG.IsActive=1 AND ERG.EffectiveFrom<=CONVERT(date,SYSUTCDATETIME()) AND (ERG.EffectiveTo IS NULL OR ERG.EffectiveTo>=CONVERT(date,SYSUTCDATETIME()))) THEN 1 ELSE 0 END
+            """;
+        await using var command = new SqlCommand(sql, connection);
+        Add(command, "@project", SqlDbType.BigInt, projectId); Add(command, "@menu", SqlDbType.NVarChar, menuCode, 20); Add(command, "@action", SqlDbType.NVarChar, action, 50);
+        if (isPartner) { Add(command, "@partner", SqlDbType.BigInt, GetLongClaim("partner_id")); Add(command, "@username", SqlDbType.NVarChar, (User.Identity?.Name ?? User.FindFirstValue("unique_name") ?? string.Empty).Trim().ToUpperInvariant(), 100); }
+        else Add(command, "@user", SqlDbType.BigInt, GetLongClaim(isLaoo ? "laoo_user_id" : "user_id"));
+        return Convert.ToBoolean(await command.ExecuteScalarAsync(token));
     }
 
     private OwnerScope? ResolveOwner()

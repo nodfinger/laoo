@@ -1,6 +1,7 @@
 using System.Data;
 using System.Security.Claims;
 using LaooApi.Models.Support;
+using LaooApi.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
@@ -11,7 +12,7 @@ namespace LaooApi.Controllers;
 [Route("api/partner/employees")]
 [Route("api/partner/customer-employees")]
 [Route("api/company/employees")]
-public sealed class EmployeeController(IConfiguration configuration) : ControllerBase
+public sealed class EmployeeController(IConfiguration configuration, PasswordService passwordService) : ControllerBase
 {
     private string ScreenCode => Request.Path.Value?.Contains("/api/company/", StringComparison.OrdinalIgnoreCase) == true ? "10001" : Request.Path.Value?.Contains("customer-employees", StringComparison.OrdinalIgnoreCase) == true ? "12001" : "11001";
 
@@ -64,6 +65,13 @@ public sealed class EmployeeController(IConfiguration configuration) : Controlle
             items.Add(Read(r));
         }
         return Ok(new { items, totalCount = total, page, pageSize });
+    }
+
+    [HttpGet("actions")]
+    public async Task<ActionResult<object>> Actions(CancellationToken token)
+    {
+        await using var connection = await Open(token);
+        return Ok(new { view = await Allowed(connection, "VIEW", token), create = await Allowed(connection, "CREATE", token), edit = await Allowed(connection, "EDIT", token), delete = await Allowed(connection, "DELETE", token) });
     }
 
     [HttpPost]
@@ -206,6 +214,212 @@ VALUES(@id,@carNo,@data,@type,@name,@size,@width,@height,1,SYSUTCDATETIME());
         return NoContent();
     }
 
+    [HttpGet("{id:long}/user")]
+    public async Task<IActionResult> GetEmployeeUser(long id, [FromQuery] long? companyId, CancellationToken token)
+    {
+        var scope = ResolveScope(companyId); if (scope is null) return Forbid();
+        await using var c = await Open(token); if (!await Allowed(c, "VIEW", token)) return Forbid();
+        const string sql = """
+SELECT TOP 1 CASE WHEN E.CompanyID IS NULL THEN PU.Username ELSE U.Username END,
+  RG.RoleGroupID
+FROM dbo.TDADEmployee E
+LEFT JOIN dbo.TDADUserEmployee UE ON UE.EmployeeID=E.EmployeeID
+LEFT JOIN dbo.TDADUser U ON U.UserID=UE.UserID
+LEFT JOIN dbo.TDADPartnerUserEmployee PUE ON PUE.EmployeeID=E.EmployeeID
+LEFT JOIN dbo.TDADPartnerUser PU ON PU.PartnerUserID=PUE.PartnerUserID
+OUTER APPLY (SELECT TOP 1 ERG.RoleGroupID FROM dbo.TDADEmployeeRoleGroup ERG WHERE ERG.EmployeeID=E.EmployeeID AND ERG.IsActive=1 AND ERG.EffectiveFrom<=CONVERT(date,SYSUTCDATETIME()) AND (ERG.EffectiveTo IS NULL OR ERG.EffectiveTo>=CONVERT(date,SYSUTCDATETIME())) ORDER BY ERG.EffectiveFrom DESC,ERG.EmployeeRoleGroupID DESC) RG
+WHERE E.EmployeeID=@id AND E.PartnerID=@partner AND ((@company IS NULL AND E.CompanyID IS NULL) OR E.CompanyID=@company)
+""";
+        await using var cmd = new SqlCommand(sql, c);
+        cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = id;
+        cmd.Parameters.Add("@partner", SqlDbType.BigInt).Value = scope.Value.PartnerId;
+        cmd.Parameters.Add("@company", SqlDbType.BigInt).Value = scope.Value.CompanyId ?? (object)DBNull.Value;
+        await using var reader = await cmd.ExecuteReaderAsync(token);
+        if (!await reader.ReadAsync(token)) return Ok(new { username = (string?)null, roleGroupId = (long?)null });
+        return Ok(new { username = reader.IsDBNull(0) ? null : reader.GetString(0), roleGroupId = reader.IsDBNull(1) ? (long?)null : reader.GetInt64(1) });
+    }
+
+    [HttpPut("{id:long}/user")]
+    public async Task<IActionResult> UpsertEmployeeUser(long id, EmployeeUserUpsertRequest request, CancellationToken token)
+    {
+        if (string.IsNullOrWhiteSpace(request.Username)) return BadRequest(new { message = "กรุณาระบุ Username" });
+        var username = request.Username.Trim();
+        if (username.Length > 100) return BadRequest(new { message = "Username ต้องไม่เกิน 100 ตัวอักษร" });
+        var scope = ResolveScope(request.CompanyId); if (scope is null) return Forbid();
+        await using var c = await Open(token); if (!await Allowed(c, "EDIT", token)) return Forbid();
+        await using var transaction = await c.BeginTransactionAsync(token);
+        try
+        {
+            long? employeeCompany;
+            string employeeName;
+            await using (var employee = new SqlCommand("SELECT CompanyID,FullName FROM dbo.TDADEmployee WHERE EmployeeID=@id AND PartnerID=@partner AND ((@company IS NULL AND CompanyID IS NULL) OR CompanyID=@company)", c, (SqlTransaction)transaction))
+            {
+                employee.Parameters.Add("@id", SqlDbType.BigInt).Value = id;
+                employee.Parameters.Add("@partner", SqlDbType.BigInt).Value = scope.Value.PartnerId;
+                employee.Parameters.Add("@company", SqlDbType.BigInt).Value = scope.Value.CompanyId ?? (object)DBNull.Value;
+                await using var reader = await employee.ExecuteReaderAsync(token);
+                if (!await reader.ReadAsync(token)) return NotFound();
+                employeeCompany = reader.IsDBNull(0) ? null : reader.GetInt64(0);
+                employeeName = reader.GetString(1);
+            }
+            var normalized = username.ToUpperInvariant();
+            var hasPassword = !string.IsNullOrEmpty(request.Password);
+            var hash = hasPassword ? passwordService.HashPassword(username, request.Password!) : string.Empty;
+            var actor = (User.Identity?.Name ?? User.FindFirstValue("unique_name") ?? string.Empty).Trim();
+            if (employeeCompany is null)
+            {
+                long? userId;
+                await using (var find = new SqlCommand("SELECT TOP 1 PartnerUserID FROM dbo.TDADPartnerUserEmployee WHERE EmployeeID=@employee AND PartnerID=@partner", c, (SqlTransaction)transaction))
+                {
+                    find.Parameters.Add("@employee", SqlDbType.BigInt).Value = id; find.Parameters.Add("@partner", SqlDbType.BigInt).Value = scope.Value.PartnerId;
+                    var result = await find.ExecuteScalarAsync(token); userId = result is null or DBNull ? null : Convert.ToInt64(result);
+                }
+                const string sql = """
+IF EXISTS (SELECT 1 FROM dbo.TDADPartnerUser WHERE NormalizedUsername=@normalized AND PartnerID=@partner AND (@userId IS NULL OR PartnerUserID<>@userId)) THROW 50008,'USERNAME_EXISTS',1;
+IF @userId IS NULL
+BEGIN
+ INSERT dbo.TDADPartnerUser(PartnerID,Username,NormalizedUsername,PasswordHash,DisplayName,Email,MobileNumber,IsPartnerAdmin,IsActive,FailedLoginCount,CreatedUtc,CreatedBy)
+ VALUES(@partner,@username,@normalized,@hash,@displayName,NULL,NULL,0,1,0,SYSUTCDATETIME(),@actor);
+ SET @userId=CONVERT(BIGINT,SCOPE_IDENTITY());
+ INSERT dbo.TDADPartnerUserEmployee(PartnerUserID,EmployeeID,PartnerID) VALUES(@userId,@employee,@partner);
+END
+ELSE UPDATE dbo.TDADPartnerUser SET Username=@username,NormalizedUsername=@normalized,PasswordHash=CASE WHEN @hasPassword=1 THEN @hash ELSE PasswordHash END WHERE PartnerUserID=@userId AND PartnerID=@partner;
+""";
+                await ExecuteEmployeeUserUpsert(c, (SqlTransaction)transaction, sql, username, normalized, hash, employeeName, actor, id, scope.Value.PartnerId, null, userId, hasPassword, token);
+            }
+            else
+            {
+                long? userId;
+                await using (var find = new SqlCommand("SELECT TOP 1 UserID FROM dbo.TDADUserEmployee WHERE EmployeeID=@employee AND CompanyID=@company", c, (SqlTransaction)transaction))
+                {
+                    find.Parameters.Add("@employee", SqlDbType.BigInt).Value = id; find.Parameters.Add("@company", SqlDbType.BigInt).Value = employeeCompany.Value;
+                    var result = await find.ExecuteScalarAsync(token); userId = result is null or DBNull ? null : Convert.ToInt64(result);
+                }
+                const string sql = """
+IF EXISTS (SELECT 1 FROM dbo.TDADUser WHERE NormalizedUsername=@normalized AND CompanyID=@company AND (@userId IS NULL OR UserID<>@userId)) THROW 50008,'USERNAME_EXISTS',1;
+IF @userId IS NULL
+BEGIN
+ INSERT dbo.TDADUser(CompanyID,Username,NormalizedUsername,PasswordHash,DisplayName,IsCompanyAdmin,IsActive,FailedLoginCount,LastPasswordChangeDate,CreateDate)
+ VALUES(@company,@username,@normalized,@hash,@displayName,0,1,0,SYSUTCDATETIME(),SYSUTCDATETIME());
+ SET @userId=CONVERT(BIGINT,SCOPE_IDENTITY());
+ INSERT dbo.TDADUserEmployee(UserID,EmployeeID,CompanyID) VALUES(@userId,@employee,@company);
+END
+ELSE UPDATE dbo.TDADUser SET Username=@username,NormalizedUsername=@normalized,PasswordHash=CASE WHEN @hasPassword=1 THEN @hash ELSE PasswordHash END WHERE UserID=@userId AND CompanyID=@company;
+IF @company IS NOT NULL
+INSERT INTO dbo.TDADUserProject(CompanyID,UserID,ProjectID,IsDefault,IsActive,CreateDate)
+SELECT @company,@userId,P.ProjectID,1,1,SYSUTCDATETIME()
+FROM dbo.TDADProject P
+WHERE P.ProjectCode=N'LAOO' AND P.IsActive=1
+  AND NOT EXISTS (SELECT 1 FROM dbo.TDADUserProject UP WHERE UP.CompanyID=@company AND UP.UserID=@userId AND UP.ProjectID=P.ProjectID);
+""";
+                await ExecuteEmployeeUserUpsert(c, (SqlTransaction)transaction, sql, username, normalized, hash, employeeName, actor, id, scope.Value.PartnerId, employeeCompany, userId, hasPassword, token);
+            }
+            if (request.RoleGroupId.HasValue) await AssignRoleGroupAsync(c, (SqlTransaction)transaction, id, employeeCompany, request.RoleGroupId.Value, scope.Value.PartnerId, token);
+            await transaction.CommitAsync(token);
+            return Ok(new { employeeId = id, username });
+        }
+        catch (SqlException ex) when (ex.Number is 50008 or 2601 or 2627) { await transaction.RollbackAsync(token); return Conflict(new { message = "Username นี้ถูกใช้งานแล้ว" }); }
+    }
+
+    private static async Task AssignRoleGroupAsync(SqlConnection c, SqlTransaction tx, long employeeId, long? companyId, long roleGroupId, long partnerId, CancellationToken token)
+    {
+        const string sql = """
+            IF NOT EXISTS (SELECT 1 FROM dbo.TDADEmployee E INNER JOIN dbo.TDADRoleGroup RG ON RG.RoleGroupID=@RoleGroupID WHERE E.EmployeeID=@EmployeeID AND E.PartnerID=@PartnerID AND ((@CompanyID IS NULL AND E.CompanyID IS NULL AND RG.ScopeType='P' AND RG.PartnerID=@PartnerID) OR (@CompanyID IS NOT NULL AND E.CompanyID=@CompanyID AND RG.ScopeType='C' AND RG.CompanyID=@CompanyID))) THROW 50009,'ROLE_GROUP_SCOPE_INVALID',1;
+            UPDATE dbo.TDADEmployeeRoleGroup SET IsActive=0,EffectiveTo=CONVERT(date,SYSUTCDATETIME()),UpdatedUtc=SYSUTCDATETIME(),UpdatedBy=N'api' WHERE EmployeeID=@EmployeeID AND IsActive=1;
+            INSERT dbo.TDADEmployeeRoleGroup(EmployeeID,RoleGroupID,EffectiveFrom,IsActive,CreatedBy) VALUES(@EmployeeID,@RoleGroupID,CONVERT(date,SYSUTCDATETIME()),1,N'api');
+            """;
+        await using var command = new SqlCommand(sql, c, tx);
+        command.Parameters.Add("@EmployeeID",SqlDbType.BigInt).Value=employeeId; command.Parameters.Add("@RoleGroupID",SqlDbType.BigInt).Value=roleGroupId; command.Parameters.Add("@PartnerID",SqlDbType.BigInt).Value=partnerId; command.Parameters.Add("@CompanyID",SqlDbType.BigInt).Value=companyId ?? (object)DBNull.Value;
+        await command.ExecuteNonQueryAsync(token);
+    }
+
+    [HttpPost("{id:long}/user")]
+    public async Task<IActionResult> CreateEmployeeUser(long id, EmployeeUserCreateRequest request, CancellationToken token)
+    {
+        if (string.IsNullOrWhiteSpace(request.Username) || string.IsNullOrWhiteSpace(request.Password))
+            return BadRequest(new { message = "กรุณาระบุ Username และ Password" });
+        if (request.Username.Trim().Length > 100)
+            return BadRequest(new { message = "Username ต้องไม่เกิน 100 ตัวอักษร" });
+        var scope = ResolveScope(request.CompanyId); if (scope is null) return Forbid();
+        await using var c = await Open(token);
+        if (!await Allowed(c, "EDIT", token)) return Forbid();
+        var username = request.Username.Trim();
+        var normalized = username.ToUpperInvariant();
+        var passwordHash = passwordService.HashPassword(username, request.Password);
+        var actor = (User.Identity?.Name ?? User.FindFirstValue("unique_name") ?? string.Empty).Trim();
+        await using var transaction = await c.BeginTransactionAsync(token);
+        try
+        {
+            long? employeeCompany;
+            string employeeName;
+            await using (var employeeCommand = new SqlCommand("SELECT CompanyID,FullName FROM dbo.TDADEmployee WHERE EmployeeID=@id AND PartnerID=@partner AND ((@company IS NULL AND CompanyID IS NULL) OR CompanyID=@company)", c, (SqlTransaction)transaction))
+            {
+                employeeCommand.Parameters.Add("@id", SqlDbType.BigInt).Value = id;
+                employeeCommand.Parameters.Add("@partner", SqlDbType.BigInt).Value = scope.Value.PartnerId;
+                employeeCommand.Parameters.Add("@company", SqlDbType.BigInt).Value = scope.Value.CompanyId ?? (object)DBNull.Value;
+                await using var reader = await employeeCommand.ExecuteReaderAsync(token);
+                if (!await reader.ReadAsync(token)) return NotFound();
+                employeeCompany = reader.IsDBNull(0) ? null : reader.GetInt64(0);
+                employeeName = reader.GetString(1);
+            }
+            if (employeeCompany is null)
+            {
+                const string sql = """
+IF EXISTS (SELECT 1 FROM dbo.TDADPartnerUserEmployee WHERE EmployeeID=@employee) THROW 50007,'EMPLOYEE_USER_EXISTS',1;
+IF EXISTS (SELECT 1 FROM dbo.TDADPartnerUser WHERE NormalizedUsername=@normalized AND PartnerID=@partner) THROW 50008,'USERNAME_EXISTS',1;
+INSERT dbo.TDADPartnerUser(PartnerID,Username,NormalizedUsername,PasswordHash,DisplayName,Email,MobileNumber,IsPartnerAdmin,IsActive,FailedLoginCount,CreatedUtc,CreatedBy)
+VALUES(@partner,@username,@normalized,@hash,@displayName,NULL,NULL,0,1,0,SYSUTCDATETIME(),@actor);
+DECLARE @userId BIGINT = CONVERT(BIGINT,SCOPE_IDENTITY());
+INSERT dbo.TDADPartnerUserEmployee(PartnerUserID,EmployeeID,PartnerID) VALUES(@userId,@employee,@partner);
+""";
+                await ExecuteUserCommand(c, (SqlTransaction)transaction, sql, username, normalized, passwordHash, employeeName, actor, id, scope.Value.PartnerId, null, token);
+            }
+            else
+            {
+                const string sql = """
+IF EXISTS (SELECT 1 FROM dbo.TDADUserEmployee WHERE EmployeeID=@employee) THROW 50007,'EMPLOYEE_USER_EXISTS',1;
+IF EXISTS (SELECT 1 FROM dbo.TDADUser WHERE NormalizedUsername=@normalized AND CompanyID=@company) THROW 50008,'USERNAME_EXISTS',1;
+INSERT dbo.TDADUser(CompanyID,Username,NormalizedUsername,PasswordHash,DisplayName,IsCompanyAdmin,IsActive,FailedLoginCount,LastPasswordChangeDate,CreateDate)
+VALUES(@company,@username,@normalized,@hash,@displayName,0,1,0,SYSUTCDATETIME(),SYSUTCDATETIME());
+DECLARE @userId BIGINT = CONVERT(BIGINT,SCOPE_IDENTITY());
+INSERT dbo.TDADUserEmployee(UserID,EmployeeID,CompanyID) VALUES(@userId,@employee,@company);
+INSERT INTO dbo.TDADUserProject(CompanyID,UserID,ProjectID,IsDefault,IsActive,CreateDate)
+SELECT @company,@userId,P.ProjectID,1,1,SYSUTCDATETIME()
+FROM dbo.TDADProject P
+WHERE P.ProjectCode=N'LAOO' AND P.IsActive=1
+  AND NOT EXISTS (SELECT 1 FROM dbo.TDADUserProject UP WHERE UP.CompanyID=@company AND UP.UserID=@userId AND UP.ProjectID=P.ProjectID);
+""";
+                await ExecuteUserCommand(c, (SqlTransaction)transaction, sql, username, normalized, passwordHash, employeeName, actor, id, scope.Value.PartnerId, employeeCompany, token);
+            }
+            await transaction.CommitAsync(token);
+            return Ok(new { employeeId = id, username });
+        }
+        catch (SqlException ex) when (ex.Number == 50007) { await transaction.RollbackAsync(token); return Conflict(new { message = "พนักงานนี้มี User แล้ว" }); }
+        catch (SqlException ex) when (ex.Number is 50008 or 2601 or 2627) { await transaction.RollbackAsync(token); return Conflict(new { message = "Username นี้ถูกใช้งานแล้ว" }); }
+    }
+
+    private static async Task ExecuteEmployeeUserUpsert(SqlConnection c, SqlTransaction tx, string sql, string username, string normalized, string hash, string displayName, string actor, long employeeId, long partnerId, long? companyId, long? userId, bool hasPassword, CancellationToken token)
+    {
+        await using var command = new SqlCommand(sql, c, tx);
+        command.Parameters.Add("@employee", SqlDbType.BigInt).Value = employeeId;
+        command.Parameters.Add("@partner", SqlDbType.BigInt).Value = partnerId;
+        command.Parameters.Add("@company", SqlDbType.BigInt).Value = companyId ?? (object)DBNull.Value;
+        command.Parameters.Add("@userId", SqlDbType.BigInt).Value = userId ?? (object)DBNull.Value;
+        command.Parameters.Add("@hasPassword", SqlDbType.Bit).Value = hasPassword;
+        Add(command, "@username", SqlDbType.NVarChar, username, 100); Add(command, "@normalized", SqlDbType.NVarChar, normalized, 100); Add(command, "@hash", SqlDbType.NVarChar, hash, 500); Add(command, "@displayName", SqlDbType.NVarChar, displayName, 200); Add(command, "@actor", SqlDbType.NVarChar, actor, 100);
+        await command.ExecuteNonQueryAsync(token);
+    }
+
+    private static async Task ExecuteUserCommand(SqlConnection c, SqlTransaction tx, string sql, string username, string normalized, string hash, string displayName, string actor, long employeeId, long partnerId, long? companyId, CancellationToken token)
+    {
+        await using var command = new SqlCommand(sql, c, tx);
+        command.Parameters.Add("@employee", SqlDbType.BigInt).Value = employeeId;
+        command.Parameters.Add("@partner", SqlDbType.BigInt).Value = partnerId;
+        command.Parameters.Add("@company", SqlDbType.BigInt).Value = companyId ?? (object)DBNull.Value;
+        Add(command, "@username", SqlDbType.NVarChar, username, 100); Add(command, "@normalized", SqlDbType.NVarChar, normalized, 100); Add(command, "@hash", SqlDbType.NVarChar, hash, 500); Add(command, "@displayName", SqlDbType.NVarChar, displayName, 200); Add(command, "@actor", SqlDbType.NVarChar, actor, 100);
+        await command.ExecuteNonQueryAsync(token);
+    }
+
     private static EmployeeResponse Read(SqlDataReader r) => new()
     {
         EmployeeId = r.GetInt64(1), PartnerId = r.GetInt64(2), CompanyId = NLong(r, 3), DivisionOrgUnitId = NLong(r, 4), DivisionName = NString(r, 5),
@@ -238,8 +452,8 @@ VALUES(@id,@carNo,@data,@type,@name,@size,@width,@height,1,SYSUTCDATETIME());
         var username = (User.Identity?.Name ?? User.FindFirstValue("unique_name") ?? string.Empty).Trim().ToUpperInvariant();
         var isCompanyUser = string.Equals(User.FindFirstValue("user_type"), "COMPANY_USER", StringComparison.OrdinalIgnoreCase);
         var sql = isCompanyUser
-            ? "SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADUser U WHERE U.UserID=@user AND U.IsActive=1 AND U.IsCompanyAdmin=1) OR EXISTS(SELECT 1 FROM dbo.TDADUserPermission UP JOIN dbo.TDADPermission P ON P.PermissionID=UP.PermissionID AND P.ProjectID=UP.ProjectID WHERE UP.UserID=@user AND UP.ProjectID=@project AND UP.IsAllowed=1 AND UP.IsActive=1 AND P.ScreenCode=@screen AND P.ActionCode=@action AND P.IsActive=1) THEN 1 ELSE 0 END"
-            : "SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADPartnerUser U WHERE U.PartnerID=@partner AND U.NormalizedUsername=@username AND U.IsPartnerAdmin=1 AND U.IsActive=1) OR EXISTS(SELECT 1 FROM dbo.TDADPartnerUser U JOIN dbo.TDADPartnerUserPermission UP ON UP.PartnerUserID=U.PartnerUserID JOIN dbo.TDADPermission P ON P.PermissionID=UP.PermissionID AND P.ProjectID=UP.ProjectID WHERE U.PartnerID=@partner AND U.NormalizedUsername=@username AND UP.ProjectID=@project AND UP.IsAllowed=1 AND UP.IsActive=1 AND P.ScreenCode=@screen AND P.ActionCode=@action AND P.IsActive=1) THEN 1 ELSE 0 END";
+            ? "SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADUser U WHERE U.UserID=@user AND U.IsActive=1 AND U.IsCompanyAdmin=1) OR EXISTS(SELECT 1 FROM dbo.TDADUserPermission UP JOIN dbo.TDADPermission P ON P.PermissionID=UP.PermissionID AND P.ProjectID=UP.ProjectID WHERE UP.UserID=@user AND UP.ProjectID=@project AND UP.IsAllowed=1 AND UP.IsActive=1 AND P.ScreenCode=@screen AND P.ActionCode=@action AND P.IsActive=1) OR EXISTS(SELECT 1 FROM dbo.TDADUser U INNER JOIN dbo.TDADUserEmployee UE ON UE.UserID=U.UserID INNER JOIN dbo.TDADEmployeeRoleGroup ERG ON ERG.EmployeeID=UE.EmployeeID INNER JOIN dbo.TDADRoleGroup RG ON RG.RoleGroupID=ERG.RoleGroupID AND RG.ScopeType='C' AND RG.CompanyID=U.CompanyID AND RG.ProjectID=@project INNER JOIN dbo.TDADRoleGroupPermission RP ON RP.RoleGroupID=RG.RoleGroupID AND RP.ProjectID=@project AND RP.MenuCode=@screen AND RP.ActionCode=@action AND RP.IsAllowed=1 WHERE U.UserID=@user AND U.IsActive=1 AND ERG.IsActive=1 AND ERG.EffectiveFrom<=CONVERT(date,SYSUTCDATETIME()) AND (ERG.EffectiveTo IS NULL OR ERG.EffectiveTo>=CONVERT(date,SYSUTCDATETIME()))) THEN 1 ELSE 0 END"
+            : "SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADPartnerUser U WHERE U.PartnerID=@partner AND U.NormalizedUsername=@username AND U.IsPartnerAdmin=1 AND U.IsActive=1) OR EXISTS(SELECT 1 FROM dbo.TDADPartnerUser U JOIN dbo.TDADPartnerUserPermission UP ON UP.PartnerUserID=U.PartnerUserID JOIN dbo.TDADPermission P ON P.PermissionID=UP.PermissionID AND P.ProjectID=UP.ProjectID WHERE U.PartnerID=@partner AND U.NormalizedUsername=@username AND UP.ProjectID=@project AND UP.IsAllowed=1 AND UP.IsActive=1 AND P.ScreenCode=@screen AND P.ActionCode=@action AND P.IsActive=1) OR EXISTS(SELECT 1 FROM dbo.TDADPartnerUser U INNER JOIN dbo.TDADPartnerUserEmployee PUE ON PUE.PartnerUserID=U.PartnerUserID INNER JOIN dbo.TDADEmployeeRoleGroup ERG ON ERG.EmployeeID=PUE.EmployeeID INNER JOIN dbo.TDADRoleGroup RG ON RG.RoleGroupID=ERG.RoleGroupID AND RG.ScopeType='P' AND RG.PartnerID=U.PartnerID AND RG.ProjectID=@project INNER JOIN dbo.TDADRoleGroupPermission RP ON RP.RoleGroupID=RG.RoleGroupID AND RP.ProjectID=@project AND RP.MenuCode=@screen AND RP.ActionCode=@action AND RP.IsAllowed=1 WHERE U.PartnerID=@partner AND U.NormalizedUsername=@username AND U.IsActive=1 AND ERG.IsActive=1 AND ERG.EffectiveFrom<=CONVERT(date,SYSUTCDATETIME()) AND (ERG.EffectiveTo IS NULL OR ERG.EffectiveTo>=CONVERT(date,SYSUTCDATETIME()))) THEN 1 ELSE 0 END";
         await using var cmd = new SqlCommand(sql, c);
         if (isCompanyUser) cmd.Parameters.Add("@user", SqlDbType.BigInt).Value = long.Parse(User.FindFirstValue("user_id")!);
         else { cmd.Parameters.Add("@partner", SqlDbType.BigInt).Value = long.Parse(User.FindFirstValue("partner_id")!); cmd.Parameters.Add("@username", SqlDbType.NVarChar, 100).Value = username; }

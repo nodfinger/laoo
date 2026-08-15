@@ -334,7 +334,22 @@ public sealed class AuthenticationService
         ) AS b
         WHERE u.NormalizedUsername = @NormalizedUsername
           AND u.IsActive = 1
-          AND (up.UserID IS NOT NULL OR u.IsCompanyAdmin = 1)
+          AND
+          (
+              up.UserID IS NOT NULL
+              OR u.IsCompanyAdmin = 1
+              OR EXISTS
+              (
+                  SELECT 1
+                  FROM dbo.TDADUserEmployee AS ue
+                  INNER JOIN dbo.TDADEmployee AS e
+                      ON e.EmployeeID = ue.EmployeeID
+                     AND e.CompanyID = ue.CompanyID
+                     AND e.IsActive = 1
+                  WHERE ue.UserID = u.UserID
+                    AND ue.CompanyID = u.CompanyID
+              )
+          )
           AND (u.LockedUntil IS NULL OR u.LockedUntil <= SYSUTCDATETIME());
         """;
 

@@ -43,6 +43,9 @@ class _MasterDataPageState extends State<MasterDataPage> {
   final List<_MasterGroup> _groups = [];
   final Map<String, List<_MasterRow>> _rows = {};
   bool _loading = true;
+  bool _canCreate = false;
+  bool _canEdit = false;
+  bool _canDelete = false;
 
   String _selectedGroup = '001';
   _MasterRow? _editing;
@@ -65,7 +68,20 @@ class _MasterDataPageState extends State<MasterDataPage> {
   @override
   void initState() {
     super.initState();
+    _loadActions();
     _load();
+  }
+
+  Future<void> _loadActions() async {
+    try {
+      final permissions = await _api.actions();
+      if (!mounted) return;
+      setState(() {
+        _canCreate = permissions['create'] == true;
+        _canEdit = permissions['edit'] == true;
+        _canDelete = permissions['delete'] == true;
+      });
+    } catch (_) {}
   }
 
   Future<void> _load() async {
@@ -480,7 +496,7 @@ class _MasterDataPageState extends State<MasterDataPage> {
                 ),
               ),
             ),
-            FilledButton(
+            if (_canCreate) FilledButton(
               onPressed: _startAdd,
               style: FilledButton.styleFrom(
                 minimumSize: const Size(100, LaooTypography.buttonHeight),
@@ -603,7 +619,7 @@ class _MasterDataPageState extends State<MasterDataPage> {
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  IconButton(
+                                  if (_canEdit) IconButton(
                                     tooltip: 'แก้ไข',
                                     onPressed: () => _startEdit(row),
                                     icon: Icon(
@@ -611,7 +627,7 @@ class _MasterDataPageState extends State<MasterDataPage> {
                                       color: theme.colorScheme.primary,
                                     ),
                                   ),
-                                  IconButton(
+                                  if (_canDelete) IconButton(
                                     tooltip: 'ลบ',
                                     onPressed: () => _delete(row),
                                     icon: const Icon(
@@ -659,6 +675,7 @@ class _MasterDataPageState extends State<MasterDataPage> {
       onDismissMessage: _dismissMessage,
       onCancel: () => setState(() => _editing = null),
       onSave: () => _save(row),
+      canSave: _isAdding ? _canCreate : _canEdit,
     );
   }
 }
@@ -773,6 +790,7 @@ class _MasterDataForm extends StatefulWidget {
     required this.onDismissMessage,
     required this.onCancel,
     required this.onSave,
+    required this.canSave,
   });
   final _MasterRow row;
   final String groupName;
@@ -782,6 +800,7 @@ class _MasterDataForm extends StatefulWidget {
   final VoidCallback onDismissMessage;
   final VoidCallback onCancel;
   final Future<void> Function() onSave;
+  final bool canSave;
 
   @override
   State<_MasterDataForm> createState() => _MasterDataFormState();
@@ -873,7 +892,7 @@ class _MasterDataFormState extends State<_MasterDataForm> {
                 child: const Text('ยกเลิก'),
               ),
               const SizedBox(width: 10),
-              FilledButton.icon(
+              if (widget.canSave) FilledButton.icon(
                 style: FilledButton.styleFrom(
                   minimumSize: const Size(100, LaooTypography.buttonHeight),
                   alignment: Alignment.center,
@@ -934,7 +953,7 @@ class _MasterDataFormState extends State<_MasterDataForm> {
                   child: const Text('ยกเลิก'),
                 ),
                 const SizedBox(width: 10),
-                FilledButton.icon(
+                if (widget.canSave) FilledButton.icon(
                   style: FilledButton.styleFrom(
                     minimumSize: const Size(100, LaooTypography.buttonHeight),
                     alignment: Alignment.center,

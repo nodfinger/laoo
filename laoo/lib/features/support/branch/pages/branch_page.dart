@@ -22,6 +22,9 @@ class _BranchPageState extends State<BranchPage> {
   List<Map<String, dynamic>> _items = [];
   List<PartnerCompany> _companies = [];
   bool _loading = true;
+  bool _canCreate = false;
+  bool _canEdit = false;
+  bool _canDelete = false;
   String? _error;
   String _status = 'ทั้งหมด';
   int? _companyFilterId;
@@ -66,7 +69,25 @@ class _BranchPageState extends State<BranchPage> {
   void initState() {
     super.initState();
     _loadCompanies();
+    _loadActions();
     _load();
+  }
+
+  Future<void> _loadActions() async {
+    final support = widget.menuScope == WorkspaceMenuScope.support;
+    if (support) {
+      if (mounted) setState(() { _canCreate = true; _canEdit = true; _canDelete = true; });
+      return;
+    }
+    try {
+      final permissions = await _repo.actions(support: false);
+      if (!mounted) return;
+      setState(() {
+        _canCreate = permissions['create'] == true;
+        _canEdit = permissions['edit'] == true;
+        _canDelete = permissions['delete'] == true;
+      });
+    } catch (_) {}
   }
 
   @override
@@ -159,7 +180,7 @@ class _BranchPageState extends State<BranchPage> {
                         favoriteKey: 'branch',
                       ),
                     ),
-                    FilledButton.icon(
+                    if (_canCreate) FilledButton.icon(
                       onPressed: () => _form(),
                       icon: const Icon(Icons.add),
                       label: const Text('เพิ่ม'),
@@ -358,7 +379,7 @@ class _BranchPageState extends State<BranchPage> {
                                           child: Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
-                                              IconButton(
+                                              if (_canEdit) IconButton(
                                                 onPressed: () => _form(x),
                                                 color: Theme.of(
                                                   context,
@@ -367,7 +388,7 @@ class _BranchPageState extends State<BranchPage> {
                                                   Icons.edit_outlined,
                                                 ),
                                               ),
-                                              IconButton(
+                                              if (_canDelete) IconButton(
                                                 onPressed: () => _delete(x),
                                                 icon: const Icon(
                                                   Icons.delete_outline,

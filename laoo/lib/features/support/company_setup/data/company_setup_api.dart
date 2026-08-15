@@ -6,6 +6,14 @@ class CompanySetupApi {
 
   final ApiClient _client;
 
+  Future<Map<String, bool>> actions() async {
+    final data = await _client.get('/api/company-setup/actions');
+    if (data is! Map) return const {};
+    return Map<String, bool>.fromEntries(
+      data.entries.map((entry) => MapEntry('${entry.key}', entry.value == true)),
+    );
+  }
+
   Future<CompanySetupModel> load() async {
     final data = await _client.get('/api/company-setup');
 

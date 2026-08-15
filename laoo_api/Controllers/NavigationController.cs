@@ -23,7 +23,7 @@ public sealed class NavigationController : ControllerBase
         var groupCodes = userType switch
         {
             "PARTNER_USER" => new[] { "05", "06", "07", "11" },
-            "COMPANY_USER" => new[] { "05", "08", "09", "10" },
+            "COMPANY_USER" => new[] { "05", "07", "08", "09", "10" },
             "LAOO_SUPPORT" => new[] { "01", "02", "03", "04", "05" },
             _ => Array.Empty<string>()
         };
@@ -33,25 +33,30 @@ public sealed class NavigationController : ControllerBase
         await connection.OpenAsync(cancellationToken);
         var admin = await IsAdminAsync(connection, userType!, cancellationToken);
         var allowedFeatures = admin ? null : await LoadAllowedFeaturesAsync(connection, userType!, cancellationToken);
+        var visibleGroupCodes = groupCodes.ToHashSet();
+        var audienceType = userType == "PARTNER_USER" ? "P" : userType == "COMPANY_USER" ? "C" : "L";
         const string sql = """
 SELECT G.MenuGroupCode, G.MenuGroupName, G.IconName AS GroupIconName, G.SortOrder AS GroupSortOrder,
        G.IsExpandedDefault, M.MenuCode, M.MenuName, M.RouteName, M.RoutePath, M.FeatureCode,
        M.IconName, M.SortOrder, M.IsFavoriteAllowed
 FROM dbo.TDADMenuGroup G
 INNER JOIN dbo.TDADMainMenu M ON M.MenuGroupCode = G.MenuGroupCode AND M.IsActive = 1 AND M.IsVisible = 1
-WHERE G.IsActive = 1 AND G.MenuGroupCode IN ('01','02','03','04','05','06','07','08','09','10','11','12')
+WHERE G.IsActive = 1
+  AND UPPER(LTRIM(RTRIM(G.AudienceType))) IN (N'A',@AudienceType)
+  AND G.MenuGroupCode IN ('01','02','03','04','05','06','07','08','09','10','11','12')
 ORDER BY G.SortOrder, M.SortOrder, M.MenuCode;
 """;
         await using var command = new SqlCommand(sql, connection);
+        command.Parameters.Add("@AudienceType", SqlDbType.Char).Value = audienceType;
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         var all = new List<(NavigationMenuGroupResponse Group, NavigationMenuItemResponse Item)>();
         while (await reader.ReadAsync(cancellationToken))
         {
             var group = new NavigationMenuGroupResponse { MenuGroupCode = reader.GetString(0).Trim(), MenuGroupName = reader.GetString(1), IconName = N(reader, 2), SortOrder = reader.GetInt32(3), IsExpandedDefault = reader.GetBoolean(4) };
             var item = new NavigationMenuItemResponse { MenuCode = reader.GetString(5), MenuName = reader.GetString(6), RouteName = N(reader, 7), RoutePath = N(reader, 8), FeatureCode = N(reader, 9), IconName = N(reader, 10), SortOrder = reader.GetInt32(11), IsFavoriteAllowed = reader.GetBoolean(12) };
-            if (groupCodes.Contains(group.MenuGroupCode) &&
+            if (visibleGroupCodes.Contains(group.MenuGroupCode) &&
                 item.FeatureCode is not null &&
-                (admin || allowedFeatures!.Contains(item.FeatureCode)))
+                (admin || allowedFeatures!.Contains(item.FeatureCode) || allowedFeatures.Contains(item.MenuCode)))
             {
                 all.Add((group, item));
             }
@@ -90,9 +95,32 @@ ORDER BY G.SortOrder, M.SortOrder, M.MenuCode;
         var claimName = userType == "COMPANY_USER" ? "user_id" : "laoo_user_id";
         var raw = User.FindFirstValue(claimName)?.Replace("laoo:", "");
         var sql = userType == "PARTNER_USER" ? $"""
-SELECT P.ScreenCode FROM dbo.TDADPartnerUserPermission UP INNER JOIN dbo.TDADPermission P ON P.PermissionID=UP.PermissionID AND P.ProjectID=UP.ProjectID INNER JOIN dbo.TDADPartnerUser U ON U.PartnerUserID=UP.PartnerUserID WHERE U.NormalizedUsername=@Username AND UP.ProjectID=@ProjectID AND UP.IsAllowed=1 AND UP.IsActive=1 AND P.IsActive=1 AND P.ActionCode='VIEW';
+SELECT P.ScreenCode
+FROM dbo.TDADPartnerUserPermission UP
+INNER JOIN dbo.TDADPermission P ON P.PermissionID=UP.PermissionID AND P.ProjectID=UP.ProjectID
+INNER JOIN dbo.TDADPartnerUser U ON U.PartnerUserID=UP.PartnerUserID
+WHERE U.NormalizedUsername=@Username AND UP.ProjectID=@ProjectID AND UP.IsAllowed=1 AND UP.IsActive=1 AND P.IsActive=1 AND P.ActionCode='VIEW'
+UNION
+SELECT RP.MenuCode
+FROM dbo.TDADPartnerUser U
+INNER JOIN dbo.TDADPartnerUserEmployee PUE ON PUE.PartnerUserID=U.PartnerUserID
+INNER JOIN dbo.TDADEmployeeRoleGroup ERG ON ERG.EmployeeID=PUE.EmployeeID
+INNER JOIN dbo.TDADRoleGroup RG ON RG.RoleGroupID=ERG.RoleGroupID AND RG.ScopeType='P' AND RG.PartnerID=U.PartnerID AND RG.ProjectID=@ProjectID
+INNER JOIN dbo.TDADRoleGroupPermission RP ON RP.RoleGroupID=RG.RoleGroupID AND RP.ProjectID=@ProjectID AND RP.ActionCode='VIEW' AND RP.IsAllowed=1
+WHERE U.NormalizedUsername=@Username AND U.IsActive=1 AND ERG.IsActive=1 AND ERG.EffectiveFrom<=CONVERT(date,SYSUTCDATETIME()) AND (ERG.EffectiveTo IS NULL OR ERG.EffectiveTo>=CONVERT(date,SYSUTCDATETIME()));
 """ : $"""
-SELECT P.ScreenCode FROM dbo.{permissionTable} UP INNER JOIN dbo.TDADPermission P ON P.PermissionID=UP.PermissionID AND P.ProjectID=UP.ProjectID WHERE UP.{idColumn}=@ID AND UP.ProjectID=@ProjectID AND UP.IsAllowed=1 AND UP.IsActive=1 AND P.IsActive=1 AND P.ActionCode='VIEW';
+SELECT P.ScreenCode
+FROM dbo.{permissionTable} UP
+INNER JOIN dbo.TDADPermission P ON P.PermissionID=UP.PermissionID AND P.ProjectID=UP.ProjectID
+WHERE UP.{idColumn}=@ID AND UP.ProjectID=@ProjectID AND UP.IsAllowed=1 AND UP.IsActive=1 AND P.IsActive=1 AND P.ActionCode='VIEW'
+UNION
+SELECT RP.MenuCode
+FROM dbo.TDADUser U
+INNER JOIN dbo.TDADUserEmployee UE ON UE.UserID=U.UserID
+INNER JOIN dbo.TDADEmployeeRoleGroup ERG ON ERG.EmployeeID=UE.EmployeeID
+INNER JOIN dbo.TDADRoleGroup RG ON RG.RoleGroupID=ERG.RoleGroupID AND RG.ScopeType='C' AND RG.CompanyID=U.CompanyID AND RG.ProjectID=@ProjectID
+INNER JOIN dbo.TDADRoleGroupPermission RP ON RP.RoleGroupID=RG.RoleGroupID AND RP.ProjectID=@ProjectID AND RP.ActionCode='VIEW' AND RP.IsAllowed=1
+WHERE U.UserID=@ID AND U.IsActive=1 AND ERG.IsActive=1 AND ERG.EffectiveFrom<=CONVERT(date,SYSUTCDATETIME()) AND (ERG.EffectiveTo IS NULL OR ERG.EffectiveTo>=CONVERT(date,SYSUTCDATETIME()));
 """;
         await using var command = new SqlCommand(sql, connection);
         command.Parameters.Add("@ProjectID", SqlDbType.BigInt).Value = projectId;

@@ -16,6 +16,8 @@ import '../../features/support/master_data/pages/master_data_page.dart';
 import '../../features/support/organization/pages/organization_structure_page.dart';
 import '../../features/support/employee/pages/employee_ux_page.dart';
 import '../../features/support/partner_user/pages/partner_user_page.dart';
+import '../../features/access/role_group/pages/role_group_page.dart';
+import '../../features/access/menu_permission/pages/menu_permission_page.dart';
 import 'route_names.dart';
 import 'route_paths.dart';
 
@@ -184,11 +186,11 @@ final GoRouter appRouter = GoRouter(
 final List<GoRoute> _placeholderRoutes = [
   GoRoute(path: RoutePaths.companyEmployees, name: RouteNames.companyEmployees, builder: (context, state) => const EmployeeUxPage(customer: true, companyScoped: true, menuScope: WorkspaceMenuScope.company)),
   _scopePlaceholder(RoutePaths.companyUsers, RouteNames.companyUsers, 'ผู้ใช้งาน', WorkspaceMenuScope.company, 'companyUsers'),
-  _scopePlaceholder(RoutePaths.companyRoleGroups, RouteNames.companyRoleGroups, 'กลุ่มสิทธิ์', WorkspaceMenuScope.company, 'companyRoleGroups'),
-  _scopePlaceholder(RoutePaths.companyMenuPermissions, RouteNames.companyMenuPermissions, 'สิทธิ์เมนู', WorkspaceMenuScope.company, 'companyMenuPermissions'),
+  GoRoute(path: RoutePaths.companyRoleGroups, name: RouteNames.companyRoleGroups, builder: (context, state) => const RoleGroupPage(scope: 'customer', activeMenu: 'companyRoleGroups')),
+  GoRoute(path: RoutePaths.companyMenuPermissions, name: RouteNames.companyMenuPermissions, builder: (context, state) => const MenuPermissionPage(scope: 'customer', activeMenu: 'companyMenuPermissions')),
   _scopePlaceholder(RoutePaths.partnerEmployees, RouteNames.partnerEmployees, 'พนักงาน', WorkspaceMenuScope.partner, 'partnerEmployees'),
-  _scopePlaceholder(RoutePaths.partnerRoleGroups, RouteNames.partnerRoleGroups, 'กลุ่มสิทธิ์', WorkspaceMenuScope.partner, 'partnerRoleGroups'),
-  _scopePlaceholder(RoutePaths.partnerMenuPermissions, RouteNames.partnerMenuPermissions, 'สิทธิ์เมนู', WorkspaceMenuScope.partner, 'partnerMenuPermissions'),
+  GoRoute(path: RoutePaths.partnerRoleGroups, name: RouteNames.partnerRoleGroups, builder: (context, state) => const RoleGroupPage(scope: 'partner', activeMenu: 'partnerRoleGroups')),
+  GoRoute(path: RoutePaths.partnerMenuPermissions, name: RouteNames.partnerMenuPermissions, builder: (context, state) => const MenuPermissionPage(scope: 'partner', activeMenu: 'partnerMenuPermissions')),
   GoRoute(path: RoutePaths.customerEmployees, name: RouteNames.customerEmployees, builder: (context, state) => const EmployeeUxPage(customer: true, menuScope: WorkspaceMenuScope.partner)),
   GoRoute(path: RoutePaths.laooEmployees, name: RouteNames.laooEmployees, builder: (context, state) => const EmployeeUxPage()),
   _scopePlaceholder(RoutePaths.laooUsers, RouteNames.laooUsers, 'ผู้ใช้งาน', WorkspaceMenuScope.support, 'laooUsers'),

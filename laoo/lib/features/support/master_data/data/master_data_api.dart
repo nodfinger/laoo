@@ -4,6 +4,14 @@ class MasterDataApi {
   MasterDataApi({ApiClient? apiClient}) : _api = apiClient ?? ApiClient();
   final ApiClient _api;
 
+  Future<Map<String, bool>> actions() async {
+    final data = await _api.get('/api/support/master-data/actions');
+    if (data is! Map) return const {};
+    return Map<String, bool>.fromEntries(
+      data.entries.map((entry) => MapEntry('${entry.key}', entry.value == true)),
+    );
+  }
+
   Future<List<Map<String, dynamic>>> groups() async => List<Map<String, dynamic>>.from(await _api.get('/api/support/master-data/groups') as List);
   Future<List<Map<String, dynamic>>> list(String groupCode, {String? search}) async => List<Map<String, dynamic>>.from(await _api.get('/api/support/master-data', query: {'groupCode': groupCode, if (search != null && search.isNotEmpty) 'search': search}) as List);
   Future<void> create(String groupCode, Map<String, dynamic> body) async { await _api.post('/api/support/master-data/$groupCode', body: body); }

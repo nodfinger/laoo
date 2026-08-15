@@ -5,6 +5,7 @@ import '../../../../core/api/api_client.dart';
 class EmployeeRepository {
   EmployeeRepository({ApiClient? api}) : _api = api ?? ApiClient();
   final ApiClient _api;
+  Future<Map<String, bool>> actions({bool customer = false, bool company = false}) async { final path = company ? '/api/company/employees/actions' : customer ? '/api/partner/customer-employees/actions' : '/api/partner/employees/actions'; final data = await _api.get(path); if (data is! Map) return const {}; return Map<String, bool>.fromEntries(data.entries.map((e) => MapEntry('${e.key}', e.value == true))); }
 
   Future<Map<String, dynamic>> list({String? search, int? divisionId, int? departmentId, bool? isActive, int? companyId, bool customer = false, bool company = false, int page = 1, int pageSize = 20}) async =>
       Map<String, dynamic>.from(await _api.get(company ? '/api/company/employees' : customer ? '/api/partner/customer-employees' : '/api/partner/employees', query: {
@@ -77,4 +78,28 @@ class EmployeeRepository {
     '${company ? '/api/company/employees' : customer ? '/api/partner/customer-employees' : '/api/partner/employees'}/$id/car-image/$carNo',
     query: {if (companyId != null) 'companyId': '$companyId'},
   );
+
+  Future<void> createEmployeeUser(int id, String username, String password, {int? companyId, bool customer = false, bool company = false}) async {
+    final path = '${company ? '/api/company/employees' : customer ? '/api/partner/customer-employees' : '/api/partner/employees'}/$id/user';
+    await _api.post(path, body: {
+      'username': username,
+      'password': password,
+      if (companyId != null) 'companyId': companyId,
+    });
+  }
+
+  Future<Map<String, dynamic>> getEmployeeUser(int id, {int? companyId, bool customer = false, bool company = false}) async {
+    final path = '${company ? '/api/company/employees' : customer ? '/api/partner/customer-employees' : '/api/partner/employees'}/$id/user';
+    return Map<String, dynamic>.from(await _api.get(path, query: {if (companyId != null) 'companyId': '$companyId'}) as Map);
+  }
+
+  Future<void> upsertEmployeeUser(int id, String username, String? password, {int? companyId, int? roleGroupId, bool customer = false, bool company = false}) async {
+    final path = '${company ? '/api/company/employees' : customer ? '/api/partner/customer-employees' : '/api/partner/employees'}/$id/user';
+    await _api.put(path, body: {
+      'username': username,
+      if (password != null && password.isNotEmpty) 'password': password,
+      if (companyId != null) 'companyId': companyId,
+      if (roleGroupId != null) 'roleGroupId': roleGroupId,
+    });
+  }
 }

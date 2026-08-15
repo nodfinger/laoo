@@ -5,6 +5,14 @@ class PartnerCompanyRepository {
   PartnerCompanyRepository({ApiClient? apiClient})
     : _api = apiClient ?? ApiClient();
   final ApiClient _api;
+
+  Future<Map<String, bool>> actions() async {
+    final data = await _api.get('/api/partner/companies/actions');
+    if (data is! Map) return const {};
+    return Map<String, bool>.fromEntries(
+      data.entries.map((entry) => MapEntry('${entry.key}', entry.value == true)),
+    );
+  }
   Future<List<PartnerCompany>> getCompanies({
     String? search,
     int? partnerId,

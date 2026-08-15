@@ -1,0 +1,21 @@
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+SET ANSI_PADDING ON;
+SET ANSI_WARNINGS ON;
+SET CONCAT_NULL_YIELDS_NULL ON;
+SET ARITHABORT ON;
+SET NUMERIC_ROUNDABORT OFF;
+
+IF COL_LENGTH('dbo.TDSTCompanySetUp', 'OrgStructureType') IS NULL
+BEGIN
+    ALTER TABLE dbo.TDSTCompanySetUp
+      ADD OrgStructureType int NOT NULL
+          CONSTRAINT DF_TDSTCompanySetUp_OrgStructureType DEFAULT (1);
+END;
+
+UPDATE S
+SET S.OrgStructureType = ISNULL(C.OrgStructureType, 1),
+    S.UpdateDate = SYSUTCDATETIME()
+FROM dbo.TDSTCompanySetUp AS S
+LEFT JOIN dbo.TDADCompany AS C ON C.CompanyID = S.CompanyID
+WHERE S.OwnerType = 'C';

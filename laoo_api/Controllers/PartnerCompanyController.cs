@@ -13,6 +13,7 @@ namespace LaooApi.Controllers;
 [Authorize]
 public sealed class PartnerCompanyController : ControllerBase
 {
+    private const string ScreenCode = "06001";
     private readonly IConfiguration _configuration;
     private readonly PasswordService _passwordService;
 
@@ -29,6 +30,7 @@ public sealed class PartnerCompanyController : ControllerBase
         var partnerId = PartnerId();
         if (partnerId is null) return Forbid();
         await using var connection = await OpenConnectionAsync(cancellationToken);
+        if (!await AllowedAsync(connection, "VIEW", cancellationToken)) return Forbid();
         const string sql = """
 SELECT C.CompanyID, C.PartnerID, C.CompanyCode, C.CompanyNameTH, C.CompanyNameEN, C.TaxID,
        C.Email, C.Telephone, C.AddressText, C.IsActive, C.CreateDate, C.CreateBy,
@@ -52,6 +54,19 @@ ORDER BY CompanyCode;
         return Ok(result);
     }
 
+    [HttpGet("actions")]
+    public async Task<ActionResult<object>> Actions(CancellationToken cancellationToken)
+    {
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        return Ok(new
+        {
+            view = await AllowedAsync(connection, "VIEW", cancellationToken),
+            create = await AllowedAsync(connection, "CREATE", cancellationToken),
+            edit = await AllowedAsync(connection, "EDIT", cancellationToken),
+            delete = await AllowedAsync(connection, "DELETE", cancellationToken),
+        });
+    }
+
     [HttpPost]
     public async Task<ActionResult<PartnerCompanyResponse>> Create(
         PartnerCompanyUpsertRequest request, CancellationToken cancellationToken)
@@ -66,6 +81,7 @@ ORDER BY CompanyCode;
         if (partnerId is null || !string.Equals(User.FindFirstValue("user_type"), "PARTNER_USER", StringComparison.OrdinalIgnoreCase))
             return Forbid();
         await using var connection = await OpenConnectionAsync(cancellationToken);
+        if (!await AllowedAsync(connection, "CREATE", cancellationToken)) return Forbid();
         if (!await IsPartnerAdminAsync(connection, cancellationToken)) return Forbid();
         await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(cancellationToken);
         try
@@ -132,6 +148,7 @@ VALUES
         var partnerId = PartnerId();
         if (partnerId is null) return Forbid();
         await using var connection = await OpenConnectionAsync(cancellationToken);
+        if (!await AllowedAsync(connection, "EDIT", cancellationToken)) return Forbid();
         if (!await IsPartnerAdminAsync(connection, cancellationToken)) return Forbid();
         const string sql = """
 UPDATE dbo.TDADCompany SET CompanyNameTH=@CompanyNameTH, CompanyNameEN=@CompanyNameEN, TaxID=@TaxID, IsActive=@IsActive,
@@ -162,6 +179,7 @@ WHERE CompanyID=@CompanyID AND PartnerID=@PartnerID;
         var partnerId = PartnerId();
         if (partnerId is null) return Forbid();
         await using var connection = await OpenConnectionAsync(cancellationToken);
+        if (!await AllowedAsync(connection, "EDIT", cancellationToken)) return Forbid();
         if (!await IsPartnerAdminAsync(connection, cancellationToken)) return Forbid();
         const string sql = """
 IF NOT EXISTS (SELECT 1 FROM dbo.TDADCompany WHERE CompanyID=@CompanyID AND PartnerID=@PartnerID)
@@ -192,6 +210,7 @@ ELSE
         var partnerId = PartnerId();
         if (partnerId is null) return Forbid();
         await using var connection = await OpenConnectionAsync(cancellationToken);
+        if (!await AllowedAsync(connection, "DELETE", cancellationToken)) return Forbid();
         if (!await IsPartnerAdminAsync(connection, cancellationToken)) return Forbid();
         const string dependencySql = "SELECT CASE WHEN EXISTS (SELECT 1 FROM dbo.TDADBranch WHERE CompanyID=@CompanyID) OR EXISTS (SELECT 1 FROM dbo.TDADUser WHERE CompanyID=@CompanyID) THEN CAST(1 AS BIGINT) ELSE CAST(0 AS BIGINT) END;";
         await using var dependency = new SqlCommand(dependencySql, connection);
@@ -215,6 +234,20 @@ ELSE
     }
 
     private long? PartnerId() => long.TryParse(User.FindFirstValue("partner_id"), out var id) ? id : null;
+    private async Task<bool> AllowedAsync(SqlConnection connection, string action, CancellationToken token)
+    {
+        var partnerId = PartnerId();
+        var project = User.FindFirstValue("project_id");
+        if (partnerId is null || !long.TryParse(project, out var projectId)) return false;
+        const string sql = "SELECT CASE WHEN EXISTS (SELECT 1 FROM dbo.TDADPartnerUserPermission UP INNER JOIN dbo.TDADPermission P ON P.PermissionID=UP.PermissionID AND P.ProjectID=UP.ProjectID INNER JOIN dbo.TDADPartnerUser U ON U.PartnerUserID=UP.PartnerUserID WHERE U.PartnerID=@PartnerID AND U.NormalizedUsername=@Username AND U.IsActive=1 AND UP.ProjectID=@ProjectID AND UP.IsAllowed=1 AND UP.IsActive=1 AND P.IsActive=1 AND P.ScreenCode=@ScreenCode AND P.ActionCode=@Action) OR EXISTS (SELECT 1 FROM dbo.TDADPartnerUser U INNER JOIN dbo.TDADPartnerUserEmployee PUE ON PUE.PartnerUserID=U.PartnerUserID INNER JOIN dbo.TDADEmployeeRoleGroup ERG ON ERG.EmployeeID=PUE.EmployeeID INNER JOIN dbo.TDADRoleGroup RG ON RG.RoleGroupID=ERG.RoleGroupID AND RG.ScopeType='P' AND RG.PartnerID=U.PartnerID AND RG.ProjectID=@ProjectID INNER JOIN dbo.TDADRoleGroupPermission RP ON RP.RoleGroupID=RG.RoleGroupID AND RP.ProjectID=@ProjectID AND RP.MenuCode=@ScreenCode AND RP.ActionCode=@Action AND RP.IsAllowed=1 WHERE U.PartnerID=@PartnerID AND U.NormalizedUsername=@Username AND U.IsActive=1 AND ERG.IsActive=1 AND ERG.EffectiveFrom<=CONVERT(date,SYSUTCDATETIME()) AND (ERG.EffectiveTo IS NULL OR ERG.EffectiveTo>=CONVERT(date,SYSUTCDATETIME()))) THEN 1 ELSE 0 END";
+        await using var command = new SqlCommand(sql, connection);
+        command.Parameters.Add("@PartnerID", SqlDbType.BigInt).Value = partnerId.Value;
+        command.Parameters.Add("@ProjectID", SqlDbType.BigInt).Value = projectId;
+        command.Parameters.Add("@Username", SqlDbType.NVarChar, 100).Value = (User.Identity?.Name ?? User.FindFirstValue("unique_name") ?? string.Empty).Trim().ToUpperInvariant();
+        command.Parameters.Add("@ScreenCode", SqlDbType.NVarChar, 100).Value = ScreenCode;
+        command.Parameters.Add("@Action", SqlDbType.NVarChar, 50).Value = action;
+        return Convert.ToBoolean(await command.ExecuteScalarAsync(token));
+    }
     private async Task<SqlConnection> OpenConnectionAsync(CancellationToken token) { var c = new SqlConnection(_configuration.GetConnectionString("LaooDatabase")); await c.OpenAsync(token); return c; }
     private static string? Null(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     private static void Add(SqlCommand c, string name, SqlDbType type, string? value, int size) => c.Parameters.Add(name, type, size).Value = (object?)value ?? DBNull.Value;

@@ -86,3 +86,18 @@ public sealed class EmployeeCarImageUpsertRequest
     public int ImageWidth { get; init; }
     public int ImageHeight { get; init; }
 }
+
+public sealed class EmployeeUserCreateRequest
+{
+    public long? CompanyId { get; init; }
+    public string Username { get; init; } = string.Empty;
+    public string Password { get; init; } = string.Empty;
+}
+
+public sealed class EmployeeUserUpsertRequest
+{
+    public long? CompanyId { get; init; }
+    public string Username { get; init; } = string.Empty;
+    public string? Password { get; init; }
+    public long? RoleGroupId { get; init; }
+}

@@ -6,6 +6,18 @@ BEGIN TRANSACTION;
 
 DECLARE @Now nvarchar(50) = CONVERT(nvarchar(50), SYSUTCDATETIME(), 126);
 
+/* Keep Employee menu captions as real Unicode Thai text. */
+DECLARE @EmployeeCaption nvarchar(200) =
+    NCHAR(3614)+NCHAR(3609)+NCHAR(3633)+NCHAR(3585)+NCHAR(3591)+NCHAR(3634)+NCHAR(3609)+NCHAR(3586)+NCHAR(3629)+NCHAR(3591);
+UPDATE dbo.TDADMainMenu
+SET MenuName = @EmployeeCaption + CASE WHEN MenuCode = N'11001' THEN N' ของ Partner' ELSE N' ของ Customer' END,
+    UpdateDate = SYSUTCDATETIME()
+WHERE MenuCode IN (N'10001',N'11001',N'12001');
+UPDATE dbo.TDSTScreen
+SET ScreenName = @EmployeeCaption + CASE WHEN ScreenCode = '11001' THEN N' ของ Partner' ELSE N' ของ Customer' END,
+    LastUpdate = @Now
+WHERE CompanyCode='TD' AND ScreenCode IN ('10001','11001','12001');
+
 /* Table and column metadata */
 DECLARE @TableFields TABLE
 (

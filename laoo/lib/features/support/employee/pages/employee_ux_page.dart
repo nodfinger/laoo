@@ -15,6 +15,8 @@ import '../../../partner/models/partner_company.dart';
 import '../data/employee_repository.dart';
 import '../../../support/master_data/data/master_data_api.dart';
 import '../../../../core/master/master_group_codes.dart';
+import '../../../access/role_group/data/role_group_repository.dart';
+import '../../../access/role_group/models/role_group.dart';
 
 class _EmployeeCalendarDelegate extends GregorianCalendarDelegate {
   const _EmployeeCalendarDelegate(this.buddhist);
@@ -67,6 +69,8 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
   final PartnerCompanyRepository _companyRepository =
       PartnerCompanyRepository();
   List<PartnerCompany> companies = [];
+  List<RoleGroup> _roleGroups = const [];
+  int? _selectedRoleGroupId;
   int? selectedCompanyId;
   String get _menuKey =>
       widget.customer ? 'customerEmployees' : 'partnerEmployees';
@@ -82,6 +86,8 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
   final searchController = TextEditingController();
   final employeeCodeController = TextEditingController();
   final fullNameController = TextEditingController();
+  final usernameController = TextEditingController();
+  final passwordController = TextEditingController();
   final nickNameController = TextEditingController();
   final positionController = TextEditingController();
   final emailController = TextEditingController();
@@ -116,6 +122,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
   int _currentPage = 1;
   int _totalCount = 0;
   bool _employeesLoading = false;
+  bool _canCreate = false, _canEdit = false, _canDelete = false;
 
   int get _pageSize => companySetupController.pageSize > 0
       ? companySetupController.pageSize
@@ -133,6 +140,17 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
     _loadVehicleMasters();
     if (widget.customer && !widget.companyScoped) _loadCompanies();
     _loadEmployees();
+    _loadRoleGroups();
+    _loadEmployeeActions();
+  }
+
+  Future<void> _loadEmployeeActions() async { try { final p = await _employeeRepository.actions(customer: widget.customer, company: widget.companyScoped); if (mounted) setState(() { _canCreate = p['create'] == true; _canEdit = p['edit'] == true; _canDelete = p['delete'] == true; }); } catch (_) {} }
+
+  Future<void> _loadRoleGroups() async {
+    try {
+      final groups = await RoleGroupRepository().list(widget.customer || widget.companyScoped ? 'customer' : 'partner');
+      if (mounted) setState(() => _roleGroups = groups.where((e) => e.isActive).toList());
+    } catch (_) {}
   }
 
   void _resetEmployeeFilters() {
@@ -709,7 +727,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
           Expanded(
             child: WorkspacePageTitle(title: 'พนักงาน', favoriteKey: _menuKey),
           ),
-          FilledButton.icon(
+          if (_canCreate) FilledButton.icon(
             onPressed: _startAddEmployee,
             icon: const Icon(Icons.add),
             label: const Text('เพิ่ม'),
@@ -952,7 +970,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
         const idWidth = 16.0;
         const statusWidth = 110.0;
         const tableRightPadding = 16.0;
-        const actionWidth = 92.0;
+        const actionWidth = 128.0;
         const phoneWidth = 140.0;
         const horizontalMargin = 16.0;
         const columnSpacing = 16.0;
@@ -1065,7 +1083,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
                                 child: Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    IconButton(
+                                    if (_canEdit) IconButton(
                                       tooltip: 'แก้ไข',
                                       visualDensity: VisualDensity.compact,
                                       padding: EdgeInsets.zero,
@@ -1080,7 +1098,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
                                         color: primary,
                                       ),
                                     ),
-                                    IconButton(
+                                    if (_canDelete) IconButton(
                                       tooltip: 'ลบ',
                                       visualDensity: VisualDensity.compact,
                                       padding: EdgeInsets.zero,
@@ -1092,6 +1110,23 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
                                       icon: const Icon(
                                         Icons.delete_outline,
                                         color: Colors.red,
+                                      ),
+                                    ),
+                                    IconButton(
+                                      tooltip: 'ผู้ใช้งาน',
+                                      visualDensity: VisualDensity.compact,
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(
+                                        minWidth: 32,
+                                        minHeight: 32,
+                                      ),
+                                      onPressed: () => _openEmployeeUserForm(
+                                        row.$1,
+                                        row.$5,
+                                      ),
+                                      icon: Icon(
+                                        Icons.person_add_alt_1_outlined,
+                                        color: primary,
                                       ),
                                     ),
                                   ],
@@ -1503,7 +1538,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
             child: const Text('ยกเลิก'),
           ),
           const SizedBox(width: 8),
-          FilledButton(onPressed: _saveEmployee, child: const Text('บันทึก')),
+          if ((editingEmployeeId == null && _canCreate) || (editingEmployeeId != null && _canEdit)) FilledButton(onPressed: _saveEmployee, child: const Text('บันทึก')),
         ],
       ),
       const SizedBox(height: 8),
@@ -1665,6 +1700,51 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
                                 Expanded(child: _startDateField()),
                               ],
                             ),
+                            const SizedBox(height: 12),
+                            Text(
+                              'User Login',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _actionField(
+                                    'Username',
+                                    usernameController,
+                                    width: double.infinity,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _actionField(
+                                    'Password',
+                                    passwordController,
+                                    width: double.infinity,
+                                    obscureText: true,
+                                    onTap: () {
+                                      if (passwordController.text == '****') {
+                                        passwordController.clear();
+                                      }
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: DropdownButtonFormField<int>(
+                                    value: _selectedRoleGroupId,
+                                    style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurface),
+                                    decoration: const InputDecoration(labelText: 'กลุ่มสิทธิ์ *', labelStyle: TextStyle(fontSize: 13)),
+                                    items: _roleGroups.map((group) => DropdownMenuItem<int>(value: group.id, child: Text(group.name, style: const TextStyle(fontSize: 13)))).toList(),
+                                    onChanged: (value) => setState(() => _selectedRoleGroupId = value),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ],
                         ),
                       ),
@@ -1723,7 +1803,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
               child: const Text('ยกเลิก'),
             ),
             const SizedBox(width: 8),
-            FilledButton(onPressed: _saveEmployee, child: const Text('บันทึก')),
+            if ((editingEmployeeId == null && _canCreate) || (editingEmployeeId != null && _canEdit)) FilledButton(onPressed: _saveEmployee, child: const Text('บันทึก')),
           ],
         ),
       ),
@@ -1734,11 +1814,15 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
     String label,
     TextEditingController controller, {
     double width = 320,
+    bool obscureText = false,
+    VoidCallback? onTap,
   }) =>
       SizedBox(
         width: width,
         child: TextField(
           controller: controller,
+          obscureText: obscureText,
+          onTap: onTap,
           decoration: InputDecoration(labelText: label),
         ),
       );
@@ -1940,6 +2024,22 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
       }
       return;
     }
+    final username = usernameController.text.trim();
+    final maskedPassword = passwordController.text == '****';
+    final password = maskedPassword ? '' : passwordController.text;
+    if (username.isNotEmpty && password.isEmpty && !maskedPassword) {
+      if (mounted) {
+        setState(() {
+          _alertMessage = 'กรุณากรอก Username และ Password ให้ครบ';
+          _alertIsError = true;
+        });
+      }
+      return;
+    }
+    if (username.isNotEmpty && _selectedRoleGroupId == null) {
+      if (mounted) setState(() { _alertMessage = 'กรุณาเลือกกลุ่มสิทธิ์'; _alertIsError = true; });
+      return;
+    }
     final body = {
       'divisionOrgUnitId': selectedDivisionId,
       'departmentOrgUnitId': selectedDepartmentId,
@@ -2030,6 +2130,17 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
           company: widget.companyScoped,
         );
       }
+      if (username.isNotEmpty) {
+        await _employeeRepository.upsertEmployeeUser(
+          savedEmployeeId,
+          username,
+          password.isEmpty ? null : password,
+          companyId: widget.customer ? selectedCompanyId : null,
+          customer: widget.customer,
+          company: widget.companyScoped,
+          roleGroupId: _selectedRoleGroupId,
+        );
+      }
     } on ApiException catch (error) {
       if (!mounted) return;
       setState(() {
@@ -2048,6 +2159,8 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
     if (!mounted) return;
     employeeCodeController.clear();
     fullNameController.clear();
+    usernameController.clear();
+    passwordController.clear();
     nickNameController.clear();
     positionController.clear();
       emailController.clear();
@@ -2070,6 +2183,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
       selectedDivisionId = null;
       selectedDepartmentId = null;
       isActive = true;
+      if (mounted) setState(() => _selectedRoleGroupId = null);
       editingEmployeeId = null;
       form = !wasEditing;
     });
@@ -2086,6 +2200,8 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
     _editRequestToken++;
     employeeCodeController.clear();
     fullNameController.clear();
+    usernameController.clear();
+    passwordController.clear();
     nickNameController.clear();
     positionController.clear();
     emailController.clear();
@@ -2121,6 +2237,8 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
     if (mounted) {
       setState(() {
         editingEmployeeId = id;
+        usernameController.clear();
+        passwordController.clear();
         _formalImageBytes = null;
         _formalImageName = null;
         _carImage1Bytes = null;
@@ -2171,8 +2289,222 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
       startDate = rawDate is String ? DateTime.tryParse(rawDate) : null;
       form = true;
     });
+    try {
+      final user = await _employeeRepository.getEmployeeUser(
+        id,
+        companyId: widget.customer ? selectedCompanyId : null,
+        customer: widget.customer,
+        company: widget.companyScoped,
+      );
+      if (mounted && requestToken == _editRequestToken) {
+        usernameController.text = (user['username'] ?? '').toString();
+        passwordController.text = usernameController.text.isEmpty ? '' : '****';
+        setState(() => _selectedRoleGroupId = (user['roleGroupId'] as num?)?.toInt());
+      }
+    } on ApiException {
+      usernameController.clear();
+      passwordController.clear();
+      if (mounted) setState(() => _selectedRoleGroupId = null);
+    }
     await _loadFormalImage(id);
     await _loadCarImages(id);
+  }
+
+  Future<void> _openEmployeeUserForm(String value, String employeeName) async {
+    final employeeId = int.tryParse(value);
+    if (employeeId == null) return;
+    final usernameController = TextEditingController();
+    final passwordController = TextEditingController();
+    final roleGroups = await RoleGroupRepository().list(widget.customer || widget.companyScoped ? 'customer' : 'partner');
+    int? selectedRoleGroupId;
+    var hasExistingUser = false;
+    try {
+      final user = await _employeeRepository.getEmployeeUser(
+        employeeId,
+        companyId: widget.customer ? selectedCompanyId : null,
+        customer: widget.customer,
+        company: widget.companyScoped,
+      );
+      usernameController.text = (user['username'] ?? '').toString();
+      selectedRoleGroupId = (user['roleGroupId'] as num?)?.toInt();
+      hasExistingUser = usernameController.text.isNotEmpty;
+      if (hasExistingUser) passwordController.text = '****';
+    } on ApiException {
+      // The employee may not have a linked user yet.
+    }
+    var saving = false;
+    String? errorMessage;
+    final saved = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => Dialog(
+          backgroundColor: Colors.white,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 440),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 12, 16),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .primary
+                      .withValues(alpha: 0.12),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'ผู้ใช้งาน',
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(
+                                    color: Theme.of(context).colorScheme.primary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(employeeName),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'ปิด',
+                        onPressed: saving
+                            ? null
+                            : () => Navigator.of(dialogContext).pop(false),
+                        icon: const Icon(Icons.close),
+                      ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      TextField(
+                        controller: usernameController,
+                        enabled: !saving,
+                        decoration: const InputDecoration(
+                          labelText: 'Username *',
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: passwordController,
+                        enabled: !saving,
+                        obscureText: true,
+                        onTap: () {
+                          if (passwordController.text == '****') {
+                            setDialogState(passwordController.clear);
+                          }
+                        },
+                        decoration: const InputDecoration(
+                          labelText: 'Password *',
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<int>(
+                        value: selectedRoleGroupId,
+                        style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurface),
+                        decoration: const InputDecoration(labelText: 'กลุ่มสิทธิ์ *', labelStyle: TextStyle(fontSize: 16)),
+                        items: roleGroups.where((e) => e.isActive).map((RoleGroup group) => DropdownMenuItem<int>(value: group.id, child: Text(group.name, style: const TextStyle(fontSize: 13)))).toList(),
+                        onChanged: saving ? null : (value) => setDialogState(() => selectedRoleGroupId = value),
+                      ),
+                      if (errorMessage != null) ...[
+                        const SizedBox(height: 12),
+                        Text(
+                          errorMessage!,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+                  color: Colors.white,
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: FilledButton(
+                      onPressed: saving
+                          ? null
+                          : () async {
+                              final maskedPassword =
+                                  passwordController.text == '****';
+                              if (usernameController.text.trim().isEmpty ||
+                                  (passwordController.text.isEmpty &&
+                                      !maskedPassword &&
+                                      !hasExistingUser)) {
+                                setDialogState(() => errorMessage =
+                                    'กรุณาระบุ Username และ Password');
+                                return;
+                              }
+                              if (selectedRoleGroupId == null) {
+                                setDialogState(() => errorMessage = 'กรุณาเลือกกลุ่มสิทธิ์');
+                                return;
+                              }
+                              setDialogState(() {
+                                saving = true;
+                                errorMessage = null;
+                              });
+                              try {
+                                await _employeeRepository.upsertEmployeeUser(
+                                  employeeId,
+                                  usernameController.text.trim(),
+                                  maskedPassword ? null : passwordController.text,
+                                  roleGroupId: selectedRoleGroupId,
+                                  companyId: widget.customer
+                                      ? selectedCompanyId
+                                      : null,
+                                  customer: widget.customer,
+                                  company: widget.companyScoped,
+                                );
+                                if (dialogContext.mounted) {
+                                  Navigator.of(dialogContext).pop(true);
+                                }
+                              } on ApiException catch (e) {
+                                setDialogState(() {
+                                  saving = false;
+                                  errorMessage = e.message;
+                                });
+                              } catch (e) {
+                                setDialogState(() {
+                                  saving = false;
+                                  errorMessage = '$e';
+                                });
+                              }
+                            },
+                      child: saving
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text('บันทึก'),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    usernameController.dispose();
+    passwordController.dispose();
+    if (saved == true && mounted) {
+      setState(() {
+        _alertMessage = 'สร้างผู้ใช้งานสำหรับ $employeeName สำเร็จ';
+        _alertIsError = false;
+      });
+    }
   }
 
   Future<void> _deleteEmployee(String value) async {

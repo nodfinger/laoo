@@ -3,6 +3,16 @@ import '../../../../core/api/api_client.dart';
 class BranchRepository {
   BranchRepository({ApiClient? api}) : _api = api ?? ApiClient();
   final ApiClient _api;
+
+  Future<Map<String, bool>> actions({bool support = true}) async {
+    final data = await _api.get(
+      '${support ? '/api/support/branches' : '/api/partner/branches'}/actions',
+    );
+    if (data is! Map) return const {};
+    return Map<String, bool>.fromEntries(
+      data.entries.map((entry) => MapEntry('${entry.key}', entry.value == true)),
+    );
+  }
   Future<List<Map<String, dynamic>>> get({
     String? search,
     int? companyId,

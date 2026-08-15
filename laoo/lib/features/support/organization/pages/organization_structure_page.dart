@@ -31,6 +31,7 @@ class _OrganizationStructurePageState extends State<OrganizationStructurePage> {
   bool _loading = true;
   bool _saving = false;
   bool _active = true;
+  bool _canCreate = false, _canEdit = false, _canDelete = false;
   String? _message;
 
   String _errorMessage(Object error) =>
@@ -40,9 +41,12 @@ class _OrganizationStructurePageState extends State<OrganizationStructurePage> {
   @override
   void initState() {
     super.initState();
+    _loadActions();
     _resolveCaption();
     _load();
   }
+
+  Future<void> _loadActions() async { try { final p = await _repository.actions(); if (mounted) setState(() { _canCreate = p['create'] == true; _canEdit = p['edit'] == true; _canDelete = p['delete'] == true; }); } catch (_) {} }
 
   @override
   void dispose() {
@@ -198,7 +202,7 @@ class _OrganizationStructurePageState extends State<OrganizationStructurePage> {
     return Card(
       child: Column(
         children: [
-          _panelHeader('ฝ่าย', 'เพิ่มฝ่าย', () => _openForm('DIV')),
+          _panelHeader('ฝ่าย', 'เพิ่มฝ่าย', _canCreate ? () => _openForm('DIV') : null),
           const Divider(height: 1),
           if (divisions.isEmpty)
             const Expanded(child: Center(child: Text('ยังไม่มีข้อมูลฝ่าย')))
@@ -222,12 +226,12 @@ class _OrganizationStructurePageState extends State<OrganizationStructurePage> {
                     ),
                     trailing: Wrap(
                       children: [
-                        IconButton(
+                        if (_canEdit) IconButton(
                           tooltip: 'แก้ไข',
                           onPressed: () => _openForm('DIV', item: item),
                           icon: const Icon(Icons.edit_outlined),
                         ),
-                        IconButton(
+                        if (_canDelete) IconButton(
                           tooltip: 'ลบ',
                           onPressed: () => _confirmDelete(item),
                           icon: const Icon(
@@ -270,7 +274,7 @@ class _OrganizationStructurePageState extends State<OrganizationStructurePage> {
           _panelHeader(
             departmentTitle,
             'เพิ่มแผนก',
-            enabled ? () => _openForm('DEP') : null,
+            enabled && _canCreate ? () => _openForm('DEP') : null,
           ),
           Divider(height: 1, color: Colors.grey.shade300),
           if (!enabled)
@@ -295,12 +299,12 @@ class _OrganizationStructurePageState extends State<OrganizationStructurePage> {
                     title: Text('${item['unitCode']} - ${item['nameTh']}'),
                     trailing: Wrap(
                       children: [
-                        IconButton(
+                        if (_canEdit) IconButton(
                           tooltip: 'แก้ไข',
                           onPressed: () => _openForm('DEP', item: item),
                           icon: const Icon(Icons.edit_outlined),
                         ),
-                        IconButton(
+                        if (_canDelete) IconButton(
                           tooltip: 'ลบ',
                           onPressed: () => _confirmDelete(item),
                           icon: const Icon(
@@ -432,7 +436,7 @@ class _OrganizationStructurePageState extends State<OrganizationStructurePage> {
         spacing: 8,
         children: [
           OutlinedButton(onPressed: _saving ? null : _closeForm, child: const Text('ยกเลิก')),
-          FilledButton(onPressed: _saving ? null : _save, child: const Text('บันทึก')),
+          if ((_editing == null && _canCreate) || (_editing != null && _canEdit)) FilledButton(onPressed: _saving ? null : _save, child: const Text('บันทึก')),
         ],
       );
 

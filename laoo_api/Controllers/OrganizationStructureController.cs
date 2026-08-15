@@ -39,6 +39,13 @@ public sealed class OrganizationStructureController(IConfiguration configuration
         return Ok(new { orgStructureType = modes.Count == 1 ? modes[0] : 1, units });
     }
 
+    [HttpGet("actions")]
+    public async Task<ActionResult<object>> Actions(CancellationToken token)
+    {
+        await using var connection = await Open(token);
+        return Ok(new { view = await Allowed(connection, "VIEW", token), create = await Allowed(connection, "CREATE", token), edit = await Allowed(connection, "EDIT", token), delete = await Allowed(connection, "DELETE", token) });
+    }
+
     [HttpPost]
     public Task<IActionResult> Create(UnitRequest request, CancellationToken token) => Save(null, request, token);
 
@@ -171,33 +178,58 @@ public sealed class OrganizationStructureController(IConfiguration configuration
         catch(SqlException ex) when(ex.Number==50004){return Conflict(new {message="โหมดแผนกเท่านั้นไม่อนุญาตให้เลือกฝ่าย"});}
         catch(SqlException ex) when(ex.Number==50005){return Conflict(new {message="กรุณาเลือกฝ่ายก่อนบันทึกแผนก"});}
     }
-    private async Task<bool> Allowed(SqlConnection c,string action,CancellationToken t)
+    private async Task<bool> Allowed(SqlConnection c, string action, CancellationToken t)
     {
         if (!long.TryParse(User.FindFirstValue("project_id"), out var pid)) return false;
-        string sql;
         await using var cmd = new SqlCommand { Connection = c };
+        string sql;
+        var menuCode = IsPartner() ? "11005" : User.FindFirstValue("laoo_user_id") is not null ? "12005" : "10005";
+        cmd.Parameters.Add("@pid", SqlDbType.BigInt).Value = pid;
+        cmd.Parameters.Add("@screen", SqlDbType.NVarChar, 100).Value = ScreenCode;
+        cmd.Parameters.Add("@menuCode", SqlDbType.NVarChar, 20).Value = menuCode;
+        cmd.Parameters.Add("@action", SqlDbType.NVarChar, 50).Value = action;
         if (IsPartner())
         {
             if (!long.TryParse(User.FindFirstValue("partner_id"), out var partnerId)) return false;
-            sql = "SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADPartnerUser U WHERE U.PartnerID=@partner AND U.NormalizedUsername=@username AND U.IsPartnerAdmin=1 AND U.IsActive=1) OR EXISTS(SELECT 1 FROM dbo.TDADPartnerUser U JOIN dbo.TDADPartnerUserPermission UP ON UP.PartnerUserID=U.PartnerUserID JOIN dbo.TDADPermission P ON P.PermissionID=UP.PermissionID AND P.ProjectID=UP.ProjectID WHERE U.PartnerID=@partner AND U.NormalizedUsername=@username AND U.IsActive=1 AND UP.ProjectID=@pid AND UP.IsAllowed=1 AND UP.IsActive=1 AND P.ScreenCode=@screen AND P.ActionCode=@action AND P.IsActive=1) THEN 1 ELSE 0 END";
             cmd.Parameters.Add("@partner", SqlDbType.BigInt).Value = partnerId;
             cmd.Parameters.Add("@username", SqlDbType.NVarChar, 100).Value = Username().ToUpperInvariant();
+            sql = """
+                SELECT CASE WHEN EXISTS(
+                    SELECT 1 FROM dbo.TDADPartnerUser U
+                    WHERE U.PartnerID=@partner AND U.NormalizedUsername=@username AND U.IsPartnerAdmin=1 AND U.IsActive=1)
+                  OR EXISTS(
+                    SELECT 1 FROM dbo.TDADPartnerUser U
+                    INNER JOIN dbo.TDADPartnerUserPermission UP ON UP.PartnerUserID=U.PartnerUserID
+                    INNER JOIN dbo.TDADPermission P ON P.PermissionID=UP.PermissionID AND P.ProjectID=UP.ProjectID
+                    WHERE U.PartnerID=@partner AND U.NormalizedUsername=@username AND U.IsActive=1
+                      AND UP.ProjectID=@pid AND UP.IsAllowed=1 AND UP.IsActive=1 AND P.IsActive=1
+                      AND P.ScreenCode IN (@screen,N'ORGANIZATION_STRUCTURE',@menuCode) AND P.ActionCode=@action)
+                  OR EXISTS(
+                    SELECT 1 FROM dbo.TDADPartnerUser U
+                    INNER JOIN dbo.TDADPartnerUserEmployee PUE ON PUE.PartnerUserID=U.PartnerUserID
+                    INNER JOIN dbo.TDADEmployeeRoleGroup ERG ON ERG.EmployeeID=PUE.EmployeeID
+                    INNER JOIN dbo.TDADRoleGroup RG ON RG.RoleGroupID=ERG.RoleGroupID AND RG.ScopeType='P'
+                      AND RG.PartnerID=U.PartnerID AND RG.ProjectID=@pid
+                    INNER JOIN dbo.TDADRoleGroupPermission RP ON RP.RoleGroupID=RG.RoleGroupID AND RP.ProjectID=@pid
+                      AND RP.MenuCode IN (@screen,@menuCode) AND RP.ActionCode=@action AND RP.IsAllowed=1
+                    WHERE U.PartnerID=@partner AND U.NormalizedUsername=@username AND U.IsActive=1
+                      AND ERG.IsActive=1 AND ERG.EffectiveFrom<=CONVERT(date,SYSUTCDATETIME())
+                      AND (ERG.EffectiveTo IS NULL OR ERG.EffectiveTo>=CONVERT(date,SYSUTCDATETIME())))
+                THEN 1 ELSE 0 END;
+                """;
         }
         else
         {
             var isLaoo = User.FindFirstValue("laoo_user_id") is not null;
             if (!long.TryParse(User.FindFirstValue(isLaoo ? "laoo_user_id" : "user_id"), out var uid)) return false;
+            cmd.Parameters.Add("@uid", SqlDbType.BigInt).Value = uid;
             var table = isLaoo ? "TDADLaooUserPermission" : "TDADUserPermission";
             var key = isLaoo ? "LaooUserID" : "UserID";
             sql = isLaoo
-                ? $"SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.{table} UP JOIN dbo.TDADPermission P ON P.PermissionID=UP.PermissionID AND P.ProjectID=UP.ProjectID WHERE UP.{key}=@uid AND UP.ProjectID=@pid AND UP.IsAllowed=1 AND UP.IsActive=1 AND P.ScreenCode=@screen AND P.ActionCode=@action AND P.IsActive=1) THEN 1 ELSE 0 END"
-                : $"SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADUser U WHERE U.UserID=@uid AND U.IsActive=1 AND U.IsCompanyAdmin=1) OR EXISTS(SELECT 1 FROM dbo.{table} UP JOIN dbo.TDADPermission P ON P.PermissionID=UP.PermissionID AND P.ProjectID=UP.ProjectID WHERE UP.{key}=@uid AND UP.ProjectID=@pid AND UP.IsAllowed=1 AND UP.IsActive=1 AND P.ScreenCode=@screen AND P.ActionCode=@action AND P.IsActive=1) THEN 1 ELSE 0 END";
-            cmd.Parameters.Add("@uid", SqlDbType.BigInt).Value = uid;
+                ? $"SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.{table} UP JOIN dbo.TDADPermission P ON P.PermissionID=UP.PermissionID AND P.ProjectID=UP.ProjectID WHERE UP.{key}=@uid AND UP.ProjectID=@pid AND UP.IsAllowed=1 AND UP.IsActive=1 AND P.ScreenCode IN (@screen,N'ORGANIZATION_STRUCTURE',@menuCode) AND P.ActionCode=@action AND P.IsActive=1) THEN 1 ELSE 0 END"
+                : $"SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADUser U WHERE U.UserID=@uid AND U.IsActive=1 AND U.IsCompanyAdmin=1) OR EXISTS(SELECT 1 FROM dbo.{table} UP JOIN dbo.TDADPermission P ON P.PermissionID=UP.PermissionID AND P.ProjectID=UP.ProjectID WHERE UP.{key}=@uid AND UP.ProjectID=@pid AND UP.IsAllowed=1 AND UP.IsActive=1 AND P.ScreenCode IN (@screen,N'ORGANIZATION_STRUCTURE',@menuCode) AND P.ActionCode=@action AND P.IsActive=1) OR EXISTS(SELECT 1 FROM dbo.TDADUser U INNER JOIN dbo.TDADUserEmployee UE ON UE.UserID=U.UserID INNER JOIN dbo.TDADEmployeeRoleGroup ERG ON ERG.EmployeeID=UE.EmployeeID INNER JOIN dbo.TDADRoleGroup RG ON RG.RoleGroupID=ERG.RoleGroupID AND RG.ScopeType='C' AND RG.CompanyID=U.CompanyID AND RG.ProjectID=@pid INNER JOIN dbo.TDADRoleGroupPermission RP ON RP.RoleGroupID=RG.RoleGroupID AND RP.ProjectID=@pid AND RP.MenuCode IN (@screen,@menuCode) AND RP.ActionCode=@action AND RP.IsAllowed=1 WHERE U.UserID=@uid AND U.IsActive=1 AND ERG.IsActive=1 AND ERG.EffectiveFrom<=CONVERT(date,SYSUTCDATETIME()) AND (ERG.EffectiveTo IS NULL OR ERG.EffectiveTo>=CONVERT(date,SYSUTCDATETIME()))) THEN 1 ELSE 0 END";
         }
         cmd.CommandText = sql;
-        cmd.Parameters.Add("@pid", SqlDbType.BigInt).Value = pid;
-        cmd.Parameters.Add("@screen", SqlDbType.NVarChar, 100).Value = ScreenCode;
-        cmd.Parameters.Add("@action", SqlDbType.NVarChar, 50).Value = action;
         return Convert.ToBoolean(await cmd.ExecuteScalarAsync(t));
     }
     private async Task<SqlConnection> Open(CancellationToken t){var c=new SqlConnection(configuration.GetConnectionString("LaooDatabase"));await c.OpenAsync(t);return c;}

@@ -50,12 +50,23 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
   int _orgStructureType = 1;
 
   bool _saving = false;
+  bool _canEdit = false;
   String? _message;
 
   @override
   void initState() {
     super.initState();
+    _loadActions();
     _load();
+  }
+
+  Future<void> _loadActions() async {
+    try {
+      final permissions = await _api.actions();
+      if (mounted) {
+        setState(() => _canEdit = permissions['edit'] == true);
+      }
+    } catch (_) {}
   }
 
   Future<void> _load() async {
@@ -224,6 +235,7 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
                       ),
                       _TopActions(
                         saving: _saving,
+                        canSave: _canEdit,
                         onCancel: _cancel,
                         onSave: _save,
                       ),
@@ -268,6 +280,7 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
                     alignment: Alignment.centerRight,
                     child: _TopActions(
                       saving: _saving,
+                      canSave: _canEdit,
                       onCancel: _cancel,
                       onSave: _save,
                     ),
@@ -808,11 +821,13 @@ class _TopActions extends StatelessWidget {
     required this.saving,
     required this.onCancel,
     required this.onSave,
+    required this.canSave,
   });
 
   final bool saving;
   final VoidCallback onCancel;
   final VoidCallback onSave;
+  final bool canSave;
 
   @override
   Widget build(BuildContext context) {
@@ -824,7 +839,7 @@ class _TopActions extends StatelessWidget {
           icon: const Icon(Icons.close_rounded),
           label: const Text('ยกเลิก'),
         ),
-        FilledButton.icon(
+        if (canSave) FilledButton.icon(
           onPressed: saving ? null : onSave,
           icon: saving
               ? const SizedBox(

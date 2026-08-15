@@ -329,6 +329,9 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
   int? _partnerFilterId;
   String _statusFilter = 'ทั้งหมด';
   bool _loading = true;
+  bool _canCreate = false;
+  bool _canEdit = false;
+  bool _canDelete = false;
   String? _error;
   String? _message;
   String _menuName = '';
@@ -380,7 +383,24 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
     _menuName = NavigationMenuRepository.fallbackMenuName(routeName: _menuCode);
     _loadMenuName();
     if (widget.menuScope == WorkspaceMenuScope.support) _loadPartners();
+    _loadActions();
     _load();
+  }
+
+  Future<void> _loadActions() async {
+    if (widget.menuScope == WorkspaceMenuScope.support) {
+      if (mounted) setState(() { _canCreate = true; _canEdit = true; _canDelete = true; });
+      return;
+    }
+    try {
+      final permissions = await _repository.actions();
+      if (!mounted) return;
+      setState(() {
+        _canCreate = permissions['create'] == true;
+        _canEdit = permissions['edit'] == true;
+        _canDelete = permissions['delete'] == true;
+      });
+    } catch (_) {}
   }
 
   Future<void> _loadMenuName() async {
@@ -768,7 +788,7 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
                         : 'partnerCompanies',
                   ),
                 ),
-                if (widget.menuScope != WorkspaceMenuScope.support)
+                if (widget.menuScope != WorkspaceMenuScope.support && _canCreate)
                   FilledButton.icon(
                     onPressed: () => _openFullForm(),
                     icon: const Icon(Icons.add),
@@ -997,7 +1017,7 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
                                       child: Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          IconButton(
+                                          if (widget.menuScope == WorkspaceMenuScope.support || _canEdit) IconButton(
                                             tooltip: 'กำหนดผู้ดูแลระบบ',
                                             visualDensity:
                                                 VisualDensity.compact,
@@ -1011,7 +1031,7 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
                                                   .primary,
                                             ),
                                           ),
-                                          IconButton(
+                                          if (widget.menuScope == WorkspaceMenuScope.support || _canEdit) IconButton(
                                             tooltip: 'แก้ไข',
                                             visualDensity:
                                                 VisualDensity.compact,
@@ -1025,7 +1045,7 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
                                               ).colorScheme.primary,
                                             ),
                                           ),
-                                          IconButton(
+                                          if (widget.menuScope == WorkspaceMenuScope.support || _canDelete) IconButton(
                                             tooltip: 'ลบ',
                                             visualDensity:
                                                 VisualDensity.compact,

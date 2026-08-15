@@ -302,13 +302,14 @@ public sealed class AuthContextController : ControllerBase
     {
         const string sql = """
             SELECT CompanyID, CompanyCode, CompanyNameTH, CompanyNameEN
-            FROM dbo.TDADCompany
+            FROM dbo.TDADCompany WITH (READUNCOMMITTED)
             WHERE PartnerID = @PartnerID
               AND IsActive = 1
             ORDER BY CompanyCode;
             """;
 
         await using var command = new SqlCommand(sql, connection);
+        command.CommandTimeout = 15;
         command.Parameters.Add(new SqlParameter("@PartnerID", SqlDbType.BigInt)
         {
             Value = partnerId
