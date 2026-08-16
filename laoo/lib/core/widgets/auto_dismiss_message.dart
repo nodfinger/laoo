@@ -3,19 +3,52 @@ import 'package:flutter/material.dart';
 import '../company_setup/company_setup_controller.dart';
 
 class AutoDismissMessage extends StatefulWidget {
-  const AutoDismissMessage({super.key, required this.message, required this.onClose, this.error = false});
+  const AutoDismissMessage({
+    super.key,
+    required this.message,
+    required this.onClose,
+    this.error = false,
+  });
   final String message;
   final VoidCallback onClose;
   final bool error;
-  @override State<AutoDismissMessage> createState() => _AutoDismissMessageState();
+  @override
+  State<AutoDismissMessage> createState() => _AutoDismissMessageState();
 }
 
 class _AutoDismissMessageState extends State<AutoDismissMessage> {
   Timer? _timer;
-  @override void initState() { super.initState(); _start(); }
-  void _start() { _timer = Timer(Duration(seconds: companySetupController.current?.timeAlert ?? 30), widget.onClose); }
-  @override void dispose() { _timer?.cancel(); super.dispose(); }
-  @override Widget build(BuildContext context) {
+  @override
+  void initState() {
+    super.initState();
+    _start();
+  }
+
+  void _start() {
+    _timer?.cancel();
+    _timer = Timer(
+      Duration(seconds: companySetupController.current?.timeAlert ?? 30),
+      widget.onClose,
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant AutoDismissMessage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.message != widget.message ||
+        oldWidget.onClose != widget.onClose) {
+      _start();
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final color = widget.error ? scheme.error : scheme.primary;
     final foreground = widget.error ? scheme.onError : scheme.onPrimary;

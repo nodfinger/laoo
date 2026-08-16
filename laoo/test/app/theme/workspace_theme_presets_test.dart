@@ -1,6 +1,6 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:laoo/app/theme/workspace_theme_presets.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   test('workspace theme codes remain unique', () {
@@ -10,31 +10,36 @@ void main() {
   });
 
   test(
-    'workspace theme controller restores and saves the selected style',
+    'workspace theme controller keeps the profile/API selection in memory',
     () async {
-      SharedPreferences.setMockInitialValues({
-        'workspace.theme.code': 'STYLE40',
-      });
       final controller = WorkspaceThemeController();
 
       await controller.initialize();
-      expect(controller.value.code, 'STYLE40');
-
-      final style01 = workspaceThemeByCode('STYLE01');
-      await controller.save(style01);
-
-      final preferences = await SharedPreferences.getInstance();
-      expect(preferences.getString('workspace.theme.code'), 'STYLE01');
       expect(controller.value.code, 'STYLE01');
+
+      final profileTheme = workspaceThemeByCode('STYLE40');
+      await controller.save(profileTheme);
+
+      expect(controller.value, same(profileTheme));
     },
   );
 
-  test('removed or unknown theme preference falls back to STYLE01', () async {
-    SharedPreferences.setMockInitialValues({'workspace.theme.code': 'STYLE41'});
-    final controller = WorkspaceThemeController();
+  test('unknown profile theme code falls back to STYLE01', () {
+    expect(workspaceThemeByCode('STYLE41').code, 'STYLE01');
+  });
 
-    await controller.initialize();
+  test('ThemeData follows each workspace preset', () {
+    for (final code in ['STYLE31', 'STYLE21']) {
+      final preset = workspaceThemeByCode(code);
+      final theme = preset.toThemeData();
 
-    expect(controller.value.code, 'STYLE01');
+      expect(theme.colorScheme.primary, preset.primary);
+      expect(theme.scaffoldBackgroundColor, preset.background);
+      expect(theme.colorScheme.surface, preset.surface);
+      expect(
+        theme.brightness,
+        preset.isDark ? Brightness.dark : Brightness.light,
+      );
+    }
   });
 }

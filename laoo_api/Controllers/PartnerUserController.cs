@@ -51,6 +51,8 @@ ORDER BY Username;
             string.IsNullOrWhiteSpace(request.Password) ||
             string.IsNullOrWhiteSpace(request.DisplayName))
             return BadRequest(new { message = "กรุณาระบุ Username, Password และชื่อผู้ใช้งาน" });
+        if (!PasswordService.MeetsPolicy(request.Username.Trim(), request.Password))
+            return BadRequest(new { message = PasswordService.PolicyMessage });
 
         await using var connection = await OpenAsync(cancellationToken);
         if (!await HasPermissionAsync(connection, "CREATE", cancellationToken)) return Forbid();
@@ -92,6 +94,9 @@ SELECT CAST(SCOPE_IDENTITY() AS BIGINT);
     {
         if (!await IsLaooSupportAsync(cancellationToken)) return Forbid();
         if (string.IsNullOrWhiteSpace(request.DisplayName) || string.IsNullOrWhiteSpace(request.Username)) return BadRequest(new { message = "กรุณาระบุ Username และชื่อผู้ใช้งาน" });
+        if (!string.IsNullOrWhiteSpace(request.Password) &&
+            !PasswordService.MeetsPolicy(request.Username.Trim(), request.Password))
+            return BadRequest(new { message = PasswordService.PolicyMessage });
         await using var connection = await OpenAsync(cancellationToken);
         if (!await HasPermissionAsync(connection, "EDIT", cancellationToken)) return Forbid();
         var passwordSql = string.IsNullOrWhiteSpace(request.Password) ? "" : ", PasswordHash=@PasswordHash";

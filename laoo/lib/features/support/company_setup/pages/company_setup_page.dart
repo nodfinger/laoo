@@ -39,6 +39,7 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
   final _emailPort = TextEditingController(text: '587');
   final _emailCenter = TextEditingController(text: 'nodfinger@gmail.com');
   final _emailAdmin = TextEditingController(text: 'nodfinger@gmail.com');
+  final _emailPasswordCenter = TextEditingController();
   final _superUserName = TextEditingController();
   final _passwordCry = TextEditingController();
   final _passwordEmpDefault = TextEditingController();
@@ -132,6 +133,7 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
       _emailPort,
       _emailCenter,
       _emailAdmin,
+      _emailPasswordCenter,
       _superUserName,
       _passwordCry,
       _passwordEmpDefault,
@@ -143,7 +145,19 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
   }
 
   Future<void> _save() async {
-    if (_saving || !(_formKey.currentState?.validate() ?? false)) return;
+    if (_saving) return;
+    final invalidEmail = [_email, _emailCenter, _emailAdmin].any(
+      (controller) =>
+          controller.text.trim().isNotEmpty && !_isValidEmail(controller.text),
+    );
+    if (invalidEmail) {
+      setState(() {
+        _messageIsError = true;
+        _message = 'คุณกำหนดรูปแบบ email ไม่ถูกต้อง';
+      });
+      return;
+    }
+    if (!(_formKey.currentState?.validate() ?? false)) return;
     setState(() => _saving = true);
     if (DateTime.now().millisecondsSinceEpoch >= 0) {
       try {
@@ -167,6 +181,7 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
             emailPort: int.tryParse(_emailPort.text),
             emailCenter: _emailCenter.text,
             emailAdmin: _emailAdmin.text,
+            emailPasswordCenter: _emailPasswordCenter.text,
             superUserName: _superUserName.text,
             passwordCry: _passwordCry.text,
             passwordEmpDefault: _passwordEmpDefault.text,
@@ -178,6 +193,7 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
         _superUserName.clear();
         _passwordCry.clear();
         _passwordEmpDefault.clear();
+        _emailPasswordCenter.clear();
         setState(() {
           _saving = false;
           _messageIsError = false;
@@ -208,6 +224,9 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
     });
   }
 
+  bool _isValidEmail(String value) =>
+      RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(value.trim());
+
   void _cancel() => context.goNamed(RouteNames.authenticatedHome);
 
   @override
@@ -222,71 +241,72 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
             _loading
                 ? const Center(child: CircularProgressIndicator())
                 : ListView(
-                padding: const EdgeInsets.all(24),
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
+                    padding: const EdgeInsets.all(24),
                     children: [
-                      const Expanded(
-                        child: WorkspacePageTitle(
-                          title: 'กำหนดค่าระบบ',
-                          favoriteKey: 'กำหนดค่าระบบ',
-                        ),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          const Expanded(
+                            child: WorkspacePageTitle(
+                              title: 'กำหนดค่าระบบ',
+                              favoriteKey: '05001',
+                            ),
+                          ),
+                          _TopActions(
+                            saving: _saving,
+                            canSave: _canEdit,
+                            onCancel: _cancel,
+                            onSave: _save,
+                          ),
+                        ],
                       ),
-                      _TopActions(
-                        saving: _saving,
-                        canSave: _canEdit,
-                        onCancel: _cancel,
-                        onSave: _save,
+                      const SizedBox(height: 8),
+                      _CompanySetupUxForm(
+                        ownerCode: _ownerCode,
+                        ownerName: _ownerName,
+                        titleHeader: _titleHeader,
+                        customerNameTh: _customerNameTh,
+                        customerNameEn: _customerNameEn,
+                        address: _address,
+                        telephone: _telephone,
+                        taxId: _taxId,
+                        email: _email,
+                      ),
+                      const SizedBox(height: 16),
+                      _LegacySetupCards(
+                        controllers: {
+                          'rowStd': _rowStd,
+                          'rowCardStd': _rowCardStd,
+                          'timeAlert': _timeAlert,
+                          'versionId': _versionId,
+                          'emailHost': _emailHost,
+                          'emailPort': _emailPort,
+                          'emailCenter': _emailCenter,
+                          'emailAdmin': _emailAdmin,
+                          'emailPasswordCenter': _emailPasswordCenter,
+                          'superUserName': _superUserName,
+                          'passwordCry': _passwordCry,
+                          'passwordEmpDefault': _passwordEmpDefault,
+                        },
+                        yearFormat: _yearFormat,
+                        onYearFormatChanged: (value) =>
+                            setState(() => _yearFormat = value),
+                        orgStructureType: _orgStructureType,
+                        onOrgStructureTypeChanged: (value) =>
+                            setState(() => _orgStructureType = value),
+                      ),
+                      const SizedBox(height: 20),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: _TopActions(
+                          saving: _saving,
+                          canSave: _canEdit,
+                          onCancel: _cancel,
+                          onSave: _save,
+                        ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  _CompanySetupUxForm(
-                    ownerCode: _ownerCode,
-                    ownerName: _ownerName,
-                    titleHeader: _titleHeader,
-                    customerNameTh: _customerNameTh,
-                    customerNameEn: _customerNameEn,
-                    address: _address,
-                    telephone: _telephone,
-                    taxId: _taxId,
-                    email: _email,
-                  ),
-                  const SizedBox(height: 16),
-                  _LegacySetupCards(
-                    controllers: {
-                      'rowStd': _rowStd,
-                      'rowCardStd': _rowCardStd,
-                      'timeAlert': _timeAlert,
-                      'versionId': _versionId,
-                      'emailHost': _emailHost,
-                      'emailPort': _emailPort,
-                      'emailCenter': _emailCenter,
-                      'emailAdmin': _emailAdmin,
-                      'superUserName': _superUserName,
-                      'passwordCry': _passwordCry,
-                      'passwordEmpDefault': _passwordEmpDefault,
-                    },
-                    yearFormat: _yearFormat,
-                    onYearFormatChanged: (value) =>
-                        setState(() => _yearFormat = value),
-                    orgStructureType: _orgStructureType,
-                    onOrgStructureTypeChanged: (value) =>
-                        setState(() => _orgStructureType = value),
-                  ),
-                  const SizedBox(height: 20),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: _TopActions(
-                      saving: _saving,
-                      canSave: _canEdit,
-                      onCancel: _cancel,
-                      onSave: _save,
-                    ),
-                  ),
-                ],
-              ),
             if (_message != null)
               Positioned(
                 top: 12,
@@ -443,6 +463,11 @@ class _LegacySetupCards extends StatelessWidget {
                     value: 'nodfinger@gmail.com',
                     controller: controllers['emailAdmin'],
                   ),
+                  if (controllers['emailPasswordCenter'] case final controller?)
+                    _SecretField(
+                      label: 'Email Password / App Password',
+                      controller: controller,
+                    ),
                 ],
               ),
             ),
@@ -560,6 +585,44 @@ class _LegacyField extends StatelessWidget {
         controller: controller,
         initialValue: controller == null ? value : null,
         decoration: InputDecoration(labelText: resolvedLabel),
+      ),
+    );
+  }
+}
+
+class _SecretField extends StatefulWidget {
+  const _SecretField({required this.label, required this.controller});
+
+  final String label;
+  final TextEditingController controller;
+
+  @override
+  State<_SecretField> createState() => _SecretFieldState();
+}
+
+class _SecretFieldState extends State<_SecretField> {
+  bool _obscure = true;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: TextFormField(
+        controller: widget.controller,
+        obscureText: _obscure,
+        autofillHints: const [AutofillHints.password],
+        decoration: InputDecoration(
+          labelText: widget.label,
+          suffixIcon: IconButton(
+            tooltip: _obscure ? 'แสดงรหัสผ่าน' : 'ซ่อนรหัสผ่าน',
+            icon: Icon(
+              _obscure
+                  ? Icons.visibility_outlined
+                  : Icons.visibility_off_outlined,
+            ),
+            onPressed: () => setState(() => _obscure = !_obscure),
+          ),
+        ),
       ),
     );
   }
@@ -839,58 +902,19 @@ class _TopActions extends StatelessWidget {
           icon: const Icon(Icons.close_rounded),
           label: const Text('ยกเลิก'),
         ),
-        if (canSave) FilledButton.icon(
-          onPressed: saving ? null : onSave,
-          icon: saving
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.save_outlined),
-          label: const Text('บันทึก'),
-        ),
+        if (canSave)
+          FilledButton.icon(
+            onPressed: saving ? null : onSave,
+            icon: saving
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.save_outlined),
+            label: const Text('บันทึก'),
+          ),
       ],
-    );
-  }
-}
-
-class _InlineMessage extends StatelessWidget {
-  const _InlineMessage({required this.message, required this.onClose})
-    : error = false;
-
-  final String message;
-  final VoidCallback onClose;
-  final bool error;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = error
-        ? Theme.of(context).colorScheme.error
-        : Theme.of(context).colorScheme.primary;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        border: Border.all(color: color.withValues(alpha: 0.25)),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            error
-                ? Icons.error_outline_rounded
-                : Icons.check_circle_outline_rounded,
-            color: color,
-          ),
-          const SizedBox(width: 9),
-          Expanded(child: Text(message)),
-          IconButton(
-            onPressed: onClose,
-            icon: const Icon(Icons.close_rounded, size: 18),
-          ),
-        ],
-      ),
     );
   }
 }

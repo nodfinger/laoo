@@ -406,7 +406,7 @@ SELECT CAST(SCOPE_IDENTITY() AS BIGINT);";
         await using var connection = await OpenConnectionAsync(cancellationToken);
 
         var scope = ResolveScope();
-        if (scope is null)
+        if (scope is null || !scope.Value.CanReadAll)
         {
             return Forbid();
         }
@@ -488,7 +488,7 @@ WHERE P.PartnerID = @RequestedPartnerID
         await using var connection = await OpenConnectionAsync(cancellationToken);
 
         var scope = ResolveScope();
-        if (scope is null)
+        if (scope is null || !scope.Value.CanReadAll)
         {
             return Forbid();
         }
@@ -563,12 +563,9 @@ WHERE P.PartnerID = @RequestedPartnerID
             return Forbid();
         }
 
-        // Temporary testing rule:
-        // use EDIT permission for DELETE until a dedicated DELETE permission
-        // is added to the permission seed.
         if (!await HasPermissionAsync(
                 connection,
-                "EDIT",
+                "DELETE",
                 cancellationToken))
         {
             return Forbid();

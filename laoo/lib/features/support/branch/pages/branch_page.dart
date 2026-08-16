@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/widgets/auto_dismiss_message.dart';
 import '../../../../core/widgets/combo_box_text.dart';
 
+import '../../../../core/navigation/navigation_menu_repository.dart';
 import '../../../../app/theme/laoo_typography.dart';
 import '../../../partner/data/partner_company_repository.dart';
 import '../../../partner/models/partner_company.dart';
@@ -49,6 +50,9 @@ class _BranchPageState extends State<BranchPage> {
   bool _saving = false;
   String? _actionMessage;
   String? _listMessage;
+  String _menuName = 'สาขา';
+
+  static const _menuCode = '06002';
 
   List<Map<String, dynamic>> get _filteredItems => _items.where((item) {
     return _status == 'ทั้งหมด' ||
@@ -70,17 +74,23 @@ class _BranchPageState extends State<BranchPage> {
     super.initState();
     _loadCompanies();
     _loadActions();
+    _resolveMenuName();
     _load();
+  }
+
+  Future<void> _resolveMenuName() async {
+    final name = await NavigationMenuRepository().resolveMenuName(
+      menuCode: _menuCode,
+      routeName: 'partnerBranches',
+      fallback: 'สาขา',
+    );
+    if (mounted) setState(() => _menuName = name);
   }
 
   Future<void> _loadActions() async {
     final support = widget.menuScope == WorkspaceMenuScope.support;
-    if (support) {
-      if (mounted) setState(() { _canCreate = true; _canEdit = true; _canDelete = true; });
-      return;
-    }
     try {
-      final permissions = await _repo.actions(support: false);
+      final permissions = await _repo.actions(support: support);
       if (!mounted) return;
       setState(() {
         _canCreate = permissions['create'] == true;
@@ -176,15 +186,16 @@ class _BranchPageState extends State<BranchPage> {
                   children: [
                     Expanded(
                       child: WorkspacePageTitle(
-                        title: 'สาขา',
-                        favoriteKey: 'branch',
+                        title: _menuName,
+                        favoriteKey: _menuCode,
                       ),
                     ),
-                    if (_canCreate) FilledButton.icon(
-                      onPressed: () => _form(),
-                      icon: const Icon(Icons.add),
-                      label: const Text('เพิ่ม'),
-                    ),
+                    if (_canCreate)
+                      FilledButton.icon(
+                        onPressed: () => _form(),
+                        icon: const Icon(Icons.add),
+                        label: const Text('เพิ่ม'),
+                      ),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -297,9 +308,18 @@ class _BranchPageState extends State<BranchPage> {
                             clipBehavior: Clip.antiAlias,
                             child: DataTable(
                               border: TableBorder(
-                                top: BorderSide(color: Theme.of(context).dividerColor, width: .5),
-                                bottom: BorderSide(color: Theme.of(context).dividerColor, width: .5),
-                                horizontalInside: BorderSide(color: Theme.of(context).dividerColor, width: .5),
+                                top: BorderSide(
+                                  color: Theme.of(context).dividerColor,
+                                  width: .5,
+                                ),
+                                bottom: BorderSide(
+                                  color: Theme.of(context).dividerColor,
+                                  width: .5,
+                                ),
+                                horizontalInside: BorderSide(
+                                  color: Theme.of(context).dividerColor,
+                                  width: .5,
+                                ),
                               ),
                               horizontalMargin: 8,
                               columnSpacing: 12,
@@ -379,22 +399,24 @@ class _BranchPageState extends State<BranchPage> {
                                           child: Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
-                                              if (_canEdit) IconButton(
-                                                onPressed: () => _form(x),
-                                                color: Theme.of(
-                                                  context,
-                                                ).colorScheme.primary,
-                                                icon: const Icon(
-                                                  Icons.edit_outlined,
+                                              if (_canEdit)
+                                                IconButton(
+                                                  onPressed: () => _form(x),
+                                                  color: Theme.of(
+                                                    context,
+                                                  ).colorScheme.primary,
+                                                  icon: const Icon(
+                                                    Icons.edit_outlined,
+                                                  ),
                                                 ),
-                                              ),
-                                              if (_canDelete) IconButton(
-                                                onPressed: () => _delete(x),
-                                                icon: const Icon(
-                                                  Icons.delete_outline,
-                                                  color: Colors.red,
+                                              if (_canDelete)
+                                                IconButton(
+                                                  onPressed: () => _delete(x),
+                                                  icon: const Icon(
+                                                    Icons.delete_outline,
+                                                    color: Colors.red,
+                                                  ),
                                                 ),
-                                              ),
                                             ],
                                           ),
                                         ),
@@ -490,8 +512,8 @@ class _BranchPageState extends State<BranchPage> {
           );
     return SupportWorkspaceShell(
       menuScope: widget.menuScope,
-      pageTitle: 'สาขา',
-      activeMenu: 'branch',
+      pageTitle: _menuName,
+      activeMenu: 'partnerBranches',
       child: content,
     );
   }
@@ -556,8 +578,8 @@ class _BranchPageState extends State<BranchPage> {
             children: [
               Expanded(
                 child: WorkspacePageTitle(
-                  title: 'สาขา > ${editing ? 'แก้ไข' : 'เพิ่ม'}',
-                  favoriteKey: 'branch',
+                  title: '$_menuName > ${editing ? 'แก้ไข' : 'เพิ่ม'}',
+                  favoriteKey: _menuCode,
                 ),
               ),
               const SizedBox(width: 16),
@@ -850,32 +872,5 @@ class _BranchPageState extends State<BranchPage> {
       setState(() => _listMessage = 'ลบข้อมูลสาขาสำเร็จ');
       await _load();
     }
-  }
-}
-
-class _SuccessMessage extends StatelessWidget {
-  const _SuccessMessage({required this.message, required this.onClose});
-
-  final String message;
-  final VoidCallback onClose;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: scheme.primary.withValues(alpha: .12),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.check_circle_outline, color: scheme.primary),
-          const SizedBox(width: 8),
-          Expanded(child: Text(message)),
-          IconButton(onPressed: onClose, icon: const Icon(Icons.close)),
-        ],
-      ),
-    );
   }
 }

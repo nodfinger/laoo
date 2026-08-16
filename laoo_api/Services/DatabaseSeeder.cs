@@ -26,8 +26,14 @@ public sealed class DatabaseSeeder
 
     public async Task SeedAsync(CancellationToken cancellationToken = default)
     {
-        var username = _configuration["SeedData:SuperAdminUsername"] ?? "t";
-        var password = _configuration["SeedData:SuperAdminPassword"] ?? "t";
+        ValidateConfiguration(_configuration);
+
+        var username = RequiredValue(_configuration, "SuperAdminUsername");
+        var password = RequiredValue(_configuration, "SuperAdminPassword");
+        var partnerUsername = RequiredValue(_configuration, "DemoPartnerUsername");
+        var partnerPassword = RequiredValue(_configuration, "DemoPartnerPassword");
+        var demoUsername = RequiredValue(_configuration, "DemoNormalUsername");
+        var demoPassword = RequiredValue(_configuration, "DemoNormalPassword");
 
         await using var connection = _connectionFactory.CreateConnection();
         await connection.OpenAsync(cancellationToken);
@@ -44,8 +50,8 @@ public sealed class DatabaseSeeder
                 connection,
                 transaction,
                 partnerId,
-                _configuration["SeedData:DemoPartnerUsername"] ?? "p",
-                _configuration["SeedData:DemoPartnerPassword"] ?? "p",
+                partnerUsername,
+                partnerPassword,
                 cancellationToken);
             var companyId = await EnsureCompanyAsync(connection, transaction, partnerId, cancellationToken);
             var branchId = await EnsureBranchAsync(connection, transaction, companyId, cancellationToken);
@@ -58,8 +64,6 @@ public sealed class DatabaseSeeder
                 password,
                 cancellationToken);
 
-            var demoUsername = _configuration["SeedData:DemoNormalUsername"] ?? "c";
-            var demoPassword = _configuration["SeedData:DemoNormalPassword"] ?? "c";
             var demoUserId = await EnsureNormalUserAsync(
                 connection,
                 transaction,
@@ -101,6 +105,40 @@ public sealed class DatabaseSeeder
             await transaction.RollbackAsync(cancellationToken);
             throw;
         }
+    }
+
+    public static void ValidateConfiguration(IConfiguration configuration)
+    {
+        ValidateCredential(configuration, "SuperAdminUsername", "SuperAdminPassword");
+        ValidateCredential(configuration, "DemoNormalUsername", "DemoNormalPassword");
+        ValidateCredential(configuration, "DemoPartnerUsername", "DemoPartnerPassword");
+    }
+
+    private static void ValidateCredential(
+        IConfiguration configuration,
+        string usernameKey,
+        string passwordKey)
+    {
+        var username = RequiredValue(configuration, usernameKey);
+        var password = RequiredValue(configuration, passwordKey);
+
+        if (!PasswordService.MeetsPolicy(username, password))
+        {
+            throw new InvalidOperationException(
+                $"SeedData:{passwordKey} must be at least {PasswordService.MinimumPasswordLength} characters " +
+                "and contain upper-case, lower-case, numeric, and special characters.");
+        }
+    }
+
+    private static string RequiredValue(
+        IConfiguration configuration,
+        string key)
+    {
+        var value = configuration[$"SeedData:{key}"]?.Trim();
+        return string.IsNullOrWhiteSpace(value)
+            ? throw new InvalidOperationException(
+                $"SeedData:{key} is required when SeedData:Enabled=true.")
+            : value;
     }
 
     private async Task EnsurePartnerUserAsync(

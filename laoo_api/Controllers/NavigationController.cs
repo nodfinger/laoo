@@ -20,20 +20,13 @@ public sealed class NavigationController : ControllerBase
     public async Task<ActionResult<List<NavigationMenuGroupResponse>>> GetMenus(CancellationToken cancellationToken)
     {
         var userType = User.FindFirstValue("user_type");
-        var groupCodes = userType switch
-        {
-            "PARTNER_USER" => new[] { "05", "06", "07", "11" },
-            "COMPANY_USER" => new[] { "05", "07", "08", "09", "10" },
-            "LAOO_SUPPORT" => new[] { "01", "02", "03", "04", "05" },
-            _ => Array.Empty<string>()
-        };
-        if (groupCodes.Length == 0) return Forbid();
+        if (userType is not ("PARTNER_USER" or "COMPANY_USER" or "LAOO_SUPPORT"))
+            return Forbid();
 
         await using var connection = new SqlConnection(_configuration.GetConnectionString("LaooDatabase"));
         await connection.OpenAsync(cancellationToken);
         var admin = await IsAdminAsync(connection, userType!, cancellationToken);
         var allowedFeatures = admin ? null : await LoadAllowedFeaturesAsync(connection, userType!, cancellationToken);
-        var visibleGroupCodes = groupCodes.ToHashSet();
         var audienceType = userType == "PARTNER_USER" ? "P" : userType == "COMPANY_USER" ? "C" : "L";
         const string sql = """
 SELECT G.MenuGroupCode, G.MenuGroupName, G.IconName AS GroupIconName, G.SortOrder AS GroupSortOrder,
@@ -43,7 +36,6 @@ FROM dbo.TDADMenuGroup G
 INNER JOIN dbo.TDADMainMenu M ON M.MenuGroupCode = G.MenuGroupCode AND M.IsActive = 1 AND M.IsVisible = 1
 WHERE G.IsActive = 1
   AND UPPER(LTRIM(RTRIM(G.AudienceType))) IN (N'A',@AudienceType)
-  AND G.MenuGroupCode IN ('01','02','03','04','05','06','07','08','09','10','11','12')
 ORDER BY G.SortOrder, M.SortOrder, M.MenuCode;
 """;
         await using var command = new SqlCommand(sql, connection);
@@ -54,9 +46,9 @@ ORDER BY G.SortOrder, M.SortOrder, M.MenuCode;
         {
             var group = new NavigationMenuGroupResponse { MenuGroupCode = reader.GetString(0).Trim(), MenuGroupName = reader.GetString(1), IconName = N(reader, 2), SortOrder = reader.GetInt32(3), IsExpandedDefault = reader.GetBoolean(4) };
             var item = new NavigationMenuItemResponse { MenuCode = reader.GetString(5), MenuName = reader.GetString(6), RouteName = N(reader, 7), RoutePath = N(reader, 8), FeatureCode = N(reader, 9), IconName = N(reader, 10), SortOrder = reader.GetInt32(11), IsFavoriteAllowed = reader.GetBoolean(12) };
-            if (visibleGroupCodes.Contains(group.MenuGroupCode) &&
-                item.FeatureCode is not null &&
-                (admin || allowedFeatures!.Contains(item.FeatureCode) || allowedFeatures.Contains(item.MenuCode)))
+            if (admin ||
+                allowedFeatures!.Contains(item.MenuCode) ||
+                (item.FeatureCode is not null && allowedFeatures.Contains(item.FeatureCode)))
             {
                 all.Add((group, item));
             }

@@ -25,11 +25,12 @@ class AuthApiService {
     required String username,
     required String password,
   }) async {
-    final uri = Uri.parse('${AppConfig.apiBaseUrl}/api/auth/login');
+    final uri = Uri.parse(AppConfig.apiBaseUrl).resolve('/api/auth/login');
 
     final request = LoginRequest(
       username: username.trim(),
       password: password,
+      projectCode: AppConfig.projectCode,
     );
 
     try {

@@ -32,17 +32,8 @@ public sealed class CompanySetupRuntimeController : ControllerBase
                 statusCode: StatusCodes.Status500InternalServerError);
         }
 
-        // Company Setup belongs to DBTDLaoo.
-        // Keep server/authentication options from local.json, but force
-        // only the InitialCatalog for this project database.
-        var builder = new SqlConnectionStringBuilder(
-            baseConnectionString)
-        {
-            InitialCatalog = "DBTDLaoo"
-        };
-
         await using var connection =
-            new SqlConnection(builder.ConnectionString);
+            new SqlConnection(baseConnectionString);
 
         await connection.OpenAsync(cancellationToken);
 

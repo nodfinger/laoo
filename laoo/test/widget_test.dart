@@ -1,4 +1,4 @@
-﻿// This is a basic Flutter widget test.
+// This is a basic Flutter widget test.
 //
 // To perform an interaction with a widget in your test, use the WidgetTester
 // utility in the flutter_test package. For example, you can send tap and scroll
@@ -27,9 +27,8 @@ void main() {
     await tester.pumpWidget(const ProviderScope(child: LaooApp()));
     await tester.pumpAndSettle();
 
-    expect(find.text('Laoo Solutions'), findsOneWidget);
+    expect(find.bySemanticsLabel('Laoo Solutions'), findsOneWidget);
     expect(find.byType(TextField), findsNothing);
-    expect(find.byType(FilledButton), findsNothing);
     expect(find.byType(CircularProgressIndicator), findsNothing);
     expect(tester.takeException(), isNull);
   });
@@ -60,8 +59,7 @@ void main() {
       ),
     );
 
-    expect(find.text('Laoo Solutions'), findsOneWidget);
+    expect(find.bySemanticsLabel('Laoo Solutions'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }
-

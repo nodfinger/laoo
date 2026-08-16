@@ -1,8 +1,13 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'auth_session.dart';
+import 'secure_token_store.dart';
 
 class AuthStorage {
+  AuthStorage({SecureTokenStore? secureTokenStore})
+    : _secureTokenStore = secureTokenStore ?? PlatformSecureTokenStore();
+
+  final SecureTokenStore _secureTokenStore;
   static const _accessTokenKey = 'auth.accessToken';
   static const _expiresAtKey = 'auth.expiresAt';
   static const _userTypeKey = 'auth.userType';
@@ -17,7 +22,6 @@ class AuthStorage {
   static const _laooUserIdKey = 'auth.laooUserId';
   static const _rememberLoginKey = 'auth.rememberLogin';
   static const _rememberedUsernameKey = 'auth.rememberedUsername';
-  static const _rememberedPasswordKey = 'auth.rememberedPassword';
 
   Future<void> save(AuthSession session, {bool? rememberLogin}) async {
     final prefs = await SharedPreferences.getInstance();
@@ -26,7 +30,8 @@ class AuthStorage {
         rememberLogin ?? prefs.getBool(_rememberLoginKey) ?? true;
     await prefs.setBool(_rememberLoginKey, shouldRemember);
 
-    await prefs.setString(_accessTokenKey, session.accessToken);
+    await _secureTokenStore.write(session.accessToken);
+    await prefs.remove(_accessTokenKey);
     await prefs.setString(
       _expiresAtKey,
       session.expiresAt.toUtc().toIso8601String(),
@@ -53,7 +58,7 @@ class AuthStorage {
       return null;
     }
 
-    final token = prefs.getString(_accessTokenKey);
+    final token = await _readAndMigrateToken(prefs);
     final expiresAtText = prefs.getString(_expiresAtKey);
 
     if (token == null || token.isEmpty || expiresAtText == null) {
@@ -91,7 +96,7 @@ class AuthStorage {
 
   Future<String?> readAccessToken() async {
     final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString(_accessTokenKey);
+    final token = await _readAndMigrateToken(prefs);
     final expiresAtText = prefs.getString(_expiresAtKey);
 
     if (token == null || token.isEmpty || expiresAtText == null) {
@@ -112,16 +117,6 @@ class AuthStorage {
     await prefs.setString(_rememberedUsernameKey, username.trim());
   }
 
-  Future<void> saveRememberedPassword(String password) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_rememberedPasswordKey, password);
-  }
-
-  Future<String?> readRememberedPassword() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_rememberedPasswordKey);
-  }
-
   Future<String?> readRememberedUsername() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_rememberedUsernameKey);
@@ -130,14 +125,12 @@ class AuthStorage {
   Future<void> clearRememberedUsername() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_rememberedUsernameKey);
-    await prefs.remove(_rememberedPasswordKey);
   }
 
   Future<void> clear({bool preserveRememberedSession = false}) async {
     final prefs = await SharedPreferences.getInstance();
     final preserveRememberedCredentials =
-        preserveRememberedSession &&
-        prefs.getBool(_rememberLoginKey) == true;
+        preserveRememberedSession && prefs.getBool(_rememberLoginKey) == true;
     await _clearSessionKeys(prefs);
 
     if (preserveRememberedCredentials) {
@@ -146,10 +139,10 @@ class AuthStorage {
 
     await prefs.remove(_rememberLoginKey);
     await prefs.remove(_rememberedUsernameKey);
-    await prefs.remove(_rememberedPasswordKey);
   }
 
   Future<void> _clearSessionKeys(SharedPreferences prefs) async {
+    await _secureTokenStore.delete();
     for (final key in [
       _accessTokenKey,
       _expiresAtKey,
@@ -166,6 +159,18 @@ class AuthStorage {
     ]) {
       await prefs.remove(key);
     }
+  }
+
+  Future<String?> _readAndMigrateToken(SharedPreferences prefs) async {
+    final secureToken = await _secureTokenStore.read();
+    if (secureToken != null && secureToken.isNotEmpty) return secureToken;
+
+    final legacyToken = prefs.getString(_accessTokenKey);
+    if (legacyToken == null || legacyToken.isEmpty) return null;
+
+    await _secureTokenStore.write(legacyToken);
+    await prefs.remove(_accessTokenKey);
+    return legacyToken;
   }
 
   Future<void> _setNullableString(

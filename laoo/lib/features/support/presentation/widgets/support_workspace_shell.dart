@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -8,11 +9,16 @@ import '../../../../app/theme/laoo_typography.dart';
 import '../../../../app/theme/workspace_theme_presets.dart';
 import '../../../../core/auth/app_auth_controller.dart';
 import '../../../../core/company_setup/company_setup_controller.dart';
+import '../../../../core/favorites/user_favorite_repository.dart';
 import '../../../../core/navigation/navigation_menu.dart';
 import '../../../../core/navigation/navigation_menu_repository.dart';
+import '../../../../core/widgets/timed_snack_bar.dart';
+import '../../../profile/pages/user_profile_dialog.dart';
 
 final ValueNotifier<Set<String>> supportFavoritePages =
     ValueNotifier<Set<String>>(<String>{});
+final ValueNotifier<int> supportFavoriteRefresh = ValueNotifier<int>(0);
+final UserFavoriteRepository _userFavoriteRepository = UserFavoriteRepository();
 
 enum WorkspaceMenuScope { support, partner, company }
 
@@ -45,20 +51,38 @@ class WorkspacePageTitle extends StatelessWidget {
           ValueListenableBuilder<Set<String>>(
             valueListenable: supportFavoritePages,
             builder: (context, favorites, _) {
-              final selected = favorites.contains(key);
-              return IconButton(
-                tooltip: selected
-                    ? 'นำออกจากเมนูลัดของฉัน'
-                    : 'เพิ่มหน้านี้เป็นเมนูลัดของฉัน',
-                onPressed: () {
-                  final next = <String>{...favorites};
-                  selected ? next.remove(key) : next.add(key);
-                  supportFavoritePages.value = next;
-                },
-                icon: Icon(
-                  selected ? Icons.star_rounded : Icons.star_border_rounded,
-                  color: accent,
+              return FutureBuilder<NavigationMenuItem?>(
+                future: NavigationMenuRepository().findMenu(
+                  menuCode: key,
+                  routeName: key,
                 ),
+                builder: (context, snapshot) {
+                  final code = snapshot.data?.code.trim() ?? key;
+                  final selected = favorites.contains(code);
+                  return IconButton(
+                    tooltip: selected
+                        ? 'นำออกจากเมนูลัดของฉัน'
+                        : 'เพิ่มหน้านี้เป็นเมนูลัดของฉัน',
+                    onPressed: () async {
+                      final resolved = snapshot.data?.code.trim();
+                      if (resolved == null || resolved.isEmpty) return;
+                      final next = <String>{...favorites};
+                      if (selected) {
+                        next.remove(resolved);
+                        await _userFavoriteRepository.remove(resolved);
+                      } else {
+                        next.add(resolved);
+                        await _userFavoriteRepository.add(resolved);
+                      }
+                      supportFavoritePages.value = next;
+                      supportFavoriteRefresh.value++;
+                    },
+                    icon: Icon(
+                      selected ? Icons.star_rounded : Icons.star_border_rounded,
+                      color: accent,
+                    ),
+                  );
+                },
               );
             },
           ),
@@ -89,24 +113,21 @@ class SupportWorkspaceShell extends StatelessWidget {
       builder: (context, preset, _) {
         final compact = MediaQuery.sizeOf(context).width < 900;
         final baseTheme = preset.toThemeData();
-        // Theme changes the navigation chrome and accent colors. The content
-        // workspace is intentionally white for every STYLE for readability.
         final workspaceTheme = baseTheme.copyWith(
-          brightness: Brightness.light,
-          scaffoldBackgroundColor: Colors.white,
-          cardColor: Colors.white,
           colorScheme: baseTheme.colorScheme.copyWith(
-            brightness: Brightness.light,
-            surface: Colors.white,
-            onSurface: Colors.black87,
-            onSurfaceVariant: Colors.black54,
+            surface: preset.surface,
+            onSurface: preset.textPrimary,
+            onSurfaceVariant: preset.textSecondary,
           ),
-          textTheme: baseTheme.textTheme.apply(
-            bodyColor: Colors.black87,
-            displayColor: Colors.black87,
+          popupMenuTheme: baseTheme.popupMenuTheme.copyWith(
+            color: preset.surface,
+            textStyle: TextStyle(
+              color: preset.textPrimary,
+              fontSize: LaooTypography.body,
+            ),
           ),
           cardTheme: baseTheme.cardTheme.copyWith(
-            color: Colors.white,
+            color: preset.surface,
             surfaceTintColor: Colors.transparent,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
@@ -121,7 +142,7 @@ class SupportWorkspaceShell extends StatelessWidget {
           data: workspaceTheme,
           child: Builder(
             builder: (context) => Scaffold(
-              backgroundColor: Colors.white,
+              backgroundColor: preset.background,
               drawer: compact
                   ? Drawer(
                       backgroundColor: preset.sidebarBackground,
@@ -134,12 +155,11 @@ class SupportWorkspaceShell extends StatelessWidget {
                   : null,
               appBar: compact
                   ? AppBar(
-                      backgroundColor: Colors.white,
+                      backgroundColor: preset.surface,
                       surfaceTintColor: Colors.transparent,
                       titleSpacing: 0,
                       actions: [
                         _ThemeButton(compact: true, preset: preset),
-                        _FavoritesButton(compact: true, preset: preset),
                         IconButton(
                           tooltip: 'กลับหน้าหลัก',
                           onPressed: () =>
@@ -156,25 +176,31 @@ class SupportWorkspaceShell extends StatelessWidget {
                     )
                   : null,
               body: SafeArea(
-                child: Row(
+                child: Stack(
                   children: [
-                    if (!compact)
-                      SizedBox(
-                        width: 220,
-                        child: _Sidebar(
-                          activeMenu: activeMenu,
-                          preset: preset,
-                          menuScope: menuScope,
+                    Row(
+                      children: [
+                        if (!compact)
+                          SizedBox(
+                            width: 220,
+                            child: _Sidebar(
+                              activeMenu: activeMenu,
+                              preset: preset,
+                              menuScope: menuScope,
+                            ),
+                          ),
+                        Expanded(
+                          child: Column(
+                            children: [
+                              if (!compact) _TopBar(preset: preset),
+                              const _FavoriteWorkspaceBar(),
+                              Expanded(child: child),
+                            ],
+                          ),
                         ),
-                      ),
-                    Expanded(
-                      child: Column(
-                        children: [
-                          if (!compact) _TopBar(preset: preset),
-                          Expanded(child: child),
-                        ],
-                      ),
+                      ],
                     ),
+                    const UserProfileThemeLoader(),
                   ],
                 ),
               ),
@@ -211,13 +237,435 @@ class _TopBar extends StatelessWidget {
             ),
           ),
           _LogoutButton(color: Theme.of(context).colorScheme.primary),
-          const SizedBox(width: 4),
           _ThemeButton(preset: preset),
-          const SizedBox(width: 4),
-          _FavoritesButton(preset: preset),
           const Spacer(),
           _UserMenu(preset: preset),
         ],
+      ),
+    );
+  }
+}
+
+/* Removed optional button-menu mode. Sidebar is the only navigation mode.
+class _MenuModeButton extends StatelessWidget {
+  const _MenuModeButton({required this.enabled, required this.preset});
+
+  final bool enabled;
+  final WorkspaceThemePreset preset;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      tooltip: enabled ? 'ใช้เมนูแบบ Sidebar' : 'ใช้เมนูแบบปุ่ม',
+      onPressed: () => _saveWorkspaceMenuMode(!enabled),
+      icon: Icon(
+        enabled ? Icons.view_sidebar_outlined : Icons.dashboard_outlined,
+        color: preset.primary,
+      ),
+    );
+  }
+}
+
+class _ButtonMenuWorkspace extends StatefulWidget {
+  const _ButtonMenuWorkspace({
+    required this.menuScope,
+    required this.preset,
+    required this.activeMenu,
+    required this.child,
+  });
+
+  final WorkspaceMenuScope menuScope;
+  final WorkspaceThemePreset preset;
+  final String? activeMenu;
+  final Widget child;
+
+  @override
+  State<_ButtonMenuWorkspace> createState() => _ButtonMenuWorkspaceState();
+}
+
+class _ButtonMenuWorkspaceState extends State<_ButtonMenuWorkspace> {
+  late Future<List<NavigationMenuGroup>> _menus;
+  String? _selectedGroup;
+
+  @override
+  void initState() {
+    super.initState();
+    _menus = NavigationMenuRepository().getMenus();
+  }
+
+  List<NavigationMenuGroup> _visibleGroups(List<NavigationMenuGroup> groups) {
+    final expectedScope = switch (widget.menuScope) {
+      WorkspaceMenuScope.support => AppMenuScope.support,
+      WorkspaceMenuScope.partner => AppMenuScope.partner,
+      WorkspaceMenuScope.company => AppMenuScope.company,
+    };
+    return groups
+        .map(
+          (group) => NavigationMenuGroup(
+            code: group.code,
+            name: group.name,
+            iconName: group.iconName,
+            isExpandedDefault: group.isExpandedDefault,
+            items: group.items.where((item) {
+              final spec = AppMenuRouteRegistry.byMenuCode(item.code);
+              return spec != null &&
+                  (spec.scope == expectedScope ||
+                      spec.scope == AppMenuScope.shared);
+            }).toList(),
+          ),
+        )
+        .where((group) => group.items.isNotEmpty)
+        .toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<NavigationMenuGroup>>(
+      future: _menus,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Center(
+            child: TextButton.icon(
+              onPressed: () => setState(() => _menus =
+                  NavigationMenuRepository().getMenus(refresh: true)),
+              icon: const Icon(Icons.refresh),
+              label: const Text('โหลดเมนูใหม่'),
+            ),
+          );
+        }
+        if (!snapshot.hasData) {
+          return Center(
+            child: CircularProgressIndicator(color: widget.preset.primary),
+          );
+        }
+
+        final groups = _visibleGroups(snapshot.data!);
+        if (groups.isEmpty) return widget.child;
+        final selected = groups.any((g) => g.code == _selectedGroup)
+            ? _selectedGroup
+            : null;
+        final group = selected == null
+            ? null
+            : groups.firstWhere((item) => item.code == selected);
+
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final narrow = constraints.maxWidth < 700;
+            final groupWidth = narrow ? 170.0 : 220.0;
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+              child: Stack(
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      SizedBox(
+                        width: groupWidth,
+                        child: _groupButtons(context, groups, selected),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(child: widget.child),
+                    ],
+                  ),
+                  if (group != null)
+                    Positioned(
+                      left: groupWidth,
+                      top: 0,
+                      right: 0,
+                      bottom: 0,
+                      child: Stack(
+                        children: [
+                          Positioned.fill(
+                            child: GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: () => setState(() => _selectedGroup = null),
+                              child: Container(
+                                color: Colors.black.withValues(alpha: .10),
+                              ),
+                            ),
+                          ),
+                          Positioned.fill(
+                            child: _menuButtons(context, group),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _groupButtons(
+    BuildContext context,
+    List<NavigationMenuGroup> groups,
+    String? selected,
+  ) => ListView(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        children: groups.map((group) {
+          final active = group.code == selected;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(10),
+              onTap: () => setState(() => _selectedGroup = group.code),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                decoration: BoxDecoration(
+                  color: active
+                      ? widget.preset.primary.withValues(alpha: .12)
+                      : Colors.transparent,
+                  border: Border.all(
+                    color: active ? widget.preset.primary : widget.preset.border,
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(_buttonMenuIcon(group.iconName),
+                        size: 20, color: widget.preset.primary),
+                    const SizedBox(width: 7),
+                    Text(group.name,
+                        style: TextStyle(
+                          color: widget.preset.primary,
+                          fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                        )),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      );
+
+  Widget _menuButtons(BuildContext context, NavigationMenuGroup group) {
+    final currentPath = GoRouter.of(context)
+        .routerDelegate
+        .currentConfiguration
+        .uri
+        .path;
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        border: Border.all(color: widget.preset.primary.withValues(alpha: .55)),
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 16)],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    group.name,
+                    style: TextStyle(
+                      color: widget.preset.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'ปิดเมนูย่อย',
+                  onPressed: () => setState(() => _selectedGroup = null),
+                  icon: const Icon(Icons.close),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Wrap(
+                spacing: 16,
+                runSpacing: 16,
+                children: group.items.map((item) {
+                final spec = AppMenuRouteRegistry.byMenuCode(item.code);
+                if (spec == null) return const SizedBox.shrink();
+                final active =
+                    spec.path == currentPath || item.code == widget.activeMenu;
+                return InkWell(
+                  onTap: () {
+                    setState(() => _selectedGroup = null);
+                    context.goNamed(spec.goRouteName);
+                  },
+                  child: Ink(
+                    decoration: BoxDecoration(
+                      color: active
+                          ? widget.preset.primary.withValues(alpha: .10)
+                          : Theme.of(context).colorScheme.surface,
+                      border: Border.all(
+                        color: active
+                            ? widget.preset.primary
+                            : widget.preset.border,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Padding(
+                    padding: const EdgeInsets.all(18),
+                    child: SizedBox(
+                      width: 180,
+                      height: 92,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            _buttonMenuIcon(item.iconName),
+                            size: 30,
+                            color: active
+                                ? widget.preset.primary
+                                : widget.preset.textPrimary,
+                          ),
+                          const SizedBox(height: 9),
+                          Text(
+                            item.name,
+                            maxLines: 2,
+                            textAlign: TextAlign.center,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: active
+                                  ? widget.preset.primary
+                                  : widget.preset.textPrimary,
+                              fontWeight:
+                                  active ? FontWeight.w700 : FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  ),
+                );
+              }).toList(),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+*/
+
+class _FavoriteWorkspaceBar extends StatefulWidget {
+  const _FavoriteWorkspaceBar();
+
+  @override
+  State<_FavoriteWorkspaceBar> createState() => _FavoriteWorkspaceBarState();
+}
+
+class _FavoriteWorkspaceBarState extends State<_FavoriteWorkspaceBar> {
+  final _repository = UserFavoriteRepository();
+  List<UserFavorite> _favorites = const [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    supportFavoriteRefresh.addListener(_reload);
+    _load();
+  }
+
+  @override
+  void dispose() {
+    supportFavoriteRefresh.removeListener(_reload);
+    super.dispose();
+  }
+
+  void _reload() => _load();
+
+  Future<void> _load() async {
+    try {
+      final results = await Future.wait([
+        _repository.getAll(),
+        NavigationMenuRepository().getMenus(),
+      ]);
+      final favorites = results[0] as List<UserFavorite>;
+      final menus = results[1] as List<NavigationMenuGroup>;
+      final visibleCodes = menus
+          .expand((group) => group.items)
+          .map((item) => item.code.trim().toUpperCase())
+          .toSet();
+      final visibleFavorites = favorites
+          .where(
+            (item) => visibleCodes.contains(item.menuCode.trim().toUpperCase()),
+          )
+          .toList();
+      final revokedFavorites = favorites
+          .where(
+            (item) =>
+                !visibleCodes.contains(item.menuCode.trim().toUpperCase()),
+          )
+          .toList();
+      for (final item in revokedFavorites) {
+        await _repository.remove(item.menuCode);
+      }
+      if (!mounted) return;
+      setState(() {
+        _favorites = visibleFavorites;
+        _loading = false;
+      });
+      supportFavoritePages.value = visibleFavorites
+          .map((e) => e.menuCode)
+          .toSet();
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  IconData _icon(String? name) => switch (name) {
+    'home' => Icons.home_outlined,
+    'people' => Icons.people_outline,
+    'settings' => Icons.settings_outlined,
+    'account_tree' => Icons.account_tree_outlined,
+    'apartment' => Icons.apartment_outlined,
+    _ => Icons.star_outline_rounded,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading || _favorites.isEmpty) return const SizedBox.shrink();
+    final accent = Theme.of(context).colorScheme.primary;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 8),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            Text(
+              'รายการโปรด',
+              style: TextStyle(color: accent, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(width: 12),
+            ..._favorites.map(
+              (item) => Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: ActionChip(
+                  avatar: Icon(_icon(item.iconName), size: 17, color: accent),
+                  label: Text(item.menuName, overflow: TextOverflow.ellipsis),
+                  onPressed: () {
+                    final spec = AppMenuRouteRegistry.byMenuCode(item.menuCode);
+                    if (spec != null) context.goNamed(spec.goRouteName);
+                  },
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -239,86 +687,6 @@ class _LogoutButton extends StatelessWidget {
         }
       },
       icon: Icon(Icons.logout_outlined, color: color),
-    );
-  }
-}
-
-class _FavoritesButton extends StatelessWidget {
-  const _FavoritesButton({this.compact = false, required this.preset});
-
-  final bool compact;
-  final WorkspaceThemePreset preset;
-
-  @override
-  Widget build(BuildContext context) {
-    final accent = Theme.of(context).colorScheme.primary;
-
-    return ValueListenableBuilder<Set<String>>(
-      valueListenable: supportFavoritePages,
-      builder: (context, favorites, _) {
-        return PopupMenuButton<String>(
-          tooltip: 'เมนูลัดของฉัน',
-          onSelected: (value) {
-            if (value == 'Partner') {
-              context.goNamed(RouteNames.partner);
-            } else if (value == 'Company Setup') {
-              context.goNamed(RouteNames.companySetup);
-            }
-          },
-          itemBuilder: (context) {
-            if (favorites.isEmpty) {
-              return const [
-                PopupMenuItem<String>(
-                  enabled: false,
-                  child: Text('ยังไม่มีเมนูลัด'),
-                ),
-              ];
-            }
-            return favorites
-                .map(
-                  (item) => PopupMenuItem<String>(
-                    value: item,
-                    child: Row(
-                      children: [
-                        Icon(Icons.star_rounded, size: 18, color: accent),
-                        const SizedBox(width: 8),
-                        Text(item),
-                      ],
-                    ),
-                  ),
-                )
-                .toList();
-          },
-          child: compact
-              ? Icon(Icons.star_outline_rounded, color: accent)
-              : Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 7,
-                  ),
-                  decoration: BoxDecoration(
-                    color: preset.surface,
-                    border: Border.all(color: preset.border),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.star_outline_rounded, size: 18, color: accent),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Favorite',
-                        style: TextStyle(
-                          color: preset.surface.computeLuminance() < 0.45
-                              ? Colors.white
-                              : preset.textPrimary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-        );
-      },
     );
   }
 }
@@ -388,6 +756,7 @@ class _ThemePickerDialogState extends State<_ThemePickerDialog> {
     _committed = true;
 
     try {
+      await saveUserProfileTheme(_preview.code);
       await workspaceThemeController.save(_preview);
       if (mounted) {
         Navigator.of(context).pop();
@@ -397,8 +766,10 @@ class _ThemePickerDialogState extends State<_ThemePickerDialog> {
       if (!mounted) return;
 
       setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('ไม่สามารถบันทึก Theme ที่เลือกได้')),
+      showTimedSnackBar(
+        context,
+        message: 'ไม่สามารถบันทึก Theme ที่เลือกได้',
+        error: true,
       );
     }
   }
@@ -558,6 +929,11 @@ class _CompactUserMenu extends StatelessWidget {
     return PopupMenuButton<String>(
       tooltip: 'ผู้ใช้งาน',
       onSelected: (value) async {
+        if (value == 'profile') {
+          final saved = await showUserProfileDialog(context);
+          if (saved && context.mounted) showUserProfileSavedAlert(context);
+          return;
+        }
         if (value == 'logout') {
           await appAuthController.logout();
           if (context.mounted) {
@@ -565,13 +941,26 @@ class _CompactUserMenu extends StatelessWidget {
           }
         }
       },
-      itemBuilder: (context) => const [
-        PopupMenuItem(value: 'logout', child: Text('ออกจากระบบ')),
+      itemBuilder: (context) => [
+        PopupMenuItem(
+          value: 'profile',
+          child: Text('ข้อมูลส่วนตัว', style: TextStyle(color: accent)),
+        ),
+        PopupMenuItem(
+          value: 'logout',
+          child: Text('ออกจากระบบ', style: TextStyle(color: accent)),
+        ),
       ],
-      child: CircleAvatar(
-        radius: 16,
-        backgroundColor: accent.withValues(alpha: 0.12),
-        child: Icon(Icons.person_outline, size: 18, color: accent),
+      child: ValueListenableBuilder<Uint8List?>(
+        valueListenable: userProfileAvatarNotifier,
+        builder: (_, image, _) => CircleAvatar(
+          radius: 16,
+          backgroundColor: accent.withValues(alpha: 0.12),
+          backgroundImage: image == null ? null : MemoryImage(image),
+          child: image == null
+              ? Icon(Icons.person_outline, size: 18, color: accent)
+              : null,
+        ),
       ),
     );
   }
@@ -593,12 +982,17 @@ class _UserMenu extends StatelessWidget {
         ? Colors.white.withValues(alpha: 0.68)
         : preset.textSecondary;
     final session = appAuthController.session;
-    final userName = session?.displayName ?? session?.username ?? '-';
-    final userContext = session?.username ?? session?.userType ?? '-';
+    final userName = session?.username ?? session?.displayName ?? '-';
+    final userContext = session?.displayName ?? session?.userType ?? '-';
 
     return PopupMenuButton<String>(
       tooltip: 'เมนูผู้ใช้งาน',
       onSelected: (value) async {
+        if (value == 'profile') {
+          final saved = await showUserProfileDialog(context);
+          if (saved && context.mounted) showUserProfileSavedAlert(context);
+          return;
+        }
         if (value == 'logout') {
           await appAuthController.logout();
           if (context.mounted) {
@@ -606,8 +1000,15 @@ class _UserMenu extends StatelessWidget {
           }
         }
       },
-      itemBuilder: (context) => const [
-        PopupMenuItem(value: 'logout', child: Text('ออกจากระบบ')),
+      itemBuilder: (context) => [
+        PopupMenuItem(
+          value: 'profile',
+          child: Text('ข้อมูลส่วนตัว', style: TextStyle(color: foreground)),
+        ),
+        PopupMenuItem(
+          value: 'logout',
+          child: Text('ออกจากระบบ', style: TextStyle(color: foreground)),
+        ),
       ],
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
@@ -619,32 +1020,45 @@ class _UserMenu extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CircleAvatar(
-              radius: 16,
-              backgroundColor: accent.withValues(alpha: 0.12),
-              child: Icon(Icons.person_outline, size: 18, color: accent),
+            ValueListenableBuilder<Uint8List?>(
+              valueListenable: userProfileAvatarNotifier,
+              builder: (_, image, _) => CircleAvatar(
+                radius: 16,
+                backgroundColor: accent.withValues(alpha: 0.12),
+                backgroundImage: image == null ? null : MemoryImage(image),
+                child: image == null
+                    ? Icon(Icons.person_outline, size: 18, color: accent)
+                    : null,
+              ),
             ),
             const SizedBox(width: 9),
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  userName,
-                  style: TextStyle(
-                    fontSize: LaooTypography.userName,
-                    fontWeight: LaooTypography.strongWeight,
-                    color: foreground,
+            ValueListenableBuilder<String?>(
+              valueListenable: userProfileIntroductionNotifier,
+              builder: (_, introduction, _) => Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    userName,
+                    style: TextStyle(
+                      fontSize: LaooTypography.userName,
+                      fontWeight: LaooTypography.strongWeight,
+                      color: foreground,
+                    ),
                   ),
-                ),
-                Text(
-                  userContext,
-                  style: TextStyle(
-                    fontSize: LaooTypography.userContext,
-                    color: secondary,
+                  Text(
+                    introduction?.isNotEmpty == true
+                        ? introduction!
+                        : userContext,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: LaooTypography.userContext,
+                      color: secondary,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
             const SizedBox(width: 6),
             Icon(
@@ -672,39 +1086,9 @@ class _Sidebar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isWhiteMenu = preset.group == 'White Menu';
-    final isLightColored = preset.group == 'Light';
-    final isHybrid = preset.group == 'Hybrid Dark Menu';
-
-    const blackSubmenuStyles = {
-      'STYLE11',
-      'STYLE14',
-      'STYLE16',
-      'STYLE17',
-      'STYLE18',
-      'STYLE19',
-    };
-    final useBlackSubmenu = blackSubmenuStyles.contains(
-      preset.code.toUpperCase(),
-    );
-
-    final itemForeground = isWhiteMenu || useBlackSubmenu
-        ? Colors.black87
-        : isLightColored
-        ? const Color(0xFFF7F8FA)
-        : isHybrid
-        ? const Color(0xFFE5E7EB)
-        : const Color(0xFFE5E7EB);
-
-    final selectedForeground = useBlackSubmenu
-        ? Colors.black87
-        : isWhiteMenu
-        ? preset.primary
-        : isLightColored
-        ? Colors.white
-        : isHybrid
-        ? Colors.white
-        : const Color(0xFFF9FAFB);
+    final darkMenu = preset.sidebarBackground.computeLuminance() < 0.45;
+    final itemForeground = darkMenu ? const Color(0xFFE5E7EB) : Colors.black87;
+    final selectedForeground = darkMenu ? Colors.white : preset.primary;
 
     return _ApiRoleScopedSidebar(
       key: ValueKey(activeMenu),
@@ -788,7 +1172,8 @@ class _ApiRoleScopedSidebarState extends State<_ApiRoleScopedSidebar> {
             items: group.items.where((item) {
               final spec = AppMenuRouteRegistry.byMenuCode(item.code);
               return spec != null &&
-                  (spec.scope == expectedScope || spec.scope == AppMenuScope.shared);
+                  (spec.scope == expectedScope ||
+                      spec.scope == AppMenuScope.shared);
             }).toList(),
           ),
         )
@@ -992,17 +1377,28 @@ class _BrandHeader extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: iconBackground,
-                    borderRadius: BorderRadius.circular(9),
-                  ),
-                  child: const Icon(
-                    Icons.home_work_outlined,
-                    size: 19,
-                    color: Colors.white,
+                ValueListenableBuilder<Uint8List?>(
+                  valueListenable: userProfileAvatarNotifier,
+                  builder: (_, image, _) => Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: iconBackground,
+                      borderRadius: BorderRadius.circular(9),
+                      image: image == null
+                          ? null
+                          : DecorationImage(
+                              image: MemoryImage(image),
+                              fit: BoxFit.cover,
+                            ),
+                    ),
+                    child: image == null
+                        ? const Icon(
+                            Icons.home_work_outlined,
+                            size: 19,
+                            color: Colors.white,
+                          )
+                        : null,
                   ),
                 ),
                 const SizedBox(width: 10),

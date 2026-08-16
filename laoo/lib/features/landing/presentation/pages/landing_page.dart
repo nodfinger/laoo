@@ -38,42 +38,64 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final wide = MediaQuery.sizeOf(context).width >= 760;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final showNavigation = constraints.maxWidth >= 1080;
+        final compact = constraints.maxWidth < 500;
 
-    return Container(
-      height: 76,
-      padding: const EdgeInsets.symmetric(horizontal: 28),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(bottom: BorderSide(color: LaooColors.border)),
-      ),
-      child: Row(
-        children: [
-          Image.asset(
-            'assets/images/laoo_logo_new.png',
-            width: 150,
-            fit: BoxFit.contain,
-            errorBuilder: (context, error, stackTrace) {
-              return const Text(
-                'LAOO SOLUTIONS',
-                style: TextStyle(
-                  fontWeight: FontWeight.w900,
-                  color: LaooColors.greenDark,
-                ),
-              );
-            },
+        return Container(
+          height: 76,
+          padding: EdgeInsets.symmetric(horizontal: compact ? 12 : 28),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            border: Border(bottom: BorderSide(color: LaooColors.border)),
           ),
-          const Spacer(),
-          if (wide) ...[
-            const _NavText('หน้าหลัก'),
-            const _NavText('โซลูชัน'),
-            const _NavText('เกี่ยวกับเรา'),
-            const _NavText('ติดต่อเรา'),
-            const SizedBox(width: 18),
-          ],
-          FilledButton(onPressed: onLogin, child: const Text('เข้าสู่ระบบ')),
-        ],
-      ),
+          child: Row(
+            children: [
+              Flexible(
+                child: Semantics(
+                  label: 'Laoo Solutions',
+                  image: true,
+                  child: Image.asset(
+                    'assets/images/laoo_logo_new.png',
+                    width: compact ? 104 : 150,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) {
+                      return const Text(
+                        'LAOO SOLUTIONS',
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w900,
+                          color: LaooColors.greenDark,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              const Spacer(),
+              if (showNavigation) ...[
+                const _NavText('หน้าหลัก'),
+                const _NavText('โซลูชัน'),
+                const _NavText('เกี่ยวกับเรา'),
+                const _NavText('ติดต่อเรา'),
+                const SizedBox(width: 18),
+              ],
+              if (compact)
+                IconButton.filled(
+                  tooltip: 'เข้าสู่ระบบ',
+                  onPressed: onLogin,
+                  icon: const Icon(Icons.login),
+                )
+              else
+                FilledButton(
+                  onPressed: onLogin,
+                  child: const Text('เข้าสู่ระบบ'),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

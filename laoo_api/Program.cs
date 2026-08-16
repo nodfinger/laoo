@@ -2,9 +2,14 @@ using System.Text;
 using LaooApi.Data;
 using LaooApi.Security;
 using LaooApi.Services;
+using Laoo.Api.Endpoints;
+using Laoo.Api.Infrastructure.Database;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,8 +22,40 @@ builder.Configuration
     .AddJsonFile("local.json", optional: true, reloadOnChange: true)
     .AddEnvironmentVariables();
 
+// Plesk/IIS captures stdout. Avoid the Windows Event Log provider because
+// application-pool identities commonly cannot create or write Event sources.
+builder.Logging.ClearProviders();
+builder.Logging.AddConfiguration(builder.Configuration.GetSection("Logging"));
+builder.Logging.AddConsole();
+builder.Logging.AddDebug();
+
 builder.Services.AddControllers();
+builder.Services.AddProblemDetails(options =>
+{
+    options.CustomizeProblemDetails = context =>
+    {
+        context.ProblemDetails.Extensions["traceId"] =
+            context.HttpContext.TraceIdentifier;
+    };
+});
 builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSingleton<ISqlConnectionChecker, SqlConnectionChecker>();
+
+var dataProtection = builder.Services
+    .AddDataProtection()
+    .SetApplicationName(
+        builder.Configuration["DataProtection:ApplicationName"] ?? "Laoo.Api");
+var keyRingPath = builder.Configuration["DataProtection:KeyRingPath"]?.Trim();
+if (!string.IsNullOrWhiteSpace(keyRingPath))
+{
+    Directory.CreateDirectory(keyRingPath);
+    dataProtection.PersistKeysToFileSystem(new DirectoryInfo(keyRingPath));
+}
+else if (builder.Environment.IsProduction())
+{
+    throw new InvalidOperationException(
+        "DataProtection:KeyRingPath is required in the Production environment.");
+}
 
 builder.Services.AddSwaggerGen(options =>
 {
@@ -57,9 +94,11 @@ builder.Services.Configure<JwtOptions>(
 builder.Services.AddSingleton<SqlConnectionFactory>();
 builder.Services.AddScoped<DatabaseRouteResolver>();
 builder.Services.AddSingleton<PasswordService>();
+builder.Services.AddSingleton<CompanySetupSecretService>();
 builder.Services.AddSingleton<JwtTokenService>();
 builder.Services.AddScoped<DatabaseSeeder>();
 builder.Services.AddScoped<AuthenticationService>();
+builder.Services.AddScoped<PasswordResetService>();
 
 var jwtOptions = builder.Configuration
     .GetSection(JwtOptions.SectionName)
@@ -90,44 +129,55 @@ builder.Services
             ClockSkew = TimeSpan.FromMinutes(1)
         };
 
-        options.Events = new JwtBearerEvents
+        if (builder.Environment.IsDevelopment())
         {
-            OnAuthenticationFailed = context =>
+            options.Events = new JwtBearerEvents
             {
-                Console.WriteLine();
-                Console.WriteLine("===== JWT AUTHENTICATION FAILED =====");
-                Console.WriteLine(context.Exception.GetType().FullName);
-                Console.WriteLine(context.Exception.Message);
-                Console.WriteLine("=====================================");
-                Console.WriteLine();
-                return Task.CompletedTask;
-            },
-
-            OnTokenValidated = context =>
-            {
-                Console.WriteLine();
-                Console.WriteLine("===== JWT TOKEN VALIDATED =====");
-                Console.WriteLine(
-                    $"User: {context.Principal?.Identity?.Name ?? "(no name)"}");
-                Console.WriteLine("===============================");
-                Console.WriteLine();
-                return Task.CompletedTask;
-            },
-
-            OnChallenge = context =>
-            {
-                Console.WriteLine();
-                Console.WriteLine("===== JWT CHALLENGE =====");
-                Console.WriteLine($"Error: {context.Error}");
-                Console.WriteLine($"Description: {context.ErrorDescription}");
-                Console.WriteLine("=========================");
-                Console.WriteLine();
-                return Task.CompletedTask;
-            }
-        };
+                OnAuthenticationFailed = context =>
+                {
+                    Console.WriteLine(
+                        $"JWT authentication failed: {context.Exception.GetType().Name}");
+                    return Task.CompletedTask;
+                },
+                OnTokenValidated = _ =>
+                {
+                    Console.WriteLine("JWT token validated.");
+                    return Task.CompletedTask;
+                },
+                OnChallenge = context =>
+                {
+                    Console.WriteLine($"JWT challenge: {context.Error}");
+                    return Task.CompletedTask;
+                }
+            };
+        }
     });
 
 builder.Services.AddAuthorization();
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy("authentication", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString()
+                ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+});
+
+var allowedCorsOrigins = builder.Configuration
+    .GetSection("Cors:AllowedOrigins")
+    .Get<string[]>()
+    ?.Where(origin => !string.IsNullOrWhiteSpace(origin))
+    .Select(origin => origin.Trim().TrimEnd('/'))
+    .Distinct(StringComparer.OrdinalIgnoreCase)
+    .ToArray() ?? [];
 
 builder.Services.AddCors(options =>
 {
@@ -137,9 +187,36 @@ builder.Services.AddCors(options =>
               .AllowAnyHeader()
               .AllowAnyMethod();
     });
+
+    options.AddPolicy("ConfiguredClients", policy =>
+    {
+        if (allowedCorsOrigins.Length > 0)
+        {
+            policy.WithOrigins(allowedCorsOrigins)
+                  .AllowAnyHeader()
+                  .AllowAnyMethod();
+        }
+    });
 });
 
+var seedEnabled = builder.Configuration.GetValue<bool>("SeedData:Enabled");
+if (seedEnabled && builder.Environment.IsProduction())
+{
+    throw new InvalidOperationException(
+        "SeedData cannot be enabled in the Production environment.");
+}
+
+if (seedEnabled)
+{
+    DatabaseSeeder.ValidateConfiguration(builder.Configuration);
+}
+
 var app = builder.Build();
+
+if (!app.Environment.IsDevelopment())
+{
+    app.UseExceptionHandler();
+}
 
 if (app.Environment.IsDevelopment())
 {
@@ -147,18 +224,25 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
     app.UseCors("FlutterDevelopment");
 }
+else
+{
+    app.UseCors("ConfiguredClients");
+}
 
 if (!app.Environment.IsDevelopment())
 {
+    app.UseHsts();
     app.UseHttpsRedirection();
 }
 
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapSystemInfoEndpoints();
 
-if (builder.Configuration.GetValue<bool>("SeedData:Enabled"))
+if (seedEnabled)
 {
     using var scope = app.Services.CreateScope();
     var seeder = scope.ServiceProvider.GetRequiredService<DatabaseSeeder>();

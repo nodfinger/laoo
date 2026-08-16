@@ -7,73 +7,316 @@ import '../data/role_group_repository.dart';
 import '../models/role_group.dart';
 
 class RoleGroupPage extends StatefulWidget {
-  const RoleGroupPage({super.key, required this.scope, required this.activeMenu});
-  final String scope; final String activeMenu;
-  @override State<RoleGroupPage> createState() => _RoleGroupPageState();
+  const RoleGroupPage({
+    super.key,
+    required this.scope,
+    required this.activeMenu,
+  });
+  final String scope;
+  final String activeMenu;
+  @override
+  State<RoleGroupPage> createState() => _RoleGroupPageState();
 }
 
 class _RoleGroupPageState extends State<RoleGroupPage> {
-  final _repo = RoleGroupRepository(); final _search = TextEditingController();
-  final _formKey = GlobalKey<_FormState>(); late Future<List<RoleGroup>> _future;
-  RoleGroup? _editing; Timer? _alertTimer; String? _alert; bool _alertError = false;
-  bool _form = false; bool _loading = false;
+  final _repo = RoleGroupRepository();
+  final _search = TextEditingController();
+  final _formKey = GlobalKey<_FormState>();
+  late Future<List<RoleGroup>> _future;
+  RoleGroup? _editing;
+  Timer? _alertTimer;
+  String? _alert;
+  bool _alertError = false;
+  bool _form = false;
+  bool _loading = false;
   bool _canCreate = false, _canEdit = false, _canDelete = false;
-  @override void initState() { super.initState(); _loadPermissions(); _load(); }
-  @override void dispose() { _alertTimer?.cancel(); _search.dispose(); super.dispose(); }
-  void _load() { final future = _repo.list(widget.scope, search: _search.text); setState(() { _future = future; }); }
-  Future<void> _loadPermissions() async { try { final p = await _repo.actions(widget.scope); if (mounted) setState(() { _canCreate = p['create'] == true; _canEdit = p['edit'] == true; _canDelete = p['delete'] == true; }); } catch (_) {} }
-  void _notice(String message, {bool error = false}) {
-    _alertTimer?.cancel(); setState(() { _alert = message; _alertError = error; });
-    _alertTimer = Timer(Duration(seconds: companySetupController.current?.timeAlert ?? 30), () { if (mounted) setState(() => _alert = null); });
+  @override
+  void initState() {
+    super.initState();
+    _loadPermissions();
+    _load();
   }
+
+  @override
+  void dispose() {
+    _alertTimer?.cancel();
+    _search.dispose();
+    super.dispose();
+  }
+
+  void _load() {
+    final future = _repo.list(widget.scope, search: _search.text);
+    setState(() {
+      _future = future;
+    });
+  }
+
+  Future<void> _loadPermissions() async {
+    try {
+      final p = await _repo.actions(widget.scope);
+      if (mounted) {
+        setState(() {
+          _canCreate = p['create'] == true;
+          _canEdit = p['edit'] == true;
+          _canDelete = p['delete'] == true;
+        });
+      }
+    } catch (_) {}
+  }
+
+  void _notice(String message, {bool error = false}) {
+    _alertTimer?.cancel();
+    setState(() {
+      _alert = message;
+      _alertError = error;
+    });
+    _alertTimer = Timer(
+      Duration(seconds: companySetupController.current?.timeAlert ?? 30),
+      () {
+        if (mounted) setState(() => _alert = null);
+      },
+    );
+  }
+
   String _thaiError(Object error) {
-    if (error is ApiException && error.message.trim().isNotEmpty) return error.message;
+    if (error is ApiException && error.message.trim().isNotEmpty) {
+      return error.message;
+    }
     final text = error.toString();
     if (text.contains('403')) return 'ไม่มีสิทธิ์ดำเนินการรายการนี้';
     if (text.contains('401')) return 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่';
     if (text.contains('404')) return 'ไม่พบข้อมูลที่ต้องการ';
-    if (text.contains('409') || text.contains('ซ้ำ')) return 'ข้อมูลนี้มีอยู่แล้ว';
-    if (text.contains('SocketException') || text.contains('Timeout')) return 'ไม่สามารถเชื่อมต่อระบบได้';
+    if (text.contains('409') || text.contains('ซ้ำ')) {
+      return 'ข้อมูลนี้มีอยู่แล้ว';
+    }
+    if (text.contains('SocketException') || text.contains('Timeout')) {
+      return 'ไม่สามารถเชื่อมต่อระบบได้';
+    }
     return 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง';
   }
+
   Future<void> _save(String code, String name, String desc, bool active) async {
-    if (code.trim().isEmpty || name.trim().isEmpty) { _notice('กรุณาระบุรหัสและชื่อกลุ่มสิทธิ์', error: true); return; }
-    final editing = _editing != null; setState(() => _loading = true);
+    if (code.trim().isEmpty || name.trim().isEmpty) {
+      _notice('กรุณาระบุรหัสและชื่อกลุ่มสิทธิ์', error: true);
+      return;
+    }
+    final editing = _editing != null;
+    setState(() => _loading = true);
     try {
-      final item = RoleGroup(id: _editing?.id ?? 0, scope: widget.scope, code: code.trim(), name: name.trim(), description: desc.trim().isEmpty ? null : desc.trim(), isActive: active);
-      if (editing) { await _repo.update(widget.scope, item); setState(() { _form = false; _editing = null; }); _notice('แก้ไขข้อมูลกลุ่มสิทธิ์สำเร็จ'); }
-      else { await _repo.create(widget.scope, item); _formKey.currentState?.clearFields(); _notice('เพิ่มข้อมูลใหม่สำเร็จ'); }
+      final item = RoleGroup(
+        id: _editing?.id ?? 0,
+        scope: widget.scope,
+        code: code.trim(),
+        name: name.trim(),
+        description: desc.trim().isEmpty ? null : desc.trim(),
+        isActive: active,
+      );
+      if (editing) {
+        await _repo.update(widget.scope, item);
+        setState(() {
+          _form = false;
+          _editing = null;
+        });
+        _notice('แก้ไขข้อมูลกลุ่มสิทธิ์สำเร็จ');
+      } else {
+        await _repo.create(widget.scope, item);
+        _formKey.currentState?.clearFields();
+        _notice('เพิ่มข้อมูลใหม่สำเร็จ');
+      }
       _load();
-    } catch (e) { _notice(_thaiError(e), error: true); } finally { if (mounted) setState(() => _loading = false); }
+    } catch (e) {
+      _notice(_thaiError(e), error: true);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
+
   Future<void> _delete(RoleGroup item) async {
-    final yes = await showDialog<bool>(context: context, builder: (c) => Dialog(
-      backgroundColor: Colors.transparent,
-      child: Container(
-        width: 420,
-        padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
-        decoration: BoxDecoration(color: const Color(0xFFF4FAF7), border: Border.all(color: Colors.red, width: 1.2), borderRadius: BorderRadius.circular(14)),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Row(children: [Container(width: 42, height: 42, decoration: BoxDecoration(color: Colors.red.shade100, borderRadius: BorderRadius.circular(9)), child: const Icon(Icons.delete_forever_outlined, color: Colors.red)), const SizedBox(width: 12), const Expanded(child: Text('ยืนยันการลบข้อมูลกลุ่มสิทธิ์', style: TextStyle(color: Colors.red, fontSize: 18, fontWeight: FontWeight.w700)))]),
-          const SizedBox(height: 16),
-          Container(width: double.infinity, padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12), decoration: BoxDecoration(color: const Color(0xFFFFC8D1), borderRadius: BorderRadius.circular(9)), child: Text('ต้องการลบ ${item.code} - ${item.name} หรือไม่?', textAlign: TextAlign.center)),
-          const SizedBox(height: 14),
-          const Align(alignment: Alignment.centerLeft, child: Text('ข้อมูลที่ลบแล้วไม่สามารถเรียกคืนกลับมาได้')),
-          const SizedBox(height: 14),
-          Row(mainAxisAlignment: MainAxisAlignment.end, children: [TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('ยกเลิก', style: TextStyle(color: Colors.teal, fontWeight: FontWeight.w600))), const SizedBox(width: 8), FilledButton.icon(style: FilledButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white), onPressed: () => Navigator.pop(c, true), icon: const Icon(Icons.delete_outline), label: const Text('ลบ'))]),
-        ]),
+    final yes = await showDialog<bool>(
+      context: context,
+      builder: (c) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          width: 420,
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF4FAF7),
+            border: Border.all(color: Colors.red, width: 1.2),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade100,
+                      borderRadius: BorderRadius.circular(9),
+                    ),
+                    child: const Icon(
+                      Icons.delete_forever_outlined,
+                      color: Colors.red,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      'ยืนยันการลบข้อมูลกลุ่มสิทธิ์',
+                      style: TextStyle(
+                        color: Colors.red,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFC8D1),
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: Text(
+                  'ต้องการลบ ${item.code} - ${item.name} หรือไม่?',
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              const SizedBox(height: 14),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text('ข้อมูลที่ลบแล้วไม่สามารถเรียกคืนกลับมาได้'),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(c, false),
+                    child: Text(
+                      'ยกเลิก',
+                      style: TextStyle(
+                        color: Theme.of(c).colorScheme.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: () => Navigator.pop(c, true),
+                    icon: const Icon(Icons.delete_outline),
+                    label: const Text('ลบ'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
-    ));
+    );
     if (yes != true) return;
-    try { await _repo.delete(widget.scope, item.id); _notice('ลบกลุ่มสิทธิ์สำเร็จ', error: true); _load(); } catch (e) { _notice(_thaiError(e), error: true); }
+    try {
+      await _repo.delete(widget.scope, item.id);
+      _notice('ลบกลุ่มสิทธิ์สำเร็จ');
+      _load();
+    } catch (e) {
+      _notice(_thaiError(e), error: true);
+    }
   }
-  @override Widget build(BuildContext context) => SupportWorkspaceShell(pageTitle: 'กลุ่มสิทธิ์', activeMenu: widget.activeMenu, menuScope: widget.scope == 'partner' ? WorkspaceMenuScope.partner : WorkspaceMenuScope.company, child: Stack(children: [Column(children: [Expanded(child: _form ? _Form(key: _formKey, onCancel: () => setState(() { _form = false; _editing = null; }), onSave: _save, editing: _editing, loading: _loading) : _List(future: _future, search: _search, onSearch: _load, canCreate: _canCreate, canEdit: _canEdit, canDelete: _canDelete, onAdd: () => setState(() { _form = true; _editing = null; }), onEdit: (x) => setState(() { _editing = x; _form = true; }), onDelete: _delete))]), if (_alert != null) Positioned(top: 16, right: 24, child: _AlertBanner(message: _alert!, error: _alertError, onClose: () => setState(() => _alert = null)))]));
+
+  @override
+  Widget build(BuildContext context) => SupportWorkspaceShell(
+    pageTitle: 'กลุ่มสิทธิ์',
+    activeMenu: widget.activeMenu,
+    menuScope: widget.scope == 'partner'
+        ? WorkspaceMenuScope.partner
+        : widget.scope == 'laoo'
+        ? WorkspaceMenuScope.support
+        : WorkspaceMenuScope.company,
+    child: Stack(
+      children: [
+        Column(
+          children: [
+            Expanded(
+              child: _form
+                  ? _Form(
+                      key: _formKey,
+                      onCancel: () => setState(() {
+                        _form = false;
+                        _editing = null;
+                      }),
+                      onSave: _save,
+                      editing: _editing,
+                      loading: _loading,
+                      favoriteKey: widget.scope == 'partner'
+                          ? '11003'
+                          : widget.scope == 'laoo'
+                          ? '12003'
+                          : '10003',
+                    )
+                  : _List(
+                      future: _future,
+                      search: _search,
+                      onSearch: _load,
+                      canCreate: _canCreate,
+                      canEdit: _canEdit,
+                      canDelete: _canDelete,
+                      favoriteKey: widget.scope == 'partner'
+                          ? '11003'
+                          : widget.scope == 'laoo'
+                          ? '12003'
+                          : '10003',
+                      onAdd: () => setState(() {
+                        _form = true;
+                        _editing = null;
+                      }),
+                      onEdit: (x) => setState(() {
+                        _form = true;
+                        _editing = x;
+                      }),
+                      onDelete: _delete,
+                    ),
+            ),
+          ],
+        ),
+        if (_alert != null)
+          Positioned(
+            top: 16,
+            right: 24,
+            child: _AlertBanner(
+              message: _alert!,
+              error: _alertError,
+              onClose: () => setState(() => _alert = null),
+            ),
+          ),
+      ],
+    ),
+  );
 }
 
 class _AlertBanner extends StatelessWidget {
-  const _AlertBanner({required this.message, required this.error, required this.onClose});
-  final String message; final bool error; final VoidCallback onClose;
-  @override Widget build(BuildContext context) {
+  const _AlertBanner({
+    required this.message,
+    required this.error,
+    required this.onClose,
+  });
+  final String message;
+  final bool error;
+  final VoidCallback onClose;
+  @override
+  Widget build(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
     final color = error ? Colors.red : primary;
     return Material(
@@ -83,19 +326,68 @@ class _AlertBanner extends StatelessWidget {
       child: Container(
         constraints: const BoxConstraints(minWidth: 280, maxWidth: 380),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(color: color.withValues(alpha: .88), borderRadius: BorderRadius.circular(12), boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 4))]),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(error ? Icons.error_outline : Icons.check_circle_outline, color: Colors.white), const SizedBox(width: 8), Flexible(child: Text(message, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600))), IconButton(onPressed: onClose, icon: const Icon(Icons.close, color: Colors.white))]),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: .88),
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: const [
+            BoxShadow(
+              color: Colors.black26,
+              blurRadius: 10,
+              offset: Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              error ? Icons.error_outline : Icons.check_circle_outline,
+              color: Colors.white,
+            ),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                message,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            IconButton(
+              onPressed: onClose,
+              icon: const Icon(Icons.close, color: Colors.white),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
 class _List extends StatefulWidget {
-  const _List({required this.future, required this.search, required this.onSearch, required this.onAdd, required this.onEdit, required this.onDelete, required this.canCreate, required this.canEdit, required this.canDelete});
-  final Future<List<RoleGroup>> future; final TextEditingController search; final VoidCallback onSearch, onAdd; final void Function(RoleGroup) onEdit, onDelete;
+  const _List({
+    required this.future,
+    required this.search,
+    required this.onSearch,
+    required this.onAdd,
+    required this.onEdit,
+    required this.onDelete,
+    required this.canCreate,
+    required this.canEdit,
+    required this.canDelete,
+    required this.favoriteKey,
+  });
+  final Future<List<RoleGroup>> future;
+  final TextEditingController search;
+  final VoidCallback onSearch, onAdd;
+  final void Function(RoleGroup) onEdit, onDelete;
   final bool canCreate, canEdit, canDelete;
-  @override State<_List> createState() => _ListState();
+  final String favoriteKey;
+  @override
+  State<_List> createState() => _ListState();
 }
+
 class _ListState extends State<_List> {
   int page = 1;
   static const pageSize = 10;
@@ -103,7 +395,10 @@ class _ListState extends State<_List> {
   int? sortColumn;
   bool sortAscending = true;
 
-  void _sort(int column, bool ascending) => setState(() { sortColumn = column; sortAscending = ascending; });
+  void _sort(int column, bool ascending) => setState(() {
+    sortColumn = column;
+    sortAscending = ascending;
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -112,128 +407,392 @@ class _ListState extends State<_List> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(children: [
-            const WorkspacePageTitle(title: 'กลุ่มสิทธิ์', favoriteKey: 'กลุ่มสิทธิ์'),
-            const Spacer(),
-            if (widget.canCreate) FilledButton.icon(onPressed: widget.onAdd, icon: const Icon(Icons.add), label: const Text('เพิ่ม')),
-          ]),
+          Row(
+            children: [
+              WorkspacePageTitle(
+                title: 'กลุ่มสิทธิ์',
+                favoriteKey: widget.favoriteKey,
+              ),
+              const Spacer(),
+              if (widget.canCreate)
+                FilledButton.icon(
+                  onPressed: widget.onAdd,
+                  icon: const Icon(Icons.add),
+                  label: const Text('เพิ่ม'),
+                ),
+            ],
+          ),
           const SizedBox(height: 8),
-          Row(children: [
-            SizedBox(width: 280, child: TextField(
-              controller: widget.search,
-              onSubmitted: (_) { page = 1; widget.onSearch(); },
-              decoration: InputDecoration(labelText: 'ค้นหา', prefixIcon: const Icon(Icons.search), suffixIcon: IconButton(onPressed: widget.onSearch, icon: const Icon(Icons.arrow_forward)), border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)), contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12)),
-            )),
-            const SizedBox(width: 8),
-            OutlinedButton.icon(onPressed: () { widget.search.clear(); page = 1; widget.onSearch(); }, icon: const Icon(Icons.filter_alt_off_outlined), label: const Text('ล้าง Filter')),
-            const SizedBox(width: 8),
-            SizedBox(width: 170, child: DropdownButtonFormField<String>(
-              value: statusFilter,
-              style: Theme.of(context).textTheme.bodyMedium,
-              decoration: InputDecoration(labelText: 'สถานะ', labelStyle: TextStyle(color: Theme.of(context).colorScheme.primary), floatingLabelStyle: TextStyle(color: Theme.of(context).colorScheme.primary), enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Theme.of(context).colorScheme.primary)), focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 1.5))),
-              items: const [DropdownMenuItem(value: 'all', child: Text('ทั้งหมด')), DropdownMenuItem(value: 'active', child: Text('เปิด')), DropdownMenuItem(value: 'inactive', child: Text('ปิด'))],
-              onChanged: (value) => setState(() { statusFilter = value ?? 'all'; page = 1; }),
-            )),
-          ]),
+          Row(
+            children: [
+              SizedBox(
+                width: 280,
+                child: TextField(
+                  controller: widget.search,
+                  onSubmitted: (_) {
+                    page = 1;
+                    widget.onSearch();
+                  },
+                  decoration: InputDecoration(
+                    labelText: 'ค้นหา',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: IconButton(
+                      onPressed: widget.onSearch,
+                      icon: const Icon(Icons.arrow_forward),
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 12,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                onPressed: () {
+                  widget.search.clear();
+                  page = 1;
+                  widget.onSearch();
+                },
+                icon: const Icon(Icons.filter_alt_off_outlined),
+                label: const Text('ล้าง Filter'),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 170,
+                child: DropdownButtonFormField<String>(
+                  initialValue: statusFilter,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                  decoration: InputDecoration(
+                    labelText: 'สถานะ',
+                    labelStyle: TextStyle(
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    floatingLabelStyle: TextStyle(
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: Theme.of(context).colorScheme.primary,
+                        width: 1.5,
+                      ),
+                    ),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'all', child: Text('ทั้งหมด')),
+                    DropdownMenuItem(value: 'active', child: Text('เปิด')),
+                    DropdownMenuItem(value: 'inactive', child: Text('ปิด')),
+                  ],
+                  onChanged: (value) => setState(() {
+                    statusFilter = value ?? 'all';
+                    page = 1;
+                  }),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 8),
-          Expanded(child: FutureBuilder<List<RoleGroup>>(
-            future: widget.future,
-            builder: (context, snapshot) {
-              if (snapshot.hasError) {
-                return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  const Icon(Icons.error_outline, color: Colors.red, size: 36),
-                  const Text('โหลดข้อมูลกลุ่มสิทธิ์ไม่สำเร็จ'),
-                  const Text('กรุณาลองใหม่อีกครั้ง'),
-                  OutlinedButton(onPressed: widget.onSearch, child: const Text('ลองใหม่')),
-                ]));
-              }
-              if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-              final source = snapshot.data!;
-              final all = (statusFilter == 'active' ? source.where((item) => item.isActive).toList() : statusFilter == 'inactive' ? source.where((item) => !item.isActive).toList() : [...source]);
-              if (sortColumn != null) {
-                all.sort((a, b) { final result = switch (sortColumn) { 2 => a.code.compareTo(b.code), 3 => a.name.compareTo(b.name), 4 => a.isActive == b.isActive ? 0 : (a.isActive ? 1 : -1), _ => 0 }; return sortAscending ? result : -result; });
-              }
-              final pages = all.isEmpty ? 1 : (all.length / pageSize).ceil();
-              if (page > pages) page = pages;
-              final start = (page - 1) * pageSize;
-              final rows = all.skip(start).take(pageSize).toList();
-              final end = rows.isEmpty ? 0 : start + rows.length;
-              return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Expanded(child: rows.isEmpty
-                    ? const Center(child: Text('ไม่พบข้อมูลตามเงื่อนไข'))
-                    : Container(
-                        decoration: BoxDecoration(borderRadius: BorderRadius.circular(8)),
-                        foregroundDecoration: BoxDecoration(border: Border.all(color: Theme.of(context).colorScheme.primary), borderRadius: BorderRadius.circular(8)),
-                        clipBehavior: Clip.antiAlias,
-                        child: SizedBox(width: double.infinity, child: Theme(
-                          data: Theme.of(context).copyWith(dividerColor: Colors.grey.shade300),
-                          child: DataTableTheme(
-                          data: DataTableThemeData(dataRowMinHeight: 48, dataRowMaxHeight: 56, headingTextStyle: Theme.of(context).textTheme.labelLarge?.copyWith(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.w700)),
-                          child: DataTable(
-                          horizontalMargin: 8,
-                          columnSpacing: 20,
-                          dividerThickness: .6,
-                          sortColumnIndex: sortColumn,
-                          sortAscending: sortAscending,
-                          headingRowColor: const WidgetStatePropertyAll(Color(0xFFF3F4F6)),
-                          columns: [DataColumn(label: const SizedBox(width: 80, child: Padding(padding: EdgeInsets.only(left: 12), child: Text('ID')))), DataColumn(label: const SizedBox(width: 120, child: Center(child: Text('Action')))), DataColumn(label: const Text('รหัสกลุ่มสิทธิ์'), onSort: (column, ascending) => _sort(column, ascending)), DataColumn(label: const Text('ชื่อกลุ่ม'), onSort: (column, ascending) => _sort(column, ascending)), DataColumn(label: const Text('สถานะ'), onSort: (column, ascending) => _sort(column, ascending))],
-                          rows: [for (var i = 0; i < rows.length; i++) DataRow(cells: [
-                            DataCell(SizedBox(width: 80, child: Padding(padding: const EdgeInsets.only(left: 12), child: Text('${start + i + 1}')))),
-                            DataCell(
-                              SizedBox(
-                                width: 120,
-                                child: Center(
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      if (widget.canEdit) IconButton(onPressed: () => widget.onEdit(rows[i]), icon: Icon(Icons.edit_outlined, color: Theme.of(context).colorScheme.primary), tooltip: 'แก้ไข'),
-                                      if (widget.canDelete) IconButton(onPressed: () => widget.onDelete(rows[i]), icon: const Icon(Icons.delete_outline, color: Colors.red), tooltip: 'ลบ'),
-                                    ],
+          Expanded(
+            child: FutureBuilder<List<RoleGroup>>(
+              future: widget.future,
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.error_outline,
+                          color: Colors.red,
+                          size: 36,
+                        ),
+                        const Text('โหลดข้อมูลกลุ่มสิทธิ์ไม่สำเร็จ'),
+                        const Text('กรุณาลองใหม่อีกครั้ง'),
+                        OutlinedButton(
+                          onPressed: widget.onSearch,
+                          child: const Text('ลองใหม่'),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+                if (!snapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                final source = snapshot.data!;
+                final all = (statusFilter == 'active'
+                    ? source.where((item) => item.isActive).toList()
+                    : statusFilter == 'inactive'
+                    ? source.where((item) => !item.isActive).toList()
+                    : [...source]);
+                if (sortColumn != null) {
+                  all.sort((a, b) {
+                    final result = switch (sortColumn) {
+                      2 => a.code.compareTo(b.code),
+                      3 => a.name.compareTo(b.name),
+                      4 => a.isActive == b.isActive ? 0 : (a.isActive ? 1 : -1),
+                      _ => 0,
+                    };
+                    return sortAscending ? result : -result;
+                  });
+                }
+                final pages = all.isEmpty ? 1 : (all.length / pageSize).ceil();
+                if (page > pages) page = pages;
+                final start = (page - 1) * pageSize;
+                final rows = all.skip(start).take(pageSize).toList();
+                final end = rows.isEmpty ? 0 : start + rows.length;
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: rows.isEmpty
+                          ? const Center(child: Text('ไม่พบข้อมูลตามเงื่อนไข'))
+                          : Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              foregroundDecoration: BoxDecoration(
+                                border: Border.all(
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              clipBehavior: Clip.antiAlias,
+                              child: SizedBox(
+                                width: double.infinity,
+                                child: Theme(
+                                  data: Theme.of(context).copyWith(
+                                    dividerColor: Colors.grey.shade300,
+                                  ),
+                                  child: DataTableTheme(
+                                    data: DataTableThemeData(
+                                      dataRowMinHeight: 48,
+                                      dataRowMaxHeight: 56,
+                                      headingTextStyle: Theme.of(context)
+                                          .textTheme
+                                          .labelLarge
+                                          ?.copyWith(
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.primary,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                    ),
+                                    child: DataTable(
+                                      horizontalMargin: 8,
+                                      columnSpacing: 20,
+                                      dividerThickness: .6,
+                                      sortColumnIndex: sortColumn,
+                                      sortAscending: sortAscending,
+                                      headingRowColor:
+                                          const WidgetStatePropertyAll(
+                                            Color(0xFFF3F4F6),
+                                          ),
+                                      columns: [
+                                        DataColumn(
+                                          label: const SizedBox(
+                                            width: 80,
+                                            child: Padding(
+                                              padding: EdgeInsets.only(
+                                                left: 12,
+                                              ),
+                                              child: Text('ID'),
+                                            ),
+                                          ),
+                                        ),
+                                        DataColumn(
+                                          label: const SizedBox(
+                                            width: 120,
+                                            child: Center(
+                                              child: Text('Action'),
+                                            ),
+                                          ),
+                                        ),
+                                        DataColumn(
+                                          label: const Text('รหัสกลุ่มสิทธิ์'),
+                                          onSort: (column, ascending) =>
+                                              _sort(column, ascending),
+                                        ),
+                                        DataColumn(
+                                          label: const Text('ชื่อกลุ่ม'),
+                                          onSort: (column, ascending) =>
+                                              _sort(column, ascending),
+                                        ),
+                                        DataColumn(
+                                          label: const Text('สถานะ'),
+                                          onSort: (column, ascending) =>
+                                              _sort(column, ascending),
+                                        ),
+                                      ],
+                                      rows: [
+                                        for (var i = 0; i < rows.length; i++)
+                                          DataRow(
+                                            cells: [
+                                              DataCell(
+                                                SizedBox(
+                                                  width: 80,
+                                                  child: Padding(
+                                                    padding:
+                                                        const EdgeInsets.only(
+                                                          left: 12,
+                                                        ),
+                                                    child: Text(
+                                                      '${start + i + 1}',
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                              DataCell(
+                                                SizedBox(
+                                                  width: 120,
+                                                  child: Center(
+                                                    child: Row(
+                                                      mainAxisSize:
+                                                          MainAxisSize.min,
+                                                      children: [
+                                                        if (widget.canEdit)
+                                                          IconButton(
+                                                            onPressed: () =>
+                                                                widget.onEdit(
+                                                                  rows[i],
+                                                                ),
+                                                            icon: Icon(
+                                                              Icons
+                                                                  .edit_outlined,
+                                                              color:
+                                                                  Theme.of(
+                                                                        context,
+                                                                      )
+                                                                      .colorScheme
+                                                                      .primary,
+                                                            ),
+                                                            tooltip: 'แก้ไข',
+                                                          ),
+                                                        if (widget.canDelete)
+                                                          IconButton(
+                                                            onPressed: () =>
+                                                                widget.onDelete(
+                                                                  rows[i],
+                                                                ),
+                                                            icon: const Icon(
+                                                              Icons
+                                                                  .delete_outline,
+                                                              color: Colors.red,
+                                                            ),
+                                                            tooltip: 'ลบ',
+                                                          ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                              DataCell(Text(rows[i].code)),
+                                              DataCell(Text(rows[i].name)),
+                                              DataCell(
+                                                Container(
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 16,
+                                                        vertical: 6,
+                                                      ),
+                                                  decoration: BoxDecoration(
+                                                    color: rows[i].isActive
+                                                        ? Theme.of(context)
+                                                              .colorScheme
+                                                              .primary
+                                                              .withValues(
+                                                                alpha: .12,
+                                                              )
+                                                        : Colors.red.shade50,
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          20,
+                                                        ),
+                                                  ),
+                                                  child: Text(
+                                                    rows[i].isActive
+                                                        ? 'เปิด'
+                                                        : 'ปิด',
+                                                    style: TextStyle(
+                                                      color: rows[i].isActive
+                                                          ? Theme.of(context)
+                                                                .colorScheme
+                                                                .primary
+                                                          : Colors.red,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
-                            DataCell(Text(rows[i].code)),
-                            DataCell(Text(rows[i].name)),
-                            DataCell(
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: rows[i].isActive ? Theme.of(context).colorScheme.primary.withValues(alpha: .12) : Colors.red.shade50,
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Text(
-                                  rows[i].isActive ? 'เปิด' : 'ปิด',
-                                  style: TextStyle(
-                                    color: rows[i].isActive ? Theme.of(context).colorScheme.primary : Colors.red,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ])],
-                        ))))
-                      )),
-                const SizedBox(height: 8),
-                Row(children: [
-                  _PageButton(label: 'ก่อนหน้า', enabled: page > 1, onTap: () => setState(() => page--)),
-                  for (var i = 1; i <= pages; i++) _PageButton(label: '$i', enabled: i != page, onTap: () => setState(() => page = i), selected: i == page),
-                  _PageButton(label: 'ถัดไป', enabled: page < pages, onTap: () => setState(() => page++)),
-                  const SizedBox(width: 12),
-                  Text('แสดง ${rows.isEmpty ? 0 : start + 1}-$end จาก ${all.length} รายการ'),
-                ]),
-              ]);
-            },
-          )),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        _PageButton(
+                          label: 'ก่อนหน้า',
+                          enabled: page > 1,
+                          onTap: () => setState(() => page--),
+                        ),
+                        for (var i = 1; i <= pages; i++)
+                          _PageButton(
+                            label: '$i',
+                            enabled: i != page,
+                            onTap: () => setState(() => page = i),
+                            selected: i == page,
+                          ),
+                        _PageButton(
+                          label: 'ถัดไป',
+                          enabled: page < pages,
+                          onTap: () => setState(() => page++),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          'แสดง ${rows.isEmpty ? 0 : start + 1}-$end จาก ${all.length} รายการ',
+                        ),
+                      ],
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
         ],
       ),
     );
   }
 }
+
 class _PageButton extends StatelessWidget {
-  const _PageButton({required this.label, required this.enabled, required this.onTap, this.selected = false});
-  final String label; final bool enabled, selected; final VoidCallback onTap;
-  @override Widget build(BuildContext context) {
+  const _PageButton({
+    required this.label,
+    required this.enabled,
+    required this.onTap,
+    this.selected = false,
+  });
+  final String label;
+  final bool enabled, selected;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
     final isPrevious = label == 'ก่อนหน้า';
     final isNext = label == 'ถัดไป';
@@ -248,8 +807,12 @@ class _PageButton extends StatelessWidget {
             shape: BoxShape.circle,
             color: selected || (arrow && enabled)
                 ? primary
-                : enabled && !arrow ? Colors.white : Colors.grey.shade300,
-            border: !arrow && enabled && !selected ? Border.all(color: primary) : null,
+                : enabled && !arrow
+                ? Colors.white
+                : Colors.grey.shade300,
+            border: !arrow && enabled && !selected
+                ? Border.all(color: primary)
+                : null,
           ),
           child: Material(
             color: Colors.transparent,
@@ -259,8 +822,21 @@ class _PageButton extends StatelessWidget {
               customBorder: const CircleBorder(),
               child: Center(
                 child: arrow
-                    ? Icon(isPrevious ? Icons.chevron_left : Icons.chevron_right, size: 22, color: selected || enabled ? Colors.white : Colors.grey.shade600)
-                    : Text(label, style: TextStyle(fontSize: 12, color: selected ? Colors.white : primary, fontWeight: FontWeight.w600)),
+                    ? Icon(
+                        isPrevious ? Icons.chevron_left : Icons.chevron_right,
+                        size: 22,
+                        color: selected || enabled
+                            ? Colors.white
+                            : Colors.grey.shade600,
+                      )
+                    : Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: selected ? Colors.white : primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
               ),
             ),
           ),
@@ -270,5 +846,156 @@ class _PageButton extends StatelessWidget {
   }
 }
 
-class _Form extends StatefulWidget { const _Form({super.key, required this.onCancel, required this.onSave, this.editing, this.loading}); final VoidCallback onCancel; final Future<void> Function(String, String, String, bool) onSave; final RoleGroup? editing; final bool? loading; @override State<_Form> createState() => _FormState(); }
-class _FormState extends State<_Form> { late final TextEditingController code, name, desc; bool active = true; @override void initState() { super.initState(); final x = widget.editing; code = TextEditingController(text: x?.code); name = TextEditingController(text: x?.name); desc = TextEditingController(text: x?.description); active = x?.isActive ?? true; } void clearFields() { code.clear(); name.clear(); desc.clear(); setState(() => active = true); } @override void dispose() { code.dispose(); name.dispose(); desc.dispose(); super.dispose(); } @override Widget build(BuildContext c) => SingleChildScrollView(padding: const EdgeInsets.all(24), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Row(children: [WorkspacePageTitle(title: 'กลุ่มสิทธิ์ > ${widget.editing == null ? 'เพิ่ม' : 'แก้ไข'}', favoriteKey: 'กลุ่มสิทธิ์'), const Spacer(), OutlinedButton(style: OutlinedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Theme.of(c).colorScheme.primary, side: BorderSide(color: Colors.grey.shade500)), onPressed: widget.onCancel, child: const Text('ยกเลิก')), const SizedBox(width: 8), FilledButton(onPressed: widget.loading == true ? null : () => widget.onSave(code.text, name.text, desc.text, active), child: const Text('บันทึก'))]), const SizedBox(height: 8), Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Row(mainAxisSize: MainAxisSize.min, children: [const Text('สถานะ'), const SizedBox(width: 8), Switch(value: active, onChanged: (v) => setState(() => active = v))]), const SizedBox(height: 12), TextField(controller: code, decoration: const InputDecoration(labelText: 'รหัสกลุ่มสิทธิ์ *')), const SizedBox(height: 12), TextField(controller: name, decoration: const InputDecoration(labelText: 'ชื่อกลุ่มสิทธิ์ *')), const SizedBox(height: 12), TextField(controller: desc, maxLines: 3, decoration: const InputDecoration(labelText: 'รายละเอียด'))]))), const SizedBox(height: 12), Align(alignment: Alignment.centerRight, child: Row(mainAxisSize: MainAxisSize.min, children: [OutlinedButton(style: OutlinedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Theme.of(c).colorScheme.primary, side: BorderSide(color: Colors.grey.shade500)), onPressed: widget.onCancel, child: const Text('ยกเลิก')), const SizedBox(width: 8), FilledButton(onPressed: widget.loading == true ? null : () => widget.onSave(code.text, name.text, desc.text, active), child: const Text('บันทึก'))]))])); }
+class _Form extends StatefulWidget {
+  const _Form({
+    super.key,
+    required this.onCancel,
+    required this.onSave,
+    required this.favoriteKey,
+    this.editing,
+    this.loading,
+  });
+  final VoidCallback onCancel;
+  final Future<void> Function(String, String, String, bool) onSave;
+  final RoleGroup? editing;
+  final bool? loading;
+  final String favoriteKey;
+  @override
+  State<_Form> createState() => _FormState();
+}
+
+class _FormState extends State<_Form> {
+  late final TextEditingController code, name, desc;
+  bool active = true;
+  @override
+  void initState() {
+    super.initState();
+    final x = widget.editing;
+    code = TextEditingController(text: x?.code);
+    name = TextEditingController(text: x?.name);
+    desc = TextEditingController(text: x?.description);
+    active = x?.isActive ?? true;
+  }
+
+  void clearFields() {
+    code.clear();
+    name.clear();
+    desc.clear();
+    setState(() => active = true);
+  }
+
+  @override
+  void dispose() {
+    code.dispose();
+    name.dispose();
+    desc.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext c) => SingleChildScrollView(
+    padding: const EdgeInsets.all(24),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            WorkspacePageTitle(
+              title:
+                  'กลุ่มสิทธิ์ > ${widget.editing == null ? 'เพิ่ม' : 'แก้ไข'}',
+              favoriteKey: widget.favoriteKey,
+            ),
+            const Spacer(),
+            OutlinedButton(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Theme.of(c).colorScheme.primary,
+                side: BorderSide(color: Theme.of(c).colorScheme.primary),
+              ),
+              onPressed: widget.onCancel,
+              child: const Text('ยกเลิก'),
+            ),
+            const SizedBox(width: 8),
+            FilledButton(
+              onPressed: widget.loading == true
+                  ? null
+                  : () =>
+                        widget.onSave(code.text, name.text, desc.text, active),
+              child: const Text('บันทึก'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('สถานะ'),
+                    const SizedBox(width: 8),
+                    Switch(
+                      value: active,
+                      onChanged: (v) => setState(() => active = v),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: code,
+                  decoration: const InputDecoration(
+                    labelText: 'รหัสกลุ่มสิทธิ์ *',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: name,
+                  decoration: const InputDecoration(
+                    labelText: 'ชื่อกลุ่มสิทธิ์ *',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: desc,
+                  maxLines: 3,
+                  decoration: const InputDecoration(labelText: 'รายละเอียด'),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Align(
+          alignment: Alignment.centerRight,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Theme.of(c).colorScheme.primary,
+                  side: BorderSide(color: Theme.of(c).colorScheme.primary),
+                ),
+                onPressed: widget.onCancel,
+                child: const Text('ยกเลิก'),
+              ),
+              const SizedBox(width: 8),
+              FilledButton(
+                onPressed: widget.loading == true
+                    ? null
+                    : () => widget.onSave(
+                        code.text,
+                        name.text,
+                        desc.text,
+                        active,
+                      ),
+                child: const Text('บันทึก'),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}

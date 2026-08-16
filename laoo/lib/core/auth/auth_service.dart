@@ -1,4 +1,5 @@
 import '../api/api_client.dart';
+import '../config/app_config.dart';
 import '../constants/api_endpoints.dart';
 import 'auth_session.dart';
 import 'auth_storage.dart';
@@ -18,7 +19,6 @@ class AuthService {
   }) async {
     if (rememberLogin) {
       await _authStorage.saveRememberedUsername(username);
-      await _authStorage.saveRememberedPassword(password);
     } else {
       await _authStorage.clearRememberedUsername();
     }
@@ -28,6 +28,7 @@ class AuthService {
       body: {
         'username': username,
         'password': password,
+        'projectCode': AppConfig.projectCode,
       },
     );
 
@@ -70,9 +71,30 @@ class AuthService {
     return session;
   }
 
+  Future<void> requestPasswordReset({required String username}) async {
+    await _apiClient.post(
+      '/api/auth/forgot-password',
+      authenticated: false,
+      body: {'username': username.trim(), 'projectCode': AppConfig.projectCode},
+    );
+  }
+
+  Future<void> resetPassword({
+    required String token,
+    required String newPassword,
+  }) async {
+    await _apiClient.post(
+      '/api/auth/reset-password',
+      authenticated: false,
+      body: {'token': token.trim(), 'newPassword': newPassword},
+    );
+  }
+
   Future<AuthSession?> restoreSession() {
     return _authStorage.read();
   }
+
+  Future<void> saveSession(AuthSession session) => _authStorage.save(session);
 
   Future<AuthSession?> restoreAndRefreshSession() async {
     final restored = await _authStorage.read();

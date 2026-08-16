@@ -1,179 +1,33 @@
-# Laoo
+# LAOO Build Tools
 
-> **Enterprise Software Platform**
-> Build Once, Customize Anywhere
+โฟลเดอร์นี้เก็บคำสั่ง Build ที่ใช้ร่วมกันใน Workspace `C:\laoo`
 
----
-
-# Overview
-
-Laoo คือแพลตฟอร์มสำหรับพัฒนาระบบงานองค์กร โดยออกแบบให้สามารถสร้างผลิตภัณฑ์ได้หลายประเภทจากมาตรฐานเดียวกัน
-
-ตัวอย่างผลิตภัณฑ์ในอนาคต
-
-* Laoo (Core Platform)
-* Laoo Meeting
-* Laoo HR
-* Laoo Quality
-* Laoo License
-* และผลิตภัณฑ์อื่น ๆ
-
----
-
-# Vision
-
-สร้างแพลตฟอร์มซอฟต์แวร์ที่
-
-* พัฒนาครั้งเดียว
-* นำกลับมาใช้ซ้ำได้
-* ปรับแต่งได้ตามความต้องการของลูกค้า
-* รองรับทั้ง On-Premise และ SaaS
-* ใช้มาตรฐานเดียวกันทุก Project
-
----
-
-# Technology
-
-Current Technology Stack
-
-* Flutter
-* ASP.NET Core Web API
-* SQL Server
-* Git
-* GitHub
-
-รายละเอียดทั้งหมดอยู่ใน `docs/standards`
-
----
-
-# Repository Structure
+## โครงสร้างปัจจุบัน
 
 ```text
-laoo/
-│
-├── docs/
-│
-│   ├── platform/
-│   ├── standards/
-│   ├── engines/
-│   ├── security/
-│   ├── qa/
-│   ├── deployment/
-│   ├── templates/
-│   └── meeting/
-│
-├── projects/
-│
-│   └── laoo/
-│       ├── app/
-│       ├── api/
-│       ├── database/
-│       └── docs/
-│
-├── tools/
-│
-└── scripts/
+C:\laoo\laoo          Flutter app หลัก
+C:\laoo\laoo_api      ASP.NET Core API หลัก
+C:\laoo\scripts       SQL scripts
+C:\laoo\docs          มาตรฐานและเอกสารส่วนกลาง
+C:\laoo\publish       ผล Build ชั่วคราว (ไม่เก็บใน Git)
 ```
 
----
+Project ใหม่ให้วางเป็นโฟลเดอร์ระดับเดียวกันภายใต้ `C:\laoo` และเปิดด้วย `.code-workspace` ของ Project นั้น ห้ามใช้โฟลเดอร์ `projects` ซ้อนอีกชั้น
 
-# Documentation
+## Build API สำหรับ Cloud
 
-เอกสารทั้งหมดของบริษัทอยู่ในโฟลเดอร์
-
-```text
-docs/
+```powershell
+& C:\laoo\tools\build-api-cloud.ps1
 ```
 
-แบ่งออกเป็น
+ผลลัพธ์อยู่ที่ `C:\laoo\publish\laoo_api_cloud.zip` และ Script จะหยุดทันทีหากพบ `local.json` หรือ `appsettings.Local.json` ในชุด Publish
 
-* Platform
-* Standards
-* Engines
-* Security
-* QA
-* Deployment
-* Templates
-* Meeting
+## Build APK สำหรับทดสอบมือถือจริง
 
----
-
-# Projects
-
-ทุกผลิตภัณฑ์จะถูกเก็บไว้ภายใต้
-
-```text
-projects/
+```powershell
+& C:\laoo\tools\build-apk-test.ps1 `
+  -ApiUrl https://api.example.com `
+  -ProjectCode LAOO
 ```
 
-เช่น
-
-```text
-projects/
-    laoo/
-    laoo-meeting/
-    laoo-hr/
-```
-
----
-
-# Development Process
-
-ทีมงานใช้กระบวนการพัฒนาเดียวกันทุก Project
-
-```text
-Requirement
-    ↓
-Platform Standard
-    ↓
-Prototype
-    ↓
-Implementation
-    ↓
-Testing
-    ↓
-Review
-    ↓
-Release
-```
-
----
-
-# AI Development
-
-AI ทุกตัวต้องอ่าน
-
-1. AGENTS.md
-2. เอกสารใน `docs/`
-3. เอกสารเฉพาะ Project
-
-ก่อนเริ่มสร้างหรือแก้ไข Code
-
----
-
-# Current Status
-
-Project Status
-
-**Foundation Phase**
-
-Current Milestone
-
-* Platform Blueprint ✅
-* Git Repository ✅
-* GitHub Repository ✅
-
-Next Milestone
-
-* Flutter Foundation
-* Core Authentication
-* Dashboard
-* Theme Engine
-
----
-
-# License
-
-Copyright © Laoo
-
-All Rights Reserved.
+ผลลัพธ์อยู่ที่ `C:\laoo\publish\laoo-LAOO-test.apk` ปัจจุบันเป็น Test APK ที่ใช้ Debug Signing Key ต้องตั้ง Release Keystore ก่อนนำขึ้น Store

@@ -272,9 +272,11 @@ SET
     {
         var loginMode = User.FindFirstValue("login_mode");
         var laooUserId = User.FindFirstValue("laoo_user_id");
+        var canLoginAsUser = User.FindFirstValue("can_login_as_user");
 
         return string.Equals(loginMode, "LAOO", StringComparison.OrdinalIgnoreCase)
-               && !string.IsNullOrWhiteSpace(laooUserId);
+               && !string.IsNullOrWhiteSpace(laooUserId)
+               && string.Equals(canLoginAsUser, "true", StringComparison.OrdinalIgnoreCase);
     }
 
     private long? GetLongClaim(string type)

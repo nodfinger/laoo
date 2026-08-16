@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/api/api_client.dart';
 import '../../../../core/api/api_exception.dart';
+import '../../../../core/widgets/auto_dismiss_message.dart';
 import '../../presentation/widgets/support_workspace_shell.dart';
 import '../data/partner_user_repository.dart';
 
@@ -20,6 +21,7 @@ class _PartnerUserPageState extends State<PartnerUserPage> {
   int? _partnerId;
   bool _loading = true;
   String? _error;
+  bool _messageError = true;
 
   @override
   void initState() {
@@ -38,7 +40,7 @@ class _PartnerUserPageState extends State<PartnerUserPage> {
       setState(() {});
       if (_partnerId != null) await _loadUsers();
     } catch (error) {
-      if (mounted) setState(() => _error = _message(error));
+      if (mounted) _showMessage(_message(error), error: true);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -55,7 +57,7 @@ class _PartnerUserPageState extends State<PartnerUserPage> {
       final items = await _users.list(id);
       if (mounted) setState(() => _items = items);
     } catch (error) {
-      if (mounted) setState(() => _error = _message(error));
+      if (mounted) _showMessage(_message(error), error: true);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -73,13 +75,23 @@ class _PartnerUserPageState extends State<PartnerUserPage> {
       await _users.create(id, result);
       await _loadUsers();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('สร้างบัญชี Partner สำเร็จ')),
-        );
+        _showMessage('สร้างบัญชี Partner สำเร็จ', error: false);
       }
     } catch (error) {
-      if (mounted) setState(() => _error = _message(error));
+      if (mounted) _showMessage(_message(error), error: true);
     }
+  }
+
+  void _showMessage(String message, {required bool error}) {
+    if (!mounted) return;
+    setState(() {
+      _error = message;
+      _messageError = error;
+    });
+  }
+
+  void _dismissMessage() {
+    if (mounted) setState(() => _error = null);
   }
 
   String _message(Object error) =>
@@ -138,11 +150,15 @@ class _PartnerUserPageState extends State<PartnerUserPage> {
               },
             ),
             const SizedBox(height: 12),
-            if (_error != null)
-              Text(
-                _error!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
+            if (_error != null) ...[
+              AutoDismissMessage(
+                key: ValueKey((_error, _messageError)),
+                message: _error!,
+                error: _messageError,
+                onClose: _dismissMessage,
               ),
+              const SizedBox(height: 8),
+            ],
             Expanded(
               child: _loading
                   ? const Center(child: CircularProgressIndicator())

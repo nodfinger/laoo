@@ -14,6 +14,20 @@ public sealed class OrganizationStructureController(IConfiguration configuration
     [HttpGet]
     public async Task<IActionResult> List([FromQuery] long? companyId, CancellationToken token)
     {
+        if (IsLaoo())
+        {
+            await using var lc = await Open(token);
+            if (!await Allowed(lc, "VIEW", token)) return Forbid();
+            const string laooSql = "SELECT COALESCE(OrgStructureType,1) FROM dbo.TDSTCompanySetUp WHERE OwnerType='L' AND PartnerID IS NULL AND CompanyID IS NULL; SELECT OrgUnitID,CompanyID,UnitType,ParentOrgUnitID,UnitCode,NameTH,NameEN,IsActive,CAST(NULL AS nvarchar(200)) FROM dbo.TDADOrganizationUnit WHERE OwnerType='L' AND PartnerID IS NULL AND CompanyID IS NULL ORDER BY UnitType,UnitCode;";
+            await using var lcmd = new SqlCommand(laooSql, lc);
+            await using var lr = await lcmd.ExecuteReaderAsync(token);
+            var laooModes = new List<int>();
+            while (await lr.ReadAsync(token)) laooModes.Add(lr.GetInt32(0));
+            await lr.NextResultAsync(token);
+            var laooUnits = new List<object>();
+            while (await lr.ReadAsync(token)) laooUnits.Add(new { orgUnitId=lr.GetInt64(0), companyId=(long?)null, unitType=lr.GetString(2), parentOrgUnitId=lr.IsDBNull(3)?(long?)null:lr.GetInt64(3), unitCode=lr.GetString(4), nameTh=lr.GetString(5), nameEn=N(lr,6), isActive=lr.GetBoolean(7), companyName=(string?)null });
+            return Ok(new { orgStructureType = laooModes.Count == 1 ? laooModes[0] : 1, units = laooUnits });
+        }
         if (IsPartner() && long.TryParse(User.FindFirstValue("partner_id"), out var partnerScope))
         {
             await using var pc = await Open(token);
@@ -52,6 +66,15 @@ public sealed class OrganizationStructureController(IConfiguration configuration
     [HttpPut("mode")]
     public async Task<IActionResult> UpdateMode(OrganizationModeRequest request, CancellationToken token)
     {
+        if (IsLaoo())
+        {
+            if (request.OrgStructureType is not (1 or 2)) return BadRequest(new { message = "รูปแบบโครงสร้างองค์กรไม่ถูกต้อง" });
+            await using var lc = await Open(token);
+            if (!await Allowed(lc, "EDIT", token)) return Forbid();
+            await using var lmode = new SqlCommand("UPDATE dbo.TDSTCompanySetUp SET OrgStructureType=@mode,UpdateDate=SYSUTCDATETIME() WHERE OwnerType='L' AND PartnerID IS NULL AND CompanyID IS NULL", lc);
+            lmode.Parameters.Add("@mode", SqlDbType.Int).Value = request.OrgStructureType;
+            return await lmode.ExecuteNonQueryAsync(token) == 0 ? NotFound() : NoContent();
+        }
         if (IsPartner() && long.TryParse(User.FindFirstValue("partner_id"), out var partnerId))
         {
             if (request.OrgStructureType is not (1 or 2))
@@ -93,6 +116,14 @@ public sealed class OrganizationStructureController(IConfiguration configuration
     [HttpDelete("{id:long}")]
     public async Task<IActionResult> Delete(long id, [FromQuery] long? companyId, CancellationToken token)
     {
+        if (IsLaoo())
+        {
+            await using var lc = await Open(token);
+            if (!await Allowed(lc, "DELETE", token)) return Forbid();
+            await using var ldel = new SqlCommand("IF EXISTS(SELECT 1 FROM dbo.TDADOrganizationUnit WHERE ParentOrgUnitID=@id AND OwnerType='L' AND PartnerID IS NULL AND CompanyID IS NULL) THROW 50001,'HAS_CHILDREN',1; DELETE dbo.TDADOrganizationUnit WHERE OrgUnitID=@id AND OwnerType='L' AND PartnerID IS NULL AND CompanyID IS NULL;", lc);
+            ldel.Parameters.Add("@id", SqlDbType.BigInt).Value = id;
+            try { return await ldel.ExecuteNonQueryAsync(token)==0 ? NotFound() : NoContent(); } catch(SqlException ex) when(ex.Number==50001){return Conflict(new {message="ไม่สามารถลบฝ่ายที่มีแผนกย่อยได้"});}
+        }
         if (IsPartner() && long.TryParse(User.FindFirstValue("partner_id"), out var partnerId))
         {
             await using var pc = await Open(token); if (!await Allowed(pc,"DELETE",token)) return Forbid();
@@ -109,6 +140,8 @@ public sealed class OrganizationStructureController(IConfiguration configuration
 
     private async Task<IActionResult> Save(long? id, UnitRequest x, CancellationToken token)
     {
+        if (IsLaoo() && long.TryParse(User.FindFirstValue("laoo_user_id"), out _))
+            return await SaveLaoo(id, x, token);
         if (IsPartner() && long.TryParse(User.FindFirstValue("partner_id"), out var partnerId))
             return await SavePartner(id, x, partnerId, token);
         var companyId = ResolveCompany(x.CompanyId);
@@ -154,6 +187,19 @@ public sealed class OrganizationStructureController(IConfiguration configuration
             return Conflict(new { message = "รหัสซ้ำ" });
         }
         return NoContent();
+    }
+
+    private async Task<IActionResult> SaveLaoo(long? id, UnitRequest x, CancellationToken token)
+    {
+        if ((x.UnitType != "DIV" && x.UnitType != "DEP") || string.IsNullOrWhiteSpace(x.UnitCode) || string.IsNullOrWhiteSpace(x.NameTh)) return BadRequest(new { message = "กรุณากรอกรหัสและชื่อฝ่าย/แผนกให้ครบ" });
+        var code = x.UnitCode.Trim().ToUpperInvariant();
+        if (code.Any(char.IsWhiteSpace)) return BadRequest(new { message = "รหัสย่อห้ามมีช่องว่าง" });
+        await using var c = await Open(token);
+        if (!await Allowed(c, id is null ? "CREATE" : "EDIT", token)) return Forbid();
+        const string sql = "DECLARE @mode int=(SELECT OrgStructureType FROM dbo.TDSTCompanySetUp WHERE OwnerType='L' AND PartnerID IS NULL AND CompanyID IS NULL); IF @mode IS NULL THROW 50002,'SETUP_NOT_FOUND',1; IF EXISTS(SELECT 1 FROM dbo.TDADOrganizationUnit WHERE OwnerType='L' AND PartnerID IS NULL AND CompanyID IS NULL AND UnitType=@type AND LOWER(REPLACE(UnitCode,N' ',N''))=LOWER(REPLACE(@code,N' ',N'')) AND (@id IS NULL OR OrgUnitID<>@id)) THROW 50007,'DUPLICATE_CODE',1; IF @type='DIV' AND @parent IS NOT NULL THROW 50003,'DIVISION_PARENT_INVALID',1; IF @type='DEP' AND @mode=1 AND @parent IS NOT NULL THROW 50004,'DEPARTMENT_PARENT_INVALID',1; IF @type='DEP' AND @mode=2 AND NOT EXISTS(SELECT 1 FROM dbo.TDADOrganizationUnit WHERE OrgUnitID=@parent AND OwnerType='L' AND PartnerID IS NULL AND CompanyID IS NULL AND UnitType='DIV' AND IsActive=1) THROW 50005,'DEPARTMENT_PARENT_REQUIRED',1; IF @id IS NULL INSERT dbo.TDADOrganizationUnit(OwnerType,PartnerID,CompanyID,UnitType,ParentOrgUnitID,UnitCode,NameTH,NameEN,IsActive) VALUES('L',NULL,NULL,@type,@parent,@code,@name,@nameEn,@active); ELSE UPDATE dbo.TDADOrganizationUnit SET UnitType=@type,ParentOrgUnitID=@parent,UnitCode=@code,NameTH=@name,NameEN=@nameEn,IsActive=@active,UpdateDate=SYSUTCDATETIME() WHERE OrgUnitID=@id AND OwnerType='L' AND PartnerID IS NULL AND CompanyID IS NULL;";
+        await using var cmd = new SqlCommand(sql, c);
+        cmd.Parameters.Add("@id",SqlDbType.BigInt).Value=id??(object)DBNull.Value; cmd.Parameters.Add("@type",SqlDbType.NVarChar,10).Value=x.UnitType; cmd.Parameters.Add("@parent",SqlDbType.BigInt).Value=x.ParentOrgUnitId??(object)DBNull.Value; cmd.Parameters.Add("@code",SqlDbType.NVarChar,50).Value=code; cmd.Parameters.Add("@name",SqlDbType.NVarChar,200).Value=x.NameTh.Trim(); cmd.Parameters.Add("@nameEn",SqlDbType.NVarChar,200).Value=(object?)x.NameEn?.Trim()??DBNull.Value; cmd.Parameters.Add("@active",SqlDbType.Bit).Value=x.IsActive;
+        try { await cmd.ExecuteNonQueryAsync(token); return NoContent(); } catch(SqlException ex) when(ex.Number==50002){return Conflict(new {message="ไม่พบค่ากลางโครงสร้างองค์กรของ Laoo"});} catch(SqlException ex) when(ex.Number==50003){return Conflict(new {message="ฝ่ายไม่สามารถมีฝ่ายแม่ได้"});} catch(SqlException ex) when(ex.Number==50004){return Conflict(new {message="โหมดแผนกเท่านั้นไม่อนุญาตให้เลือกฝ่าย"});} catch(SqlException ex) when(ex.Number==50005){return Conflict(new {message="กรุณาเลือกฝ่ายก่อนบันทึกแผนก"});} catch(SqlException ex) when(ex.Number==50007){return Conflict(new {message="รหัสซ้ำ"});}
     }
 
     private async Task<IActionResult> SavePartner(long? id, UnitRequest x, long partnerId, CancellationToken token)
@@ -234,6 +280,7 @@ public sealed class OrganizationStructureController(IConfiguration configuration
     }
     private async Task<SqlConnection> Open(CancellationToken t){var c=new SqlConnection(configuration.GetConnectionString("LaooDatabase"));await c.OpenAsync(t);return c;}
     private bool IsPartner()=>string.Equals(User.FindFirstValue("user_type"),"PARTNER_USER",StringComparison.OrdinalIgnoreCase);
+    private bool IsLaoo()=>string.Equals(User.FindFirstValue("user_type"),"LAOO_SUPPORT",StringComparison.OrdinalIgnoreCase);
     private string Username() => (User.Identity?.Name ?? User.FindFirstValue("unique_name") ?? string.Empty).Trim();
     private long? ResolveCompany(long? _) =>
         long.TryParse(User.FindFirstValue("company_id"), out var company)

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'laoo_typography.dart';
 
@@ -38,7 +37,7 @@ class WorkspaceThemePreset {
       seedColor: primary,
       brightness: brightness,
       surface: surface,
-    );
+    ).copyWith(primary: primary);
     final baseTheme = ThemeData(
       useMaterial3: true,
       brightness: brightness,
@@ -358,8 +357,8 @@ final List<WorkspaceThemePreset> workspaceThemePresets = [
     primary: _c(0xFF198754),
     background: _c(0xFFFFFFFF),
     surface: _c(0xFFFFFFFF),
-    sidebarBackground: _c(0xFF198754),
-    sidebarText: _c(0xFFFFFFFF),
+    sidebarBackground: _c(0xFFFFFFFF),
+    sidebarText: _c(0xFF256B2B),
     textPrimary: _c(0xFF212529),
     textSecondary: _c(0xFF667085),
     border: _c(0xFFDCE8E1),
@@ -371,8 +370,8 @@ final List<WorkspaceThemePreset> workspaceThemePresets = [
     primary: _c(0xFF1976D2),
     background: _c(0xFFFFFFFF),
     surface: _c(0xFFFFFFFF),
-    sidebarBackground: _c(0xFF1976D2),
-    sidebarText: _c(0xFFFFFFFF),
+    sidebarBackground: _c(0xFFFFFFFF),
+    sidebarText: _c(0xFF1565C0),
     textPrimary: _c(0xFF212529),
     textSecondary: _c(0xFF667085),
     border: _c(0xFFDCE6F2),
@@ -397,8 +396,8 @@ final List<WorkspaceThemePreset> workspaceThemePresets = [
     primary: _c(0xFF7B1FA2),
     background: _c(0xFFFFFFFF),
     surface: _c(0xFFFFFFFF),
-    sidebarBackground: _c(0xFF7B1FA2),
-    sidebarText: _c(0xFFFFFFFF),
+    sidebarBackground: _c(0xFFFFFFFF),
+    sidebarText: _c(0xFF6A1B9A),
     textPrimary: _c(0xFF212529),
     textSecondary: _c(0xFF667085),
     border: _c(0xFFE8DCEF),
@@ -744,34 +743,18 @@ final List<WorkspaceThemePreset> workspaceThemePresets = [
 WorkspaceThemePreset workspaceThemeByCode(String code) =>
     workspaceThemePresets.firstWhere(
       (item) => item.code == code,
-      orElse: () => workspaceThemePresets.firstWhere(
-        (item) => item.code == 'STYLE01',
-      ),
+      orElse: () =>
+          workspaceThemePresets.firstWhere((item) => item.code == 'STYLE01'),
     );
 
 class WorkspaceThemeController extends ValueNotifier<WorkspaceThemePreset> {
   WorkspaceThemeController() : super(workspaceThemeByCode('STYLE01'));
 
-  static const _preferenceKey = 'workspace.theme.code';
+  Future<void> initialize() async {}
 
-  Future<void> initialize() async {
-    final preferences = await SharedPreferences.getInstance();
-    final savedCode = preferences.getString(_preferenceKey);
-
-    if (savedCode != null) {
-      value = workspaceThemeByCode(savedCode);
-    }
-  }
-
-  Future<void> save(WorkspaceThemePreset preset) async {
-    final preferences = await SharedPreferences.getInstance();
-    final saved = await preferences.setString(_preferenceKey, preset.code);
-
-    if (!saved) {
-      throw StateError('Unable to save workspace theme preference.');
-    }
-
+  Future<void> save(WorkspaceThemePreset preset) {
     value = preset;
+    return Future.value();
   }
 }
 

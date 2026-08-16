@@ -23,7 +23,8 @@ public sealed class RoleGroupController(IConfiguration configuration) : Controll
             FROM dbo.TDADRoleGroup
             WHERE ProjectID=@ProjectID AND ScopeType=@ScopeType
               AND ((@ScopeType='P' AND PartnerID=@PartnerID AND CompanyID IS NULL)
-                OR (@ScopeType='C' AND CompanyID=@CompanyID AND PartnerID IS NULL))
+                OR (@ScopeType='C' AND CompanyID=@CompanyID AND PartnerID IS NULL)
+                OR (@ScopeType='L' AND PartnerID IS NULL AND CompanyID IS NULL))
               AND (@Search IS NULL OR RoleCode LIKE @Search OR RoleNameTH LIKE @Search)
             ORDER BY RoleNameTH;
             """;
@@ -70,7 +71,7 @@ public sealed class RoleGroupController(IConfiguration configuration) : Controll
         await using var c = await OpenAsync(token); if (!await HasPermissionAsync(c, screen, "EDIT", token)) return Forbid();
         var owner = OwnerId(st); var project = ClaimLong("project_id"); if (!owner.HasValue || !project.HasValue) return BadRequest(new { message = "ไม่พบ Scope ของผู้ใช้งาน" });
         var duplicate = await DuplicateMessageAsync(c, project.Value, st, owner.Value, request, id, token); if (duplicate != null) return Conflict(new { message = duplicate });
-        const string sql = "UPDATE dbo.TDADRoleGroup SET RoleCode=@RoleCode,RoleNameTH=@RoleNameTH,Description=@Description,IsActive=@IsActive,UpdatedUtc=SYSUTCDATETIME(),UpdatedBy=N'api' WHERE RoleGroupID=@ID AND ProjectID=@ProjectID AND ScopeType=@ScopeType AND ((@ScopeType='P' AND PartnerID=@PartnerID AND CompanyID IS NULL) OR (@ScopeType='C' AND CompanyID=@CompanyID AND PartnerID IS NULL));";
+        const string sql = "UPDATE dbo.TDADRoleGroup SET RoleCode=@RoleCode,RoleNameTH=@RoleNameTH,Description=@Description,IsActive=@IsActive,UpdatedUtc=SYSUTCDATETIME(),UpdatedBy=N'api' WHERE RoleGroupID=@ID AND ProjectID=@ProjectID AND ScopeType=@ScopeType AND ((@ScopeType='P' AND PartnerID=@PartnerID AND CompanyID IS NULL) OR (@ScopeType='C' AND CompanyID=@CompanyID AND PartnerID IS NULL) OR (@ScopeType='L' AND PartnerID IS NULL AND CompanyID IS NULL));";
         await using var cmd = new SqlCommand(sql, c); BindScope(cmd, project.Value, st, owner.Value); BindRequest(cmd, request); Add(cmd, "@ID", SqlDbType.BigInt, id);
         return await cmd.ExecuteNonQueryAsync(token) == 0 ? NotFound() : NoContent();
     }
@@ -80,21 +81,45 @@ public sealed class RoleGroupController(IConfiguration configuration) : Controll
     {
         if (!TryScope(scope, out var st, out var screen)) return BadRequest(new { message = "scope ไม่ถูกต้อง" });
         await using var c = await OpenAsync(token); if (!await HasPermissionAsync(c, screen, "DELETE", token)) return Forbid();
-        var owner = OwnerId(st); var project = ClaimLong("project_id"); if (!owner.HasValue || !project.HasValue) return BadRequest(new { message = "ไม่พบ Scope ของผู้ใช้งาน" });
+        if (!TryGetDeleteScope(st, out var project, out var owner)) return Forbid();
         const string sql = """
-            DELETE FROM dbo.TDADRoleGroupPermission WHERE RoleGroupID=@ID;
-            DELETE FROM dbo.TDADEmployeeRoleGroup WHERE RoleGroupID=@ID;
+            IF NOT EXISTS
+            (
+                SELECT 1 FROM dbo.TDADRoleGroup WITH (UPDLOCK,HOLDLOCK)
+                WHERE RoleGroupID=@ID AND ProjectID=@ProjectID AND ScopeType=@ScopeType
+                  AND ((@ScopeType='P' AND PartnerID=@PartnerID AND CompanyID IS NULL)
+                    OR (@ScopeType='C' AND CompanyID=@CompanyID AND PartnerID IS NULL)
+                    OR (@ScopeType='L' AND PartnerID IS NULL AND CompanyID IS NULL))
+            )
+            BEGIN
+                SELECT CAST(0 AS int);
+                RETURN;
+            END;
+            DELETE RP FROM dbo.TDADRoleGroupPermission RP
+            INNER JOIN dbo.TDADRoleGroup RG ON RG.RoleGroupID=RP.RoleGroupID
+            WHERE RP.RoleGroupID=@ID AND RP.ProjectID=@ProjectID
+              AND RG.ProjectID=@ProjectID AND RG.ScopeType=@ScopeType
+              AND ((@ScopeType='P' AND RG.PartnerID=@PartnerID AND RG.CompanyID IS NULL)
+                OR (@ScopeType='C' AND RG.CompanyID=@CompanyID AND RG.PartnerID IS NULL)
+                OR (@ScopeType='L' AND RG.PartnerID IS NULL AND RG.CompanyID IS NULL));
+            DELETE ERG FROM dbo.TDADEmployeeRoleGroup ERG
+            INNER JOIN dbo.TDADRoleGroup RG ON RG.RoleGroupID=ERG.RoleGroupID
+            WHERE ERG.RoleGroupID=@ID AND RG.ProjectID=@ProjectID AND RG.ScopeType=@ScopeType
+              AND ((@ScopeType='P' AND RG.PartnerID=@PartnerID AND RG.CompanyID IS NULL)
+                OR (@ScopeType='C' AND RG.CompanyID=@CompanyID AND RG.PartnerID IS NULL)
+                OR (@ScopeType='L' AND RG.PartnerID IS NULL AND RG.CompanyID IS NULL));
             DELETE FROM dbo.TDADRoleGroup
             WHERE RoleGroupID=@ID AND ProjectID=@ProjectID AND ScopeType=@ScopeType
               AND ((@ScopeType='P' AND PartnerID=@PartnerID AND CompanyID IS NULL)
-                OR (@ScopeType='C' AND CompanyID=@CompanyID AND PartnerID IS NULL));
+                OR (@ScopeType='C' AND CompanyID=@CompanyID AND PartnerID IS NULL)
+                OR (@ScopeType='L' AND PartnerID IS NULL AND CompanyID IS NULL));
             SELECT @@ROWCOUNT;
             """;
         await using var transaction = await c.BeginTransactionAsync(token);
         try
         {
             await using var cmd = new SqlCommand(sql, c, (SqlTransaction)transaction);
-            BindScope(cmd, project.Value, st, owner.Value); Add(cmd, "@ID", SqlDbType.BigInt, id);
+            BindScope(cmd, project, st, owner); Add(cmd, "@ID", SqlDbType.BigInt, id);
             var deleted = Convert.ToInt32(await cmd.ExecuteScalarAsync(token));
             if (deleted == 0)
             {
@@ -115,8 +140,8 @@ public sealed class RoleGroupController(IConfiguration configuration) : Controll
     {
         const string sql = """
             SELECT CASE
-              WHEN EXISTS (SELECT 1 FROM dbo.TDADRoleGroup WHERE ProjectID=@ProjectID AND ScopeType=@ScopeType AND ((@ScopeType='P' AND PartnerID=@PartnerID AND CompanyID IS NULL) OR (@ScopeType='C' AND CompanyID=@CompanyID AND PartnerID IS NULL)) AND RoleCode=@RoleCode AND (@ExcludeID IS NULL OR RoleGroupID<>@ExcludeID)) THEN N'รหัสกลุ่มสิทธิ์ซ้ำ'
-              WHEN EXISTS (SELECT 1 FROM dbo.TDADRoleGroup WHERE ProjectID=@ProjectID AND ScopeType=@ScopeType AND ((@ScopeType='P' AND PartnerID=@PartnerID AND CompanyID IS NULL) OR (@ScopeType='C' AND CompanyID=@CompanyID AND PartnerID IS NULL)) AND UPPER(LTRIM(RTRIM(RoleNameTH)))=UPPER(LTRIM(RTRIM(@RoleNameTH))) AND (@ExcludeID IS NULL OR RoleGroupID<>@ExcludeID)) THEN N'ชื่อกลุ่มสิทธิ์ซ้ำ'
+              WHEN EXISTS (SELECT 1 FROM dbo.TDADRoleGroup WHERE ProjectID=@ProjectID AND ScopeType=@ScopeType AND ((@ScopeType='P' AND PartnerID=@PartnerID AND CompanyID IS NULL) OR (@ScopeType='C' AND CompanyID=@CompanyID AND PartnerID IS NULL) OR (@ScopeType='L' AND PartnerID IS NULL AND CompanyID IS NULL)) AND RoleCode=@RoleCode AND (@ExcludeID IS NULL OR RoleGroupID<>@ExcludeID)) THEN N'รหัสกลุ่มสิทธิ์ซ้ำ'
+              WHEN EXISTS (SELECT 1 FROM dbo.TDADRoleGroup WHERE ProjectID=@ProjectID AND ScopeType=@ScopeType AND ((@ScopeType='P' AND PartnerID=@PartnerID AND CompanyID IS NULL) OR (@ScopeType='C' AND CompanyID=@CompanyID AND PartnerID IS NULL) OR (@ScopeType='L' AND PartnerID IS NULL AND CompanyID IS NULL)) AND UPPER(LTRIM(RTRIM(RoleNameTH)))=UPPER(LTRIM(RTRIM(@RoleNameTH))) AND (@ExcludeID IS NULL OR RoleGroupID<>@ExcludeID)) THEN N'ชื่อกลุ่มสิทธิ์ซ้ำ'
               ELSE NULL END;
             """;
         await using var cmd = new SqlCommand(sql, c); BindScope(cmd, project, st, owner); Add(cmd, "@RoleCode", SqlDbType.NVarChar, request.RoleCode.Trim(), 50); Add(cmd, "@RoleNameTH", SqlDbType.NVarChar, request.RoleNameTh.Trim(), 200); Add(cmd, "@ExcludeID", SqlDbType.BigInt, exclude);
@@ -159,9 +184,21 @@ public sealed class RoleGroupController(IConfiguration configuration) : Controll
     }
 
     private long? ClaimLong(string name) => long.TryParse(User.FindFirstValue(name), out var value) ? value : null;
-    private long? OwnerId(char scope) => ClaimLong(scope == 'P' ? "partner_id" : "company_id");
+    private bool TryGetDeleteScope(char scope, out long project, out long owner)
+    {
+        project = 0;
+        owner = 0;
+        if (ClaimLong("project_id") is not long projectId) return false;
+        var userType = User.FindFirstValue("user_type") ?? string.Empty;
+        if (scope == 'P' && userType.Equals("PARTNER_USER", StringComparison.OrdinalIgnoreCase) && ClaimLong("partner_id") is long partnerId) owner = partnerId;
+        else if (scope == 'C' && userType.Equals("COMPANY_USER", StringComparison.OrdinalIgnoreCase) && ClaimLong("company_id") is long companyId) owner = companyId;
+        else if (scope != 'L' || !userType.Equals("LAOO_SUPPORT", StringComparison.OrdinalIgnoreCase) || !ClaimLong("laoo_user_id").HasValue) return false;
+        project = projectId;
+        return true;
+    }
+    private long? OwnerId(char scope) => scope == 'L' ? 0 : ClaimLong(scope == 'P' ? "partner_id" : "company_id");
     private long? PartnerUserId() { var subject = User.FindFirstValue("sub") ?? User.FindFirstValue(ClaimTypes.NameIdentifier); return subject?.StartsWith("partner:", StringComparison.OrdinalIgnoreCase) == true && long.TryParse(subject[8..], out var id) ? id : null; }
-    private static bool TryScope(string value, out char scope, out string screen) { var s = value.Trim().ToLowerInvariant(); scope = s == "partner" ? 'P' : s == "customer" ? 'C' : ' '; screen = scope == 'P' ? "11003" : "10003"; return scope != ' '; }
+    private static bool TryScope(string value, out char scope, out string screen) { var s = value.Trim().ToLowerInvariant(); scope = s == "partner" ? 'P' : s == "customer" ? 'C' : s is "laoo" or "support" ? 'L' : ' '; screen = scope switch { 'P' => "11003", 'C' => "10003", 'L' => "12003", _ => string.Empty }; return scope != ' '; }
     private async Task<SqlConnection> OpenAsync(CancellationToken token) { var c = new SqlConnection(configuration.GetConnectionString("LaooDatabase")); await c.OpenAsync(token); return c; }
     private static void BindScope(SqlCommand c, long project, char scope, long owner) { Add(c, "@ProjectID", SqlDbType.BigInt, project); Add(c, "@ScopeType", SqlDbType.Char, scope); Add(c, "@PartnerID", SqlDbType.BigInt, scope == 'P' ? owner : null); Add(c, "@CompanyID", SqlDbType.BigInt, scope == 'C' ? owner : null); }
     private static void BindRequest(SqlCommand c, RoleGroupUpsertRequest r) { Add(c, "@RoleCode", SqlDbType.NVarChar, r.RoleCode.Trim(), 50); Add(c, "@RoleNameTH", SqlDbType.NVarChar, r.RoleNameTh.Trim(), 200); Add(c, "@Description", SqlDbType.NVarChar, Null(r.Description), 500); Add(c, "@IsActive", SqlDbType.Bit, r.IsActive); }

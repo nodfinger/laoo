@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/widgets/combo_box_text.dart';
 import '../../../../core/widgets/auto_dismiss_message.dart';
-
-import 'dart:async';
+import '../../../../core/widgets/timed_snack_bar.dart';
 
 import '../../../../app/theme/laoo_typography.dart';
 import '../../../../core/company_setup/company_setup_controller.dart';
@@ -56,7 +55,6 @@ class _MasterDataPageState extends State<MasterDataPage> {
   bool _sortAscending = true;
   int _currentPage = 0;
   String _appliedSearch = '';
-  Timer? _messageTimer;
 
   int get _pageSize => companySetupController.pageSize > 0
       ? companySetupController.pageSize
@@ -135,24 +133,12 @@ class _MasterDataPageState extends State<MasterDataPage> {
 
   @override
   void dispose() {
-    _messageTimer?.cancel();
     _searchController.dispose();
     _api.dispose();
     super.dispose();
   }
 
-  void _scheduleMessageDismiss() {
-    if (_message == null || _messageTimer != null) return;
-    final seconds = companySetupController.current?.timeAlert ?? 30;
-    _messageTimer = Timer(Duration(seconds: seconds), () {
-      if (mounted) setState(() => _message = null);
-      _messageTimer = null;
-    });
-  }
-
   void _dismissMessage() {
-    _messageTimer?.cancel();
-    _messageTimer = null;
     if (mounted) setState(() => _message = null);
   }
 
@@ -350,7 +336,7 @@ class _MasterDataPageState extends State<MasterDataPage> {
         _currentPage = (_totalPages - 1).clamp(0, _totalPages);
       }
       _message = 'ลบข้อมูล ${row.name} สำเร็จ';
-      _messageError = true;
+      _messageError = false;
     });
   }
 
@@ -479,7 +465,6 @@ class _MasterDataPageState extends State<MasterDataPage> {
   }
 
   Widget _buildList(BuildContext context) {
-    _scheduleMessageDismiss();
     final theme = Theme.of(context);
     return ListView(
       padding: const EdgeInsets.all(24),
@@ -487,23 +472,20 @@ class _MasterDataPageState extends State<MasterDataPage> {
         Row(
           children: [
             Expanded(
-              child: Text(
-                'รหัสพื้นฐาน > ${_group.name}',
-                style: TextStyle(
-                  fontSize: LaooTypography.workspaceCaption,
-                  fontWeight: LaooTypography.workspaceCaptionWeight,
-                  color: theme.colorScheme.primary,
+              child: WorkspacePageTitle(
+                title: 'รหัสพื้นฐาน > ${_group.name}',
+                favoriteKey: '05002',
+              ),
+            ),
+            if (_canCreate)
+              FilledButton(
+                onPressed: _startAdd,
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(100, LaooTypography.buttonHeight),
+                  alignment: Alignment.center,
                 ),
+                child: const Text('เพิ่ม'),
               ),
-            ),
-            if (_canCreate) FilledButton(
-              onPressed: _startAdd,
-              style: FilledButton.styleFrom(
-                minimumSize: const Size(100, LaooTypography.buttonHeight),
-                alignment: Alignment.center,
-              ),
-              child: const Text('เพิ่ม'),
-            ),
           ],
         ),
         const SizedBox(height: 16),
@@ -544,7 +526,9 @@ class _MasterDataPageState extends State<MasterDataPage> {
                         .map(
                           (item) => DropdownMenuItem(
                             value: item.code,
-                            child: LaooComboBoxText('${item.code} - ${item.name}'),
+                            child: LaooComboBoxText(
+                              '${item.code} - ${item.name}',
+                            ),
                           ),
                         )
                         .toList(),
@@ -619,22 +603,24 @@ class _MasterDataPageState extends State<MasterDataPage> {
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  if (_canEdit) IconButton(
-                                    tooltip: 'แก้ไข',
-                                    onPressed: () => _startEdit(row),
-                                    icon: Icon(
-                                      Icons.edit_outlined,
-                                      color: theme.colorScheme.primary,
+                                  if (_canEdit)
+                                    IconButton(
+                                      tooltip: 'แก้ไข',
+                                      onPressed: () => _startEdit(row),
+                                      icon: Icon(
+                                        Icons.edit_outlined,
+                                        color: theme.colorScheme.primary,
+                                      ),
                                     ),
-                                  ),
-                                  if (_canDelete) IconButton(
-                                    tooltip: 'ลบ',
-                                    onPressed: () => _delete(row),
-                                    icon: const Icon(
-                                      Icons.delete_outline,
-                                      color: Colors.red,
+                                  if (_canDelete)
+                                    IconButton(
+                                      tooltip: 'ลบ',
+                                      onPressed: () => _delete(row),
+                                      icon: const Icon(
+                                        Icons.delete_outline,
+                                        color: Colors.red,
+                                      ),
                                     ),
-                                  ),
                                 ],
                               ),
                             ),
@@ -665,7 +651,6 @@ class _MasterDataPageState extends State<MasterDataPage> {
   }
 
   Widget _buildForm(BuildContext context, _MasterRow row) {
-    _scheduleMessageDismiss();
     return _MasterDataForm(
       row: row,
       groupName: _group.name,
@@ -697,20 +682,20 @@ class _PaginationBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent = Theme.of(context).colorScheme.primary;
     final start = totalItems == 0 ? 0 : page * pageSize + 1;
     final end = totalItems == 0
         ? 0
         : (start + pageSize - 1).clamp(0, totalItems);
-    final pageIndexes = totalPages <= 7
-        ? List<int>.generate(totalPages, (index) => index)
-        : <int>{
-            0,
-            (page - 1).clamp(1, totalPages - 2),
-            page,
-            (page + 1).clamp(1, totalPages - 2),
-            totalPages - 1,
-          }.toList()
+    final pageIndexes =
+        totalPages <= 7
+              ? List<int>.generate(totalPages, (index) => index)
+              : <int>{
+                  0,
+                  (page - 1).clamp(1, totalPages - 2),
+                  page,
+                  (page + 1).clamp(1, totalPages - 2),
+                  totalPages - 1,
+                }.toList()
           ..sort();
     return Wrap(
       spacing: 6,
@@ -742,19 +727,22 @@ class _PaginationBar extends StatelessWidget {
     );
   }
 
-  Widget _arrowButton(BuildContext context, IconData icon, VoidCallback? onPressed) =>
-      SizedBox(
-        width: 34,
-        height: 34,
-        child: FilledButton(
-          onPressed: onPressed,
-          style: FilledButton.styleFrom(
-            padding: EdgeInsets.zero,
-            shape: const CircleBorder(),
-          ),
-          child: Icon(icon, size: 20),
-        ),
-      );
+  Widget _arrowButton(
+    BuildContext context,
+    IconData icon,
+    VoidCallback? onPressed,
+  ) => SizedBox(
+    width: 34,
+    height: 34,
+    child: FilledButton(
+      onPressed: onPressed,
+      style: FilledButton.styleFrom(
+        padding: EdgeInsets.zero,
+        shape: const CircleBorder(),
+      ),
+      child: Icon(icon, size: 20),
+    ),
+  );
 
   Widget _pageButton(BuildContext context, int index, int currentPage) =>
       SizedBox(
@@ -843,9 +831,7 @@ class _MasterDataFormState extends State<_MasterDataForm> {
 
   Future<void> _sync() async {
     if (_name.text.trim().isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('กรุณาระบุชื่อ')));
+      showTimedSnackBar(context, message: 'กรุณาระบุชื่อ', error: true);
       return;
     }
     widget.row.name = _name.text;
@@ -856,9 +842,7 @@ class _MasterDataFormState extends State<_MasterDataForm> {
       await widget.onSave();
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(error.toString())));
+        showTimedSnackBar(context, message: error.toString(), error: true);
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -874,13 +858,10 @@ class _MasterDataFormState extends State<_MasterDataForm> {
           Row(
             children: [
               Expanded(
-                child: Text(
-                  'รหัสพื้นฐาน > ${widget.groupName} > ${widget.isAdding ? 'เพิ่ม' : 'แก้ไข'}',
-                  style: TextStyle(
-                    fontSize: LaooTypography.workspaceCaption,
-                    fontWeight: FontWeight.w700,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
+                child: WorkspacePageTitle(
+                  title:
+                      'รหัสพื้นฐาน > ${widget.groupName} > ${widget.isAdding ? 'เพิ่ม' : 'แก้ไข'}',
+                  favoriteKey: '05002',
                 ),
               ),
               OutlinedButton(
@@ -892,15 +873,16 @@ class _MasterDataFormState extends State<_MasterDataForm> {
                 child: const Text('ยกเลิก'),
               ),
               const SizedBox(width: 10),
-              if (widget.canSave) FilledButton.icon(
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size(100, LaooTypography.buttonHeight),
-                  alignment: Alignment.center,
+              if (widget.canSave)
+                FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(100, LaooTypography.buttonHeight),
+                    alignment: Alignment.center,
+                  ),
+                  onPressed: _saving ? null : _sync,
+                  icon: const Icon(Icons.save_outlined),
+                  label: Text(_saving ? 'กำลังบันทึก...' : 'บันทึก'),
                 ),
-                onPressed: _saving ? null : _sync,
-                icon: const Icon(Icons.save_outlined),
-                label: Text(_saving ? 'กำลังบันทึก...' : 'บันทึก'),
-              ),
             ],
           ),
           const SizedBox(height: 8),
@@ -953,15 +935,16 @@ class _MasterDataFormState extends State<_MasterDataForm> {
                   child: const Text('ยกเลิก'),
                 ),
                 const SizedBox(width: 10),
-                if (widget.canSave) FilledButton.icon(
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size(100, LaooTypography.buttonHeight),
-                    alignment: Alignment.center,
+                if (widget.canSave)
+                  FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(100, LaooTypography.buttonHeight),
+                      alignment: Alignment.center,
+                    ),
+                    onPressed: _saving ? null : _sync,
+                    icon: const Icon(Icons.save_outlined),
+                    label: Text(_saving ? 'กำลังบันทึก...' : 'บันทึก'),
                   ),
-                  onPressed: _saving ? null : _sync,
-                  icon: const Icon(Icons.save_outlined),
-                  label: Text(_saving ? 'กำลังบันทึก...' : 'บันทึก'),
-                ),
               ],
             ),
           ),

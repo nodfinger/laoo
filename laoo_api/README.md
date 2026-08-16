@@ -87,3 +87,30 @@ https://localhost:7080/swagger
 ```
 
 `local.json` ถูก ignore โดย Git
+
+## Production / Plesk
+
+ไฟล์ `local.json` และ `appsettings.Local.json` ถูกตัดออกจากผล Publish เสมอ ห้ามอัปโหลดไฟล์ Secret ไปกับ ZIP ให้กำหนดค่าผ่าน Environment Variables ของ Hosting:
+
+```text
+ASPNETCORE_ENVIRONMENT=Production
+ConnectionStrings__LaooDatabase=<SQL Server connection string>
+Jwt__SecretKey=<random secret อย่างน้อย 32 ตัวอักษร>
+DataProtection__ApplicationName=Laoo.Api
+DataProtection__KeyRingPath=<absolute persistent writable folder>
+SeedData__Enabled=false
+```
+
+หากให้ Flutter Web เรียก API ให้เพิ่ม Origin ที่อนุญาต เช่น:
+
+```text
+Cors__AllowedOrigins__0=https://app.example.com
+```
+
+Flutter Android/iOS ไม่อยู่ภายใต้ CORS แต่ต้อง Build ด้วย API URL จริง:
+
+```powershell
+flutter build apk --release --dart-define=API_URL=https://api.example.com --dart-define=PROJECT_CODE=LAOO
+```
+
+หลัง Deploy ให้ตรวจ `GET /health` ซึ่งจะคืนสถานะ API และการเชื่อมต่อฐานข้อมูล โดยไม่เปิดเผย Secret

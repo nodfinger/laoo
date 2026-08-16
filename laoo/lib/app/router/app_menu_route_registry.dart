@@ -168,10 +168,34 @@ abstract final class AppMenuRouteRegistry {
       path: RoutePaths.companyCustomers,
       scope: AppMenuScope.company,
     ),
-    '10001': AppMenuRouteSpec(menuCode: '10001', databaseRouteName: 'companyEmployees', goRouteName: RouteNames.companyEmployees, path: RoutePaths.companyEmployees, scope: AppMenuScope.company),
-    '10002': AppMenuRouteSpec(menuCode: '10002', databaseRouteName: 'companyUsers', goRouteName: RouteNames.companyUsers, path: RoutePaths.companyUsers, scope: AppMenuScope.company),
-    '10003': AppMenuRouteSpec(menuCode: '10003', databaseRouteName: 'companyRoleGroups', goRouteName: RouteNames.companyRoleGroups, path: RoutePaths.companyRoleGroups, scope: AppMenuScope.company),
-    '10004': AppMenuRouteSpec(menuCode: '10004', databaseRouteName: 'companyMenuPermissions', goRouteName: RouteNames.companyMenuPermissions, path: RoutePaths.companyMenuPermissions, scope: AppMenuScope.company),
+    '10001': AppMenuRouteSpec(
+      menuCode: '10001',
+      databaseRouteName: 'companyEmployees',
+      goRouteName: RouteNames.companyEmployees,
+      path: RoutePaths.companyEmployees,
+      scope: AppMenuScope.company,
+    ),
+    '10002': AppMenuRouteSpec(
+      menuCode: '10002',
+      databaseRouteName: 'companyUsers',
+      goRouteName: RouteNames.companyUsers,
+      path: RoutePaths.companyUsers,
+      scope: AppMenuScope.company,
+    ),
+    '10003': AppMenuRouteSpec(
+      menuCode: '10003',
+      databaseRouteName: 'companyRoleGroups',
+      goRouteName: RouteNames.companyRoleGroups,
+      path: RoutePaths.companyRoleGroups,
+      scope: AppMenuScope.company,
+    ),
+    '10004': AppMenuRouteSpec(
+      menuCode: '10004',
+      databaseRouteName: 'companyMenuPermissions',
+      goRouteName: RouteNames.companyMenuPermissions,
+      path: RoutePaths.companyMenuPermissions,
+      scope: AppMenuScope.company,
+    ),
     '10005': AppMenuRouteSpec(
       menuCode: '10005',
       databaseRouteName: 'organizationStructure',
@@ -179,14 +203,62 @@ abstract final class AppMenuRouteRegistry {
       path: RoutePaths.organizationStructure,
       scope: AppMenuScope.company,
     ),
-    '11001': AppMenuRouteSpec(menuCode: '11001', databaseRouteName: 'partnerEmployees', goRouteName: RouteNames.partnerEmployees, path: RoutePaths.partnerEmployees, scope: AppMenuScope.partner),
-    '11002': AppMenuRouteSpec(menuCode: '11002', databaseRouteName: 'partnerUsers', goRouteName: RouteNames.partnerUsers, path: RoutePaths.partnerUsers, scope: AppMenuScope.partner),
-    '11003': AppMenuRouteSpec(menuCode: '11003', databaseRouteName: 'partnerRoleGroups', goRouteName: RouteNames.partnerRoleGroups, path: RoutePaths.partnerRoleGroups, scope: AppMenuScope.partner),
-    '11004': AppMenuRouteSpec(menuCode: '11004', databaseRouteName: 'partnerMenuPermissions', goRouteName: RouteNames.partnerMenuPermissions, path: RoutePaths.partnerMenuPermissions, scope: AppMenuScope.partner),
-    '12001': AppMenuRouteSpec(menuCode: '12001', databaseRouteName: 'customerEmployees', goRouteName: RouteNames.customerEmployees, path: RoutePaths.customerEmployees, scope: AppMenuScope.partner),
-    '12002': AppMenuRouteSpec(menuCode: '12002', databaseRouteName: 'laooUsers', goRouteName: RouteNames.laooUsers, path: RoutePaths.laooUsers, scope: AppMenuScope.support),
-    '12003': AppMenuRouteSpec(menuCode: '12003', databaseRouteName: 'laooRoleGroups', goRouteName: RouteNames.laooRoleGroups, path: RoutePaths.laooRoleGroups, scope: AppMenuScope.support),
-    '12004': AppMenuRouteSpec(menuCode: '12004', databaseRouteName: 'laooMenuPermissions', goRouteName: RouteNames.laooMenuPermissions, path: RoutePaths.laooMenuPermissions, scope: AppMenuScope.support),
+    '11001': AppMenuRouteSpec(
+      menuCode: '11001',
+      databaseRouteName: 'partnerEmployees',
+      goRouteName: RouteNames.partnerEmployees,
+      path: RoutePaths.partnerEmployees,
+      scope: AppMenuScope.partner,
+    ),
+    '11002': AppMenuRouteSpec(
+      menuCode: '11002',
+      databaseRouteName: 'partnerUsers',
+      goRouteName: RouteNames.partnerUsers,
+      path: RoutePaths.partnerUsers,
+      scope: AppMenuScope.partner,
+    ),
+    '11003': AppMenuRouteSpec(
+      menuCode: '11003',
+      databaseRouteName: 'partnerRoleGroups',
+      goRouteName: RouteNames.partnerRoleGroups,
+      path: RoutePaths.partnerRoleGroups,
+      scope: AppMenuScope.partner,
+    ),
+    '11004': AppMenuRouteSpec(
+      menuCode: '11004',
+      databaseRouteName: 'partnerMenuPermissions',
+      goRouteName: RouteNames.partnerMenuPermissions,
+      path: RoutePaths.partnerMenuPermissions,
+      scope: AppMenuScope.partner,
+    ),
+    '12001': AppMenuRouteSpec(
+      menuCode: '12001',
+      databaseRouteName: 'customerEmployees',
+      goRouteName: RouteNames.customerEmployees,
+      path: RoutePaths.customerEmployees,
+      scope: AppMenuScope.partner,
+    ),
+    '12002': AppMenuRouteSpec(
+      menuCode: '12002',
+      databaseRouteName: 'laooUsers',
+      goRouteName: RouteNames.laooUsers,
+      path: RoutePaths.laooUsers,
+      scope: AppMenuScope.support,
+    ),
+    '12003': AppMenuRouteSpec(
+      menuCode: '12003',
+      databaseRouteName: 'laooRoleGroups',
+      goRouteName: RouteNames.laooRoleGroups,
+      path: RoutePaths.laooRoleGroups,
+      scope: AppMenuScope.support,
+    ),
+    '12004': AppMenuRouteSpec(
+      menuCode: '12004',
+      databaseRouteName: 'laooMenuPermissions',
+      goRouteName: RouteNames.laooMenuPermissions,
+      path: RoutePaths.laooMenuPermissions,
+      scope: AppMenuScope.support,
+    ),
   };
 
   static AppMenuRouteSpec? byMenuCode(String menuCode) =>
@@ -194,10 +266,8 @@ abstract final class AppMenuRouteRegistry {
 
   static Iterable<AppMenuRouteSpec> get all => _byMenuCode.values;
 
-  static AppMenuRouteSpec? byPath(String path) {
-    for (final spec in _byMenuCode.values) {
-      if (spec.path == path) return spec;
-    }
-    return null;
-  }
+  static Iterable<AppMenuRouteSpec> byPath(String path) =>
+      _byMenuCode.values.where((spec) => spec.path == path);
+
+  static bool containsPath(String path) => byPath(path).isNotEmpty;
 }

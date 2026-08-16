@@ -15,13 +15,16 @@ public sealed class CompanySetupController : ControllerBase
 {
     private readonly IConfiguration _configuration;
     private readonly PasswordService _passwordService;
+    private readonly CompanySetupSecretService _secretService;
 
     public CompanySetupController(
         IConfiguration configuration,
-        PasswordService passwordService)
+        PasswordService passwordService,
+        CompanySetupSecretService secretService)
     {
         _configuration = configuration;
         _passwordService = passwordService;
+        _secretService = secretService;
     }
 
     [HttpGet]
@@ -59,18 +62,10 @@ public sealed class CompanySetupController : ControllerBase
         if (validationError is not null)
             return BadRequest(new { message = validationError });
 
-        if (!string.IsNullOrWhiteSpace(request.EmailPasswordCenter))
-        {
-            return BadRequest(new
-            {
-                message =
-                    "ยังไม่อนุญาตให้อัปเดต EmailPasswordCenter จนกว่าจะเชื่อม Secret Encryption Service"
-            });
-        }
-
         var passwordCry = HashIfProvided(request.PasswordCry);
         var passwordEmpDefault = HashIfProvided(request.PasswordEmpDefault);
         var passwordDirect = HashIfProvided(request.PasswordDirect);
+        var emailPasswordCenter = _secretService.Protect(request.EmailPasswordCenter);
         var actorId = GetActorIdFromToken();
 
         await using var connection = CreateConnection();
@@ -124,6 +119,8 @@ SET
     EmailPort = @EmailPort,
     EmailCenter = @EmailCenter,
     EmailAdmin = @EmailAdmin,
+    EmailPasswordCenter =
+        CASE WHEN @EmailPasswordCenter IS NULL THEN EmailPasswordCenter ELSE @EmailPasswordCenter END,
     SuperUserName =
         CASE WHEN @SuperUserName IS NULL THEN SuperUserName ELSE @SuperUserName END,
     PasswordCry =
@@ -160,6 +157,7 @@ WHERE OwnerType = @OwnerType
         Add(command, "@EmailPort", SqlDbType.Int, request.EmailPort);
         Add(command, "@EmailCenter", SqlDbType.NVarChar, NullIfBlank(request.EmailCenter), 320);
         Add(command, "@EmailAdmin", SqlDbType.NVarChar, NullIfBlank(request.EmailAdmin), 320);
+        Add(command, "@EmailPasswordCenter", SqlDbType.NVarChar, emailPasswordCenter, 1000);
         Add(command, "@SuperUserName", SqlDbType.NVarChar, NullIfBlank(request.SuperUserName), 200);
         Add(command, "@PasswordCry", SqlDbType.NVarChar, passwordCry, 500);
         Add(command, "@PasswordEmpDefault", SqlDbType.NVarChar, passwordEmpDefault, 500);

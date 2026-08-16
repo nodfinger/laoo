@@ -34,6 +34,12 @@ class _OrganizationStructurePageState extends State<OrganizationStructurePage> {
   bool _canCreate = false, _canEdit = false, _canDelete = false;
   String? _message;
 
+  String get _menuCode => appAuthController.isPartnerUser
+      ? '11005'
+      : appAuthController.isCompanyUser
+      ? '10005'
+      : '12005';
+
   String _errorMessage(Object error) =>
       error is ApiException ? error.message : error.toString();
   bool _messageError = false;
@@ -46,7 +52,18 @@ class _OrganizationStructurePageState extends State<OrganizationStructurePage> {
     _load();
   }
 
-  Future<void> _loadActions() async { try { final p = await _repository.actions(); if (mounted) setState(() { _canCreate = p['create'] == true; _canEdit = p['edit'] == true; _canDelete = p['delete'] == true; }); } catch (_) {} }
+  Future<void> _loadActions() async {
+    try {
+      final p = await _repository.actions();
+      if (mounted) {
+        setState(() {
+          _canCreate = p['create'] == true;
+          _canEdit = p['edit'] == true;
+          _canDelete = p['delete'] == true;
+        });
+      }
+    } catch (_) {}
+  }
 
   @override
   void dispose() {
@@ -108,101 +125,63 @@ class _OrganizationStructurePageState extends State<OrganizationStructurePage> {
 
   @override
   Widget build(BuildContext context) => SupportWorkspaceShell(
-        pageTitle: _caption,
-        activeMenu: 'organizationStructure',
-        menuScope: appAuthController.isPartnerUser
-            ? WorkspaceMenuScope.partner
-            : appAuthController.isCompanyUser
-            ? WorkspaceMenuScope.company
-            : WorkspaceMenuScope.support,
-        child: Stack(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(24),
-              child: _formType == null ? _buildList() : _buildForm(),
-            ),
-            if (_message != null)
-              Positioned(
-                top: 12,
-                right: 24,
-                child: _messageBox(),
-              ),
-          ],
+    pageTitle: _caption,
+    activeMenu: 'organizationStructure',
+    menuScope: appAuthController.isPartnerUser
+        ? WorkspaceMenuScope.partner
+        : appAuthController.isCompanyUser
+        ? WorkspaceMenuScope.company
+        : WorkspaceMenuScope.support,
+    child: Stack(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(24),
+          child: _formType == null ? _buildList() : _buildForm(),
         ),
-      );
+        if (_message != null)
+          Positioned(top: 12, right: 24, child: _messageBox()),
+      ],
+    ),
+  );
 
   Widget _buildList() => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Row(
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: WorkspacePageTitle(
-                  title: _caption,
-                  favoriteKey: 'organizationStructure',
-                ),
-              ),
-            ],
+          Expanded(
+            child: WorkspacePageTitle(title: _caption, favoriteKey: _menuCode),
           ),
-          const SizedBox(height: 8),
-          if (_loading) const LinearProgressIndicator(),
-          if (!_loading)
-            Expanded(
-              child: _mode == 1
-                  ? _departmentPanel()
-                  : Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        SizedBox(width: 330, child: _divisionPanel()),
-                        const SizedBox(width: 12),
-                        Expanded(child: _departmentPanel()),
-                      ],
-                    ),
-            ),
         ],
-      );
-
-  Widget _modeCard() => Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+      ),
+      const SizedBox(height: 8),
+      if (_loading) const LinearProgressIndicator(),
+      if (!_loading)
+        Expanded(
+          child: _mode == 1
+              ? _departmentPanel()
+              : Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(
-                      'รูปแบบโครงสร้างองค์กร',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: Theme.of(context).colorScheme.primary,
-                            fontWeight: FontWeight.w700,
-                          ),
-                    ),
-                    const Text(
-                      'หน้าพนักงานจะอ่านค่านี้และปรับช่องฝ่าย/แผนกอัตโนมัติ',
-                    ),
+                    SizedBox(width: 330, child: _divisionPanel()),
+                    const SizedBox(width: 12),
+                    Expanded(child: _departmentPanel()),
                   ],
                 ),
-              ),
-              SegmentedButton<int>(
-                segments: const [
-                  ButtonSegment(value: 1, label: Text('แผนกเท่านั้น')),
-                  ButtonSegment(value: 2, label: Text('ฝ่าย > แผนก')),
-                ],
-                selected: {_mode},
-                onSelectionChanged: null,
-              ),
-            ],
-          ),
         ),
-      );
+    ],
+  );
 
   Widget _divisionPanel() {
     final divisions = _units.where((x) => x['unitType'] == 'DIV').toList();
     return Card(
       child: Column(
         children: [
-          _panelHeader('ฝ่าย', 'เพิ่มฝ่าย', _canCreate ? () => _openForm('DIV') : null),
+          _panelHeader(
+            'ฝ่าย',
+            'เพิ่มฝ่าย',
+            _canCreate ? () => _openForm('DIV') : null,
+          ),
           const Divider(height: 1),
           if (divisions.isEmpty)
             const Expanded(child: Center(child: Text('ยังไม่มีข้อมูลฝ่าย')))
@@ -210,12 +189,17 @@ class _OrganizationStructurePageState extends State<OrganizationStructurePage> {
             Expanded(
               child: ListView.separated(
                 itemCount: divisions.length,
-                separatorBuilder: (_, _) => Divider(height: 1, color: Colors.grey.shade300),
+                separatorBuilder: (_, _) =>
+                    Divider(height: 1, color: Colors.grey.shade300),
                 itemBuilder: (context, index) {
                   final item = divisions[index];
-                  final departmentCount = _units.where((unit) =>
-                      unit['unitType'] == 'DEP' &&
-                      unit['parentOrgUnitId'] == item['orgUnitId']).length;
+                  final departmentCount = _units
+                      .where(
+                        (unit) =>
+                            unit['unitType'] == 'DEP' &&
+                            unit['parentOrgUnitId'] == item['orgUnitId'],
+                      )
+                      .length;
                   return ListTile(
                     selected: item['orgUnitId'] == _selectedDivisionId,
                     leading: const Icon(Icons.account_tree_outlined),
@@ -226,19 +210,21 @@ class _OrganizationStructurePageState extends State<OrganizationStructurePage> {
                     ),
                     trailing: Wrap(
                       children: [
-                        if (_canEdit) IconButton(
-                          tooltip: 'แก้ไข',
-                          onPressed: () => _openForm('DIV', item: item),
-                          icon: const Icon(Icons.edit_outlined),
-                        ),
-                        if (_canDelete) IconButton(
-                          tooltip: 'ลบ',
-                          onPressed: () => _confirmDelete(item),
-                          icon: const Icon(
-                            Icons.delete_outline,
-                            color: Colors.red,
+                        if (_canEdit)
+                          IconButton(
+                            tooltip: 'แก้ไข',
+                            onPressed: () => _openForm('DIV', item: item),
+                            icon: const Icon(Icons.edit_outlined),
                           ),
-                        ),
+                        if (_canDelete)
+                          IconButton(
+                            tooltip: 'ลบ',
+                            onPressed: () => _confirmDelete(item),
+                            icon: const Icon(
+                              Icons.delete_outline,
+                              color: Colors.red,
+                            ),
+                          ),
                       ],
                     ),
                   );
@@ -295,25 +281,27 @@ class _OrganizationStructurePageState extends State<OrganizationStructurePage> {
                       ),
                     ),
                     child: ListTile(
-                    leading: Text('${index + 1}'),
-                    title: Text('${item['unitCode']} - ${item['nameTh']}'),
-                    trailing: Wrap(
-                      children: [
-                        if (_canEdit) IconButton(
-                          tooltip: 'แก้ไข',
-                          onPressed: () => _openForm('DEP', item: item),
-                          icon: const Icon(Icons.edit_outlined),
-                        ),
-                        if (_canDelete) IconButton(
-                          tooltip: 'ลบ',
-                          onPressed: () => _confirmDelete(item),
-                          icon: const Icon(
-                            Icons.delete_outline,
-                            color: Colors.red,
-                          ),
-                        ),
-                      ],
-                    ),
+                      leading: Text('${index + 1}'),
+                      title: Text('${item['unitCode']} - ${item['nameTh']}'),
+                      trailing: Wrap(
+                        children: [
+                          if (_canEdit)
+                            IconButton(
+                              tooltip: 'แก้ไข',
+                              onPressed: () => _openForm('DEP', item: item),
+                              icon: const Icon(Icons.edit_outlined),
+                            ),
+                          if (_canDelete)
+                            IconButton(
+                              tooltip: 'ลบ',
+                              onPressed: () => _confirmDelete(item),
+                              icon: const Icon(
+                                Icons.delete_outline,
+                                color: Colors.red,
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
                   );
                 },
@@ -333,9 +321,9 @@ class _OrganizationStructurePageState extends State<OrganizationStructurePage> {
               child: Text(
                 title,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.primary,
-                      fontWeight: FontWeight.w700,
-                    ),
+                  color: Theme.of(context).colorScheme.primary,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
             FilledButton.icon(
@@ -358,7 +346,7 @@ class _OrganizationStructurePageState extends State<OrganizationStructurePage> {
             Expanded(
               child: WorkspacePageTitle(
                 title: '$_caption > $action$unitName',
-                favoriteKey: 'organizationStructure',
+                favoriteKey: _menuCode,
               ),
             ),
             _formButtons(),
@@ -433,12 +421,19 @@ class _OrganizationStructurePageState extends State<OrganizationStructurePage> {
   }
 
   Widget _formButtons() => Wrap(
-        spacing: 8,
-        children: [
-          OutlinedButton(onPressed: _saving ? null : _closeForm, child: const Text('ยกเลิก')),
-          if ((_editing == null && _canCreate) || (_editing != null && _canEdit)) FilledButton(onPressed: _saving ? null : _save, child: const Text('บันทึก')),
-        ],
-      );
+    spacing: 8,
+    children: [
+      OutlinedButton(
+        onPressed: _saving ? null : _closeForm,
+        child: const Text('ยกเลิก'),
+      ),
+      if ((_editing == null && _canCreate) || (_editing != null && _canEdit))
+        FilledButton(
+          onPressed: _saving ? null : _save,
+          child: const Text('บันทึก'),
+        ),
+    ],
+  );
 
   Widget _messageBox() {
     return AutoDismissMessage(
@@ -447,24 +442,6 @@ class _OrganizationStructurePageState extends State<OrganizationStructurePage> {
       error: _messageError,
       onClose: () => setState(() => _message = null),
     );
-  }
-
-  Future<void> _changeMode(int value) async {
-    if (value == _mode) return;
-    setState(() => _saving = true);
-    try {
-      await _repository.updateMode(value);
-      setState(() {
-        _mode = value;
-        _selectedDivisionId = null;
-      });
-      _showMessage('บันทึกรูปแบบโครงสร้างองค์กรสำเร็จ');
-      await _load(clearMessage: false);
-    } catch (error) {
-      _showMessage(_errorMessage(error), error: true);
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
   }
 
   void _openForm(String type, {Map<String, dynamic>? item}) {
@@ -483,10 +460,10 @@ class _OrganizationStructurePageState extends State<OrganizationStructurePage> {
   }
 
   void _closeForm() => setState(() {
-        _formType = null;
-        _editing = null;
-        _message = null;
-      });
+    _formType = null;
+    _editing = null;
+    _message = null;
+  });
 
   Future<void> _save() async {
     if (_code.text.trim().isEmpty || _name.text.trim().isEmpty) {
@@ -517,10 +494,7 @@ class _OrganizationStructurePageState extends State<OrganizationStructurePage> {
         _showMessage('เพิ่มข้อมูลสำเร็จ');
         await _load(clearMessage: false);
       } else {
-        await _repository.update(
-          _editing!['orgUnitId'] as int,
-          body,
-        );
+        await _repository.update(_editing!['orgUnitId'] as int, body);
         _closeForm();
         await _load(clearMessage: false);
         _showMessage('แก้ไขข้อมูลสำเร็จ');
@@ -538,47 +512,55 @@ class _OrganizationStructurePageState extends State<OrganizationStructurePage> {
       builder: (dialogContext) {
         final red = Theme.of(dialogContext).colorScheme.error;
         return AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: red),
-        ),
-        title: Row(children: [
-          Icon(Icons.delete_outline, color: red),
-          const SizedBox(width: 8),
-          Text('ยืนยันการลบ', style: TextStyle(color: red)),
-        ]),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: red.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(8),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: red),
+          ),
+          title: Row(
+            children: [
+              Icon(Icons.delete_outline, color: red),
+              const SizedBox(width: 8),
+              Text('ยืนยันการลบ', style: TextStyle(color: red)),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: red.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text('${item['unitCode']} - ${item['nameTh']}'),
+              ),
+              const SizedBox(height: 12),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text('ข้อมูลที่ลบแล้วไม่สามารถเรียกคืนได้'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('ยกเลิก'),
             ),
-            child: Text('${item['unitCode']} - ${item['nameTh']}'),
-          ),
-          const SizedBox(height: 12),
-          const Align(
-            alignment: Alignment.centerLeft,
-            child: Text('ข้อมูลที่ลบแล้วไม่สามารถเรียกคืนได้'),
-          ),
-        ]),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('ยกเลิก'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Row(mainAxisSize: MainAxisSize.min, children: [
-              Icon(Icons.delete_outline),
-              SizedBox(width: 6),
-              Text('ลบ'),
-            ]),
-          ),
-        ],
-      );
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: Colors.red),
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.delete_outline),
+                  SizedBox(width: 6),
+                  Text('ลบ'),
+                ],
+              ),
+            ),
+          ],
+        );
       },
     );
     if (confirmed != true) return;

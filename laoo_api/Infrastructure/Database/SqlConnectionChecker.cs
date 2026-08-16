@@ -9,11 +9,11 @@ public sealed class SqlConnectionChecker(
     public async Task<bool> CanConnectAsync(CancellationToken cancellationToken)
     {
         var connectionString =
-            configuration.GetConnectionString("DefaultConnection");
+            configuration.GetConnectionString("LaooDatabase");
 
         if (string.IsNullOrWhiteSpace(connectionString))
         {
-            logger.LogError("DefaultConnection is not configured.");
+            logger.LogError("LaooDatabase connection is not configured.");
             return false;
         }
 

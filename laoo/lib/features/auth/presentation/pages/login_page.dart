@@ -10,6 +10,7 @@ import '../../../../core/auth/app_auth_controller.dart';
 import '../../../../core/auth/auth_storage.dart';
 import '../../../../core/company_setup/company_setup_controller.dart';
 import '../../../../core/platform/window_title_service.dart';
+import '../../../../core/widgets/auto_dismiss_message.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -27,6 +28,7 @@ class _LoginPageState extends State<LoginPage> {
   bool _isSubmitting = false;
   bool _rememberLogin = true;
   String? _loginError;
+  bool _loginAlertError = true;
 
   @override
   void initState() {
@@ -36,15 +38,11 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<void> _restoreRememberedUsername() async {
     final username = await AuthStorage().readRememberedUsername();
-    final password = await AuthStorage().readRememberedPassword();
     if (!mounted) {
       return;
     }
     if (username != null && username.isNotEmpty) {
       _usernameController.text = username;
-    }
-    if (password != null && password.isNotEmpty) {
-      _passwordController.text = password;
     }
   }
 
@@ -53,6 +51,18 @@ class _LoginPageState extends State<LoginPage> {
     _usernameController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  void _showLoginAlert(String message, {bool error = true}) {
+    if (!mounted) return;
+    setState(() {
+      _loginError = message;
+      _loginAlertError = error;
+    });
+  }
+
+  void _dismissLoginAlert() {
+    if (mounted) setState(() => _loginError = null);
   }
 
   Future<void> _submitLogin() async {
@@ -100,19 +110,19 @@ class _LoginPageState extends State<LoginPage> {
         return;
       }
 
-      setState(() => _loginError = _apiErrorMessage(error));
+      _showLoginAlert(_apiErrorMessage(error));
     } on StateError catch (error) {
       if (!mounted) {
         return;
       }
 
-      setState(() => _loginError = error.message);
+      _showLoginAlert(error.message);
     } catch (error) {
       if (!mounted) {
         return;
       }
 
-      setState(() => _loginError = 'ไม่สามารถเข้าสู่ระบบได้: $error');
+      _showLoginAlert('ไม่สามารถเข้าสู่ระบบได้: $error');
     } finally {
       if (mounted) {
         setState(() {
@@ -137,16 +147,80 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  void _forgotPassword() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('ระบบลืมรหัสผ่านจะพัฒนาในขั้นตอนถัดไป')),
+  Future<void> _openForgotPassword() async {
+    final controller = TextEditingController();
+    final username = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        titleTextStyle: const TextStyle(
+          color: Color(0xFF16845F),
+          fontSize: 16,
+          fontWeight: FontWeight.w700,
+        ),
+        titlePadding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
+        contentPadding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        title: const Text('ลืมรหัสผ่าน'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Divider(height: 1),
+            const SizedBox(height: 16),
+            const Text('กรุณาระบุ Username เพื่อขอเปลี่ยนรหัสผ่าน'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              decoration: const InputDecoration(labelText: 'Username'),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('ยกเลิก'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text),
+            child: const Text('ส่งคำขอ'),
+          ),
+        ],
+      ),
     );
+    // Let the dialog route finish its closing animation before disposing the
+    // controller used by its TextField.
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    controller.dispose();
+    if (!mounted || username == null || username.trim().isEmpty) return;
+    try {
+      _showLoginAlert(
+        'กำลังตรวจสอบข้อมูลและส่งคำแนะนำไปยัง Email...',
+        error: false,
+      );
+      await appAuthController.requestPasswordReset(username: username);
+      if (mounted) {
+        _showLoginAlert(
+          'ระบบส่งคำแนะนำการตั้งรหัสผ่านใหม่ไปยัง Email แล้ว',
+          error: false,
+        );
+        appRouter.goNamed(RouteNames.resetPassword);
+      }
+    } on ApiException catch (error) {
+      if (mounted) _showLoginAlert(error.message);
+    } catch (_) {
+      if (mounted) {
+        _showLoginAlert(
+          'ไม่สามารถส่งคำขอได้ กรุณาตรวจสอบการตั้งค่า Email ของระบบ',
+        );
+      }
+    }
   }
 
   void _openRegister() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('ระบบสมัครใช้งานจะพัฒนาในขั้นตอนถัดไป')),
-    );
+    _showLoginAlert('ระบบสมัครใช้งานจะพัฒนาในขั้นตอนถัดไป', error: false);
   }
 
   void _backToLanding() {
@@ -266,29 +340,11 @@ class _LoginPageState extends State<LoginPage> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   if (_loginError != null) ...[
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.red.shade50,
-                        border: Border.all(color: Colors.red.shade300),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Icon(Icons.error_outline, color: Colors.red),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              _loginError!,
-                              style: TextStyle(color: Colors.red.shade800),
-                            ),
-                          ),
-                        ],
-                      ),
+                    AutoDismissMessage(
+                      key: ValueKey((_loginError, _loginAlertError)),
+                      message: _loginError!,
+                      error: _loginAlertError,
+                      onClose: _dismissLoginAlert,
                     ),
                     const SizedBox(height: 12),
                   ],
@@ -402,7 +458,7 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                       const Spacer(),
                       TextButton(
-                        onPressed: _isSubmitting ? null : _forgotPassword,
+                        onPressed: _isSubmitting ? null : _openForgotPassword,
                         style: TextButton.styleFrom(
                           minimumSize: Size.zero,
                           padding: const EdgeInsets.symmetric(

@@ -78,6 +78,14 @@ class AppAuthController extends ChangeNotifier {
     }
   }
 
+  Future<void> requestPasswordReset({required String username}) =>
+      _authService.requestPasswordReset(username: username);
+
+  Future<void> resetPassword({
+    required String token,
+    required String newPassword,
+  }) => _authService.resetPassword(token: token, newPassword: newPassword);
+
   Future<AuthSession> reloadSessionFromStorage() async {
     final session = await _authService.restoreSession();
     if (session == null) {
@@ -89,6 +97,14 @@ class AppAuthController extends ChangeNotifier {
     _lastError = null;
     notifyListeners();
     return session;
+  }
+
+  Future<void> updateSessionProfile(String username) async {
+    final current = _session;
+    if (current == null) return;
+    _session = current.copyWith(username: username);
+    await _authService.saveSession(_session!);
+    notifyListeners();
   }
 
   Future<void> logout() async {

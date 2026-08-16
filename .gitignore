@@ -14,6 +14,8 @@ build/
 # IDE
 .vscode/
 .idea/
+.vs/
+*.user
 
 # OS
 Thumbs.db
@@ -26,11 +28,28 @@ Desktop.ini
 # Environment / Secrets
 .env
 .env.*
+local.json
+appsettings.Local.json
 *.p12
+*.pfx
 *.jks
 *.keystore
+*.pem
+*.key
 /api_token
+/.secrets/
 
 # Generated
 coverage/
+bin/
+obj/
 /.build/
+/.android-sdk-home/
+/.codex/
+/.tmp-*/
+/_buildcheck*/
+/tmp/
+/publish/
+/archive/
+/.dart-analyze.err
+/.dart-analyze.out

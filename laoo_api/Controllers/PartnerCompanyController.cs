@@ -77,6 +77,8 @@ ORDER BY CompanyCode;
             return BadRequest(new { message = "กรุณาระบุ Username และ Password ผู้ดูแลระบบ" });
         if (request.AdminUsername.Trim().Length > 100 || request.AdminPassword.Trim().Length < 1)
             return BadRequest(new { message = "Username หรือ Password ผู้ดูแลระบบไม่ถูกต้อง" });
+        if (!PasswordService.MeetsPolicy(request.AdminUsername.Trim(), request.AdminPassword))
+            return BadRequest(new { message = PasswordService.PolicyMessage });
         var partnerId = PartnerId();
         if (partnerId is null || !string.Equals(User.FindFirstValue("user_type"), "PARTNER_USER", StringComparison.OrdinalIgnoreCase))
             return Forbid();
@@ -176,6 +178,8 @@ WHERE CompanyID=@CompanyID AND PartnerID=@PartnerID;
         var username = request.Username.Trim();
         if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(request.Password))
             return BadRequest(new { message = "กรุณาระบุ Username และ Password ผู้ดูแลระบบ" });
+        if (!PasswordService.MeetsPolicy(username, request.Password))
+            return BadRequest(new { message = PasswordService.PolicyMessage });
         var partnerId = PartnerId();
         if (partnerId is null) return Forbid();
         await using var connection = await OpenConnectionAsync(cancellationToken);

@@ -1,7 +1,10 @@
 import 'package:go_router/go_router.dart';
 
 import '../../core/auth/app_auth_controller.dart';
+import '../../core/auth/auth_session.dart';
+import '../../core/navigation/navigation_route_authorization.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
+import '../../features/auth/presentation/pages/reset_password_page.dart';
 import '../../features/landing/presentation/pages/landing_page.dart';
 import '../../features/home/presentation/pages/authenticated_home_page.dart';
 import '../../features/support/partner/pages/partner_module_page.dart';
@@ -18,72 +21,56 @@ import '../../features/support/employee/pages/employee_ux_page.dart';
 import '../../features/support/partner_user/pages/partner_user_page.dart';
 import '../../features/access/role_group/pages/role_group_page.dart';
 import '../../features/access/menu_permission/pages/menu_permission_page.dart';
+import 'app_menu_route_registry.dart';
 import 'route_names.dart';
 import 'route_paths.dart';
+
+final NavigationRouteAuthorization _navigationRouteAuthorization =
+    NavigationRouteAuthorization();
 
 final GoRouter appRouter = GoRouter(
   initialLocation: RoutePaths.landing,
   refreshListenable: appAuthController,
-  redirect: (context, state) {
+  redirect: (context, state) async {
+    final isAuthenticated = appAuthController.isAuthenticated;
     final path = state.uri.path;
+    Set<String> allowedMenuCodes = const <String>{};
 
-    if (appAuthController.isChecking) {
-      return null;
-    }
-
-    final isCompanySetupRoute = path == RoutePaths.companySetup;
-    final isSupportRoute =
-        !isCompanySetupRoute &&
-        (path == RoutePaths.supportHome ||
-            path.startsWith('${RoutePaths.supportHome}/'));
-
-    if (!appAuthController.isAuthenticated) {
-      if (isSupportRoute) {
-        return RoutePaths.login;
+    if (!isAuthenticated) {
+      _navigationRouteAuthorization.clear();
+    } else if (AppMenuRouteRegistry.containsPath(path)) {
+      final session = appAuthController.session;
+      if (session != null) {
+        final requestedSessionKey = _navigationSessionKey(session);
+        try {
+          allowedMenuCodes = await _navigationRouteAuthorization
+              .allowedMenuCodes(sessionKey: requestedSessionKey);
+          final currentSession = appAuthController.session;
+          if (!appAuthController.isAuthenticated || currentSession == null) {
+            return RoutePaths.login;
+          }
+          if (_navigationSessionKey(currentSession) != requestedSessionKey) {
+            return _authorizedHome(
+              isLaooSupport: appAuthController.isLaooSupport,
+            );
+          }
+        } catch (_) {
+          // Navigation API is the VIEW-permission source of truth. If it is
+          // unavailable, protected menu routes remain closed.
+          allowedMenuCodes = const <String>{};
+        }
       }
-      return null;
     }
 
-    // Support Workspace is reserved for Laoo Support users.
-    if (isSupportRoute && !appAuthController.isLaooSupport) {
-      return RoutePaths.login;
-    }
-
-    // Company Setup is shared by Customer and Laoo Support, but is not a
-    // general Partner route.
-    if (isCompanySetupRoute &&
-        !appAuthController.isCompanyUser &&
-        !appAuthController.isPartnerUser &&
-        !appAuthController.isLaooSupport) {
-      return RoutePaths.authenticatedHome;
-    }
-
-    final isCompanyRoute = path.startsWith('/company/');
-    if (isCompanyRoute && !appAuthController.isCompanyUser) {
-      return RoutePaths.authenticatedHome;
-    }
-
-    final isPartnerRoute = path.startsWith('/partner/');
-    if (isPartnerRoute && !appAuthController.isPartnerUser) {
-      return RoutePaths.authenticatedHome;
-    }
-
-    if (path == RoutePaths.landing) {
-      return appAuthController.isLaooSupport
-          ? RoutePaths.supportHome
-          : RoutePaths.authenticatedHome;
-    }
-
-    // Authenticated Laoo Support users should not remain on Login.
-    if (path == RoutePaths.login && appAuthController.isLaooSupport) {
-      return RoutePaths.supportHome;
-    }
-
-    if (path == RoutePaths.login && appAuthController.isAuthenticated) {
-      return RoutePaths.authenticatedHome;
-    }
-
-    return null;
+    return resolveAppRouteRedirect(
+      path: path,
+      isChecking: appAuthController.isChecking,
+      isAuthenticated: isAuthenticated,
+      isLaooSupport: appAuthController.isLaooSupport,
+      isCompanyUser: appAuthController.isCompanyUser,
+      isPartnerUser: appAuthController.isPartnerUser,
+      allowedMenuCodes: allowedMenuCodes,
+    );
   },
   routes: [
     GoRoute(
@@ -95,6 +82,11 @@ final GoRouter appRouter = GoRouter(
       path: RoutePaths.login,
       name: RouteNames.login,
       builder: (context, state) => const LoginPage(),
+    ),
+    GoRoute(
+      path: RoutePaths.resetPassword,
+      name: RouteNames.resetPassword,
+      builder: (context, state) => const ResetPasswordPage(),
     ),
     GoRoute(
       path: RoutePaths.authenticatedHome,
@@ -163,7 +155,9 @@ final GoRouter appRouter = GoRouter(
       builder: (context, state) => SupportWorkspaceShell(
         pageTitle: 'กำหนดค่าระบบ',
         activeMenu: 'companySetup',
-        menuScope: appAuthController.isPartnerUser
+        menuScope: appAuthController.isLaooSupport
+            ? WorkspaceMenuScope.support
+            : appAuthController.isPartnerUser
             ? WorkspaceMenuScope.partner
             : WorkspaceMenuScope.company,
         child: CompanySetupPage(),
@@ -183,19 +177,209 @@ final GoRouter appRouter = GoRouter(
   ],
 );
 
+String? resolveAppRouteRedirect({
+  required String path,
+  required bool isChecking,
+  required bool isAuthenticated,
+  required bool isLaooSupport,
+  required bool isCompanyUser,
+  required bool isPartnerUser,
+  Set<String> allowedMenuCodes = const <String>{},
+}) {
+  if (isChecking) {
+    return null;
+  }
+
+  final isPublicRoute =
+      path == RoutePaths.landing ||
+      path == RoutePaths.login ||
+      path == RoutePaths.resetPassword;
+
+  if (!isAuthenticated) {
+    return isPublicRoute ? null : RoutePaths.login;
+  }
+
+  if (path == RoutePaths.landing || path == RoutePaths.login) {
+    return isLaooSupport
+        ? RoutePaths.supportHome
+        : RoutePaths.authenticatedHome;
+  }
+
+  final isCompanySetupRoute = path == RoutePaths.companySetup;
+  final isSupportRoute =
+      !isCompanySetupRoute &&
+      (path == RoutePaths.supportHome ||
+          path.startsWith('${RoutePaths.supportHome}/'));
+
+  // Support Workspace is reserved for Laoo Support users.
+  if (isSupportRoute && !isLaooSupport) {
+    return RoutePaths.login;
+  }
+
+  // Company Setup keeps the existing shared role scope.
+  if (isCompanySetupRoute &&
+      !isCompanyUser &&
+      !isPartnerUser &&
+      !isLaooSupport) {
+    return RoutePaths.authenticatedHome;
+  }
+
+  final isCompanyRoute = path.startsWith('/company/');
+  if (isCompanyRoute && !isCompanyUser) {
+    return RoutePaths.authenticatedHome;
+  }
+
+  final isPartnerRoute = path.startsWith('/partner/');
+  if (isPartnerRoute && !isPartnerUser) {
+    return RoutePaths.authenticatedHome;
+  }
+
+  final routeSpecs = AppMenuRouteRegistry.byPath(path);
+  if (routeSpecs.isNotEmpty) {
+    final allowedScopes = <AppMenuScope>{
+      AppMenuScope.shared,
+      if (isLaooSupport) AppMenuScope.support,
+      if (isPartnerUser) AppMenuScope.partner,
+      if (isCompanyUser) AppMenuScope.company,
+    };
+    final hasViewPermission = routeSpecs.any(
+      (spec) =>
+          allowedScopes.contains(spec.scope) &&
+          allowedMenuCodes.contains(spec.menuCode),
+    );
+    if (!hasViewPermission) {
+      return _authorizedHome(isLaooSupport: isLaooSupport);
+    }
+    return null;
+  }
+
+  final isKnownNonMenuRoute =
+      path == RoutePaths.resetPassword ||
+      path == RoutePaths.authenticatedHome ||
+      path == RoutePaths.supportHome;
+  if (!isKnownNonMenuRoute) {
+    return _authorizedHome(isLaooSupport: isLaooSupport);
+  }
+
+  return null;
+}
+
+String _authorizedHome({required bool isLaooSupport}) =>
+    isLaooSupport ? RoutePaths.supportHome : RoutePaths.authenticatedHome;
+
+String _navigationSessionKey(AuthSession session) => <Object?>[
+  session.accessToken,
+  session.projectId,
+  session.userType,
+  session.laooUserId,
+  session.userId,
+  session.partnerId,
+  session.companyId,
+].join('|');
+
+Future<void> refreshNavigationRoutePermissions() async {
+  final session = appAuthController.session;
+  if (session == null) {
+    _navigationRouteAuthorization.clear();
+  } else {
+    try {
+      await _navigationRouteAuthorization.allowedMenuCodes(
+        sessionKey: _navigationSessionKey(session),
+        refresh: true,
+      );
+    } catch (_) {
+      // The next redirect remains fail-closed and can retry the API request.
+    }
+  }
+  appRouter.refresh();
+}
+
 final List<GoRoute> _placeholderRoutes = [
-  GoRoute(path: RoutePaths.companyEmployees, name: RouteNames.companyEmployees, builder: (context, state) => const EmployeeUxPage(customer: true, companyScoped: true, menuScope: WorkspaceMenuScope.company)),
-  _scopePlaceholder(RoutePaths.companyUsers, RouteNames.companyUsers, 'ผู้ใช้งาน', WorkspaceMenuScope.company, 'companyUsers'),
-  GoRoute(path: RoutePaths.companyRoleGroups, name: RouteNames.companyRoleGroups, builder: (context, state) => const RoleGroupPage(scope: 'customer', activeMenu: 'companyRoleGroups')),
-  GoRoute(path: RoutePaths.companyMenuPermissions, name: RouteNames.companyMenuPermissions, builder: (context, state) => const MenuPermissionPage(scope: 'customer', activeMenu: 'companyMenuPermissions')),
-  _scopePlaceholder(RoutePaths.partnerEmployees, RouteNames.partnerEmployees, 'พนักงาน', WorkspaceMenuScope.partner, 'partnerEmployees'),
-  GoRoute(path: RoutePaths.partnerRoleGroups, name: RouteNames.partnerRoleGroups, builder: (context, state) => const RoleGroupPage(scope: 'partner', activeMenu: 'partnerRoleGroups')),
-  GoRoute(path: RoutePaths.partnerMenuPermissions, name: RouteNames.partnerMenuPermissions, builder: (context, state) => const MenuPermissionPage(scope: 'partner', activeMenu: 'partnerMenuPermissions')),
-  GoRoute(path: RoutePaths.customerEmployees, name: RouteNames.customerEmployees, builder: (context, state) => const EmployeeUxPage(customer: true, menuScope: WorkspaceMenuScope.partner)),
-  GoRoute(path: RoutePaths.laooEmployees, name: RouteNames.laooEmployees, builder: (context, state) => const EmployeeUxPage()),
-  _scopePlaceholder(RoutePaths.laooUsers, RouteNames.laooUsers, 'ผู้ใช้งาน', WorkspaceMenuScope.support, 'laooUsers'),
-  _scopePlaceholder(RoutePaths.laooRoleGroups, RouteNames.laooRoleGroups, 'กลุ่มสิทธิ์', WorkspaceMenuScope.support, 'laooRoleGroups'),
-  _scopePlaceholder(RoutePaths.laooMenuPermissions, RouteNames.laooMenuPermissions, 'สิทธิ์เมนู', WorkspaceMenuScope.support, 'laooMenuPermissions'),
+  GoRoute(
+    path: RoutePaths.companyEmployees,
+    name: RouteNames.companyEmployees,
+    builder: (context, state) => const EmployeeUxPage(
+      customer: true,
+      companyScoped: true,
+      menuScope: WorkspaceMenuScope.company,
+    ),
+  ),
+  _scopePlaceholder(
+    RoutePaths.companyUsers,
+    RouteNames.companyUsers,
+    'ผู้ใช้งาน',
+    WorkspaceMenuScope.company,
+    'companyUsers',
+  ),
+  GoRoute(
+    path: RoutePaths.companyRoleGroups,
+    name: RouteNames.companyRoleGroups,
+    builder: (context, state) =>
+        const RoleGroupPage(scope: 'customer', activeMenu: 'companyRoleGroups'),
+  ),
+  GoRoute(
+    path: RoutePaths.companyMenuPermissions,
+    name: RouteNames.companyMenuPermissions,
+    builder: (context, state) => const MenuPermissionPage(
+      scope: 'customer',
+      activeMenu: 'companyMenuPermissions',
+    ),
+  ),
+  _scopePlaceholder(
+    RoutePaths.partnerEmployees,
+    RouteNames.partnerEmployees,
+    'พนักงาน',
+    WorkspaceMenuScope.partner,
+    'partnerEmployees',
+  ),
+  GoRoute(
+    path: RoutePaths.partnerRoleGroups,
+    name: RouteNames.partnerRoleGroups,
+    builder: (context, state) =>
+        const RoleGroupPage(scope: 'partner', activeMenu: 'partnerRoleGroups'),
+  ),
+  GoRoute(
+    path: RoutePaths.partnerMenuPermissions,
+    name: RouteNames.partnerMenuPermissions,
+    builder: (context, state) => const MenuPermissionPage(
+      scope: 'partner',
+      activeMenu: 'partnerMenuPermissions',
+    ),
+  ),
+  GoRoute(
+    path: RoutePaths.customerEmployees,
+    name: RouteNames.customerEmployees,
+    builder: (context, state) => const EmployeeUxPage(
+      customer: true,
+      menuScope: WorkspaceMenuScope.partner,
+    ),
+  ),
+  GoRoute(
+    path: RoutePaths.laooEmployees,
+    name: RouteNames.laooEmployees,
+    builder: (context, state) => const EmployeeUxPage(),
+  ),
+  _scopePlaceholder(
+    RoutePaths.laooUsers,
+    RouteNames.laooUsers,
+    'ผู้ใช้งาน',
+    WorkspaceMenuScope.support,
+    'laooUsers',
+  ),
+  GoRoute(
+    path: RoutePaths.laooRoleGroups,
+    name: RouteNames.laooRoleGroups,
+    builder: (context, state) =>
+        const RoleGroupPage(scope: 'laoo', activeMenu: 'laooRoleGroups'),
+  ),
+  GoRoute(
+    path: RoutePaths.laooMenuPermissions,
+    name: RouteNames.laooMenuPermissions,
+    builder: (context, state) => const MenuPermissionPage(
+      scope: 'laoo',
+      activeMenu: 'laooMenuPermissions',
+    ),
+  ),
   GoRoute(
     path: RoutePaths.branch,
     name: RouteNames.branch,
@@ -262,10 +446,10 @@ GoRoute _scopePlaceholder(
   builder: (context, state) => path == RoutePaths.partnerEmployees
       ? const EmployeeUxPage(menuScope: WorkspaceMenuScope.partner)
       : CompanyModulePlaceholderPage(
-    title: title,
-    menuScope: scope,
-    activeMenu: activeMenu,
-  ),
+          title: title,
+          menuScope: scope,
+          activeMenu: activeMenu,
+        ),
 );
 
 GoRoute _placeholder(

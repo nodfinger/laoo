@@ -6,7 +6,8 @@ plugins {
 
 android {
     namespace = "com.example.laoo"
-    compileSdk = flutter.compileSdkVersion
+    // flutter_plugin_android_lifecycle requires Android API 36 or newer.
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

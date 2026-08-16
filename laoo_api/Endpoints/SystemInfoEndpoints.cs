@@ -10,6 +10,23 @@ public static class SystemInfoEndpoints
         this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet(
+            "/health",
+            async (
+                ISqlConnectionChecker connectionChecker,
+                CancellationToken cancellationToken) =>
+            {
+                var canConnect =
+                    await connectionChecker.CanConnectAsync(cancellationToken);
+
+                return canConnect
+                    ? Results.Ok(new { status = "Healthy" })
+                    : Results.Json(
+                        new { status = "Unhealthy" },
+                        statusCode: StatusCodes.Status503ServiceUnavailable);
+            })
+            .AllowAnonymous();
+
+        endpoints.MapGet(
             "/api/system/info",
             async (
                 IConfiguration configuration,

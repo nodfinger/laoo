@@ -1,6 +1,7 @@
 abstract final class RouteNames {
   static const String landing = 'landing';
   static const String login = 'login';
+  static const String resetPassword = 'reset-password';
   static const String authenticatedHome = 'authenticated-home';
   static const String companyProducts = 'company-products';
   static const String companyCustomers = 'company-customers';

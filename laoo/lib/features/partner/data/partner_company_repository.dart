@@ -6,13 +6,20 @@ class PartnerCompanyRepository {
     : _api = apiClient ?? ApiClient();
   final ApiClient _api;
 
-  Future<Map<String, bool>> actions() async {
-    final data = await _api.get('/api/partner/companies/actions');
+  Future<Map<String, bool>> actions({bool support = false}) async {
+    final data = await _api.get(
+      support
+          ? '/api/support/companies/actions'
+          : '/api/partner/companies/actions',
+    );
     if (data is! Map) return const {};
     return Map<String, bool>.fromEntries(
-      data.entries.map((entry) => MapEntry('${entry.key}', entry.value == true)),
+      data.entries.map(
+        (entry) => MapEntry('${entry.key}', entry.value == true),
+      ),
     );
   }
+
   Future<List<PartnerCompany>> getCompanies({
     String? search,
     int? partnerId,
@@ -62,10 +69,14 @@ class PartnerCompanyRepository {
     await _api.delete(path);
   }
 
-  Future<void> updateAdmin(int companyId, String username, String password) async {
-    await _api.put('/api/partner/companies/$companyId/admin', body: {
-      'username': username,
-      'password': password,
-    });
+  Future<void> updateAdmin(
+    int companyId,
+    String username,
+    String password,
+  ) async {
+    await _api.put(
+      '/api/partner/companies/$companyId/admin',
+      body: {'username': username, 'password': password},
+    );
   }
 }

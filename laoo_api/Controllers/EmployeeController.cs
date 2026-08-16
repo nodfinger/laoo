@@ -245,7 +245,11 @@ WHERE E.EmployeeID=@id AND E.PartnerID=@partner AND ((@company IS NULL AND E.Com
         if (string.IsNullOrWhiteSpace(request.Username)) return BadRequest(new { message = "กรุณาระบุ Username" });
         var username = request.Username.Trim();
         if (username.Length > 100) return BadRequest(new { message = "Username ต้องไม่เกิน 100 ตัวอักษร" });
+        if (!string.IsNullOrWhiteSpace(request.Password) &&
+            !PasswordService.MeetsPolicy(username, request.Password))
+            return BadRequest(new { message = PasswordService.PolicyMessage });
         var scope = ResolveScope(request.CompanyId); if (scope is null) return Forbid();
+        if (!long.TryParse(User.FindFirstValue("project_id"), out var projectId)) return Forbid();
         await using var c = await Open(token); if (!await Allowed(c, "EDIT", token)) return Forbid();
         await using var transaction = await c.BeginTransactionAsync(token);
         try
@@ -285,7 +289,7 @@ BEGIN
 END
 ELSE UPDATE dbo.TDADPartnerUser SET Username=@username,NormalizedUsername=@normalized,PasswordHash=CASE WHEN @hasPassword=1 THEN @hash ELSE PasswordHash END WHERE PartnerUserID=@userId AND PartnerID=@partner;
 """;
-                await ExecuteEmployeeUserUpsert(c, (SqlTransaction)transaction, sql, username, normalized, hash, employeeName, actor, id, scope.Value.PartnerId, null, userId, hasPassword, token);
+                await ExecuteEmployeeUserUpsert(c, (SqlTransaction)transaction, sql, username, normalized, hash, employeeName, actor, id, scope.Value.PartnerId, null, userId, hasPassword, projectId, token);
             }
             else
             {
@@ -309,10 +313,10 @@ IF @company IS NOT NULL
 INSERT INTO dbo.TDADUserProject(CompanyID,UserID,ProjectID,IsDefault,IsActive,CreateDate)
 SELECT @company,@userId,P.ProjectID,1,1,SYSUTCDATETIME()
 FROM dbo.TDADProject P
-WHERE P.ProjectCode=N'LAOO' AND P.IsActive=1
+WHERE P.ProjectID=@project AND P.IsActive=1
   AND NOT EXISTS (SELECT 1 FROM dbo.TDADUserProject UP WHERE UP.CompanyID=@company AND UP.UserID=@userId AND UP.ProjectID=P.ProjectID);
 """;
-                await ExecuteEmployeeUserUpsert(c, (SqlTransaction)transaction, sql, username, normalized, hash, employeeName, actor, id, scope.Value.PartnerId, employeeCompany, userId, hasPassword, token);
+                await ExecuteEmployeeUserUpsert(c, (SqlTransaction)transaction, sql, username, normalized, hash, employeeName, actor, id, scope.Value.PartnerId, employeeCompany, userId, hasPassword, projectId, token);
             }
             if (request.RoleGroupId.HasValue) await AssignRoleGroupAsync(c, (SqlTransaction)transaction, id, employeeCompany, request.RoleGroupId.Value, scope.Value.PartnerId, token);
             await transaction.CommitAsync(token);
@@ -340,7 +344,10 @@ WHERE P.ProjectCode=N'LAOO' AND P.IsActive=1
             return BadRequest(new { message = "กรุณาระบุ Username และ Password" });
         if (request.Username.Trim().Length > 100)
             return BadRequest(new { message = "Username ต้องไม่เกิน 100 ตัวอักษร" });
+        if (!PasswordService.MeetsPolicy(request.Username.Trim(), request.Password))
+            return BadRequest(new { message = PasswordService.PolicyMessage });
         var scope = ResolveScope(request.CompanyId); if (scope is null) return Forbid();
+        if (!long.TryParse(User.FindFirstValue("project_id"), out var projectId)) return Forbid();
         await using var c = await Open(token);
         if (!await Allowed(c, "EDIT", token)) return Forbid();
         var username = request.Username.Trim();
@@ -372,7 +379,7 @@ VALUES(@partner,@username,@normalized,@hash,@displayName,NULL,NULL,0,1,0,SYSUTCD
 DECLARE @userId BIGINT = CONVERT(BIGINT,SCOPE_IDENTITY());
 INSERT dbo.TDADPartnerUserEmployee(PartnerUserID,EmployeeID,PartnerID) VALUES(@userId,@employee,@partner);
 """;
-                await ExecuteUserCommand(c, (SqlTransaction)transaction, sql, username, normalized, passwordHash, employeeName, actor, id, scope.Value.PartnerId, null, token);
+                await ExecuteUserCommand(c, (SqlTransaction)transaction, sql, username, normalized, passwordHash, employeeName, actor, id, scope.Value.PartnerId, null, projectId, token);
             }
             else
             {
@@ -386,10 +393,10 @@ INSERT dbo.TDADUserEmployee(UserID,EmployeeID,CompanyID) VALUES(@userId,@employe
 INSERT INTO dbo.TDADUserProject(CompanyID,UserID,ProjectID,IsDefault,IsActive,CreateDate)
 SELECT @company,@userId,P.ProjectID,1,1,SYSUTCDATETIME()
 FROM dbo.TDADProject P
-WHERE P.ProjectCode=N'LAOO' AND P.IsActive=1
+WHERE P.ProjectID=@project AND P.IsActive=1
   AND NOT EXISTS (SELECT 1 FROM dbo.TDADUserProject UP WHERE UP.CompanyID=@company AND UP.UserID=@userId AND UP.ProjectID=P.ProjectID);
 """;
-                await ExecuteUserCommand(c, (SqlTransaction)transaction, sql, username, normalized, passwordHash, employeeName, actor, id, scope.Value.PartnerId, employeeCompany, token);
+                await ExecuteUserCommand(c, (SqlTransaction)transaction, sql, username, normalized, passwordHash, employeeName, actor, id, scope.Value.PartnerId, employeeCompany, projectId, token);
             }
             await transaction.CommitAsync(token);
             return Ok(new { employeeId = id, username });
@@ -398,7 +405,7 @@ WHERE P.ProjectCode=N'LAOO' AND P.IsActive=1
         catch (SqlException ex) when (ex.Number is 50008 or 2601 or 2627) { await transaction.RollbackAsync(token); return Conflict(new { message = "Username นี้ถูกใช้งานแล้ว" }); }
     }
 
-    private static async Task ExecuteEmployeeUserUpsert(SqlConnection c, SqlTransaction tx, string sql, string username, string normalized, string hash, string displayName, string actor, long employeeId, long partnerId, long? companyId, long? userId, bool hasPassword, CancellationToken token)
+    private static async Task ExecuteEmployeeUserUpsert(SqlConnection c, SqlTransaction tx, string sql, string username, string normalized, string hash, string displayName, string actor, long employeeId, long partnerId, long? companyId, long? userId, bool hasPassword, long projectId, CancellationToken token)
     {
         await using var command = new SqlCommand(sql, c, tx);
         command.Parameters.Add("@employee", SqlDbType.BigInt).Value = employeeId;
@@ -406,16 +413,18 @@ WHERE P.ProjectCode=N'LAOO' AND P.IsActive=1
         command.Parameters.Add("@company", SqlDbType.BigInt).Value = companyId ?? (object)DBNull.Value;
         command.Parameters.Add("@userId", SqlDbType.BigInt).Value = userId ?? (object)DBNull.Value;
         command.Parameters.Add("@hasPassword", SqlDbType.Bit).Value = hasPassword;
+        command.Parameters.Add("@project", SqlDbType.BigInt).Value = projectId;
         Add(command, "@username", SqlDbType.NVarChar, username, 100); Add(command, "@normalized", SqlDbType.NVarChar, normalized, 100); Add(command, "@hash", SqlDbType.NVarChar, hash, 500); Add(command, "@displayName", SqlDbType.NVarChar, displayName, 200); Add(command, "@actor", SqlDbType.NVarChar, actor, 100);
         await command.ExecuteNonQueryAsync(token);
     }
 
-    private static async Task ExecuteUserCommand(SqlConnection c, SqlTransaction tx, string sql, string username, string normalized, string hash, string displayName, string actor, long employeeId, long partnerId, long? companyId, CancellationToken token)
+    private static async Task ExecuteUserCommand(SqlConnection c, SqlTransaction tx, string sql, string username, string normalized, string hash, string displayName, string actor, long employeeId, long partnerId, long? companyId, long projectId, CancellationToken token)
     {
         await using var command = new SqlCommand(sql, c, tx);
         command.Parameters.Add("@employee", SqlDbType.BigInt).Value = employeeId;
         command.Parameters.Add("@partner", SqlDbType.BigInt).Value = partnerId;
         command.Parameters.Add("@company", SqlDbType.BigInt).Value = companyId ?? (object)DBNull.Value;
+        command.Parameters.Add("@project", SqlDbType.BigInt).Value = projectId;
         Add(command, "@username", SqlDbType.NVarChar, username, 100); Add(command, "@normalized", SqlDbType.NVarChar, normalized, 100); Add(command, "@hash", SqlDbType.NVarChar, hash, 500); Add(command, "@displayName", SqlDbType.NVarChar, displayName, 200); Add(command, "@actor", SqlDbType.NVarChar, actor, 100);
         await command.ExecuteNonQueryAsync(token);
     }

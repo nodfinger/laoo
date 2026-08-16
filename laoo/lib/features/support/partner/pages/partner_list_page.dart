@@ -131,10 +131,16 @@ class _PartnerListPageState extends State<PartnerListPage> {
         await widget.createPartnerAdmin(partner, result.$1, result.$2);
       }
       await _load();
-      if (mounted) _showMessage(editing ? 'แก้ไข Partner Admin สำเร็จ' : 'สร้าง Partner Admin สำเร็จ');
+      if (mounted) {
+        _showMessage(
+          editing ? 'แก้ไข Partner Admin สำเร็จ' : 'สร้าง Partner Admin สำเร็จ',
+        );
+      }
     } catch (error) {
       if (mounted) {
-        final message = error is ApiException ? error.message : 'ไม่สามารถสร้าง Partner Admin ได้';
+        final message = error is ApiException
+            ? error.message
+            : 'ไม่สามารถสร้าง Partner Admin ได้';
         _showMessage(message, error: true);
       }
     }
@@ -309,7 +315,12 @@ class _PartnerListPageState extends State<PartnerListPage> {
             sortAndInternalReserve;
 
         final flexibleWidth =
-            (tableWidth - actionWidth - codeWidth - adminWidth - statusWidth - tableOverhead)
+            (tableWidth -
+                    actionWidth -
+                    codeWidth -
+                    adminWidth -
+                    statusWidth -
+                    tableOverhead)
                 .clamp(360.0, double.infinity);
 
         final nameWidth = flexibleWidth * 0.45;
@@ -429,7 +440,8 @@ class _PartnerListPageState extends State<PartnerListPage> {
                                     style: TextButton.styleFrom(
                                       padding: EdgeInsets.zero,
                                       minimumSize: const Size(38, 32),
-                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                      tapTargetSize:
+                                          MaterialTapTargetSize.shrinkWrap,
                                     ),
                                     onPressed: () => _manageAdmin(partner),
                                     child: const Text('admin'),
@@ -486,7 +498,12 @@ class _PartnerListPageState extends State<PartnerListPage> {
                           ),
                           DataCell(cellText(partner.partnerCode, codeWidth)),
                           DataCell(cellText(partner.partnerNameTh, nameWidth)),
-                          DataCell(cellText(partner.partnerAdminUsername ?? '-', adminWidth)),
+                          DataCell(
+                            cellText(
+                              partner.partnerAdminUsername ?? '-',
+                              adminWidth,
+                            ),
+                          ),
                           DataCell(
                             cellText(partner.contactName1 ?? '-', contactWidth),
                           ),
@@ -916,8 +933,14 @@ class _Toolbar extends StatelessWidget {
             ),
             items: const [
               DropdownMenuItem(value: null, child: LaooComboBoxText('ทั้งหมด')),
-              DropdownMenuItem(value: true, child: LaooComboBoxText('เปิดใช้งาน')),
-              DropdownMenuItem(value: false, child: LaooComboBoxText('ระงับใช้งาน')),
+              DropdownMenuItem(
+                value: true,
+                child: LaooComboBoxText('เปิดใช้งาน'),
+              ),
+              DropdownMenuItem(
+                value: false,
+                child: LaooComboBoxText('ระงับใช้งาน'),
+              ),
             ],
             onChanged: onActiveChanged,
           ),
@@ -933,48 +956,6 @@ class _Toolbar extends StatelessWidget {
           icon: Icon(Icons.refresh_rounded, color: accent),
         ),
       ],
-    );
-  }
-}
-
-class _TopMessage extends StatelessWidget {
-  const _TopMessage({
-    required this.message,
-    required this.error,
-    required this.onClose,
-  });
-
-  final String message;
-  final bool error;
-  final VoidCallback onClose;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = error ? LaooColors.error : LaooColors.success;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withValues(alpha: 0.24)),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            error ? Icons.error_outline : Icons.check_circle_outline,
-            color: color,
-            size: 20,
-          ),
-          const SizedBox(width: 9),
-          Expanded(child: Text(message)),
-          IconButton(
-            tooltip: 'ปิด',
-            onPressed: onClose,
-            visualDensity: VisualDensity.compact,
-            icon: const Icon(Icons.close_rounded, size: 18),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -1082,21 +1063,42 @@ class _PartnerAdminDialogState extends State<_PartnerAdminDialog> {
               color: theme.colorScheme.primaryContainer,
               child: Text(
                 widget.editing ? 'แก้ไข Partner Admin' : 'สร้าง Partner Admin',
-                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
               child: Column(
                 children: [
-                  TextField(controller: _username, decoration: _fieldDecoration('Username Admin')),
+                  TextField(
+                    controller: _username,
+                    decoration: _fieldDecoration('Username Admin'),
+                  ),
                   const SizedBox(height: 12),
-                  TextField(controller: _password, obscureText: true, decoration: _fieldDecoration(widget.editing ? 'Password ใหม่ (เว้นว่างได้)' : 'Password')),
+                  TextField(
+                    controller: _password,
+                    obscureText: true,
+                    decoration: _fieldDecoration(
+                      widget.editing
+                          ? 'Password ใหม่ (เว้นว่างได้)'
+                          : 'Password',
+                    ),
+                  ),
                   const SizedBox(height: 8),
-                  const Align(alignment: Alignment.centerLeft, child: Text('แนะนำให้ใช้รหัสชั่วคราวและเปลี่ยนหลัง Login ครั้งแรก')),
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'แนะนำให้ใช้รหัสชั่วคราวและเปลี่ยนหลัง Login ครั้งแรก',
+                    ),
+                  ),
                   if (_error != null) ...[
                     const SizedBox(height: 8),
-                    Align(alignment: Alignment.centerLeft, child: Text(_error!, style: TextStyle(color: Colors.red))),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(_error!, style: TextStyle(color: Colors.red)),
+                    ),
                   ],
                 ],
               ),
@@ -1104,13 +1106,21 @@ class _PartnerAdminDialogState extends State<_PartnerAdminDialog> {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
-              decoration: BoxDecoration(border: Border(top: BorderSide(color: theme.dividerColor))),
+              decoration: BoxDecoration(
+                border: Border(top: BorderSide(color: theme.dividerColor)),
+              ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  TextButton(onPressed: () => Navigator.pop(context), child: const Text('ยกเลิก')),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('ยกเลิก'),
+                  ),
                   const SizedBox(width: 12),
-                  FilledButton(onPressed: _submit, child: Text(widget.editing ? 'บันทึก' : 'สร้าง Admin')),
+                  FilledButton(
+                    onPressed: _submit,
+                    child: Text(widget.editing ? 'บันทึก' : 'สร้าง Admin'),
+                  ),
                 ],
               ),
             ),

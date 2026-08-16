@@ -1,6 +1,7 @@
 abstract final class RoutePaths {
   static const String landing = '/';
   static const String login = '/login';
+  static const String resetPassword = '/reset-password';
   static const String authenticatedHome = '/home';
   static const String companyProducts = '/company/products';
   static const String companyCustomers = '/company/customers';

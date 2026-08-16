@@ -1,0 +1,38 @@
+{
+  "folders": [
+    {
+      "name": "LAOO App",
+      "path": "laoo"
+    },
+    {
+      "name": "LAOO API",
+      "path": "laoo_api"
+    },
+    {
+      "name": "Shared Documentation",
+      "path": "docs"
+    },
+    {
+      "name": "Database Scripts",
+      "path": "scripts"
+    },
+    {
+      "name": "Build Tools",
+      "path": "tools"
+    }
+  ],
+  "settings": {
+    "files.exclude": {
+      "**/.dart_tool": true,
+      "**/bin": true,
+      "**/build": true,
+      "**/obj": true
+    },
+    "search.exclude": {
+      "**/.dart_tool": true,
+      "**/bin": true,
+      "**/build": true,
+      "**/obj": true
+    }
+  }
+}
