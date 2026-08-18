@@ -188,9 +188,12 @@ public sealed class PasswordResetService(
                 }
             }
 
+            var policyCode = resetToken is not null && long.TryParse(resetToken.SubjectId, out var policySubjectId)
+                ? await _passwords.GetPolicyForAccountAsync(connection, resetToken.UserType, policySubjectId, cancellationToken)
+                : PasswordService.DefaultPolicyCode;
             if (resetToken is null ||
                 !long.TryParse(resetToken.SubjectId, out var subjectId) ||
-                !PasswordService.MeetsPolicy(resetToken.Username, newPassword))
+                !PasswordService.MeetsPolicy(resetToken.Username, newPassword, policyCode))
             {
                 await transaction.RollbackAsync(CancellationToken.None);
                 return false;

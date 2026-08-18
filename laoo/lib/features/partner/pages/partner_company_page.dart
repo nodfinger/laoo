@@ -4,6 +4,7 @@ import '../../../core/widgets/combo_box_text.dart';
 import '../../../core/widgets/auto_dismiss_message.dart';
 
 import '../../../app/theme/laoo_typography.dart';
+import '../../../app/theme/workspace_theme_presets.dart';
 import '../../../core/company_setup/company_setup_controller.dart';
 import '../../../core/navigation/navigation_menu_repository.dart';
 import '../../support/presentation/widgets/support_workspace_shell.dart';
@@ -133,7 +134,9 @@ class _PartnerCompanyFormPageState extends State<_PartnerCompanyFormPage> {
   @override
   Widget build(BuildContext context) {
     final editing = widget.existing != null;
-    return SupportWorkspaceShell(
+    return ValueListenableBuilder<WorkspaceThemePreset>(
+      valueListenable: workspaceThemeController,
+      builder: (_, _, _) => SupportWorkspaceShell(
       menuScope: widget.support
           ? WorkspaceMenuScope.support
           : WorkspaceMenuScope.partner,
@@ -281,6 +284,7 @@ class _PartnerCompanyFormPageState extends State<_PartnerCompanyFormPage> {
             ),
           ),
         ),
+      ),
       ),
     );
   }
@@ -632,9 +636,11 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
       menuScope: widget.menuScope,
       pageTitle: _menuName,
       activeMenu: _menuCode,
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Stack(
+      child: ValueListenableBuilder<WorkspaceThemePreset>(
+        valueListenable: workspaceThemeController,
+        builder: (_, _, child) => Padding(
+          padding: const EdgeInsets.all(24),
+          child: Stack(
           children: [
             Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -660,13 +666,16 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                Wrap(
-                  spacing: 0,
-                  runSpacing: 10,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
+                LayoutBuilder(
+                  builder: (context, constraints) => Wrap(
+                    spacing: 0,
+                    runSpacing: 10,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
                     SizedBox(
-                      width: 330,
+                      width: constraints.maxWidth < 600
+                          ? constraints.maxWidth
+                          : 420,
                       child: TextField(
                         controller: _search,
                         onSubmitted: (_) => _load(),
@@ -739,13 +748,8 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
                         },
                       ),
                     ),
-                    const SizedBox(width: 4),
-                    OutlinedButton.icon(
-                      onPressed: _clearFilters,
-                      icon: const Icon(Icons.clear_all, size: 18),
-                      label: const Text('ล้าง Filter'),
-                    ),
                   ],
+                  ),
                 ),
                 const SizedBox(height: 16),
                 Expanded(child: _buildBody()),
@@ -763,6 +767,7 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
                 ),
               ),
           ],
+          ),
         ),
       ),
     );
@@ -774,6 +779,17 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
     if (_error != null) return Center(child: Text(_error!));
     if (_items.isEmpty) {
       return const Center(child: Text('ยังไม่มีข้อมูลลูกค้า'));
+    }
+
+    if (MediaQuery.sizeOf(context).width < 600) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(child: _buildMobileCards(context)),
+          const SizedBox(height: 10),
+          Align(alignment: Alignment.centerLeft, child: _paginationBar()),
+        ],
+      );
     }
 
     return Column(
@@ -821,7 +837,10 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
                       ),
                       columns: [
                         const DataColumn(
-                          label: SizedBox(width: 28, child: Text('ID')),
+                          label: SizedBox(
+                            width: 28,
+                            child: Center(child: Text('ID')),
+                          ),
                         ),
                         DataColumn(
                           label: SizedBox(
@@ -830,27 +849,27 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
                           ),
                         ),
                         if (widget.menuScope == WorkspaceMenuScope.support)
-                          const DataColumn(label: Text('Partner')),
+                          const DataColumn(label: Center(child: Text('Partner'))),
                         DataColumn(
-                          label: Text('ชื่อลูกค้า'),
+                          label: const Center(child: Text('ชื่อลูกค้า')),
                           onSort: (i, a) =>
                               _sortBy(i, (x) => x.companyNameTh, a),
                         ),
                         DataColumn(
-                          label: Text('เลขผู้เสียภาษี'),
+                          label: const Center(child: Text('เลขผู้เสียภาษี')),
                           onSort: (i, a) => _sortBy(i, (x) => x.taxId ?? "", a),
                         ),
                         DataColumn(
                           label: const SizedBox(
                             width: 110,
-                            child: Text('Email'),
+                            child: Center(child: Text('Email')),
                           ),
                           onSort: (i, a) => _sortBy(i, (x) => x.email ?? "", a),
                         ),
                         DataColumn(
                           label: const SizedBox(
                             width: 110,
-                            child: Text('โทรศัพท์'),
+                            child: Center(child: Text('โทรศัพท์')),
                           ),
                           onSort: (i, a) =>
                               _sortBy(i, (x) => x.telephone ?? "", a),
@@ -858,7 +877,7 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
                         DataColumn(
                           label: const SizedBox(
                             width: 110,
-                            child: Text('สถานะ'),
+                            child: Center(child: Text('สถานะ')),
                           ),
                           onSort: (i, a) =>
                               _sortBy(i, (x) => x.isActive ? 1 : 0, a),
@@ -1004,8 +1023,14 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
                                         ),
                                         decoration: BoxDecoration(
                                           color: item.isActive
-                                              ? Colors.green.shade50
-                                              : Colors.red.shade50,
+                                              ? Theme.of(context)
+                                                    .colorScheme
+                                                    .primary
+                                                    .withValues(alpha: 0.12)
+                                              : Theme.of(context)
+                                                    .colorScheme
+                                                    .error
+                                                    .withValues(alpha: 0.12),
                                           borderRadius: BorderRadius.circular(
                                             16,
                                           ),
@@ -1016,8 +1041,12 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
                                               : 'ปิดใช้งาน',
                                           style: TextStyle(
                                             color: item.isActive
-                                                ? Colors.green.shade700
-                                                : Colors.red.shade700,
+                                                ? Theme.of(context)
+                                                      .colorScheme
+                                                      .primary
+                                                : Theme.of(context)
+                                                      .colorScheme
+                                                      .error,
                                             fontWeight: FontWeight.w700,
                                           ),
                                         ),
@@ -1039,6 +1068,90 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
         const SizedBox(height: 10),
         Align(alignment: Alignment.centerLeft, child: _paginationBar()),
       ],
+    );
+  }
+
+  Widget _buildMobileCards(BuildContext context) {
+    return ListView.separated(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      itemCount: _visibleItems.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 10),
+      itemBuilder: (context, index) {
+        final item = _visibleItems[index];
+        final primary = Theme.of(context).colorScheme.primary;
+        final statusColor = item.isActive
+            ? primary
+            : Theme.of(context).colorScheme.error;
+        return Card(
+          margin: EdgeInsets.zero,
+          elevation: 2,
+          shadowColor: Colors.black26,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    if (widget.menuScope != WorkspaceMenuScope.support &&
+                        _canEdit)
+                      IconButton(
+                        tooltip: 'กำหนดผู้ดูแลระบบ',
+                        visualDensity: VisualDensity.compact,
+                        onPressed: () => _openAdminCredentials(item),
+                        icon: Icon(Icons.admin_panel_settings_outlined, color: primary),
+                      ),
+                    if (_canEdit)
+                      IconButton(
+                        tooltip: 'แก้ไข',
+                        visualDensity: VisualDensity.compact,
+                        onPressed: () => _openFullForm(existing: item),
+                        icon: Icon(Icons.edit_outlined, color: primary),
+                      ),
+                    if (_canDelete)
+                      IconButton(
+                        tooltip: 'ลบ',
+                        visualDensity: VisualDensity.compact,
+                        onPressed: () => _confirmDelete(item),
+                        icon: const Icon(Icons.delete_outline, color: Colors.red),
+                      ),
+                    const Spacer(),
+                    Text('ID ${item.companyId}  รหัส ${item.companyCode}'),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  item.companyNameTh,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Expanded(child: Text('โทรศัพท์ ${item.telephone ?? '-'}')),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: statusColor.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Text(
+                        item.isActive ? 'เปิดใช้งาน' : 'ปิดใช้งาน',
+                        style: TextStyle(
+                          color: statusColor,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -1080,7 +1193,7 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
           enabled: page < _pageCount - 1,
           onPressed: () => setState(() => _currentPage++),
         ),
-        Text('แสดง $first-$last จาก ${_items.length} รายการ'),
+        Text('$first-$last จาก ${_items.length}'),
       ],
     );
   }
@@ -1094,7 +1207,7 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
       final saved = await showDialog<bool>(
         context: context,
         builder: (dialogContext) {
-          final primary = Theme.of(dialogContext).colorScheme.primary;
+          final primary = workspaceThemeController.value.primary;
           String? dialogError;
           return StatefulBuilder(
             builder: (context, setDialogState) => AlertDialog(
@@ -1109,8 +1222,8 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
               title: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
-                decoration: const BoxDecoration(
-                  color: Color(0xFFF1F3F2),
+                decoration: BoxDecoration(
+                  color: primary.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
                 ),
                 child: Text(

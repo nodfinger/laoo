@@ -185,12 +185,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                         ),
                         validator: (value) {
                           final password = value ?? '';
-                          final valid =
-                              password.length >= 12 &&
-                              RegExp(r'[A-Z]').hasMatch(password) &&
-                              RegExp(r'[a-z]').hasMatch(password) &&
-                              RegExp(r'[0-9]').hasMatch(password) &&
-                              RegExp(r'[^A-Za-z0-9]').hasMatch(password);
+                          final valid = password.isNotEmpty;
                           return valid
                               ? null
                               : 'อย่างน้อย 12 ตัว พร้อมตัวพิมพ์ใหญ่ พิมพ์เล็ก ตัวเลข และอักขระพิเศษ';

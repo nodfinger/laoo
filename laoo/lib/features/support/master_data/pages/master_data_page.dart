@@ -4,6 +4,7 @@ import '../../../../core/widgets/auto_dismiss_message.dart';
 import '../../../../core/widgets/timed_snack_bar.dart';
 
 import '../../../../app/theme/laoo_typography.dart';
+import '../../../../app/theme/workspace_theme_presets.dart';
 import '../../../../core/company_setup/company_setup_controller.dart';
 import '../data/master_data_api.dart';
 import '../../../support/presentation/widgets/support_workspace_shell.dart';
@@ -466,89 +467,118 @@ class _MasterDataPageState extends State<MasterDataPage> {
 
   Widget _buildList(BuildContext context) {
     final theme = Theme.of(context);
+    final accent = workspaceThemeController.value.primary;
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: WorkspacePageTitle(
-                title: 'รหัสพื้นฐาน > ${_group.name}',
-                favoriteKey: '05002',
-              ),
-            ),
-            if (_canCreate)
-              FilledButton(
-                onPressed: _startAdd,
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size(100, LaooTypography.buttonHeight),
-                  alignment: Alignment.center,
-                ),
-                child: const Text('เพิ่ม'),
-              ),
-          ],
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxWidth < 600;
+            final title = WorkspacePageTitle(
+              title: 'รหัสพื้นฐาน > ${_group.name}',
+              favoriteKey: '05002',
+            );
+            final addButton = _canCreate
+                ? FilledButton.icon(
+                    onPressed: _startAdd,
+                    icon: const Icon(Icons.add),
+                    label: const Text('เพิ่ม'),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(
+                        100,
+                        LaooTypography.buttonHeight,
+                      ),
+                      alignment: Alignment.center,
+                    ),
+                  )
+                : null;
+
+            if (compact) {
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(child: title),
+                  if (addButton != null) ...[
+                    const SizedBox(width: 10),
+                    addButton,
+                  ],
+                ],
+              );
+            }
+
+            return Row(
+              children: [
+                Expanded(child: title),
+                if (addButton != null) addButton,
+              ],
+            );
+          },
         ),
         const SizedBox(height: 16),
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Padding(
-            padding: EdgeInsets.zero,
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    onSubmitted: (_) => _applySearch(),
-                    decoration: InputDecoration(
-                      prefixIcon: Icon(Icons.search),
-                      labelText: 'ค้นหารหัสหรือชื่อ',
-                      suffixIcon: IconButton(
-                        tooltip: 'ค้นหา',
-                        onPressed: _applySearch,
-                        icon: const Icon(Icons.arrow_forward),
-                      ),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxWidth < 600;
+            final search = TextField(
+              controller: _searchController,
+              onSubmitted: (_) => _applySearch(),
+              decoration: InputDecoration(
+                prefixIcon: const Icon(Icons.search),
+                labelText: 'ค้นหารหัสหรือชื่อ',
+                suffixIcon: IconButton(
+                  tooltip: 'ค้นหา',
+                  onPressed: _applySearch,
+                  icon: const Icon(Icons.arrow_forward),
+                ),
+              ),
+            );
+            final group = DropdownButtonFormField<String>(
+              initialValue: _selectedGroup,
+              decoration: const InputDecoration(labelText: 'กลุ่มข้อมูล'),
+              items: _groups
+                  .map(
+                    (item) => DropdownMenuItem(
+                      value: item.code,
+                      child: LaooComboBoxText('${item.code} - ${item.name}'),
                     ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                OutlinedButton.icon(
-                  onPressed: _clearFilters,
-                  icon: const Icon(Icons.filter_alt_off_outlined, size: 18),
-                  label: const Text('ล้าง Filter'),
-                ),
+                  )
+                  .toList(),
+              onChanged: _selectGroup,
+            );
+            if (compact) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  search,
+                  const SizedBox(height: 10),
+                  group,
+                ],
+              );
+            }
+
+            return Row(
+              children: [
+                Expanded(child: search),
                 const SizedBox(width: 14),
-                SizedBox(
-                  width: 280,
-                  child: DropdownButtonFormField<String>(
-                    initialValue: _selectedGroup,
-                    decoration: const InputDecoration(labelText: 'กลุ่มข้อมูล'),
-                    items: _groups
-                        .map(
-                          (item) => DropdownMenuItem(
-                            value: item.code,
-                            child: LaooComboBoxText(
-                              '${item.code} - ${item.name}',
-                            ),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: _selectGroup,
-                  ),
-                ),
+                SizedBox(width: 280, child: group),
               ],
-            ),
-          ),
+            );
+          },
         ),
         const SizedBox(height: 8),
         LayoutBuilder(
-          builder: (context, constraints) => Card(
-            margin: EdgeInsets.zero,
-            clipBehavior: Clip.antiAlias,
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minWidth: constraints.maxWidth),
-                child: DataTable(
+          builder: (context, constraints) {
+            if (constraints.maxWidth < 600) {
+              return _buildMobileCards(context);
+            }
+
+            return Card(
+              margin: EdgeInsets.zero,
+              clipBehavior: Clip.antiAlias,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                  child: DataTable(
                   sortColumnIndex: _sortColumn,
                   sortAscending: _sortAscending,
                   border: TableBorder(
@@ -560,14 +590,12 @@ class _MasterDataPageState extends State<MasterDataPage> {
                     ),
                   ),
                   headingRowColor: WidgetStatePropertyAll(
-                    theme.colorScheme.surfaceContainerHighest.withValues(
-                      alpha: .65,
-                    ),
+                    accent.withValues(alpha: .10),
                   ),
                   headingTextStyle: TextStyle(
                     fontSize: LaooTypography.tableHeader,
                     fontWeight: FontWeight.w700,
-                    color: theme.colorScheme.primary,
+                    color: accent,
                   ),
                   dataTextStyle: TextStyle(
                     fontSize: LaooTypography.tableBody,
@@ -609,7 +637,7 @@ class _MasterDataPageState extends State<MasterDataPage> {
                                       onPressed: () => _startEdit(row),
                                       icon: Icon(
                                         Icons.edit_outlined,
-                                        color: theme.colorScheme.primary,
+                                        color: accent,
                                       ),
                                     ),
                                   if (_canDelete)
@@ -633,10 +661,11 @@ class _MasterDataPageState extends State<MasterDataPage> {
                       ],
                     );
                   }).toList(),
+                  ),
                 ),
               ),
-            ),
-          ),
+            );
+          },
         ),
         const SizedBox(height: 10),
         _PaginationBar(
@@ -647,6 +676,114 @@ class _MasterDataPageState extends State<MasterDataPage> {
           onChanged: (page) => setState(() => _currentPage = page),
         ),
       ],
+    );
+  }
+
+  Widget _buildMobileCards(BuildContext context) {
+    final theme = Theme.of(context);
+    final accent = workspaceThemeController.value.primary;
+    final rows = _filteredRows;
+    if (rows.isEmpty) {
+      return Card(
+        margin: EdgeInsets.zero,
+        color: Colors.white,
+        elevation: 3,
+        shadowColor: Colors.black.withValues(alpha: .14),
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Center(
+            child: Text(
+              'ไม่พบข้อมูล',
+              style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      children: rows.asMap().entries.map((entry) {
+        final row = entry.value;
+        final number = (_currentPage * _pageSize) + entry.key + 1;
+        return Card(
+          margin: const EdgeInsets.only(bottom: 10),
+          color: Colors.white,
+          elevation: 3,
+          shadowColor: Colors.black.withValues(alpha: .14),
+          surfaceTintColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 10, 14),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'ลำดับแสดง: ${row.seq}  |  ID $number  |  ${row.code}',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        row.name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      if (row.shortCode.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          'รหัสย่อ: ${row.shortCode}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                if (_canEdit || _canDelete)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_canEdit)
+                        IconButton(
+                          tooltip: 'แก้ไข',
+                          onPressed: () => _startEdit(row),
+                          icon: Icon(
+                            Icons.edit_outlined,
+                            color: accent,
+                          ),
+                        ),
+                      if (_canDelete)
+                        IconButton(
+                          tooltip: 'ลบ',
+                          onPressed: () => _delete(row),
+                          icon: const Icon(
+                            Icons.delete_outline,
+                            color: Colors.red,
+                          ),
+                        ),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 
@@ -717,7 +854,7 @@ class _PaginationBar extends StatelessWidget {
           page + 1 < totalPages ? () => onChanged(page + 1) : null,
         ),
         Text(
-          'แสดง $start-$end จาก $totalItems รายการ',
+          '$start-$end จาก $totalItems',
           style: TextStyle(
             color: Theme.of(context).colorScheme.onSurfaceVariant,
             fontSize: LaooTypography.tableBody,
@@ -923,8 +1060,10 @@ class _MasterDataFormState extends State<_MasterDataForm> {
           const SizedBox(height: 18),
           Align(
             alignment: Alignment.centerRight,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
+            child: Wrap(
+              alignment: WrapAlignment.end,
+              spacing: 10,
+              runSpacing: 10,
               children: [
                 OutlinedButton(
                   style: OutlinedButton.styleFrom(
@@ -934,7 +1073,6 @@ class _MasterDataFormState extends State<_MasterDataForm> {
                   onPressed: _saving ? null : widget.onCancel,
                   child: const Text('ยกเลิก'),
                 ),
-                const SizedBox(width: 10),
                 if (widget.canSave)
                   FilledButton.icon(
                     style: FilledButton.styleFrom(

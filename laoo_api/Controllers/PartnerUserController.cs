@@ -50,15 +50,15 @@ ORDER BY Username;
         if (string.IsNullOrWhiteSpace(request.Username) ||
             string.IsNullOrWhiteSpace(request.Password) ||
             string.IsNullOrWhiteSpace(request.DisplayName))
-            return BadRequest(new { message = "กรุณาระบุ Username, Password และชื่อผู้ใช้งาน" });
-        if (!PasswordService.MeetsPolicy(request.Username.Trim(), request.Password))
-            return BadRequest(new { message = PasswordService.PolicyMessage });
-
+            return BadRequest(new { message = "เธเธฃเธธเธ“เธฒเธฃเธฐเธเธธ Username, Password เนเธฅเธฐเธเธทเนเธญเธเธนเนเนเธเนเธเธฒเธ" });
         await using var connection = await OpenAsync(cancellationToken);
+        var policyCode = await passwordService.GetPolicyAsync(connection, "P", partnerId, null, cancellationToken);
+        if (!PasswordService.MeetsPolicy(request.Username.Trim(), request.Password, policyCode))
+            return BadRequest(new { message = PasswordService.GetReadablePartnerPolicyMessage(policyCode) });
         if (!await HasPermissionAsync(connection, "CREATE", cancellationToken)) return Forbid();
-        if (!await PartnerExistsAsync(connection, partnerId, cancellationToken)) return NotFound(new { message = "ไม่พบ Partner" });
+        if (!await PartnerExistsAsync(connection, partnerId, cancellationToken)) return NotFound(new { message = "เนเธกเนเธเธ Partner" });
         if (request.IsPartnerAdmin && await HasActiveAdminAsync(connection, partnerId, cancellationToken))
-            return Conflict(new { message = "Partner นี้มี Partner Admin ที่ใช้งานอยู่แล้ว" });
+            return Conflict(new { message = "Partner เธเธตเนเธกเธต Partner Admin เธ—เธตเนเนเธเนเธเธฒเธเธญเธขเธนเนเนเธฅเนเธง" });
 
         var username = request.Username.Trim();
         const string sql = """
@@ -85,7 +85,7 @@ SELECT CAST(SCOPE_IDENTITY() AS BIGINT);
         }
         catch (SqlException ex) when (ex.Number is 2601 or 2627)
         {
-            return Conflict(new { message = "Username นี้ถูกใช้งานแล้ว" });
+            return Conflict(new { message = "Username เธเธตเนเธ–เธนเธเนเธเนเธเธฒเธเนเธฅเนเธง" });
         }
     }
 
@@ -93,11 +93,23 @@ SELECT CAST(SCOPE_IDENTITY() AS BIGINT);
     public async Task<IActionResult> Update(long id, PartnerUserUpsertRequest request, CancellationToken cancellationToken)
     {
         if (!await IsLaooSupportAsync(cancellationToken)) return Forbid();
-        if (string.IsNullOrWhiteSpace(request.DisplayName) || string.IsNullOrWhiteSpace(request.Username)) return BadRequest(new { message = "กรุณาระบุ Username และชื่อผู้ใช้งาน" });
-        if (!string.IsNullOrWhiteSpace(request.Password) &&
-            !PasswordService.MeetsPolicy(request.Username.Trim(), request.Password))
-            return BadRequest(new { message = PasswordService.PolicyMessage });
+        if (string.IsNullOrWhiteSpace(request.DisplayName) || string.IsNullOrWhiteSpace(request.Username)) return BadRequest(new { message = "เธเธฃเธธเธ“เธฒเธฃเธฐเธเธธ Username เนเธฅเธฐเธเธทเนเธญเธเธนเนเนเธเนเธเธฒเธ" });
         await using var connection = await OpenAsync(cancellationToken);
+        long? partnerId = long.TryParse(User.FindFirstValue("partner_id"), out var currentPartner) ? currentPartner : null;
+        if (!partnerId.HasValue)
+        {
+            await using var partnerLookup = new SqlCommand(
+                "SELECT PartnerID FROM dbo.TDADPartnerUser WHERE PartnerUserID=@ID",
+                connection);
+            partnerLookup.Parameters.Add("@ID", SqlDbType.BigInt).Value = id;
+            var partnerValue = await partnerLookup.ExecuteScalarAsync(cancellationToken);
+            if (partnerValue is not null && partnerValue != DBNull.Value)
+                partnerId = Convert.ToInt64(partnerValue);
+        }
+        var policyCode = await passwordService.GetPolicyAsync(connection, "P", partnerId, null, cancellationToken);
+        if (!string.IsNullOrWhiteSpace(request.Password) &&
+            !PasswordService.MeetsPolicy(request.Username.Trim(), request.Password, policyCode))
+            return BadRequest(new { message = PasswordService.GetReadablePartnerPolicyMessage(policyCode) });
         if (!await HasPermissionAsync(connection, "EDIT", cancellationToken)) return Forbid();
         var passwordSql = string.IsNullOrWhiteSpace(request.Password) ? "" : ", PasswordHash=@PasswordHash";
         const string sql = "UPDATE dbo.TDADPartnerUser SET Username=@Username,NormalizedUsername=@NormalizedUsername,DisplayName=@DisplayName,Email=@Email,MobileNumber=@MobileNumber,IsPartnerAdmin=@IsPartnerAdmin,IsActive=@IsActive,UpdatedUtc=SYSUTCDATETIME(),UpdatedBy=@UpdatedBy";
@@ -112,7 +124,7 @@ SELECT CAST(SCOPE_IDENTITY() AS BIGINT);
         }
         catch (SqlException ex) when (ex.Number is 2601 or 2627)
         {
-            return Conflict(new { message = "Username นี้ถูกใช้งานแล้ว" });
+            return Conflict(new { message = "Username เธเธตเนเธ–เธนเธเนเธเนเธเธฒเธเนเธฅเนเธง" });
         }
     }
 

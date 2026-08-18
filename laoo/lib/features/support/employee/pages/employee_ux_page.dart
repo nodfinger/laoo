@@ -830,13 +830,16 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
         ],
       ),
       const SizedBox(height: 12),
-      Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
+      LayoutBuilder(
+        builder: (context, constraints) => Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
           SizedBox(
-            width: 220,
+            width: constraints.maxWidth < 600
+                ? constraints.maxWidth
+                : 320,
             child: TextField(
               controller: searchController,
               onSubmitted: (_) => _searchEmployees(),
@@ -949,19 +952,6 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
                 },
               ),
             ),
-          OutlinedButton.icon(
-            onPressed: () {
-              searchController.clear();
-              setState(() {
-                filterDivisionId = null;
-                filterDepartmentId = null;
-                filterIsActive = null;
-              });
-              _searchEmployees();
-            },
-            icon: const Icon(Icons.filter_alt_off_outlined),
-            label: const Text('ล้าง Filter'),
-          ),
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -976,7 +966,8 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
               const Text('แสดงรูปพนักงาน'),
             ],
           ),
-        ],
+          ],
+        ),
       ),
       const SizedBox(height: 12),
       Expanded(
@@ -1055,7 +1046,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
           selected: _currentPage < _totalPages,
         ),
         const SizedBox(width: 8),
-        Text('แสดง $first-$last จาก $_totalCount รายการ'),
+        Text('$first-$last จาก $_totalCount'),
       ],
     );
   }
@@ -1067,6 +1058,9 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
+        if (constraints.maxWidth < 600) {
+          return _employeeMobileCards();
+        }
         final tableWidth = constraints.maxWidth < minTableWidth
             ? minTableWidth
             : constraints.maxWidth;
@@ -1214,7 +1208,8 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
                                       color: Colors.red,
                                     ),
                                   ),
-                                IconButton(
+                                if (_canEdit)
+                                  IconButton(
                                   tooltip: 'ผู้ใช้งาน',
                                   visualDensity: VisualDensity.compact,
                                   padding: EdgeInsets.zero,
@@ -1293,6 +1288,144 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
                   }).toList(),
                 ),
               ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _employeeMobileCards() {
+    final primary = workspaceThemeController.value.primary;
+    final surface = workspaceThemeController.value.surface;
+    final error = Theme.of(context).colorScheme.error;
+    return ListView.separated(
+      padding: const EdgeInsets.only(bottom: 8),
+      itemCount: rows.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 10),
+      itemBuilder: (context, index) {
+        final row = rows[index];
+        final employeeId = int.tryParse(row.$1) ?? 0;
+        return Card(
+          margin: EdgeInsets.zero,
+          color: surface,
+          surfaceTintColor: Colors.transparent,
+          elevation: 3,
+          shadowColor: primary.withValues(alpha: .18),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: BorderSide.none,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _employeeImageThumbnail(employeeId),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          if (_canEdit)
+                            IconButton(
+                              tooltip: 'แก้ไข',
+                              visualDensity: VisualDensity.compact,
+                              onPressed: () => _openEmployeeEdit(row.$4),
+                              icon: Icon(Icons.edit_outlined, color: primary),
+                            ),
+                          if (_canDelete)
+                            IconButton(
+                              tooltip: 'ลบ',
+                              visualDensity: VisualDensity.compact,
+                              onPressed: () => _deleteEmployee(row.$4),
+                              icon: Icon(Icons.delete_outline, color: error),
+                            ),
+                          if (_canEdit)
+                            IconButton(
+                              tooltip: 'ผู้ใช้งาน',
+                              visualDensity: VisualDensity.compact,
+                              onPressed: () =>
+                                  _openEmployeeUserForm(row.$1, row.$5),
+                              icon: Icon(
+                                Icons.person_add_alt_1_outlined,
+                                color: primary,
+                              ),
+                            ),
+                          Expanded(
+                            child: Text(
+                              row.$4,
+                              style: TextStyle(
+                                color: primary,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            row.$2,
+                            style: TextStyle(
+                              color: row.$2 == 'ปกติ' ? primary : error,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        row.$5,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              row.$6,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              row.$7,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.right,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                if (false)
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_canEdit)
+                        IconButton(
+                          tooltip: 'แก้ไข',
+                          visualDensity: VisualDensity.compact,
+                          onPressed: () => _openEmployeeEdit(row.$4),
+                          icon: Icon(Icons.edit_outlined, color: primary),
+                        ),
+                      if (_canDelete)
+                        IconButton(
+                          tooltip: 'ลบ',
+                          visualDensity: VisualDensity.compact,
+                          onPressed: () => _deleteEmployee(row.$4),
+                          icon: Icon(Icons.delete_outline, color: error),
+                        ),
+                    ],
+                  ),
+              ],
             ),
           ),
         );
@@ -2278,12 +2411,13 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
     }
     var saving = false;
     String? errorMessage;
+    final preset = workspaceThemeController.value;
     final saved = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => Dialog(
-          backgroundColor: Colors.white,
+          backgroundColor: preset.surface,
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 440),
             child: Column(
@@ -2292,9 +2426,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
               children: [
                 Container(
                   padding: const EdgeInsets.fromLTRB(20, 16, 12, 16),
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.primary.withValues(alpha: 0.12),
+                  color: preset.primary.withValues(alpha: 0.12),
                   child: Row(
                     children: [
                       Expanded(
@@ -2305,9 +2437,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
                               'ผู้ใช้งาน',
                               style: Theme.of(context).textTheme.titleMedium
                                   ?.copyWith(
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.primary,
+                                    color: preset.primary,
                                     fontWeight: FontWeight.w700,
                                   ),
                             ),
@@ -2357,7 +2487,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
                         initialValue: selectedRoleGroupId,
                         style: TextStyle(
                           fontSize: 13,
-                          color: Theme.of(context).colorScheme.onSurface,
+                          color: preset.textPrimary,
                         ),
                         decoration: const InputDecoration(
                           labelText: 'กลุ่มสิทธิ์ *',
@@ -2395,10 +2525,14 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
                 ),
                 Container(
                   padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
-                  color: Colors.white,
+                  color: preset.surface,
                   child: Align(
                     alignment: Alignment.centerRight,
                     child: FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: preset.primary,
+                        foregroundColor: preset.surface,
+                      ),
                       onPressed: saving
                           ? null
                           : () async {

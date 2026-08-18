@@ -82,6 +82,25 @@ class _PartnerUserPageState extends State<PartnerUserPage> {
     }
   }
 
+  Future<void> _edit(Map<String, dynamic> item) async {
+    final id = (item['partnerUserId'] as num?)?.toInt();
+    if (id == null) return;
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (_) => _PartnerUserDialog(initial: item, editMode: true),
+    );
+    if (result == null) return;
+    result['email'] = item['email'];
+    result['mobileNumber'] = item['mobileNumber'];
+    try {
+      await _users.update(id, result);
+      await _loadUsers();
+      if (mounted) _showMessage('แก้ไขบัญชี Partner สำเร็จ', error: false);
+    } catch (error) {
+      if (mounted) _showMessage(_message(error), error: true);
+    }
+  }
+
   void _showMessage(String message, {required bool error}) {
     if (!mounted) return;
     setState(() {
@@ -180,9 +199,19 @@ class _PartnerUserPageState extends State<PartnerUserPage> {
                                 ? 'Partner Admin'
                                 : 'ผู้ใช้งาน',
                           ),
-                          trailing: Icon(
-                            active ? Icons.check_circle : Icons.block,
-                            color: active ? Colors.green : Colors.red,
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                tooltip: 'แก้ไข',
+                                onPressed: _loading ? null : () => _edit(item),
+                                icon: const Icon(Icons.edit_outlined),
+                              ),
+                              Icon(
+                                active ? Icons.check_circle : Icons.block,
+                                color: active ? Colors.green : Colors.red,
+                              ),
+                            ],
                           ),
                         );
                       },
@@ -196,7 +225,10 @@ class _PartnerUserPageState extends State<PartnerUserPage> {
 }
 
 class _PartnerUserDialog extends StatefulWidget {
-  const _PartnerUserDialog();
+  const _PartnerUserDialog({this.initial, this.editMode = false});
+
+  final Map<String, dynamic>? initial;
+  final bool editMode;
 
   @override
   State<_PartnerUserDialog> createState() => _PartnerUserDialogState();
@@ -207,6 +239,17 @@ class _PartnerUserDialogState extends State<_PartnerUserDialog> {
   final _password = TextEditingController();
   final _display = TextEditingController();
   bool _admin = true;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.initial;
+    if (initial != null) {
+      _username.text = initial['username']?.toString() ?? '';
+      _display.text = initial['displayName']?.toString() ?? '';
+      _admin = initial['isPartnerAdmin'] == true;
+    }
+  }
 
   @override
   void dispose() {
@@ -220,8 +263,11 @@ class _PartnerUserDialogState extends State<_PartnerUserDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('เพิ่มผู้ใช้งาน Partner'),
-      content: SizedBox(
-        width: 420,
+      content: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.sizeOf(context).width - 48,
+          minWidth: 280,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -233,7 +279,13 @@ class _PartnerUserDialogState extends State<_PartnerUserDialog> {
             TextField(
               controller: _password,
               obscureText: true,
-              decoration: const InputDecoration(labelText: 'Password'),
+              decoration: InputDecoration(
+                labelText: widget.editMode
+                    ? 'Password ใหม่ (เว้นว่างถ้าไม่เปลี่ยน)'
+                    : 'Password',
+                helperText:
+                    'อย่างน้อย 6 ตัว: พิมพ์ใหญ่ พิมพ์เล็ก และอักขระพิเศษ',
+              ),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -257,17 +309,18 @@ class _PartnerUserDialogState extends State<_PartnerUserDialog> {
         FilledButton(
           onPressed: () {
             if (_username.text.trim().isEmpty ||
-                _password.text.isEmpty ||
+                (!widget.editMode && _password.text.isEmpty) ||
                 _display.text.trim().isEmpty) {
               return;
             }
-            Navigator.pop(context, {
+            final body = <String, dynamic>{
               'username': _username.text.trim(),
-              'password': _password.text,
               'displayName': _display.text.trim(),
               'isPartnerAdmin': _admin,
               'isActive': true,
-            });
+            };
+            if (_password.text.isNotEmpty) body['password'] = _password.text;
+            Navigator.pop(context, body);
           },
           child: const Text('บันทึก'),
         ),

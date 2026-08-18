@@ -15,6 +15,7 @@ class CompanySetupModel {
     required this.rowCardStd,
     required this.timeAlert,
     required this.orgStructureType,
+    required this.passwordPolicyCode,
     required this.isActive,
     required this.hasSuperUser,
     required this.hasPasswordCry,
@@ -54,6 +55,7 @@ class CompanySetupModel {
   final int rowCardStd;
   final int timeAlert;
   final int orgStructureType;
+  final int passwordPolicyCode;
   final String? yearFormat;
   final String? versionId;
   final String? emailHost;
@@ -98,6 +100,7 @@ class CompanySetupModel {
           asInt(json['rowCardSTD']) ?? asInt(json['rowCardStd']) ?? 30,
       timeAlert: asInt(json['timeAlert']) ?? 30,
       orgStructureType: asInt(json['orgStructureType']) ?? 1,
+      passwordPolicyCode: asInt(json['passwordPolicyCode']) ?? 3,
       yearFormat: json['yearFormat']?.toString(),
       versionId: json['versionID']?.toString() ?? json['versionId']?.toString(),
       emailHost: json['emailHost']?.toString(),
@@ -132,6 +135,7 @@ class CompanySetupUpdateInput {
     required this.rowCardStd,
     required this.timeAlert,
     required this.orgStructureType,
+    this.passwordPolicyCode = 3,
     this.yearFormat,
     this.versionId,
     this.emailHost,
@@ -157,6 +161,7 @@ class CompanySetupUpdateInput {
   final int rowCardStd;
   final int timeAlert;
   final int orgStructureType;
+  final int passwordPolicyCode;
   final String? yearFormat;
   final String? versionId;
   final String? emailHost;
@@ -182,6 +187,7 @@ class CompanySetupUpdateInput {
         'rowCardSTD': rowCardStd,
         'timeAlert': timeAlert,
         'orgStructureType': orgStructureType,
+        'passwordPolicyCode': passwordPolicyCode,
         'yearFormat': yearFormat,
         'versionID': versionId,
         'emailHost': emailHost,

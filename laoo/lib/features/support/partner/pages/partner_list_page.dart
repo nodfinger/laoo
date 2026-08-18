@@ -200,6 +200,7 @@ class _PartnerListPageState extends State<PartnerListPage> {
                     favoriteKey: 'Partner',
                   ),
                 ),
+                const SizedBox(width: 10),
                 FilledButton.icon(
                   onPressed: () async {
                     await widget.openCreate();
@@ -606,7 +607,7 @@ class _PartnerListPageState extends State<PartnerListPage> {
           child: const Text('ถัดไป'),
         ),
         Text(
-          'แสดง $firstRow-$lastRow จาก ${_partners.length} รายการ',
+          '$firstRow-$lastRow จาก ${_partners.length}',
           style: const TextStyle(color: LaooColors.textSecondary),
         ),
       ],
@@ -813,62 +814,76 @@ class _PartnerListPageState extends State<PartnerListPage> {
         final partner = _visiblePartners[index];
         return Card(
           margin: EdgeInsets.zero,
-          elevation: 0,
+          color: Colors.white,
+          elevation: 3,
+          shadowColor: Colors.black.withValues(alpha: .14),
+          surfaceTintColor: Colors.transparent,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(LaooRadius.md),
-            side: const BorderSide(color: LaooColors.border),
+            side: BorderSide.none,
           ),
           child: Padding(
             padding: const EdgeInsets.all(14),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                IconButton(
-                  tooltip: 'แก้ไข',
-                  onPressed: () async {
-                    final updated = await widget.openEdit(partner);
-                    if (updated) {
-                      await _load();
-                      if (mounted) {
-                        _showMessage('แก้ไขข้อมูล Partner สำเร็จ');
-                      }
-                    }
-                  },
-                  icon: Icon(
-                    Icons.edit_outlined,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                ),
-                IconButton(
-                  tooltip: 'ลบ',
-                  onPressed: () => _confirmDelete(partner),
-                  icon: const Icon(
-                    Icons.delete_outline_rounded,
-                    color: LaooColors.error,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        partner.partnerNameTh,
-                        style: const TextStyle(fontWeight: FontWeight.w800),
+                Row(
+                  children: [
+                    IconButton(
+                      tooltip: 'แก้ไข',
+                      onPressed: () async {
+                        final updated = await widget.openEdit(partner);
+                        if (updated) {
+                          await _load();
+                          if (mounted) {
+                            _showMessage('แก้ไขข้อมูล Partner สำเร็จ');
+                          }
+                        }
+                      },
+                      icon: Icon(
+                        Icons.edit_outlined,
+                        color: Theme.of(context).colorScheme.primary,
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        partner.partnerCode,
-                        style: const TextStyle(color: LaooColors.textSecondary),
+                    ),
+                    IconButton(
+                      tooltip: 'ลบ',
+                      onPressed: () => _confirmDelete(partner),
+                      icon: const Icon(
+                        Icons.delete_outline_rounded,
+                        color: LaooColors.error,
                       ),
-                      if (partner.partnerAdminUsername != null) ...[
-                        const SizedBox(height: 4),
-                        Text('Admin: ${partner.partnerAdminUsername}'),
-                      ],
-                      const SizedBox(height: 8),
-                      _StatusChip(active: partner.isActive),
-                    ],
-                  ),
+                    ),
+                    const Spacer(),
+                    _StatusChip(active: partner.isActive),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '${partner.partnerCode} - ${partner.partnerNameTh}',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Admin: ${partner.partnerAdminUsername ?? '-'}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        partner.contactPhone1 ?? '-',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.right,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -967,7 +982,8 @@ class _StatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = active ? LaooColors.success : LaooColors.error;
+    final scheme = Theme.of(context).colorScheme;
+    final color = active ? scheme.primary : scheme.error;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
@@ -1031,6 +1047,7 @@ class _PartnerAdminDialog extends StatefulWidget {
 class _PartnerAdminDialogState extends State<_PartnerAdminDialog> {
   late final TextEditingController _username;
   final _password = TextEditingController();
+  bool _obscurePassword = true;
   String? _error;
 
   @override
@@ -1050,6 +1067,7 @@ class _PartnerAdminDialogState extends State<_PartnerAdminDialog> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Dialog(
+      backgroundColor: Colors.white,
       clipBehavior: Clip.antiAlias,
       insetPadding: const EdgeInsets.all(24),
       child: ConstrainedBox(
@@ -1079,18 +1097,34 @@ class _PartnerAdminDialogState extends State<_PartnerAdminDialog> {
                   const SizedBox(height: 12),
                   TextField(
                     controller: _password,
-                    obscureText: true,
+                    obscureText: _obscurePassword,
                     decoration: _fieldDecoration(
                       widget.editing
                           ? 'Password ใหม่ (เว้นว่างได้)'
                           : 'Password',
+                      suffixIcon: IconButton(
+                        tooltip: _obscurePassword
+                            ? 'แสดง Password'
+                            : 'ซ่อน Password',
+                        onPressed: () {
+                          setState(() {
+                            _obscurePassword = !_obscurePassword;
+                          });
+                        },
+                        icon: Icon(
+                          _obscurePassword
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 8),
                   const Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
-                      'แนะนำให้ใช้รหัสชั่วคราวและเปลี่ยนหลัง Login ครั้งแรก',
+                      'Password ใหม่ต้องมีอย่างน้อย 6 ตัวอักษร พร้อมตัวพิมพ์ใหญ่ ตัวพิมพ์เล็ก และอักขระพิเศษ',
+                      style: TextStyle(fontSize: 12),
                     ),
                   ),
                   if (_error != null) ...[
@@ -1140,7 +1174,7 @@ class _PartnerAdminDialogState extends State<_PartnerAdminDialog> {
     Navigator.pop(context, (username, password));
   }
 
-  InputDecoration _fieldDecoration(String label) {
+  InputDecoration _fieldDecoration(String label, {Widget? suffixIcon}) {
     final color = Theme.of(context).colorScheme;
     final border = OutlineInputBorder(
       borderRadius: BorderRadius.circular(10),
@@ -1154,6 +1188,7 @@ class _PartnerAdminDialogState extends State<_PartnerAdminDialog> {
         borderRadius: BorderRadius.circular(10),
         borderSide: BorderSide(color: color.primary, width: 2),
       ),
+      suffixIcon: suffixIcon,
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
     );
   }

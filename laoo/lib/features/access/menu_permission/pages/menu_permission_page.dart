@@ -468,7 +468,13 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
     ),
   );
 
-  Widget _table(BuildContext context) => SingleChildScrollView(
+  Widget _table(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 600) {
+          return _mobileCards(context);
+        }
+        return SingleChildScrollView(
     padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
     child: Container(
       width: double.infinity,
@@ -490,7 +496,89 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
         rows: _tableRows(),
       ),
     ),
-  );
+        );
+      },
+    );
+  }
+
+  Widget _mobileCards(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
+    final surface = Theme.of(context).colorScheme.surface;
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+      itemCount: _filteredRows.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 10),
+      itemBuilder: (context, index) {
+        final row = _filteredRows[index];
+        final actions = <(String, String, bool)>[
+          ('ดู', 'VIEW', row.canView),
+          ('เพิ่ม', 'CREATE', row.canCreate),
+          ('แก้ไข', 'EDIT', row.canEdit),
+          ('ลบ', 'DELETE', row.canDelete),
+        ];
+        return Card(
+          margin: EdgeInsets.zero,
+          color: surface,
+          surfaceTintColor: Colors.transparent,
+          elevation: 3,
+          shadowColor: primary.withValues(alpha: .18),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: BorderSide.none,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 10, 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  row.menuName,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                if (row.menuGroupName.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    row.menuGroupName,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: actions.map((action) {
+                    final enabled = _visible(row.screenType, action.$2);
+                    return Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Checkbox(
+                          value: action.$3,
+                          onChanged: enabled
+                              ? (value) => _change(row, action.$2, value ?? false)
+                              : null,
+                          activeColor: primary,
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        Text(action.$1),
+                      ],
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
   List<DataRow> _tableRows() {
     final result = <DataRow>[];
     String? lastGroup;

@@ -4,6 +4,7 @@ import '../../../../core/widgets/combo_box_text.dart';
 
 import '../../../../core/navigation/navigation_menu_repository.dart';
 import '../../../../app/theme/laoo_typography.dart';
+import '../../../../app/theme/workspace_theme_presets.dart';
 import '../../../partner/data/partner_company_repository.dart';
 import '../../../partner/models/partner_company.dart';
 import '../../presentation/widgets/support_workspace_shell.dart';
@@ -174,7 +175,6 @@ class _BranchPageState extends State<BranchPage> {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     final content = _showAction
         ? _actionScreen(context)
         : Padding(
@@ -200,8 +200,8 @@ class _BranchPageState extends State<BranchPage> {
                 ),
                 const SizedBox(height: 12),
                 Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+                  spacing: 12,
+                  runSpacing: 12,
                   children: [
                     SizedBox(
                       width: 330,
@@ -218,7 +218,6 @@ class _BranchPageState extends State<BranchPage> {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
                     SizedBox(
                       width: 150,
                       child: DropdownButtonFormField<String>(
@@ -244,9 +243,8 @@ class _BranchPageState extends State<BranchPage> {
                         }),
                       ),
                     ),
-                    const SizedBox(width: 8),
                     SizedBox(
-                      width: 220,
+                      width: 280,
                       child: DropdownButtonFormField<int?>(
                         initialValue: _companyFilterId,
                         decoration: const InputDecoration(labelText: 'ลูกค้า'),
@@ -268,8 +266,7 @@ class _BranchPageState extends State<BranchPage> {
                         },
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    OutlinedButton.icon(
+                    if (false) OutlinedButton.icon(
                       onPressed: () {
                         _search.clear();
                         setState(() {
@@ -295,7 +292,9 @@ class _BranchPageState extends State<BranchPage> {
                 if (_loading) const LinearProgressIndicator(),
                 if (!_loading)
                   Expanded(
-                    child: LayoutBuilder(
+                    child: MediaQuery.sizeOf(context).width < 600
+                        ? _buildMobileCards(context)
+                        : LayoutBuilder(
                       builder: (context, constraints) => SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         child: ConstrainedBox(
@@ -325,10 +324,10 @@ class _BranchPageState extends State<BranchPage> {
                               columnSpacing: 12,
                               dividerThickness: 1,
                               headingRowColor: WidgetStatePropertyAll(
-                                scheme.primary.withValues(alpha: .12),
+                                workspaceThemeController.value.primary.withValues(alpha: .12),
                               ),
                               headingTextStyle: TextStyle(
-                                color: Theme.of(context).colorScheme.primary,
+                                color: workspaceThemeController.value.primary,
                                 fontWeight: FontWeight.w700,
                               ),
                               sortColumnIndex: _sortColumnIndex,
@@ -437,9 +436,7 @@ class _BranchPageState extends State<BranchPage> {
                                           vertical: 6,
                                         ),
                                         decoration: BoxDecoration(
-                                          color: x['isActive'] == true
-                                              ? Colors.green.shade50
-                                              : Colors.red.shade50,
+                                          color: workspaceThemeController.value.primary.withValues(alpha: .12),
                                           borderRadius: BorderRadius.circular(
                                             16,
                                           ),
@@ -449,9 +446,7 @@ class _BranchPageState extends State<BranchPage> {
                                               ? 'เปิดใช้งาน'
                                               : 'ปิดใช้งาน',
                                           style: TextStyle(
-                                            color: x['isActive'] == true
-                                                ? Colors.green.shade700
-                                                : Colors.red.shade700,
+                                            color: workspaceThemeController.value.primary,
                                             fontWeight: FontWeight.w700,
                                           ),
                                         ),
@@ -502,7 +497,7 @@ class _BranchPageState extends State<BranchPage> {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          'แสดง ${_currentPage * _pageSize + 1}-${((_currentPage + 1) * _pageSize).clamp(0, _filteredItems.length)} จาก ${_filteredItems.length} รายการ',
+                          '${_currentPage * _pageSize + 1}-${((_currentPage + 1) * _pageSize).clamp(0, _filteredItems.length)} จาก ${_filteredItems.length}',
                         ),
                       ],
                     ),
@@ -510,11 +505,89 @@ class _BranchPageState extends State<BranchPage> {
               ],
             ),
           );
-    return SupportWorkspaceShell(
-      menuScope: widget.menuScope,
-      pageTitle: _menuName,
-      activeMenu: 'partnerBranches',
-      child: content,
+    return ValueListenableBuilder<WorkspaceThemePreset>(
+      valueListenable: workspaceThemeController,
+      builder: (_, _, _) => SupportWorkspaceShell(
+        menuScope: widget.menuScope,
+        pageTitle: _menuName,
+        activeMenu: 'partnerBranches',
+        child: content,
+      ),
+    );
+  }
+
+  Widget _buildMobileCards(BuildContext context) {
+    final primary = workspaceThemeController.value.primary;
+    return ListView.separated(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      itemCount: _visibleItems.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 10),
+      itemBuilder: (context, index) {
+        final item = _visibleItems[index];
+        final statusColor = primary;
+        return Card(
+          margin: EdgeInsets.zero,
+          elevation: 2,
+          shadowColor: Colors.black26,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    if (_canEdit)
+                      IconButton(
+                        tooltip: 'แก้ไข',
+                        visualDensity: VisualDensity.compact,
+                        onPressed: () => _form(item),
+                        icon: Icon(Icons.edit_outlined, color: primary),
+                      ),
+                    if (_canDelete)
+                      IconButton(
+                        tooltip: 'ลบ',
+                        visualDensity: VisualDensity.compact,
+                        onPressed: () => _delete(item),
+                        icon: const Icon(Icons.delete_outline, color: Colors.red),
+                      ),
+                    const Spacer(),
+                    Text('ID ${item['branchId']} | ${item['companyName']}'),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '${item['branchCode']} | ${item['branchNameTh']}',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Expanded(child: Text('${item['contName'] ?? '-'}')),
+                    Expanded(child: Text('${item['contPhone'] ?? '-'}')),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: statusColor.withValues(alpha: .12),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Text(
+                        item['isActive'] == true ? 'เปิดใช้งาน' : 'ปิดใช้งาน',
+                        style: TextStyle(
+                          color: statusColor,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

@@ -96,7 +96,7 @@ public sealed class EmployeeController(IConfiguration configuration, PasswordSer
     {
         var scope = ResolveScope(x.CompanyId); if (scope is null) return Forbid();
         if (string.IsNullOrWhiteSpace(x.EmployeeCode) || string.IsNullOrWhiteSpace(x.FullName))
-            return BadRequest(new { message = "กรุณากรอกรหัสพนักงานและชื่อ-นามสกุล" });
+            return BadRequest(new { message = "เธเธฃเธธเธ“เธฒเธเธฃเธญเธเธฃเธซเธฑเธชเธเธเธฑเธเธเธฒเธเนเธฅเธฐเธเธทเนเธญ-เธเธฒเธกเธชเธเธธเธฅ" });
         await using var c = await Open(token);
         if (!await Allowed(c, id is null ? "CREATE" : "EDIT", token)) return Forbid();
         const string sql = """
@@ -121,8 +121,8 @@ public sealed class EmployeeController(IConfiguration configuration, PasswordSer
         Add(cmd, "@carId2", SqlDbType.NVarChar, x.CarID2, 50); Add(cmd, "@carColor2", SqlDbType.NVarChar, x.CarColor2, 100); Add(cmd, "@carType2", SqlDbType.NVarChar, x.CarTypeCode2, 50); Add(cmd, "@carOil2", SqlDbType.NVarChar, x.CarOilType2, 50);
         cmd.Parameters.Add("@active", SqlDbType.Bit).Value = x.IsActive;
         try { var savedId = Convert.ToInt64(await cmd.ExecuteScalarAsync(token)); return Ok(new { employeeId = savedId }); }
-        catch (SqlException ex) when (ex.Number == 50001) { return Conflict(new { message = "รหัสพนักงานซ้ำ" }); }
-        catch (SqlException ex) when (ex.Number is 50002 or 50003) { return BadRequest(new { message = "ฝ่ายหรือแผนกไม่ถูกต้อง" }); }
+        catch (SqlException ex) when (ex.Number == 50001) { return Conflict(new { message = "เธฃเธซเธฑเธชเธเธเธฑเธเธเธฒเธเธเนเธณ" }); }
+        catch (SqlException ex) when (ex.Number is 50002 or 50003) { return BadRequest(new { message = "เธเนเธฒเธขเธซเธฃเธทเธญเนเธเธเธเนเธกเนเธ–เธนเธเธ•เนเธญเธ" }); }
     }
 
     [HttpGet("{id:long}/image")]
@@ -144,10 +144,10 @@ public sealed class EmployeeController(IConfiguration configuration, PasswordSer
     public async Task<IActionResult> SaveImage(long id, EmployeeImageUpsertRequest request, CancellationToken token)
     {
         var scope = ResolveScope(request.CompanyId); if (scope is null) return Forbid();
-        if (!string.Equals(request.ImageType, "FORMAL", StringComparison.OrdinalIgnoreCase)) return BadRequest(new { message = "รองรับเฉพาะรูปแบบเป็นทางการ" });
+        if (!string.Equals(request.ImageType, "FORMAL", StringComparison.OrdinalIgnoreCase)) return BadRequest(new { message = "เธฃเธญเธเธฃเธฑเธเน€เธเธเธฒเธฐเธฃเธนเธเนเธเธเน€เธเนเธเธ—เธฒเธเธเธฒเธฃ" });
         byte[] bytes;
-        try { bytes = Convert.FromBase64String(request.ImageDataBase64); } catch (FormatException) { return BadRequest(new { message = "ข้อมูลรูปภาพไม่ถูกต้อง" }); }
-        if (bytes.Length == 0 || bytes.Length > 102400) return BadRequest(new { message = "รูปภาพต้องมีขนาดไม่เกิน 100 KB" });
+        try { bytes = Convert.FromBase64String(request.ImageDataBase64); } catch (FormatException) { return BadRequest(new { message = "เธเนเธญเธกเธนเธฅเธฃเธนเธเธ เธฒเธเนเธกเนเธ–เธนเธเธ•เนเธญเธ" }); }
+        if (bytes.Length == 0 || bytes.Length > 102400) return BadRequest(new { message = "เธฃเธนเธเธ เธฒเธเธ•เนเธญเธเธกเธตเธเธเธฒเธ”เนเธกเนเน€เธเธดเธ 100 KB" });
         await using var c = await Open(token); if (!await Allowed(c, "EDIT", token)) return Forbid();
         const string sql = """
 IF NOT EXISTS (SELECT 1 FROM dbo.TDADEmployee WHERE EmployeeID=@id AND PartnerID=@partner AND ((@company IS NULL AND CompanyID IS NULL) OR CompanyID=@company)) THROW 50006,'EMPLOYEE_NOT_FOUND',1;
@@ -165,7 +165,7 @@ VALUES(@id,N'FORMAL',@data,@type,@name,@size,@width,@height,1,SYSUTCDATETIME());
     [HttpGet("{id:long}/car-image/{carNo:int}")]
     public async Task<IActionResult> GetCarImage(long id, int carNo, [FromQuery] long? companyId, CancellationToken token)
     {
-        if (carNo is < 1 or > 2) return BadRequest(new { message = "CarNo ต้องเป็น 1 หรือ 2" });
+        if (carNo is < 1 or > 2) return BadRequest(new { message = "CarNo เธ•เนเธญเธเน€เธเนเธ 1 เธซเธฃเธทเธญ 2" });
         var scope = ResolveScope(companyId); if (scope is null) return Forbid();
         await using var c = await Open(token);
         const string sql = "SELECT TOP 1 I.ImageData,I.ContentType,I.FileName,I.ImageWidth,I.ImageHeight FROM dbo.TDADEmployeeCarImage I INNER JOIN dbo.TDADEmployee E ON E.EmployeeID=I.EmployeeID WHERE I.EmployeeID=@id AND I.CarNo=@carNo AND ISNULL(I.IsActive,1)=1 AND DATALENGTH(I.ImageData)>0 AND E.PartnerID=@partner AND ((@company IS NULL AND E.CompanyID IS NULL) OR E.CompanyID=@company)";
@@ -182,11 +182,11 @@ VALUES(@id,N'FORMAL',@data,@type,@name,@size,@width,@height,1,SYSUTCDATETIME());
     [HttpPut("{id:long}/car-image/{carNo:int}")]
     public async Task<IActionResult> SaveCarImage(long id, int carNo, EmployeeCarImageUpsertRequest request, CancellationToken token)
     {
-        if (carNo is < 1 or > 2 || request.CarNo != carNo) return BadRequest(new { message = "CarNo ต้องเป็น 1 หรือ 2" });
+        if (carNo is < 1 or > 2 || request.CarNo != carNo) return BadRequest(new { message = "CarNo เธ•เนเธญเธเน€เธเนเธ 1 เธซเธฃเธทเธญ 2" });
         var scope = ResolveScope(request.CompanyId); if (scope is null) return Forbid();
         byte[] bytes;
-        try { bytes = Convert.FromBase64String(request.ImageDataBase64); } catch (FormatException) { return BadRequest(new { message = "ข้อมูลรูปรถไม่ถูกต้อง" }); }
-        if (bytes.Length == 0 || bytes.Length > 102400) return BadRequest(new { message = "รูปรถต้องมีขนาดไม่เกิน 100 KB" });
+        try { bytes = Convert.FromBase64String(request.ImageDataBase64); } catch (FormatException) { return BadRequest(new { message = "เธเนเธญเธกเธนเธฅเธฃเธนเธเธฃเธ–เนเธกเนเธ–เธนเธเธ•เนเธญเธ" }); }
+        if (bytes.Length == 0 || bytes.Length > 102400) return BadRequest(new { message = "เธฃเธนเธเธฃเธ–เธ•เนเธญเธเธกเธตเธเธเธฒเธ”เนเธกเนเน€เธเธดเธ 100 KB" });
         await using var c = await Open(token); if (!await Allowed(c, "EDIT", token)) return Forbid();
         const string sql = """
 IF NOT EXISTS (SELECT 1 FROM dbo.TDADEmployee WHERE EmployeeID=@id AND PartnerID=@partner AND ((@company IS NULL AND CompanyID IS NULL) OR CompanyID=@company)) THROW 50006,'EMPLOYEE_NOT_FOUND',1;
@@ -204,7 +204,7 @@ VALUES(@id,@carNo,@data,@type,@name,@size,@width,@height,1,SYSUTCDATETIME());
     [HttpDelete("{id:long}/car-image/{carNo:int}")]
     public async Task<IActionResult> DeleteCarImage(long id, int carNo, [FromQuery] long? companyId, CancellationToken token)
     {
-        if (carNo is < 1 or > 2) return BadRequest(new { message = "CarNo ต้องเป็น 1 หรือ 2" });
+        if (carNo is < 1 or > 2) return BadRequest(new { message = "CarNo เธ•เนเธญเธเน€เธเนเธ 1 เธซเธฃเธทเธญ 2" });
         var scope = ResolveScope(companyId); if (scope is null) return Forbid();
         await using var c = await Open(token); if (!await Allowed(c, "EDIT", token)) return Forbid();
         const string sql = "DELETE I FROM dbo.TDADEmployeeCarImage I INNER JOIN dbo.TDADEmployee E ON E.EmployeeID=I.EmployeeID WHERE I.EmployeeID=@id AND I.CarNo=@carNo AND E.PartnerID=@partner AND ((@company IS NULL AND E.CompanyID IS NULL) OR E.CompanyID=@company)";
@@ -242,15 +242,15 @@ WHERE E.EmployeeID=@id AND E.PartnerID=@partner AND ((@company IS NULL AND E.Com
     [HttpPut("{id:long}/user")]
     public async Task<IActionResult> UpsertEmployeeUser(long id, EmployeeUserUpsertRequest request, CancellationToken token)
     {
-        if (string.IsNullOrWhiteSpace(request.Username)) return BadRequest(new { message = "กรุณาระบุ Username" });
+        if (string.IsNullOrWhiteSpace(request.Username)) return BadRequest(new { message = "เธเธฃเธธเธ“เธฒเธฃเธฐเธเธธ Username" });
         var username = request.Username.Trim();
-        if (username.Length > 100) return BadRequest(new { message = "Username ต้องไม่เกิน 100 ตัวอักษร" });
-        if (!string.IsNullOrWhiteSpace(request.Password) &&
-            !PasswordService.MeetsPolicy(username, request.Password))
-            return BadRequest(new { message = PasswordService.PolicyMessage });
+        if (username.Length > 100) return BadRequest(new { message = "Username เธ•เนเธญเธเนเธกเนเน€เธเธดเธ 100 เธ•เธฑเธงเธญเธฑเธเธฉเธฃ" });
         var scope = ResolveScope(request.CompanyId); if (scope is null) return Forbid();
         if (!long.TryParse(User.FindFirstValue("project_id"), out var projectId)) return Forbid();
         await using var c = await Open(token); if (!await Allowed(c, "EDIT", token)) return Forbid();
+        var policyCode = await passwordService.GetPolicyAsync(c, scope.Value.CompanyId is null ? "P" : "C", scope.Value.PartnerId, scope.Value.CompanyId, token);
+        if (!string.IsNullOrWhiteSpace(request.Password) && !PasswordService.MeetsPolicy(username, request.Password, policyCode))
+            return BadRequest(new { message = PasswordService.GetPolicyMessage(policyCode) });
         await using var transaction = await c.BeginTransactionAsync(token);
         try
         {
@@ -322,7 +322,7 @@ WHERE P.ProjectID=@project AND P.IsActive=1
             await transaction.CommitAsync(token);
             return Ok(new { employeeId = id, username });
         }
-        catch (SqlException ex) when (ex.Number is 50008 or 2601 or 2627) { await transaction.RollbackAsync(token); return Conflict(new { message = "Username นี้ถูกใช้งานแล้ว" }); }
+        catch (SqlException ex) when (ex.Number is 50008 or 2601 or 2627) { await transaction.RollbackAsync(token); return Conflict(new { message = "Username เธเธตเนเธ–เธนเธเนเธเนเธเธฒเธเนเธฅเนเธง" }); }
     }
 
     private static async Task AssignRoleGroupAsync(SqlConnection c, SqlTransaction tx, long employeeId, long? companyId, long roleGroupId, long partnerId, CancellationToken token)
@@ -341,15 +341,16 @@ WHERE P.ProjectID=@project AND P.IsActive=1
     public async Task<IActionResult> CreateEmployeeUser(long id, EmployeeUserCreateRequest request, CancellationToken token)
     {
         if (string.IsNullOrWhiteSpace(request.Username) || string.IsNullOrWhiteSpace(request.Password))
-            return BadRequest(new { message = "กรุณาระบุ Username และ Password" });
+            return BadRequest(new { message = "เธเธฃเธธเธ“เธฒเธฃเธฐเธเธธ Username เนเธฅเธฐ Password" });
         if (request.Username.Trim().Length > 100)
-            return BadRequest(new { message = "Username ต้องไม่เกิน 100 ตัวอักษร" });
-        if (!PasswordService.MeetsPolicy(request.Username.Trim(), request.Password))
-            return BadRequest(new { message = PasswordService.PolicyMessage });
+            return BadRequest(new { message = "Username เธ•เนเธญเธเนเธกเนเน€เธเธดเธ 100 เธ•เธฑเธงเธญเธฑเธเธฉเธฃ" });
         var scope = ResolveScope(request.CompanyId); if (scope is null) return Forbid();
         if (!long.TryParse(User.FindFirstValue("project_id"), out var projectId)) return Forbid();
         await using var c = await Open(token);
         if (!await Allowed(c, "EDIT", token)) return Forbid();
+        var policyCode = await passwordService.GetPolicyAsync(c, scope.Value.CompanyId is null ? "P" : "C", scope.Value.PartnerId, scope.Value.CompanyId, token);
+        if (!PasswordService.MeetsPolicy(request.Username.Trim(), request.Password, policyCode))
+            return BadRequest(new { message = PasswordService.GetPolicyMessage(policyCode) });
         var username = request.Username.Trim();
         var normalized = username.ToUpperInvariant();
         var passwordHash = passwordService.HashPassword(username, request.Password);
@@ -401,8 +402,8 @@ WHERE P.ProjectID=@project AND P.IsActive=1
             await transaction.CommitAsync(token);
             return Ok(new { employeeId = id, username });
         }
-        catch (SqlException ex) when (ex.Number == 50007) { await transaction.RollbackAsync(token); return Conflict(new { message = "พนักงานนี้มี User แล้ว" }); }
-        catch (SqlException ex) when (ex.Number is 50008 or 2601 or 2627) { await transaction.RollbackAsync(token); return Conflict(new { message = "Username นี้ถูกใช้งานแล้ว" }); }
+        catch (SqlException ex) when (ex.Number == 50007) { await transaction.RollbackAsync(token); return Conflict(new { message = "เธเธเธฑเธเธเธฒเธเธเธตเนเธกเธต User เนเธฅเนเธง" }); }
+        catch (SqlException ex) when (ex.Number is 50008 or 2601 or 2627) { await transaction.RollbackAsync(token); return Conflict(new { message = "Username เธเธตเนเธ–เธนเธเนเธเนเธเธฒเธเนเธฅเนเธง" }); }
     }
 
     private static async Task ExecuteEmployeeUserUpsert(SqlConnection c, SqlTransaction tx, string sql, string username, string normalized, string hash, string displayName, string actor, long employeeId, long partnerId, long? companyId, long? userId, bool hasPassword, long projectId, CancellationToken token)

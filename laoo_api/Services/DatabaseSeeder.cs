@@ -125,8 +125,8 @@ public sealed class DatabaseSeeder
         if (!PasswordService.MeetsPolicy(username, password))
         {
             throw new InvalidOperationException(
-                $"SeedData:{passwordKey} must be at least {PasswordService.MinimumPasswordLength} characters " +
-                "and contain upper-case, lower-case, numeric, and special characters.");
+                $"SeedData:{passwordKey} must satisfy the default password policy " +
+                "(at least 6 characters with upper-case, lower-case, and special characters).");
         }
     }
 

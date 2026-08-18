@@ -52,6 +52,8 @@ abstract final class LaooTypography {
   static const double userContext = 10;
   static const double systemTitle = 13.5;
   static const double systemVersion = 8.5;
+  static const double mobileSystemTitle = 17;
+  static const double mobileSystemVersion = 11;
 
   // Thai readability
   static const double titleLineHeight = 1.3;

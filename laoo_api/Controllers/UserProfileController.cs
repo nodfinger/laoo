@@ -19,22 +19,23 @@ public sealed class UserProfileController(IConfiguration configuration, Password
         await using var connection = new SqlConnection(configuration.GetConnectionString("LaooDatabase"));
         await connection.OpenAsync(token);
         await using var command = new SqlCommand($"""
-SELECT U.Username,U.DisplayName,P.ThemeCode,P.Introduction,P.AvatarContentType,P.AvatarFileName,P.AvatarData
+SELECT U.Username,U.DisplayName,P.ThemeCode,P.MenuStyleCode,P.Introduction,P.AvatarContentType,P.AvatarFileName,P.AvatarData
 FROM dbo.{owner.Value.Table} U
 LEFT JOIN dbo.TDADUserProfile P ON P.{owner.Value.ProfileKey}=@id
 WHERE U.{owner.Value.UserKey}=@id AND U.IsActive=1;
 """, connection);
         command.Parameters.Add("@id", SqlDbType.BigInt).Value = owner.Value.Id;
         await using var reader = await command.ExecuteReaderAsync(token);
-        if (!await reader.ReadAsync(token)) return NotFound(new { message = "ไม่พบข้อมูลผู้ใช้งาน" });
+        if (!await reader.ReadAsync(token)) return NotFound(new { message = "เนเธกเนเธเธเธเนเธญเธกเธนเธฅเธเธนเนเนเธเนเธเธฒเธ" });
         return Ok(new
         {
             username = reader.GetString(0), displayName = reader.GetString(1),
             themeCode = reader.IsDBNull(2) ? null : reader.GetString(2),
-            introduction = reader.IsDBNull(3) ? null : reader.GetString(3),
-            avatarContentType = reader.IsDBNull(4) ? null : reader.GetString(4),
-            avatarFileName = reader.IsDBNull(5) ? null : reader.GetString(5),
-            avatarDataBase64 = reader.IsDBNull(6) ? null : Convert.ToBase64String((byte[])reader[6])
+            menuStyleCode = reader.IsDBNull(3) ? "SLIDE" : reader.GetString(3),
+            introduction = reader.IsDBNull(4) ? null : reader.GetString(4),
+            avatarContentType = reader.IsDBNull(5) ? null : reader.GetString(5),
+            avatarFileName = reader.IsDBNull(6) ? null : reader.GetString(6),
+            avatarDataBase64 = reader.IsDBNull(7) ? null : Convert.ToBase64String((byte[])reader[7])
         });
     }
 
@@ -44,36 +45,42 @@ WHERE U.{owner.Value.UserKey}=@id AND U.IsActive=1;
         var owner = ResolveOwner();
         if (owner is null) return Forbid();
         var username = request.Username?.Trim() ?? string.Empty;
-        if (username.Length is < 1 or > 100) return BadRequest(new { message = "กรุณาระบุ Username ให้ถูกต้อง" });
+        if (username.Length is < 1 or > 100) return BadRequest(new { message = "เธเธฃเธธเธ“เธฒเธฃเธฐเธเธธ Username เนเธซเนเธ–เธนเธเธ•เนเธญเธ" });
+        await using var connection = new SqlConnection(configuration.GetConnectionString("LaooDatabase"));
+        await connection.OpenAsync(token);
+        long? partnerId = long.TryParse(User.FindFirstValue("partner_id"), out var partner) ? partner : null;
+        long? companyId = long.TryParse(User.FindFirstValue("company_id"), out var company) ? company : null;
+        var policyCode = await passwordService.GetPolicyAsync(connection, owner.Value.Type.ToString(), partnerId, companyId, token);
         if (!string.IsNullOrWhiteSpace(request.NewPassword) &&
-            !PasswordService.MeetsPolicy(username, request.NewPassword))
-            return BadRequest(new { message = PasswordService.PolicyMessage });
-        if (request.Introduction?.Length > 1000) return BadRequest(new { message = "ข้อความแนะนำยาวเกิน 1,000 ตัวอักษร" });
+            !PasswordService.MeetsPolicy(username, request.NewPassword, policyCode))
+            return BadRequest(new { message = PasswordService.GetReadablePolicyMessage(policyCode) });
+        if (request.Introduction?.Length > 1000) return BadRequest(new { message = "เธเนเธญเธเธงเธฒเธกเนเธเธฐเธเธณเธขเธฒเธงเน€เธเธดเธ 1,000 เธ•เธฑเธงเธญเธฑเธเธฉเธฃ" });
+        var menuStyle = string.Equals(request.MenuStyleCode?.Trim(), "BUTTON", StringComparison.OrdinalIgnoreCase)
+            ? "BUTTON"
+            : "SLIDE";
         byte[]? avatar = null;
         if (!request.RemoveAvatar && !string.IsNullOrWhiteSpace(request.AvatarDataBase64))
         {
             try { avatar = Convert.FromBase64String(request.AvatarDataBase64); }
-            catch (FormatException) { return BadRequest(new { message = "รูปโปรไฟล์ไม่ถูกต้อง" }); }
-            if (avatar.Length > 2 * 1024 * 1024) return BadRequest(new { message = "รูปโปรไฟล์ต้องมีขนาดไม่เกิน 2 MB" });
+            catch (FormatException) { return BadRequest(new { message = "เธฃเธนเธเนเธเธฃเนเธเธฅเนเนเธกเนเธ–เธนเธเธ•เนเธญเธ" }); }
+            if (avatar.Length > 2 * 1024 * 1024) return BadRequest(new { message = "เธฃเธนเธเนเธเธฃเนเธเธฅเนเธ•เนเธญเธเธกเธตเธเธเธฒเธ”เนเธกเนเน€เธเธดเธ 2 MB" });
         }
 
-        await using var connection = new SqlConnection(configuration.GetConnectionString("LaooDatabase"));
-        await connection.OpenAsync(token);
         await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(token);
         try
         {
             var current = await ReadCurrentAsync(connection, transaction, owner.Value, token);
-            if (current is null) return NotFound(new { message = "ไม่พบข้อมูลผู้ใช้งาน" });
+            if (current is null) return NotFound(new { message = "เนเธกเนเธเธเธเนเธญเธกเธนเธฅเธเธนเนเนเธเนเธเธฒเธ" });
             var loginChanged = !string.Equals(current.Value.Username, username, StringComparison.OrdinalIgnoreCase) || !string.IsNullOrWhiteSpace(request.NewPassword);
-            if (loginChanged && string.IsNullOrWhiteSpace(request.CurrentPassword)) return BadRequest(new { message = "กรุณาระบุ Password เดิมก่อนแก้ไขข้อมูล Login" });
-            if (loginChanged && !passwordService.VerifyPassword(current.Value.Username, current.Value.PasswordHash, request.CurrentPassword!)) return BadRequest(new { message = "Password เดิมไม่ถูกต้อง" });
+            if (loginChanged && string.IsNullOrWhiteSpace(request.CurrentPassword)) return BadRequest(new { message = "เธเธฃเธธเธ“เธฒเธฃเธฐเธเธธ Password เน€เธ”เธดเธกเธเนเธญเธเนเธเนเนเธเธเนเธญเธกเธนเธฅ Login" });
+            if (loginChanged && !passwordService.VerifyPassword(current.Value.Username, current.Value.PasswordHash, request.CurrentPassword!)) return BadRequest(new { message = "Password เน€เธ”เธดเธกเนเธกเนเธ–เธนเธเธ•เนเธญเธ" });
             var normalized = username.ToUpperInvariant();
             if (!string.Equals(current.Value.Username, username, StringComparison.OrdinalIgnoreCase))
             {
                 await using var duplicate = new SqlCommand($"SELECT COUNT(1) FROM dbo.{owner.Value.Table} WHERE NormalizedUsername=@name AND {owner.Value.UserKey}<>@id", connection, transaction);
                 duplicate.Parameters.Add("@name", SqlDbType.NVarChar, 100).Value = normalized;
                 duplicate.Parameters.Add("@id", SqlDbType.BigInt).Value = owner.Value.Id;
-                if ((int)await duplicate.ExecuteScalarAsync(token)! > 0) return Conflict(new { message = "Username นี้ถูกใช้งานแล้ว" });
+                if ((int)await duplicate.ExecuteScalarAsync(token)! > 0) return Conflict(new { message = "Username เธเธตเนเธ–เธนเธเนเธเนเธเธฒเธเนเธฅเนเธง" });
             }
 
             var passwordHash = string.IsNullOrWhiteSpace(request.NewPassword) ? current.Value.PasswordHash : passwordService.HashPassword(username, request.NewPassword!);
@@ -82,12 +89,12 @@ WHERE U.{owner.Value.UserKey}=@id AND U.IsActive=1;
             await update.ExecuteNonQueryAsync(token);
 
             await using var profile = new SqlCommand($"""
-UPDATE dbo.TDADUserProfile SET AvatarData=CASE WHEN @remove=1 THEN NULL ELSE COALESCE(@avatar,AvatarData) END,AvatarContentType=CASE WHEN @remove=1 THEN NULL ELSE COALESCE(@type,AvatarContentType) END,AvatarFileName=CASE WHEN @remove=1 THEN NULL ELSE COALESCE(@file,AvatarFileName) END,ThemeCode=@theme,Introduction=@intro,UpdateDate=SYSUTCDATETIME()
+UPDATE dbo.TDADUserProfile SET AvatarData=CASE WHEN @remove=1 THEN NULL ELSE COALESCE(@avatar,AvatarData) END,AvatarContentType=CASE WHEN @remove=1 THEN NULL ELSE COALESCE(@type,AvatarContentType) END,AvatarFileName=CASE WHEN @remove=1 THEN NULL ELSE COALESCE(@file,AvatarFileName) END,ThemeCode=@theme,MenuStyleCode=@menuStyle,Introduction=@intro,UpdateDate=SYSUTCDATETIME()
 WHERE {owner.Value.ProfileKey}=@id;
-IF @@ROWCOUNT=0 INSERT dbo.TDADUserProfile(UserType,{owner.Value.ProfileKey},AvatarData,AvatarContentType,AvatarFileName,ThemeCode,Introduction) VALUES(@userType,@id,@avatar,@type,@file,@theme,@intro);
+IF @@ROWCOUNT=0 INSERT dbo.TDADUserProfile(UserType,{owner.Value.ProfileKey},AvatarData,AvatarContentType,AvatarFileName,ThemeCode,MenuStyleCode,Introduction) VALUES(@userType,@id,@avatar,@type,@file,@theme,@menuStyle,@intro);
 """, connection, transaction);
             profile.Parameters.Add("@userType", SqlDbType.Char, 1).Value = owner.Value.Type; profile.Parameters.Add("@id", SqlDbType.BigInt).Value = owner.Value.Id; profile.Parameters.Add("@remove", SqlDbType.Bit).Value = request.RemoveAvatar;
-            profile.Parameters.Add("@avatar", SqlDbType.VarBinary, -1).Value = (object?)avatar ?? DBNull.Value; Add(profile, "@type", SqlDbType.NVarChar, request.AvatarContentType, 100); Add(profile, "@file", SqlDbType.NVarChar, request.AvatarFileName, 250); Add(profile, "@theme", SqlDbType.NVarChar, request.ThemeCode, 30); Add(profile, "@intro", SqlDbType.NVarChar, request.Introduction, 1000);
+            profile.Parameters.Add("@avatar", SqlDbType.VarBinary, -1).Value = (object?)avatar ?? DBNull.Value; Add(profile, "@type", SqlDbType.NVarChar, request.AvatarContentType, 100); Add(profile, "@file", SqlDbType.NVarChar, request.AvatarFileName, 250); Add(profile, "@theme", SqlDbType.NVarChar, request.ThemeCode, 30); Add(profile, "@menuStyle", SqlDbType.NVarChar, menuStyle, 10); Add(profile, "@intro", SqlDbType.NVarChar, request.Introduction, 1000);
             await profile.ExecuteNonQueryAsync(token);
             await transaction.CommitAsync(token);
             return Ok(new { username, displayName = current.Value.DisplayName });
@@ -100,7 +107,7 @@ IF @@ROWCOUNT=0 INSERT dbo.TDADUserProfile(UserType,{owner.Value.ProfileKey},Ava
     {
         var owner = ResolveOwner();
         if (owner is null) return Forbid();
-        if (string.IsNullOrWhiteSpace(request.ThemeCode)) return BadRequest(new { message = "กรุณาเลือก Style" });
+        if (string.IsNullOrWhiteSpace(request.ThemeCode)) return BadRequest(new { message = "เธเธฃเธธเธ“เธฒเน€เธฅเธทเธญเธ Style" });
         await using var connection = new SqlConnection(configuration.GetConnectionString("LaooDatabase"));
         await connection.OpenAsync(token);
         await using var command = new SqlCommand($"""
@@ -144,5 +151,5 @@ IF @@ROWCOUNT=0 INSERT dbo.TDADUserProfile(UserType,{owner.Value.ProfileKey},The
     private readonly record struct Owner(char Type, string Table, string UserKey, string ProfileKey, long Id);
 }
 
-public sealed record UserProfileUpdate(string? Username, string? CurrentPassword, string? NewPassword, string? ThemeCode, string? Introduction, string? AvatarDataBase64, string? AvatarContentType, string? AvatarFileName, bool RemoveAvatar = false);
+public sealed record UserProfileUpdate(string? Username, string? CurrentPassword, string? NewPassword, string? ThemeCode, string? MenuStyleCode, string? Introduction, string? AvatarDataBase64, string? AvatarContentType, string? AvatarFileName, bool RemoveAvatar = false);
 public sealed record UserProfileThemeUpdate(string? ThemeCode);

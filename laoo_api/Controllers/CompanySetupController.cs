@@ -113,6 +113,7 @@ SET
     RowCardSTD = @RowCardSTD,
     TimeAlert = @TimeAlert,
     OrgStructureType = @OrgStructureType,
+    PasswordPolicyCode = @PasswordPolicyCode,
     YearFormat = @YearFormat,
     VersionID = @VersionID,
     EmailHost = @EmailHost,
@@ -151,6 +152,7 @@ WHERE OwnerType = @OwnerType
         Add(command, "@RowCardSTD", SqlDbType.Int, request.RowCardSTD);
         Add(command, "@TimeAlert", SqlDbType.Int, request.TimeAlert);
         Add(command, "@OrgStructureType", SqlDbType.Int, request.OrgStructureType);
+        Add(command, "@PasswordPolicyCode", SqlDbType.TinyInt, PasswordService.NormalizePolicyCode(request.PasswordPolicyCode));
         Add(command, "@YearFormat", SqlDbType.NVarChar, NullIfBlank(request.YearFormat), 10);
         Add(command, "@VersionID", SqlDbType.NVarChar, NullIfBlank(request.VersionID), 50);
         Add(command, "@EmailHost", SqlDbType.NVarChar, NullIfBlank(request.EmailHost), 255);
@@ -195,7 +197,7 @@ WHERE OwnerType = @OwnerType
         var userType = User.FindFirstValue("user_type") ?? string.Empty;
         var isPartner = userType.Equals("PARTNER_USER", StringComparison.OrdinalIgnoreCase);
         var isLaoo = userType.Equals("LAOO_SUPPORT", StringComparison.OrdinalIgnoreCase);
-        const string menuCode = "05001";
+        const string menuCode = "COMPANY_SETUP";
         var sql = isPartner ? """
             SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADPartnerUser U WHERE U.PartnerID=@partner AND U.NormalizedUsername=@username AND U.IsPartnerAdmin=1 AND U.IsActive=1)
               OR EXISTS(SELECT 1 FROM dbo.TDADPartnerUser U INNER JOIN dbo.TDADPartnerUserPermission UP ON UP.PartnerUserID=U.PartnerUserID INNER JOIN dbo.TDADPermission P ON P.PermissionID=UP.PermissionID AND P.ProjectID=UP.ProjectID WHERE U.PartnerID=@partner AND U.NormalizedUsername=@username AND U.IsActive=1 AND UP.ProjectID=@project AND UP.IsAllowed=1 AND UP.IsActive=1 AND P.IsActive=1 AND P.ScreenCode=@menu AND P.ActionCode=@action)
@@ -268,6 +270,7 @@ SELECT
     S.RowCardSTD,
     S.TimeAlert,
     S.OrgStructureType,
+    CAST(COALESCE(S.PasswordPolicyCode, 3) AS tinyint) AS PasswordPolicyCode,
     S.YearFormat,
     S.VersionID,
     S.EmailHost,
@@ -349,6 +352,7 @@ WHERE S.OwnerType = @OwnerType
             reader.GetInt32(reader.GetOrdinal("RowCardSTD")),
             reader.GetInt32(reader.GetOrdinal("TimeAlert")),
             reader.GetInt32(reader.GetOrdinal("OrgStructureType")),
+            reader.GetByte(reader.GetOrdinal("PasswordPolicyCode")),
             NString("YearFormat"),
             NString("VersionID"),
             NString("EmailHost"),
@@ -426,6 +430,8 @@ WHERE S.OwnerType = @OwnerType
             return "เวลา Alert ต้องมากกว่า 0";
         if (request.OrgStructureType is not (1 or 2))
             return "รูปแบบโครงสร้างองค์กรต้องเป็น 1 หรือ 2";
+        if (request.PasswordPolicyCode is not (1 or 2 or 3))
+            return "รูปแบบ Password ต้องเป็น 1, 2 หรือ 3";
         if (request.EmailPort is < 1 or > 65535)
             return "Email Port ต้องอยู่ระหว่าง 1 ถึง 65535";
         if (!string.IsNullOrWhiteSpace(request.PasswordCry)

@@ -388,7 +388,9 @@ class _LoginPageState extends State<LoginPage> {
                   const SizedBox(height: 11),
                   TextFormField(
                     controller: _passwordController,
-                    enabled: !_isSubmitting,
+                    // Keep the password editable even if a previous login
+                    // request is still waiting on the API.
+                    enabled: true,
                     style: const TextStyle(fontSize: 13, height: 1.2),
                     obscureText: _obscurePassword,
                     autofillHints: const [AutofillHints.password],
@@ -405,13 +407,11 @@ class _LoginPageState extends State<LoginPage> {
                         tooltip: _obscurePassword
                             ? 'แสดงรหัสผ่าน'
                             : 'ซ่อนรหัสผ่าน',
-                        onPressed: _isSubmitting
-                            ? null
-                            : () {
-                                setState(() {
-                                  _obscurePassword = !_obscurePassword;
-                                });
-                              },
+                        onPressed: () {
+                          setState(() {
+                            _obscurePassword = !_obscurePassword;
+                          });
+                        },
                         icon: Icon(
                           _obscurePassword
                               ? Icons.visibility_outlined

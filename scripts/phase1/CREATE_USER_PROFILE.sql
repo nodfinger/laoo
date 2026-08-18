@@ -11,10 +11,12 @@ BEGIN
         AvatarContentType NVARCHAR(100) NULL,
         AvatarFileName NVARCHAR(250) NULL,
         ThemeCode NVARCHAR(30) NULL,
+        MenuStyleCode NVARCHAR(10) NOT NULL CONSTRAINT DF_TDADUserProfile_MenuStyleCode DEFAULT 'SLIDE',
         Introduction NVARCHAR(1000) NULL,
         CreateDate DATETIME2(0) NOT NULL CONSTRAINT DF_TDADUserProfile_CreateDate DEFAULT SYSUTCDATETIME(),
         UpdateDate DATETIME2(0) NOT NULL CONSTRAINT DF_TDADUserProfile_UpdateDate DEFAULT SYSUTCDATETIME(),
         CONSTRAINT CK_TDADUserProfile_UserType CHECK (UserType IN ('L','P','C')),
+        CONSTRAINT CK_TDADUserProfile_MenuStyleCode CHECK (MenuStyleCode IN ('SLIDE','BUTTON')),
         CONSTRAINT CK_TDADUserProfile_OneOwner CHECK
         ((UserType='L' AND LaooUserID IS NOT NULL AND PartnerUserID IS NULL AND UserID IS NULL)
           OR (UserType='P' AND LaooUserID IS NULL AND PartnerUserID IS NOT NULL AND UserID IS NULL)

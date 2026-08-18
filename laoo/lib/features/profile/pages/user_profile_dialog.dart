@@ -8,6 +8,7 @@ import '../../../app/theme/laoo_typography.dart';
 import '../../../app/theme/workspace_theme_presets.dart';
 import '../../../core/auth/app_auth_controller.dart';
 import '../../../core/auth/auth_session.dart';
+import '../../../core/navigation/menu_style_preferences.dart';
 import '../../../core/widgets/auto_dismiss_message.dart';
 import '../data/user_profile_repository.dart';
 
@@ -60,6 +61,7 @@ class _UserProfileThemeLoaderState extends State<UserProfileThemeLoader> {
     try {
       final profile = await _repo.get();
       final code = profile['themeCode']?.toString();
+      final menuStyle = profile['menuStyleCode']?.toString().toUpperCase();
       final avatar = profile['avatarDataBase64']?.toString();
       final introduction = profile['introduction']?.toString().trim();
       if (_loadedUser == requestIdentity &&
@@ -79,6 +81,9 @@ class _UserProfileThemeLoaderState extends State<UserProfileThemeLoader> {
         workspaceThemeController.value = code != null && code.isNotEmpty
             ? workspaceThemeByCode(code)
             : workspaceThemeByCode('STYLE01');
+      }
+      if (_loadedUser == requestIdentity) {
+        workspaceButtonMenu.value = menuStyle == menuStyleButton;
       }
     } catch (_) {
       // Profile loading must not block the workspace.
@@ -147,11 +152,16 @@ class _UserProfileDialogState extends State<_UserProfileDialog> {
   bool _saving = false;
   String? _error;
   late String _originalThemeCode;
+  late String _originalMenuStyleCode;
+  String _menuStyleCode = menuStyleSlide;
 
   @override
   void initState() {
     super.initState();
     _originalThemeCode = workspaceThemeController.value.code;
+    _originalMenuStyleCode = workspaceButtonMenu.value
+        ? menuStyleButton
+        : menuStyleSlide;
     _load();
   }
 
@@ -176,6 +186,11 @@ class _UserProfileDialogState extends State<_UserProfileDialog> {
         _themeCode =
             item['themeCode']?.toString() ??
             workspaceThemeController.value.code;
+        _menuStyleCode = item['menuStyleCode']?.toString().toUpperCase() ==
+                menuStyleButton
+            ? menuStyleButton
+            : menuStyleSlide;
+        _originalMenuStyleCode = _menuStyleCode;
         _avatarBase64 = item['avatarDataBase64']?.toString();
         _avatarType = item['avatarContentType']?.toString();
         _avatarName = item['avatarFileName']?.toString();
@@ -241,6 +256,7 @@ class _UserProfileDialogState extends State<_UserProfileDialog> {
         'currentPassword': _currentPassword.text,
         'newPassword': _newPassword.text.isEmpty ? null : _newPassword.text,
         'themeCode': _themeCode,
+        'menuStyleCode': _isPhone ? menuStyleButton : _menuStyleCode,
         'introduction': _intro.text.trim(),
         'avatarDataBase64': _avatarBase64,
         'avatarContentType': _avatarType,
@@ -254,6 +270,8 @@ class _UserProfileDialogState extends State<_UserProfileDialog> {
       userProfileIntroductionNotifier.value = introduction.isEmpty
           ? null
           : introduction;
+      workspaceButtonMenu.value =
+          (_isPhone ? menuStyleButton : _menuStyleCode) == menuStyleButton;
       await appAuthController.updateSessionProfile(
         result['username']?.toString() ?? _username.text.trim(),
       );
@@ -349,8 +367,52 @@ class _UserProfileDialogState extends State<_UserProfileDialog> {
 
   void _cancel() {
     workspaceThemeController.value = workspaceThemeByCode(_originalThemeCode);
+    workspaceButtonMenu.value = _originalMenuStyleCode == menuStyleButton;
     Navigator.of(context).pop(false);
   }
+
+  bool get _isPhone => MediaQuery.sizeOf(context).width < 600;
+
+  Widget _menuStyleSelector(ThemeData theme) => Column(
+    mainAxisSize: MainAxisSize.min,
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        'รูปแบบเมนู',
+        style: TextStyle(
+          color: theme.colorScheme.primary,
+          fontWeight: FontWeight.w600,
+          fontSize: LaooTypography.validation,
+        ),
+      ),
+      const SizedBox(height: 2),
+      Opacity(
+        opacity: _isPhone ? 0.55 : 1,
+        child: SegmentedButton<String>(
+          segments: const [
+            ButtonSegment<String>(
+              value: menuStyleSlide,
+              icon: Icon(Icons.view_sidebar_outlined),
+              label: Text('Slide'),
+            ),
+            ButtonSegment<String>(
+              value: menuStyleButton,
+              icon: Icon(Icons.dashboard_outlined),
+              label: Text('ปุ่มกด'),
+            ),
+          ],
+          selected: {_menuStyleCode},
+          onSelectionChanged: _isPhone
+              ? null
+              : (selected) {
+                  final code = selected.first;
+                  setState(() => _menuStyleCode = code);
+                  workspaceButtonMenu.value = code == menuStyleButton;
+                },
+        ),
+      ),
+    ],
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -398,20 +460,28 @@ class _UserProfileDialogState extends State<_UserProfileDialog> {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      TextField(
-                        controller: _currentPassword,
-                        obscureText: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Password เดิม',
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _newPassword,
-                        obscureText: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Password ใหม่ (ถ้าต้องการเปลี่ยน)',
-                        ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _currentPassword,
+                              obscureText: true,
+                              decoration: const InputDecoration(
+                                labelText: 'Password เดิม',
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextField(
+                              controller: _newPassword,
+                              obscureText: true,
+                              decoration: const InputDecoration(
+                                labelText: 'Password ใหม่ (ถ้าต้องการเปลี่ยน)',
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ]),
                     const SizedBox(height: 12),
@@ -505,19 +575,27 @@ class _UserProfileDialogState extends State<_UserProfileDialog> {
                               color: theme.colorScheme.primary,
                             ),
                           );
+                          final menuStyle = SizedBox(
+                            width: 200,
+                            child: _menuStyleSelector(theme),
+                          );
                           return compact
                               ? Row(
                                   children: [
                                     palette,
                                     const SizedBox(width: 8),
                                     Expanded(child: intro),
+                                    const SizedBox(width: 8),
+                                    menuStyle,
                                   ],
                                 )
                               : Row(
                                   children: [
                                     palette,
                                     const SizedBox(width: 8),
-                                    SizedBox(width: 240, child: intro),
+                                    Expanded(child: intro),
+                                    const SizedBox(width: 8),
+                                    menuStyle,
                                   ],
                                 );
                         },

@@ -4,6 +4,8 @@ internal static class AuthenticationProjectAccess
 {
     internal const string PartnerSql = """
         (
+            u.IsPartnerAdmin = 1
+            OR
             EXISTS
             (
                 SELECT 1

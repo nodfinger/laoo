@@ -90,6 +90,7 @@ public sealed class BranchController(IConfiguration configuration) : ControllerB
     {
         var projectId = long.TryParse(User.FindFirstValue("project_id"), out var parsedProject) ? parsedProject : 0;
         if (projectId == 0) return false;
+        if (IsPartner() && await IsPartnerAdminAsync(connection, token)) return true;
 
         if (IsSupport())
         {
@@ -115,6 +116,18 @@ public sealed class BranchController(IConfiguration configuration) : ControllerB
         command.Parameters.Add("@ScreenCode", SqlDbType.NVarChar, 100).Value = ScreenCode;
         command.Parameters.Add("@LegacyScreenCode", SqlDbType.NVarChar, 100).Value = "PARTNER_BRANCH";
         command.Parameters.Add("@Action", SqlDbType.NVarChar, 50).Value = action;
+        return Convert.ToBoolean(await command.ExecuteScalarAsync(token));
+    }
+
+    private async Task<bool> IsPartnerAdminAsync(SqlConnection connection, CancellationToken token)
+    {
+        if (!IsPartner()) return false;
+        var partnerId = long.TryParse(User.FindFirstValue("partner_id"), out var parsedPartner) ? parsedPartner : 0;
+        var username = (User.Identity?.Name ?? User.FindFirstValue("unique_name") ?? string.Empty).Trim().ToUpperInvariant();
+        const string sql = "SELECT CASE WHEN EXISTS (SELECT 1 FROM dbo.TDADPartnerUser WHERE PartnerID=@PartnerID AND NormalizedUsername=UPPER(@Username) AND IsPartnerAdmin=1 AND IsActive=1) THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END";
+        await using var command = new SqlCommand(sql, connection);
+        command.Parameters.Add("@PartnerID", SqlDbType.BigInt).Value = partnerId;
+        command.Parameters.Add("@Username", SqlDbType.NVarChar, 200).Value = username;
         return Convert.ToBoolean(await command.ExecuteScalarAsync(token));
     }
 }

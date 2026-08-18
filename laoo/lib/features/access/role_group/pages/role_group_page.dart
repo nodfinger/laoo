@@ -363,6 +363,87 @@ class _AlertBanner extends StatelessWidget {
       ),
     );
   }
+
+  Widget _buildMobileCards(
+    BuildContext context,
+    List<RoleGroup> rows,
+    int start,
+  ) {
+    final theme = Theme.of(context);
+    final primary = theme.colorScheme.primary;
+    return ListView.separated(
+      padding: const EdgeInsets.only(bottom: 8),
+      itemCount: rows.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 10),
+      itemBuilder: (context, index) {
+        final item = rows[index];
+        return Card(
+          margin: EdgeInsets.zero,
+          color: theme.colorScheme.surface,
+          surfaceTintColor: Colors.transparent,
+          elevation: 3,
+          shadowColor: primary.withValues(alpha: .18),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: BorderSide.none,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        item.code,
+                        style: TextStyle(
+                          color: primary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      item.isActive ? 'เปิด' : 'ปิด',
+                      style: TextStyle(
+                        color: item.isActive ? primary : theme.colorScheme.error,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    if (false)
+                      IconButton(
+                        tooltip: 'แก้ไข',
+                        onPressed: () {},
+                        icon: Icon(Icons.edit_outlined, color: primary),
+                      ),
+                    if (false)
+                      IconButton(
+                        tooltip: 'ลบ',
+                        onPressed: () {},
+                        icon: Icon(
+                          Icons.delete_outline,
+                          color: theme.colorScheme.error,
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  item.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: theme.colorScheme.onSurface,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 }
 
 class _List extends StatefulWidget {
@@ -423,10 +504,15 @@ class _ListState extends State<_List> {
             ],
           ),
           const SizedBox(height: 8),
-          Row(
-            children: [
+          LayoutBuilder(
+            builder: (context, constraints) => Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
               SizedBox(
-                width: 280,
+                width: constraints.maxWidth < 600
+                    ? constraints.maxWidth
+                    : constraints.maxWidth - 178,
                 child: TextField(
                   controller: widget.search,
                   onSubmitted: (_) {
@@ -450,19 +536,10 @@ class _ListState extends State<_List> {
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
-              OutlinedButton.icon(
-                onPressed: () {
-                  widget.search.clear();
-                  page = 1;
-                  widget.onSearch();
-                },
-                icon: const Icon(Icons.filter_alt_off_outlined),
-                label: const Text('ล้าง Filter'),
-              ),
-              const SizedBox(width: 8),
               SizedBox(
-                width: 170,
+                width: constraints.maxWidth < 600
+                    ? constraints.maxWidth
+                    : 170,
                 child: DropdownButtonFormField<String>(
                   initialValue: statusFilter,
                   style: Theme.of(context).textTheme.bodyMedium,
@@ -499,7 +576,8 @@ class _ListState extends State<_List> {
                   }),
                 ),
               ),
-            ],
+              ],
+            ),
           ),
           const SizedBox(height: 8),
           Expanded(
@@ -550,14 +628,24 @@ class _ListState extends State<_List> {
                 if (page > pages) page = pages;
                 final start = (page - 1) * pageSize;
                 final rows = all.skip(start).take(pageSize).toList();
-                final end = rows.isEmpty ? 0 : start + rows.length;
+                final firstItem = rows.isEmpty ? 0 : start + 1;
+                final lastItem = rows.isEmpty ? 0 : start + rows.length;
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
                       child: rows.isEmpty
                           ? const Center(child: Text('ไม่พบข้อมูลตามเงื่อนไข'))
-                          : Container(
+                          : LayoutBuilder(
+                              builder: (context, constraints) {
+                                if (constraints.maxWidth < 600) {
+                                  return _buildMobileCards(
+                                    context,
+                                    rows,
+                                    start,
+                                  );
+                                }
+                                return Container(
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(8),
                               ),
@@ -742,6 +830,8 @@ class _ListState extends State<_List> {
                                   ),
                                 ),
                               ),
+                                );
+                              },
                             ),
                     ),
                     const SizedBox(height: 8),
@@ -765,9 +855,7 @@ class _ListState extends State<_List> {
                           onTap: () => setState(() => page++),
                         ),
                         const SizedBox(width: 12),
-                        Text(
-                          'แสดง ${rows.isEmpty ? 0 : start + 1}-$end จาก ${all.length} รายการ',
-                        ),
+                        Text('$firstItem-$lastItem จาก ${all.length}'),
                       ],
                     ),
                   ],
@@ -777,6 +865,86 @@ class _ListState extends State<_List> {
           ),
         ],
       ),
+    );
+  }
+  Widget _buildMobileCards(
+    BuildContext context,
+    List<RoleGroup> rows,
+    int start,
+  ) {
+    final theme = Theme.of(context);
+    final primary = theme.colorScheme.primary;
+    return ListView.separated(
+      padding: const EdgeInsets.only(bottom: 8),
+      itemCount: rows.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 10),
+      itemBuilder: (context, index) {
+        final item = rows[index];
+        return Card(
+          margin: EdgeInsets.zero,
+          color: theme.colorScheme.surface,
+          surfaceTintColor: Colors.transparent,
+          elevation: 3,
+          shadowColor: primary.withValues(alpha: .18),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: BorderSide.none,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        item.code,
+                        style: TextStyle(
+                          color: primary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      item.isActive ? 'เปิด' : 'ปิด',
+                      style: TextStyle(
+                        color: item.isActive ? primary : theme.colorScheme.error,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    if (widget.canEdit)
+                      IconButton(
+                        tooltip: 'แก้ไข',
+                        onPressed: () => widget.onEdit(item),
+                        icon: Icon(Icons.edit_outlined, color: primary),
+                      ),
+                    if (widget.canDelete)
+                      IconButton(
+                        tooltip: 'ลบ',
+                        onPressed: () => widget.onDelete(item),
+                        icon: Icon(
+                          Icons.delete_outline,
+                          color: theme.colorScheme.error,
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  item.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: theme.colorScheme.onSurface,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

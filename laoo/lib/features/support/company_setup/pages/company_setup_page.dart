@@ -49,6 +49,7 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
   bool _messageIsError = false;
   String _yearFormat = CompanySetupConstants.yearFormatAd;
   int _orgStructureType = 1;
+  int _passwordPolicyCode = 3;
 
   bool _saving = false;
   bool _canEdit = false;
@@ -87,6 +88,7 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
       _rowCardStd.text = setup.rowCardStd.toString();
       _timeAlert.text = setup.timeAlert.toString();
       _orgStructureType = setup.orgStructureType;
+      _passwordPolicyCode = setup.passwordPolicyCode;
       _versionId.text = setup.versionId ?? '';
       _emailHost.text = setup.emailHost ?? '';
       _emailPort.text = setup.emailPort?.toString() ?? '';
@@ -175,6 +177,7 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
             rowCardStd: int.tryParse(_rowCardStd.text) ?? 30,
             timeAlert: int.tryParse(_timeAlert.text) ?? 30,
             orgStructureType: _orgStructureType,
+            passwordPolicyCode: _passwordPolicyCode,
             yearFormat: _yearFormat,
             versionId: _versionId.text,
             emailHost: _emailHost.text,
@@ -294,6 +297,9 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
                         orgStructureType: _orgStructureType,
                         onOrgStructureTypeChanged: (value) =>
                             setState(() => _orgStructureType = value),
+                        passwordPolicyCode: _passwordPolicyCode,
+                        onPasswordPolicyCodeChanged: (value) =>
+                            setState(() => _passwordPolicyCode = value),
                       ),
                       const SizedBox(height: 20),
                       Align(
@@ -332,6 +338,8 @@ class _LegacySetupCards extends StatelessWidget {
     required this.onYearFormatChanged,
     required this.orgStructureType,
     required this.onOrgStructureTypeChanged,
+    required this.passwordPolicyCode,
+    required this.onPasswordPolicyCodeChanged,
   });
 
   final Map<String, TextEditingController> controllers;
@@ -339,6 +347,8 @@ class _LegacySetupCards extends StatelessWidget {
   final ValueChanged<String> onYearFormatChanged;
   final int orgStructureType;
   final ValueChanged<int> onOrgStructureTypeChanged;
+  final int passwordPolicyCode;
+  final ValueChanged<int> onPasswordPolicyCodeChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -365,6 +375,10 @@ class _LegacySetupCards extends StatelessWidget {
                   _OrgStructureField(
                     value: orgStructureType,
                     onChanged: onOrgStructureTypeChanged,
+                  ),
+                  _PasswordPolicyField(
+                    value: passwordPolicyCode,
+                    onChanged: onPasswordPolicyCodeChanged,
                   ),
                 ],
               ),
@@ -646,6 +660,55 @@ class _OrgStructureField extends StatelessWidget {
       if (next != null) onChanged(next);
     },
   );
+}
+
+class _PasswordPolicyField extends StatelessWidget {
+  const _PasswordPolicyField({required this.value, required this.onChanged});
+
+  final int value;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(top: 8, bottom: 12),
+        child: DropdownButtonFormField<int>(
+          initialValue: const [1, 2, 3].contains(value) ? value : 3,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            fontSize: 13,
+            height: 1.35,
+          ),
+          decoration: const InputDecoration(
+            labelText: 'Password Policy',
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 12,
+            ),
+          ),
+          items: const [
+            DropdownMenuItem(
+              value: 1,
+              child: Text(
+                '1 - อิสระ อย่างน้อย 1 ตัว',
+                style: TextStyle(fontSize: 13),
+              ),
+            ),
+            DropdownMenuItem(
+              value: 2,
+              child: Text('2 - ขั้นต่ำ 4 ตัว', style: TextStyle(fontSize: 13)),
+            ),
+            DropdownMenuItem(
+              value: 3,
+              child: Text(
+                '3 - ขั้นต่ำ 6 ตัว + เงื่อนไข',
+                style: TextStyle(fontSize: 13),
+              ),
+            ),
+          ],
+          onChanged: (next) {
+            if (next != null) onChanged(next);
+          },
+        ),
+      );
 }
 
 class _YearFormatField extends StatelessWidget {

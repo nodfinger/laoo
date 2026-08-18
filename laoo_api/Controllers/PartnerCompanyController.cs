@@ -30,7 +30,9 @@ public sealed class PartnerCompanyController : ControllerBase
         var partnerId = PartnerId();
         if (partnerId is null) return Forbid();
         await using var connection = await OpenConnectionAsync(cancellationToken);
-        if (!await AllowedAsync(connection, "VIEW", cancellationToken)) return Forbid();
+        if (!await AllowedAsync(connection, "VIEW", cancellationToken) &&
+            !await IsPartnerAdminAsync(connection, cancellationToken))
+            return Forbid();
         const string sql = """
 SELECT C.CompanyID, C.PartnerID, C.CompanyCode, C.CompanyNameTH, C.CompanyNameEN, C.TaxID,
        C.Email, C.Telephone, C.AddressText, C.IsActive, C.CreateDate, C.CreateBy,
@@ -58,12 +60,13 @@ ORDER BY CompanyCode;
     public async Task<ActionResult<object>> Actions(CancellationToken cancellationToken)
     {
         await using var connection = await OpenConnectionAsync(cancellationToken);
+        var isAdmin = await IsPartnerAdminAsync(connection, cancellationToken);
         return Ok(new
         {
-            view = await AllowedAsync(connection, "VIEW", cancellationToken),
-            create = await AllowedAsync(connection, "CREATE", cancellationToken),
-            edit = await AllowedAsync(connection, "EDIT", cancellationToken),
-            delete = await AllowedAsync(connection, "DELETE", cancellationToken),
+            view = isAdmin || await AllowedAsync(connection, "VIEW", cancellationToken),
+            create = isAdmin || await AllowedAsync(connection, "CREATE", cancellationToken),
+            edit = isAdmin || await AllowedAsync(connection, "EDIT", cancellationToken),
+            delete = isAdmin || await AllowedAsync(connection, "DELETE", cancellationToken),
         });
     }
 
@@ -72,18 +75,20 @@ ORDER BY CompanyCode;
         PartnerCompanyUpsertRequest request, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.CompanyNameTh))
-            return BadRequest(new { message = "กรุณาระบุชื่อ Customer/Company" });
+            return BadRequest(new { message = "เธเธฃเธธเธ“เธฒเธฃเธฐเธเธธเธเธทเนเธญ Customer/Company" });
         if (string.IsNullOrWhiteSpace(request.AdminUsername) || string.IsNullOrWhiteSpace(request.AdminPassword))
-            return BadRequest(new { message = "กรุณาระบุ Username และ Password ผู้ดูแลระบบ" });
+            return BadRequest(new { message = "เธเธฃเธธเธ“เธฒเธฃเธฐเธเธธ Username เนเธฅเธฐ Password เธเธนเนเธ”เธนเนเธฅเธฃเธฐเธเธ" });
         if (request.AdminUsername.Trim().Length > 100 || request.AdminPassword.Trim().Length < 1)
-            return BadRequest(new { message = "Username หรือ Password ผู้ดูแลระบบไม่ถูกต้อง" });
-        if (!PasswordService.MeetsPolicy(request.AdminUsername.Trim(), request.AdminPassword))
-            return BadRequest(new { message = PasswordService.PolicyMessage });
+            return BadRequest(new { message = "Username เธซเธฃเธทเธญ Password เธเธนเนเธ”เธนเนเธฅเธฃเธฐเธเธเนเธกเนเธ–เธนเธเธ•เนเธญเธ" });
         var partnerId = PartnerId();
         if (partnerId is null || !string.Equals(User.FindFirstValue("user_type"), "PARTNER_USER", StringComparison.OrdinalIgnoreCase))
             return Forbid();
         await using var connection = await OpenConnectionAsync(cancellationToken);
-        if (!await AllowedAsync(connection, "CREATE", cancellationToken)) return Forbid();
+        var policyCode = await _passwordService.GetPolicyAsync(connection, "P", partnerId, null, cancellationToken);
+        if (!PasswordService.MeetsPolicy(request.AdminUsername.Trim(), request.AdminPassword, policyCode))
+            return BadRequest(new { message = PasswordService.GetReadablePolicyMessage(policyCode) });
+        if (!await AllowedAsync(connection, "CREATE", cancellationToken) &&
+            !await IsPartnerAdminAsync(connection, cancellationToken)) return Forbid();
         if (!await IsPartnerAdminAsync(connection, cancellationToken)) return Forbid();
         await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(cancellationToken);
         try
@@ -133,12 +138,12 @@ VALUES
         catch (SqlException ex) when (ex.Number is 2601 or 2627)
         {
             await transaction.RollbackAsync(cancellationToken);
-            return Conflict(new { message = "รหัสลูกค้าซ้ำ กรุณากดบันทึกอีกครั้ง" });
+            return Conflict(new { message = "เธฃเธซเธฑเธชเธฅเธนเธเธเนเธฒเธเนเธณ เธเธฃเธธเธ“เธฒเธเธ”เธเธฑเธเธ—เธถเธเธญเธตเธเธเธฃเธฑเนเธ" });
         }
         catch (SqlException ex) when (ex.Number == 50010)
         {
             await transaction.RollbackAsync(cancellationToken);
-            return Conflict(new { message = "Username ผู้ดูแลระบบซ้ำ กรุณาใช้ Username อื่น" });
+            return Conflict(new { message = "Username เธเธนเนเธ”เธนเนเธฅเธฃเธฐเธเธเธเนเธณ เธเธฃเธธเธ“เธฒเนเธเน Username เธญเธทเนเธ" });
         }
         catch { await transaction.RollbackAsync(cancellationToken); throw; }
     }
@@ -146,11 +151,12 @@ VALUES
     [HttpPut("{companyId:long}")]
     public async Task<IActionResult> Update(long companyId, PartnerCompanyUpsertRequest request, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(request.CompanyNameTh)) return BadRequest(new { message = "กรุณาระบุชื่อผู้ใช้บริการ" });
+        if (string.IsNullOrWhiteSpace(request.CompanyNameTh)) return BadRequest(new { message = "เธเธฃเธธเธ“เธฒเธฃเธฐเธเธธเธเธทเนเธญเธเธนเนเนเธเนเธเธฃเธดเธเธฒเธฃ" });
         var partnerId = PartnerId();
         if (partnerId is null) return Forbid();
         await using var connection = await OpenConnectionAsync(cancellationToken);
-        if (!await AllowedAsync(connection, "EDIT", cancellationToken)) return Forbid();
+        if (!await AllowedAsync(connection, "EDIT", cancellationToken) &&
+            !await IsPartnerAdminAsync(connection, cancellationToken)) return Forbid();
         if (!await IsPartnerAdminAsync(connection, cancellationToken)) return Forbid();
         const string sql = """
 UPDATE dbo.TDADCompany SET CompanyNameTH=@CompanyNameTH, CompanyNameEN=@CompanyNameEN, TaxID=@TaxID, IsActive=@IsActive,
@@ -177,13 +183,15 @@ WHERE CompanyID=@CompanyID AND PartnerID=@PartnerID;
     {
         var username = request.Username.Trim();
         if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(request.Password))
-            return BadRequest(new { message = "กรุณาระบุ Username และ Password ผู้ดูแลระบบ" });
-        if (!PasswordService.MeetsPolicy(username, request.Password))
-            return BadRequest(new { message = PasswordService.PolicyMessage });
+            return BadRequest(new { message = "เธเธฃเธธเธ“เธฒเธฃเธฐเธเธธ Username เนเธฅเธฐ Password เธเธนเนเธ”เธนเนเธฅเธฃเธฐเธเธ" });
         var partnerId = PartnerId();
         if (partnerId is null) return Forbid();
         await using var connection = await OpenConnectionAsync(cancellationToken);
-        if (!await AllowedAsync(connection, "EDIT", cancellationToken)) return Forbid();
+        var policyCode = await _passwordService.GetPolicyAsync(connection, "C", partnerId, companyId, cancellationToken);
+        if (!PasswordService.MeetsPolicy(username, request.Password, policyCode))
+            return BadRequest(new { message = PasswordService.GetReadablePolicyMessage(policyCode) });
+        if (!await AllowedAsync(connection, "EDIT", cancellationToken) &&
+            !await IsPartnerAdminAsync(connection, cancellationToken)) return Forbid();
         if (!await IsPartnerAdminAsync(connection, cancellationToken)) return Forbid();
         const string sql = """
 IF NOT EXISTS (SELECT 1 FROM dbo.TDADCompany WHERE CompanyID=@CompanyID AND PartnerID=@PartnerID)
@@ -195,7 +203,7 @@ IF EXISTS (SELECT 1 FROM dbo.TDADUser WHERE CompanyID=@CompanyID AND IsCompanyAd
         LastPasswordChangeDate=SYSUTCDATETIME() WHERE CompanyID=@CompanyID AND IsCompanyAdmin=1;
 ELSE
     INSERT INTO dbo.TDADUser (CompanyID, Username, NormalizedUsername, PasswordHash, DisplayName, IsCompanyAdmin, IsActive, FailedLoginCount, LastPasswordChangeDate, CreateDate)
-    VALUES (@CompanyID, @Username, @NormalizedUsername, @PasswordHash, N'ผู้ดูแลระบบ', 1, 1, 0, SYSUTCDATETIME(), SYSUTCDATETIME());
+    VALUES (@CompanyID, @Username, @NormalizedUsername, @PasswordHash, N'เธเธนเนเธ”เธนเนเธฅเธฃเธฐเธเธ', 1, 1, 0, SYSUTCDATETIME(), SYSUTCDATETIME());
 """;
         await using var command = new SqlCommand(sql, connection);
         command.Parameters.Add("@CompanyID", SqlDbType.BigInt).Value = companyId;
@@ -204,7 +212,7 @@ ELSE
         Add(command, "@NormalizedUsername", SqlDbType.NVarChar, username.ToUpperInvariant(), 100);
         Add(command, "@PasswordHash", SqlDbType.NVarChar, _passwordService.HashPassword(username, request.Password), 500);
         try { await command.ExecuteNonQueryAsync(cancellationToken); return NoContent(); }
-        catch (SqlException ex) when (ex.Number == 50010) { return Conflict(new { message = "Username ผู้ดูแลระบบซ้ำ กรุณาใช้ Username อื่น" }); }
+        catch (SqlException ex) when (ex.Number == 50010) { return Conflict(new { message = "Username เธเธนเนเธ”เธนเนเธฅเธฃเธฐเธเธเธเนเธณ เธเธฃเธธเธ“เธฒเนเธเน Username เธญเธทเนเธ" }); }
         catch (SqlException ex) when (ex.Number == 50011) { return NotFound(); }
     }
 
@@ -214,13 +222,14 @@ ELSE
         var partnerId = PartnerId();
         if (partnerId is null) return Forbid();
         await using var connection = await OpenConnectionAsync(cancellationToken);
-        if (!await AllowedAsync(connection, "DELETE", cancellationToken)) return Forbid();
+        if (!await AllowedAsync(connection, "DELETE", cancellationToken) &&
+            !await IsPartnerAdminAsync(connection, cancellationToken)) return Forbid();
         if (!await IsPartnerAdminAsync(connection, cancellationToken)) return Forbid();
         const string dependencySql = "SELECT CASE WHEN EXISTS (SELECT 1 FROM dbo.TDADBranch WHERE CompanyID=@CompanyID) OR EXISTS (SELECT 1 FROM dbo.TDADUser WHERE CompanyID=@CompanyID) THEN CAST(1 AS BIGINT) ELSE CAST(0 AS BIGINT) END;";
         await using var dependency = new SqlCommand(dependencySql, connection);
         dependency.Parameters.Add("@CompanyID", SqlDbType.BigInt).Value = companyId;
         if (Convert.ToInt64(await dependency.ExecuteScalarAsync(cancellationToken)) > 0)
-            return Conflict(new { code = "COMPANY_IN_USE", message = "ไม่สามารถลบผู้ใช้บริการที่มีสาขาหรือผู้ใช้งานอยู่ได้" });
+            return Conflict(new { code = "COMPANY_IN_USE", message = "เนเธกเนเธชเธฒเธกเธฒเธฃเธ–เธฅเธเธเธนเนเนเธเนเธเธฃเธดเธเธฒเธฃเธ—เธตเนเธกเธตเธชเธฒเธเธฒเธซเธฃเธทเธญเธเธนเนเนเธเนเธเธฒเธเธญเธขเธนเนเนเธ”เน" });
         await using var command = new SqlCommand("DELETE FROM dbo.TDADCompany WHERE CompanyID=@CompanyID AND PartnerID=@PartnerID", connection);
         command.Parameters.Add("@CompanyID", SqlDbType.BigInt).Value = companyId;
         command.Parameters.Add("@PartnerID", SqlDbType.BigInt).Value = partnerId.Value;

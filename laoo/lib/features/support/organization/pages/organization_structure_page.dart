@@ -5,6 +5,7 @@ import '../../../../core/auth/app_auth_controller.dart';
 import '../../../../core/navigation/navigation_menu_repository.dart';
 import '../../../../core/widgets/auto_dismiss_message.dart';
 import '../../../../core/widgets/combo_box_text.dart';
+import '../../../../app/theme/workspace_theme_presets.dart';
 import '../../presentation/widgets/support_workspace_shell.dart';
 import '../data/organization_repository.dart';
 
@@ -124,25 +125,29 @@ class _OrganizationStructurePageState extends State<OrganizationStructurePage> {
   }
 
   @override
-  Widget build(BuildContext context) => SupportWorkspaceShell(
-    pageTitle: _caption,
-    activeMenu: 'organizationStructure',
-    menuScope: appAuthController.isPartnerUser
-        ? WorkspaceMenuScope.partner
-        : appAuthController.isCompanyUser
-        ? WorkspaceMenuScope.company
-        : WorkspaceMenuScope.support,
-    child: Stack(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(24),
-          child: _formType == null ? _buildList() : _buildForm(),
+  Widget build(BuildContext context) =>
+      ValueListenableBuilder<WorkspaceThemePreset>(
+        valueListenable: workspaceThemeController,
+        builder: (context, _, _) => SupportWorkspaceShell(
+          pageTitle: _caption,
+          activeMenu: 'organizationStructure',
+          menuScope: appAuthController.isPartnerUser
+              ? WorkspaceMenuScope.partner
+              : appAuthController.isCompanyUser
+              ? WorkspaceMenuScope.company
+              : WorkspaceMenuScope.support,
+          child: Stack(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: _formType == null ? _buildList() : _buildForm(),
+              ),
+              if (_message != null)
+                Positioned(top: 12, right: 24, child: _messageBox()),
+            ],
+          ),
         ),
-        if (_message != null)
-          Positioned(top: 12, right: 24, child: _messageBox()),
-      ],
-    ),
-  );
+      );
 
   Widget _buildList() => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -160,13 +165,27 @@ class _OrganizationStructurePageState extends State<OrganizationStructurePage> {
         Expanded(
           child: _mode == 1
               ? _departmentPanel()
-              : Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    SizedBox(width: 330, child: _divisionPanel()),
-                    const SizedBox(width: 12),
-                    Expanded(child: _departmentPanel()),
-                  ],
+              : LayoutBuilder(
+                  builder: (context, constraints) {
+                    if (constraints.maxWidth < 600) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          SizedBox(height: 260, child: _divisionPanel()),
+                          const SizedBox(height: 12),
+                          Expanded(child: _departmentPanel()),
+                        ],
+                      );
+                    }
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        SizedBox(width: 330, child: _divisionPanel()),
+                        const SizedBox(width: 12),
+                        Expanded(child: _departmentPanel()),
+                      ],
+                    );
+                  },
                 ),
         ),
     ],
@@ -174,6 +193,8 @@ class _OrganizationStructurePageState extends State<OrganizationStructurePage> {
 
   Widget _divisionPanel() {
     final divisions = _units.where((x) => x['unitType'] == 'DIV').toList();
+    final colors = Theme.of(context).colorScheme;
+    final primary = workspaceThemeController.value.primary;
     return Card(
       child: Column(
         children: [
@@ -200,8 +221,14 @@ class _OrganizationStructurePageState extends State<OrganizationStructurePage> {
                             unit['parentOrgUnitId'] == item['orgUnitId'],
                       )
                       .length;
+                  final selected = item['orgUnitId'] == _selectedDivisionId;
                   return ListTile(
-                    selected: item['orgUnitId'] == _selectedDivisionId,
+                    selected: selected,
+                    selectedColor: primary,
+                    iconColor: selected
+                        ? primary
+                        : colors.onSurfaceVariant,
+                    textColor: colors.onSurface,
                     leading: const Icon(Icons.account_tree_outlined),
                     title: Text('${item['unitCode']} - ${item['nameTh']}'),
                     subtitle: Text('แผนก $departmentCount รายการ'),
@@ -220,9 +247,9 @@ class _OrganizationStructurePageState extends State<OrganizationStructurePage> {
                           IconButton(
                             tooltip: 'ลบ',
                             onPressed: () => _confirmDelete(item),
-                            icon: const Icon(
+                            icon: Icon(
                               Icons.delete_outline,
-                              color: Colors.red,
+                              color: Theme.of(context).colorScheme.error,
                             ),
                           ),
                       ],
@@ -254,6 +281,7 @@ class _OrganizationStructurePageState extends State<OrganizationStructurePage> {
       return _mode == 1 || item['parentOrgUnitId'] == _selectedDivisionId;
     }).toList();
     final enabled = _mode == 1 || _selectedDivisionId != null;
+    final primary = workspaceThemeController.value.primary;
     return Card(
       child: Column(
         children: [
@@ -312,8 +340,9 @@ class _OrganizationStructurePageState extends State<OrganizationStructurePage> {
     );
   }
 
-  Widget _panelHeader(String title, String buttonText, VoidCallback? onTap) =>
-      Padding(
+  Widget _panelHeader(String title, String buttonText, VoidCallback? onTap) {
+    final primary = workspaceThemeController.value.primary;
+    return Padding(
         padding: const EdgeInsets.all(16),
         child: Row(
           children: [
@@ -321,7 +350,7 @@ class _OrganizationStructurePageState extends State<OrganizationStructurePage> {
               child: Text(
                 title,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.primary,
+                  color: primary,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -334,6 +363,7 @@ class _OrganizationStructurePageState extends State<OrganizationStructurePage> {
           ],
         ),
       );
+  }
 
   Widget _buildForm() {
     final action = _editing == null ? 'เพิ่ม' : 'แก้ไข';

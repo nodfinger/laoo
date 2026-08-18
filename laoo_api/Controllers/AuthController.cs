@@ -3,6 +3,7 @@ using LaooApi.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Data.SqlClient;
 
 namespace LaooApi.Controllers;
 
@@ -67,11 +68,29 @@ public sealed class AuthController : ControllerBase
         [FromBody] LoginRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await _authenticationService.LoginAsync(
-            request,
-            cancellationToken);
+        try
+        {
+            var result = await _authenticationService.LoginAsync(
+                request,
+                cancellationToken);
 
-        return result.Success ? Ok(result) : Unauthorized(result);
+            return result.Success ? Ok(result) : Unauthorized(result);
+        }
+        catch (SqlException exception)
+        {
+            _logger.LogError(
+                exception,
+                "Login failed because the authentication database is unavailable.");
+
+            return StatusCode(
+                StatusCodes.Status503ServiceUnavailable,
+                new
+                {
+                    success = false,
+                    code = "DATABASE_UNAVAILABLE",
+                    message = "ระบบไม่สามารถเชื่อมต่อฐานข้อมูลได้ชั่วคราว กรุณาลองใหม่อีกครั้ง"
+                });
+        }
     }
 
     [HttpGet("me")]
