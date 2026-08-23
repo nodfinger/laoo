@@ -329,32 +329,32 @@ SELECT
        FROM dbo.TDSTCompanySetupSystem AS SS
       WHERE SS.ProjectID = @ProjectID
         AND SS.OwnerType = S.OwnerType
-        AND ISNULL(SS.PartnerID,0)=ISNULL(S.PartnerID,0)
-        AND ISNULL(SS.CompanyID,0)=ISNULL(S.CompanyID,0)
+        AND ISNULL(SS.PartnerID,0)=ISNULL(@PartnerID,0)
+        AND ISNULL(SS.CompanyID,0)=ISNULL(@CompanyID,0)
         AND SS.IsActive=1
       ORDER BY ISNULL(SS.UpdateDate, SS.CreateDate) DESC, SS.PKValue DESC) AS RunItem,
     (SELECT TOP 1 ItemDigit
        FROM dbo.TDSTCompanySetupSystem AS SS
       WHERE SS.ProjectID = @ProjectID
         AND SS.OwnerType = S.OwnerType
-        AND ISNULL(SS.PartnerID,0)=ISNULL(S.PartnerID,0)
-        AND ISNULL(SS.CompanyID,0)=ISNULL(S.CompanyID,0)
+        AND ISNULL(SS.PartnerID,0)=ISNULL(@PartnerID,0)
+        AND ISNULL(SS.CompanyID,0)=ISNULL(@CompanyID,0)
         AND SS.IsActive=1
       ORDER BY ISNULL(SS.UpdateDate, SS.CreateDate) DESC, SS.PKValue DESC) AS ItemDigit,
     (SELECT TOP 1 RunCus
        FROM dbo.TDSTCompanySetupSystem AS SS
       WHERE SS.ProjectID = @ProjectID
         AND SS.OwnerType = S.OwnerType
-        AND ISNULL(SS.PartnerID,0)=ISNULL(S.PartnerID,0)
-        AND ISNULL(SS.CompanyID,0)=ISNULL(S.CompanyID,0)
+        AND ISNULL(SS.PartnerID,0)=ISNULL(@PartnerID,0)
+        AND ISNULL(SS.CompanyID,0)=ISNULL(@CompanyID,0)
         AND SS.IsActive=1
       ORDER BY ISNULL(SS.UpdateDate, SS.CreateDate) DESC, SS.PKValue DESC) AS RunCus,
     (SELECT TOP 1 CustomerDigit
        FROM dbo.TDSTCompanySetupSystem AS SS
       WHERE SS.ProjectID = @ProjectID
         AND SS.OwnerType = S.OwnerType
-        AND ISNULL(SS.PartnerID,0)=ISNULL(S.PartnerID,0)
-        AND ISNULL(SS.CompanyID,0)=ISNULL(S.CompanyID,0)
+        AND ISNULL(SS.PartnerID,0)=ISNULL(@PartnerID,0)
+        AND ISNULL(SS.CompanyID,0)=ISNULL(@CompanyID,0)
         AND SS.IsActive=1
       ORDER BY ISNULL(SS.UpdateDate, SS.CreateDate) DESC, SS.PKValue DESC) AS CustomerDigit,
     S.RowSTD,
