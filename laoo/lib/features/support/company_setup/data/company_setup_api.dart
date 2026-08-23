@@ -1,4 +1,5 @@
 import '../../../../core/api/api_client.dart';
+import '../models/company_setup_constants.dart';
 import '../models/company_setup_model.dart';
 
 class CompanySetupApi {
@@ -35,6 +36,17 @@ class CompanySetupApi {
     }
 
     return CompanySetupModel.fromJson(data);
+  }
+
+  Future<List<Map<String, dynamic>>> runItemOptions({String? groupCode}) async {
+    final data = await _client.get(
+      '/api/company-setup/run-item-options',
+      query: {
+        'groupCode': groupCode ?? CompanySetupConstants.cConstRunItem,
+      },
+    );
+    if (data is! List) return const [];
+    return List<Map<String, dynamic>>.from(data);
   }
 
   void dispose() => _client.dispose();

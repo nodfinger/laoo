@@ -2,7 +2,7 @@
 
 Copy และ Replace ไฟล์นี้:
 
-`C:\laoo\laoo\lib\features\authentication\presentation\pages\login_page.dart`
+`C:\laooplatformplatform\laoo\lib\features\authentication\presentation\pages\login_page.dart`
 
 การเปลี่ยนแปลง:
 
@@ -14,7 +14,7 @@ Copy และ Replace ไฟล์นี้:
 จากนั้นรัน:
 
 ```powershell
-cd C:\laoo\laoo
+cd C:\laooplatformplatform\laoo
 flutter clean
 flutter pub get
 flutter run -d chrome

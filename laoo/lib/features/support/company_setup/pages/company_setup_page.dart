@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../../core/widgets/auto_dismiss_message.dart';
 import 'package:go_router/go_router.dart';
 
@@ -14,7 +15,9 @@ import '../models/company_setup_model.dart';
 import '../../presentation/widgets/support_workspace_shell.dart';
 
 class CompanySetupPage extends StatefulWidget {
-  const CompanySetupPage({super.key});
+  const CompanySetupPage({super.key, this.additionalOnly = false});
+
+  final bool additionalOnly;
 
   @override
   State<CompanySetupPage> createState() => _CompanySetupPageState();
@@ -34,6 +37,7 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
   final _rowStd = TextEditingController(text: '30');
   final _rowCardStd = TextEditingController(text: '30');
   final _timeAlert = TextEditingController(text: '30');
+  final _itemDigit = TextEditingController(text: '3');
   final _versionId = TextEditingController(text: '1.0.0');
   final _emailHost = TextEditingController(text: 'smtp.gmail.com');
   final _emailPort = TextEditingController(text: '587');
@@ -50,6 +54,11 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
   String _yearFormat = CompanySetupConstants.yearFormatAd;
   int _orgStructureType = 1;
   int _passwordPolicyCode = 3;
+  String? _runItem;
+  List<Map<String, dynamic>> _runItemOptions = const [];
+  String? _runCus;
+  List<Map<String, dynamic>> _runCusOptions = const [];
+  final _customerDigit = TextEditingController(text: '5');
 
   bool _saving = false;
   bool _canEdit = false;
@@ -73,7 +82,16 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
 
   Future<void> _load() async {
     try {
-      final setup = await _api.load();
+      final results = await Future.wait([
+        _api.load(),
+        _api.runItemOptions(),
+        _api.runItemOptions(
+          groupCode: CompanySetupConstants.cConstRunCus,
+        ),
+      ]);
+      final setup = results[0] as CompanySetupModel;
+      final itemOptions = results[1] as List<Map<String, dynamic>>;
+      final customerOptions = results[2] as List<Map<String, dynamic>>;
       if (!mounted) return;
       _ownerCode.text = setup.ownerCode;
       _ownerName.text = setup.name;
@@ -87,6 +105,8 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
       _rowStd.text = setup.rowStd.toString();
       _rowCardStd.text = setup.rowCardStd.toString();
       _timeAlert.text = setup.timeAlert.toString();
+      _itemDigit.text = setup.itemDigit.toString();
+      _customerDigit.text = setup.customerDigit.toString();
       _orgStructureType = setup.orgStructureType;
       _passwordPolicyCode = setup.passwordPolicyCode;
       _versionId.text = setup.versionId ?? '';
@@ -97,13 +117,19 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
       _yearFormat = setup.yearFormat == CompanySetupConstants.yearFormatBe
           ? CompanySetupConstants.yearFormatBe
           : CompanySetupConstants.yearFormatAd;
+      _runItemOptions = itemOptions;
+      _runItem = setup.runItem ??
+          (itemOptions.isEmpty ? null : '${itemOptions.first['code']}');
+      _runCusOptions = customerOptions;
+      _runCus = setup.runCus ??
+          (customerOptions.isEmpty ? null : '${customerOptions.first['code']}');
       setState(() => _loading = false);
     } on ApiException catch (error) {
       if (!mounted) return;
       setState(() {
         _loading = false;
         _messageIsError = true;
-        _message = error.message;
+        _message = _apiMessage(error);
       });
     } catch (_) {
       if (!mounted) return;
@@ -130,6 +156,8 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
       _rowStd,
       _rowCardStd,
       _timeAlert,
+      _itemDigit,
+      _customerDigit,
       _versionId,
       _emailHost,
       _emailPort,
@@ -145,6 +173,10 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
     _api.dispose();
     super.dispose();
   }
+
+  String _apiMessage(ApiException error) => error.statusCode == null
+      ? error.message
+      : '${error.message} (HTTP ${error.statusCode})';
 
   Future<void> _save() async {
     if (_saving) return;
@@ -163,7 +195,7 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
     setState(() => _saving = true);
     if (DateTime.now().millisecondsSinceEpoch >= 0) {
       try {
-        await _api.save(
+        final savedSetup = await _api.save(
           CompanySetupUpdateInput(
             customerNameTh: _customerNameTh.text,
             customerNameEn: _customerNameEn.text,
@@ -173,9 +205,13 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
             customerEmail: _email.text,
             name: _ownerName.text,
             titleHeader: _titleHeader.text,
+            runItem: _runItem,
             rowStd: int.tryParse(_rowStd.text) ?? 30,
             rowCardStd: int.tryParse(_rowCardStd.text) ?? 30,
             timeAlert: int.tryParse(_timeAlert.text) ?? 30,
+            itemDigit: int.tryParse(_itemDigit.text) ?? 3,
+            runCus: _runCus,
+            customerDigit: int.tryParse(_customerDigit.text) ?? 5,
             orgStructureType: _orgStructureType,
             passwordPolicyCode: _passwordPolicyCode,
             yearFormat: _yearFormat,
@@ -190,6 +226,7 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
             passwordEmpDefault: _passwordEmpDefault.text,
           ),
         );
+        _itemDigit.text = savedSetup.itemDigit.toString();
         await companySetupController.load();
         WindowTitleService.setTitle(companySetupController.appTitle);
         if (!mounted) return;
@@ -207,7 +244,7 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
         setState(() {
           _saving = false;
           _messageIsError = true;
-          _message = error.message;
+          _message = _apiMessage(error);
         });
       } catch (_) {
         if (!mounted) return;
@@ -225,6 +262,135 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
       _saving = false;
       _message = 'บันทึกตัวอย่างหน้าจอสำเร็จ (UX Demo ยังไม่เชื่อม API)';
     });
+  }
+
+  Widget _runItemCard(Color accent) {
+    return Card(
+      margin: EdgeInsets.zero,
+      color: Colors.white,
+      elevation: 3,
+      shadowColor: Colors.black.withValues(alpha: .10),
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: accent.withValues(alpha: .35)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (!widget.additionalOnly) ...[
+              Text(
+                'กำหนดค่าระบบเพิ่มเติม',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: accent,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+            Align(
+              alignment: Alignment.centerLeft,
+              child: SizedBox(
+                width: widget.additionalOnly ? 420 : double.infinity,
+                child: DropdownButtonFormField<String>(
+                  value: _runItemOptions.any((x) => '${x['code']}' == _runItem)
+                      ? _runItem
+                      : null,
+                  decoration: const InputDecoration(
+                    labelText: 'รูปแบบการสร้างรหัสสินค้า',
+                  ),
+                  items: _runItemOptions
+                      .map(
+                        (x) => DropdownMenuItem<String>(
+                          value: '${x['code']}',
+                          child: LaooComboBoxText('${x['name']}'),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: _canEdit
+                      ? (value) => setState(() => _runItem = value)
+                      : null,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: SizedBox(
+                width: widget.additionalOnly ? 180 : 240,
+                child: TextFormField(
+                  controller: _itemDigit,
+                  enabled: _canEdit,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  style: const TextStyle(fontSize: 12),
+                  decoration: const InputDecoration(
+                    labelText: 'จำนวนหลักของสินค้า',
+                  ),
+                  validator: (value) {
+                    final digits = int.tryParse(value?.trim() ?? '');
+                    return digits == null || digits < 1 || digits > 10
+                        ? 'ระบุ 1-10 หลัก'
+                        : null;
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: SizedBox(
+                width: widget.additionalOnly ? 420 : double.infinity,
+                child: DropdownButtonFormField<String>(
+                  value: _runCusOptions.any((x) => '${x['code']}' == _runCus)
+                      ? _runCus
+                      : null,
+                  decoration: const InputDecoration(
+                    labelText: 'รูปแบบการสร้างรหัสลูกค้า',
+                  ),
+                  items: _runCusOptions
+                      .map(
+                        (x) => DropdownMenuItem<String>(
+                          value: '${x['code']}',
+                          child: LaooComboBoxText('${x['name']}'),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: _canEdit
+                      ? (value) => setState(() => _runCus = value)
+                      : null,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: SizedBox(
+                width: widget.additionalOnly ? 180 : 240,
+                child: TextFormField(
+                  controller: _customerDigit,
+                  enabled: _canEdit,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  style: const TextStyle(fontSize: 12),
+                  decoration: const InputDecoration(
+                    labelText: 'จำนวนหลักรหัสลูกค้า',
+                  ),
+                  validator: (value) {
+                    final digits = int.tryParse(value?.trim() ?? '');
+                    return digits == null || digits < 1 || digits > 10
+                        ? 'ระบุ 1-10 หลัก'
+                        : null;
+                  },
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   bool _isValidEmail(String value) =>
@@ -249,10 +415,14 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          const Expanded(
+                          Expanded(
                             child: WorkspacePageTitle(
-                              title: 'กำหนดค่าระบบ',
-                              favoriteKey: '05001',
+                              title: widget.additionalOnly
+                                  ? 'กำหนดค่าระบบเพิ่มเติม'
+                                  : 'กำหนดค่าระบบ',
+                              favoriteKey: widget.additionalOnly
+                                  ? '05003'
+                                  : '05001',
                             ),
                           ),
                           _TopActions(
@@ -263,20 +433,26 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 8),
-                      _CompanySetupUxForm(
-                        ownerCode: _ownerCode,
-                        ownerName: _ownerName,
-                        titleHeader: _titleHeader,
-                        customerNameTh: _customerNameTh,
-                        customerNameEn: _customerNameEn,
-                        address: _address,
-                        telephone: _telephone,
-                        taxId: _taxId,
-                        email: _email,
-                      ),
                       const SizedBox(height: 16),
-                      _LegacySetupCards(
+                      if (!widget.additionalOnly) ...[
+                        const SizedBox(height: 8),
+                        _CompanySetupUxForm(
+                          ownerCode: _ownerCode,
+                          ownerName: _ownerName,
+                          titleHeader: _titleHeader,
+                          customerNameTh: _customerNameTh,
+                          customerNameEn: _customerNameEn,
+                          address: _address,
+                          telephone: _telephone,
+                          taxId: _taxId,
+                          email: _email,
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                      _runItemCard(preset.primary),
+                      if (!widget.additionalOnly) ...[
+                        const SizedBox(height: 16),
+                        _LegacySetupCards(
                         controllers: {
                           'rowStd': _rowStd,
                           'rowCardStd': _rowCardStd,
@@ -300,17 +476,20 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
                         passwordPolicyCode: _passwordPolicyCode,
                         onPasswordPolicyCodeChanged: (value) =>
                             setState(() => _passwordPolicyCode = value),
-                      ),
-                      const SizedBox(height: 20),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: _TopActions(
-                          saving: _saving,
-                          canSave: _canEdit,
-                          onCancel: _cancel,
-                          onSave: _save,
                         ),
-                      ),
+                      ],
+                      if (!widget.additionalOnly) ...[
+                        const SizedBox(height: 20),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: _TopActions(
+                            saving: _saving,
+                            canSave: _canEdit,
+                            onCancel: _cancel,
+                            onSave: _save,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
             if (_message != null)
@@ -670,45 +849,41 @@ class _PasswordPolicyField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(top: 8, bottom: 12),
-        child: DropdownButtonFormField<int>(
-          initialValue: const [1, 2, 3].contains(value) ? value : 3,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            fontSize: 13,
-            height: 1.35,
+    padding: const EdgeInsets.only(top: 8, bottom: 12),
+    child: DropdownButtonFormField<int>(
+      initialValue: const [1, 2, 3].contains(value) ? value : 3,
+      style: Theme.of(
+        context,
+      ).textTheme.bodyMedium?.copyWith(fontSize: 13, height: 1.35),
+      decoration: const InputDecoration(
+        labelText: 'Password Policy',
+        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      ),
+      items: const [
+        DropdownMenuItem(
+          value: 1,
+          child: Text(
+            '1 - อิสระ อย่างน้อย 1 ตัว',
+            style: TextStyle(fontSize: 13),
           ),
-          decoration: const InputDecoration(
-            labelText: 'Password Policy',
-            contentPadding: EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 12,
-            ),
-          ),
-          items: const [
-            DropdownMenuItem(
-              value: 1,
-              child: Text(
-                '1 - อิสระ อย่างน้อย 1 ตัว',
-                style: TextStyle(fontSize: 13),
-              ),
-            ),
-            DropdownMenuItem(
-              value: 2,
-              child: Text('2 - ขั้นต่ำ 4 ตัว', style: TextStyle(fontSize: 13)),
-            ),
-            DropdownMenuItem(
-              value: 3,
-              child: Text(
-                '3 - ขั้นต่ำ 6 ตัว + เงื่อนไข',
-                style: TextStyle(fontSize: 13),
-              ),
-            ),
-          ],
-          onChanged: (next) {
-            if (next != null) onChanged(next);
-          },
         ),
-      );
+        DropdownMenuItem(
+          value: 2,
+          child: Text('2 - ขั้นต่ำ 4 ตัว', style: TextStyle(fontSize: 13)),
+        ),
+        DropdownMenuItem(
+          value: 3,
+          child: Text(
+            '3 - ขั้นต่ำ 6 ตัว + เงื่อนไข',
+            style: TextStyle(fontSize: 13),
+          ),
+        ),
+      ],
+      onChanged: (next) {
+        if (next != null) onChanged(next);
+      },
+    ),
+  );
 }
 
 class _YearFormatField extends StatelessWidget {

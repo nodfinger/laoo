@@ -1,4 +1,6 @@
 abstract final class CompanySetupConstants {
+  static const cConstRunItem = '002';
+  static const cConstRunCus = '001';
   static const yearFormatAd = 'AD';
   static const yearFormatBe = 'BE';
 

@@ -839,11 +839,13 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
           SizedBox(
             width: constraints.maxWidth < 600
                 ? constraints.maxWidth
-                : 320,
+                : 210,
             child: TextField(
               controller: searchController,
+              style: const TextStyle(fontSize: 12),
               onSubmitted: (_) => _searchEmployees(),
               decoration: InputDecoration(
+                labelStyle: const TextStyle(fontSize: 12),
                 prefixIcon: Icon(Icons.search),
                 labelText: 'ค้นหารหัส/ชื่อ/ชื่อเล่น/อีเมล',
                 suffixIcon: IconButton(
@@ -852,6 +854,58 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
                   icon: Icon(Icons.arrow_forward),
                 ),
               ),
+            ),
+          ),
+          OutlinedButton.icon(
+            onPressed: _searchEmployees,
+            icon: const Icon(Icons.search),
+            label: const Text('ค้นหา'),
+          ),
+          OutlinedButton.icon(
+            onPressed: () async {
+              setState(_resetEmployeeFilters);
+              await _searchEmployees();
+            },
+            icon: const Icon(Icons.filter_alt_off_outlined),
+            label: const Text('ล้าง Filter'),
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Transform.scale(
+                scale: 0.8,
+                child: Switch(
+                  value: showEmployeeImage,
+                  onChanged: (value) =>
+                      setState(() => showEmployeeImage = value),
+                ),
+              ),
+              const Text('แสดงรูป'),
+            ],
+          ),
+          SizedBox(
+            width: 140,
+            child: DropdownButtonFormField<bool>(
+              initialValue: filterIsActive,
+              decoration: const InputDecoration(labelText: 'สถานะ'),
+              items: const [
+                DropdownMenuItem<bool>(
+                  value: null,
+                  child: LaooComboBoxText('ทั้งหมด'),
+                ),
+                DropdownMenuItem<bool>(
+                  value: true,
+                  child: LaooComboBoxText('ปกติ'),
+                ),
+                DropdownMenuItem<bool>(
+                  value: false,
+                  child: LaooComboBoxText('หยุดใช้งาน'),
+                ),
+              ],
+              onChanged: (value) {
+                setState(() => filterIsActive = value);
+                _searchEmployees();
+              },
             ),
           ),
           if (organizationMode == 2)
@@ -904,31 +958,6 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
               },
             ),
           ),
-          SizedBox(
-            width: 160,
-            child: DropdownButtonFormField<bool>(
-              initialValue: filterIsActive,
-              decoration: const InputDecoration(labelText: 'สถานะ'),
-              items: const [
-                DropdownMenuItem<bool>(
-                  value: null,
-                  child: LaooComboBoxText('ทั้งหมด'),
-                ),
-                DropdownMenuItem<bool>(
-                  value: true,
-                  child: LaooComboBoxText('ปกติ'),
-                ),
-                DropdownMenuItem<bool>(
-                  value: false,
-                  child: LaooComboBoxText('หยุดใช้งาน'),
-                ),
-              ],
-              onChanged: (value) {
-                setState(() => filterIsActive = value);
-                _searchEmployees();
-              },
-            ),
-          ),
           if (widget.customer && !widget.companyScoped)
             SizedBox(
               width: 240,
@@ -952,20 +981,6 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
                 },
               ),
             ),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Transform.scale(
-                scale: 0.8,
-                child: Switch(
-                  value: showEmployeeImage,
-                  onChanged: (value) =>
-                      setState(() => showEmployeeImage = value),
-                ),
-              ),
-              const Text('แสดงรูปพนักงาน'),
-            ],
-          ),
           ],
         ),
       ),
@@ -1053,7 +1068,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
 
   Widget _employeeTableStyle() {
     final primary = workspaceThemeController.value.primary;
-    final border = Theme.of(context).dividerColor;
+    const border = Color(0xFFD1D5DB);
     const minTableWidth = 900.0;
 
     return LayoutBuilder(
@@ -1329,6 +1344,27 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
                     children: [
                       Row(
                         children: [
+                          DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: (row.$2 == 'ปกติ' ? primary : error)
+                                  .withValues(alpha: .12),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 9,
+                                vertical: 4,
+                              ),
+                              child: Text(
+                                row.$2,
+                                style: TextStyle(
+                                  color: row.$2 == 'ปกติ' ? primary : error,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const Spacer(),
                           if (_canEdit)
                             IconButton(
                               tooltip: 'แก้ไข',
@@ -1354,33 +1390,31 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
                                 color: primary,
                               ),
                             ),
-                          Expanded(
-                            child: Text(
-                              row.$4,
-                              style: TextStyle(
-                                color: primary,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                          Text(
-                            row.$2,
-                            style: TextStyle(
-                              color: row.$2 == 'ปกติ' ? primary : error,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
                         ],
                       ),
                       const SizedBox(height: 3),
-                      Text(
-                        row.$5,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onSurface,
-                          fontWeight: FontWeight.w600,
-                        ),
+                      Row(
+                        children: [
+                          Text(
+                            row.$4,
+                            style: TextStyle(
+                              color: primary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              row.$5,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.onSurface,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 3),
                       Row(
@@ -1501,7 +1535,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w700,
-                                color: Theme.of(context).colorScheme.primary,
+                                color: workspaceThemeController.value.primary,
                               ),
                             ),
                             const SizedBox(height: 12),

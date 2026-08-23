@@ -35,64 +35,71 @@ class WorkspacePageTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent = workspaceThemeController.value.primary;
     final key = favoriteKey;
 
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Flexible(
-          child: Text(
-            title,
-            style: TextStyle(
-              fontSize: LaooTypography.workspaceCaption,
-              fontWeight: LaooTypography.workspaceCaptionWeight,
-              color: accent,
-            ),
-          ),
-        ),
-        if (key != null) ...[
-          const SizedBox(width: 6),
-          ValueListenableBuilder<Set<String>>(
-            valueListenable: supportFavoritePages,
-            builder: (context, favorites, _) {
-              return FutureBuilder<NavigationMenuItem?>(
-                future: NavigationMenuRepository().findMenu(
-                  menuCode: key,
-                  routeName: key,
+    return ValueListenableBuilder<WorkspaceThemePreset>(
+      valueListenable: workspaceThemeController,
+      builder: (context, preset, _) {
+        final accent = preset.primary;
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: Text(
+                title,
+                style: TextStyle(
+                  fontSize: LaooTypography.workspaceCaption,
+                  fontWeight: LaooTypography.workspaceCaptionWeight,
+                  color: accent,
                 ),
-                builder: (context, snapshot) {
-                  final code = snapshot.data?.code.trim() ?? key;
-                  final selected = favorites.contains(code);
-                  return IconButton(
-                    tooltip: selected
-                        ? 'นำออกจากเมนูลัดของฉัน'
-                        : 'เพิ่มหน้านี้เป็นเมนูลัดของฉัน',
-                    onPressed: () async {
-                      final resolved = snapshot.data?.code.trim();
-                      if (resolved == null || resolved.isEmpty) return;
-                      final next = <String>{...favorites};
-                      if (selected) {
-                        next.remove(resolved);
-                        await _userFavoriteRepository.remove(resolved);
-                      } else {
-                        next.add(resolved);
-                        await _userFavoriteRepository.add(resolved);
-                      }
-                      supportFavoritePages.value = next;
-                      supportFavoriteRefresh.value++;
-                    },
-                    icon: Icon(
-                      selected ? Icons.star_rounded : Icons.star_border_rounded,
-                      color: accent,
+              ),
+            ),
+            if (key != null) ...[
+              const SizedBox(width: 6),
+              ValueListenableBuilder<Set<String>>(
+                valueListenable: supportFavoritePages,
+                builder: (context, favorites, _) {
+                  return FutureBuilder<NavigationMenuItem?>(
+                    future: NavigationMenuRepository().findMenu(
+                      menuCode: key,
+                      routeName: key,
                     ),
+                    builder: (context, snapshot) {
+                      final code = snapshot.data?.code.trim() ?? key;
+                      final selected = favorites.contains(code);
+                      return IconButton(
+                        tooltip: selected
+                            ? 'นำออกจากเมนูลัดของฉัน'
+                            : 'เพิ่มหน้านี้เป็นเมนูลัดของฉัน',
+                        onPressed: () async {
+                          final resolved = snapshot.data?.code.trim();
+                          if (resolved == null || resolved.isEmpty) return;
+                          final next = <String>{...favorites};
+                          if (selected) {
+                            next.remove(resolved);
+                            await _userFavoriteRepository.remove(resolved);
+                          } else {
+                            next.add(resolved);
+                            await _userFavoriteRepository.add(resolved);
+                          }
+                          supportFavoritePages.value = next;
+                          supportFavoriteRefresh.value++;
+                        },
+                        icon: Icon(
+                          selected
+                              ? Icons.star_rounded
+                              : Icons.star_border_rounded,
+                          color: accent,
+                        ),
+                      );
+                    },
                   );
                 },
-              );
-            },
-          ),
-        ],
-      ],
+              ),
+            ],
+          ],
+        );
+      },
     );
   }
 }
@@ -104,12 +111,14 @@ class SupportWorkspaceShell extends StatelessWidget {
     required this.child,
     this.activeMenu,
     this.menuScope = WorkspaceMenuScope.support,
+    this.showMobileMenuButton = true,
   });
 
   final String pageTitle;
   final String? activeMenu;
   final Widget child;
   final WorkspaceMenuScope menuScope;
+  final bool showMobileMenuButton;
 
   @override
   Widget build(BuildContext context) {
@@ -151,42 +160,41 @@ class SupportWorkspaceShell extends StatelessWidget {
               drawer: compact
                   ? ValueListenableBuilder<bool>(
                       valueListenable: workspaceButtonMenu,
-                      builder: (context, buttonMenu, _) => buttonMenu
-                          ? const SizedBox.shrink()
-                          : Drawer(
-                              child: _Sidebar(
-                                activeMenu: activeMenu,
-                                preset: preset,
-                                menuScope: menuScope,
-                              ),
-                            ),
+                      builder: (context, _, _) => Drawer(
+                        child: _Sidebar(
+                          activeMenu: activeMenu,
+                          preset: preset,
+                          menuScope: menuScope,
+                        ),
+                      ),
                     )
                   : null,
               appBar: compact
                   ? AppBar(
                       backgroundColor: preset.surface,
                       surfaceTintColor: Colors.transparent,
+                      automaticallyImplyLeading: false,
                       titleSpacing: 0,
                       title: ValueListenableBuilder<bool>(
                         valueListenable: workspaceButtonMenu,
                         builder: (context, buttonMenu, _) => Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            if (!buttonMenu)
+                            if (showMobileMenuButton)
                               _MobileGroupMenu(
                                 preset: preset,
                                 menuScope: menuScope,
                                 activeMenu: activeMenu,
                                 slide: true,
                               ),
-                            if (!buttonMenu) const SizedBox(width: 4),
+                            if (showMobileMenuButton) const SizedBox(width: 4),
                             SizedBox(
-                              width: buttonMenu ? 155 : 145,
+                              width: showMobileMenuButton ? 145 : 155,
                               child: _BrandHeader(
-                          accent: preset.primary,
-                          preset: preset,
-                          compact: true,
-                        ),
+                                accent: preset.primary,
+                                preset: preset,
+                                compact: true,
+                              ),
                             ),
                           ],
                         ),
@@ -314,6 +322,8 @@ class _MobileGroupMenuState extends State<_MobileGroupMenu> {
 
   @override
   Widget build(BuildContext context) {
+    // Button/Style menu already exposes its menu cards; do not show a
+    // redundant hamburger trigger. Slide menu keeps the trigger normally.
     if (widget.slide) {
       return Builder(
         builder: (context) => IconButton(
@@ -352,7 +362,10 @@ class _MobileGroupMenuState extends State<_MobileGroupMenu> {
               value: '__all_groups__',
               child: ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: Icon(Icons.apps_outlined, color: widget.preset.primary),
+                leading: Icon(
+                  Icons.apps_outlined,
+                  color: widget.preset.primary,
+                ),
                 title: Text(
                   'แสดงทุกกลุ่มเมนู',
                   style: TextStyle(color: widget.preset.textPrimary),
@@ -549,11 +562,7 @@ class _TopBar extends StatelessWidget {
             color: Theme.of(context).colorScheme.primary,
             onPressed: () => context.goNamed(RouteNames.authenticatedHome),
           ),
-          Container(
-            width: 1,
-            height: 34,
-            color: preset.border,
-          ),
+          Container(width: 1, height: 34, color: preset.border),
           _TopBarAction(
             icon: Icons.logout_outlined,
             label: 'ออกจากระบบ',
@@ -590,20 +599,23 @@ class _TopBarAction extends StatelessWidget {
       onPressed: onPressed,
       style: TextButton.styleFrom(
         foregroundColor: color,
-        minimumSize: const Size(90, 48),
-        padding: const EdgeInsets.symmetric(horizontal: 8),
+        minimumSize: const Size(112, LaooTypography.buttonHeight),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
         shape: const RoundedRectangleBorder(),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 20),
-          const SizedBox(width: 6),
+          Icon(icon, size: 24),
+          const SizedBox(width: 8),
           Text(
             label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+            style: const TextStyle(
+              fontSize: LaooTypography.button,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ],
       ),
@@ -992,6 +1004,16 @@ class _ButtonMenuWorkspaceState extends State<_ButtonMenuWorkspace> {
     super.initState();
     _menus = NavigationMenuRepository().getMenus();
     _loadFavorites();
+    if (widget.compact) {
+      mobileSelectedMenuGroup.value = null;
+      _setDefaultMobileGroup();
+    }
+  }
+
+  Future<void> _setDefaultMobileGroup() async {
+    final groups = _visibleGroups(await _menus);
+    if (!mounted || groups.isEmpty) return;
+    mobileSelectedMenuGroup.value = groups.first.code;
   }
 
   Future<void> _loadFavorites() async {
@@ -1050,6 +1072,11 @@ class _ButtonMenuWorkspaceState extends State<_ButtonMenuWorkspace> {
         }
 
         final groups = _visibleGroups(snapshot.data!);
+        if (widget.compact &&
+            widget.activeMenu != null &&
+            widget.activeMenu != 'home') {
+          return widget.child;
+        }
         if (widget.compact) {
           return ValueListenableBuilder<String?>(
             valueListenable: mobileSelectedMenuGroup,
@@ -1203,18 +1230,15 @@ class _ButtonMenuWorkspaceState extends State<_ButtonMenuWorkspace> {
                             selectedCode.trim().toUpperCase(),
                       )
                       .map(
-                        (group) => _buildCompactGroup(
-                          context,
-                          group,
-                          currentPath,
-                        ),
+                        (group) =>
+                            _buildCompactGroup(context, group, currentPath),
                       ),
                 ],
               ],
             ),
           ),
         ),
-                _buildCompactFooter(context, groups, selectedCode),
+        _buildCompactFooter(context, groups, selectedCode),
       ],
     );
   }
@@ -1375,9 +1399,9 @@ class _ButtonMenuWorkspaceState extends State<_ButtonMenuWorkspace> {
               itemCount: items.length,
               gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
                 maxCrossAxisExtent: 102,
-              mainAxisExtent: 96,
-              crossAxisSpacing: 10,
-              mainAxisSpacing: 14,
+                mainAxisExtent: 96,
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 14,
               ),
               itemBuilder: (context, index) {
                 final item = items[index];
@@ -1484,18 +1508,11 @@ class _ButtonMenuWorkspaceState extends State<_ButtonMenuWorkspace> {
                 icon: Icons.apps_outlined,
                 label: 'กลับหน้าแรก',
                 color: foreground,
-                onPressed: () => _showCompactGroupPicker(
-                  context,
-                  groups,
-                  selectedCode,
-                ),
+                onPressed: () =>
+                    _showCompactGroupPicker(context, groups, selectedCode),
               ),
             ),
-            Container(
-              width: 1,
-              height: 36,
-              color: widget.preset.border,
-            ),
+            Container(width: 1, height: 36, color: widget.preset.border),
             Expanded(
               child: _CompactFooterButton(
                 icon: Icons.home_rounded,
@@ -1504,11 +1521,7 @@ class _ButtonMenuWorkspaceState extends State<_ButtonMenuWorkspace> {
                 onPressed: () => context.goNamed(RouteNames.authenticatedHome),
               ),
             ),
-            Container(
-              width: 1,
-              height: 36,
-              color: widget.preset.border,
-            ),
+            Container(width: 1, height: 36, color: widget.preset.border),
             Expanded(
               child: _CompactFooterButton(
                 icon: Icons.logout_rounded,
@@ -1564,7 +1577,8 @@ class _ButtonMenuWorkspaceState extends State<_ButtonMenuWorkspace> {
                 group.name,
                 style: TextStyle(color: widget.preset.textPrimary),
               ),
-              selected: group.code.trim().toUpperCase() ==
+              selected:
+                  group.code.trim().toUpperCase() ==
                   selectedCode?.trim().toUpperCase(),
               selectedColor: widget.preset.primary,
               onTap: () {
@@ -1954,7 +1968,7 @@ class _FavoriteWorkspaceBarState extends State<_FavoriteWorkspaceBar> {
               final spec = AppMenuRouteRegistry.byMenuCode(item.menuCode);
               final favoriteIndex = _favorites.indexOf(item);
               return Padding(
-                padding: const EdgeInsets.only(right: 8),
+                padding: EdgeInsets.zero,
                 child: buttonStyle
                     ? Row(
                         mainAxisSize: MainAxisSize.min,
@@ -1995,19 +2009,24 @@ class _FavoriteWorkspaceBarState extends State<_FavoriteWorkspaceBar> {
                             ),
                         ],
                       )
-                    : ActionChip(
-                        avatar: Icon(
-                          _icon(item.iconName),
-                          size: 17,
-                          color: accent,
-                        ),
-                        label: Text(
-                          item.menuName,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        onPressed: spec == null
+                    : InkWell(
+                        onTap: spec == null
                             ? null
                             : () => context.goNamed(spec.goRouteName),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(item.menuName, overflow: TextOverflow.ellipsis, style: TextStyle(color: accent)),
+                              if (favoriteIndex < _favorites.length - 1)
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                                  child: Text('|', style: TextStyle(color: accent.withValues(alpha: .55))),
+                                ),
+                            ],
+                          ),
+                        ),
                       ),
               );
             }),
@@ -2151,7 +2170,10 @@ class _ThemePickerDialogState extends State<_ThemePickerDialog> {
               scrollDirection: Axis.horizontal,
               child: SegmentedButton<String>(
                 segments: const [
-                  ButtonSegment(value: 'Hybrid Dark Menu', label: Text('Hybrid')),
+                  ButtonSegment(
+                    value: 'Hybrid Dark Menu',
+                    label: Text('Hybrid'),
+                  ),
                   ButtonSegment(value: 'White Menu', label: Text('White Menu')),
                   ButtonSegment(value: 'Light', label: Text('Light')),
                   ButtonSegment(value: 'Soft Dark', label: Text('Soft Dark')),
@@ -2729,12 +2751,14 @@ class _BrandHeader extends StatelessWidget {
     required this.preset,
     this.lightSurface = false,
     this.compact = false,
+    this.onTap,
   });
 
   final Color accent;
   final WorkspaceThemePreset preset;
   final bool lightSurface;
   final bool compact;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -2769,9 +2793,16 @@ class _BrandHeader extends StatelessWidget {
             ? configuredVersion
             : (compact ? '1.0.0' : '');
 
-        return SizedBox(
-          height: compact ? 64 : 72,
-          child: Padding(
+        return GestureDetector(
+          onTap: onTap ??
+              () => context.goNamed(
+                    appAuthController.isLaooSupport
+                        ? RouteNames.supportHome
+                        : RouteNames.authenticatedHome,
+                  ),
+          child: SizedBox(
+            height: compact ? 64 : 72,
+            child: Padding(
             padding: EdgeInsets.symmetric(horizontal: compact ? 4 : 16),
             child: Row(
               children: [
@@ -2858,6 +2889,7 @@ class _BrandHeader extends StatelessWidget {
                   ),
                 ),
               ],
+            ),
             ),
           ),
         );

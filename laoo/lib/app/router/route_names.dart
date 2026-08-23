@@ -5,13 +5,12 @@ abstract final class RouteNames {
   static const String authenticatedHome = 'authenticated-home';
   static const String companyProducts = 'company-products';
   static const String companyCustomers = 'company-customers';
+  static const String companyBranches = 'company-branches';
   static const String partnerCompanies = 'partner-companies';
   static const String partnerBranches = 'partner-branches';
   static const String partnerUsers = 'partner-users';
   static const String supportHome = 'support-home';
   static const String partner = 'partner';
-  static const String company = 'company';
-  static const String branch = 'branch';
   static const String laooUser = 'laooUser';
   static const String partnerUser = 'partnerUser';
   static const String companyUser = 'companyUser';
@@ -21,6 +20,7 @@ abstract final class RouteNames {
   static const String audit = 'audit';
   static const String loginLog = 'loginLog';
   static const String companySetup = 'companySetup';
+  static const String companySetupAdditional = 'companySetupAdditional';
   static const String technicalInfo = 'technicalInfo';
   static const String masterData = 'masterData';
   static const String organizationStructure = 'organizationStructure';
@@ -34,6 +34,4 @@ abstract final class RouteNames {
   static const String partnerMenuPermissions = 'partnerMenuPermissions';
   static const String laooEmployees = 'laooEmployees';
   static const String laooUsers = 'laooUsers';
-  static const String laooRoleGroups = 'laooRoleGroups';
-  static const String laooMenuPermissions = 'laooMenuPermissions';
 }

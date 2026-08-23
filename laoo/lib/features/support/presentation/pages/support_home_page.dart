@@ -17,6 +17,7 @@ class SupportHomePage extends StatelessWidget {
     return SupportWorkspaceShell(
       pageTitle: 'หน้าหลัก',
       activeMenu: 'home',
+      showMobileMenuButton: true,
       child: LayoutBuilder(
         builder: (context, constraints) => constraints.maxWidth < 600
             ? const _MobileSupportHomeContent()
@@ -58,7 +59,22 @@ class _MobileSupportHomeContentState extends State<_MobileSupportHomeContent> {
 
   Future<void> _loadFavorites() async {
     final favorites = await _favoritesRepository.getAll();
-    if (mounted) setState(() => _favorites = favorites);
+    final groups = await _menus;
+    final visibleCodes = groups
+        .expand((group) => group.items)
+        .map((item) => item.code.trim().toUpperCase())
+        .toSet();
+    final valid = favorites
+        .where(
+          (item) =>
+              visibleCodes.contains(item.menuCode.trim().toUpperCase()) &&
+              AppMenuRouteRegistry.byMenuCode(item.menuCode) != null,
+        )
+        .toList();
+    for (final item in favorites.where((item) => !valid.contains(item))) {
+      await _favoritesRepository.remove(item.menuCode);
+    }
+    if (mounted) setState(() => _favorites = valid);
   }
 
   @override
@@ -326,18 +342,6 @@ class _WorkspaceContent extends StatelessWidget {
                 title: 'Partner',
                 accent: accent,
                 onTap: () => context.goNamed(RouteNames.partner),
-              ),
-              _MenuCard(
-                icon: Icons.apartment_outlined,
-                title: 'Company',
-                accent: accent,
-                onTap: () => context.goNamed(RouteNames.company),
-              ),
-              _MenuCard(
-                icon: Icons.account_tree_outlined,
-                title: 'Branch',
-                accent: accent,
-                onTap: () => context.goNamed(RouteNames.branch),
               ),
               _MenuCard(
                 icon: Icons.support_agent_outlined,

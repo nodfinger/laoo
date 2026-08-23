@@ -4,9 +4,9 @@ class BranchRepository {
   BranchRepository({ApiClient? api}) : _api = api ?? ApiClient();
   final ApiClient _api;
 
-  Future<Map<String, bool>> actions({bool support = true}) async {
+  Future<Map<String, bool>> actions({bool support = true, bool company = false}) async {
     final data = await _api.get(
-      '${support ? '/api/support/branches' : '/api/partner/branches'}/actions',
+      '${company ? '/api/company/branches' : support ? '/api/support/branches' : '/api/partner/branches'}/actions',
     );
     if (data is! Map) return const {};
     return Map<String, bool>.fromEntries(
@@ -17,9 +17,10 @@ class BranchRepository {
     String? search,
     int? companyId,
     bool support = true,
+    bool company = false,
   }) async => List<Map<String, dynamic>>.from(
     await _api.get(
-          support ? '/api/support/branches' : '/api/partner/branches',
+          company ? '/api/company/branches' : support ? '/api/support/branches' : '/api/partner/branches',
           query: {
             'search': search ?? '',
             if (companyId != null) 'companyId': '$companyId',
@@ -27,9 +28,9 @@ class BranchRepository {
         )
         as List,
   );
-  Future<void> create(Map<String, dynamic> data, {bool support = true}) async {
+  Future<void> create(Map<String, dynamic> data, {bool support = true, bool company = false}) async {
     await _api.post(
-      support ? '/api/support/branches' : '/api/partner/branches',
+      company ? '/api/company/branches' : support ? '/api/support/branches' : '/api/partner/branches',
       body: data,
     );
   }
@@ -38,16 +39,17 @@ class BranchRepository {
     int id,
     Map<String, dynamic> data, {
     bool support = true,
+    bool company = false,
   }) async {
     await _api.put(
-      '${support ? '/api/support/branches' : '/api/partner/branches'}/$id',
+      '${company ? '/api/company/branches' : support ? '/api/support/branches' : '/api/partner/branches'}/$id',
       body: data,
     );
   }
 
-  Future<void> delete(int id, {bool support = true}) async {
+  Future<void> delete(int id, {bool support = true, bool company = false}) async {
     await _api.delete(
-      '${support ? '/api/support/branches' : '/api/partner/branches'}/$id',
+      '${company ? '/api/company/branches' : support ? '/api/support/branches' : '/api/partner/branches'}/$id',
     );
   }
 }

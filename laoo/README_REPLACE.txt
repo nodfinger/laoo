@@ -1,16 +1,16 @@
 ชุดไฟล์ปรับหน้าเริ่มต้น Laoo Solutions
 
 ให้นำไฟล์ไปวางแทนที่ในโปรเจกต์:
-C:\laoo\laoo
+C:\laooplatformplatform\laoo
 
 รายการไฟล์:
-1. C:\laoo\laoo\lib\main.dart
-2. C:\laoo\laoo\lib\app\laoo_app.dart
-3. C:\laoo\laoo\lib\features\landing\presentation\pages\landing_page.dart
-4. C:\laoo\laoo\lib\features\auth\presentation\pages\login_page.dart
+1. C:\laooplatformplatform\laoo\lib\main.dart
+2. C:\laooplatformplatform\laoo\lib\app\laoo_app.dart
+3. C:\laooplatformplatform\laoo\lib\features\landing\presentation\pages\landing_page.dart
+4. C:\laooplatformplatform\laoo\lib\features\auth\presentation\pages\login_page.dart
 
 หลังจากแทนที่ไฟล์ ให้รัน:
-cd C:\laoo\laoo
+cd C:\laooplatformplatform\laoo
 flutter clean
 flutter pub get
 flutter run -d windows

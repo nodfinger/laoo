@@ -1,5 +1,5 @@
 param(
-    [string]$ProjectPath = "C:\laoo\laoo"
+    [string]$ProjectPath = "C:\laooplatformplatform\laoo"
 )
 
 $ErrorActionPreference = "Stop"

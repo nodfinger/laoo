@@ -16,7 +16,7 @@ Status: Active
 # Root Structure
 
 ```text
-C:\laoo
+C:\laooplatform
 │
 ├── docs
 ├── scripts
@@ -27,12 +27,12 @@ C:\laoo
 └── ...
 ```
 
-Project ใหม่ต้องอยู่ภายใต้ `C:\laoo` โดยตรง
+Project ใหม่ต้องอยู่ภายใต้ `C:\laooplatform` โดยตรง
 
 ห้ามสร้าง Project ใหม่ภายใต้
 
 ```text
-C:\laoo\projects
+C:\laooplatform\projects
 ```
 
 ---
@@ -44,7 +44,7 @@ C:\laoo\projects
 Path:
 
 ```text
-C:\laoo\docs
+C:\laooplatform\docs
 ```
 
 ใช้เก็บเอกสารและมาตรฐานกลาง เช่น
@@ -79,7 +79,7 @@ templates/
 Path:
 
 ```text
-C:\laoo\scripts
+C:\laooplatform\scripts
 ```
 
 ใช้เก็บ Script กลาง เช่น
@@ -105,7 +105,7 @@ deploy.ps1
 Path:
 
 ```text
-C:\laoo\tools
+C:\laooplatform\tools
 ```
 
 ใช้เก็บเครื่องมือกลางและ Utility
@@ -133,7 +133,7 @@ validators/
 Path:
 
 ```text
-C:\laoo\laoo
+C:\laooplatformplatform\laoo
 ```
 
 Flutter Project หลัก
@@ -153,7 +153,7 @@ Flutter Project หลัก
 Path:
 
 ```text
-C:\laoo\laoo_api
+C:\laooplatformplatform\laoo\laoo_api
 ```
 
 ASP.NET Core Web API
@@ -174,7 +174,7 @@ ASP.NET Core Web API
 Path:
 
 ```text
-C:\laoo\laoo_meeting
+C:\laooplatformplatform\laoo_meeting
 ```
 
 Flutter Project ระบบห้องประชุม
@@ -200,7 +200,7 @@ LICENSE
 README หลักปัจจุบันอยู่ที่
 
 ```text
-C:\laoo\docs\README.md
+C:\laooplatform\docs\README.md
 ```
 
 ห้ามเก็บไฟล์ชั่วคราวที่ Root เช่น
@@ -254,14 +254,14 @@ git grep --cached -n -I -E "Password=|User Id=|ApiKey|Api_Key|AccessToken|Bearer
 
 | File Type | Location |
 |---|---|
-| Standard `.md` | `C:\laoo\docs\standards` |
-| API Contract | `C:\laoo\docs\api` |
-| Deployment Plan | `C:\laoo\docs\deployment` |
-| QA Checklist | `C:\laoo\docs\qa` |
+| Standard `.md` | `C:\laooplatform\docs\standards` |
+| API Contract | `C:\laooplatform\docs\api` |
+| Deployment Plan | `C:\laooplatform\docs\deployment` |
+| QA Checklist | `C:\laooplatform\docs\qa` |
 | Flutter Code | `<ProjectRoot>\lib` |
-| ASP.NET Core Code | `C:\laoo\laoo_api` |
-| Shared Script | `C:\laoo\scripts` |
-| Shared Tool | `C:\laoo\tools` |
+| ASP.NET Core Code | `C:\laooplatformplatform\laoo\laoo_api` |
+| Shared Script | `C:\laooplatform\scripts` |
+| Shared Tool | `C:\laooplatform\tools` |
 | Project Manifest | `<ProjectRoot>\PROJECT.md` |
 | Local Secret | `<ProjectRoot>\appsettings.Local.json` |
 
@@ -272,15 +272,15 @@ git grep --cached -n -I -E "Password=|User Id=|ApiKey|Api_Key|AccessToken|Bearer
 ห้ามมีไฟล์มาตรฐานชื่อเดียวกันหลายตำแหน่ง เช่น
 
 ```text
-C:\laoo\docs\AGENTS.md
-C:\laoo\tools\AGENTS.md
-C:\laoo\AGENTS.md
+C:\laooplatform\docs\AGENTS.md
+C:\laooplatform\tools\AGENTS.md
+C:\laooplatform\AGENTS.md
 ```
 
 ให้ยึดไฟล์จริงเพียงตำแหน่งเดียว:
 
 ```text
-C:\laoo\docs\AGENTS.md
+C:\laooplatform\docs\AGENTS.md
 ```
 
 ถ้าพบไฟล์ซ้ำ:

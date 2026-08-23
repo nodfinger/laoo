@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/api/api_exception.dart';
 import '../../../../core/company_setup/company_setup_controller.dart';
 import '../../../../features/support/presentation/widgets/support_workspace_shell.dart';
+import '../../../../app/theme/workspace_theme_presets.dart';
 import '../../role_group/data/role_group_repository.dart';
 import '../../role_group/models/role_group.dart';
 import '../data/menu_permission_repository.dart';
@@ -293,8 +294,10 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
         : widget.scope == 'partner'
         ? WorkspaceMenuScope.partner
         : WorkspaceMenuScope.company,
-    child: Stack(
-      children: [
+    child: ValueListenableBuilder<WorkspaceThemePreset>(
+      valueListenable: workspaceThemeController,
+      builder: (context, _, _) => Stack(
+        children: [
         Column(
           children: [
             Padding(
@@ -464,7 +467,8 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
               ),
             ),
           ),
-      ],
+        ],
+      ),
     ),
   );
 
@@ -479,7 +483,7 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
     child: Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        border: Border.all(color: Theme.of(context).colorScheme.primary),
+        border: Border.all(color: const Color(0xFFD1D5DB)),
         borderRadius: BorderRadius.circular(8),
       ),
       child: DataTable(
@@ -493,7 +497,7 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
           DataColumn(label: _headerCell(context, 'แก้ไข')),
           DataColumn(label: _headerCell(context, 'ลบ')),
         ],
-        rows: _tableRows(),
+        rows: _tableRows(context),
       ),
     ),
         );
@@ -579,7 +583,7 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
       },
     );
   }
-  List<DataRow> _tableRows() {
+  List<DataRow> _tableRows(BuildContext tableContext) {
     final result = <DataRow>[];
     String? lastGroup;
     for (final row in _filteredRows) {
@@ -588,14 +592,14 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
         result.add(
           DataRow(
             color: WidgetStatePropertyAll(
-              Theme.of(context).colorScheme.primary.withValues(alpha: .08),
+              Theme.of(tableContext).colorScheme.primary.withValues(alpha: .10),
             ),
             cells: [
               DataCell(
                 Text(
                   row.menuGroupName,
                   style: TextStyle(
-                    color: Theme.of(context).colorScheme.primary,
+                    color: Theme.of(tableContext).colorScheme.primary,
                     fontWeight: FontWeight.w700,
                   ),
                 ),

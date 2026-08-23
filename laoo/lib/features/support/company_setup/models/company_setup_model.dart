@@ -11,6 +11,10 @@ class CompanySetupModel {
     this.customerEmail,
     required this.name,
     required this.titleHeader,
+    this.runItem,
+    this.itemDigit = 3,
+    this.runCus,
+    this.customerDigit = 5,
     required this.rowStd,
     required this.rowCardStd,
     required this.timeAlert,
@@ -51,6 +55,10 @@ class CompanySetupModel {
   final String? customerEmail;
   final String name;
   final String titleHeader;
+  final String? runItem;
+  final int itemDigit;
+  final String? runCus;
+  final int customerDigit;
   final int rowStd;
   final int rowCardStd;
   final int timeAlert;
@@ -95,6 +103,10 @@ class CompanySetupModel {
       customerEmail: json['customerEmail']?.toString(),
       name: json['name']?.toString() ?? '',
       titleHeader: json['titleHeader']?.toString() ?? '',
+      runItem: json['runItem']?.toString(),
+      itemDigit: asInt(json['itemDigit']) ?? 3,
+      runCus: json['runCus']?.toString(),
+      customerDigit: asInt(json['customerDigit']) ?? 5,
       rowStd: asInt(json['rowSTD']) ?? asInt(json['rowStd']) ?? 30,
       rowCardStd:
           asInt(json['rowCardSTD']) ?? asInt(json['rowCardStd']) ?? 30,
@@ -131,6 +143,10 @@ class CompanySetupUpdateInput {
     this.customerEmail,
     required this.name,
     required this.titleHeader,
+    this.runItem,
+    this.itemDigit = 3,
+    this.runCus,
+    this.customerDigit = 5,
     required this.rowStd,
     required this.rowCardStd,
     required this.timeAlert,
@@ -157,6 +173,10 @@ class CompanySetupUpdateInput {
   final String? customerEmail;
   final String name;
   final String titleHeader;
+  final String? runItem;
+  final int itemDigit;
+  final String? runCus;
+  final int customerDigit;
   final int rowStd;
   final int rowCardStd;
   final int timeAlert;
@@ -183,6 +203,10 @@ class CompanySetupUpdateInput {
         'customerEmail': customerEmail,
         'name': name,
         'titleHeader': titleHeader,
+        'runItem': runItem,
+        'itemDigit': itemDigit,
+        'runCus': runCus,
+        'customerDigit': customerDigit,
         'rowSTD': rowStd,
         'rowCardSTD': rowCardStd,
         'timeAlert': timeAlert,

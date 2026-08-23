@@ -5,13 +5,12 @@ abstract final class RoutePaths {
   static const String authenticatedHome = '/home';
   static const String companyProducts = '/company/products';
   static const String companyCustomers = '/company/customers';
+  static const String companyBranches = '/company/branches';
   static const String partnerCompanies = '/partner/companies';
   static const String partnerBranches = '/partner/branches';
   static const String partnerUsers = '/partner/users';
   static const String supportHome = '/support';
   static const String partner = '/support/partner';
-  static const String company = '/support/company';
-  static const String branch = '/support/branch';
   static const String laooUser = '/support/laoo-user';
   static const String partnerUser = '/support/partner-user';
   static const String companyUser = '/support/company-user';
@@ -21,6 +20,7 @@ abstract final class RoutePaths {
   static const String audit = '/support/audit';
   static const String loginLog = '/support/login-log';
   static const String companySetup = '/support/company-setup';
+  static const String companySetupAdditional = '/support/company-setup-additional';
   static const String technicalInfo = '/support/technical-info';
   static const String masterData = '/master-data';
   static const String organizationStructure = '/organization-structure';
@@ -34,6 +34,4 @@ abstract final class RoutePaths {
   static const String partnerMenuPermissions = '/partner/menu-permissions';
   static const String laooEmployees = '/support/employees';
   static const String laooUsers = '/support/users';
-  static const String laooRoleGroups = '/support/role-groups';
-  static const String laooMenuPermissions = '/support/menu-permissions';
 }

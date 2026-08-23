@@ -342,9 +342,11 @@ class _PartnerListPageState extends State<PartnerListPage> {
           );
         }
 
-        return Align(
-          alignment: Alignment.topLeft,
-          child: Card(
+        return SizedBox(
+          height: constraints.maxHeight,
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: Card(
             margin: EdgeInsets.zero,
             elevation: 0,
             shape: RoundedRectangleBorder(
@@ -530,6 +532,7 @@ class _PartnerListPageState extends State<PartnerListPage> {
                   ),
                 ),
               ),
+            ),
             ),
           ),
         );
@@ -852,6 +855,15 @@ class _PartnerListPageState extends State<PartnerListPage> {
                         Icons.delete_outline_rounded,
                         color: LaooColors.error,
                       ),
+                    ),
+                    TextButton(
+                      onPressed: () => _manageAdmin(partner),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        minimumSize: const Size(0, 36),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: const Text('admin'),
                     ),
                     const Spacer(),
                     _StatusChip(active: partner.isActive),

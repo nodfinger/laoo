@@ -1,6 +1,6 @@
 $ErrorActionPreference = "Stop"
 
-$projectRoot = "C:\laoo\laoo"
+$projectRoot = "C:\laooplatformplatform\laoo"
 $libRoot = Join-Path $projectRoot "lib"
 
 Write-Host ""

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../../core/api/api_exception.dart';
 import '../../../../core/company_setup/company_setup_controller.dart';
+import '../../../../app/theme/workspace_theme_presets.dart';
 import '../../../support/presentation/widgets/support_workspace_shell.dart';
 import '../data/role_group_repository.dart';
 import '../models/role_group.dart';
@@ -317,17 +318,22 @@ class _AlertBanner extends StatelessWidget {
   final VoidCallback onClose;
   @override
   Widget build(BuildContext context) {
-    final primary = Theme.of(context).colorScheme.primary;
-    final color = error ? Colors.red : primary;
-    return Material(
-      color: Colors.transparent,
-      elevation: 8,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
+    return ValueListenableBuilder<WorkspaceThemePreset>(
+      valueListenable: workspaceThemeController,
+      builder: (context, preset, _) {
+        final color = error ? Colors.red : preset.primary;
+        final foreground = error
+            ? Theme.of(context).colorScheme.onError
+            : Theme.of(context).colorScheme.onPrimary;
+        return Material(
+          color: Colors.transparent,
+          elevation: 8,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
         constraints: const BoxConstraints(minWidth: 280, maxWidth: 380),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: .88),
+          color: color.withValues(alpha: .62),
           borderRadius: BorderRadius.circular(12),
           boxShadow: const [
             BoxShadow(
@@ -342,25 +348,28 @@ class _AlertBanner extends StatelessWidget {
           children: [
             Icon(
               error ? Icons.error_outline : Icons.check_circle_outline,
-              color: Colors.white,
+              color: foreground,
             ),
             const SizedBox(width: 8),
             Flexible(
               child: Text(
                 message,
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: foreground,
                   fontWeight: FontWeight.w600,
                 ),
               ),
             ),
             IconButton(
               onPressed: onClose,
-              icon: const Icon(Icons.close, color: Colors.white),
+              color: foreground,
+              icon: const Icon(Icons.close),
             ),
           ],
         ),
-      ),
+          ),
+        );
+      },
     );
   }
 
@@ -371,6 +380,7 @@ class _AlertBanner extends StatelessWidget {
   ) {
     final theme = Theme.of(context);
     final primary = theme.colorScheme.primary;
+    final cardBackground = theme.colorScheme.surface;
     return ListView.separated(
       padding: const EdgeInsets.only(bottom: 8),
       itemCount: rows.length,
@@ -379,7 +389,7 @@ class _AlertBanner extends StatelessWidget {
         final item = rows[index];
         return Card(
           margin: EdgeInsets.zero,
-          color: theme.colorScheme.surface,
+          color: cardBackground,
           surfaceTintColor: Colors.transparent,
           elevation: 3,
           shadowColor: primary.withValues(alpha: .18),
@@ -403,11 +413,28 @@ class _AlertBanner extends StatelessWidget {
                         ),
                       ),
                     ),
-                    Text(
-                      item.isActive ? 'เปิด' : 'ปิด',
-                      style: TextStyle(
-                        color: item.isActive ? primary : theme.colorScheme.error,
-                        fontWeight: FontWeight.w700,
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: (item.isActive
+                                ? primary
+                                : theme.colorScheme.error)
+                            .withValues(alpha: .12),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        child: Text(
+                          item.isActive ? 'เปิด' : 'ปิด',
+                          style: TextStyle(
+                            color: item.isActive
+                                ? primary
+                                : theme.colorScheme.error,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                       ),
                     ),
                     if (false)
@@ -649,10 +676,10 @@ class _ListState extends State<_List> {
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              foregroundDecoration: BoxDecoration(
-                                border: Border.all(
-                                  color: Theme.of(context).colorScheme.primary,
-                                ),
+                                foregroundDecoration: BoxDecoration(
+                                  border: Border.all(
+                                  color: const Color(0xFFD1D5DB),
+                                  ),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               clipBehavior: Clip.antiAlias,
@@ -682,10 +709,12 @@ class _ListState extends State<_List> {
                                       dividerThickness: .6,
                                       sortColumnIndex: sortColumn,
                                       sortAscending: sortAscending,
-                                      headingRowColor:
-                                          const WidgetStatePropertyAll(
-                                            Color(0xFFF3F4F6),
-                                          ),
+                                      headingRowColor: WidgetStatePropertyAll(
+                                        Theme.of(context)
+                                            .colorScheme
+                                            .primary
+                                            .withValues(alpha: 0.12),
+                                      ),
                                       columns: [
                                         DataColumn(
                                           label: const SizedBox(
@@ -874,6 +903,7 @@ class _ListState extends State<_List> {
   ) {
     final theme = Theme.of(context);
     final primary = theme.colorScheme.primary;
+    final cardBackground = theme.colorScheme.surface;
     return ListView.separated(
       padding: const EdgeInsets.only(bottom: 8),
       itemCount: rows.length,
@@ -882,7 +912,7 @@ class _ListState extends State<_List> {
         final item = rows[index];
         return Card(
           margin: EdgeInsets.zero,
-          color: theme.colorScheme.surface,
+          color: cardBackground,
           surfaceTintColor: Colors.transparent,
           elevation: 3,
           shadowColor: primary.withValues(alpha: .18),
@@ -906,11 +936,28 @@ class _ListState extends State<_List> {
                         ),
                       ),
                     ),
-                    Text(
-                      item.isActive ? 'เปิด' : 'ปิด',
-                      style: TextStyle(
-                        color: item.isActive ? primary : theme.colorScheme.error,
-                        fontWeight: FontWeight.w700,
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: (item.isActive
+                                ? primary
+                                : theme.colorScheme.error)
+                            .withValues(alpha: .12),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        child: Text(
+                          item.isActive ? 'เปิด' : 'ปิด',
+                          style: TextStyle(
+                            color: item.isActive
+                                ? primary
+                                : theme.colorScheme.error,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                       ),
                     ),
                     if (widget.canEdit)
@@ -1009,8 +1056,8 @@ class _PageButton extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
+          ),
+        );
   }
 }
 

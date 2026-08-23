@@ -2,12 +2,12 @@
 
 นำไฟล์นี้ไปวางทับ:
 
-`C:\laoo\laoo\lib\features\authentication\presentation\pages\login_page.dart`
+`C:\laooplatformplatform\laoo\lib\features\authentication\presentation\pages\login_page.dart`
 
 จากนั้นรัน:
 
 ```powershell
-cd C:\laoo\laoo
+cd C:\laooplatformplatform\laoo
 flutter clean
 flutter pub get
 flutter run -d chrome

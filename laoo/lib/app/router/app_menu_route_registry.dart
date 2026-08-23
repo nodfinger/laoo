@@ -28,32 +28,11 @@ abstract final class AppMenuRouteRegistry {
       path: RoutePaths.partner,
       scope: AppMenuScope.support,
     ),
-    '01002': AppMenuRouteSpec(
-      menuCode: '01002',
-      databaseRouteName: 'company',
-      goRouteName: RouteNames.company,
-      path: RoutePaths.company,
-      scope: AppMenuScope.support,
-    ),
-    '01003': AppMenuRouteSpec(
-      menuCode: '01003',
-      databaseRouteName: 'branch',
-      goRouteName: RouteNames.branch,
-      path: RoutePaths.branch,
-      scope: AppMenuScope.support,
-    ),
     '01004': AppMenuRouteSpec(
       menuCode: '01004',
       databaseRouteName: 'technicalInfo',
       goRouteName: RouteNames.technicalInfo,
       path: RoutePaths.technicalInfo,
-      scope: AppMenuScope.support,
-    ),
-    '12005': AppMenuRouteSpec(
-      menuCode: '12005',
-      databaseRouteName: 'organizationStructure',
-      goRouteName: RouteNames.organizationStructure,
-      path: RoutePaths.organizationStructure,
       scope: AppMenuScope.support,
     ),
     '02001': AppMenuRouteSpec(
@@ -126,6 +105,13 @@ abstract final class AppMenuRouteRegistry {
       path: RoutePaths.masterData,
       scope: AppMenuScope.shared,
     ),
+    '05003': AppMenuRouteSpec(
+      menuCode: '05003',
+      databaseRouteName: 'companySetupAdditional',
+      goRouteName: RouteNames.companySetupAdditional,
+      path: RoutePaths.companySetupAdditional,
+      scope: AppMenuScope.shared,
+    ),
     '06001': AppMenuRouteSpec(
       menuCode: '06001',
       databaseRouteName: 'partnerCompanies',
@@ -166,6 +152,13 @@ abstract final class AppMenuRouteRegistry {
       databaseRouteName: 'companyCustomers',
       goRouteName: RouteNames.companyCustomers,
       path: RoutePaths.companyCustomers,
+      scope: AppMenuScope.company,
+    ),
+    '09002': AppMenuRouteSpec(
+      menuCode: '09002',
+      databaseRouteName: 'companyBranches',
+      goRouteName: RouteNames.companyBranches,
+      path: RoutePaths.companyBranches,
       scope: AppMenuScope.company,
     ),
     '10001': AppMenuRouteSpec(
@@ -243,20 +236,6 @@ abstract final class AppMenuRouteRegistry {
       databaseRouteName: 'laooUsers',
       goRouteName: RouteNames.laooUsers,
       path: RoutePaths.laooUsers,
-      scope: AppMenuScope.support,
-    ),
-    '12003': AppMenuRouteSpec(
-      menuCode: '12003',
-      databaseRouteName: 'laooRoleGroups',
-      goRouteName: RouteNames.laooRoleGroups,
-      path: RoutePaths.laooRoleGroups,
-      scope: AppMenuScope.support,
-    ),
-    '12004': AppMenuRouteSpec(
-      menuCode: '12004',
-      databaseRouteName: 'laooMenuPermissions',
-      goRouteName: RouteNames.laooMenuPermissions,
-      path: RoutePaths.laooMenuPermissions,
       scope: AppMenuScope.support,
     ),
   };

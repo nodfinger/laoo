@@ -1,0 +1,8 @@
+bin/
+obj/
+.vs/
+local.json
+*.user
+*.suo
+wwwroot/uploads/items/*
+!wwwroot/uploads/items/.gitkeep

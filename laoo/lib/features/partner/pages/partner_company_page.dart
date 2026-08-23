@@ -228,7 +228,37 @@ class _PartnerCompanyFormPageState extends State<_PartnerCompanyFormPage> {
                           'ชื่อลูกค้า (ภาษาไทย) *',
                           required: true,
                         ),
-                        _formField(_nameEn, 'ชื่อลูกค้า (ภาษาอังกฤษ)'),
+                        if (!editing)
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: _formField(
+                                  _nameEn,
+                                  'ชื่อลูกค้า (ภาษาอังกฤษ)',
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: _formField(
+                                  _adminUsername,
+                                  'Username ผู้ดูแลระบบ *',
+                                  required: true,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: _formField(
+                                  _adminPassword,
+                                  'Password ผู้ดูแลระบบ *',
+                                  required: true,
+                                  obscureText: true,
+                                ),
+                              ),
+                            ],
+                          )
+                        else
+                          _formField(_nameEn, 'ชื่อลูกค้า (ภาษาอังกฤษ)'),
                         _formField(_taxId, 'เลขประจำตัวผู้เสียภาษี'),
                         _formField(
                           _email,
@@ -241,19 +271,6 @@ class _PartnerCompanyFormPageState extends State<_PartnerCompanyFormPage> {
                           keyboardType: TextInputType.phone,
                         ),
                         _formField(_address, 'ที่อยู่', maxLines: 4),
-                        if (!editing) ...[
-                          _formField(
-                            _adminUsername,
-                            'Username ผู้ดูแลระบบ *',
-                            required: true,
-                          ),
-                          _formField(
-                            _adminPassword,
-                            'Password ผู้ดูแลระบบ *',
-                            required: true,
-                            obscureText: true,
-                          ),
-                        ],
                       ],
                     ),
                   ),

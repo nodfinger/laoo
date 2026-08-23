@@ -65,6 +65,22 @@ class HttpService {
     return _decode(response);
   }
 
+  Future<dynamic> patch(
+    String path, {
+    Object? body,
+    bool authenticated = true,
+  }) async {
+    final uri = _buildUri(path);
+    final response = await _client
+        .patch(
+          uri,
+          headers: await _headers(authenticated: authenticated),
+          body: body == null ? null : jsonEncode(body),
+        )
+        .timeout(ApiConfig.requestTimeout);
+    return _decode(response);
+  }
+
   Future<dynamic> delete(
     String path, {
     Object? body,
@@ -136,8 +152,14 @@ class HttpService {
     String message = 'เกิดข้อผิดพลาดในการเรียก API';
 
     if (data is Map<String, dynamic>) {
-      message =
-          data['message']?.toString() ?? data['title']?.toString() ?? message;
+      message = data['message']?.toString() ??
+          data['title']?.toString() ??
+          message;
+      final description = data['description']?.toString() ??
+          data['detail']?.toString();
+      if (description != null && description.trim().isNotEmpty) {
+        message = '$message: $description';
+      }
     } else if (data is String && data.trim().isNotEmpty) {
       message = data;
     }

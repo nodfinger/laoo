@@ -21,6 +21,10 @@ class ApiClient {
     return _http.put(path, body: body, authenticated: authenticated);
   }
 
+  Future<dynamic> patch(String path, {Object? body, bool authenticated = true}) {
+    return _http.patch(path, body: body, authenticated: authenticated);
+  }
+
   Future<dynamic> delete(
     String path, {
     Object? body,

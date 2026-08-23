@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../../core/widgets/combo_box_text.dart';
 import '../../../../core/widgets/auto_dismiss_message.dart';
 import '../../../../core/widgets/timed_snack_bar.dart';
@@ -8,6 +9,20 @@ import '../../../../app/theme/workspace_theme_presets.dart';
 import '../../../../core/company_setup/company_setup_controller.dart';
 import '../data/master_data_api.dart';
 import '../../../support/presentation/widgets/support_workspace_shell.dart';
+
+class _UpperCaseTextFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final upper = newValue.text.toUpperCase();
+    return newValue.copyWith(
+      text: upper,
+      selection: TextSelection.collapsed(offset: upper.length),
+    );
+  }
+}
 
 class MasterDataPage extends StatefulWidget {
   const MasterDataPage({super.key, required this.menuScope});
@@ -544,11 +559,37 @@ class _MasterDataPageState extends State<MasterDataPage> {
                   .toList(),
               onChanged: _selectGroup,
             );
+            final searchButton = FilledButton.icon(
+              onPressed: _applySearch,
+              icon: const Icon(Icons.search),
+              label: const Text('ค้นหา'),
+              style: FilledButton.styleFrom(
+                backgroundColor: accent,
+                foregroundColor: Colors.white,
+              ),
+            );
+            final clearButton = OutlinedButton.icon(
+              onPressed: _clearFilters,
+              icon: const Icon(Icons.filter_alt_off_outlined),
+              label: const Text('ล้าง Filter'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: accent,
+                side: BorderSide(color: accent),
+              ),
+            );
             if (compact) {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   search,
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(child: searchButton),
+                      const SizedBox(width: 8),
+                      Expanded(child: clearButton),
+                    ],
+                  ),
                   const SizedBox(height: 10),
                   group,
                 ],
@@ -557,7 +598,11 @@ class _MasterDataPageState extends State<MasterDataPage> {
 
             return Row(
               children: [
-                Expanded(child: search),
+                SizedBox(width: 280, child: search),
+                const SizedBox(width: 8),
+                searchButton,
+                const SizedBox(width: 8),
+                clearButton,
                 const SizedBox(width: 14),
                 SizedBox(width: 280, child: group),
               ],
@@ -573,6 +618,10 @@ class _MasterDataPageState extends State<MasterDataPage> {
 
             return Card(
               margin: EdgeInsets.zero,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+                side: const BorderSide(color: Color(0xFFD1D5DB)),
+              ),
               clipBehavior: Clip.antiAlias,
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
@@ -973,7 +1022,12 @@ class _MasterDataFormState extends State<_MasterDataForm> {
     }
     widget.row.name = _name.text;
     widget.row.seq = int.tryParse(_seq.text) ?? 1;
-    widget.row.shortCode = _shortCode.text.trim();
+    final normalizedShortCode = _shortCode.text.trim().toUpperCase();
+    _shortCode.value = _shortCode.value.copyWith(
+      text: normalizedShortCode,
+      selection: TextSelection.collapsed(offset: normalizedShortCode.length),
+    );
+    widget.row.shortCode = normalizedShortCode;
     setState(() => _saving = true);
     try {
       await widget.onSave();
@@ -1051,6 +1105,7 @@ class _MasterDataFormState extends State<_MasterDataForm> {
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: _shortCode,
+                    inputFormatters: [_UpperCaseTextFormatter()],
                     decoration: const InputDecoration(labelText: 'รหัสย่อ'),
                   ),
                 ],

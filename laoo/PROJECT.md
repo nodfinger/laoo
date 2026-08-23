@@ -29,7 +29,7 @@ Flutter Application
 Project Path:
 
 ```text
-C:\laoo\laoo
+C:\laooplatformplatform\laoo
 ```
 
 ---
@@ -83,22 +83,22 @@ C:\laoo\laoo
 
 ## Core
 
-- `C:\laoo\docs\README.md`
-- `C:\laoo\docs\AGENTS.md`
-- `C:\laoo\docs\PROJECT_CONTEXT.md`
-- `C:\laoo\docs\PROJECT_WORKFLOW_STANDARD.md`
+- `C:\laooplatform\docs\README.md`
+- `C:\laooplatform\docs\AGENTS.md`
+- `C:\laooplatform\docs\PROJECT_CONTEXT.md`
+- `C:\laooplatform\docs\PROJECT_WORKFLOW_STANDARD.md`
 
 ## Architecture
 
-- `C:\laoo\docs\platform\ARCHITECTURE.md`
+- `C:\laooplatform\docs\platform\ARCHITECTURE.md`
 
 ## Standards
 
-- `C:\laoo\docs\standards\TECH_STACK_STANDARD.md`
-- `C:\laoo\docs\standards\ROUTING_STANDARD.md`
-- `C:\laoo\docs\standards\STATE_MANAGEMENT_STANDARD.md`
-- `C:\laoo\docs\standards\PROJECT_NAMING_STANDARD.md`
-- `C:\laoo\docs\standards\COMPANY_PARTNER_BRANCH_STANDARD.md`
+- `C:\laooplatform\docs\standards\TECH_STACK_STANDARD.md`
+- `C:\laooplatform\docs\standards\ROUTING_STANDARD.md`
+- `C:\laooplatform\docs\standards\STATE_MANAGEMENT_STANDARD.md`
+- `C:\laooplatform\docs\standards\PROJECT_NAMING_STANDARD.md`
+- `C:\laooplatform\docs\standards\COMPANY_PARTNER_BRANCH_STANDARD.md`
 
 ## Project Specific
 
@@ -143,18 +143,18 @@ None
 ให้นำรายการต่อไปนี้ไปเพิ่มในหัวข้อ `Required Documents` ของ
 
 ```text
-C:\laoo\laoo\PROJECT.md
+C:\laooplatformplatform\laoo\PROJECT.md
 ```
 
 ## API
 
-- `C:\laoo\docs\api\SYSTEM_INFO_API.md`
-- `C:\laoo\docs\api\API_ERROR_STANDARD.md`
+- `C:\laooplatform\docs\api\SYSTEM_INFO_API.md`
+- `C:\laooplatform\docs\api\API_ERROR_STANDARD.md`
 
 ## Standards
 
 ตรวจสอบว่ามีรายการนี้อยู่แล้ว
 
-- `C:\laoo\docs\standards\API_STANDARD.md`
+- `C:\laooplatform\docs\standards\API_STANDARD.md`
 
 ถ้าไฟล์ `API_STANDARD.md` ยังไม่มีจริง ให้แจ้งเป็น Missing Required Document และยังไม่เดาเนื้อหาแทน

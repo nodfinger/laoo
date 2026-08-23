@@ -112,6 +112,12 @@ final GoRouter appRouter = GoRouter(
       ),
     ),
     GoRoute(
+      path: RoutePaths.companyBranches,
+      name: RouteNames.companyBranches,
+      builder: (context, state) =>
+          const BranchPage(menuScope: WorkspaceMenuScope.company),
+    ),
+    GoRoute(
       path: RoutePaths.partnerCompanies,
       name: RouteNames.partnerCompanies,
       builder: (context, state) =>
@@ -142,12 +148,6 @@ final GoRouter appRouter = GoRouter(
       name: RouteNames.partner,
       builder: (context, state) => const PartnerModulePage(),
     ),
-    GoRoute(
-      path: RoutePaths.company,
-      name: RouteNames.company,
-      builder: (context, state) =>
-          const PartnerCompanyPage(menuScope: WorkspaceMenuScope.support),
-    ),
     ..._placeholderRoutes,
     GoRoute(
       path: RoutePaths.companySetup,
@@ -161,6 +161,20 @@ final GoRouter appRouter = GoRouter(
             ? WorkspaceMenuScope.partner
             : WorkspaceMenuScope.company,
         child: CompanySetupPage(),
+      ),
+    ),
+    GoRoute(
+      path: RoutePaths.companySetupAdditional,
+      name: RouteNames.companySetupAdditional,
+      builder: (context, state) => SupportWorkspaceShell(
+        pageTitle: 'กำหนดค่าระบบเพิ่มเติม',
+        activeMenu: 'companySetupAdditional',
+        menuScope: appAuthController.isLaooSupport
+            ? WorkspaceMenuScope.support
+            : appAuthController.isPartnerUser
+            ? WorkspaceMenuScope.partner
+            : WorkspaceMenuScope.company,
+        child: const CompanySetupPage(additionalOnly: true),
       ),
     ),
     GoRoute(
@@ -205,7 +219,9 @@ String? resolveAppRouteRedirect({
         : RoutePaths.authenticatedHome;
   }
 
-  final isCompanySetupRoute = path == RoutePaths.companySetup;
+  final isCompanySetupRoute =
+      path == RoutePaths.companySetup ||
+      path == RoutePaths.companySetupAdditional;
   final isSupportRoute =
       !isCompanySetupRoute &&
       (path == RoutePaths.supportHome ||
@@ -365,25 +381,6 @@ final List<GoRoute> _placeholderRoutes = [
     'ผู้ใช้งาน',
     WorkspaceMenuScope.support,
     'laooUsers',
-  ),
-  GoRoute(
-    path: RoutePaths.laooRoleGroups,
-    name: RouteNames.laooRoleGroups,
-    builder: (context, state) =>
-        const RoleGroupPage(scope: 'laoo', activeMenu: 'laooRoleGroups'),
-  ),
-  GoRoute(
-    path: RoutePaths.laooMenuPermissions,
-    name: RouteNames.laooMenuPermissions,
-    builder: (context, state) => const MenuPermissionPage(
-      scope: 'laoo',
-      activeMenu: 'laooMenuPermissions',
-    ),
-  ),
-  GoRoute(
-    path: RoutePaths.branch,
-    name: RouteNames.branch,
-    builder: (context, state) => const BranchPage(),
   ),
   _placeholder(
     RoutePaths.laooUser,

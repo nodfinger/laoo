@@ -16,7 +16,7 @@ Password: t
 แตก ZIP ลงที่:
 
 ```text
-C:\laoo\laoo
+C:\laooplatformplatform\laoo
 ```
 
 กดยืนยัน Replace ไฟล์เดิม
@@ -24,7 +24,7 @@ C:\laoo\laoo
 จากนั้นรัน:
 
 ```powershell
-cd C:\laoo\laoo
+cd C:\laooplatformplatform\laoo
 powershell -ExecutionPolicy Bypass -File .\apply_laoo_flutter_login_update.ps1
 ```
 
@@ -33,7 +33,7 @@ powershell -ExecutionPolicy Bypass -File .\apply_laoo_flutter_login_update.ps1
 เปิด PowerShell อีกหน้าต่างและรัน API:
 
 ```powershell
-cd C:\laoo\laoo_api
+cd C:\laooplatformplatform\laoo\laoo_api
 dotnet run --project .\laoo_api.csproj
 ```
 
@@ -46,7 +46,7 @@ Now listening on: http://localhost:5080
 ## รัน Flutter
 
 ```powershell
-cd C:\laoo\laoo
+cd C:\laooplatformplatform\laoo
 flutter run -d windows
 ```
 

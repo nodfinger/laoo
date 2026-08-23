@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/widgets/auto_dismiss_message.dart';
 import '../../../../core/widgets/combo_box_text.dart';
+import '../../../../core/widgets/timed_snack_bar.dart';
 
 import '../../../../core/navigation/navigation_menu_repository.dart';
 import '../../../../app/theme/laoo_typography.dart';
@@ -53,7 +54,10 @@ class _BranchPageState extends State<BranchPage> {
   String? _listMessage;
   String _menuName = 'สาขา';
 
-  static const _menuCode = '06002';
+  String get _menuCode => widget.menuScope == WorkspaceMenuScope.company
+      ? '09002'
+      : '06002';
+  bool get _isCompany => widget.menuScope == WorkspaceMenuScope.company;
 
   List<Map<String, dynamic>> get _filteredItems => _items.where((item) {
     return _status == 'ทั้งหมด' ||
@@ -82,7 +86,7 @@ class _BranchPageState extends State<BranchPage> {
   Future<void> _resolveMenuName() async {
     final name = await NavigationMenuRepository().resolveMenuName(
       menuCode: _menuCode,
-      routeName: 'partnerBranches',
+      routeName: _isCompany ? 'companyBranches' : 'partnerBranches',
       fallback: 'สาขา',
     );
     if (mounted) setState(() => _menuName = name);
@@ -91,7 +95,10 @@ class _BranchPageState extends State<BranchPage> {
   Future<void> _loadActions() async {
     final support = widget.menuScope == WorkspaceMenuScope.support;
     try {
-      final permissions = await _repo.actions(support: support);
+      final permissions = await _repo.actions(
+        support: support,
+        company: _isCompany,
+      );
       if (!mounted) return;
       setState(() {
         _canCreate = permissions['create'] == true;
@@ -117,6 +124,10 @@ class _BranchPageState extends State<BranchPage> {
   }
 
   Future<void> _loadCompanies() async {
+    if (_isCompany) {
+      if (mounted) setState(() => _companies = []);
+      return;
+    }
     try {
       final result = await _companiesRepo.getCompanies(
         support: widget.menuScope == WorkspaceMenuScope.support,
@@ -136,6 +147,7 @@ class _BranchPageState extends State<BranchPage> {
         search: _search.text,
         companyId: _companyFilterId,
         support: widget.menuScope == WorkspaceMenuScope.support,
+        company: _isCompany,
       );
       if (mounted) setState(() => _items = result);
       _applySort();
@@ -510,7 +522,7 @@ class _BranchPageState extends State<BranchPage> {
       builder: (_, _, _) => SupportWorkspaceShell(
         menuScope: widget.menuScope,
         pageTitle: _menuName,
-        activeMenu: 'partnerBranches',
+        activeMenu: _menuCode,
         child: content,
       ),
     );
@@ -604,7 +616,7 @@ class _BranchPageState extends State<BranchPage> {
     _actionPosition.text = item?['contPositionName'] ?? '';
     _actionCompanyId =
         item?['companyId'] ??
-        (_companies.isNotEmpty ? _companies.first.companyId : null);
+        (_companies.isNotEmpty ? _companies.first.companyId : 0);
     _actionIsActive = item?['isActive'] ?? true;
     _actionMessage = null;
     setState(() => _showAction = true);
@@ -690,7 +702,8 @@ class _BranchPageState extends State<BranchPage> {
                           ],
                         ),
                         const SizedBox(height: 12),
-                        DropdownButtonFormField<int>(
+                        if (!_isCompany)
+                          DropdownButtonFormField<int>(
                           initialValue: _actionCompanyId,
                           decoration: const InputDecoration(
                             labelText: 'ลูกค้า *',
@@ -709,7 +722,7 @@ class _BranchPageState extends State<BranchPage> {
                           validator: (value) =>
                               value == null ? 'กรุณาเลือกลูกค้า' : null,
                         ),
-                        const SizedBox(height: 12),
+                        if (!_isCompany) const SizedBox(height: 12),
                         TextFormField(
                           controller: _actionCode,
                           decoration: const InputDecoration(
@@ -839,6 +852,7 @@ class _BranchPageState extends State<BranchPage> {
           _actionItem!['branchId'] as int,
           data,
           support: widget.menuScope == WorkspaceMenuScope.support,
+          company: _isCompany,
         );
         if (!mounted) return;
         setState(() {
@@ -851,6 +865,7 @@ class _BranchPageState extends State<BranchPage> {
         await _repo.create(
           data,
           support: widget.menuScope == WorkspaceMenuScope.support,
+          company: _isCompany,
         );
         if (!mounted) return;
         _actionCode.clear();
@@ -866,9 +881,7 @@ class _BranchPageState extends State<BranchPage> {
       }
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(error.toString())));
+        showTimedSnackBar(context, message: error.toString(), error: true);
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -940,6 +953,7 @@ class _BranchPageState extends State<BranchPage> {
       await _repo.delete(
         item['branchId'] as int,
         support: widget.menuScope == WorkspaceMenuScope.support,
+        company: _isCompany,
       );
       if (!mounted) return;
       setState(() => _listMessage = 'ลบข้อมูลสาขาสำเร็จ');

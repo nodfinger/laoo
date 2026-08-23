@@ -2,19 +2,19 @@
 
 ไฟล์ชุดนี้จัดทำสำหรับโปรเจกต์:
 
-`C:\laoo\laoo`
+`C:\laooplatformplatform\laoo`
 
 ## ไฟล์ที่ต้องวาง
 
-- `C:\laoo\laoo\assets\images\laoo_login_logo.png`
-- `C:\laoo\laoo\lib\main.dart`
-- `C:\laoo\laoo\lib\core\theme\app_theme.dart`
-- `C:\laoo\laoo\lib\features\authentication\presentation\pages\login_page.dart`
-- `C:\laoo\laoo\lib\features\authentication\presentation\widgets\login_form.dart`
+- `C:\laooplatformplatform\laoo\assets\images\laoo_login_logo.png`
+- `C:\laooplatformplatform\laoo\lib\main.dart`
+- `C:\laooplatformplatform\laoo\lib\core\theme\app_theme.dart`
+- `C:\laooplatformplatform\laoo\lib\features\authentication\presentation\pages\login_page.dart`
+- `C:\laooplatformplatform\laoo\lib\features\authentication\presentation\widgets\login_form.dart`
 
 ## pubspec.yaml
 
-ตรวจสอบว่า `C:\laoo\laoo\pubspec.yaml` มีส่วนนี้:
+ตรวจสอบว่า `C:\laooplatformplatform\laoo\pubspec.yaml` มีส่วนนี้:
 
 ```yaml
 flutter:
@@ -27,7 +27,7 @@ flutter:
 จากนั้นรัน:
 
 ```powershell
-cd C:\laoo\laoo
+cd C:\laooplatformplatform\laoo
 flutter pub get
 flutter run -d windows
 ```

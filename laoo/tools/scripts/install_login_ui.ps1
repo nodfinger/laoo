@@ -1,7 +1,7 @@
-﻿$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Stop"
 
 $SourceRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$ProjectRoot = "C:\laoo\laoo"
+$ProjectRoot = "C:\laooplatformplatform\laoo"
 
 Write-Host "Installing Laoo Login UI..." -ForegroundColor Green
 
@@ -36,6 +36,6 @@ Write-Host "Files copied successfully." -ForegroundColor Green
 Write-Host "Please add the asset entry from pubspec_asset_snippet.yaml to pubspec.yaml."
 Write-Host ""
 Write-Host "Then run:" -ForegroundColor Cyan
-Write-Host "  cd C:\laoo\laoo"
+Write-Host "  cd C:\laooplatformplatform\laoo"
 Write-Host "  flutter pub get"
 Write-Host "  flutter run -d windows"
