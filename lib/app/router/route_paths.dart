@@ -1,0 +1,49 @@
+abstract final class RoutePaths {
+  static const String landing = '/';
+  static const String login = '/login';
+  static const String resetPassword = '/reset-password';
+  static const String authenticatedHome = '/home';
+  static const String companyProducts = '/company/products';
+  static const String companyCustomers = '/company/customers';
+  static const String companyQuotations = '/company/quotations';
+  static const String companyPreOrders = '/company/pre-orders';
+  static const String companyTemporaryReceipts = '/company/temporary-receipts';
+  static const String companyDeliveryNotes = '/company/delivery-notes';
+  static const String companyTaxInvoices = '/company/tax-invoices';
+  static const String salesManagement = '/company/sales-management';
+  static const String companyBranches = '/company/branches';
+  static const String partnerCompanies = '/partner/companies';
+  static const String partnerCompanyFeatures = '/partner/company-features';
+  static const String partnerBranches = '/partner/branches';
+  static const String partnerUsers = '/partner/users';
+  static const String supportHome = '/support';
+  static const String partner = '/support/partner';
+  static const String laooUser = '/support/laoo-user';
+  static const String partnerUser = '/support/partner-user';
+  static const String companyUser = '/support/company-user';
+  static const String module = '/support/module';
+  static const String customerModule = '/support/customer-module';
+  static const String permission = '/support/permission';
+  static const String audit = '/support/audit';
+  static const String loginLog = '/support/login-log';
+  static const String companySetup = '/support/company-setup';
+  static const String companySetupAdditional =
+      '/support/company-setup-additional';
+  static const String technicalInfo = '/support/technical-info';
+  static const String globalSettings = '/support/global-settings';
+  static const String globalPermissionSettings =
+      '/support/global-permission-settings';
+  static const String masterData = '/master-data';
+  static const String organizationStructure = '/organization-structure';
+  static const String companyEmployees = '/company/employees';
+  static const String companyUsers = '/company/users';
+  static const String companyRoleGroups = '/company/role-groups';
+  static const String companyMenuPermissions = '/company/menu-permissions';
+  static const String companySubPermissions = '/company/sub-permissions';
+  static const String partnerEmployees = '/partner/employees';
+  static const String customerEmployees = '/partner/customer-employees';
+  static const String partnerRoleGroups = '/partner/role-groups';
+  static const String partnerMenuPermissions = '/partner/menu-permissions';
+  static const String laooEmployees = '/support/employees';
+  static const String laooUsers = '/support/users';
+}
