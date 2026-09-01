@@ -104,7 +104,7 @@ public sealed class BranchController(IConfiguration configuration) : ControllerB
     private bool IsPartner() => string.Equals(User.FindFirstValue("user_type"), "PARTNER_USER", StringComparison.OrdinalIgnoreCase);
     private bool IsCompany() => string.Equals(User.FindFirstValue("user_type"), "COMPANY_USER", StringComparison.OrdinalIgnoreCase);
     private static readonly BranchScreenContract MeetingCompanyScreen =
-        new(BranchOwnerScope.Company, "15005", "companyBranches", 1, "09002");
+        new(BranchOwnerScope.Company, "09002", "companyBranches", 1);
     private BranchScreenContract CurrentScreen =>
         Request.Path.Value?.Contains("/api/company/", StringComparison.OrdinalIgnoreCase) == true
             ? MeetingCompanyScreen

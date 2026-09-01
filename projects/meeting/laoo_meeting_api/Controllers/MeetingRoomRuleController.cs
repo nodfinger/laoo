@@ -8,7 +8,7 @@ namespace LaooMeetingApi.Controllers;
 [ApiController, Route("api/company/meeting-rooms/{roomId:long}/rules"), Authorize]
 public sealed class MeetingRoomRuleController(IConfiguration configuration) : ControllerBase
 {
-    private const string ScreenCode = "15002";
+    private const string ScreenCode = "23002";
 
     [HttpGet]
     public async Task<IActionResult> Get(long roomId, CancellationToken token)

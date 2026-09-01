@@ -57,7 +57,7 @@ class _MeetingRoomApprovalPageState extends State<MeetingRoomApprovalPage> {
 
   Future<void> _loadCaption() async {
     final value = await NavigationMenuRepository().resolveMenuName(
-      menuCode: '13004',
+      menuCode: '21004',
       routeName: 'meetingRoomApprovals',
       fallback: _caption,
     );
@@ -664,7 +664,7 @@ class _MeetingRoomApprovalPageState extends State<MeetingRoomApprovalPage> {
     return SupportWorkspaceShell(
       menuScope: WorkspaceMenuScope.company,
       pageTitle: _caption,
-      activeMenu: '13004',
+      activeMenu: '21004',
       child: Stack(
         children: [
           Padding(
@@ -681,7 +681,7 @@ class _MeetingRoomApprovalPageState extends State<MeetingRoomApprovalPage> {
                         Expanded(
                           child: WorkspacePageTitle(
                             title: _caption,
-                            favoriteKey: '13004',
+                            favoriteKey: '21004',
                           ),
                         ),
                         IconButton(

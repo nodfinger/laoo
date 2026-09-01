@@ -16,7 +16,7 @@ class MeetingRoomBookingPage extends StatefulWidget {
   const MeetingRoomBookingPage({
     super.key,
     this.initialCalendar = false,
-    this.menuCode = '13001',
+    this.menuCode = '21001',
   });
 
   final bool initialCalendar;

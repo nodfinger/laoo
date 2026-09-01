@@ -113,7 +113,7 @@ void main() {
           path: RoutePaths.meetingRooms,
           isAuthenticated: true,
           isCompanyUser: true,
-          allowedMenuCodes: const {'15002'},
+          allowedMenuCodes: const {'23002'},
         ),
         isNull,
       );

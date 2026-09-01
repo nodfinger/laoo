@@ -8,7 +8,7 @@ namespace LaooMeetingApi.Controllers;
 [ApiController, Route("api/company/my-meeting-invitations"), Authorize]
 public sealed class MeetingInvitationController(IConfiguration configuration) : ControllerBase
 {
-    private const string ScreenCode = "13003";
+    private const string ScreenCode = "21003";
 
     [HttpGet("actions")]
     public async Task<IActionResult> Actions(CancellationToken token)

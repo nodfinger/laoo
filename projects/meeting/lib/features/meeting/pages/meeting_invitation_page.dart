@@ -49,7 +49,7 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
 
   Future<void> _loadCaption() async {
     final value = await NavigationMenuRepository().resolveMenuName(
-      menuCode: '13003',
+      menuCode: '21003',
       routeName: 'meetingInvitationRsvp',
       fallback: 'การเชิญของฉัน',
     );
@@ -176,7 +176,7 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
           WorkspaceSectionCard(
             child: WorkspaceActionHeader(
               title: '$_caption > ตอบรับ',
-              favoriteKey: '13003',
+              favoriteKey: '21003',
               actions: [
                 OutlinedButton(
                   onPressed: _saving
@@ -330,7 +330,7 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            WorkspacePageTitle(title: _caption, favoriteKey: '13003'),
+            WorkspacePageTitle(title: _caption, favoriteKey: '21003'),
             const Divider(height: 17, color: LaooColors.border),
             LayoutBuilder(
               builder: (context, constraints) => Wrap(
@@ -514,7 +514,7 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
       builder: (context, preset, _) => SupportWorkspaceShell(
         menuScope: WorkspaceMenuScope.company,
         pageTitle: _caption,
-        activeMenu: '13003',
+        activeMenu: '21003',
         child: Stack(
           children: [
             _detail == null ? _list(preset) : _action(preset),

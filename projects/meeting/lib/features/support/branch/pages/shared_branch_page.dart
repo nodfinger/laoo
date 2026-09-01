@@ -23,11 +23,11 @@ class BranchPage extends StatefulWidget {
 
 class _BranchPageState extends State<BranchPage> {
   static const _meetingCompanyContract = ScreenContract(
-    menuCode: '15005',
+    menuCode: '09002',
     routeName: 'companyBranches',
     apiPath: '/api/company/branches',
     screenType: 1,
-    legacyPermissionCodes: ['09002'],
+    legacyPermissionCodes: [],
   );
 
   late final ApiClient _api;

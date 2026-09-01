@@ -57,7 +57,7 @@ class _BranchPageState extends State<BranchPage> {
   String _menuName = 'สาขา';
 
   String get _menuCode => switch (widget.menuScope) {
-    WorkspaceMenuScope.company => '15005',
+    WorkspaceMenuScope.company => '09002',
     WorkspaceMenuScope.partner => '06002',
     _ => '01003',
   };

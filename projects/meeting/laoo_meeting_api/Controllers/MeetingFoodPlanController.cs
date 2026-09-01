@@ -9,7 +9,7 @@ namespace LaooMeetingApi.Controllers;
 [ApiController, Route("api/company/meeting-food-plans"), Authorize]
 public sealed class MeetingFoodPlanController(IConfiguration configuration) : ControllerBase
 {
-    private const string ScreenCode = "13005";
+    private const string ScreenCode = "21005";
 
     [HttpGet("actions")]
     public async Task<IActionResult> Actions(CancellationToken token)

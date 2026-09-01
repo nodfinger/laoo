@@ -105,8 +105,8 @@ abstract final class AppMenuRouteRegistry {
       path: RoutePaths.masterData,
       scope: AppMenuScope.shared,
     ),
-    '15005': AppMenuRouteSpec(
-      menuCode: '15005',
+    '09002': AppMenuRouteSpec(
+      menuCode: '09002',
       databaseRouteName: 'companyBranches',
       goRouteName: RouteNames.companyBranches,
       path: RoutePaths.companyBranches,
@@ -147,8 +147,8 @@ abstract final class AppMenuRouteRegistry {
       path: RoutePaths.companyEmployees,
       scope: AppMenuScope.company,
     ),
-    '10006': AppMenuRouteSpec(
-      menuCode: '10006',
+    '23005': AppMenuRouteSpec(
+      menuCode: '23005',
       databaseRouteName: 'companySupervisors',
       goRouteName: RouteNames.companySupervisors,
       path: RoutePaths.companySupervisors,
@@ -224,106 +224,106 @@ abstract final class AppMenuRouteRegistry {
       path: RoutePaths.laooUsers,
       scope: AppMenuScope.support,
     ),
-    '13001': AppMenuRouteSpec(
-      menuCode: '13001',
+    '21001': AppMenuRouteSpec(
+      menuCode: '21001',
       databaseRouteName: 'meetingRoomBookings',
       goRouteName: RouteNames.meetingRoomBookings,
       path: RoutePaths.meetingRoomBookings,
       scope: AppMenuScope.company,
     ),
-    '13004': AppMenuRouteSpec(
-      menuCode: '13004',
+    '21004': AppMenuRouteSpec(
+      menuCode: '21004',
       databaseRouteName: 'meetingRoomApprovals',
       goRouteName: RouteNames.meetingRoomApprovals,
       path: RoutePaths.meetingRoomApprovals,
       scope: AppMenuScope.company,
     ),
-    '13002': AppMenuRouteSpec(
-      menuCode: '13002',
+    '21002': AppMenuRouteSpec(
+      menuCode: '21002',
       databaseRouteName: 'meetingRoomCalendar',
       goRouteName: RouteNames.meetingRoomCalendar,
       path: RoutePaths.meetingRoomCalendar,
       scope: AppMenuScope.company,
     ),
-    '13003': AppMenuRouteSpec(
-      menuCode: '13003',
+    '21003': AppMenuRouteSpec(
+      menuCode: '21003',
       databaseRouteName: 'meetingInvitationRsvp',
       goRouteName: RouteNames.meetingInvitationRsvp,
       path: RoutePaths.meetingInvitationRsvp,
       scope: AppMenuScope.company,
     ),
-    '13005': AppMenuRouteSpec(
-      menuCode: '13005',
+    '21005': AppMenuRouteSpec(
+      menuCode: '21005',
       databaseRouteName: 'meetingFoodPlans',
       goRouteName: RouteNames.meetingFoodPlans,
       path: RoutePaths.meetingFoodPlans,
       scope: AppMenuScope.company,
     ),
-    '14001': AppMenuRouteSpec(
-      menuCode: '14001',
+    '22001': AppMenuRouteSpec(
+      menuCode: '22001',
       databaseRouteName: 'roomCheckIn',
       goRouteName: RouteNames.roomCheckIn,
       path: RoutePaths.roomCheckIn,
       scope: AppMenuScope.company,
     ),
-    '14002': AppMenuRouteSpec(
-      menuCode: '14002',
+    '22002': AppMenuRouteSpec(
+      menuCode: '22002',
       databaseRouteName: 'roomSupportTasks',
       goRouteName: RouteNames.roomSupportTasks,
       path: RoutePaths.roomSupportTasks,
       scope: AppMenuScope.company,
     ),
-    '14003': AppMenuRouteSpec(
-      menuCode: '14003',
+    '22003': AppMenuRouteSpec(
+      menuCode: '22003',
       databaseRouteName: 'roomIssues',
       goRouteName: RouteNames.roomIssues,
       path: RoutePaths.roomIssues,
       scope: AppMenuScope.company,
     ),
-    '15001': AppMenuRouteSpec(
-      menuCode: '15001',
+    '23001': AppMenuRouteSpec(
+      menuCode: '23001',
       databaseRouteName: 'meetingBuildings',
       goRouteName: RouteNames.meetingBuildings,
       path: RoutePaths.meetingBuildings,
       scope: AppMenuScope.company,
     ),
-    '15002': AppMenuRouteSpec(
-      menuCode: '15002',
+    '23002': AppMenuRouteSpec(
+      menuCode: '23002',
       databaseRouteName: 'meetingRooms',
       goRouteName: RouteNames.meetingRooms,
       path: RoutePaths.meetingRooms,
       scope: AppMenuScope.company,
     ),
-    '15003': AppMenuRouteSpec(
-      menuCode: '15003',
+    '23003': AppMenuRouteSpec(
+      menuCode: '23003',
       databaseRouteName: 'meetingFacilities',
       goRouteName: RouteNames.meetingFacilities,
       path: RoutePaths.meetingFacilities,
       scope: AppMenuScope.company,
     ),
-    '15004': AppMenuRouteSpec(
-      menuCode: '15004',
+    '23004': AppMenuRouteSpec(
+      menuCode: '23004',
       databaseRouteName: 'meetingFoods',
       goRouteName: RouteNames.meetingFoods,
       path: RoutePaths.meetingFoods,
       scope: AppMenuScope.company,
     ),
-    '16001': AppMenuRouteSpec(
-      menuCode: '16001',
+    '24001': AppMenuRouteSpec(
+      menuCode: '24001',
       databaseRouteName: 'meetingRoomUtilizationReport',
       goRouteName: RouteNames.meetingRoomUtilizationReport,
       path: RoutePaths.meetingRoomUtilizationReport,
       scope: AppMenuScope.company,
     ),
-    '16002': AppMenuRouteSpec(
-      menuCode: '16002',
+    '24002': AppMenuRouteSpec(
+      menuCode: '24002',
       databaseRouteName: 'meetingNoShowReport',
       goRouteName: RouteNames.meetingNoShowReport,
       path: RoutePaths.meetingNoShowReport,
       scope: AppMenuScope.company,
     ),
-    '16003': AppMenuRouteSpec(
-      menuCode: '16003',
+    '24003': AppMenuRouteSpec(
+      menuCode: '24003',
       databaseRouteName: 'meetingFeedbackReport',
       goRouteName: RouteNames.meetingFeedbackReport,
       path: RoutePaths.meetingFeedbackReport,

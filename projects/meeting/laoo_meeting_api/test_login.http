@@ -6,7 +6,7 @@ Content-Type: application/json
 {
   "username": "t",
   "password": "t",
-  "projectCode": "LAOO"
+  "projectCode": "LAOO_MEETING"
 }
 
 ### วาง Token ที่ได้จาก Login เพื่อทดสอบ Route ปัจจุบัน

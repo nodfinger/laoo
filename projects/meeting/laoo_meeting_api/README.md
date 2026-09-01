@@ -110,7 +110,7 @@ Cors__AllowedOrigins__0=https://app.example.com
 Flutter Android/iOS ไม่อยู่ภายใต้ CORS แต่ต้อง Build ด้วย API URL จริง:
 
 ```powershell
-flutter build apk --release --dart-define=API_URL=https://api.example.com --dart-define=PROJECT_CODE=LAOO
+flutter build apk --release --dart-define=API_URL=https://api.example.com --dart-define=PROJECT_CODE=LAOO_MEETING
 ```
 
 หลัง Deploy ให้ตรวจ `GET /health` ซึ่งจะคืนสถานะ API และการเชื่อมต่อฐานข้อมูล โดยไม่เปิดเผย Secret

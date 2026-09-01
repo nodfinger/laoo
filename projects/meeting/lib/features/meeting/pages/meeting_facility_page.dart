@@ -87,7 +87,7 @@ class _MeetingFacilityPageState extends State<MeetingFacilityPage> {
       : '$fallback\n$error';
   Future<void> _resolveCaption() async {
     final caption = await NavigationMenuRepository().resolveMenuName(
-      menuCode: '15003',
+      menuCode: '23003',
       routeName: 'meetingFacilities',
       fallback: '',
     );
@@ -553,7 +553,7 @@ class _MeetingFacilityPageState extends State<MeetingFacilityPage> {
     return SupportWorkspaceShell(
       menuScope: WorkspaceMenuScope.company,
       pageTitle: _caption,
-      activeMenu: '15003',
+      activeMenu: '23003',
       child: Stack(
         children: [
           Padding(
@@ -567,7 +567,7 @@ class _MeetingFacilityPageState extends State<MeetingFacilityPage> {
                       Expanded(
                         child: WorkspacePageTitle(
                           title: _caption,
-                          favoriteKey: '15003',
+                          favoriteKey: '23003',
                         ),
                       ),
                       if (MediaQuery.sizeOf(context).width >= 900)

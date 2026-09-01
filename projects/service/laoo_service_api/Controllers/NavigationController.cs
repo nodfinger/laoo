@@ -22,6 +22,8 @@ public sealed class NavigationController : ControllerBase
         var userType = User.FindFirstValue("user_type");
         if (userType is not ("PARTNER_USER" or "COMPANY_USER" or "LAOO_SUPPORT"))
             return Forbid();
+        if (LongClaim("project_id") is not long projectId)
+            return Forbid();
 
         await using var connection = new SqlConnection(_configuration.GetConnectionString("LaooDatabase"));
         await connection.OpenAsync(cancellationToken);
@@ -33,7 +35,12 @@ SELECT G.MenuGroupCode, G.MenuGroupName, G.IconName AS GroupIconName, G.SortOrde
        G.IsExpandedDefault, M.MenuCode, M.MenuName, M.RouteName, M.RoutePath, M.FeatureCode,
        M.IconName, M.SortOrder, M.IsFavoriteAllowed
 FROM dbo.TDADMenuGroup G
+INNER JOIN dbo.TDADProjectMenuGroup PG
+    ON PG.MenuGroupCode = G.MenuGroupCode AND PG.ProjectID = @ProjectID AND PG.IsActive = 1
 INNER JOIN dbo.TDADMainMenu M ON M.MenuGroupCode = G.MenuGroupCode AND M.IsActive = 1 AND M.IsVisible = 1
+INNER JOIN dbo.TDADProjectMenu PM
+    ON PM.MenuCode = M.MenuCode AND PM.MenuGroupCode = G.MenuGroupCode
+   AND PM.ProjectID = @ProjectID AND PM.IsActive = 1
 WHERE G.IsActive = 1
   AND UPPER(LTRIM(RTRIM(G.AudienceType))) IN (N'A',@AudienceType)
   AND (
@@ -56,12 +63,12 @@ WHERE G.IsActive = 1
             )
         )
       )
-ORDER BY G.SortOrder, M.SortOrder, M.MenuCode;
+ORDER BY PG.SortOrder, PM.SortOrder, M.MenuCode;
 """;
         await using var command = new SqlCommand(sql, connection);
         command.Parameters.Add("@AudienceType", SqlDbType.Char).Value = audienceType;
         command.Parameters.Add("@UserType", SqlDbType.NVarChar, 30).Value = userType;
-        command.Parameters.Add("@ProjectID", SqlDbType.BigInt).Value = LongClaim("project_id") is long projectId ? projectId : DBNull.Value;
+        command.Parameters.Add("@ProjectID", SqlDbType.BigInt).Value = projectId;
         command.Parameters.Add("@CompanyID", SqlDbType.BigInt).Value = LongClaim("company_id") is long companyId ? companyId : DBNull.Value;
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         var all = new List<(NavigationMenuGroupResponse Group, NavigationMenuItemResponse Item)>();

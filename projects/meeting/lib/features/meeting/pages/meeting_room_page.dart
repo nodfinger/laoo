@@ -72,7 +72,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
 
   Future<void> _captionLoad() async {
     final v = await NavigationMenuRepository().resolveMenuName(
-      menuCode: '15002',
+      menuCode: '23002',
       routeName: 'meetingRooms',
       fallback: 'ห้องประชุม',
     );
@@ -2257,7 +2257,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
     return SupportWorkspaceShell(
       menuScope: WorkspaceMenuScope.company,
       pageTitle: _caption,
-      activeMenu: '15002',
+      activeMenu: '23002',
       child: Stack(
         children: [
           Padding(
@@ -2271,7 +2271,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                       Expanded(
                         child: WorkspacePageTitle(
                           title: _caption,
-                          favoriteKey: '15002',
+                          favoriteKey: '23002',
                         ),
                       ),
                       if (MediaQuery.sizeOf(context).width >= 900)

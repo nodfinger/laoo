@@ -48,7 +48,7 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
 
   Future<void> _loadCaption() async {
     final value = await NavigationMenuRepository().resolveMenuName(
-      menuCode: '13005',
+      menuCode: '21005',
       routeName: 'meetingFoodPlans',
       fallback: 'เมนูอาหารสำหรับการประชุม',
     );
@@ -330,7 +330,7 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
           WorkspaceSectionCard(
             child: WorkspaceActionHeader(
               title: '$_caption > กำหนดเมนู',
-              favoriteKey: '13005',
+              favoriteKey: '21005',
               actions: [
                 OutlinedButton(
                   onPressed: _saving
@@ -410,7 +410,7 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            WorkspacePageTitle(title: _caption, favoriteKey: '13005'),
+            WorkspacePageTitle(title: _caption, favoriteKey: '21005'),
             const Divider(height: 17, color: LaooColors.border),
             Wrap(
               spacing: 8,
@@ -553,7 +553,7 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
       builder: (context, preset, _) => SupportWorkspaceShell(
         menuScope: WorkspaceMenuScope.company,
         pageTitle: _caption,
-        activeMenu: '13005',
+        activeMenu: '21005',
         child: Stack(
           children: [
             _detail == null ? _list(preset) : _action(preset),

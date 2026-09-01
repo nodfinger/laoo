@@ -11,9 +11,9 @@ namespace LaooMeetingApi.Controllers;
 [Authorize]
 public sealed class MeetingRoomBookingController(IConfiguration configuration) : ControllerBase
 {
-    private const string ScreenCode = "13001";
-    private const string CalendarScreenCode = "13002";
-    private const string ApprovalScreenCode = "13004";
+    private const string ScreenCode = "21001";
+    private const string CalendarScreenCode = "21002";
+    private const string ApprovalScreenCode = "21004";
 
     [HttpGet("actions")]
     public async Task<IActionResult> Actions(CancellationToken token)

@@ -2,8 +2,8 @@
 
 ## ขอบเขตหน้าจอ
 
-- หน้าจอจองห้องประชุมใช้ MenuCode `13001`
-- หน้าจอปฏิทินการจองใช้ MenuCode `13002`
+- หน้าจอจองห้องประชุมใช้ MenuCode `21001`
+- หน้าจอปฏิทินการจองใช้ MenuCode `21002`
 - ใช้ข้อมูลห้องประชุม สาขา อาคาร ชั้น ความจุ อุปกรณ์ และกฎประจำห้องจากระบบจริง
 - การอ่าน/บันทึกข้อมูลใช้ Company Scope ของผู้ Login
 
@@ -99,4 +99,3 @@
 - `lib/features/meeting/widgets/meeting_room_calendar_view.dart`
 - `lib/features/meeting/data/meeting_room_booking_repository.dart`
 - `laoo_meeting_api/Controllers/MeetingRoomBookingController.cs`
-

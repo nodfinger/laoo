@@ -850,7 +850,7 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
       builder: (context, preset, _) => SupportWorkspaceShell(
         menuScope: WorkspaceMenuScope.company,
         pageTitle: 'อาคารและชั้น',
-        activeMenu: '15001',
+        activeMenu: '23001',
         child: Stack(
           children: [
             Padding(
@@ -864,7 +864,7 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
                         const Expanded(
                           child: WorkspacePageTitle(
                             title: 'อาคารและชั้น',
-                            favoriteKey: '15001',
+                            favoriteKey: '23001',
                           ),
                         ),
                         if (_actions['create'] == true)

@@ -38,7 +38,7 @@ class _OrganizationSupervisorPageState
 
   Future<void> _loadCaption() async {
     final value = await NavigationMenuRepository().resolveMenuName(
-      menuCode: '10006',
+      menuCode: '23005',
       routeName: 'companySupervisors',
       fallback: 'กำหนดผู้บังคับบัญชา',
     );
@@ -278,7 +278,7 @@ class _OrganizationSupervisorPageState
     return SupportWorkspaceShell(
       menuScope: WorkspaceMenuScope.company,
       pageTitle: _caption,
-      activeMenu: '10006',
+      activeMenu: '23005',
       child: Stack(
         children: [
           Padding(
@@ -289,7 +289,7 @@ class _OrganizationSupervisorPageState
                 WorkspaceSectionCard(
                   child: WorkspacePageTitle(
                     title: _caption,
-                    favoriteKey: '10006',
+                    favoriteKey: '23005',
                   ),
                 ),
                 const SizedBox(height: 8),

@@ -94,7 +94,7 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
 
   Future<void> _resolveCaption() async {
     final caption = await NavigationMenuRepository().resolveMenuName(
-      menuCode: '15004',
+      menuCode: '23004',
       routeName: 'meetingFoods',
       fallback: 'รายการอาหาร',
     );
@@ -718,7 +718,7 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
     return SupportWorkspaceShell(
       menuScope: WorkspaceMenuScope.company,
       pageTitle: _caption,
-      activeMenu: '15004',
+      activeMenu: '23004',
       child: Stack(
         children: [
           Padding(
@@ -730,7 +730,7 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
                   LayoutBuilder(
                     builder: (context, constraints) => WorkspaceActionHeader(
                       title: _caption,
-                      favoriteKey: '15004',
+                      favoriteKey: '23004',
                       actions: [
                         if (constraints.maxWidth >= 900)
                           IconButton(

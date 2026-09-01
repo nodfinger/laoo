@@ -8,6 +8,6 @@ class AppConfig {
 
   static const String projectCode = String.fromEnvironment(
     'PROJECT_CODE',
-    defaultValue: 'LAOO',
+    defaultValue: 'LAOO_MEETING',
   );
 }

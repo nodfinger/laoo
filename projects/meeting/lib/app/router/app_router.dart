@@ -423,7 +423,7 @@ final List<GoRoute> _meetingRoomPlaceholderRoutes = [
     path: RoutePaths.meetingRoomCalendar,
     name: RouteNames.meetingRoomCalendar,
     builder: (context, state) =>
-        const MeetingRoomBookingPage(initialCalendar: true, menuCode: '13002'),
+        const MeetingRoomBookingPage(initialCalendar: true, menuCode: '21002'),
   ),
   GoRoute(
     path: RoutePaths.meetingInvitationRsvp,
