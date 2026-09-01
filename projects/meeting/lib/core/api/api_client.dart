@@ -1,0 +1,50 @@
+import '../network/http_service.dart';
+import 'package:laoo_shared_core/laoo_shared_core.dart';
+
+class ApiClient implements JsonApiClient {
+  ApiClient({HttpService? httpService}) : _http = httpService ?? HttpService();
+
+  final HttpService _http;
+
+  @override
+  Future<dynamic> get(
+    String path, {
+    Map<String, String>? query,
+    bool authenticated = true,
+  }) {
+    return _http.get(path, query: query, authenticated: authenticated);
+  }
+
+  @override
+  Future<dynamic> post(String path, {Object? body, bool authenticated = true}) {
+    return _http.post(path, body: body, authenticated: authenticated);
+  }
+
+  @override
+  Future<dynamic> put(String path, {Object? body, bool authenticated = true}) {
+    return _http.put(path, body: body, authenticated: authenticated);
+  }
+
+  @override
+  Future<dynamic> delete(
+    String path, {
+    Object? body,
+    Map<String, String>? query,
+    bool authenticated = true,
+  }) {
+    return _http.delete(
+      path,
+      body: body,
+      query: query,
+      authenticated: authenticated,
+    );
+  }
+
+  Future<dynamic> upload(
+    String path, {
+    required List<int> bytes,
+    required String filename,
+  }) => _http.upload(path, bytes: bytes, filename: filename);
+
+  void dispose() => _http.dispose();
+}

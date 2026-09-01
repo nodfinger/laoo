@@ -1,0 +1,10 @@
+bin/
+obj/
+.vs/
+local.json
+*.user
+*.suo
+*.log
+
+# Runtime uploads stay on the API server and must never be committed.
+wwwroot/uploads/*

@@ -1,0 +1,17 @@
+// LAOO Login UX Step 4
+//
+// Apply these UI changes to login_page.dart
+//
+// 1. Left Brand Panel
+//    - Move 'Simple Today. Ready Tomorrow.' directly under 'LAOO SOLUTIONS'.
+//    - Keep Logo -> LAOO SOLUTIONS -> Slogan together as one Brand Block.
+//    - Add spacing, then Welcome message.
+//    - Add text: 'รองรับ Windows • Web • Mobile'
+//
+// 2. Right Login Panel
+//    - Remove floating 'Back to Landing' button from top-left.
+//    - Keep Login button as primary action.
+//    - Add secondary text button: 'สมัครใช้งาน' under Login.
+//    - Add text button: '← กลับหน้าหลัก' below Register.
+//    - Keep Username/Password textbox style from Step 3.
+//
