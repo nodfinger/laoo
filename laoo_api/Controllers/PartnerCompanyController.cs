@@ -236,16 +236,27 @@ WHERE CompanyID=@CompanyID AND PartnerID=@PartnerID;
         const string sql = """
 IF NOT EXISTS (SELECT 1 FROM dbo.TDSTCompanySetUp WHERE CompanyID=@CompanyID AND PartnerID=@PartnerID)
     THROW 50011, 'COMPANY_NOT_FOUND', 1;
-IF EXISTS (SELECT 1 FROM dbo.TDADLaooUser WHERE NormalizedUsername=@NormalizedUsername)
-   OR EXISTS (SELECT 1 FROM dbo.TDADPartnerUser WHERE NormalizedUsername=@NormalizedUsername)
-   OR EXISTS (SELECT 1 FROM dbo.TDADUser WHERE NormalizedUsername=@NormalizedUsername AND NOT (CompanyID=@CompanyID AND IsCompanyAdmin=1))
-    THROW 50010, 'DUPLICATE_ADMIN_USERNAME', 1;
-IF EXISTS (SELECT 1 FROM dbo.TDADUser WHERE CompanyID=@CompanyID AND IsCompanyAdmin=1)
-    UPDATE dbo.TDADUser SET Username=@Username, NormalizedUsername=@NormalizedUsername, PasswordHash=@PasswordHash, IsActive=1,
-        LastPasswordChangeDate=SYSUTCDATETIME() WHERE CompanyID=@CompanyID AND IsCompanyAdmin=1;
-ELSE
+DECLARE @AdminUserID bigint =
+    (SELECT TOP (1) UserID FROM dbo.TDADUser WHERE CompanyID=@CompanyID AND IsCompanyAdmin=1 ORDER BY UserID);
+IF @AdminUserID IS NULL
+BEGIN
+    IF EXISTS (SELECT 1 FROM dbo.TDADLaooUser WHERE NormalizedUsername=@NormalizedUsername)
+       OR EXISTS (SELECT 1 FROM dbo.TDADPartnerUser WHERE NormalizedUsername=@NormalizedUsername)
+       OR EXISTS (SELECT 1 FROM dbo.TDADUser WHERE NormalizedUsername=@NormalizedUsername)
+        THROW 50012, 'DUPLICATE_ADMIN_USERNAME', 1;
     INSERT INTO dbo.TDADUser (CompanyID, Username, NormalizedUsername, PasswordHash, DisplayName, IsCompanyAdmin, IsActive, FailedLoginCount, LastPasswordChangeDate, CreateDate)
     VALUES (@CompanyID, @Username, @NormalizedUsername, @PasswordHash, N'เธเธนเนเธ”เธนเนเธฅเธฃเธฐเธเธ', 1, 1, 0, SYSUTCDATETIME(), SYSUTCDATETIME());
+END
+ELSE
+BEGIN
+    IF EXISTS (SELECT 1 FROM dbo.TDADUser WHERE UserID=@AdminUserID AND ISNULL(NormalizedUsername, N'')<>@NormalizedUsername)
+       AND (EXISTS (SELECT 1 FROM dbo.TDADLaooUser WHERE NormalizedUsername=@NormalizedUsername)
+         OR EXISTS (SELECT 1 FROM dbo.TDADPartnerUser WHERE NormalizedUsername=@NormalizedUsername)
+         OR EXISTS (SELECT 1 FROM dbo.TDADUser WHERE NormalizedUsername=@NormalizedUsername AND UserID<>@AdminUserID))
+        THROW 50012, 'DUPLICATE_ADMIN_USERNAME', 1;
+    UPDATE dbo.TDADUser SET Username=@Username, NormalizedUsername=@NormalizedUsername, PasswordHash=@PasswordHash, IsActive=1,
+        LastPasswordChangeDate=SYSUTCDATETIME() WHERE UserID=@AdminUserID;
+END
 """;
         await using var command = new SqlCommand(sql, connection);
         command.Parameters.Add("@CompanyID", SqlDbType.BigInt).Value = companyId;
@@ -254,6 +265,7 @@ ELSE
         Add(command, "@NormalizedUsername", SqlDbType.NVarChar, username.ToUpperInvariant(), 100);
         Add(command, "@PasswordHash", SqlDbType.NVarChar, _passwordService.HashPassword(username, request.Password), 500);
         try { await command.ExecuteNonQueryAsync(cancellationToken); return NoContent(); }
+        catch (SqlException ex) when (ex.Number == 50012) { return Conflict(new { message = "Username ผู้ดูแลระบบซ้ำ กรุณาใช้ Username อื่น" }); }
         catch (SqlException ex) when (ex.Number == 50010) { return Conflict(new { message = "Username เธเธนเนเธ”เธนเนเธฅเธฃเธฐเธเธเธเนเธณ เธเธฃเธธเธ“เธฒเนเธเน Username เธญเธทเนเธ" }); }
         catch (SqlException ex) when (ex.Number == 50011) { return NotFound(); }
     }

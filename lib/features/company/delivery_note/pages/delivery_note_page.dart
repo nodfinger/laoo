@@ -1,8 +1,7 @@
 import 'dart:math' as math;
 
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
+import '../../../../app/theme/laoo_typography.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
@@ -251,13 +250,7 @@ class _DeliveryNoteListPageState extends State<_DeliveryNoteListPage> {
           children: [
             Icon(Icons.delete_outline, color: LaooColors.error),
             SizedBox(width: 8),
-            Text(
-              'ยืนยันการลบข้อมูล',
-              style: TextStyle(
-                color: LaooColors.error,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+            Text('ยืนยันการลบข้อมูล', style: LaooTypography.screenCaptionStyle),
           ],
         ),
         content: Column(
@@ -482,7 +475,7 @@ class _DeliveryNoteListPageState extends State<_DeliveryNoteListPage> {
                               child: WorkspacePageTitle(
                                 title: _menuName,
                                 favoriteKey: _activeMenu,
-                                titleColor: LaooColors.textPrimary,
+                                titleColor: Colors.black,
                               ),
                             ),
                             if (!compact) ...[
@@ -885,10 +878,7 @@ class _DeliveryNoteActionPageState extends State<DeliveryNoteActionPage> {
           children: [
             Icon(Icons.delete_outline, color: LaooColors.error),
             SizedBox(width: 8),
-            Text(
-              'ยืนยันการลบข้อมูล',
-              style: TextStyle(color: LaooColors.error),
-            ),
+            Text('ยืนยันการลบข้อมูล', style: LaooTypography.screenCaptionStyle),
           ],
         ),
         content: Text(
@@ -1090,7 +1080,7 @@ class _DeliveryNoteActionPageState extends State<DeliveryNoteActionPage> {
                                 title:
                                     '$_menuName > ${_id == null ? 'เพิ่ม' : 'แก้ไข'}',
                                 favoriteKey: _activeMenu,
-                                titleColor: LaooColors.textPrimary,
+                                titleColor: Colors.black,
                               ),
                               Wrap(
                                 spacing: 8,
@@ -1597,7 +1587,7 @@ class _LineDialogState extends State<_LineDialog> {
         children: [
           Icon(Icons.inventory_2_outlined),
           SizedBox(width: 8),
-          Text('รายการสินค้า', style: TextStyle(color: LaooColors.textPrimary)),
+          Text('รายการสินค้า', style: LaooTypography.screenCaptionStyle),
         ],
       ),
       content: SizedBox(

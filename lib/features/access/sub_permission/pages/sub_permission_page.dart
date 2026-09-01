@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../app/theme/workspace_theme_presets.dart';
+import '../../../../app/theme/laoo_typography.dart';
 import '../../../../core/widgets/timed_snack_bar.dart';
 import '../../../support/presentation/widgets/support_workspace_shell.dart';
 import '../data/sub_permission_api.dart';
@@ -88,11 +89,7 @@ class _SubPermissionPageState extends State<SubPermissionPage> {
                         children: [
                           Text(
                             _caption,
-                            style: const TextStyle(
-                              color: Colors.black,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                            ),
+                            style: LaooTypography.screenCaptionStyle,
                           ),
                         ],
                       ),

@@ -66,4 +66,14 @@ abstract final class LaooTypography {
   static const FontWeight strongWeight = FontWeight.w800;
   static const FontWeight emphasizedWeight = FontWeight.w700;
   static const FontWeight normalWeight = FontWeight.w400;
+
+  /// Mandatory style for the top-level caption of every screen and dialog.
+  static const TextStyle screenCaptionStyle = TextStyle(
+    fontFamily: fontFamily,
+    fontFamilyFallback: fontFallback,
+    fontSize: workspaceCaption,
+    height: titleLineHeight,
+    fontWeight: workspaceCaptionWeight,
+    color: Colors.black,
+  );
 }

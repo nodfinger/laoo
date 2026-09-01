@@ -1,0 +1,7 @@
+name: laoo_shared_core
+description: Shared contracts for LAOO applications.
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: ^3.12.2

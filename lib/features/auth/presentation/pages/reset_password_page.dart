@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/route_names.dart';
 import '../../../../app/theme/laoo_design_tokens.dart';
+import '../../../../app/theme/laoo_typography.dart';
 import '../../../../core/api/api_exception.dart';
 import '../../../../core/auth/app_auth_controller.dart';
 
@@ -49,11 +50,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
           backgroundColor: Colors.white,
           title: const Text(
             'ตั้งรหัสผ่านสำเร็จ',
-            style: TextStyle(
-              color: LaooColors.green,
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-            ),
+            style: LaooTypography.screenCaptionStyle,
           ),
           content: const Text('คุณสามารถเข้าสู่ระบบด้วยรหัสผ่านใหม่ได้แล้ว'),
           actions: [
@@ -94,11 +91,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                     children: [
                       const Text(
                         'ตั้งรหัสผ่านใหม่',
-                        style: TextStyle(
-                          color: LaooColors.green,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                        ),
+                        style: LaooTypography.screenCaptionStyle,
                       ),
                       const SizedBox(height: 12),
                       Container(

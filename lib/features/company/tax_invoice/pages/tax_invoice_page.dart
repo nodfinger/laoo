@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import '../../../../app/theme/laoo_typography.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
@@ -173,13 +174,7 @@ class _TaxInvoiceListPageState extends State<_TaxInvoiceListPage> {
           children: [
             Icon(Icons.delete_outline, color: LaooColors.error),
             SizedBox(width: 8),
-            Text(
-              'ยืนยันการลบข้อมูล',
-              style: TextStyle(
-                color: LaooColors.error,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+            Text('ยืนยันการลบข้อมูล', style: LaooTypography.screenCaptionStyle),
           ],
         ),
         content: Column(
@@ -389,7 +384,7 @@ class _TaxInvoiceListPageState extends State<_TaxInvoiceListPage> {
                         child: WorkspacePageTitle(
                           title: _menuName,
                           favoriteKey: _activeMenu,
-                          titleColor: LaooColors.textPrimary,
+                          titleColor: Colors.black,
                         ),
                       ),
                       if (!compact) ...[
@@ -859,10 +854,7 @@ class _TaxInvoiceActionPageState extends State<_TaxInvoiceActionPage> {
           children: [
             Icon(Icons.delete_outline, color: LaooColors.error),
             SizedBox(width: 8),
-            Text(
-              'ยืนยันการลบข้อมูล',
-              style: TextStyle(color: LaooColors.error),
-            ),
+            Text('ยืนยันการลบข้อมูล', style: LaooTypography.screenCaptionStyle),
           ],
         ),
         content: Text(
@@ -1032,7 +1024,7 @@ class _TaxInvoiceActionPageState extends State<_TaxInvoiceActionPage> {
         WorkspacePageTitle(
           title: '$_menuName > ${_id == null ? 'เพิ่ม' : 'แก้ไข'}',
           favoriteKey: _activeMenu,
-          titleColor: LaooColors.textPrimary,
+          titleColor: Colors.black,
         ),
         Wrap(
           spacing: 4,

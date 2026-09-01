@@ -5,19 +5,19 @@
 ## Layout
 
 - Popup background must always be white.
-- Popup must have a rounded border using the current User Style color.
+- Popup must have a rounded border using the system Error/Delete color.
 - Header uses one row: delete icon beside the caption `ยืนยันการลบข้อมูล`.
-- Delete icon is inside a small soft-color box.
+- Delete icon is red and inside a small light-red box.
 - The selected record must be shown in a separate information bar.
-- The information bar uses a transparent User Style background.
+- The information bar uses a light-red background.
 - Show a warning that deleted data cannot be restored.
 - Add a divider before the footer buttons.
 - Cancel and Delete buttons must be on the same row.
 
 ## Colors
 
-- Border, header accent, information bar, and Cancel button follow the logged-in user's User Style.
-- Delete button remains red to communicate a destructive action.
+- Border, delete icon, header caption, information bar accent, and Delete button use the system Error/Delete color.
+- Cancel uses a plain TextButton.
 - Do not use a dark or theme-colored Popup background.
 
 ## Behavior

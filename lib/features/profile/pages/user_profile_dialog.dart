@@ -455,210 +455,267 @@ class _UserProfileDialogState extends State<_UserProfileDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final screenSize = MediaQuery.sizeOf(context);
+    final compact = screenSize.width < 600;
     final preview = _avatarBase64 == null
         ? null
         : MemoryImage(Uint8List.fromList(base64Decode(_avatarBase64!)));
-    return AlertDialog(
+    return Dialog(
       backgroundColor: Colors.white,
       surfaceTintColor: Colors.transparent,
-      title: Row(
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: compact ? 10 : 24,
+        vertical: compact ? 10 : 24,
+      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      clipBehavior: Clip.antiAlias,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 560,
+          maxHeight: screenSize.height - (compact ? 20 : 48),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _dialogHeader(theme, preview, compact),
+            Divider(height: 1, color: theme.dividerColor),
+            Flexible(
+              child: _loading
+                  ? const SizedBox(
+                      height: 180,
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  : SingleChildScrollView(
+                      padding: EdgeInsets.all(compact ? 12 : 18),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (_error != null) _errorBox(theme),
+                          _loginSection(theme),
+                          const SizedBox(height: 12),
+                          _appearanceSection(theme, preview),
+                        ],
+                      ),
+                    ),
+            ),
+            Divider(height: 1, color: theme.dividerColor),
+            _dialogActions(compact),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _dialogHeader(
+    ThemeData theme,
+    ImageProvider<Object>? preview,
+    bool compact,
+  ) => Padding(
+    padding: EdgeInsets.fromLTRB(
+      compact ? 14 : 20,
+      compact ? 12 : 16,
+      compact ? 10 : 16,
+      compact ? 12 : 16,
+    ),
+    child: Row(
+      children: [
+        CircleAvatar(
+          radius: compact ? 19 : 22,
+          backgroundImage: preview,
+          child: preview == null ? const Icon(Icons.person_outline) : null,
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            'ข้อมูลส่วนตัว',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: LaooTypography.screenCaptionStyle,
+          ),
+        ),
+        IconButton(
+          tooltip: 'ปิด',
+          onPressed: _saving ? null : _cancel,
+          icon: const Icon(Icons.close),
+        ),
+      ],
+    ),
+  );
+
+  Widget _loginSection(ThemeData theme) => _section(
+    theme,
+    'ข้อมูลเข้าสู่ระบบ',
+    [
+      TextField(
+        controller: _username,
+        decoration: const InputDecoration(labelText: 'Username'),
+      ),
+      const SizedBox(height: 12),
+      LayoutBuilder(
+        builder: (context, constraints) {
+          final oldPassword = TextField(
+            controller: _currentPassword,
+            obscureText: true,
+            decoration: const InputDecoration(labelText: 'Password เดิม'),
+          );
+          final newPassword = TextField(
+            controller: _newPassword,
+            obscureText: true,
+            decoration: const InputDecoration(
+              labelText: 'Password ใหม่ (ถ้าต้องการเปลี่ยน)',
+            ),
+          );
+          if (constraints.maxWidth < 390) {
+            return Column(
+              children: [oldPassword, const SizedBox(height: 12), newPassword],
+            );
+          }
+          return Row(
+            children: [
+              Expanded(child: oldPassword),
+              const SizedBox(width: 12),
+              Expanded(child: newPassword),
+            ],
+          );
+        },
+      ),
+    ],
+  );
+
+  Widget _appearanceSection(ThemeData theme, ImageProvider<Object>? preview) =>
+      _section(theme, 'การแสดงผลส่วนตัว', [
+        _viewModeSelector(theme),
+        const SizedBox(height: 16),
+        _profileImageEditor(theme, preview),
+        const SizedBox(height: 16),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final themeButton = OutlinedButton.icon(
+              onPressed: _chooseTheme,
+              icon: const Icon(Icons.palette_outlined, size: 19),
+              label: const Text('เลือกโทนสี'),
+            );
+            final introduction = TextField(
+              controller: _intro,
+              maxLines: 2,
+              maxLength: 300,
+              decoration: const InputDecoration(labelText: 'ข้อความแนะนำ'),
+            );
+            if (constraints.maxWidth < 430) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Align(alignment: Alignment.centerLeft, child: themeButton),
+                  const SizedBox(height: 12),
+                  introduction,
+                  const SizedBox(height: 12),
+                  _menuStyleSelector(theme),
+                ],
+              );
+            }
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    themeButton,
+                    const SizedBox(width: 12),
+                    Expanded(child: introduction),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                SizedBox(width: 240, child: _menuStyleSelector(theme)),
+              ],
+            );
+          },
+        ),
+      ]);
+
+  Widget _profileImageEditor(ThemeData theme, ImageProvider<Object>? preview) =>
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           CircleAvatar(
-            radius: 22,
+            radius: 34,
             backgroundImage: preview,
-            child: preview == null ? const Icon(Icons.person_outline) : null,
+            child: preview == null
+                ? Icon(
+                    Icons.person_outline,
+                    color: theme.colorScheme.primary,
+                    size: 30,
+                  )
+                : null,
           ),
-          const SizedBox(width: 12),
-          Text(
-            'ข้อมูลส่วนตัว',
-            style: TextStyle(
-              color: theme.colorScheme.primary,
-              fontWeight: FontWeight.w700,
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'รูปโปรไฟล์',
+                  style: TextStyle(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: _pickImage,
+                      icon: const Icon(Icons.photo_camera_outlined, size: 18),
+                      label: const Text('เลือกรูป'),
+                    ),
+                    if (preview != null)
+                      OutlinedButton.icon(
+                        onPressed: _deleteImage,
+                        icon: const Icon(
+                          Icons.delete_outline,
+                          size: 18,
+                          color: Colors.red,
+                        ),
+                        label: const Text(
+                          'ลบรูป',
+                          style: TextStyle(color: Colors.red),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
             ),
           ),
         ],
+      );
+
+  Widget _dialogActions(bool compact) => SafeArea(
+    top: false,
+    child: Padding(
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 12 : 18,
+        vertical: 12,
       ),
-      content: SizedBox(
-        width: 520,
-        child: _loading
-            ? const SizedBox(
-                height: 140,
-                child: Center(child: CircularProgressIndicator()),
-              )
-            : SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (_error != null) _errorBox(theme),
-                    _section(theme, 'ข้อมูลเข้าสู่ระบบ', [
-                      TextField(
-                        controller: _username,
-                        decoration: const InputDecoration(
-                          labelText: 'Username',
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _currentPassword,
-                              obscureText: true,
-                              decoration: const InputDecoration(
-                                labelText: 'Password เดิม',
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: TextField(
-                              controller: _newPassword,
-                              obscureText: true,
-                              decoration: const InputDecoration(
-                                labelText: 'Password ใหม่ (ถ้าต้องการเปลี่ยน)',
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ]),
-                    const SizedBox(height: 12),
-                    _section(theme, 'การแสดงผลส่วนตัว', [
-                      _viewModeSelector(theme),
-                      const SizedBox(height: 14),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          CircleAvatar(
-                            radius: 34,
-                            backgroundImage: preview,
-                            child: preview == null
-                                ? Icon(
-                                    Icons.person_outline,
-                                    color: theme.colorScheme.primary,
-                                    size: 30,
-                                  )
-                                : null,
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'รูปโปรไฟล์',
-                                  style: TextStyle(
-                                    color: theme.colorScheme.primary,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                Wrap(
-                                  spacing: 8,
-                                  children: [
-                                    OutlinedButton.icon(
-                                      onPressed: _pickImage,
-                                      icon: const Icon(
-                                        Icons.photo_camera_outlined,
-                                        size: 18,
-                                      ),
-                                      label: const Text('เลือกรูป'),
-                                    ),
-                                    if (preview != null)
-                                      OutlinedButton.icon(
-                                        onPressed: _deleteImage,
-                                        icon: const Icon(
-                                          Icons.delete_outline,
-                                          size: 18,
-                                          color: Colors.red,
-                                        ),
-                                        label: const Text(
-                                          'ลบรูป',
-                                          style: TextStyle(color: Colors.red),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      LayoutBuilder(
-                        builder: (context, constraints) {
-                          final compact = constraints.maxWidth < 420;
-                          final intro = Padding(
-                            padding: const EdgeInsets.only(top: 2),
-                            child: SizedBox(
-                              height: 56,
-                              child: TextField(
-                                controller: _intro,
-                                maxLines: 1,
-                                maxLength: 300,
-                                decoration: const InputDecoration(
-                                  isDense: true,
-                                  contentPadding: EdgeInsets.symmetric(
-                                    horizontal: 14,
-                                    vertical: 12,
-                                  ),
-                                  labelText: 'ข้อความแนะนำ',
-                                ),
-                              ),
-                            ),
-                          );
-                          final palette = IconButton(
-                            tooltip: 'เลือกโทนสี',
-                            onPressed: _chooseTheme,
-                            icon: Icon(
-                              Icons.palette_outlined,
-                              color: theme.colorScheme.primary,
-                            ),
-                          );
-                          final menuStyle = SizedBox(
-                            width: 200,
-                            child: _menuStyleSelector(theme),
-                          );
-                          return compact
-                              ? Row(
-                                  children: [
-                                    palette,
-                                    const SizedBox(width: 8),
-                                    Expanded(child: intro),
-                                    const SizedBox(width: 8),
-                                    menuStyle,
-                                  ],
-                                )
-                              : Row(
-                                  children: [
-                                    palette,
-                                    const SizedBox(width: 8),
-                                    Expanded(child: intro),
-                                    const SizedBox(width: 8),
-                                    menuStyle,
-                                  ],
-                                );
-                        },
-                      ),
-                    ]),
-                  ],
-                ),
-              ),
+      child: Wrap(
+        alignment: WrapAlignment.end,
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          OutlinedButton.icon(
+            onPressed: _saving ? null : _cancel,
+            icon: const Icon(Icons.close),
+            label: const Text('ยกเลิก'),
+          ),
+          FilledButton.icon(
+            onPressed: _saving ? null : _save,
+            icon: const Icon(Icons.save_outlined),
+            label: Text(_saving ? 'กำลังบันทึก...' : 'บันทึก'),
+          ),
+        ],
       ),
-      actions: [
-        OutlinedButton.icon(
-          onPressed: _saving ? null : _cancel,
-          icon: const Icon(Icons.close),
-          label: const Text('ยกเลิก'),
-        ),
-        FilledButton.icon(
-          onPressed: _saving ? null : _save,
-          icon: const Icon(Icons.save_outlined),
-          label: Text(_saving ? 'กำลังบันทึก...' : 'บันทึก'),
-        ),
-      ],
-    );
-  }
+    ),
+  );
 
   Widget _errorBox(ThemeData theme) => Container(
     width: double.infinity,

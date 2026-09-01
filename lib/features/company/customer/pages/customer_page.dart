@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/widgets/timed_snack_bar.dart';
 import '../../../../app/theme/workspace_theme_presets.dart';
+import '../../../../app/theme/laoo_typography.dart';
 import '../../../../core/company_setup/company_date_formatter.dart';
 import '../../../../core/company_setup/company_setup_controller.dart';
 import '../../../../features/support/presentation/widgets/support_workspace_shell.dart';
@@ -68,19 +69,21 @@ class _CustomerFilesDialogState extends State<CustomerFilesDialog> {
   Future<void> load() async {
     try {
       final result = await api.list(widget.customerId);
-      if (mounted)
+      if (mounted) {
         setState(
           () => files = result
               .where((x) => x['fileType'] == widget.fileType)
               .toList(),
         );
+      }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         showTimedSnackBar(
           context,
           message: _customerError('โหลดไฟล์', e),
           error: true,
         );
+      }
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -119,12 +122,13 @@ class _CustomerFilesDialogState extends State<CustomerFilesDialog> {
       await load();
       if (mounted) showTimedSnackBar(context, message: 'แนบไฟล์สำเร็จ');
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         showTimedSnackBar(
           context,
           message: _customerError('แนบไฟล์', e),
           error: true,
         );
+      }
     } finally {
       if (mounted) setState(() => uploading = false);
     }
@@ -165,12 +169,13 @@ class _CustomerFilesDialogState extends State<CustomerFilesDialog> {
         );
       }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         showTimedSnackBar(
           context,
           message: _customerError('เปิดไฟล์', e),
           error: true,
         );
+      }
     }
   }
 
@@ -186,12 +191,13 @@ class _CustomerFilesDialogState extends State<CustomerFilesDialog> {
         webOnlyWindowName: '_blank',
       );
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         showTimedSnackBar(
           context,
           message: _customerError('ดาวน์โหลดไฟล์', e),
           error: true,
         );
+      }
     }
   }
 
@@ -255,11 +261,7 @@ class _CustomerFilesDialogState extends State<CustomerFilesDialog> {
             Expanded(
               child: Text(
                 'ยืนยันการลบข้อมูล',
-                style: TextStyle(
-                  color: widget.accent,
-                  fontSize: 19,
-                  fontWeight: FontWeight.w700,
-                ),
+                style: LaooTypography.screenCaptionStyle,
               ),
             ),
           ],
@@ -307,12 +309,13 @@ class _CustomerFilesDialogState extends State<CustomerFilesDialog> {
       await api.delete(widget.customerId, id);
       await load();
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         showTimedSnackBar(
           context,
           message: _customerError('ลบไฟล์', e),
           error: true,
         );
+      }
     }
   }
 
@@ -334,13 +337,7 @@ class _CustomerFilesDialogState extends State<CustomerFilesDialog> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              'แก้ไขคำอธิบาย',
-              style: TextStyle(
-                color: widget.accent,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+            Text('แก้ไขคำอธิบาย', style: LaooTypography.screenCaptionStyle),
             const SizedBox(height: 8),
             Divider(color: widget.accent.withValues(alpha: .5), thickness: 1),
           ],
@@ -390,12 +387,13 @@ class _CustomerFilesDialogState extends State<CustomerFilesDialog> {
         await api.updateDescription(widget.customerId, id, controller.text);
         await load();
       } catch (e) {
-        if (mounted)
+        if (mounted) {
           showTimedSnackBar(
             context,
             message: _customerError('แก้ไขคำอธิบาย', e),
             error: true,
           );
+        }
       }
     }
     controller.dispose();
@@ -421,11 +419,7 @@ class _CustomerFilesDialogState extends State<CustomerFilesDialog> {
             const SizedBox(width: 10),
             Text(
               isCard ? 'แนบนามบัตร' : 'แนบเอกสารลูกค้า',
-              style: TextStyle(
-                color: Colors.black,
-                fontSize: 24,
-                fontWeight: FontWeight.w600,
-              ),
+              style: LaooTypography.screenCaptionStyle,
             ),
           ],
         ),
@@ -514,7 +508,7 @@ class _CustomerFilesDialogState extends State<CustomerFilesDialog> {
           : ListView.separated(
               shrinkWrap: true,
               itemCount: files.length,
-              separatorBuilder: (_, __) =>
+              separatorBuilder: (_, _) =>
                   const Divider(height: 1, color: Color(0xFFE5E7EB)),
               itemBuilder: (_, index) {
                 final file = files[index];
@@ -705,11 +699,12 @@ class _CustomerPageState extends State<CustomerPage> {
   Future<void> _loadDefaultViewMode() async {
     try {
       final profile = await _profile.get();
-      if (mounted)
+      if (mounted) {
         setState(
           () => _card =
               profile['defaultViewMode']?.toString().toUpperCase() == 'CARD',
         );
+      }
     } catch (_) {}
   }
 
@@ -849,7 +844,7 @@ class _CustomerPageState extends State<CustomerPage> {
                 SizedBox(
                   width: 220,
                   child: DropdownButtonFormField<String>(
-                    value: groupFilter,
+                    initialValue: groupFilter,
                     isExpanded: true,
                     style: const TextStyle(fontSize: 12, height: 1.35),
                     decoration: const InputDecoration(labelText: 'กลุ่มลูกค้า'),
@@ -927,7 +922,7 @@ class _CustomerPageState extends State<CustomerPage> {
                   SizedBox(
                     width: w,
                     child: DropdownButtonFormField<String>(
-                      value: groupFilter,
+                      initialValue: groupFilter,
                       isExpanded: true,
                       style: const TextStyle(fontSize: 12, height: 1.35),
                       decoration: const InputDecoration(
@@ -957,7 +952,7 @@ class _CustomerPageState extends State<CustomerPage> {
                   SizedBox(
                     width: w,
                     child: DropdownButtonFormField<String>(
-                      value: businessFilter,
+                      initialValue: businessFilter,
                       isExpanded: true,
                       style: const TextStyle(fontSize: 12, height: 1.35),
                       decoration: const InputDecoration(
@@ -1013,25 +1008,23 @@ class _CustomerPageState extends State<CustomerPage> {
     List<Map<String, dynamic>> data,
     Color accent,
     double width,
-  ) => SizedBox(
-    width: double.infinity,
-    height: 58 + (data.length * 64),
-    child: Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      color: Colors.white,
-      surfaceTintColor: Colors.transparent,
-      elevation: 0,
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(4),
-        side: BorderSide.none,
-      ),
-      child: Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.grey.shade300),
+  ) => Card(
+    margin: const EdgeInsets.symmetric(horizontal: 16),
+    color: Colors.white,
+    surfaceTintColor: Colors.transparent,
+    elevation: 0,
+    clipBehavior: Clip.antiAlias,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(4),
+      side: BorderSide.none,
+    ),
+    child: Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.grey.shade300),
+      child: SingleChildScrollView(
         child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
-          child: SizedBox(
-            width: width,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minWidth: width < 900 ? 900 : width),
             child: DataTable(
               border: TableBorder(
                 horizontalInside: BorderSide(
@@ -1197,7 +1190,7 @@ class _CustomerPageState extends State<CustomerPage> {
   ) => ListView.separated(
     padding: const EdgeInsets.symmetric(horizontal: 8),
     itemCount: data.length,
-    separatorBuilder: (_, __) => const SizedBox(height: 8),
+    separatorBuilder: (_, _) => const SizedBox(height: 8),
     itemBuilder: (_, index) {
       final x = data[index];
       final short = '${x['cusShortCode'] ?? ''}';
@@ -1392,11 +1385,7 @@ class _CustomerPageState extends State<CustomerPage> {
                     Expanded(
                       child: Text(
                         'ยืนยันการลบข้อมูล',
-                        style: TextStyle(
-                          color: accent,
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: LaooTypography.screenCaptionStyle,
                       ),
                     ),
                   ],
@@ -1453,12 +1442,13 @@ class _CustomerPageState extends State<CustomerPage> {
       await api.delete((x['customerID'] as num).toInt());
       await load();
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         showTimedSnackBar(
           context,
           message: _customerError('ลบข้อมูลลูกค้า', e),
           error: true,
         );
+      }
     }
   }
 }
@@ -1536,8 +1526,9 @@ class _CustomerFormState extends State<CustomerForm> {
   @override
   void initState() {
     super.initState();
-    for (final k in names.keys)
+    for (final k in names.keys) {
       fields[k] = TextEditingController(text: '${widget.initial[k] ?? ''}');
+    }
     final initialDate = _parseCustomerDate(widget.initial['startDate']);
     if (initialDate != null) {
       fields['startDate']!.text = _displayCustomerDate(initialDate);
@@ -1607,7 +1598,9 @@ class _CustomerFormState extends State<CustomerForm> {
 
   @override
   void dispose() {
-    for (final c in fields.values) c.dispose();
+    for (final c in fields.values) {
+      c.dispose();
+    }
     _master.dispose();
     _fileApi.dispose();
     super.dispose();
@@ -1668,12 +1661,13 @@ class _CustomerFormState extends State<CustomerForm> {
       await _loadCustomerFiles();
       if (mounted) showTimedSnackBar(context, message: 'แนบไฟล์สำเร็จ');
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         showTimedSnackBar(
           context,
           message: _customerError('แนบไฟล์', e),
           error: true,
         );
+      }
     }
   }
 
@@ -1685,12 +1679,13 @@ class _CustomerFormState extends State<CustomerForm> {
       await _fileApi.delete(customerId, fileId);
       await _loadCustomerFiles();
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         showTimedSnackBar(
           context,
           message: _customerError('ลบไฟล์', e),
           error: true,
         );
+      }
     }
   }
 
@@ -1752,10 +1747,11 @@ class _CustomerFormState extends State<CustomerForm> {
     };
     try {
       final id = widget.initial['customerID'];
-      if (id == null)
+      if (id == null) {
         await widget.api.create(b);
-      else
+      } else {
         await widget.api.update((id as num).toInt(), b);
+      }
       if (mounted) {
         showTimedSnackBar(context, message: 'บันทึกข้อมูลลูกค้าสำเร็จ');
         widget.onSaved();
@@ -2460,11 +2456,7 @@ class _CustomerFormState extends State<CustomerForm> {
                     const Expanded(
                       child: Text(
                         'เลือกผู้รับผิดชอบการขาย',
-                        style: TextStyle(
-                          color: Colors.black,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700,
-                        ),
+                        style: LaooTypography.screenCaptionStyle,
                       ),
                     ),
                   ],
@@ -2479,7 +2471,7 @@ class _CustomerFormState extends State<CustomerForm> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   DropdownButtonFormField<int?>(
-                    value: departmentId,
+                    initialValue: departmentId,
                     decoration: const InputDecoration(labelText: 'แผนก'),
                     items: [
                       const DropdownMenuItem<int?>(
@@ -2514,7 +2506,7 @@ class _CustomerFormState extends State<CustomerForm> {
                     child: ListView.separated(
                       shrinkWrap: true,
                       itemCount: rows.length,
-                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      separatorBuilder: (_, _) => const Divider(height: 1),
                       itemBuilder: (_, index) {
                         final employee = rows[index];
                         final nick = '${employee['nickName'] ?? ''}'.trim();
@@ -2760,7 +2752,7 @@ class _CustomerFormState extends State<CustomerForm> {
     return SizedBox(
       width: width ?? comboWidth,
       child: DropdownButtonFormField<String>(
-        value: valid,
+        initialValue: valid,
         isExpanded: true,
         style: TextStyle(
           fontSize: 12,

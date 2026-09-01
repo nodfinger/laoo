@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../app/theme/laoo_typography.dart';
 
 import '../../../../app/theme/workspace_theme_presets.dart';
 import '../../../../core/widgets/timed_snack_bar.dart';
@@ -66,12 +67,14 @@ class _GlobalSettingsPageState extends State<GlobalSettingsPage> {
     }
     setState(() => _saving = true);
     try {
-      await _api.save(itemMB: item, cardMB: card, itemDescription: _itemDescription.text, cardDescription: _cardDescription.text);
+      await _api.save(
+        itemMB: item,
+        cardMB: card,
+        itemDescription: _itemDescription.text,
+        cardDescription: _cardDescription.text,
+      );
       if (mounted) {
-        showTimedSnackBar(
-          context,
-          message: 'บันทึกกำหนดค่าส่วนกลางสำเร็จ',
-        );
+        showTimedSnackBar(context, message: 'บันทึกกำหนดค่าส่วนกลางสำเร็จ');
       }
     } catch (error) {
       if (mounted) {
@@ -99,11 +102,7 @@ class _GlobalSettingsPageState extends State<GlobalSettingsPage> {
                     Expanded(
                       child: Text(
                         'กำหนดค่าส่วนกลาง',
-                        style: TextStyle(
-                          color: accent,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w700,
-                        ),
+                        style: LaooTypography.screenCaptionStyle,
                       ),
                     ),
                     FilledButton(
@@ -111,9 +110,9 @@ class _GlobalSettingsPageState extends State<GlobalSettingsPage> {
                       style: FilledButton.styleFrom(
                         backgroundColor: accent,
                         foregroundColor: Colors.white,
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(4)),
-          ),
+                        shape: const RoundedRectangleBorder(
+                          borderRadius: BorderRadius.all(Radius.circular(4)),
+                        ),
                       ),
                       child: const Text('บันทึก'),
                     ),
@@ -157,13 +156,17 @@ class _GlobalSettingsPageState extends State<GlobalSettingsPage> {
                         TextField(
                           controller: _itemDescription,
                           maxLines: 2,
-                          decoration: const InputDecoration(labelText: 'คำอธิบายรูปสินค้า'),
+                          decoration: const InputDecoration(
+                            labelText: 'คำอธิบายรูปสินค้า',
+                          ),
                         ),
                         const SizedBox(height: 16),
                         TextField(
                           controller: _cardDescription,
                           maxLines: 2,
-                          decoration: const InputDecoration(labelText: 'คำอธิบายรูปนามบัตร'),
+                          decoration: const InputDecoration(
+                            labelText: 'คำอธิบายรูปนามบัตร',
+                          ),
                         ),
                       ],
                     ),

@@ -17,6 +17,7 @@ abstract final class RoutePaths {
   static const String partnerBranches = '/partner/branches';
   static const String partnerUsers = '/partner/users';
   static const String supportHome = '/support';
+  static const String supportBranches = '/support/branches';
   static const String partner = '/support/partner';
   static const String laooUser = '/support/laoo-user';
   static const String partnerUser = '/support/partner-user';

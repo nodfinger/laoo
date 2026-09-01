@@ -1,7 +1,5 @@
 import 'dart:convert';
 
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -292,7 +290,7 @@ class _QuotationDocumentActionPageState
           title:
               '${_menuName.isEmpty ? 'ใบเสนอราคา' : _menuName} > ${_isEdit ? 'แก้ไข' : 'เพิ่ม'}',
           favoriteKey: 'companyQuotations',
-          titleColor: LaooColors.textPrimary,
+          titleColor: Colors.black,
           titleFontSize: LaooTypography.pageTitle,
         );
         final actions = Wrap(
@@ -1110,14 +1108,7 @@ class _QuotationDocumentActionPageState
               children: [
                 Icon(icon, color: accent),
                 const SizedBox(width: 8),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: LaooColors.textPrimary,
-                    fontSize: LaooTypography.pageTitle,
-                    fontWeight: LaooTypography.pageTitleWeight,
-                  ),
-                ),
+                Text(title, style: LaooTypography.screenCaptionStyle),
               ],
             ),
             content: SizedBox(
@@ -1295,14 +1286,7 @@ class _QuotationDocumentActionPageState
               child: Icon(Icons.delete_outline, color: accent),
             ),
             const SizedBox(width: 12),
-            Text(
-              'ยืนยันการลบข้อมูล',
-              style: TextStyle(
-                color: accent,
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+            Text('ยืนยันการลบข้อมูล', style: LaooTypography.screenCaptionStyle),
           ],
         ),
         content: Column(

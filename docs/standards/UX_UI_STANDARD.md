@@ -19,7 +19,7 @@
 - Padding ภายใน Card ใช้ `LaooLayout.cardPadding` (`10px`)
 - ระยะทั่วไประหว่าง Card/Section ใช้ `LaooLayout.cardSpacing` (`10px`) ยกเว้น Card รายการใน Card Mode ซึ่งกำหนดไว้ที่ `6px`
 - เส้นคั่นใช้ `LaooColors.border` สีเทาอ่อนและบาง
-- Caption หลักใช้ `LaooColors.pageCaption` สีดำ ส่วน Icon ใช้สีหลักของ User Style
+- Caption หลักของหน้า `List`, `Card`, `Action` และ `Popup/Dialog` ใช้ `fontSize: 18`, `fontWeight: FontWeight.w700` และ `LaooColors.pageCaption` ซึ่งต้องเป็นสีดำ ส่วน Icon ใช้สีหลักของ User Style
 - ห้ามใช้ `Colors.green`, `Colors.blue` หรือสีหลักแบบ hardcode; สีแดงใช้ได้เฉพาะ Error, Delete, Offline หรือสถานะไม่ใช้งานตามข้อกำหนด
 - เมื่อ User เปลี่ยน Style สีทุกส่วนที่อิง User Styleต้องเปลี่ยนทันทีและต้องไม่กระทบ User คนอื่น
 
@@ -37,4 +37,3 @@
 ```text
 ปรับหน้าจอใน Project C:\laooplatform\laoo โดยอ่าน AGENTS.md และ docs/standards/UX_UI_STANDARD.md ก่อน จากนั้นอ่านมาตรฐานเฉพาะประเภทหน้าจอที่เกี่ยวข้อง ห้ามแก้ API, SQL, Repository หรือ Business Logic ให้ใช้ LaooColors, LaooLayout, LaooRadius, LaooTypography และ Workspace Theme จากส่วนกลางเท่านั้น ตรวจ Permission, Responsive, Overflow, dart format และ dart analyze แล้วสรุปไฟล์ที่แก้
 ```
-

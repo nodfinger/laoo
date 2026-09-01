@@ -12,6 +12,7 @@ import '../../../../core/api/api_exception.dart';
 import '../../../../core/company_setup/company_setup_controller.dart';
 import '../../../../core/favorites/user_favorite_repository.dart';
 import '../../../../core/navigation/navigation_menu.dart';
+import '../../../../core/navigation/navigation_icon_resolver.dart';
 import '../../../../core/navigation/navigation_menu_repository.dart';
 import '../../../../core/navigation/menu_style_preferences.dart';
 import '../../../../core/widgets/timed_snack_bar.dart';
@@ -55,10 +56,9 @@ class WorkspacePageTitle extends StatelessWidget {
             Flexible(
               child: Text(
                 title,
-                style: TextStyle(
+                style: LaooTypography.screenCaptionStyle.copyWith(
                   fontSize: titleFontSize ?? LaooTypography.workspaceCaption,
-                  fontWeight: LaooTypography.workspaceCaptionWeight,
-                  color: titleColor ?? accent,
+                  color: titleColor ?? Colors.black,
                 ),
               ),
             ),
@@ -253,8 +253,8 @@ class SupportWorkspaceShell extends StatelessWidget {
                                         menuScope: menuScope,
                                         preset: preset,
                                         activeMenu: activeMenu,
-                                        child: child,
                                         compact: compact,
+                                        child: child,
                                       ),
                                     )
                                   else
@@ -1813,15 +1813,8 @@ class _ButtonMenuWorkspaceState extends State<_ButtonMenuWorkspace> {
   }
 }
 
-IconData _buttonMenuIcon(String? name) => switch (name) {
-  'home' => Icons.home_outlined,
-  'people' => Icons.people_outline,
-  'settings' => Icons.settings_outlined,
-  'account_tree' => Icons.account_tree_outlined,
-  'apartment' => Icons.apartment_outlined,
-  'meeting_room' => Icons.meeting_room_outlined,
-  _ => Icons.apps_outlined,
-};
+IconData _buttonMenuIcon(String? name) =>
+    NavigationIconResolver.resolve(name, fallback: Icons.apps_outlined);
 
 class _CompactFooterButton extends StatelessWidget {
   const _CompactFooterButton({
@@ -1947,14 +1940,10 @@ class _FavoriteWorkspaceBarState extends State<_FavoriteWorkspaceBar> {
     }
   }
 
-  IconData _icon(String? name) => switch (name) {
-    'home' => Icons.home_outlined,
-    'people' => Icons.people_outline,
-    'settings' => Icons.settings_outlined,
-    'account_tree' => Icons.account_tree_outlined,
-    'apartment' => Icons.apartment_outlined,
-    _ => Icons.star_outline_rounded,
-  };
+  IconData _icon(String? name) => NavigationIconResolver.resolve(
+    name,
+    fallback: Icons.star_outline_rounded,
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -1987,7 +1976,8 @@ class _FavoriteWorkspaceBarState extends State<_FavoriteWorkspaceBar> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           InkWell(
-                            onTap: spec == null &&
+                            onTap:
+                                spec == null &&
                                     (item.routePath?.trim().isEmpty ?? true)
                                 ? null
                                 : () {
@@ -2028,7 +2018,8 @@ class _FavoriteWorkspaceBarState extends State<_FavoriteWorkspaceBar> {
                         ],
                       )
                     : InkWell(
-                        onTap: spec == null &&
+                        onTap:
+                            spec == null &&
                                 (item.routePath?.trim().isEmpty ?? true)
                             ? null
                             : () {
@@ -2097,7 +2088,7 @@ class _LogoutButton extends StatelessWidget {
 }
 
 class _ThemeButton extends StatelessWidget {
-  const _ThemeButton({this.compact = false, required this.preset});
+  const _ThemeButton({required this.preset}) : compact = false;
 
   final bool compact;
   final WorkspaceThemePreset preset;
@@ -2669,7 +2660,8 @@ class _ApiRoleScopedSidebarState extends State<_ApiRoleScopedSidebar> {
                             accent: widget.itemForeground,
                             selectedAccent: widget.preset.primary,
                             selectedForeground: widget.selectedForeground,
-                            onTap: spec == null &&
+                            onTap:
+                                spec == null &&
                                     (item.routePath?.trim().isEmpty ?? true)
                                 ? null
                                 : () {
@@ -2739,16 +2731,7 @@ class _ApiRoleScopedSidebarState extends State<_ApiRoleScopedSidebar> {
   }
 
   IconData _iconFor(String? name) {
-    return switch (name) {
-      'apartment' => Icons.apartment_outlined,
-      'account_tree' => Icons.account_tree_outlined,
-      'people' => Icons.people_outline,
-      'inventory_2' => Icons.inventory_2_outlined,
-      'sell' => Icons.sell_outlined,
-      'settings' => Icons.settings_outlined,
-      'developer_mode' => Icons.developer_mode_outlined,
-      _ => Icons.menu_outlined,
-    };
+    return NavigationIconResolver.resolve(name);
   }
 }
 
@@ -2797,10 +2780,9 @@ class _BrandHeader extends StatelessWidget {
   const _BrandHeader({
     required this.accent,
     required this.preset,
-    this.lightSurface = false,
     this.compact = false,
-    this.onTap,
-  });
+  }) : lightSurface = false,
+       onTap = null;
 
   final Color accent;
   final WorkspaceThemePreset preset;

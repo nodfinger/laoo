@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../app/theme/workspace_theme_presets.dart';
+import '../../../../app/theme/laoo_typography.dart';
 import 'dart:typed_data';
 import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
@@ -68,9 +69,8 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
   bool _alertIsError = false;
   int sortColumn = 4;
   bool sortAscending = true;
-  final OrganizationRepository _organizationRepository =
-      OrganizationRepository();
-  final EmployeeRepository _employeeRepository = EmployeeRepository();
+  late final OrganizationRepository _organizationRepository;
+  late final EmployeeRepository _employeeRepository;
   final MasterDataApi _masterDataApi = MasterDataApi();
   final PartnerCompanyRepository _companyRepository =
       PartnerCompanyRepository();
@@ -142,6 +142,20 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
   @override
   void initState() {
     super.initState();
+    _employeeRepository = EmployeeRepository(
+      scope: widget.companyScoped
+          ? EmployeeOwnerScope.company
+          : widget.customer
+          ? EmployeeOwnerScope.partnerCustomer
+          : EmployeeOwnerScope.partner,
+    );
+    _organizationRepository = OrganizationRepository(
+      scope: switch (widget.menuScope) {
+        WorkspaceMenuScope.support => LaooOwnerScope.support,
+        WorkspaceMenuScope.partner => LaooOwnerScope.partner,
+        WorkspaceMenuScope.company => LaooOwnerScope.company,
+      },
+    );
     _resetEmployeeFilters();
     _loadOrganizationUnits();
     _loadVehicleMasters();
@@ -157,20 +171,18 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
   Future<void> _loadDefaultViewMode() async {
     try {
       final profile = await _profileRepository.get();
-      if (mounted)
+      if (mounted) {
         setState(
           () => _card =
               profile['defaultViewMode']?.toString().toUpperCase() == 'CARD',
         );
+      }
     } catch (_) {}
   }
 
   Future<void> _loadEmployeeActions() async {
     try {
-      final p = await _employeeRepository.actions(
-        customer: widget.customer,
-        company: widget.companyScoped,
-      );
+      final p = await _employeeRepository.actions();
       if (mounted) {
         setState(() {
           _canCreate = p['create'] == true;
@@ -321,8 +333,6 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
     final result = await _employeeRepository.getFormalImage(
       employeeId,
       companyId: selectedCompanyId,
-      customer: widget.customer,
-      company: widget.companyScoped,
     );
     final encoded = result?['imageDataBase64'];
     if (encoded is String &&
@@ -342,15 +352,11 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
         employeeId,
         1,
         companyId: selectedCompanyId,
-        customer: widget.customer,
-        company: widget.companyScoped,
       ),
       _employeeRepository.getCarImage(
         employeeId,
         2,
         companyId: selectedCompanyId,
-        customer: widget.customer,
-        company: widget.companyScoped,
       ),
     ]);
     if (!mounted || editingEmployeeId != employeeId) {
@@ -380,8 +386,6 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
     final result = await _employeeRepository.getFormalImage(
       employeeId,
       companyId: selectedCompanyId,
-      customer: widget.customer,
-      company: widget.companyScoped,
     );
     final encoded = result?['imageDataBase64'];
     if (encoded is! String || encoded.isEmpty) {
@@ -581,8 +585,6 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
         departmentId: _selectedFilterDepartmentId,
         isActive: filterIsActive,
         companyId: selectedCompanyId,
-        customer: widget.customer,
-        company: widget.companyScoped,
         page: _currentPage,
         pageSize: _pageSize,
       );
@@ -2156,8 +2158,6 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
           editingEmployeeId!,
           carNo,
           companyId: widget.customer ? selectedCompanyId : null,
-          customer: widget.customer,
-          company: widget.companyScoped,
         );
       } on ApiException catch (error) {
         if (mounted) {
@@ -2306,17 +2306,11 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
       body['companyId'] = widget.customer ? selectedCompanyId : null;
       int savedEmployeeId;
       if (editingEmployeeId == null) {
-        savedEmployeeId = await _employeeRepository.create(
-          body,
-          customer: widget.customer,
-          company: widget.companyScoped,
-        );
+        savedEmployeeId = await _employeeRepository.create(body);
       } else {
         savedEmployeeId = await _employeeRepository.update(
           editingEmployeeId!,
           body,
-          customer: widget.customer,
-          company: widget.companyScoped,
         );
       }
       if (_formalImageBytes != null) {
@@ -2325,8 +2319,6 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
           _formalImageBytes!,
           _formalImageName ?? 'employee-formal.jpg',
           companyId: widget.customer ? selectedCompanyId : null,
-          customer: widget.customer,
-          company: widget.companyScoped,
         );
       }
       final carImages = <int, (Uint8List, String)>{
@@ -2342,8 +2334,6 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
           entry.value.$1,
           entry.value.$2,
           companyId: widget.customer ? selectedCompanyId : null,
-          customer: widget.customer,
-          company: widget.companyScoped,
         );
       }
       if (username.isNotEmpty) {
@@ -2352,8 +2342,6 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
           username,
           password.isEmpty ? null : password,
           companyId: widget.customer ? selectedCompanyId : null,
-          customer: widget.customer,
-          company: widget.companyScoped,
           roleGroupId: _selectedRoleGroupId,
         );
       }
@@ -2486,8 +2474,6 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
       page: _currentPage,
       pageSize: _pageSize,
       companyId: selectedCompanyId,
-      customer: widget.customer,
-      company: widget.companyScoped,
     );
     final items = result['items'] is List ? result['items'] as List : const [];
     final item = items.whereType<Map>().cast<Map<String, dynamic>>().firstWhere(
@@ -2538,8 +2524,6 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
       final user = await _employeeRepository.getEmployeeUser(
         id,
         companyId: widget.customer ? selectedCompanyId : null,
-        customer: widget.customer,
-        company: widget.companyScoped,
       );
       if (mounted && requestToken == _editRequestToken) {
         usernameController.text = (user['username'] ?? '').toString();
@@ -2580,8 +2564,6 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
       final user = await _employeeRepository.getEmployeeUser(
         employeeId,
         companyId: widget.customer ? selectedCompanyId : null,
-        customer: widget.customer,
-        company: widget.companyScoped,
       );
       usernameController.text = (user['username'] ?? '').toString();
       selectedRoleGroupId = (user['roleGroupId'] as num?)?.toInt();
@@ -2765,8 +2747,6 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
                                   companyId: widget.customer
                                       ? selectedCompanyId
                                       : null,
-                                  customer: widget.customer,
-                                  company: widget.companyScoped,
                                 );
                                 if (dialogContext.mounted) {
                                   Navigator.of(dialogContext).pop(true);
@@ -2848,11 +2828,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
             Expanded(
               child: Text(
                 'ยืนยันการลบข้อมูล',
-                style: TextStyle(
-                  color: accent,
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
-                ),
+                style: LaooTypography.screenCaptionStyle,
               ),
             ),
           ],
@@ -2903,12 +2879,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
       return;
     }
     try {
-      await _employeeRepository.delete(
-        id,
-        companyId: selectedCompanyId,
-        customer: widget.customer,
-        company: widget.companyScoped,
-      );
+      await _employeeRepository.delete(id, companyId: selectedCompanyId);
       if (!mounted) {
         return;
       }

@@ -11,7 +11,7 @@
 
 - Popup ใช้พื้นผิว Theme กลาง ไม่มี `BorderSide` หรือเส้นกรอบรอบนอกเฉพาะหน้า
 - ระยะขอบ Popup ใช้ `LaooLayout.dialogInsetPadding`; Padding ภายในใช้ `LaooLayout.cardPadding`
-- Caption ขนาด `18px`, น้ำหนัก `700`, สีดำ; Icon หน้า Caption ใช้ Primary ตาม User Style
+- Caption ใช้มาตรฐานกลาง `fontSize: 18`, `fontWeight: FontWeight.w700`, `color: Colors.black` ตาม `TYPOGRAPHY_STANDARD.md`; Icon หน้า Caption ใช้ Primary ตาม User Style
 - ใช้เส้น `LaooColors.border` สีเทาอ่อนใต้ Caption และก่อนส่วนปุ่มด้านล่าง
 - Context Bar ที่แสดงรายการแม่/ห้อง/อาคารที่เลือก ใช้พื้น Primary แบบโปร่งแสงและข้อความขนาด `16px`
 - TextBox/ComboBox ใช้กรอบมาตรฐาน มุมโค้ง `4px`; Label และ Focus Border ใช้ Primary
@@ -28,7 +28,7 @@
 
 ## Delete Confirmation
 
-- ใช้ Pattern เดียวกันทั้งระบบ: Icon ถังขยะสีแดง, Caption สีแดง, กล่องข้อความพื้นแดงอ่อนที่แสดง Key/ชื่อรายการ และข้อความว่าเรียกคืนไม่ได้
+- ใช้ Pattern เดียวกันทั้งระบบ: Icon ถังขยะสีแดง, Caption ใช้มาตรฐานกลางสีดำ `18px`/`FontWeight.w700`, กล่องข้อความพื้นแดงอ่อนที่แสดง Key/ชื่อรายการ และข้อความว่าเรียกคืนไม่ได้
 - ปุ่ม `ยกเลิก` เป็น TextButton สี Primary ของ User Style
 - ปุ่ม `ลบ` เป็น Filled สีแดงพร้อม Icon ถังขยะ
 - Popup ยืนยันลบไม่มีเส้นกรอบรอบนอก
@@ -38,4 +38,3 @@
 ```text
 ปรับ Popup/Dialog/Alert นี้ตาม docs/standards/UX_UI_STANDARD.md, POPUP_UI_STANDARD.md และ TYPOGRAPHY_STANDARD.md เอาเส้นกรอบรอบนอกออก Caption สีดำ 18px Icon ใช้สี Primary มีเส้นเทาอ่อนใต้ Caption และก่อนปุ่ม TextBox/ComboBox มุมโค้ง 4px Validation สีแดงใต้ Field ปุ่มด้านล่างสูง 48px มุมโค้ง 4px และใช้สี User Style ส่วน Delete Confirm ใช้ Pattern สีแดงกลางของระบบ Notification ต้องลอยมุมขวาบนและหายตาม TimeAlert ห้ามแก้ API, SQL, Repository หรือ Business Logic ตรวจ Responsive, Overflow, dart format และ dart analyze
 ```
-

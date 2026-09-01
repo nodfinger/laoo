@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/api/api_exception.dart';
 import '../../../../core/company_setup/company_setup_controller.dart';
 import '../../../../app/theme/workspace_theme_presets.dart';
+import '../../../../app/theme/laoo_typography.dart';
 import '../../../support/presentation/widgets/support_workspace_shell.dart';
 import '../data/role_group_repository.dart';
 import '../models/role_group.dart';
@@ -45,11 +46,12 @@ class _RoleGroupPageState extends State<RoleGroupPage> {
   Future<void> _loadDefaultViewMode() async {
     try {
       final profile = await _profile.get();
-      if (mounted)
+      if (mounted) {
         setState(
           () => _card =
               profile['defaultViewMode']?.toString().toUpperCase() == 'CARD',
         );
+      }
     } catch (_) {}
   }
 
@@ -173,11 +175,7 @@ class _RoleGroupPageState extends State<RoleGroupPage> {
             Expanded(
               child: Text(
                 'ยืนยันการลบข้อมูล',
-                style: TextStyle(
-                  color: accent,
-                  fontSize: 19,
-                  fontWeight: FontWeight.w700,
-                ),
+                style: LaooTypography.screenCaptionStyle,
               ),
             ),
           ],

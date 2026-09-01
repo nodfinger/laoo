@@ -389,6 +389,27 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.0.0"
+  laoo_shared_admin:
+    dependency: "direct main"
+    description:
+      path: "packages/laoo_shared_admin"
+      relative: true
+    source: path
+    version: "0.1.0"
+  laoo_shared_admin_ui:
+    dependency: "direct main"
+    description:
+      path: "packages/laoo_shared_admin_ui"
+      relative: true
+    source: path
+    version: "0.1.0"
+  laoo_shared_core:
+    dependency: "direct main"
+    description:
+      path: "packages/laoo_shared_core"
+      relative: true
+    source: path
+    version: "0.1.0"
   leak_tracker:
     dependency: transitive
     description:

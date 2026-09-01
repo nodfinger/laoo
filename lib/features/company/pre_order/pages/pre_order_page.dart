@@ -167,14 +167,7 @@ class _PreOrderListPageState extends State<PreOrderListPage> {
           children: [
             Icon(Icons.delete_outline, color: LaooColors.error),
             SizedBox(width: 8),
-            Text(
-              'ยืนยันการลบข้อมูล',
-              style: TextStyle(
-                color: LaooColors.error,
-                fontSize: LaooTypography.workspaceCaption,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+            Text('ยืนยันการลบข้อมูล', style: LaooTypography.screenCaptionStyle),
           ],
         ),
         content: Column(
@@ -490,7 +483,7 @@ class _PreOrderListPageState extends State<PreOrderListPage> {
                               child: WorkspacePageTitle(
                                 title: _menuName,
                                 favoriteKey: _activeMenu,
-                                titleColor: LaooColors.textPrimary,
+                                titleColor: Colors.black,
                               ),
                             ),
                             if (!compact) ...[

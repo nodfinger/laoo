@@ -304,7 +304,7 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
               child: SizedBox(
                 width: widget.additionalOnly ? 420 : double.infinity,
                 child: DropdownButtonFormField<String>(
-                  value: _runItemOptions.any((x) => '${x['code']}' == _runItem)
+                  initialValue: _runItemOptions.any((x) => '${x['code']}' == _runItem)
                       ? _runItem
                       : null,
                   decoration: const InputDecoration(
@@ -368,7 +368,7 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
               child: SizedBox(
                 width: widget.additionalOnly ? 420 : double.infinity,
                 child: DropdownButtonFormField<String>(
-                  value: _runCusOptions.any((x) => '${x['code']}' == _runCus)
+                  initialValue: _runCusOptions.any((x) => '${x['code']}' == _runCus)
                       ? _runCus
                       : null,
                   decoration: const InputDecoration(

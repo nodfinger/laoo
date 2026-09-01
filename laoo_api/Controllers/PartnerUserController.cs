@@ -1,6 +1,6 @@
 using System.Data;
 using System.Security.Claims;
-using LaooApi.Models.Partner;
+using Laoo.Shared.Contracts.PartnerUsers;
 using LaooApi.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -15,7 +15,21 @@ public sealed class PartnerUserController(
     IConfiguration configuration,
     PasswordService passwordService) : ControllerBase
 {
-    private const string ScreenCode = "PARTNER";
+    private static PartnerUserScreenContract Screen => PartnerUserScreenContracts.Support;
+
+    [HttpGet("actions")]
+    public async Task<ActionResult<object>> Actions(CancellationToken cancellationToken)
+    {
+        if (!await IsLaooSupportAsync(cancellationToken)) return Forbid();
+        await using var connection = await OpenAsync(cancellationToken);
+        return Ok(new
+        {
+            view = await HasPermissionAsync(connection, "VIEW", cancellationToken),
+            create = await HasPermissionAsync(connection, "CREATE", cancellationToken),
+            edit = await HasPermissionAsync(connection, "EDIT", cancellationToken),
+            delete = await HasPermissionAsync(connection, "DELETE", cancellationToken),
+        });
+    }
 
     [HttpGet]
     public async Task<ActionResult<List<PartnerUserResponse>>> List(
@@ -85,9 +99,9 @@ SELECT CAST(SCOPE_IDENTITY() AS BIGINT);
         try
         {
             var id = Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken));
-            return Created($"/api/support/partner-users/{id}", new PartnerUserResponse { PartnerUserId=id, PartnerId=partnerId, Username=username, DisplayName=request.DisplayName.Trim(), Email=Null(request.Email), MobileNumber=Null(request.MobileNumber), IsPartnerAdmin=request.IsPartnerAdmin, IsActive=request.IsActive });
+            return Created($"{Screen.ApiPath}/{id}", new PartnerUserResponse { PartnerUserId=id, PartnerId=partnerId, Username=username, DisplayName=request.DisplayName.Trim(), Email=Null(request.Email), MobileNumber=Null(request.MobileNumber), IsPartnerAdmin=request.IsPartnerAdmin, IsActive=request.IsActive });
         }
-        catch (SqlException ex) when (ex.Number is 2601 or 2627)
+        catch (SqlException ex) when (ex.Number is 50008 or 2601 or 2627)
         {
             return Conflict(new { message = "Username เธเธตเนเธ–เธนเธเนเธเนเธเธฒเธเนเธฅเนเธง" });
         }
@@ -151,12 +165,12 @@ UPDATE dbo.TDADPartnerUser SET Username=@Username,NormalizedUsername=@Normalized
         return await command.ExecuteNonQueryAsync(cancellationToken) == 0 ? NotFound() : NoContent();
     }
 
-    private Task<bool> IsLaooSupportAsync(CancellationToken token) => Task.FromResult(string.Equals(User.FindFirstValue("user_type"), "LAOO_SUPPORT", StringComparison.OrdinalIgnoreCase) && User.FindFirstValue("laoo_user_id") is not null);
+    private Task<bool> IsLaooSupportAsync(CancellationToken token) => Task.FromResult(string.Equals(User.FindFirstValue("user_type"), Screen.RequiredUserType, StringComparison.OrdinalIgnoreCase) && User.FindFirstValue("laoo_user_id") is not null);
     private async Task<bool> HasPermissionAsync(SqlConnection connection, string action, CancellationToken token)
     {
         if (!long.TryParse(User.FindFirstValue("laoo_user_id"), out var user) || !long.TryParse(User.FindFirstValue("project_id"), out var project)) return false;
-        const string sql = "SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADLaooUserPermission UP JOIN dbo.TDADPermission P ON P.PermissionID=UP.PermissionID AND P.ProjectID=UP.ProjectID WHERE UP.LaooUserID=@UserID AND UP.ProjectID=@ProjectID AND UP.IsAllowed=1 AND UP.IsActive=1 AND P.IsActive=1 AND P.ScreenCode=@ScreenCode AND P.ActionCode=@Action) THEN 1 ELSE 0 END";
-        await using var command = new SqlCommand(sql, connection); Add(command,"@UserID",SqlDbType.BigInt,user); Add(command,"@ProjectID",SqlDbType.BigInt,project); Add(command,"@ScreenCode",SqlDbType.NVarChar,ScreenCode,100); Add(command,"@Action",SqlDbType.NVarChar,action,50); return Convert.ToBoolean(await command.ExecuteScalarAsync(token));
+        const string sql = "SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADLaooUserPermission UP JOIN dbo.TDADPermission P ON P.PermissionID=UP.PermissionID AND P.ProjectID=UP.ProjectID WHERE UP.LaooUserID=@UserID AND UP.ProjectID=@ProjectID AND UP.IsAllowed=1 AND UP.IsActive=1 AND P.IsActive=1 AND P.ScreenCode IN (@ScreenCode,@LegacyScreenCode) AND P.ActionCode=@Action) THEN 1 ELSE 0 END";
+        await using var command = new SqlCommand(sql, connection); Add(command,"@UserID",SqlDbType.BigInt,user); Add(command,"@ProjectID",SqlDbType.BigInt,project); Add(command,"@ScreenCode",SqlDbType.NVarChar,Screen.MenuCode,100); Add(command,"@LegacyScreenCode",SqlDbType.NVarChar,Screen.LegacyPermissionCode,100); Add(command,"@Action",SqlDbType.NVarChar,action,50); return Convert.ToBoolean(await command.ExecuteScalarAsync(token));
     }
     private async Task<bool> PartnerExistsAsync(SqlConnection c,long id,CancellationToken t){await using var x=new SqlCommand("SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADPartner WHERE PartnerID=@ID) THEN 1 ELSE 0 END",c);Add(x,"@ID",SqlDbType.BigInt,id);return Convert.ToBoolean(await x.ExecuteScalarAsync(t));}
     private async Task<bool> HasActiveAdminAsync(SqlConnection c,long id,CancellationToken t){await using var x=new SqlCommand("SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADPartnerUser WHERE PartnerID=@ID AND IsPartnerAdmin=1 AND IsActive=1) THEN 1 ELSE 0 END",c);Add(x,"@ID",SqlDbType.BigInt,id);return Convert.ToBoolean(await x.ExecuteScalarAsync(t));}

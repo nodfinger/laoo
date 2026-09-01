@@ -12,6 +12,12 @@ dependencies:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
+  laoo_shared_admin:
+    path: packages/laoo_shared_admin
+  laoo_shared_admin_ui:
+    path: packages/laoo_shared_admin_ui
+  laoo_shared_core:
+    path: packages/laoo_shared_core
 
   cupertino_icons: ^1.0.8
   flutter_riverpod: ^3.4.2

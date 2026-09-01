@@ -45,6 +45,9 @@ abstract final class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
       ),
+      dialogTheme: const DialogThemeData(
+        titleTextStyle: LaooTypography.screenCaptionStyle,
+      ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           minimumSize: const Size(120, LaooTypography.buttonHeight),

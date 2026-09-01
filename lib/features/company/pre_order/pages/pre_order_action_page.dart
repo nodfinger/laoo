@@ -262,11 +262,7 @@ class _PreOrderActionPageState extends State<PreOrderActionPage> {
                 const SizedBox(width: 8),
                 Text(
                   'เลือกใบเสนอราคา',
-                  style: TextStyle(
-                    color: LaooColors.textPrimary,
-                    fontSize: LaooTypography.workspaceCaption,
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: LaooTypography.screenCaptionStyle,
                 ),
               ],
             ),
@@ -443,11 +439,7 @@ class _PreOrderActionPageState extends State<PreOrderActionPage> {
                 const SizedBox(width: 8),
                 Text(
                   index == null ? 'เพิ่มรายการสินค้า' : 'แก้ไขรายการสินค้า',
-                  style: const TextStyle(
-                    color: LaooColors.textPrimary,
-                    fontSize: LaooTypography.workspaceCaption,
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: LaooTypography.screenCaptionStyle,
                 ),
               ],
             ),
@@ -671,10 +663,7 @@ class _PreOrderActionPageState extends State<PreOrderActionPage> {
           children: [
             Icon(Icons.delete_outline, color: Colors.red),
             SizedBox(width: 8),
-            Text(
-              'ยืนยันการลบข้อมูล',
-              style: TextStyle(color: Colors.red, fontWeight: FontWeight.w700),
-            ),
+            Text('ยืนยันการลบข้อมูล', style: LaooTypography.screenCaptionStyle),
           ],
         ),
         content: Column(
@@ -1287,7 +1276,7 @@ class _PreOrderActionPageState extends State<PreOrderActionPage> {
                                   title:
                                       '$_menuName > ${_isEdit ? 'แก้ไข' : 'เพิ่ม'}',
                                   favoriteKey: _activeMenu,
-                                  titleColor: LaooColors.textPrimary,
+                                  titleColor: Colors.black,
                                 ),
                               ),
                               OutlinedButton.icon(

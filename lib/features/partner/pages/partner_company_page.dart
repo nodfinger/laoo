@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../../core/api/api_exception.dart';
 import '../../../core/widgets/combo_box_text.dart';
 import '../../../core/widgets/auto_dismiss_message.dart';
 
@@ -468,13 +469,6 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
     }
   }
 
-  void _clearFilters() {
-    _search.clear();
-    _partnerFilterId = null;
-    _statusFilter = 'ทั้งหมด';
-    _load();
-  }
-
   Future<void> _loadPartners() async {
     try {
       final result = await _partnerRepository.getPartners(isActive: true);
@@ -530,11 +524,7 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
             Expanded(
               child: RichText(
                 text: const TextSpan(
-                  style: TextStyle(
-                    fontFamily: LaooTypography.fontFamily,
-                    fontSize: LaooTypography.sectionTitle,
-                    color: Colors.red,
-                  ),
+                  style: LaooTypography.screenCaptionStyle,
                   children: [
                     TextSpan(text: 'ยืนยันการลบ '),
                     TextSpan(
@@ -1243,11 +1233,7 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
                 ),
                 child: Text(
                   'กำหนดผู้ดูแลระบบ - ${item.companyNameTh}',
-                  style: TextStyle(
-                    color: primary,
-                    fontSize: LaooTypography.sectionTitle,
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: LaooTypography.screenCaptionStyle,
                 ),
               ),
               content: Stack(
@@ -1323,13 +1309,19 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
                           if (dialogContext.mounted) {
                             Navigator.pop(dialogContext, true);
                           }
-                        } catch (error) {
+                        } on ApiException catch (error) {
                           if (dialogContext.mounted) {
                             setDialogState(
-                              () =>
-                                  dialogError = error.toString().contains('ซ้ำ')
-                                  ? 'Username นี้มีในระบบแล้ว กรุณาใช้ Username อื่น'
-                                  : 'บันทึกไม่สำเร็จ กรุณาตรวจสอบข้อมูลอีกครั้ง',
+                              () => dialogError = error.message.trim().isEmpty
+                                  ? 'บันทึกไม่สำเร็จ กรุณาตรวจสอบข้อมูลอีกครั้ง'
+                                  : error.message,
+                            );
+                          }
+                        } catch (_) {
+                          if (dialogContext.mounted) {
+                            setDialogState(
+                              () => dialogError =
+                                  'บันทึกไม่สำเร็จ กรุณาตรวจสอบข้อมูลอีกครั้ง',
                             );
                           }
                         }

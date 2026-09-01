@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../app/theme/laoo_typography.dart';
 import '../../../../app/theme/workspace_theme_presets.dart';
 import '../../../../core/widgets/timed_snack_bar.dart';
 import '../../presentation/widgets/support_workspace_shell.dart';
@@ -35,8 +36,9 @@ class _GlobalPermissionSettingsPageState
       _caption = result[0] as String;
       _rows = result[1] as List<Map<String, dynamic>>;
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         showTimedSnackBar(context, message: e.toString(), error: true);
+      }
     }
     if (mounted) setState(() => _loading = false);
   }
@@ -45,8 +47,9 @@ class _GlobalPermissionSettingsPageState
   Widget build(BuildContext context) {
     final accent = workspaceThemeController.value.primary;
     final groups = <String, List<Map<String, dynamic>>>{};
-    for (final row in _rows)
+    for (final row in _rows) {
       groups.putIfAbsent('${row['menuGroupCode']}', () => []).add(row);
+    }
     final caption = _rows
         .where((row) => '${row['menuCode']}'.trim() == '01006')
         .map((row) => '${row['menuName']}'.trim())
@@ -65,11 +68,7 @@ class _GlobalPermissionSettingsPageState
                     Expanded(
                       child: Text(
                         _caption,
-                        style: TextStyle(
-                          color: accent,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w700,
-                        ),
+                        style: LaooTypography.screenCaptionStyle,
                       ),
                     ),
                   ],
@@ -90,8 +89,9 @@ class _GlobalPermissionSettingsPageState
   ) {
     final first = items.first;
     final menus = <String, List<Map<String, dynamic>>>{};
-    for (final item in items)
+    for (final item in items) {
       menus.putIfAbsent('${item['menuCode']}', () => []).add(item);
+    }
     return Card(
       margin: const EdgeInsets.only(bottom: 14),
       child: Padding(
@@ -229,11 +229,7 @@ class _GlobalPermissionSettingsPageState
                 children: [
                   Text(
                     'เพิ่มประเภทสิทธิ์',
-                    style: TextStyle(
-                      color: accent,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: LaooTypography.screenCaptionStyle,
                   ),
                   const SizedBox(height: 10),
                   Container(
@@ -243,7 +239,7 @@ class _GlobalPermissionSettingsPageState
                       vertical: 12,
                     ),
                     decoration: BoxDecoration(
-                      color: accent.withOpacity(.10),
+                      color: accent.withValues(alpha: .10),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
@@ -292,12 +288,13 @@ class _GlobalPermissionSettingsPageState
                             );
                             if (context.mounted) Navigator.pop(context, true);
                           } catch (e) {
-                            if (context.mounted)
+                            if (context.mounted) {
                               showTimedSnackBar(
                                 context,
                                 message: e.toString(),
                                 error: true,
                               );
+                            }
                           }
                         },
                         style: FilledButton.styleFrom(
@@ -363,11 +360,7 @@ class _GlobalPermissionSettingsPageState
                 children: [
                   Text(
                     'แก้ไขประเภทสิทธิ์',
-                    style: TextStyle(
-                      color: accent,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: LaooTypography.screenCaptionStyle,
                   ),
                   const SizedBox(height: 10),
                   Container(
@@ -427,15 +420,17 @@ class _GlobalPermissionSettingsPageState
                               name: name.text,
                               description: description.text,
                             );
-                            if (dialogContext.mounted)
+                            if (dialogContext.mounted) {
                               Navigator.pop(dialogContext, true);
+                            }
                           } catch (error) {
-                            if (dialogContext.mounted)
+                            if (dialogContext.mounted) {
                               showTimedSnackBar(
                                 dialogContext,
                                 message: error.toString(),
                                 error: true,
                               );
+                            }
                           }
                         },
                         style: FilledButton.styleFrom(
@@ -485,7 +480,7 @@ class _GlobalPermissionSettingsPageState
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: accent.withOpacity(.12),
+                        color: accent.withValues(alpha: .12),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Icon(Icons.delete_outline, color: accent),
@@ -493,11 +488,7 @@ class _GlobalPermissionSettingsPageState
                     const SizedBox(width: 12),
                     Text(
                       'ยืนยันการลบข้อมูล',
-                      style: TextStyle(
-                        color: accent,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                      ),
+                      style: LaooTypography.screenCaptionStyle,
                     ),
                   ],
                 ),
@@ -506,7 +497,7 @@ class _GlobalPermissionSettingsPageState
                   width: double.infinity,
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: accent.withOpacity(.10),
+                    color: accent.withValues(alpha: .10),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -558,8 +549,9 @@ class _GlobalPermissionSettingsPageState
         );
         await _load();
       } catch (e) {
-        if (context.mounted)
+        if (context.mounted) {
           showTimedSnackBar(context, message: e.toString(), error: true);
+        }
       }
     }
   }

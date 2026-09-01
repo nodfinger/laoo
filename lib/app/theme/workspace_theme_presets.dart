@@ -142,14 +142,7 @@ class WorkspaceThemePreset {
         ),
       ),
       dialogTheme: DialogThemeData(
-        titleTextStyle: TextStyle(
-          fontFamily: LaooTypography.fontFamily,
-          fontFamilyFallback: LaooTypography.fontFallback,
-          fontSize: LaooTypography.sectionTitle,
-          height: LaooTypography.titleLineHeight,
-          fontWeight: FontWeight.w700,
-          color: textPrimary,
-        ),
+        titleTextStyle: LaooTypography.screenCaptionStyle,
         contentTextStyle: TextStyle(
           fontFamily: LaooTypography.fontFamily,
           fontFamilyFallback: LaooTypography.fontFallback,

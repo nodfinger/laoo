@@ -153,11 +153,7 @@ class _LoginPageState extends State<LoginPage> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Colors.white,
-        titleTextStyle: const TextStyle(
-          color: Color(0xFF16845F),
-          fontSize: 16,
-          fontWeight: FontWeight.w700,
-        ),
+        titleTextStyle: LaooTypography.screenCaptionStyle,
         titlePadding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
         contentPadding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
         actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),

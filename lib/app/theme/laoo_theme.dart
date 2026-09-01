@@ -72,6 +72,9 @@ abstract final class LaooTheme {
           side: BorderSide.none,
         ),
       ),
+      dialogTheme: const DialogThemeData(
+        titleTextStyle: LaooTypography.screenCaptionStyle,
+      ),
     );
   }
 }

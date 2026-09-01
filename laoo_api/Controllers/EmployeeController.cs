@@ -1,6 +1,6 @@
 using System.Data;
 using System.Security.Claims;
-using LaooApi.Models.Support;
+using Laoo.Shared.Contracts.Employees;
 using LaooApi.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -14,7 +14,8 @@ namespace LaooApi.Controllers;
 [Route("api/company/employees")]
 public sealed class EmployeeController(IConfiguration configuration, PasswordService passwordService) : ControllerBase
 {
-    private string ScreenCode => Request.Path.Value?.Contains("/api/company/", StringComparison.OrdinalIgnoreCase) == true ? "10001" : Request.Path.Value?.Contains("customer-employees", StringComparison.OrdinalIgnoreCase) == true ? "12001" : "11001";
+    private EmployeeScreenContract CurrentScreen => EmployeeScreenContracts.FromRequestPath(Request.Path.Value);
+    private string ScreenCode => CurrentScreen.MenuCode;
 
     [HttpGet]
     public async Task<IActionResult> List(
@@ -98,6 +99,7 @@ public sealed class EmployeeController(IConfiguration configuration, PasswordSer
         if (string.IsNullOrWhiteSpace(x.EmployeeCode) || string.IsNullOrWhiteSpace(x.FullName))
             return BadRequest(new { message = "เธเธฃเธธเธ“เธฒเธเธฃเธญเธเธฃเธซเธฑเธชเธเธเธฑเธเธเธฒเธเนเธฅเธฐเธเธทเนเธญ-เธเธฒเธกเธชเธเธธเธฅ" });
         await using var c = await Open(token);
+        if (scope.Value.CompanyId is long companyScope && !await CompanyBelongsToPartner(c, scope.Value.PartnerId, companyScope, token)) return Forbid();
         if (!await Allowed(c, id is null ? "CREATE" : "EDIT", token)) return Forbid();
         const string sql = """
             IF EXISTS(SELECT 1 FROM dbo.TDADEmployee WHERE PartnerID=@partner AND ((@company IS NULL AND CompanyID IS NULL) OR CompanyID=@company) AND EmployeeCode=@code AND (@id IS NULL OR EmployeeID<>@id)) THROW 50001,'DUPLICATE_EMPLOYEE_CODE',1;
@@ -455,8 +457,16 @@ WHERE P.ProjectID=@project AND P.IsActive=1
     private static string? NString(SqlDataReader r, int i) => r.IsDBNull(i) ? null : r.GetString(i);
     private static void Add(SqlCommand c, string name, SqlDbType type, object? value, int size = 0) { var p = size > 0 ? c.Parameters.Add(name, type, size) : c.Parameters.Add(name, type); p.Value = value ?? DBNull.Value; }
     private async Task<SqlConnection> Open(CancellationToken t) { var c = new SqlConnection(configuration.GetConnectionString("LaooDatabase")); await c.OpenAsync(t); return c; }
+    private static async Task<bool> CompanyBelongsToPartner(SqlConnection c, long partnerId, long companyId, CancellationToken token)
+    {
+        await using var command = new SqlCommand("SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.TDSTCompanySetUp WHERE CompanyID=@company AND PartnerID=@partner) THEN 1 ELSE 0 END", c);
+        command.Parameters.Add("@company", SqlDbType.BigInt).Value = companyId;
+        command.Parameters.Add("@partner", SqlDbType.BigInt).Value = partnerId;
+        return Convert.ToBoolean(await command.ExecuteScalarAsync(token));
+    }
     private (long PartnerId, long? CompanyId)? ResolveScope(long? requestedCompany)
     {
+        if (!string.Equals(User.FindFirstValue("user_type"), CurrentScreen.RequiredUserType, StringComparison.OrdinalIgnoreCase)) return null;
         if (!long.TryParse(User.FindFirstValue("partner_id"), out var partnerId)) return null;
         if (Request.Path.Value?.Contains("/api/company/", StringComparison.OrdinalIgnoreCase) == true)
         {
@@ -471,6 +481,7 @@ WHERE P.ProjectID=@project AND P.IsActive=1
     }
     private async Task<bool> Allowed(SqlConnection c, string action, CancellationToken t)
     {
+        if (!string.Equals(User.FindFirstValue("user_type"), CurrentScreen.RequiredUserType, StringComparison.OrdinalIgnoreCase)) return false;
         if (!long.TryParse(User.FindFirstValue("project_id"), out var projectId)) return false;
         var username = (User.Identity?.Name ?? User.FindFirstValue("unique_name") ?? string.Empty).Trim().ToUpperInvariant();
         var isCompanyUser = string.Equals(User.FindFirstValue("user_type"), "COMPANY_USER", StringComparison.OrdinalIgnoreCase);

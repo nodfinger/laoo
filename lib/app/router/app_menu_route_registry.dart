@@ -126,6 +126,13 @@ abstract final class AppMenuRouteRegistry {
       path: RoutePaths.companySetupAdditional,
       scope: AppMenuScope.shared,
     ),
+    '01003': AppMenuRouteSpec(
+      menuCode: '01003',
+      databaseRouteName: 'branch',
+      goRouteName: RouteNames.supportBranches,
+      path: RoutePaths.supportBranches,
+      scope: AppMenuScope.support,
+    ),
     '06001': AppMenuRouteSpec(
       menuCode: '06001',
       databaseRouteName: 'partnerCompanies',
@@ -139,6 +146,13 @@ abstract final class AppMenuRouteRegistry {
       goRouteName: RouteNames.partnerBranches,
       path: RoutePaths.partnerBranches,
       scope: AppMenuScope.partner,
+    ),
+    '09002': AppMenuRouteSpec(
+      menuCode: '09002',
+      databaseRouteName: 'companyBranches',
+      goRouteName: RouteNames.companyBranches,
+      path: RoutePaths.companyBranches,
+      scope: AppMenuScope.company,
     ),
     '06003': AppMenuRouteSpec(
       menuCode: '06003',
@@ -195,6 +209,13 @@ abstract final class AppMenuRouteRegistry {
       goRouteName: RouteNames.organizationStructure,
       path: RoutePaths.organizationStructure,
       scope: AppMenuScope.partner,
+    ),
+    '12005': AppMenuRouteSpec(
+      menuCode: '12005',
+      databaseRouteName: 'organizationStructure',
+      goRouteName: RouteNames.organizationStructure,
+      path: RoutePaths.organizationStructure,
+      scope: AppMenuScope.support,
     ),
     '08001': AppMenuRouteSpec(
       menuCode: '08001',

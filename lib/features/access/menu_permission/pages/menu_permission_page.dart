@@ -5,6 +5,7 @@ import '../../../../core/api/api_exception.dart';
 import '../../../../core/company_setup/company_setup_controller.dart';
 import '../../../../features/support/presentation/widgets/support_workspace_shell.dart';
 import '../../../../app/theme/workspace_theme_presets.dart';
+import '../../../../app/theme/laoo_typography.dart';
 import '../../role_group/data/role_group_repository.dart';
 import '../../role_group/models/role_group.dart';
 import '../data/menu_permission_repository.dart';
@@ -48,11 +49,12 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
   Future<void> _loadDefaultViewMode() async {
     try {
       final profile = await _profile.get();
-      if (mounted)
+      if (mounted) {
         setState(
           () => _card =
               profile['defaultViewMode']?.toString().toUpperCase() == 'CARD',
         );
+      }
     } catch (_) {}
   }
 
@@ -165,11 +167,7 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
                     const Expanded(
                       child: Text(
                         'ยืนยันลบข้อมูลกลุ่มสิทธิ์',
-                        style: TextStyle(
-                          color: Colors.red,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700,
-                        ),
+                        style: LaooTypography.screenCaptionStyle,
                       ),
                     ),
                   ],
@@ -575,6 +573,8 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
                 constraints: BoxConstraints(minWidth: constraints.maxWidth),
                 child: DataTable(
                   headingRowColor: WidgetStatePropertyAll(headerColor),
+                  horizontalMargin: 24,
+                  columnSpacing: 0,
                   columns: columns,
                   rows: const [],
                 ),
@@ -586,6 +586,8 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
                     constraints: BoxConstraints(minWidth: constraints.maxWidth),
                     child: DataTable(
                       headingRowHeight: 0,
+                      horizontalMargin: 24,
+                      columnSpacing: 0,
                       columns: columns,
                       rows: _tableRows(context),
                     ),
@@ -600,11 +602,30 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
   }
 
   List<DataColumn> _tableColumns(BuildContext context) => [
-    DataColumn(label: _menuHeaderCell(context)),
-    DataColumn(label: _headerCell(context, 'แสดง')),
-    DataColumn(label: _headerCell(context, 'เพิ่ม')),
-    DataColumn(label: _headerCell(context, 'แก้ไข')),
-    DataColumn(label: _headerCell(context, 'ลบ')),
+    DataColumn(
+      columnWidth: const FlexColumnWidth(2.4),
+      label: _menuHeaderCell(context),
+    ),
+    DataColumn(
+      columnWidth: const FlexColumnWidth(),
+      headingRowAlignment: MainAxisAlignment.center,
+      label: _headerCell(context, 'แสดง'),
+    ),
+    DataColumn(
+      columnWidth: const FlexColumnWidth(),
+      headingRowAlignment: MainAxisAlignment.center,
+      label: _headerCell(context, 'เพิ่ม'),
+    ),
+    DataColumn(
+      columnWidth: const FlexColumnWidth(),
+      headingRowAlignment: MainAxisAlignment.center,
+      label: _headerCell(context, 'แก้ไข'),
+    ),
+    DataColumn(
+      columnWidth: const FlexColumnWidth(),
+      headingRowAlignment: MainAxisAlignment.center,
+      label: _headerCell(context, 'ลบ'),
+    ),
   ];
 
   Widget _mobileCards(BuildContext context) {
@@ -661,14 +682,12 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
                     return Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Checkbox(
+                        _permissionCheckbox(
                           value: action.$3,
                           onChanged: enabled
                               ? (value) =>
                                     _change(row, action.$2, value ?? false)
                               : null,
-                          activeColor: primary,
-                          visualDensity: VisualDensity.compact,
                         ),
                         Text(action.$1),
                       ],
@@ -724,47 +743,71 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
     return result;
   }
 
-  Widget _headerCell(BuildContext context, String text) => SizedBox(
-    width: 100,
-    child: Center(
-      child: Text(
-        text,
-        textAlign: TextAlign.center,
-        style: TextStyle(
-          color: Theme.of(context).colorScheme.primary,
-          fontWeight: FontWeight.w700,
-          fontSize: 15,
-        ),
+  Widget _headerCell(BuildContext context, String text) => Center(
+    child: Text(
+      text,
+      textAlign: TextAlign.center,
+      style: TextStyle(
+        color: Theme.of(context).colorScheme.primary,
+        fontWeight: FontWeight.w700,
+        fontSize: 15,
       ),
     ),
   );
-  Widget _menuHeaderCell(BuildContext context) => SizedBox(
-    width: 100,
-    child: Align(
-      alignment: Alignment.centerLeft,
-      child: Text(
-        'เมนู',
-        style: TextStyle(
-          color: Theme.of(context).colorScheme.primary,
-          fontWeight: FontWeight.w700,
-          fontSize: 15,
-        ),
+  Widget _menuHeaderCell(BuildContext context) => Align(
+    alignment: Alignment.centerLeft,
+    child: Text(
+      'เมนู',
+      style: TextStyle(
+        color: Theme.of(context).colorScheme.primary,
+        fontWeight: FontWeight.w700,
+        fontSize: 15,
       ),
     ),
   );
   DataCell _cell(MenuPermissionRow row, String action, bool value) => DataCell(
-    SizedBox(
-      width: 100,
-      child: Center(
-        child:
-            _visible(row.screenType, action) &&
-                (action == 'VIEW' || row.canView)
-            ? Checkbox(
-                value: value,
-                onChanged: (v) => _change(row, action, v ?? false),
-              )
-            : const SizedBox.shrink(),
-      ),
+    Center(
+      child:
+          _visible(row.screenType, action) && (action == 'VIEW' || row.canView)
+          ? _permissionCheckbox(
+              value: value,
+              onChanged: (v) => _change(row, action, v ?? false),
+            )
+          : const SizedBox.shrink(),
     ),
   );
+
+  Widget _permissionCheckbox({
+    required bool value,
+    required ValueChanged<bool?>? onChanged,
+  }) {
+    final theme = Theme.of(context);
+    final primary = theme.colorScheme.primary;
+    final enabled = onChanged != null;
+    return Semantics(
+      checked: value,
+      enabled: enabled,
+      child: Checkbox(
+        value: value,
+        onChanged: onChanged,
+        checkColor: Colors.white,
+        fillColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.disabled)) {
+            return theme.colorScheme.surfaceContainerHighest;
+          }
+          if (states.contains(WidgetState.selected)) return primary;
+          return Colors.white;
+        }),
+        overlayColor: WidgetStatePropertyAll(primary.withValues(alpha: .12)),
+        side: BorderSide(
+          color: enabled
+              ? primary.withValues(alpha: .72)
+              : theme.colorScheme.outlineVariant,
+          width: 1.6,
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+        visualDensity: VisualDensity.compact,
+      ),
+    );
+  }
 }

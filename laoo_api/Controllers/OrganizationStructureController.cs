@@ -3,17 +3,17 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
+using Laoo.Shared.Contracts.Organizations;
 
 namespace LaooApi.Controllers;
 
-[ApiController, Route("api/support/organization-structure"), Authorize]
+[ApiController, Route("api/support/organization-structure"), Route("api/partner/organization-structure"), Route("api/company/organization-structure"), Authorize]
 public sealed class OrganizationStructureController(IConfiguration configuration) : ControllerBase
 {
-    private const string ScreenCode = "ORGANIZATION_STRUCTURE";
-
     [HttpGet]
     public async Task<IActionResult> List([FromQuery] long? companyId, CancellationToken token)
     {
+        if (!IsRouteScopeAllowed()) return Forbid();
         if (IsLaoo()) return NotFound();
         if (IsLaoo())
         {
@@ -57,17 +57,19 @@ public sealed class OrganizationStructureController(IConfiguration configuration
     [HttpGet("actions")]
     public async Task<ActionResult<object>> Actions(CancellationToken token)
     {
+        if (!IsRouteScopeAllowed()) return Forbid();
         if (IsLaoo()) return NotFound();
         await using var connection = await Open(token);
         return Ok(new { view = await Allowed(connection, "VIEW", token), create = await Allowed(connection, "CREATE", token), edit = await Allowed(connection, "EDIT", token), delete = await Allowed(connection, "DELETE", token) });
     }
 
     [HttpPost]
-    public Task<IActionResult> Create(UnitRequest request, CancellationToken token) => Save(null, request, token);
+    public Task<IActionResult> Create(OrganizationUnitRequest request, CancellationToken token) => Save(null, request, token);
 
     [HttpPut("mode")]
     public async Task<IActionResult> UpdateMode(OrganizationModeRequest request, CancellationToken token)
     {
+        if (!IsRouteScopeAllowed()) return Forbid();
         if (IsLaoo()) return NotFound();
         if (IsLaoo())
         {
@@ -114,11 +116,12 @@ public sealed class OrganizationStructureController(IConfiguration configuration
         return await cmd.ExecuteNonQueryAsync(token) == 0 ? NotFound() : NoContent();
     }
     [HttpPut("{id:long}")]
-    public Task<IActionResult> Update(long id, UnitRequest request, CancellationToken token) => Save(id, request, token);
+    public Task<IActionResult> Update(long id, OrganizationUnitRequest request, CancellationToken token) => Save(id, request, token);
 
     [HttpDelete("{id:long}")]
     public async Task<IActionResult> Delete(long id, [FromQuery] long? companyId, CancellationToken token)
     {
+        if (!IsRouteScopeAllowed()) return Forbid();
         if (IsLaoo()) return NotFound();
         if (IsLaoo())
         {
@@ -142,8 +145,9 @@ public sealed class OrganizationStructureController(IConfiguration configuration
         try { if (await cmd.ExecuteNonQueryAsync(token)==0) return NotFound(); } catch(SqlException ex) when(ex.Number==50001){return Conflict(new {message="ไม่สามารถลบฝ่ายที่มีแผนกย่อยได้"});} return NoContent();
     }
 
-    private async Task<IActionResult> Save(long? id, UnitRequest x, CancellationToken token)
+    private async Task<IActionResult> Save(long? id, OrganizationUnitRequest x, CancellationToken token)
     {
+        if (!IsRouteScopeAllowed()) return Forbid();
         if (IsLaoo()) return NotFound();
         if (IsLaoo() && long.TryParse(User.FindFirstValue("laoo_user_id"), out _))
             return await SaveLaoo(id, x, token);
@@ -194,7 +198,7 @@ public sealed class OrganizationStructureController(IConfiguration configuration
         return NoContent();
     }
 
-    private async Task<IActionResult> SaveLaoo(long? id, UnitRequest x, CancellationToken token)
+    private async Task<IActionResult> SaveLaoo(long? id, OrganizationUnitRequest x, CancellationToken token)
     {
         if ((x.UnitType != "DIV" && x.UnitType != "DEP") || string.IsNullOrWhiteSpace(x.UnitCode) || string.IsNullOrWhiteSpace(x.NameTh)) return BadRequest(new { message = "กรุณากรอกรหัสและชื่อฝ่าย/แผนกให้ครบ" });
         var code = x.UnitCode.Trim().ToUpperInvariant();
@@ -207,7 +211,7 @@ public sealed class OrganizationStructureController(IConfiguration configuration
         try { await cmd.ExecuteNonQueryAsync(token); return NoContent(); } catch(SqlException ex) when(ex.Number==50002){return Conflict(new {message="ไม่พบค่ากลางโครงสร้างองค์กรของ Laoo"});} catch(SqlException ex) when(ex.Number==50003){return Conflict(new {message="ฝ่ายไม่สามารถมีฝ่ายแม่ได้"});} catch(SqlException ex) when(ex.Number==50004){return Conflict(new {message="โหมดแผนกเท่านั้นไม่อนุญาตให้เลือกฝ่าย"});} catch(SqlException ex) when(ex.Number==50005){return Conflict(new {message="กรุณาเลือกฝ่ายก่อนบันทึกแผนก"});} catch(SqlException ex) when(ex.Number==50007){return Conflict(new {message="รหัสซ้ำ"});}
     }
 
-    private async Task<IActionResult> SavePartner(long? id, UnitRequest x, long partnerId, CancellationToken token)
+    private async Task<IActionResult> SavePartner(long? id, OrganizationUnitRequest x, long partnerId, CancellationToken token)
     {
         if ((x.UnitType != "DIV" && x.UnitType != "DEP") || string.IsNullOrWhiteSpace(x.UnitCode) || string.IsNullOrWhiteSpace(x.NameTh))
             return BadRequest(new { message = "กรุณากรอกรหัสและชื่อฝ่าย/แผนกให้ครบ และรหัสย่อห้ามมีช่องว่าง" });
@@ -234,9 +238,10 @@ public sealed class OrganizationStructureController(IConfiguration configuration
         if (!long.TryParse(User.FindFirstValue("project_id"), out var pid)) return false;
         await using var cmd = new SqlCommand { Connection = c };
         string sql;
-        var menuCode = IsPartner() ? "11005" : User.FindFirstValue("laoo_user_id") is not null ? "12005" : "10005";
+        var screen = CurrentScreen;
+        var menuCode = screen.MenuCode;
         cmd.Parameters.Add("@pid", SqlDbType.BigInt).Value = pid;
-        cmd.Parameters.Add("@screen", SqlDbType.NVarChar, 100).Value = ScreenCode;
+        cmd.Parameters.Add("@screen", SqlDbType.NVarChar, 100).Value = screen.LegacyPermissionCode ?? screen.MenuCode;
         cmd.Parameters.Add("@menuCode", SqlDbType.NVarChar, 20).Value = menuCode;
         cmd.Parameters.Add("@action", SqlDbType.NVarChar, 50).Value = action;
         if (IsPartner())
@@ -286,6 +291,15 @@ public sealed class OrganizationStructureController(IConfiguration configuration
     private async Task<SqlConnection> Open(CancellationToken t){var c=new SqlConnection(configuration.GetConnectionString("LaooDatabase"));await c.OpenAsync(t);return c;}
     private bool IsPartner()=>string.Equals(User.FindFirstValue("user_type"),"PARTNER_USER",StringComparison.OrdinalIgnoreCase);
     private bool IsLaoo()=>string.Equals(User.FindFirstValue("user_type"),"LAOO_SUPPORT",StringComparison.OrdinalIgnoreCase);
+    private bool IsCompany()=>string.Equals(User.FindFirstValue("user_type"),"COMPANY_USER",StringComparison.OrdinalIgnoreCase);
+    private OrganizationScreenContract CurrentScreen => OrganizationScreenContracts.FromRequestPath(Request.Path.Value);
+    private bool IsRouteScopeAllowed() => CurrentScreen.Scope switch
+    {
+        OrganizationOwnerScope.Support => IsLaoo(),
+        OrganizationOwnerScope.Partner => IsPartner(),
+        OrganizationOwnerScope.Company => IsCompany(),
+        _ => false,
+    };
     private string Username() => (User.Identity?.Name ?? User.FindFirstValue("unique_name") ?? string.Empty).Trim();
     private long? ResolveCompany(long? _) =>
         long.TryParse(User.FindFirstValue("company_id"), out var company)
@@ -293,5 +307,3 @@ public sealed class OrganizationStructureController(IConfiguration configuration
             : null;
     private static string? N(SqlDataReader r,int i)=>r.IsDBNull(i)?null:r.GetString(i);
 }
-public sealed record UnitRequest(long? CompanyId,string UnitType,long? ParentOrgUnitId,string UnitCode,string NameTh,string? NameEn,bool IsActive=true);
-public sealed record OrganizationModeRequest(long? CompanyId, int OrgStructureType);

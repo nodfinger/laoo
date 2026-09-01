@@ -10,6 +10,7 @@ import '../../features/home/presentation/pages/authenticated_home_page.dart';
 import '../../features/support/partner/pages/partner_module_page.dart';
 import '../../features/partner/pages/partner_company_page.dart';
 import '../../features/partner/pages/partner_company_feature_page.dart';
+import '../../features/partner/pages/partner_company_user_page.dart';
 import '../../features/support/company_setup/pages/company_setup_page.dart';
 import '../../features/support/presentation/pages/support_home_page.dart';
 import '../../features/support/presentation/pages/support_placeholder_page.dart';
@@ -18,7 +19,7 @@ import '../../features/support/technical_info/pages/technical_info_page.dart';
 import '../../features/support/branch/pages/branch_page.dart';
 import '../../features/support/master_data/pages/master_data_page.dart';
 import '../../features/support/organization/pages/organization_structure_page.dart';
-import '../../features/support/employee/pages/employee_ux_page.dart';
+import '../../features/support/employee/pages/employee_shared_page.dart';
 import '../../features/support/global_settings/pages/global_settings_page.dart';
 import '../../features/support/global_permission_settings/pages/global_permission_settings_page.dart';
 import '../../features/company/quotation/pages/quotation_page.dart';
@@ -101,6 +102,12 @@ final GoRouter appRouter = GoRouter(
       path: RoutePaths.authenticatedHome,
       name: RouteNames.authenticatedHome,
       builder: (context, state) => const AuthenticatedHomePage(),
+    ),
+    GoRoute(
+      path: RoutePaths.supportBranches,
+      name: RouteNames.supportBranches,
+      builder: (context, state) =>
+          const BranchPage(menuScope: WorkspaceMenuScope.support),
     ),
     GoRoute(
       path: RoutePaths.companyProducts,
@@ -196,11 +203,7 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: RoutePaths.partnerUsers,
       name: RouteNames.partnerUsers,
-      builder: (context, state) => const CompanyModulePlaceholderPage(
-        title: 'ผู้ใช้งานบริษัท',
-        menuScope: WorkspaceMenuScope.partner,
-        activeMenu: 'partnerUsers',
-      ),
+      builder: (context, state) => const PartnerCompanyUserPage(),
     ),
     GoRoute(
       path: RoutePaths.supportHome,
@@ -411,12 +414,11 @@ final List<GoRoute> _placeholderRoutes = [
     builder: (context, state) =>
         const SubPermissionPage(activeMenu: 'companySubPermissions'),
   ),
-  _scopePlaceholder(
-    RoutePaths.partnerEmployees,
-    RouteNames.partnerEmployees,
-    'พนักงาน',
-    WorkspaceMenuScope.partner,
-    'partnerEmployees',
+  GoRoute(
+    path: RoutePaths.partnerEmployees,
+    name: RouteNames.partnerEmployees,
+    builder: (context, state) =>
+        const EmployeeUxPage(menuScope: WorkspaceMenuScope.partner),
   ),
   GoRoute(
     path: RoutePaths.partnerRoleGroups,
@@ -527,13 +529,11 @@ GoRoute _scopePlaceholder(
 ) => GoRoute(
   path: path,
   name: name,
-  builder: (context, state) => path == RoutePaths.partnerEmployees
-      ? const EmployeeUxPage(menuScope: WorkspaceMenuScope.partner)
-      : CompanyModulePlaceholderPage(
-          title: title,
-          menuScope: scope,
-          activeMenu: activeMenu,
-        ),
+  builder: (context, state) => CompanyModulePlaceholderPage(
+    title: title,
+    menuScope: scope,
+    activeMenu: activeMenu,
+  ),
 );
 
 GoRoute _placeholder(

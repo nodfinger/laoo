@@ -19,4 +19,8 @@
     <Content Update="appsettings.Local.json" CopyToPublishDirectory="Never" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\packages\dotnet\Laoo.Shared.Contracts\Laoo.Shared.Contracts.csproj" />
+  </ItemGroup>
+
 </Project>

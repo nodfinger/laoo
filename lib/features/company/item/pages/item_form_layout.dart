@@ -1,7 +1,6 @@
 // ignore_for_file: dead_code
 
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -221,8 +220,9 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
       if (current.width > 1600) current = img.copyResize(current, width: 1600);
       for (var quality = 85; quality >= 35; quality -= 10) {
         final bytes = img.encodeJpg(current, quality: quality);
-        if (bytes.length <= _maxImageBytes)
+        if (bytes.length <= _maxImageBytes) {
           return (bytes: bytes, contentType: 'image/jpeg');
+        }
       }
       current = img.copyResize(current, width: (current.width * .8).round());
     }
@@ -663,7 +663,7 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
           ),
           const Text(
             'สูงสุด 5 รูป | ไม่เกิน 1 MB ต่อรูป',
-            style: const TextStyle(fontSize: 0, color: Colors.transparent),
+            style: TextStyle(fontSize: 0, color: Colors.transparent),
           ),
           Text(
             'สูงสุด 5 รูป | ไม่เกิน ${widget.maxItemImageSizeMB.toStringAsFixed(2)} MB ต่อรูป | ถ้าเกินระบบจะลดขนาดให้อัตโนมัติ',

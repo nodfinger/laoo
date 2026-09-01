@@ -13,7 +13,7 @@
 
 - Header เป็น Card สีขาวเต็มความกว้าง ไม่มีเส้นกรอบ และมุมโค้ง `4px`
 - Icon ดาวอยู่ซ้ายสุดและใช้สี Primary; Caption อยู่ชิดถัดจากดาว
-- Caption ใช้รูปแบบ `{MenuName} > {Action}`, ขนาด `18px`, น้ำหนัก `700`, สีดำ
+- Caption ใช้รูปแบบ `{MenuName} > {Action}` และใช้มาตรฐานกลาง `fontSize: 18`, `fontWeight: FontWeight.w700`, `color: Colors.black` ตาม `TYPOGRAPHY_STANDARD.md`
 - ปุ่ม `ยกเลิก` และ `บันทึก` อยู่ขวาของ Caption ในบรรทัดเดียวกัน
 - ปุ่มยกเลิกเป็น Outlined Primary; ปุ่มบันทึกเป็น Filled Primary; มุมโค้ง `4px`
 - แสดงปุ่ม Action เฉพาะด้านบนของ Form เท่านั้น ห้ามมีชุดปุ่มบันทึก/ยกเลิกซ้ำด้านล่าง
@@ -41,4 +41,3 @@
 ```text
 ปรับหน้า Action นี้ตาม docs/standards/UX_UI_STANDARD.md, ACTION_UI_STANDARD.md และ TYPOGRAPHY_STANDARD.md ใช้ Header Card และ Form Card สีขาวเต็มความกว้างและจัดติดกัน Caption เป็น {MenuName} > {Action} สีดำ 18px ดาวอยู่ซ้าย ปุ่มยกเลิก/บันทึกอยู่ด้านขวาเฉพาะด้านบนเท่านั้น Form ใช้ TextBox/ComboBox มุมโค้ง 4px ระยะระหว่างแถว 12px แสดง Validation สีแดงใต้ Field และใช้สี Primary ตาม User Style ห้ามแก้ API, SQL, Repository หรือ Business Logic ตรวจ Responsive, Overflow, dart format และ dart analyze
 ```
-

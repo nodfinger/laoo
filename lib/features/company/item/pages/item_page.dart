@@ -201,8 +201,9 @@ class _ItemPageState extends State<ItemPage> {
         return 'ไม่สามารถดำเนินการกับข้อมูลสินค้าได้: Session หมดอายุ กรุณาเข้าสู่ระบบใหม่';
       }
       final message = error.message.trim();
-      if (message.isNotEmpty && !message.contains('ApiException'))
+      if (message.isNotEmpty && !message.contains('ApiException')) {
         return message;
+      }
       return 'ไม่สามารถดำเนินการกับข้อมูลสินค้าได้: API ตอบกลับผิดพลาด (HTTP ${error.statusCode})';
     }
     return 'ไม่สามารถดำเนินการกับข้อมูลสินค้าได้: ${error.toString()}';
@@ -523,11 +524,8 @@ class _ItemPageState extends State<ItemPage> {
                                                   const SizedBox(height: 14),
                                                   const Text(
                                                     'ยืนยันการลบข้อมูล',
-                                                    style: TextStyle(
-                                                      color: Colors.red,
-                                                      fontWeight:
-                                                          FontWeight.w700,
-                                                    ),
+                                                    style: LaooTypography
+                                                        .screenCaptionStyle,
                                                   ),
                                                 ],
                                               ),
@@ -890,8 +888,9 @@ class _ItemPageState extends State<ItemPage> {
                         });
                         if (mounted) _show('บันทึกอัตราส่วนการบรรจุสำเร็จ');
                       } catch (error) {
-                        if (mounted)
+                        if (mounted) {
                           _show('บันทึกอัตราส่วนการบรรจุไม่สำเร็จ: $error');
+                        }
                       }
                     }
                   : null,
@@ -1060,7 +1059,9 @@ class _ItemPageState extends State<ItemPage> {
           ),
         ),
       );
-      for (final controller in controllers) controller.dispose();
+      for (final controller in controllers) {
+        controller.dispose();
+      }
     } catch (error) {
       if (mounted) {
         showTimedSnackBar(context, message: _readableError(error), error: true);
@@ -1113,11 +1114,7 @@ class _ItemPageState extends State<ItemPage> {
                   Expanded(
                     child: Text(
                       'ยืนยันการลบข้อมูล',
-                      style: TextStyle(
-                        color: accent,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                      ),
+                      style: LaooTypography.screenCaptionStyle,
                     ),
                   ),
                 ],

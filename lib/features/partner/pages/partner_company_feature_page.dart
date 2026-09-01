@@ -139,11 +139,7 @@ class _PartnerCompanyFeaturePageState extends State<PartnerCompanyFeaturePage> {
                 Expanded(
                   child: Text(
                     _menuName,
-                    style: TextStyle(
-                      color: accent,
-                      fontSize: LaooTypography.pageTitle,
-                      fontWeight: LaooTypography.pageTitleWeight,
-                    ),
+                    style: LaooTypography.screenCaptionStyle,
                   ),
                 ),
                 IconButton(

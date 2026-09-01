@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -287,12 +286,13 @@ class _QuotationListPageState extends State<QuotationListPage> {
         await _load();
       }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         showTimedSnackBar(
           context,
           message: 'ลบใบเสนอราคาไม่สำเร็จ\nรายละเอียด: $e',
           error: true,
         );
+      }
     }
   }
 
@@ -342,12 +342,8 @@ class _QuotationListPageState extends State<QuotationListPage> {
                                       children: [
                                         Text(
                                           _menuName,
-                                          style: TextStyle(
-                                            color: LaooColors.textPrimary,
-                                            fontSize: LaooTypography.pageTitle,
-                                            fontWeight:
-                                                LaooTypography.pageTitleWeight,
-                                          ),
+                                          style:
+                                              LaooTypography.screenCaptionStyle,
                                         ),
                                         const SizedBox(width: 8),
                                         Icon(Icons.star_outline, color: accent),
@@ -416,7 +412,7 @@ class _QuotationListPageState extends State<QuotationListPage> {
                               shrinkWrap: true,
                               physics: const NeverScrollableScrollPhysics(),
                               itemCount: rows.length,
-                              separatorBuilder: (_, __) =>
+                              separatorBuilder: (_, _) =>
                                   const SizedBox(height: 6),
                               itemBuilder: (context, index) {
                                 final e = rows[index];
@@ -825,12 +821,7 @@ class _QuotationActionPageState extends State<QuotationActionPage> {
                                     const SizedBox(width: 8),
                                     Text(
                                       '$_menuName > เพิ่ม',
-                                      style: const TextStyle(
-                                        color: LaooColors.textPrimary,
-                                        fontSize: LaooTypography.pageTitle,
-                                        fontWeight:
-                                            LaooTypography.pageTitleWeight,
-                                      ),
+                                      style: LaooTypography.screenCaptionStyle,
                                     ),
                                   ],
                                 ),

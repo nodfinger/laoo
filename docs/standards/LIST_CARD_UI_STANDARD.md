@@ -13,7 +13,7 @@
 ## Caption Card
 
 - Caption อ่าน `MenuName` จาก Navigation API/`TDADMainMenu` ห้าม hardcode
-- Caption ขนาด `18px`, น้ำหนัก `700`, สีดำ
+- Caption ใช้มาตรฐานกลาง `fontSize: 18`, `fontWeight: FontWeight.w700`, `color: Colors.black` ตาม `TYPOGRAPHY_STANDARD.md`
 - Icon ดาวอยู่ซ้ายสุด ชิดกับ Caption และใช้สี Primary ของ User Style
 - ปุ่ม `+ เพิ่ม` อยู่ขวา ใช้สี Primary มุมโค้ง `4px` และแสดงตาม Permission
 - มีเส้นสีเทาอ่อนยาวใต้ Caption โดยต้องอยู่ภายใน Card พอดี
@@ -51,4 +51,3 @@
 ```text
 ปรับหน้า List/Card นี้ตาม docs/standards/UX_UI_STANDARD.md, LIST_CARD_UI_STANDARD.md, PAGINATION_UI_STANDARD.md และ TYPOGRAPHY_STANDARD.md ใช้ Caption จาก MenuName, Card สีขาวไม่มีกรอบสี, Filter/Table/Pagination เต็มความกว้าง, Action ตาม Permission และ User Style เมื่อหน้าจอแคบกว่า 900px ให้เป็น Card Mode อัตโนมัติ โดย Card รายการแต่ละใบห่างกัน 6px พอดี ห้ามพึ่ง Card default margin ห้ามแก้ API, SQL, Repository หรือ Business Logic และต้องตรวจ Responsive, Overflow, dart format และ dart analyze
 ```
-

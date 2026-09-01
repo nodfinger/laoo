@@ -329,13 +329,7 @@ class _TemporaryReceiptActionPageState
           children: [
             Icon(Icons.delete_outline, color: LaooColors.error),
             SizedBox(width: 8),
-            Text(
-              'ยืนยันการลบข้อมูล',
-              style: TextStyle(
-                color: LaooColors.error,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+            Text('ยืนยันการลบข้อมูล', style: LaooTypography.screenCaptionStyle),
           ],
         ),
         content: const Text('ต้องการลบรายการรับเงินนี้หรือไม่?'),
@@ -545,12 +539,14 @@ class _TemporaryReceiptActionPageState
                                   title:
                                       '$_menuName > ${_isEdit ? 'แก้ไข' : 'เพิ่ม'}',
                                   favoriteKey: _activeMenu,
-                                  titleColor: LaooColors.textPrimary,
+                                  titleColor: Colors.black,
                                 ),
                               ),
                               const SizedBox(width: 8),
                               FilledButton.icon(
-                                onPressed: _payments.isEmpty ? null : _exportPdf,
+                                onPressed: _payments.isEmpty
+                                    ? null
+                                    : _exportPdf,
                                 style: FilledButton.styleFrom(
                                   backgroundColor: accent,
                                   shape: RoundedRectangleBorder(
@@ -1136,14 +1132,7 @@ class _PaymentDialogState extends State<_PaymentDialog> {
         children: [
           Icon(Icons.payments_outlined),
           SizedBox(width: 8),
-          Text(
-            'รายการรับเงิน',
-            style: TextStyle(
-              color: LaooColors.textPrimary,
-              fontSize: LaooTypography.workspaceCaption,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
+          Text('รายการรับเงิน', style: LaooTypography.screenCaptionStyle),
         ],
       ),
       content: SizedBox(

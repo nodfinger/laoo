@@ -6,6 +6,7 @@ import '../../../../app/router/route_names.dart';
 import '../../../../app/theme/laoo_design_tokens.dart';
 import '../../../../core/favorites/user_favorite_repository.dart';
 import '../../../../core/navigation/navigation_menu.dart';
+import '../../../../core/navigation/navigation_icon_resolver.dart';
 import '../../../../core/navigation/navigation_menu_repository.dart';
 import '../widgets/support_workspace_shell.dart';
 
@@ -179,16 +180,8 @@ class _MobileSupportHomeContentState extends State<_MobileSupportHomeContent> {
     if (route != null) context.goNamed(route);
   }
 
-  IconData _icon(String? name) => switch (name) {
-    'home' => Icons.home_outlined,
-    'people' => Icons.people_outline,
-    'settings' => Icons.settings_outlined,
-    'business' => Icons.business_outlined,
-    'support' => Icons.support_outlined,
-    'list' => Icons.list_alt_outlined,
-    'apartment' => Icons.apartment_outlined,
-    _ => Icons.apps_outlined,
-  };
+  IconData _icon(String? name) =>
+      NavigationIconResolver.resolve(name, fallback: Icons.apps_outlined);
 }
 
 class _MobileSection extends StatelessWidget {

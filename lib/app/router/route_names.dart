@@ -17,6 +17,7 @@ abstract final class RouteNames {
   static const String partnerBranches = 'partner-branches';
   static const String partnerUsers = 'partner-users';
   static const String supportHome = 'support-home';
+  static const String supportBranches = 'support-branches';
   static const String partner = 'partner';
   static const String laooUser = 'laooUser';
   static const String partnerUser = 'partnerUser';

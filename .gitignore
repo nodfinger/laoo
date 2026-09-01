@@ -32,6 +32,11 @@ migrate_working_dir/
 .pub/
 /build/
 /coverage/
+packages/**/pubspec.lock
+
+# .NET build artifacts
+**/bin/
+**/obj/
 
 # Symbolication related
 app.*.symbols

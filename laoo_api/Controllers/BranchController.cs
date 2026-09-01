@@ -3,17 +3,17 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
+using Laoo.Shared.Contracts.Branches;
 
 namespace LaooApi.Controllers;
 
 [ApiController, Route("api/support/branches"), Route("api/partner/branches"), Route("api/company/branches"), Authorize]
 public sealed class BranchController(IConfiguration configuration) : ControllerBase
 {
-    private const string ScreenCode = "06002";
     [HttpGet]
     public async Task<IActionResult> Get([FromQuery] string? search, [FromQuery] long? companyId, CancellationToken token)
     {
-        if (!IsSupport() && !IsPartner() && !IsCompany()) return Forbid();
+        if (!IsRouteScopeAllowed()) return Forbid();
         await using var c = await Open(token);
         if (!await Allowed(c, "VIEW", token)) return Forbid();
         const string sql = "SELECT B.BranchID,B.CompanyID,C.CustomerNameTH,B.BranchCode,B.BranchNameTH,B.BranchNameEN,B.Email,B.Telephone,B.AddressText,B.ContName,B.ContPhone,B.ContPositionName,B.IsActive FROM dbo.TDADBranch B INNER JOIN dbo.TDSTCompanySetUp C ON C.CompanyID=B.CompanyID WHERE (@q='' OR B.BranchCode LIKE @like OR B.BranchNameTH LIKE @like OR B.BranchNameEN LIKE @like) AND ((@isCompany=1 AND B.CompanyID=@currentCompanyId) OR (@isCompany=0 AND (@companyId IS NULL OR B.CompanyID=@companyId) AND (@partnerId IS NULL OR C.PartnerID=@partnerId))) ORDER BY B.BranchCode";
@@ -26,7 +26,7 @@ public sealed class BranchController(IConfiguration configuration) : ControllerB
     [HttpGet("actions")]
     public async Task<IActionResult> Actions(CancellationToken token)
     {
-        if (!IsSupport() && !IsPartner() && !IsCompany()) return Forbid();
+        if (!IsRouteScopeAllowed()) return Forbid();
         await using var c = await Open(token);
         return Ok(new
         {
@@ -45,7 +45,7 @@ public sealed class BranchController(IConfiguration configuration) : ControllerB
     [HttpDelete("{id:long}")]
     public async Task<IActionResult> Delete(long id, CancellationToken token)
     {
-        if (!IsSupport() && !IsPartner() && !IsCompany()) return Forbid();
+        if (!IsRouteScopeAllowed()) return Forbid();
         await using var c = await Open(token);
         if (!await Allowed(c, "DELETE", token)) return Forbid();
         if (IsPartner())
@@ -69,7 +69,7 @@ public sealed class BranchController(IConfiguration configuration) : ControllerB
 
     private async Task<IActionResult> Save(long? id, BranchRequest x, CancellationToken token)
     {
-        if (!IsSupport() && !IsPartner() && !IsCompany()) return Forbid();
+        if (!IsRouteScopeAllowed()) return Forbid();
         var targetCompanyId = IsCompany() ? CompanyIdClaim() : x.CompanyId;
         if (IsCompany() && targetCompanyId is long companyId) x = x with { CompanyId = companyId };
         if (targetCompanyId is null or <= 0) return BadRequest(new { message = "กรุณาระบุบริษัทของสาขา" });
@@ -103,12 +103,21 @@ public sealed class BranchController(IConfiguration configuration) : ControllerB
     private bool IsSupport() => string.Equals(User.FindFirstValue("user_type"), "LAOO_SUPPORT", StringComparison.OrdinalIgnoreCase);
     private bool IsPartner() => string.Equals(User.FindFirstValue("user_type"), "PARTNER_USER", StringComparison.OrdinalIgnoreCase);
     private bool IsCompany() => string.Equals(User.FindFirstValue("user_type"), "COMPANY_USER", StringComparison.OrdinalIgnoreCase);
+    private BranchScreenContract CurrentScreen => BranchScreenContracts.FromRequestPath(Request.Path.Value);
+    private bool IsRouteScopeAllowed() => CurrentScreen.Scope switch
+    {
+        BranchOwnerScope.Support => IsSupport(),
+        BranchOwnerScope.Partner => IsPartner(),
+        BranchOwnerScope.Company => IsCompany(),
+        _ => false,
+    };
     private long? CompanyIdClaim() => long.TryParse(User.FindFirstValue("company_id"), out var companyId) && companyId > 0 ? companyId : null;
 
     private async Task<bool> Allowed(SqlConnection connection, string action, CancellationToken token)
     {
         var projectId = long.TryParse(User.FindFirstValue("project_id"), out var parsedProject) ? parsedProject : 0;
         if (projectId == 0) return false;
+        var screen = CurrentScreen;
         if (IsPartner() && await IsPartnerAdminAsync(connection, token)) return true;
 
         if (IsCompany())
@@ -119,7 +128,7 @@ public sealed class BranchController(IConfiguration configuration) : ControllerB
             await using var companyCommand = new SqlCommand(companySql, connection);
             companyCommand.Parameters.Add("@UserID", SqlDbType.BigInt).Value = userId;
             companyCommand.Parameters.Add("@ProjectID", SqlDbType.BigInt).Value = projectId;
-            companyCommand.Parameters.Add("@ScreenCode", SqlDbType.NVarChar, 20).Value = "09002";
+            companyCommand.Parameters.Add("@ScreenCode", SqlDbType.NVarChar, 20).Value = screen.MenuCode;
             companyCommand.Parameters.Add("@Action", SqlDbType.NVarChar, 50).Value = action;
             return Convert.ToBoolean(await companyCommand.ExecuteScalarAsync(token));
         }
@@ -132,8 +141,8 @@ public sealed class BranchController(IConfiguration configuration) : ControllerB
             await using var supportCommand = new SqlCommand(supportSql, connection);
             supportCommand.Parameters.Add("@UserID", SqlDbType.BigInt).Value = userId;
             supportCommand.Parameters.Add("@ProjectID", SqlDbType.BigInt).Value = projectId;
-            supportCommand.Parameters.Add("@ScreenCode", SqlDbType.NVarChar, 20).Value = ScreenCode;
-            supportCommand.Parameters.Add("@LegacyScreenCode", SqlDbType.NVarChar, 100).Value = "BRANCH";
+            supportCommand.Parameters.Add("@ScreenCode", SqlDbType.NVarChar, 20).Value = screen.MenuCode;
+            supportCommand.Parameters.Add("@LegacyScreenCode", SqlDbType.NVarChar, 100).Value = screen.LegacyPermissionCode ?? screen.MenuCode;
             supportCommand.Parameters.Add("@Action", SqlDbType.NVarChar, 50).Value = action;
             return Convert.ToBoolean(await supportCommand.ExecuteScalarAsync(token));
         }
@@ -145,8 +154,8 @@ public sealed class BranchController(IConfiguration configuration) : ControllerB
         command.Parameters.Add("@PartnerID", SqlDbType.BigInt).Value = partnerId;
         command.Parameters.Add("@ProjectID", SqlDbType.BigInt).Value = projectId;
         command.Parameters.Add("@Username", SqlDbType.NVarChar, 100).Value = (User.Identity?.Name ?? User.FindFirstValue("unique_name") ?? string.Empty).Trim().ToUpperInvariant();
-        command.Parameters.Add("@ScreenCode", SqlDbType.NVarChar, 100).Value = ScreenCode;
-        command.Parameters.Add("@LegacyScreenCode", SqlDbType.NVarChar, 100).Value = "PARTNER_BRANCH";
+        command.Parameters.Add("@ScreenCode", SqlDbType.NVarChar, 100).Value = screen.MenuCode;
+        command.Parameters.Add("@LegacyScreenCode", SqlDbType.NVarChar, 100).Value = screen.LegacyPermissionCode ?? screen.MenuCode;
         command.Parameters.Add("@Action", SqlDbType.NVarChar, 50).Value = action;
         return Convert.ToBoolean(await command.ExecuteScalarAsync(token));
     }
@@ -163,4 +172,3 @@ public sealed class BranchController(IConfiguration configuration) : ControllerB
         return Convert.ToBoolean(await command.ExecuteScalarAsync(token));
     }
 }
-public sealed record BranchRequest(long CompanyId, string BranchCode, string BranchNameTh, string? BranchNameEn, string? Email, string? Telephone, string? AddressText, string? ContName, string? ContPhone, string? ContPositionName, bool IsActive = true);

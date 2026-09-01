@@ -54,6 +54,12 @@ class _MasterRow {
 }
 
 class _MasterDataPageState extends State<MasterDataPage> {
+  static const double _minimumTableWidth = 820;
+  static const double _idColumnWidth = 64;
+  static const double _actionColumnWidth = 120;
+  static const double _codeColumnWidth = 120;
+  static const double _sequenceColumnWidth = 150;
+
   final _searchController = TextEditingController();
   final _api = MasterDataApi();
   final _profile = UserProfileRepository();
@@ -320,7 +326,7 @@ class _MasterDataPageState extends State<MasterDataPage> {
               const SizedBox(width: 12),
               Text(
                 'ยืนยันการลบข้อมูล',
-                style: TextStyle(color: accent, fontWeight: FontWeight.w700),
+                style: LaooTypography.screenCaptionStyle,
               ),
             ],
           ),
@@ -699,6 +705,10 @@ class _MasterDataPageState extends State<MasterDataPage> {
                 return _buildMobileCards(context);
               }
 
+              final tableWidth = constraints.maxWidth < _minimumTableWidth
+                  ? _minimumTableWidth
+                  : constraints.maxWidth;
+
               return Card(
                 color: Colors.white,
                 surfaceTintColor: Colors.transparent,
@@ -712,9 +722,11 @@ class _MasterDataPageState extends State<MasterDataPage> {
                 clipBehavior: Clip.antiAlias,
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                  child: SizedBox(
+                    width: tableWidth,
                     child: DataTable(
+                      horizontalMargin: 12,
+                      columnSpacing: 20,
                       sortColumnIndex: _sortColumn,
                       sortAscending: _sortAscending,
                       border: TableBorder(
@@ -740,20 +752,36 @@ class _MasterDataPageState extends State<MasterDataPage> {
                         color: theme.colorScheme.onSurface,
                       ),
                       columns: [
-                        const DataColumn(label: Text('ID')),
                         const DataColumn(
-                          label: SizedBox(
-                            width: 100,
-                            child: Center(child: Text('Action')),
-                          ),
+                          columnWidth: FixedColumnWidth(_idColumnWidth),
+                          label: Text('ID'),
                         ),
-                        DataColumn(label: const Text('รหัส'), onSort: _sort),
-                        DataColumn(label: const Text('ชื่อ'), onSort: _sort),
+                        const DataColumn(
+                          columnWidth: FixedColumnWidth(_actionColumnWidth),
+                          label: Center(child: Text('Action')),
+                        ),
                         DataColumn(
+                          columnWidth: const FixedColumnWidth(_codeColumnWidth),
+                          label: const Text('รหัส'),
+                          onSort: _sort,
+                        ),
+                        DataColumn(
+                          columnWidth: const FlexColumnWidth(2),
+                          label: const Text('ชื่อ'),
+                          onSort: _sort,
+                        ),
+                        DataColumn(
+                          columnWidth: const FixedColumnWidth(
+                            _sequenceColumnWidth,
+                          ),
                           label: const Text('เรียงลำดับแสดง'),
                           onSort: _sort,
                         ),
-                        DataColumn(label: const Text('รหัสย่อ'), onSort: _sort),
+                        DataColumn(
+                          columnWidth: const FlexColumnWidth(),
+                          label: const Text('รหัสย่อ'),
+                          onSort: _sort,
+                        ),
                       ],
                       rows: _filteredRows.asMap().entries.map((entry) {
                         final row = entry.value;
@@ -765,32 +793,29 @@ class _MasterDataPageState extends State<MasterDataPage> {
                               ),
                             ),
                             DataCell(
-                              SizedBox(
-                                width: 100,
-                                child: Center(
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      if (_canEdit)
-                                        IconButton(
-                                          tooltip: 'แก้ไข',
-                                          onPressed: () => _startEdit(row),
-                                          icon: Icon(
-                                            Icons.edit_outlined,
-                                            color: accent,
-                                          ),
+                              Center(
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (_canEdit)
+                                      IconButton(
+                                        tooltip: 'แก้ไข',
+                                        onPressed: () => _startEdit(row),
+                                        icon: Icon(
+                                          Icons.edit_outlined,
+                                          color: accent,
                                         ),
-                                      if (_canDelete)
-                                        IconButton(
-                                          tooltip: 'ลบ',
-                                          onPressed: () => _delete(row),
-                                          icon: const Icon(
-                                            Icons.delete_outline,
-                                            color: Colors.red,
-                                          ),
+                                      ),
+                                    if (_canDelete)
+                                      IconButton(
+                                        tooltip: 'ลบ',
+                                        onPressed: () => _delete(row),
+                                        icon: const Icon(
+                                          Icons.delete_outline,
+                                          color: Colors.red,
                                         ),
-                                    ],
-                                  ),
+                                      ),
+                                  ],
                                 ),
                               ),
                             ),

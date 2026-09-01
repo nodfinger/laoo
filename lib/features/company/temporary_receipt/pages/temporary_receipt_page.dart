@@ -182,12 +182,12 @@ class _TemporaryReceiptListPageState extends State<TemporaryReceiptListPage> {
       final items = payments
           .map(
             (payment) => <String, dynamic>{
-              'itemName': noReference &&
-                      '${header['remark'] ?? ''}'.trim().isNotEmpty
+              'itemName':
+                  noReference && '${header['remark'] ?? ''}'.trim().isNotEmpty
                   ? '${header['remark']}'.trim()
                   : payment['paymentMethodName'] ??
-                      payment['paymentMethodCode'] ??
-                      'รับเงิน',
+                        payment['paymentMethodCode'] ??
+                        'รับเงิน',
               'deliveryQty': 1,
               'unitPrice': payment['amount'] ?? 0,
               'unitName': payment['referenceNo'] ?? '',
@@ -197,7 +197,9 @@ class _TemporaryReceiptListPageState extends State<TemporaryReceiptListPage> {
       await DeliveryNoteReceiptPdfService.export(
         documentCode: '${header['receiptCode'] ?? row['receiptCode'] ?? ''}',
         documentDate:
-            DateTime.tryParse('${header['receiptDate'] ?? row['receiptDate']}') ??
+            DateTime.tryParse(
+              '${header['receiptDate'] ?? row['receiptDate']}',
+            ) ??
             DateTime.now(),
         companyName: DeliveryNoteReceiptPdfService.defaultCompanyName,
         companyAddress: DeliveryNoteReceiptPdfService.defaultCompanyAddress,
@@ -272,14 +274,7 @@ class _TemporaryReceiptListPageState extends State<TemporaryReceiptListPage> {
           children: [
             Icon(Icons.delete_outline, color: LaooColors.error),
             SizedBox(width: 8),
-            Text(
-              'ยืนยันการลบข้อมูล',
-              style: TextStyle(
-                color: LaooColors.error,
-                fontSize: LaooTypography.workspaceCaption,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+            Text('ยืนยันการลบข้อมูล', style: LaooTypography.screenCaptionStyle),
           ],
         ),
         content: Column(
@@ -545,7 +540,7 @@ class _TemporaryReceiptListPageState extends State<TemporaryReceiptListPage> {
                               child: WorkspacePageTitle(
                                 title: _menuName,
                                 favoriteKey: _activeMenu,
-                                titleColor: LaooColors.textPrimary,
+                                titleColor: Colors.black,
                               ),
                             ),
                             if (!compact) ...[
