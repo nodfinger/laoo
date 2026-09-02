@@ -9,6 +9,7 @@ import '../../../../app/theme/workspace_theme_presets.dart';
 import '../../../../core/company_setup/company_setup_controller.dart';
 import '../../../../core/api/api_exception.dart';
 import '../../../../core/widgets/timed_snack_bar.dart';
+import '../../../../core/widgets/pinned_data_table.dart';
 import '../../../../features/support/master_data/data/master_data_api.dart';
 import '../../../../features/support/presentation/widgets/support_workspace_shell.dart';
 import '../../../../features/profile/data/user_profile_repository.dart';
@@ -524,8 +525,11 @@ class _ItemPageState extends State<ItemPage> {
                                                   const SizedBox(height: 14),
                                                   const Text(
                                                     'ยืนยันการลบข้อมูล',
-                                                    style: LaooTypography
-                                                        .screenCaptionStyle,
+                                                    style: TextStyle(
+                                                      color: Colors.red,
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                    ),
                                                   ),
                                                 ],
                                               ),
@@ -562,7 +566,7 @@ class _ItemPageState extends State<ItemPage> {
                                                     child: Text(
                                                       'ข้อมูลที่ลบแล้วไม่สามารถเรียกคืนกลับมาได้',
                                                       style: TextStyle(
-                                                        fontSize: 12,
+                                                        fontSize: 14,
                                                       ),
                                                     ),
                                                   ),
@@ -659,7 +663,7 @@ class _ItemPageState extends State<ItemPage> {
                       child: TextField(
                         controller: newQuantity,
                         keyboardType: TextInputType.number,
-                        style: const TextStyle(fontSize: 12),
+                        style: const TextStyle(fontSize: 14),
                         decoration: InputDecoration(
                           labelText: 'จำนวน',
                           border: OutlineInputBorder(
@@ -680,7 +684,7 @@ class _ItemPageState extends State<ItemPage> {
                     Expanded(
                       child: DropdownButtonFormField<String>(
                         initialValue: newUnit,
-                        style: const TextStyle(fontSize: 12),
+                        style: const TextStyle(fontSize: 14),
                         decoration: InputDecoration(
                           labelText: 'หน่วยย่อยคิดเป็น',
                           border: OutlineInputBorder(
@@ -701,7 +705,7 @@ class _ItemPageState extends State<ItemPage> {
                                 value: '${unit['code']}',
                                 child: Text(
                                   '${unit['name']}',
-                                  style: const TextStyle(fontSize: 12),
+                                  style: const TextStyle(fontSize: 14),
                                 ),
                               ),
                             )
@@ -730,7 +734,7 @@ class _ItemPageState extends State<ItemPage> {
                         child: TextField(
                           controller: newQuantity,
                           keyboardType: TextInputType.number,
-                          style: const TextStyle(fontSize: 12),
+                          style: const TextStyle(fontSize: 14),
                           decoration: InputDecoration(
                             labelText: 'จำนวน',
                             border: OutlineInputBorder(
@@ -751,7 +755,7 @@ class _ItemPageState extends State<ItemPage> {
                     Expanded(
                       child: DropdownButtonFormField<String>(
                         initialValue: newParentUnit,
-                        style: const TextStyle(fontSize: 12),
+                        style: const TextStyle(fontSize: 14),
                         decoration: InputDecoration(
                           labelText: 'หน่วยใหญ่',
                           border: OutlineInputBorder(
@@ -772,7 +776,7 @@ class _ItemPageState extends State<ItemPage> {
                                 value: '${unit['code']}',
                                 child: Text(
                                   '${unit['name']}',
-                                  style: const TextStyle(fontSize: 12),
+                                  style: const TextStyle(fontSize: 14),
                                 ),
                               ),
                             )
@@ -1114,7 +1118,11 @@ class _ItemPageState extends State<ItemPage> {
                   Expanded(
                     child: Text(
                       'ยืนยันการลบข้อมูล',
-                      style: LaooTypography.screenCaptionStyle,
+                      style: TextStyle(
+                        color: accent,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ],
@@ -1490,7 +1498,7 @@ class _ItemPageState extends State<ItemPage> {
                         color: accent,
                       ),
                     ),
-                    child: DataTable(
+                    child: PinnedDataTable(
                       horizontalMargin: 6,
                       columnSpacing: 2,
                       dataRowMinHeight: 58,
@@ -1522,12 +1530,7 @@ class _ItemPageState extends State<ItemPage> {
                         ),
                       ),
                       columns: [
-                        DataColumn(
-                          label: Padding(
-                            padding: const EdgeInsets.only(left: 8),
-                            child: SizedBox(width: 48, child: Text('ID')),
-                          ),
-                        ),
+                        LaooTableColumns.id,
                         const DataColumn(label: Text('รูปสินค้า')),
                         DataColumn(
                           numeric: true,

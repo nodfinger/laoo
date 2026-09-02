@@ -15,6 +15,7 @@ class AuthStorage {
   static const _displayNameKey = 'auth.displayName';
   static const _projectCodeKey = 'auth.projectCode';
   static const _projectIdKey = 'auth.projectId';
+  static const _partnerUserIdKey = 'auth.partnerUserId';
   static const _partnerIdKey = 'auth.partnerId';
   static const _companyIdKey = 'auth.companyId';
   static const _branchIdKey = 'auth.branchId';
@@ -43,6 +44,7 @@ class AuthStorage {
     await _setNullableString(prefs, _projectCodeKey, session.projectCode);
 
     await _setNullableInt(prefs, _projectIdKey, session.projectId);
+    await _setNullableInt(prefs, _partnerUserIdKey, session.partnerUserId);
     await _setNullableInt(prefs, _partnerIdKey, session.partnerId);
     await _setNullableInt(prefs, _companyIdKey, session.companyId);
     await _setNullableInt(prefs, _branchIdKey, session.branchId);
@@ -79,6 +81,7 @@ class AuthStorage {
       displayName: prefs.getString(_displayNameKey),
       projectCode: prefs.getString(_projectCodeKey),
       projectId: prefs.getInt(_projectIdKey),
+      partnerUserId: prefs.getInt(_partnerUserIdKey),
       partnerId: prefs.getInt(_partnerIdKey),
       companyId: prefs.getInt(_companyIdKey),
       branchId: prefs.getInt(_branchIdKey),
@@ -151,6 +154,7 @@ class AuthStorage {
       _displayNameKey,
       _projectCodeKey,
       _projectIdKey,
+      _partnerUserIdKey,
       _partnerIdKey,
       _companyIdKey,
       _branchIdKey,

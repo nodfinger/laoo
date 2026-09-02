@@ -11,7 +11,9 @@ class CompanySetupApi {
     final data = await _client.get('/api/company-setup/actions');
     if (data is! Map) return const {};
     return Map<String, bool>.fromEntries(
-      data.entries.map((entry) => MapEntry('${entry.key}', entry.value == true)),
+      data.entries.map(
+        (entry) => MapEntry('${entry.key}', entry.value == true),
+      ),
     );
   }
 
@@ -44,9 +46,7 @@ class CompanySetupApi {
   Future<List<Map<String, dynamic>>> runItemOptions({String? groupCode}) async {
     final data = await _client.get(
       '/api/company-setup/run-item-options',
-      query: {
-        'groupCode': groupCode ?? CompanySetupConstants.cConstRunItem,
-      },
+      query: {'groupCode': groupCode ?? CompanySetupConstants.cConstRunItem},
     );
     if (data is! List) return const [];
     return List<Map<String, dynamic>>.from(data);

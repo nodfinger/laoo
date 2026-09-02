@@ -65,8 +65,13 @@ class WorkspaceThemePreset {
         ),
       ),
       textTheme: themedText.copyWith(
+        titleMedium: themedText.titleMedium?.copyWith(
+          fontSize: LaooTypography.comboBox,
+          height: LaooTypography.bodyLineHeight,
+          color: textPrimary,
+        ),
         bodyLarge: themedText.bodyLarge?.copyWith(
-          fontSize: LaooTypography.body,
+          fontSize: LaooTypography.inputText,
           height: LaooTypography.bodyLineHeight,
           color: textPrimary,
         ),
@@ -87,6 +92,21 @@ class WorkspaceThemePreset {
         labelMedium: themedText.labelMedium?.copyWith(
           fontSize: LaooTypography.inputLabel,
           height: LaooTypography.bodyLineHeight,
+        ),
+      ),
+      dataTableTheme: DataTableThemeData(
+        headingTextStyle: TextStyle(
+          fontFamily: LaooTypography.fontFamily,
+          fontFamilyFallback: LaooTypography.fontFallback,
+          fontSize: LaooTypography.tableHeader,
+          fontWeight: FontWeight.w700,
+          color: primary,
+        ),
+        dataTextStyle: TextStyle(
+          fontFamily: LaooTypography.fontFamily,
+          fontFamilyFallback: LaooTypography.fontFallback,
+          fontSize: LaooTypography.tableBody,
+          color: textPrimary,
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -142,7 +162,14 @@ class WorkspaceThemePreset {
         ),
       ),
       dialogTheme: DialogThemeData(
-        titleTextStyle: LaooTypography.screenCaptionStyle,
+        titleTextStyle: TextStyle(
+          fontFamily: LaooTypography.fontFamily,
+          fontFamilyFallback: LaooTypography.fontFallback,
+          fontSize: LaooTypography.sectionTitle,
+          height: LaooTypography.titleLineHeight,
+          fontWeight: FontWeight.w700,
+          color: textPrimary,
+        ),
         contentTextStyle: TextStyle(
           fontFamily: LaooTypography.fontFamily,
           fontFamilyFallback: LaooTypography.fontFallback,

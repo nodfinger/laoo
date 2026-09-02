@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../app/router/app_menu_route_registry.dart';
 import '../../../../app/router/route_names.dart';
 import '../../../../app/router/route_paths.dart';
+import '../../../../app/theme/laoo_design_tokens.dart';
 import '../../../../app/theme/laoo_typography.dart';
 import '../../../../app/theme/workspace_theme_presets.dart';
 import '../../../../core/auth/app_auth_controller.dart';
@@ -12,9 +13,9 @@ import '../../../../core/api/api_exception.dart';
 import '../../../../core/company_setup/company_setup_controller.dart';
 import '../../../../core/favorites/user_favorite_repository.dart';
 import '../../../../core/navigation/navigation_menu.dart';
-import '../../../../core/navigation/navigation_icon_resolver.dart';
 import '../../../../core/navigation/navigation_menu_repository.dart';
 import '../../../../core/navigation/menu_style_preferences.dart';
+import '../../../../core/navigation/navigation_icon_resolver.dart';
 import '../../../../core/widgets/timed_snack_bar.dart';
 import '../../../profile/pages/user_profile_dialog.dart';
 
@@ -27,6 +28,24 @@ final ValueNotifier<String?> mobileSelectedMenuGroup = ValueNotifier<String?>(
 final UserFavoriteRepository _userFavoriteRepository = UserFavoriteRepository();
 
 enum WorkspaceMenuScope { support, partner, company }
+
+class WorkspaceSectionCard extends StatelessWidget {
+  const WorkspaceSectionCard({
+    super.key,
+    required this.child,
+    this.padding = const EdgeInsets.all(LaooLayout.cardPadding),
+  });
+
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) => Card(
+    margin: EdgeInsets.zero,
+    clipBehavior: Clip.antiAlias,
+    child: Padding(padding: padding, child: child),
+  );
+}
 
 class WorkspacePageTitle extends StatelessWidget {
   const WorkspacePageTitle({
@@ -53,17 +72,7 @@ class WorkspacePageTitle extends StatelessWidget {
         return Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Flexible(
-              child: Text(
-                title,
-                style: LaooTypography.screenCaptionStyle.copyWith(
-                  fontSize: titleFontSize ?? LaooTypography.workspaceCaption,
-                  color: titleColor ?? Colors.black,
-                ),
-              ),
-            ),
             if (key != null) ...[
-              const SizedBox(width: 6),
               ValueListenableBuilder<Set<String>>(
                 valueListenable: supportFavoritePages,
                 builder: (context, favorites, _) {
@@ -104,6 +113,85 @@ class WorkspacePageTitle extends StatelessWidget {
                   );
                 },
               ),
+              const SizedBox(width: 6),
+            ],
+            Flexible(
+              child: Text(
+                title,
+                style: TextStyle(
+                  fontSize: titleFontSize ?? LaooTypography.workspaceCaption,
+                  fontWeight: LaooTypography.workspaceCaptionWeight,
+                  color: Colors.black,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// Shared action-screen header that keeps the caption and actions readable.
+/// On compact layouts the actions move below the caption instead of competing
+/// for horizontal space.
+class WorkspaceActionHeader extends StatelessWidget {
+  const WorkspaceActionHeader({
+    super.key,
+    required this.title,
+    required this.actions,
+    this.favoriteKey,
+    this.compactBreakpoint = 900,
+  });
+
+  final String title;
+  final String? favoriteKey;
+  final List<Widget> actions;
+  final double compactBreakpoint;
+
+  @override
+  Widget build(BuildContext context) {
+    final titleWidget = WorkspacePageTitle(
+      title: title,
+      favoriteKey: favoriteKey,
+    );
+    final actionWidgets = <Widget>[
+      for (var index = 0; index < actions.length; index++) ...[
+        if (index > 0) const SizedBox(width: 10),
+        actions[index],
+      ],
+    ];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < compactBreakpoint;
+        if (compact) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              titleWidget,
+              if (actions.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Wrap(
+                    alignment: WrapAlignment.start,
+                    spacing: 10,
+                    runSpacing: 8,
+                    children: actions,
+                  ),
+                ),
+              ],
+            ],
+          );
+        }
+
+        return Row(
+          children: [
+            Expanded(child: titleWidget),
+            if (actions.isNotEmpty) ...[
+              const SizedBox(width: 16),
+              ...actionWidgets,
             ],
           ],
         );
@@ -180,43 +268,55 @@ class SupportWorkspaceShell extends StatelessWidget {
               appBar: compact
                   ? AppBar(
                       backgroundColor: preset.surface,
-                      toolbarHeight: 72,
+                      toolbarHeight: 76,
+                      elevation: 0,
+                      scrolledUnderElevation: 0,
                       surfaceTintColor: Colors.transparent,
                       automaticallyImplyLeading: false,
                       titleSpacing: 0,
-                      title: ValueListenableBuilder<bool>(
-                        valueListenable: workspaceButtonMenu,
-                        builder: (context, buttonMenu, _) => Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (showMobileMenuButton)
-                              _MobileGroupMenu(
-                                preset: preset,
-                                menuScope: menuScope,
-                                activeMenu: activeMenu,
-                                slide: true,
-                              ),
-                            if (showMobileMenuButton) const SizedBox(width: 4),
-                            SizedBox(
-                              width: showMobileMenuButton ? 145 : 155,
-                              child: _BrandHeader(
-                                accent: preset.primary,
-                                preset: preset,
-                                compact: true,
-                              ),
-                            ),
-                          ],
+                      shape: Border(
+                        bottom: BorderSide(
+                          color: preset.primary.withValues(alpha: 0.16),
                         ),
                       ),
+                      title: ValueListenableBuilder<bool>(
+                        valueListenable: workspaceButtonMenu,
+                        builder: (context, buttonMenu, _) {
+                          final narrow = MediaQuery.sizeOf(context).width < 430;
+                          return Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (showMobileMenuButton)
+                                _MobileGroupMenu(
+                                  preset: preset,
+                                  menuScope: menuScope,
+                                  activeMenu: activeMenu,
+                                  slide: true,
+                                ),
+                              if (showMobileMenuButton)
+                                SizedBox(width: narrow ? 0 : 4),
+                              SizedBox(
+                                width: narrow
+                                    ? 132
+                                    : showMobileMenuButton
+                                    ? 158
+                                    : 176,
+                                child: _BrandHeader(
+                                  accent: preset.primary,
+                                  preset: preset,
+                                  compact: true,
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
                       actions: [
-                        /* IconButton(
-                          tooltip: 'กลับหน้าหลัก',
-                          onPressed: () =>
-                              context.goNamed(RouteNames.authenticatedHome),
-                          icon: Icon(
-                        ), */
-                        _UserMenu(preset: preset),
-                        const SizedBox(width: 8),
+                        if (MediaQuery.sizeOf(context).width < 620)
+                          _CompactUserMenu(preset: preset)
+                        else
+                          _UserMenu(preset: preset),
+                        const SizedBox(width: 12),
                       ],
                     )
                   : null,
@@ -242,9 +342,10 @@ class SupportWorkspaceShell extends StatelessWidget {
                               child: Column(
                                 children: [
                                   if (!compact)
-                                    _TopBar(
+                                    WorkspaceTopBar(
                                       preset: preset,
                                       buttonMenu: buttonMenu,
+                                      activeMenu: activeMenu,
                                     ),
                                   if (!compact) const _FavoriteWorkspaceBar(),
                                   if (buttonMenu)
@@ -301,32 +402,15 @@ class _MobileGroupMenuState extends State<_MobileGroupMenu> {
   @override
   void initState() {
     super.initState();
-    _menus = NavigationMenuRepository().getMenus();
+    _menus = widget.slide
+        ? Future.value(const <NavigationMenuGroup>[])
+        : NavigationMenuRepository().getMenus();
   }
 
   List<NavigationMenuGroup> _visibleGroups(List<NavigationMenuGroup> groups) {
-    final expectedScope = switch (widget.menuScope) {
-      WorkspaceMenuScope.support => AppMenuScope.support,
-      WorkspaceMenuScope.partner => AppMenuScope.partner,
-      WorkspaceMenuScope.company => AppMenuScope.company,
-    };
-    return groups
-        .map(
-          (group) => NavigationMenuGroup(
-            code: group.code,
-            name: group.name,
-            iconName: group.iconName,
-            isExpandedDefault: group.isExpandedDefault,
-            items: group.items.where((item) {
-              final spec = AppMenuRouteRegistry.byMenuCode(item.code);
-              return spec != null &&
-                  (spec.scope == expectedScope ||
-                      spec.scope == AppMenuScope.shared);
-            }).toList(),
-          ),
-        )
-        .where((group) => group.items.isNotEmpty)
-        .toList();
+    // Navigation API has already applied UserType, owner scope and VIEW
+    // permission. Do not second-guess it with a client-side role map.
+    return groups.where((group) => group.items.isNotEmpty).toList();
   }
 
   @override
@@ -537,51 +621,73 @@ class _MobileMenuEntry {
   final String? routeName;
 }
 
-class _TopBar extends StatelessWidget {
-  const _TopBar({required this.preset, required this.buttonMenu});
+/// Primary desktop workspace navigation bar.
+class WorkspaceTopBar extends StatelessWidget {
+  const WorkspaceTopBar({
+    super.key,
+    required this.preset,
+    required this.buttonMenu,
+    required this.activeMenu,
+  });
 
   final WorkspaceThemePreset preset;
   final bool buttonMenu;
+  final String? activeMenu;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 73,
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      height: 80,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
       decoration: BoxDecoration(
         color: preset.surface,
-        border: Border(bottom: BorderSide(color: preset.border)),
+        border: Border(
+          bottom: BorderSide(color: preset.primary.withValues(alpha: 0.18)),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.035),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: Row(
         children: [
           if (buttonMenu) ...[
             SizedBox(
-              width: 160,
+              width: 188,
               child: _BrandHeader(
                 accent: preset.primary,
                 preset: preset,
                 compact: true,
               ),
             ),
-            const SizedBox(width: 12),
+            Container(
+              width: 1,
+              height: 38,
+              margin: const EdgeInsets.only(left: 10, right: 18),
+              color: preset.border,
+            ),
           ],
           _TopBarAction(
             icon: Icons.home_outlined,
             label: 'หน้าแรก',
             color: Theme.of(context).colorScheme.primary,
+            selected: activeMenu == 'home',
             onPressed: () => context.goNamed(RouteNames.authenticatedHome),
           ),
-          Container(width: 1, height: 40, color: preset.border),
+          const Spacer(),
           _TopBarAction(
             icon: Icons.logout_outlined,
             label: 'ออกจากระบบ',
-            color: Theme.of(context).colorScheme.primary,
+            color: preset.textPrimary,
             onPressed: () async {
               await appAuthController.logout();
               if (context.mounted) context.goNamed(RouteNames.login);
             },
           ),
-          const Spacer(),
+          const SizedBox(width: 12),
           _UserMenu(preset: preset),
         ],
       ),
@@ -595,12 +701,14 @@ class _TopBarAction extends StatelessWidget {
     required this.label,
     required this.color,
     required this.onPressed,
+    this.selected = false,
   });
 
   final IconData icon;
   final String label;
   final Color color;
   final VoidCallback onPressed;
+  final bool selected;
 
   @override
   Widget build(BuildContext context) {
@@ -608,23 +716,33 @@ class _TopBarAction extends StatelessWidget {
       onPressed: onPressed,
       style: TextButton.styleFrom(
         foregroundColor: color,
-        minimumSize: const Size(112, LaooTypography.buttonHeight),
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        shape: const RoundedRectangleBorder(),
+        backgroundColor: selected
+            ? color.withValues(alpha: 0.09)
+            : Colors.transparent,
+        minimumSize: const Size(108, 46),
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(
+            color: selected
+                ? color.withValues(alpha: 0.22)
+                : Colors.transparent,
+          ),
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 24, color: color),
+          Icon(icon, size: 22, color: color),
           const SizedBox(width: 8),
           Text(
             label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: LaooTypography.button,
+            style: TextStyle(
+              fontSize: LaooTypography.topBar,
               fontWeight: FontWeight.w700,
-              color: Colors.black,
+              color: color,
             ),
           ),
         ],
@@ -704,28 +822,8 @@ class _ButtonMenuWorkspaceState extends State<_ButtonMenuWorkspace> {
   }
 
   List<NavigationMenuGroup> _visibleGroups(List<NavigationMenuGroup> groups) {
-    final expectedScope = switch (widget.menuScope) {
-      WorkspaceMenuScope.support => AppMenuScope.support,
-      WorkspaceMenuScope.partner => AppMenuScope.partner,
-      WorkspaceMenuScope.company => AppMenuScope.company,
-    };
-    return groups
-        .map(
-          (group) => NavigationMenuGroup(
-            code: group.code,
-            name: group.name,
-            iconName: group.iconName,
-            isExpandedDefault: group.isExpandedDefault,
-            items: group.items.where((item) {
-              final spec = AppMenuRouteRegistry.byMenuCode(item.code);
-              return spec != null &&
-                  (spec.scope == expectedScope ||
-                      spec.scope == AppMenuScope.shared);
-            }).toList(),
-          ),
-        )
-        .where((group) => group.items.isNotEmpty)
-        .toList();
+    // UserType/scope/VIEW permission are enforced by Navigation API.
+    return groups.where((group) => group.items.isNotEmpty).toList();
   }
 
   @override
@@ -1034,28 +1132,8 @@ class _ButtonMenuWorkspaceState extends State<_ButtonMenuWorkspace> {
   }
 
   List<NavigationMenuGroup> _visibleGroups(List<NavigationMenuGroup> groups) {
-    final expectedScope = switch (widget.menuScope) {
-      WorkspaceMenuScope.support => AppMenuScope.support,
-      WorkspaceMenuScope.partner => AppMenuScope.partner,
-      WorkspaceMenuScope.company => AppMenuScope.company,
-    };
-    return groups
-        .map(
-          (group) => NavigationMenuGroup(
-            code: group.code,
-            name: group.name,
-            iconName: group.iconName,
-            isExpandedDefault: group.isExpandedDefault,
-            items: group.items.where((item) {
-              final spec = AppMenuRouteRegistry.byMenuCode(item.code);
-              return spec != null &&
-                  (spec.scope == expectedScope ||
-                      spec.scope == AppMenuScope.shared);
-            }).toList(),
-          ),
-        )
-        .where((group) => group.items.isNotEmpty)
-        .toList();
+    // UserType/scope/VIEW permission are enforced by Navigation API.
+    return groups.where((group) => group.items.isNotEmpty).toList();
   }
 
   @override
@@ -1085,7 +1163,20 @@ class _ButtonMenuWorkspaceState extends State<_ButtonMenuWorkspace> {
         if (widget.compact &&
             widget.activeMenu != null &&
             widget.activeMenu != 'home') {
-          return widget.child;
+          final activeMenuCode = widget.activeMenu!.trim().toUpperCase();
+          final activeGroup = groups.cast<NavigationMenuGroup?>().firstWhere(
+            (group) => group!.items.any(
+              (item) => item.code.trim().toUpperCase() == activeMenuCode,
+            ),
+            orElse: () => groups.isEmpty ? null : groups.first,
+          );
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(child: widget.child),
+              _buildCompactFooter(context, groups, activeGroup?.code),
+            ],
+          );
         }
         if (widget.compact) {
           return ValueListenableBuilder<String?>(
@@ -1217,6 +1308,13 @@ class _ButtonMenuWorkspaceState extends State<_ButtonMenuWorkspace> {
     final currentPath = GoRouter.of(
       context,
     ).routerDelegate.currentConfiguration.uri.path;
+    final normalizedSelected = selectedCode?.trim().toUpperCase();
+    final selectedGroup = groups.isEmpty
+        ? null
+        : groups.firstWhere(
+            (group) => group.code.trim().toUpperCase() == normalizedSelected,
+            orElse: () => groups.first,
+          );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -1230,142 +1328,14 @@ class _ButtonMenuWorkspaceState extends State<_ButtonMenuWorkspace> {
                   _buildMobileFavorites(context),
                   const SizedBox(height: 14),
                 ],
-                _buildCompactGroupSelector(context, groups, selectedCode),
-                if (selectedCode != null) ...[
-                  const SizedBox(height: 14),
-                  ...groups
-                      .where(
-                        (group) =>
-                            group.code.trim().toUpperCase() ==
-                            selectedCode.trim().toUpperCase(),
-                      )
-                      .map(
-                        (group) =>
-                            _buildCompactGroup(context, group, currentPath),
-                      ),
-                ],
+                if (selectedGroup != null)
+                  _buildCompactGroup(context, selectedGroup, currentPath),
               ],
             ),
           ),
         ),
-        _buildCompactFooter(context, groups, selectedCode),
+        _buildCompactFooter(context, groups, selectedGroup?.code),
       ],
-    );
-  }
-
-  Widget _buildCompactGroupSelector(
-    BuildContext context,
-    List<NavigationMenuGroup> groups,
-    String? selectedCode,
-  ) {
-    final normalizedSelected = selectedCode?.trim().toUpperCase();
-    return Card(
-      color: widget.preset.surface,
-      surfaceTintColor: Colors.transparent,
-      elevation: 3,
-      shadowColor: widget.preset.primary.withValues(alpha: .18),
-      margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
-        side: BorderSide.none,
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'กลุ่มเมนู',
-              style: TextStyle(
-                color: widget.preset.primary,
-                fontSize: LaooTypography.sectionTitle,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 10),
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: groups.length,
-              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                maxCrossAxisExtent: 102,
-                mainAxisExtent: 96,
-                crossAxisSpacing: 10,
-                mainAxisSpacing: 14,
-              ),
-              itemBuilder: (context, index) {
-                final group = groups[index];
-                final selected =
-                    group.code.trim().toUpperCase() == normalizedSelected;
-                return Card(
-                  color: selected
-                      ? widget.preset.primary.withValues(alpha: .12)
-                      : widget.preset.surface,
-                  surfaceTintColor: Colors.transparent,
-                  elevation: 3,
-                  shadowColor: widget.preset.primary.withValues(alpha: .16),
-                  margin: EdgeInsets.zero,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    side: BorderSide.none,
-                  ),
-                  child: InkWell(
-                    onTap: () => mobileSelectedMenuGroup.value = group.code,
-                    borderRadius: BorderRadius.circular(14),
-                    child: Stack(
-                      children: [
-                        Center(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 5),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  _buttonMenuIcon(group.iconName),
-                                  size: 30,
-                                  color: widget.preset.primary,
-                                ),
-                                const SizedBox(height: 7),
-                                Text(
-                                  group.name,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    color: widget.preset.textPrimary,
-                                    fontSize: LaooTypography.bodySmall,
-                                    height: 1.15,
-                                    fontWeight: selected
-                                        ? FontWeight.w700
-                                        : FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        if (selected)
-                          Positioned(
-                            left: 12,
-                            right: 12,
-                            bottom: 5,
-                            child: Container(
-                              height: 3,
-                              decoration: BoxDecoration(
-                                color: widget.preset.primary,
-                                borderRadius: BorderRadius.circular(3),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -1516,7 +1486,7 @@ class _ButtonMenuWorkspaceState extends State<_ButtonMenuWorkspace> {
             Expanded(
               child: _CompactFooterButton(
                 icon: Icons.apps_outlined,
-                label: 'กลับหน้าแรก',
+                label: 'เมนู',
                 color: foreground,
                 onPressed: () =>
                     _showCompactGroupPicker(context, groups, selectedCode),
@@ -1563,20 +1533,6 @@ class _ButtonMenuWorkspaceState extends State<_ButtonMenuWorkspace> {
         shrinkWrap: true,
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         children: [
-          ListTile(
-            leading: Icon(Icons.apps_outlined, color: widget.preset.primary),
-            title: Text(
-              'แสดงทุกกลุ่มเมนู',
-              style: TextStyle(color: widget.preset.textPrimary),
-            ),
-            selected: selectedCode == null,
-            selectedColor: widget.preset.primary,
-            onTap: () {
-              mobileSelectedMenuGroup.value = null;
-              Navigator.of(sheetContext).pop();
-            },
-          ),
-          const Divider(),
           ...groups.map(
             (group) => ListTile(
               leading: Icon(
@@ -1594,6 +1550,11 @@ class _ButtonMenuWorkspaceState extends State<_ButtonMenuWorkspace> {
               onTap: () {
                 mobileSelectedMenuGroup.value = group.code;
                 Navigator.of(sheetContext).pop();
+                if (widget.activeMenu != null &&
+                    widget.activeMenu != 'home' &&
+                    context.mounted) {
+                  context.goNamed(RouteNames.authenticatedHome);
+                }
               },
             ),
           ),
@@ -1675,7 +1636,7 @@ class _ButtonMenuWorkspaceState extends State<_ButtonMenuWorkspace> {
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 color: Colors.black,
-                                fontSize: 11,
+                                fontSize: 14,
                                 height: 1.15,
                               ),
                             ),
@@ -1813,8 +1774,7 @@ class _ButtonMenuWorkspaceState extends State<_ButtonMenuWorkspace> {
   }
 }
 
-IconData _buttonMenuIcon(String? name) =>
-    NavigationIconResolver.resolve(name, fallback: Icons.apps_outlined);
+IconData _buttonMenuIcon(String? name) => resolveNavigationIcon(name);
 
 class _CompactFooterButton extends StatelessWidget {
   const _CompactFooterButton({
@@ -1940,10 +1900,8 @@ class _FavoriteWorkspaceBarState extends State<_FavoriteWorkspaceBar> {
     }
   }
 
-  IconData _icon(String? name) => NavigationIconResolver.resolve(
-    name,
-    fallback: Icons.star_outline_rounded,
-  );
+  IconData _icon(String? name) =>
+      resolveNavigationIcon(name, fallback: Icons.star_outline_rounded);
 
   @override
   Widget build(BuildContext context) {
@@ -1963,7 +1921,11 @@ class _FavoriteWorkspaceBarState extends State<_FavoriteWorkspaceBar> {
           children: [
             Text(
               'รายการโปรด',
-              style: TextStyle(color: accent, fontWeight: FontWeight.w700),
+              style: TextStyle(
+                color: accent,
+                fontSize: LaooTypography.topBar,
+                fontWeight: FontWeight.w700,
+              ),
             ),
             const SizedBox(width: 12),
             ..._favorites.map((item) {
@@ -2003,7 +1965,10 @@ class _FavoriteWorkspaceBarState extends State<_FavoriteWorkspaceBar> {
                                     item.menuName,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(color: Colors.black),
+                                    style: const TextStyle(
+                                      color: Colors.black,
+                                      fontSize: LaooTypography.topBar,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -2040,7 +2005,10 @@ class _FavoriteWorkspaceBarState extends State<_FavoriteWorkspaceBar> {
                               Text(
                                 item.menuName,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(color: Colors.black),
+                                style: const TextStyle(
+                                  color: Colors.black,
+                                  fontSize: LaooTypography.topBar,
+                                ),
                               ),
                               if (favoriteIndex < _favorites.length - 1)
                                 Padding(
@@ -2365,22 +2333,44 @@ class _CompactUserMenu extends StatelessWidget {
       itemBuilder: (context) => [
         PopupMenuItem(
           value: 'profile',
-          child: Text('ข้อมูลส่วนตัว', style: TextStyle(color: accent)),
+          child: Row(
+            children: [
+              Icon(Icons.person_outline_rounded, size: 20, color: accent),
+              const SizedBox(width: 10),
+              Text('ข้อมูลส่วนตัว', style: TextStyle(color: accent)),
+            ],
+          ),
         ),
         PopupMenuItem(
           value: 'logout',
-          child: Text('ออกจากระบบ', style: TextStyle(color: accent)),
+          child: Row(
+            children: [
+              Icon(Icons.logout_rounded, size: 20, color: accent),
+              const SizedBox(width: 10),
+              Text('ออกจากระบบ', style: TextStyle(color: accent)),
+            ],
+          ),
         ),
       ],
-      child: ValueListenableBuilder<Uint8List?>(
-        valueListenable: userProfileAvatarNotifier,
-        builder: (_, image, _) => CircleAvatar(
-          radius: 16,
-          backgroundColor: accent.withValues(alpha: 0.12),
-          backgroundImage: image == null ? null : MemoryImage(image),
-          child: image == null
-              ? Icon(Icons.person_outline, size: 18, color: accent)
-              : null,
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: accent.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: accent.withValues(alpha: 0.14)),
+        ),
+        alignment: Alignment.center,
+        child: ValueListenableBuilder<Uint8List?>(
+          valueListenable: userProfileAvatarNotifier,
+          builder: (_, image, _) => CircleAvatar(
+            radius: 16,
+            backgroundColor: accent.withValues(alpha: 0.12),
+            backgroundImage: image == null ? null : MemoryImage(image),
+            child: image == null
+                ? Icon(Icons.person_outline, size: 18, color: accent)
+                : null,
+          ),
         ),
       ),
     );
@@ -2424,68 +2414,88 @@ class _UserMenu extends StatelessWidget {
       itemBuilder: (context) => [
         PopupMenuItem(
           value: 'profile',
-          child: Text('ข้อมูลส่วนตัว', style: TextStyle(color: foreground)),
+          child: Row(
+            children: [
+              Icon(Icons.person_outline_rounded, size: 20, color: accent),
+              const SizedBox(width: 10),
+              Text('ข้อมูลส่วนตัว', style: TextStyle(color: foreground)),
+            ],
+          ),
         ),
         PopupMenuItem(
           value: 'logout',
-          child: Text('ออกจากระบบ', style: TextStyle(color: foreground)),
+          child: Row(
+            children: [
+              Icon(Icons.logout_rounded, size: 20, color: accent),
+              const SizedBox(width: 10),
+              Text('ออกจากระบบ', style: TextStyle(color: foreground)),
+            ],
+          ),
         ),
       ],
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-        decoration: BoxDecoration(
-          color: preset.surface,
-          border: Border.all(color: preset.border),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ValueListenableBuilder<Uint8List?>(
-              valueListenable: userProfileAvatarNotifier,
-              builder: (_, image, _) => CircleAvatar(
-                radius: 16,
-                backgroundColor: accent.withValues(alpha: 0.12),
-                backgroundImage: image == null ? null : MemoryImage(image),
-                child: image == null
-                    ? Icon(Icons.person_outline, size: 18, color: accent)
-                    : null,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minWidth: 176, maxWidth: 220),
+        child: Container(
+          height: 52,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            color: accent.withValues(alpha: 0.035),
+            border: Border.all(color: accent.withValues(alpha: 0.15)),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ValueListenableBuilder<Uint8List?>(
+                valueListenable: userProfileAvatarNotifier,
+                builder: (_, image, _) => CircleAvatar(
+                  radius: 18,
+                  backgroundColor: accent.withValues(alpha: 0.12),
+                  backgroundImage: image == null ? null : MemoryImage(image),
+                  child: image == null
+                      ? Icon(Icons.person_outline, size: 18, color: accent)
+                      : null,
+                ),
               ),
-            ),
-            const SizedBox(width: 9),
-            ValueListenableBuilder<String?>(
-              valueListenable: userProfileIntroductionNotifier,
-              builder: (_, introduction, _) => Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    userName,
-                    style: TextStyle(
-                      fontSize: LaooTypography.userName,
-                      fontWeight: LaooTypography.strongWeight,
-                      color: foreground,
-                    ),
+              const SizedBox(width: 9),
+              Expanded(
+                child: ValueListenableBuilder<String?>(
+                  valueListenable: userProfileIntroductionNotifier,
+                  builder: (_, introduction, _) => Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        userName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: LaooTypography.userName,
+                          fontWeight: LaooTypography.strongWeight,
+                          color: foreground,
+                        ),
+                      ),
+                      Text(
+                        userContext,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: LaooTypography.userContext,
+                          color: secondary,
+                        ),
+                      ),
+                    ],
                   ),
-                  Text(
-                    userContext,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: LaooTypography.userContext,
-                      color: secondary,
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
-            const SizedBox(width: 6),
-            Icon(
-              Icons.keyboard_arrow_down_rounded,
-              size: 18,
-              color: foreground,
-            ),
-          ],
+              const SizedBox(width: 6),
+              Icon(
+                Icons.keyboard_arrow_down_rounded,
+                size: 18,
+                color: foreground,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -2587,28 +2597,9 @@ class _ApiRoleScopedSidebarState extends State<_ApiRoleScopedSidebar> {
     final currentPath = GoRouter.of(
       context,
     ).routerDelegate.currentConfiguration.uri.path;
-    final expectedScope = switch (widget.menuScope) {
-      WorkspaceMenuScope.support => AppMenuScope.support,
-      WorkspaceMenuScope.partner => AppMenuScope.partner,
-      WorkspaceMenuScope.company => AppMenuScope.company,
-    };
-    final menuGroups = groups
-        .map(
-          (group) => NavigationMenuGroup(
-            code: group.code,
-            name: group.name,
-            iconName: group.iconName,
-            isExpandedDefault: group.isExpandedDefault,
-            items: group.items.where((item) {
-              final spec = AppMenuRouteRegistry.byMenuCode(item.code);
-              return spec != null &&
-                  (spec.scope == expectedScope ||
-                      spec.scope == AppMenuScope.shared);
-            }).toList(),
-          ),
-        )
-        .where((group) => group.items.isNotEmpty)
-        .toList();
+    // Keep the exact groups returned by Navigation API. The backend is the
+    // source of truth for user type, owner scope and VIEW permission.
+    final menuGroups = groups.where((group) => group.items.isNotEmpty).toList();
     final homeRoute = widget.menuScope == WorkspaceMenuScope.support
         ? RouteNames.supportHome
         : RouteNames.authenticatedHome;
@@ -2730,9 +2721,8 @@ class _ApiRoleScopedSidebarState extends State<_ApiRoleScopedSidebar> {
     );
   }
 
-  IconData _iconFor(String? name) {
-    return NavigationIconResolver.resolve(name);
-  }
+  IconData _iconFor(String? name) =>
+      resolveNavigationIcon(name, fallback: Icons.menu_outlined);
 }
 
 class _MenuGroup extends StatelessWidget {
@@ -2839,11 +2829,21 @@ class _BrandHeader extends StatelessWidget {
                 children: [
                   if (compact)
                     Container(
-                      width: 44,
-                      height: 44,
+                      width: 46,
+                      height: 46,
                       decoration: BoxDecoration(
                         color: iconBackground,
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(13),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.26),
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: preset.primary.withValues(alpha: 0.18),
+                            blurRadius: 10,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
                       ),
                       alignment: Alignment.center,
                       child: Text(

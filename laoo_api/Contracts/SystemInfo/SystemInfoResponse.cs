@@ -1,4 +1,4 @@
-namespace Laoo.Api.Contracts.SystemInfo;
+namespace Laoo.Service.Api.Contracts.SystemInfo;
 
 public sealed record SystemInfoResponse(
     string SystemName,

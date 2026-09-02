@@ -8,6 +8,7 @@ import '../../../../app/theme/laoo_typography.dart';
 import '../../../../app/theme/workspace_theme_presets.dart';
 import '../../../../core/company_setup/company_setup_controller.dart';
 import '../../../../core/navigation/navigation_menu_repository.dart';
+import '../../../../core/widgets/pinned_data_table.dart';
 import '../../../../core/widgets/timed_snack_bar.dart';
 import '../../../profile/data/user_profile_repository.dart';
 import '../../../support/presentation/widgets/support_workspace_shell.dart';
@@ -167,7 +168,14 @@ class _PreOrderListPageState extends State<PreOrderListPage> {
           children: [
             Icon(Icons.delete_outline, color: LaooColors.error),
             SizedBox(width: 8),
-            Text('ยืนยันการลบข้อมูล', style: LaooTypography.screenCaptionStyle),
+            Text(
+              'ยืนยันการลบข้อมูล',
+              style: TextStyle(
+                color: LaooColors.error,
+                fontSize: LaooTypography.workspaceCaption,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ],
         ),
         content: Column(
@@ -275,62 +283,50 @@ class _PreOrderListPageState extends State<PreOrderListPage> {
   }
 
   Widget _table(Color accent) {
-    return LayoutBuilder(
-      builder: (context, constraints) => SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(minWidth: constraints.maxWidth),
-          child: DataTable(
-            headingRowColor: WidgetStatePropertyAll(
-              accent.withValues(alpha: .10),
-            ),
-            dividerThickness: .6,
-            columnSpacing: 20,
-            headingTextStyle: TextStyle(
-              color: accent,
-              fontSize: LaooTypography.tableHeader,
-              fontWeight: FontWeight.w700,
-            ),
-            dataTextStyle: const TextStyle(
-              color: LaooColors.textPrimary,
-              fontSize: LaooTypography.tableBody,
-            ),
-            columns: const [
-              DataColumn(label: Text('ID')),
-              DataColumn(label: Text('Action')),
-              DataColumn(label: Text('เลขที่ใบจอง')),
-              DataColumn(label: Text('วันที่เอกสาร')),
-              DataColumn(label: Text('ลูกค้า')),
-              DataColumn(label: Text('ใบเสนอราคา')),
-              DataColumn(label: Text('รวมเงิน'), numeric: true),
-              DataColumn(label: Text('คงเหลือ'), numeric: true),
-              DataColumn(label: Text('สถานะ')),
-            ],
-            rows: [
-              for (var index = 0; index < _visibleRows.length; index++)
-                DataRow(
-                  cells: [
-                    DataCell(Text('${_page * _pageSize + index + 1}')),
-                    DataCell(_actionsCell(_visibleRows[index], accent)),
-                    DataCell(Text('${_visibleRows[index]['preOrderCode']}')),
-                    DataCell(Text(_date(_visibleRows[index]['preOrderDate']))),
-                    DataCell(
-                      Text(
-                        '${_visibleRows[index]['customerCode']} | ${_visibleRows[index]['customerName']}',
-                      ),
-                    ),
-                    DataCell(Text('${_visibleRows[index]['quoteCode']}')),
-                    DataCell(Text(_money(_visibleRows[index]['totalAmount']))),
-                    DataCell(
-                      Text(_money(_visibleRows[index]['balanceAmount'])),
-                    ),
-                    DataCell(_statusBadge(_visibleRows[index], accent)),
-                  ],
+    return PinnedDataTable(
+      headingRowColor: WidgetStatePropertyAll(accent.withValues(alpha: .10)),
+      dividerThickness: .6,
+      columnSpacing: 20,
+      headingTextStyle: TextStyle(
+        color: accent,
+        fontSize: LaooTypography.tableHeader,
+        fontWeight: FontWeight.w700,
+      ),
+      dataTextStyle: const TextStyle(
+        color: LaooColors.textPrimary,
+        fontSize: LaooTypography.tableBody,
+      ),
+      columns: const [
+        LaooTableColumns.id,
+        DataColumn(label: Text('Action')),
+        DataColumn(label: Text('เลขที่ใบจอง')),
+        DataColumn(label: Text('วันที่เอกสาร')),
+        DataColumn(label: Text('ลูกค้า')),
+        DataColumn(label: Text('ใบเสนอราคา')),
+        DataColumn(label: Text('รวมเงิน'), numeric: true),
+        DataColumn(label: Text('คงเหลือ'), numeric: true),
+        DataColumn(label: Text('สถานะ')),
+      ],
+      rows: [
+        for (var index = 0; index < _visibleRows.length; index++)
+          DataRow(
+            cells: [
+              DataCell(Text('${_page * _pageSize + index + 1}')),
+              DataCell(_actionsCell(_visibleRows[index], accent)),
+              DataCell(Text('${_visibleRows[index]['preOrderCode']}')),
+              DataCell(Text(_date(_visibleRows[index]['preOrderDate']))),
+              DataCell(
+                Text(
+                  '${_visibleRows[index]['customerCode']} | ${_visibleRows[index]['customerName']}',
                 ),
+              ),
+              DataCell(Text('${_visibleRows[index]['quoteCode']}')),
+              DataCell(Text(_money(_visibleRows[index]['totalAmount']))),
+              DataCell(Text(_money(_visibleRows[index]['balanceAmount']))),
+              DataCell(_statusBadge(_visibleRows[index], accent)),
             ],
           ),
-        ),
-      ),
+      ],
     );
   }
 
@@ -483,7 +479,7 @@ class _PreOrderListPageState extends State<PreOrderListPage> {
                               child: WorkspacePageTitle(
                                 title: _menuName,
                                 favoriteKey: _activeMenu,
-                                titleColor: Colors.black,
+                                titleColor: LaooColors.textPrimary,
                               ),
                             ),
                             if (!compact) ...[

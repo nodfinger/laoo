@@ -78,6 +78,162 @@ ORDER BY CompanyCode;
         });
     }
 
+    [HttpGet("{companyId:long}/features")]
+    public async Task<ActionResult<List<PartnerCompanyFeatureResponse>>> GetFeatures(
+        long companyId,
+        CancellationToken cancellationToken)
+    {
+        var partnerId = PartnerId();
+        var projectId = LongClaim("project_id");
+        if (partnerId is null || projectId is null) return Forbid();
+
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        if (!await IsPartnerAdminAsync(connection, cancellationToken) &&
+            !await AllowedAsync(connection, "VIEW", cancellationToken))
+            return Forbid();
+
+        const string sql = """
+IF NOT EXISTS
+(
+    SELECT 1 FROM dbo.TDSTCompanySetUp
+    WHERE CompanyID=@CompanyID AND PartnerID=@PartnerID AND IsActive=1
+)
+    THROW 50011, 'COMPANY_NOT_FOUND', 1;
+
+SELECT F.FeatureCode, F.FeatureName, F.FeatureDescription,
+       CONVERT(bit, ISNULL(CF.IsEnabled, 0)) AS IsEnabled, F.SortOrder
+FROM dbo.TDADFeature F
+LEFT JOIN dbo.TDADCompanyFeature CF
+  ON CF.ProjectID=@ProjectID
+ AND CF.PartnerID=@PartnerID
+ AND CF.CompanyID=@CompanyID
+ AND CF.FeatureCode=F.FeatureCode
+WHERE F.IsActive=1
+ORDER BY F.SortOrder, F.FeatureCode;
+""";
+        await using var command = new SqlCommand(sql, connection);
+        command.Parameters.Add("@ProjectID", SqlDbType.BigInt).Value = projectId.Value;
+        command.Parameters.Add("@PartnerID", SqlDbType.BigInt).Value = partnerId.Value;
+        command.Parameters.Add("@CompanyID", SqlDbType.BigInt).Value = companyId;
+        try
+        {
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            var result = new List<PartnerCompanyFeatureResponse>();
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                result.Add(new PartnerCompanyFeatureResponse
+                {
+                    FeatureCode = reader.GetString(0),
+                    FeatureName = reader.GetString(1),
+                    FeatureDescription = N(reader, 2),
+                    IsEnabled = reader.GetBoolean(3),
+                    SortOrder = reader.GetInt32(4),
+                });
+            }
+            return Ok(result);
+        }
+        catch (SqlException ex) when (ex.Number == 50011)
+        {
+            return NotFound(new { message = "ไม่พบลูกค้าในขอบเขตของ Partner นี้" });
+        }
+    }
+
+    [HttpPut("{companyId:long}/features")]
+    public async Task<IActionResult> UpdateFeatures(
+        long companyId,
+        PartnerCompanyFeatureUpdateRequest request,
+        CancellationToken cancellationToken)
+    {
+        var partnerId = PartnerId();
+        var projectId = LongClaim("project_id");
+        var partnerUserId = LongClaim("partner_user_id");
+        if (partnerId is null || projectId is null || partnerUserId is null) return Forbid();
+
+        var normalized = request.Features
+            .Select(item => new PartnerCompanyFeatureUpdateItem
+            {
+                FeatureCode = item.FeatureCode.Trim().ToUpperInvariant(),
+                IsEnabled = item.IsEnabled,
+            })
+            .Where(item => item.FeatureCode.Length > 0)
+            .ToList();
+        if (normalized.Count == 0)
+            return BadRequest(new { message = "กรุณาระบุระบบที่ต้องการเปิดหรือปิด" });
+        if (normalized.Select(item => item.FeatureCode).Distinct(StringComparer.OrdinalIgnoreCase).Count() != normalized.Count)
+            return BadRequest(new { message = "พบรหัสระบบซ้ำในคำขอ" });
+
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        if (!await IsPartnerAdminAsync(connection, cancellationToken)) return Forbid();
+
+        await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            const string companySql = """
+SELECT COUNT(1)
+FROM dbo.TDSTCompanySetUp WITH (UPDLOCK, HOLDLOCK)
+WHERE CompanyID=@CompanyID AND PartnerID=@PartnerID AND IsActive=1;
+""";
+            await using (var companyCommand = new SqlCommand(companySql, connection, transaction))
+            {
+                companyCommand.Parameters.Add("@CompanyID", SqlDbType.BigInt).Value = companyId;
+                companyCommand.Parameters.Add("@PartnerID", SqlDbType.BigInt).Value = partnerId.Value;
+                if (Convert.ToInt32(await companyCommand.ExecuteScalarAsync(cancellationToken)) == 0)
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    return NotFound(new { message = "ไม่พบลูกค้าในขอบเขตของ Partner นี้" });
+                }
+            }
+
+            const string upsertSql = """
+IF NOT EXISTS
+(
+    SELECT 1 FROM dbo.TDADFeature
+    WHERE FeatureCode=@FeatureCode AND IsActive=1
+)
+    THROW 50020, 'FEATURE_NOT_FOUND', 1;
+
+UPDATE dbo.TDADCompanyFeature
+SET IsEnabled=@IsEnabled, UpdateDate=SYSUTCDATETIME(), UpdatedBy=@UserID
+WHERE ProjectID=@ProjectID AND PartnerID=@PartnerID
+  AND CompanyID=@CompanyID AND FeatureCode=@FeatureCode;
+
+IF @@ROWCOUNT=0
+BEGIN
+    INSERT INTO dbo.TDADCompanyFeature
+        (ProjectID, PartnerID, CompanyID, FeatureCode, IsEnabled, IsTrial,
+         StartDate, ExpireDate, CreateDate, CreatedBy)
+    VALUES
+        (@ProjectID, @PartnerID, @CompanyID, @FeatureCode, @IsEnabled, 0,
+         NULL, NULL, SYSUTCDATETIME(), @UserID);
+END;
+""";
+            foreach (var item in normalized)
+            {
+                await using var upsert = new SqlCommand(upsertSql, connection, transaction);
+                upsert.Parameters.Add("@ProjectID", SqlDbType.BigInt).Value = projectId.Value;
+                upsert.Parameters.Add("@PartnerID", SqlDbType.BigInt).Value = partnerId.Value;
+                upsert.Parameters.Add("@CompanyID", SqlDbType.BigInt).Value = companyId;
+                upsert.Parameters.Add("@FeatureCode", SqlDbType.NVarChar, 50).Value = item.FeatureCode;
+                upsert.Parameters.Add("@IsEnabled", SqlDbType.Bit).Value = item.IsEnabled;
+                upsert.Parameters.Add("@UserID", SqlDbType.BigInt).Value = partnerUserId.Value;
+                await upsert.ExecuteNonQueryAsync(cancellationToken);
+            }
+
+            await transaction.CommitAsync(cancellationToken);
+            return NoContent();
+        }
+        catch (SqlException ex) when (ex.Number == 50020)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return BadRequest(new { message = "พบระบบที่ไม่มีอยู่หรือถูกปิดใช้งาน" });
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+    }
+
     [HttpPost]
     public async Task<ActionResult<PartnerCompanyResponse>> Create(
         PartnerCompanyUpsertRequest request, CancellationToken cancellationToken)
@@ -301,6 +457,7 @@ END
     }
 
     private long? PartnerId() => long.TryParse(User.FindFirstValue("partner_id"), out var id) ? id : null;
+    private long? LongClaim(string name) => long.TryParse(User.FindFirstValue(name), out var id) ? id : null;
     private async Task<bool> AllowedAsync(SqlConnection connection, string action, CancellationToken token)
     {
         var partnerId = PartnerId();

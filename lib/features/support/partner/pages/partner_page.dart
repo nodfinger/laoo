@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../../../app/theme/laoo_typography.dart';
 
 class PartnerPage extends StatelessWidget {
   const PartnerPage({super.key});
@@ -47,7 +46,7 @@ class _PartnerFoundationNotice extends StatelessWidget {
               children: const [
                 Text(
                   'Partner Management V1',
-                  style: LaooTypography.screenCaptionStyle,
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
                 ),
                 SizedBox(height: 12),
                 Text(

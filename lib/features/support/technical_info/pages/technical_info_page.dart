@@ -4,6 +4,7 @@ import 'package:flutter/gestures.dart';
 
 import '../../../../app/theme/laoo_typography.dart';
 import '../../../../core/widgets/auto_dismiss_message.dart';
+import '../../../../core/widgets/pinned_data_table.dart';
 import '../../../../core/widgets/timed_snack_bar.dart';
 import '../../presentation/widgets/support_workspace_shell.dart';
 import '../data/technical_info_repository.dart';
@@ -221,7 +222,7 @@ class _TechnicalInfoPageState extends State<TechnicalInfoPage> {
                   children: [
                     SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
-                      child: DataTable(
+                      child: PinnedDataTable(
                         columns: const [
                           DataColumn(label: Text('ชื่อคอลัมน์')),
                           DataColumn(label: Text('ประเภทข้อมูล')),
@@ -431,7 +432,7 @@ class _TechnicalInfoPageState extends State<TechnicalInfoPage> {
             else
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
-                child: DataTable(
+                child: PinnedDataTable(
                   headingRowColor: WidgetStatePropertyAll(Color(0x12000000)),
                   columns: const [
                     DataColumn(label: Text('เปิดไฟล์')),

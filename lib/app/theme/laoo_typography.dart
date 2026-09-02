@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'laoo_design_tokens.dart';
+
 /// Central typography tokens for Laoo Solutions.
 ///
 /// Feature code should reference these tokens instead of hard-coding fontSize.
@@ -23,28 +25,29 @@ abstract final class LaooTypography {
   static const double subsectionTitle = 14;
 
   // General text
-  static const double body = 13;
+  static const double body = 14;
   static const double bodySmall = 12;
   static const double caption = 11;
 
   // Form / input
-  static const double inputText = 13;
+  static const double inputText = 14;
   static const double inputLabel = 16;
-  static const double inputHint = 12;
+  static const double inputHint = 14;
   static const double validation = 12;
-  static const double comboBox = 12;
+  static const double comboBox = 14;
 
   // Table
-  static const double tableHeader = 13;
-  static const double tableBody = 13;
+  static const double tableHeader = 14;
+  static const double tableBody = 14;
 
   // Buttons / menus
-  static const double button = 13;
+  static const double button = 14;
 
   /// Shared button height keeps icon and text buttons visually aligned.
   static const double buttonHeight = 48;
+  static const double topBar = 14;
   static const double menuGroup = 14;
-  static const double menuItem = 12;
+  static const double menuItem = 13;
   static const double popupMenu = 12;
 
   // User / shell
@@ -67,13 +70,15 @@ abstract final class LaooTypography {
   static const FontWeight emphasizedWeight = FontWeight.w700;
   static const FontWeight normalWeight = FontWeight.w400;
 
-  /// Mandatory style for the top-level caption of every screen and dialog.
-  static const TextStyle screenCaptionStyle = TextStyle(
+  static const TextStyle pageCaptionStyle = TextStyle(
     fontFamily: fontFamily,
     fontFamilyFallback: fontFallback,
     fontSize: workspaceCaption,
     height: titleLineHeight,
     fontWeight: workspaceCaptionWeight,
-    color: Colors.black,
+    color: LaooColors.pageCaption,
   );
+
+  static const TextStyle popupTitleStyle = pageCaptionStyle;
+  static const TextStyle screenCaptionStyle = pageCaptionStyle;
 }

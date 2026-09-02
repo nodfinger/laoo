@@ -312,6 +312,10 @@ SELECT
     S.PKValue,
     S.OwnerType,
     S.PartnerID,
+    P.PartnerNameTH AS PartnerNameTh,
+    P.AddressText AS PartnerAddress,
+    P.Telephone AS PartnerTelephone,
+    P.Email AS PartnerEmail,
     S.CompanyID,
     CASE
         WHEN S.OwnerType = 'L' THEN N'LAOO'
@@ -449,6 +453,10 @@ WHERE S.OwnerType = @OwnerType
             NLong("PKValue"),
             reader.GetString(reader.GetOrdinal("OwnerType")),
             NLong("PartnerID"),
+            NString("PartnerNameTh"),
+            NString("PartnerAddress"),
+            NString("PartnerTelephone"),
+            NString("PartnerEmail"),
             NLong("CompanyID"),
             reader.GetString(reader.GetOrdinal("OwnerCode")),
             reader.GetString(reader.GetOrdinal("OwnerName")),

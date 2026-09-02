@@ -30,6 +30,10 @@ class CompanySetupModel {
     required this.hasPasswordDirect,
     this.pkValue,
     this.partnerId,
+    this.partnerNameTh,
+    this.partnerAddress,
+    this.partnerTelephone,
+    this.partnerEmail,
     this.companyId,
     this.yearFormat,
     this.versionId,
@@ -46,6 +50,10 @@ class CompanySetupModel {
   final int? pkValue;
   final String ownerType;
   final int? partnerId;
+  final String? partnerNameTh;
+  final String? partnerAddress;
+  final String? partnerTelephone;
+  final String? partnerEmail;
   final int? companyId;
   final String ownerCode;
   final String ownerName;
@@ -96,6 +104,10 @@ class CompanySetupModel {
       pkValue: asInt(json['pkValue']),
       ownerType: json['ownerType']?.toString() ?? '',
       partnerId: asInt(json['partnerID']) ?? asInt(json['partnerId']),
+      partnerNameTh: json['partnerNameTh']?.toString(),
+      partnerAddress: json['partnerAddress']?.toString(),
+      partnerTelephone: json['partnerTelephone']?.toString(),
+      partnerEmail: json['partnerEmail']?.toString(),
       companyId: asInt(json['companyID']) ?? asInt(json['companyId']),
       ownerCode: json['ownerCode']?.toString() ?? '',
       ownerName: json['ownerName']?.toString() ?? '',
@@ -114,8 +126,7 @@ class CompanySetupModel {
       markCus: json['markCus']?.toString(),
       customerDigit: asInt(json['customerDigit']) ?? 5,
       rowStd: asInt(json['rowSTD']) ?? asInt(json['rowStd']) ?? 30,
-      rowCardStd:
-          asInt(json['rowCardSTD']) ?? asInt(json['rowCardStd']) ?? 30,
+      rowCardStd: asInt(json['rowCardSTD']) ?? asInt(json['rowCardStd']) ?? 30,
       timeAlert: asInt(json['timeAlert']) ?? 30,
       orgStructureType: asInt(json['orgStructureType']) ?? 1,
       passwordPolicyCode: asInt(json['passwordPolicyCode']) ?? 3,
@@ -205,35 +216,35 @@ class CompanySetupUpdateInput {
   final String? passwordDirect;
 
   Map<String, dynamic> toJson() => {
-        'customerNameTh': customerNameTh,
-        'customerNameEn': customerNameEn,
-        'addressText': addressText,
-        'telephone': telephone,
-        'taxID': taxId,
-        'customerEmail': customerEmail,
-        'name': name,
-        'titleHeader': titleHeader,
-        'runItem': runItem,
-        'markItem': markItem,
-        'itemDigit': itemDigit,
-        'runCus': runCus,
-        'markCus': markCus,
-        'customerDigit': customerDigit,
-        'rowSTD': rowStd,
-        'rowCardSTD': rowCardStd,
-        'timeAlert': timeAlert,
-        'orgStructureType': orgStructureType,
-        'passwordPolicyCode': passwordPolicyCode,
-        'yearFormat': yearFormat,
-        'versionID': versionId,
-        'emailHost': emailHost,
-        'emailPort': emailPort,
-        'emailCenter': emailCenter,
-        'emailAdmin': emailAdmin,
-        'superUserName': superUserName,
-        'passwordCry': passwordCry,
-        'emailPasswordCenter': emailPasswordCenter,
-        'passwordEmpDefault': passwordEmpDefault,
-        'passwordDirect': passwordDirect,
-      };
+    'customerNameTh': customerNameTh,
+    'customerNameEn': customerNameEn,
+    'addressText': addressText,
+    'telephone': telephone,
+    'taxID': taxId,
+    'customerEmail': customerEmail,
+    'name': name,
+    'titleHeader': titleHeader,
+    'runItem': runItem,
+    'markItem': markItem,
+    'itemDigit': itemDigit,
+    'runCus': runCus,
+    'markCus': markCus,
+    'customerDigit': customerDigit,
+    'rowSTD': rowStd,
+    'rowCardSTD': rowCardStd,
+    'timeAlert': timeAlert,
+    'orgStructureType': orgStructureType,
+    'passwordPolicyCode': passwordPolicyCode,
+    'yearFormat': yearFormat,
+    'versionID': versionId,
+    'emailHost': emailHost,
+    'emailPort': emailPort,
+    'emailCenter': emailCenter,
+    'emailAdmin': emailAdmin,
+    'superUserName': superUserName,
+    'passwordCry': passwordCry,
+    'emailPasswordCenter': emailPasswordCenter,
+    'passwordEmpDefault': passwordEmpDefault,
+    'passwordDirect': passwordDirect,
+  };
 }

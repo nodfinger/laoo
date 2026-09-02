@@ -56,14 +56,19 @@ class ApiClient implements JsonApiClient {
 
   Future<dynamic> upload(
     String path, {
-    required String fileName,
+    String? fileName,
+    String? filename,
     required List<int> bytes,
     Map<String, String>? fields,
     bool authenticated = true,
   }) {
+    final resolvedFileName = fileName ?? filename;
+    if (resolvedFileName == null || resolvedFileName.isEmpty) {
+      throw ArgumentError('fileName is required');
+    }
     return _http.upload(
       path,
-      fileName: fileName,
+      fileName: resolvedFileName,
       bytes: bytes,
       fields: fields,
       authenticated: authenticated,

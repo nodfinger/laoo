@@ -1,4 +1,4 @@
-namespace Laoo.Api.Contracts.Common;
+namespace Laoo.Service.Api.Contracts.Common;
 
 public sealed record ApiErrorResponse(
     string Code,

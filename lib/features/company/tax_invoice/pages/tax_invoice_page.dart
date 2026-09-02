@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import '../../../../app/theme/laoo_typography.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
@@ -9,6 +8,7 @@ import '../../../../app/theme/laoo_design_tokens.dart';
 import '../../../../app/theme/workspace_theme_presets.dart';
 import '../../../../core/company_setup/company_setup_controller.dart';
 import '../../../../core/navigation/navigation_menu_repository.dart';
+import '../../../../core/widgets/pinned_data_table.dart';
 import '../../../../core/widgets/timed_snack_bar.dart';
 import '../../../profile/data/user_profile_repository.dart';
 import '../../../support/presentation/widgets/support_workspace_shell.dart';
@@ -174,7 +174,13 @@ class _TaxInvoiceListPageState extends State<_TaxInvoiceListPage> {
           children: [
             Icon(Icons.delete_outline, color: LaooColors.error),
             SizedBox(width: 8),
-            Text('ยืนยันการลบข้อมูล', style: LaooTypography.screenCaptionStyle),
+            Text(
+              'ยืนยันการลบข้อมูล',
+              style: TextStyle(
+                color: LaooColors.error,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ],
         ),
         content: Column(
@@ -272,12 +278,12 @@ class _TaxInvoiceListPageState extends State<_TaxInvoiceListPage> {
   Widget _table(Color accent, double width) => _surface(
     child: SizedBox(
       width: width,
-      child: DataTable(
+      child: PinnedDataTable(
         headingRowColor: WidgetStatePropertyAll(accent.withValues(alpha: .10)),
         dividerThickness: .5,
         columnSpacing: 20,
         columns: const [
-          DataColumn(label: Text('ID')),
+          LaooTableColumns.id,
           DataColumn(label: Text('Action')),
           DataColumn(label: Text('เลขที่เอกสาร')),
           DataColumn(label: Text('วันที่')),
@@ -384,7 +390,7 @@ class _TaxInvoiceListPageState extends State<_TaxInvoiceListPage> {
                         child: WorkspacePageTitle(
                           title: _menuName,
                           favoriteKey: _activeMenu,
-                          titleColor: Colors.black,
+                          titleColor: LaooColors.textPrimary,
                         ),
                       ),
                       if (!compact) ...[
@@ -854,7 +860,10 @@ class _TaxInvoiceActionPageState extends State<_TaxInvoiceActionPage> {
           children: [
             Icon(Icons.delete_outline, color: LaooColors.error),
             SizedBox(width: 8),
-            Text('ยืนยันการลบข้อมูล', style: LaooTypography.screenCaptionStyle),
+            Text(
+              'ยืนยันการลบข้อมูล',
+              style: TextStyle(color: LaooColors.error),
+            ),
           ],
         ),
         content: Text(
@@ -1015,55 +1024,42 @@ class _TaxInvoiceActionPageState extends State<_TaxInvoiceActionPage> {
   );
 
   Widget _caption(Color accent, bool compact) => _surface(
-    Wrap(
-      alignment: WrapAlignment.spaceBetween,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      spacing: 8,
-      runSpacing: 8,
-      children: [
-        WorkspacePageTitle(
-          title: '$_menuName > ${_id == null ? 'เพิ่ม' : 'แก้ไข'}',
-          favoriteKey: _activeMenu,
-          titleColor: Colors.black,
+    WorkspaceActionHeader(
+      title: '$_menuName > ${_id == null ? 'เพิ่ม' : 'แก้ไข'}',
+      favoriteKey: _activeMenu,
+      actions: [
+        if (_status == 'DRAFT' && _id != null && _actions['edit'] == true)
+          FilledButton.icon(
+            onPressed: _issue,
+            style: _filledStyle(accent),
+            icon: const Icon(Icons.verified_outlined),
+            label: const Text('ออกใบกำกับภาษี'),
+          ),
+        if (_status == 'ISSUED' && _actions['edit'] == true)
+          OutlinedButton.icon(
+            onPressed: _voidDocument,
+            style: _outlinedStyle(accent),
+            icon: const Icon(Icons.cancel_outlined),
+            label: const Text('ยกเลิกเอกสาร'),
+          ),
+        OutlinedButton.icon(
+          onPressed: () => context.go('/company/tax-invoices'),
+          style: _outlinedStyle(accent),
+          icon: const Icon(Icons.close),
+          label: const Text('ยกเลิก'),
         ),
-        Wrap(
-          spacing: 4,
-          runSpacing: 4,
-          children: [
-            if (_status == 'DRAFT' && _id != null && _actions['edit'] == true)
-              FilledButton.icon(
-                onPressed: _issue,
-                style: _filledStyle(accent),
-                icon: const Icon(Icons.verified_outlined),
-                label: const Text('ออกใบกำกับภาษี'),
-              ),
-            if (_status == 'ISSUED' && _actions['edit'] == true)
-              OutlinedButton.icon(
-                onPressed: _voidDocument,
-                style: _outlinedStyle(accent),
-                icon: const Icon(Icons.cancel_outlined),
-                label: const Text('ยกเลิกเอกสาร'),
-              ),
-            OutlinedButton.icon(
-              onPressed: () => context.go('/company/tax-invoices'),
-              style: _outlinedStyle(accent),
-              icon: const Icon(Icons.close),
-              label: const Text('ยกเลิก'),
-            ),
-            FilledButton.icon(
-              onPressed:
-                  _editable &&
-                      !_saving &&
-                      (_id == null
-                          ? _actions['create'] == true
-                          : _actions['edit'] == true)
-                  ? _save
-                  : null,
-              style: _filledStyle(accent),
-              icon: const Icon(Icons.save_outlined),
-              label: const Text('บันทึก'),
-            ),
-          ],
+        FilledButton.icon(
+          onPressed:
+              _editable &&
+                  !_saving &&
+                  (_id == null
+                      ? _actions['create'] == true
+                      : _actions['edit'] == true)
+              ? _save
+              : null,
+          style: _filledStyle(accent),
+          icon: const Icon(Icons.save_outlined),
+          label: const Text('บันทึก'),
         ),
       ],
     ),
@@ -1326,13 +1322,13 @@ class _TaxInvoiceActionPageState extends State<_TaxInvoiceActionPage> {
         else
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
-            child: DataTable(
+            child: PinnedDataTable(
               headingRowColor: WidgetStatePropertyAll(
                 accent.withValues(alpha: .10),
               ),
               dividerThickness: .5,
               columns: const [
-                DataColumn(label: Text('ID')),
+                LaooTableColumns.id,
                 DataColumn(label: Text('Action')),
                 DataColumn(label: Text('รหัสสินค้า')),
                 DataColumn(label: Text('ชื่อสินค้า')),

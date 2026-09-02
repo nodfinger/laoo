@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../../../app/theme/workspace_theme_presets.dart';
-import '../../../../app/theme/laoo_typography.dart';
 import 'dart:typed_data';
 import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
@@ -10,6 +9,7 @@ import '../../../../core/company_setup/company_setup_controller.dart';
 import '../../../../core/company_setup/company_date_formatter.dart';
 import '../../../../core/widgets/auto_dismiss_message.dart';
 import '../../../../core/widgets/combo_box_text.dart';
+import '../../../../core/widgets/pinned_data_table.dart';
 import '../../presentation/widgets/support_workspace_shell.dart';
 import '../../organization/data/organization_repository.dart';
 import '../../../partner/data/partner_company_repository.dart';
@@ -65,6 +65,8 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
   bool showEmployeeImage = false;
   bool form = false;
   bool isActive = true;
+  bool notifyByEmail = false;
+  bool notifyInSystem = true;
   String? _alertMessage;
   bool _alertIsError = false;
   int sortColumn = 4;
@@ -125,8 +127,10 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
   final Map<int, Future<Uint8List?>> _listImageFutures = {};
   int _editRequestToken = 0;
 
-  List<(String, String, String, String, String, String, String)> rows = [];
-  List<(String, String, String, String, String, String, String)> allRows = [];
+  List<(String, String, String, String, String, String, String, String)> rows =
+      [];
+  List<(String, String, String, String, String, String, String, String)>
+  allRows = [];
   final Map<String, int> _employeeIdsByCode = {};
   int _currentPage = 1;
   int _totalCount = 0;
@@ -491,7 +495,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
                 child: Text(
                   'รูปพนักงาน',
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 14,
                     fontWeight: FontWeight.w700,
                     color: Colors.black,
                   ),
@@ -542,7 +546,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
       const SizedBox(height: 4),
       Text(
         'ไม่เกิน 100 KB ระบบลดขนาดให้อัตโนมัติ',
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 10),
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 14),
       ),
     ],
   );
@@ -619,6 +623,10 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
               _value(item['fullName']),
               _value(item['nickName']),
               _value(item['telephone']),
+              _notificationLabel(
+                _isActive(item['notifyByEmail']),
+                _isActive(item['notifyInSystem']),
+              ),
             ),
           )
           .toList();
@@ -677,6 +685,9 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
       ? value != 0
       : value?.toString().toLowerCase() == 'true';
 
+  static String _notificationLabel(bool email, bool system) =>
+      [if (email) 'Email', if (system) 'ระบบ'].join(', ');
+
   static String? _optionalText(TextEditingController controller) =>
       controller.text.trim().isEmpty ? null : controller.text.trim();
 
@@ -730,7 +741,8 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
             row.$4.toLowerCase().contains(query) ||
             row.$5.toLowerCase().contains(query) ||
             row.$6.toLowerCase().contains(query) ||
-            row.$7.toLowerCase().contains(query);
+            row.$7.toLowerCase().contains(query) ||
+            row.$8.toLowerCase().contains(query);
       }).toList();
     });
   }
@@ -926,10 +938,10 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
                       : 180,
                   child: TextField(
                     controller: searchController,
-                    style: const TextStyle(fontSize: 12),
+                    style: const TextStyle(fontSize: 14),
                     onSubmitted: (_) => _searchEmployees(),
                     decoration: InputDecoration(
-                      labelStyle: const TextStyle(fontSize: 12),
+                      labelStyle: const TextStyle(fontSize: 14),
                       prefixIcon: Icon(Icons.search),
                       labelText: 'ค้นหารหัส/ชื่อ/ชื่อเล่น/อีเมล',
                       suffixIcon: IconButton(
@@ -1178,14 +1190,14 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
 
   Widget _employeeTableStyle() {
     final primary = workspaceThemeController.value.primary;
-    const minTableWidth = 900.0;
+    const minTableWidth = 1080.0;
 
     return LayoutBuilder(
       builder: (context, constraints) {
         // Keep the employee list readable when the workspace is narrowed by
         // the navigation rail or a small browser window. The table has a
         // practical minimum width, so switch to cards before it can overflow.
-        if (_card || constraints.maxWidth < 1000) {
+        if (_card || constraints.maxWidth < 1100) {
           return _employeeMobileCards();
         }
         final tableWidth = constraints.maxWidth < minTableWidth
@@ -1196,6 +1208,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
         const tableRightPadding = 16.0;
         const actionWidth = 128.0;
         const phoneWidth = 140.0;
+        const notificationWidth = 150.0;
         const horizontalMargin = 16.0;
         const columnSpacing = 16.0;
         final remainingWidth =
@@ -1204,9 +1217,10 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
                 statusWidth +
                 actionWidth +
                 phoneWidth +
+                notificationWidth +
                 tableRightPadding) -
             (horizontalMargin * 2) -
-            (columnSpacing * 8);
+            (columnSpacing * 9);
         final departmentWidth = remainingWidth * 0.18;
         final employeeCodeWidth = remainingWidth * 0.18;
         final employeeNameWidth = remainingWidth * 0.34;
@@ -1236,7 +1250,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
               scrollDirection: Axis.horizontal,
               child: ConstrainedBox(
                 constraints: BoxConstraints(minWidth: tableWidth),
-                child: DataTable(
+                child: PinnedDataTable(
                   horizontalMargin: horizontalMargin,
                   columnSpacing: columnSpacing,
                   sortColumnIndex: sortColumn,
@@ -1252,7 +1266,10 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
                   dataRowMaxHeight: 48,
                   columns: [
                     DataColumn(
-                      label: headerText('ID', idWidth),
+                      columnWidth: const FixedColumnWidth(
+                        LaooTableColumns.idWidth,
+                      ),
+                      label: const Text('ID'),
                       onSort: (index, ascending) => _sortBy(index, ascending),
                     ),
                     DataColumn(
@@ -1279,6 +1296,10 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
                     ),
                     DataColumn(
                       label: headerText('โทรศัพท์', phoneWidth),
+                      onSort: (index, ascending) => _sortBy(index, ascending),
+                    ),
+                    DataColumn(
+                      label: headerText('รูปแบบแจ้งเตือน', notificationWidth),
                       onSort: (index, ascending) => _sortBy(index, ascending),
                     ),
                     DataColumn(
@@ -1381,6 +1402,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
                         ),
                         DataCell(cellText(row.$6, nicknameWidth)),
                         DataCell(cellText(row.$7, phoneWidth)),
+                        DataCell(cellText(row.$8, notificationWidth)),
                         DataCell(
                           Center(
                             child: Container(
@@ -1533,14 +1555,14 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
                         children: [
                           Expanded(
                             child: Text(
-                              row.$7,
+                              'แจ้งเตือน: ${row.$8}',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           Expanded(
                             child: Text(
-                              row.$7,
+                              row.$7.isEmpty ? '' : 'โทร: ${row.$7}',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               textAlign: TextAlign.right,
@@ -1559,7 +1581,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
                             color: Theme.of(
                               context,
                             ).colorScheme.onSurfaceVariant,
-                            fontSize: 12,
+                            fontSize: 14,
                           ),
                         ),
                       ),
@@ -1606,16 +1628,17 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
   }
 
   String _sortValue(
-    (String, String, String, String, String, String, String) row,
+    (String, String, String, String, String, String, String, String) row,
     int column,
   ) => switch (column) {
     0 => row.$1,
-    1 => row.$2,
-    3 => row.$3,
-    4 => row.$4,
-    5 => row.$5,
-    6 => row.$6,
-    7 => row.$7,
+    2 => row.$3,
+    3 => row.$4,
+    4 => row.$5,
+    5 => row.$6,
+    6 => row.$7,
+    7 => row.$8,
+    8 => row.$2,
     _ => '',
   };
 
@@ -1634,22 +1657,15 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
         ),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Row(
-            children: [
-              Expanded(
-                child: WorkspacePageTitle(
-                  title:
-                      'พนักงาน > ${editingEmployeeId == null ? 'เพิ่ม' : 'แก้ไข'}',
-                  favoriteKey: _menuKey,
-                  titleColor: Colors.black,
-                ),
-              ),
+          child: WorkspaceActionHeader(
+            title: 'พนักงาน > ${editingEmployeeId == null ? 'เพิ่ม' : 'แก้ไข'}',
+            favoriteKey: _menuKey,
+            actions: [
               OutlinedButton.icon(
                 onPressed: () => setState(() => form = false),
                 icon: const Icon(Icons.close),
                 label: const Text('ยกเลิก'),
               ),
-              const SizedBox(width: 8),
               if ((editingEmployeeId == null && _canCreate) ||
                   (editingEmployeeId != null && _canEdit))
                 FilledButton.icon(
@@ -1832,6 +1848,8 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
                                 ],
                               ),
                               const SizedBox(height: 12),
+                              _notificationChannelField(),
+                              const SizedBox(height: 12),
                               Text(
                                 'User Login',
                                 style: TextStyle(
@@ -1869,14 +1887,14 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
                                     child: DropdownButtonFormField<int>(
                                       initialValue: _selectedRoleGroupId,
                                       style: TextStyle(
-                                        fontSize: 13,
+                                        fontSize: 14,
                                         color: Theme.of(
                                           context,
                                         ).colorScheme.onSurface,
                                       ),
                                       decoration: const InputDecoration(
                                         labelText: 'กลุ่มสิทธิ์ *',
-                                        labelStyle: TextStyle(fontSize: 13),
+                                        labelStyle: TextStyle(fontSize: 14),
                                       ),
                                       items: _roleGroups
                                           .map(
@@ -1885,7 +1903,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
                                               child: Text(
                                                 group.name,
                                                 style: const TextStyle(
-                                                  fontSize: 13,
+                                                  fontSize: 14,
                                                 ),
                                               ),
                                             ),
@@ -1970,6 +1988,54 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
       obscureText: obscureText,
       onTap: onTap,
       decoration: InputDecoration(labelText: label),
+    ),
+  );
+
+  Widget _notificationChannelField() => InputDecorator(
+    decoration: const InputDecoration(labelText: 'รูปแบบแจ้งเตือน *'),
+    child: Wrap(
+      spacing: 20,
+      runSpacing: 4,
+      children: [
+        _notificationOption(
+          icon: Icons.email_outlined,
+          label: 'Email',
+          value: notifyByEmail,
+          onChanged: (value) => setState(() => notifyByEmail = value),
+        ),
+        _notificationOption(
+          icon: Icons.notifications_active_outlined,
+          label: 'ระบบ',
+          value: notifyInSystem,
+          onChanged: (value) => setState(() => notifyInSystem = value),
+        ),
+      ],
+    ),
+  );
+
+  Widget _notificationOption({
+    required IconData icon,
+    required String label,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) => InkWell(
+    borderRadius: BorderRadius.circular(8),
+    onTap: () => onChanged(!value),
+    child: Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Checkbox(
+            value: value,
+            onChanged: (selected) => onChanged(selected ?? false),
+            visualDensity: VisualDensity.compact,
+          ),
+          Icon(icon, size: 20),
+          const SizedBox(width: 6),
+          Text(label),
+        ],
+      ),
     ),
   );
 
@@ -2206,6 +2272,24 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
   Future<void> _saveEmployee() async {
     final wasEditing = editingEmployeeId != null;
     final email = emailController.text.trim();
+    if (!notifyByEmail && !notifyInSystem) {
+      if (mounted) {
+        setState(() {
+          _alertMessage = 'กรุณาเลือกรูปแบบแจ้งเตือนอย่างน้อย 1 รูปแบบ';
+          _alertIsError = true;
+        });
+      }
+      return;
+    }
+    if (notifyByEmail && email.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _alertMessage = 'กรุณาระบุ Email เมื่อเลือกรับการแจ้งเตือนทาง Email';
+          _alertIsError = true;
+        });
+      }
+      return;
+    }
     if (email.isNotEmpty && !_isValidEmail(email)) {
       if (mounted) {
         setState(() {
@@ -2270,6 +2354,8 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
           ? null
           : positionController.text.trim(),
       'email': email.isEmpty ? null : email,
+      'notifyByEmail': notifyByEmail,
+      'notifyInSystem': notifyInSystem,
       'telephone': telephoneController.text.trim().isEmpty
           ? null
           : telephoneController.text.trim(),
@@ -2396,6 +2482,8 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
       selectedDivisionId = null;
       selectedDepartmentId = null;
       isActive = true;
+      notifyByEmail = false;
+      notifyInSystem = true;
       if (mounted) {
         setState(() => _selectedRoleGroupId = null);
       }
@@ -2446,6 +2534,8 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
       selectedDivisionId = null;
       selectedDepartmentId = null;
       isActive = true;
+      notifyByEmail = false;
+      notifyInSystem = true;
       _alertMessage = null;
       form = true;
     });
@@ -2516,6 +2606,8 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
       selectedDivisionId = item['divisionOrgUnitId'] as int?;
       selectedDepartmentId = item['departmentOrgUnitId'] as int?;
       isActive = item['isActive'] == true;
+      notifyByEmail = _isActive(item['notifyByEmail']);
+      notifyInSystem = _isActive(item['notifyInSystem']);
       final rawDate = item['startWorkDate'];
       startDate = rawDate is String ? DateTime.tryParse(rawDate) : null;
       form = true;
@@ -2664,7 +2756,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
                       DropdownButtonFormField<int>(
                         initialValue: selectedRoleGroupId,
                         style: TextStyle(
-                          fontSize: 13,
+                          fontSize: 14,
                           color: preset.textPrimary,
                         ),
                         decoration: const InputDecoration(
@@ -2678,7 +2770,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
                                 value: group.id,
                                 child: Text(
                                   group.name,
-                                  style: const TextStyle(fontSize: 13),
+                                  style: const TextStyle(fontSize: 14),
                                 ),
                               ),
                             )
@@ -2828,7 +2920,11 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
             Expanded(
               child: Text(
                 'ยืนยันการลบข้อมูล',
-                style: LaooTypography.screenCaptionStyle,
+                style: TextStyle(
+                  color: accent,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
           ],

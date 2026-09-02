@@ -11,9 +11,8 @@ class CompanyContextItem {
 
   factory CompanyContextItem.fromJson(Map<String, dynamic> json) {
     return CompanyContextItem(
-      companyId: int.tryParse(
-            (json['companyID'] ?? json['companyId']).toString(),
-          ) ??
+      companyId:
+          int.tryParse((json['companyID'] ?? json['companyId']).toString()) ??
           0,
       companyCode: json['companyCode']?.toString() ?? '',
       companyName: json['companyName']?.toString() ?? '',

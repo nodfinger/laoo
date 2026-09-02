@@ -173,18 +173,12 @@ class _PartnerFormPageState extends State<PartnerFormPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: WorkspacePageTitle(
-                          title: widget.isCreate
-                              ? 'Partner > เพิ่ม'
-                              : 'Partner > แก้ไข',
-                          favoriteKey: 'Partner',
-                        ),
-                      ),
-                      _actionButtons(),
-                    ],
+                  WorkspaceActionHeader(
+                    title: widget.isCreate
+                        ? 'Partner > เพิ่ม'
+                        : 'Partner > แก้ไข',
+                    favoriteKey: 'Partner',
+                    actions: [_actionButtons()],
                   ),
                   const SizedBox(height: 16),
                   if (_message != null) ...[

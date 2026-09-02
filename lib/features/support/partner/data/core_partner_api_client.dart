@@ -21,9 +21,9 @@ class CorePartnerApiClient implements PartnerApiClient {
   Future<dynamic> put(String path, {Object? body}) {
     return _apiClient.put(path, body: body);
   }
+
   @override
   Future<dynamic> delete(String path, {Object? body}) {
     return _apiClient.delete(path, body: body);
   }
-
 }

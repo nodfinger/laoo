@@ -24,8 +24,8 @@ class CustomerFileApi {
     );
   }
 
-  Future<List<int>> downloadBytes(int customerId, int fileId) =>
-      _client.getBytes('/api/company/customers/$customerId/files/$fileId/download');
+  Future<List<int>> downloadBytes(int customerId, int fileId) => _client
+      .getBytes('/api/company/customers/$customerId/files/$fileId/download');
 
   Future<void> delete(int customerId, int fileId) async =>
       _client.delete('/api/company/customers/$customerId/files/$fileId');
@@ -34,10 +34,10 @@ class CustomerFileApi {
     int customerId,
     int fileId,
     String? description,
-  ) async =>
-      _client.put('/api/company/customers/$customerId/files/$fileId', body: {
-        'description': description ?? '',
-      });
+  ) async => _client.put(
+    '/api/company/customers/$customerId/files/$fileId',
+    body: {'description': description ?? ''},
+  );
 
   void dispose() => _client.dispose();
 }

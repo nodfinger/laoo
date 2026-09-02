@@ -40,3 +40,23 @@ public sealed class PartnerCompanyAdminUpsertRequest
     public string Username { get; init; } = string.Empty;
     public string Password { get; init; } = string.Empty;
 }
+
+public sealed class PartnerCompanyFeatureResponse
+{
+    public string FeatureCode { get; init; } = string.Empty;
+    public string FeatureName { get; init; } = string.Empty;
+    public string? FeatureDescription { get; init; }
+    public bool IsEnabled { get; init; }
+    public int SortOrder { get; init; }
+}
+
+public sealed class PartnerCompanyFeatureUpdateRequest
+{
+    public List<PartnerCompanyFeatureUpdateItem> Features { get; init; } = [];
+}
+
+public sealed class PartnerCompanyFeatureUpdateItem
+{
+    public string FeatureCode { get; init; } = string.Empty;
+    public bool IsEnabled { get; init; }
+}

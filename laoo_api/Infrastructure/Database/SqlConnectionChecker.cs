@@ -1,6 +1,6 @@
 using Microsoft.Data.SqlClient;
 
-namespace Laoo.Api.Infrastructure.Database;
+namespace Laoo.Service.Api.Infrastructure.Database;
 
 public sealed class SqlConnectionChecker(
     IConfiguration configuration,

@@ -1,13 +1,13 @@
 using System.Data;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using Laoo.Api.Models.Auth;
+using Laoo.Service.Api.Models.Auth;
 using LaooApi.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 
-namespace Laoo.Api.Controllers;
+namespace Laoo.Service.Api.Controllers;
 
 [ApiController]
 [Route("api/auth")]

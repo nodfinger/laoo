@@ -9,12 +9,12 @@ class LaooComboBoxText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Text(
-        value,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(
-          fontSize: LaooTypography.comboBox,
-          height: LaooTypography.inputLineHeight,
-        ),
-      );
+    value,
+    maxLines: 1,
+    overflow: TextOverflow.ellipsis,
+    style: const TextStyle(
+      fontSize: LaooTypography.comboBox,
+      height: LaooTypography.inputLineHeight,
+    ),
+  );
 }

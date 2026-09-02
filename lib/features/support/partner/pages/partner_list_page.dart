@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/widgets/auto_dismiss_message.dart';
 import '../../../../core/widgets/combo_box_text.dart';
+import '../../../../core/widgets/pinned_data_table.dart';
 
 import '../../../../app/theme/laoo_design_tokens.dart';
 import '../../presentation/widgets/support_workspace_shell.dart';
@@ -369,7 +370,7 @@ class _PartnerListPageState extends State<PartnerListPage> {
                 child: SizedBox(
                   width: tableWidth,
                   child: SingleChildScrollView(
-                    child: DataTable(
+                    child: PinnedDataTable(
                       horizontalMargin: horizontalMargin,
                       columnSpacing: columnSpacing,
                       sortColumnIndex: _sortColumnIndex,
@@ -751,7 +752,7 @@ class _PartnerListPageState extends State<PartnerListPage> {
                             color: Theme.of(
                               dialogContext,
                             ).colorScheme.onSurface,
-                            fontSize: 12,
+                            fontSize: 14,
                             height: 1.45,
                           ),
                           children: [
@@ -780,7 +781,7 @@ class _PartnerListPageState extends State<PartnerListPage> {
                       'ข้อมูลที่ลบแล้วไม่สามารถเรียกคืนจากหน้าจอนี้ได้',
                       style: TextStyle(
                         color: LaooColors.textSecondary,
-                        fontSize: 11,
+                        fontSize: 14,
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -792,7 +793,7 @@ class _PartnerListPageState extends State<PartnerListPage> {
                               Navigator.of(dialogContext).pop(false),
                           child: const Text(
                             'ยกเลิก',
-                            style: TextStyle(fontSize: 12),
+                            style: TextStyle(fontSize: 14),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -813,7 +814,7 @@ class _PartnerListPageState extends State<PartnerListPage> {
                           ),
                           label: const Text(
                             'ลบ',
-                            style: TextStyle(fontSize: 12),
+                            style: TextStyle(fontSize: 14),
                           ),
                         ),
                       ],
@@ -971,7 +972,7 @@ class _Toolbar extends StatelessWidget {
             onSubmitted: (_) => onSearch(),
             decoration: InputDecoration(
               hintText: 'ค้นหา Partner...',
-              hintStyle: const TextStyle(fontSize: 11),
+              hintStyle: const TextStyle(fontSize: 14),
               prefixIcon: const Icon(Icons.search_rounded),
               suffixIcon: IconButton(
                 tooltip: 'ค้นหา',
@@ -1038,7 +1039,7 @@ class _StatusChip extends StatelessWidget {
         active ? 'เปิดใช้งาน' : 'ระงับใช้งาน',
         style: TextStyle(
           color: color,
-          fontSize: 12,
+          fontSize: 14,
           fontWeight: FontWeight.w800,
         ),
       ),
@@ -1168,7 +1169,7 @@ class _PartnerAdminDialogState extends State<_PartnerAdminDialog> {
                     alignment: Alignment.centerLeft,
                     child: Text(
                       'Password ใหม่ต้องมีอย่างน้อย 6 ตัวอักษร พร้อมตัวพิมพ์ใหญ่ ตัวพิมพ์เล็ก และอักขระพิเศษ',
-                      style: TextStyle(fontSize: 12),
+                      style: TextStyle(fontSize: 14),
                     ),
                   ),
                   if (_error != null) ...[

@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import '../../../../app/theme/laoo_typography.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
@@ -10,6 +9,7 @@ import '../../../../app/theme/workspace_theme_presets.dart';
 import '../../../../core/auth/app_auth_controller.dart';
 import '../../../../core/company_setup/company_setup_controller.dart';
 import '../../../../core/navigation/navigation_menu_repository.dart';
+import '../../../../core/widgets/pinned_data_table.dart';
 import '../../../../core/widgets/timed_snack_bar.dart';
 import '../../../profile/data/user_profile_repository.dart';
 import '../../../support/presentation/widgets/support_workspace_shell.dart';
@@ -250,7 +250,13 @@ class _DeliveryNoteListPageState extends State<_DeliveryNoteListPage> {
           children: [
             Icon(Icons.delete_outline, color: LaooColors.error),
             SizedBox(width: 8),
-            Text('ยืนยันการลบข้อมูล', style: LaooTypography.screenCaptionStyle),
+            Text(
+              'ยืนยันการลบข้อมูล',
+              style: TextStyle(
+                color: LaooColors.error,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ],
         ),
         content: Column(
@@ -357,14 +363,14 @@ class _DeliveryNoteListPageState extends State<_DeliveryNoteListPage> {
   Widget _table(Color accent, double width) => _surface(
     child: SizedBox(
       width: width,
-      child: DataTable(
+      child: PinnedDataTable(
         headingRowColor: WidgetStatePropertyAll(accent.withValues(alpha: .10)),
         headingTextStyle: const TextStyle(color: Colors.black),
         dataTextStyle: const TextStyle(color: Colors.black),
         dividerThickness: .5,
         columnSpacing: 22,
         columns: const [
-          DataColumn(label: Text('ID')),
+          LaooTableColumns.id,
           DataColumn(label: Text('Action')),
           DataColumn(label: Text('เลขที่เอกสาร')),
           DataColumn(label: Text('วันที่')),
@@ -475,7 +481,7 @@ class _DeliveryNoteListPageState extends State<_DeliveryNoteListPage> {
                               child: WorkspacePageTitle(
                                 title: _menuName,
                                 favoriteKey: _activeMenu,
-                                titleColor: Colors.black,
+                                titleColor: LaooColors.textPrimary,
                               ),
                             ),
                             if (!compact) ...[
@@ -878,7 +884,10 @@ class _DeliveryNoteActionPageState extends State<DeliveryNoteActionPage> {
           children: [
             Icon(Icons.delete_outline, color: LaooColors.error),
             SizedBox(width: 8),
-            Text('ยืนยันการลบข้อมูล', style: LaooTypography.screenCaptionStyle),
+            Text(
+              'ยืนยันการลบข้อมูล',
+              style: TextStyle(color: LaooColors.error),
+            ),
           ],
         ),
         content: Text(
@@ -1070,102 +1079,81 @@ class _DeliveryNoteActionPageState extends State<DeliveryNoteActionPage> {
                       padding: const EdgeInsets.all(16),
                       children: [
                         _surface(
-                          child: Wrap(
-                            alignment: WrapAlignment.spaceBetween,
-                            crossAxisAlignment: WrapCrossAlignment.center,
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: [
-                              WorkspacePageTitle(
-                                title:
-                                    '$_menuName > ${_id == null ? 'เพิ่ม' : 'แก้ไข'}',
-                                favoriteKey: _activeMenu,
-                                titleColor: Colors.black,
+                          child: WorkspaceActionHeader(
+                            title:
+                                '$_menuName > ${_id == null ? 'เพิ่ม' : 'แก้ไข'}',
+                            favoriteKey: _activeMenu,
+                            actions: [
+                              OutlinedButton.icon(
+                                onPressed: _exportingPdf
+                                    ? null
+                                    : _exportReceiptPdf,
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: accent,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                ),
+                                icon: _exportingPdf
+                                    ? const SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Icon(Icons.picture_as_pdf_outlined),
+                                label: const Text('ส่งออก PDF'),
                               ),
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                children: [
-                                  OutlinedButton.icon(
-                                    onPressed: _exportingPdf
-                                        ? null
-                                        : _exportReceiptPdf,
-                                    style: OutlinedButton.styleFrom(
-                                      foregroundColor: accent,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                    ),
-                                    icon: _exportingPdf
-                                        ? const SizedBox(
-                                            width: 18,
-                                            height: 18,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                            ),
-                                          )
-                                        : const Icon(
-                                            Icons.picture_as_pdf_outlined,
-                                          ),
-                                    label: const Text('ส่งออก PDF'),
-                                  ),
-                                  if (_status == 'DRAFT' && _id != null)
-                                    FilledButton.icon(
-                                      onPressed: _actions['edit'] == true
-                                          ? _confirm
-                                          : null,
-                                      style: FilledButton.styleFrom(
-                                        backgroundColor: accent,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            4,
-                                          ),
-                                        ),
-                                      ),
-                                      icon: const Icon(Icons.check),
-                                      label: const Text('ยืนยันตัดสต๊อก'),
-                                    ),
-                                  if (_status == 'CONFIRMED')
-                                    FilledButton.icon(
-                                      onPressed: _actions['edit'] == true
-                                          ? _void
-                                          : null,
-                                      style: FilledButton.styleFrom(
-                                        backgroundColor: LaooColors.error,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            4,
-                                          ),
-                                        ),
-                                      ),
-                                      icon: const Icon(Icons.undo),
-                                      label: const Text('ยกเลิก/คืนสต๊อก'),
-                                    ),
-                                  OutlinedButton.icon(
-                                    onPressed: () =>
-                                        context.go('/company/delivery-notes'),
-                                    icon: const Icon(Icons.close),
-                                    label: const Text('ยกเลิก'),
-                                    style: OutlinedButton.styleFrom(
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
+                              if (_status == 'DRAFT' && _id != null)
+                                FilledButton.icon(
+                                  onPressed: _actions['edit'] == true
+                                      ? _confirm
+                                      : null,
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: accent,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(4),
                                     ),
                                   ),
-                                  FilledButton.icon(
-                                    onPressed: _editable && !_saving
-                                        ? _save
-                                        : null,
-                                    style: FilledButton.styleFrom(
-                                      backgroundColor: accent,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
+                                  icon: const Icon(Icons.check),
+                                  label: const Text('ยืนยันตัดสต๊อก'),
+                                ),
+                              if (_status == 'CONFIRMED')
+                                FilledButton.icon(
+                                  onPressed: _actions['edit'] == true
+                                      ? _void
+                                      : null,
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: LaooColors.error,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(4),
                                     ),
-                                    icon: const Icon(Icons.save_outlined),
-                                    label: const Text('บันทึก'),
                                   ),
-                                ],
+                                  icon: const Icon(Icons.undo),
+                                  label: const Text('ยกเลิก/คืนสต๊อก'),
+                                ),
+                              OutlinedButton.icon(
+                                onPressed: () =>
+                                    context.go('/company/delivery-notes'),
+                                icon: const Icon(Icons.close),
+                                label: const Text('ยกเลิก'),
+                                style: OutlinedButton.styleFrom(
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                ),
+                              ),
+                              FilledButton.icon(
+                                onPressed: _editable && !_saving ? _save : null,
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: accent,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                ),
+                                icon: const Icon(Icons.save_outlined),
+                                label: const Text('บันทึก'),
                               ),
                             ],
                           ),
@@ -1384,13 +1372,13 @@ class _DeliveryNoteActionPageState extends State<DeliveryNoteActionPage> {
                               else
                                 SingleChildScrollView(
                                   scrollDirection: Axis.horizontal,
-                                  child: DataTable(
+                                  child: PinnedDataTable(
                                     headingRowColor: WidgetStatePropertyAll(
                                       accent.withValues(alpha: .10),
                                     ),
                                     dividerThickness: .5,
                                     columns: const [
-                                      DataColumn(label: Text('ID')),
+                                      LaooTableColumns.id,
                                       DataColumn(label: Text('Action')),
                                       DataColumn(label: Text('รหัสสินค้า')),
                                       DataColumn(label: Text('ชื่อสินค้า')),
@@ -1587,7 +1575,7 @@ class _LineDialogState extends State<_LineDialog> {
         children: [
           Icon(Icons.inventory_2_outlined),
           SizedBox(width: 8),
-          Text('รายการสินค้า', style: LaooTypography.screenCaptionStyle),
+          Text('รายการสินค้า', style: TextStyle(color: LaooColors.textPrimary)),
         ],
       ),
       content: SizedBox(

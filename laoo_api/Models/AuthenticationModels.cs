@@ -1,4 +1,4 @@
-namespace Laoo.Api.Models;
+namespace Laoo.Service.Api.Models;
 
 public sealed record LoginRequest(
     string Username,

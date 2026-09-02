@@ -8,12 +8,14 @@ import '../../../app/theme/laoo_typography.dart';
 import '../../../app/theme/workspace_theme_presets.dart';
 import '../../../core/company_setup/company_setup_controller.dart';
 import '../../../core/navigation/navigation_menu_repository.dart';
+import '../../../core/widgets/pinned_data_table.dart';
 import '../../support/presentation/widgets/support_workspace_shell.dart';
 import '../../support/partner/data/api_partner_repository.dart';
 import '../../support/partner/data/core_partner_api_client.dart';
 import '../../support/partner/models/partner.dart';
 import '../data/partner_company_repository.dart';
 import '../models/partner_company.dart';
+import 'partner_company_modules_page.dart';
 
 /// Shared user-service company screen. The API applies the caller's data scope:
 /// Support sees all records, Partner sees records belonging to that partner.
@@ -152,16 +154,11 @@ class _PartnerCompanyFormPageState extends State<_PartnerCompanyFormPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: WorkspacePageTitle(
-                          title:
-                              '${widget.menuName} > ${editing ? 'แก้ไข' : 'เพิ่ม'}',
-                          favoriteKey: 'company',
-                        ),
-                      ),
-                      const SizedBox(width: 16),
+                  WorkspaceActionHeader(
+                    title:
+                        '${widget.menuName} > ${editing ? 'แก้ไข' : 'เพิ่ม'}',
+                    favoriteKey: 'company',
+                    actions: [
                       OutlinedButton.icon(
                         onPressed: _saving
                             ? null
@@ -169,7 +166,6 @@ class _PartnerCompanyFormPageState extends State<_PartnerCompanyFormPage> {
                         icon: const Icon(Icons.close),
                         label: const Text('ยกเลิก'),
                       ),
-                      const SizedBox(width: 10),
                       FilledButton.icon(
                         onPressed: _saving ? null : _save,
                         icon: _saving
@@ -498,6 +494,18 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
     }
   }
 
+  Future<void> _openModules(PartnerCompany company) async {
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) =>
+            PartnerCompanyModulesPage(company: company, menuName: _menuName),
+      ),
+    );
+    if (saved == true && mounted) {
+      setState(() => _message = 'บันทึกระบบที่เปิดใช้สำเร็จ');
+    }
+  }
+
   Future<void> _confirmDelete(PartnerCompany item) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -524,7 +532,11 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
             Expanded(
               child: RichText(
                 text: const TextSpan(
-                  style: LaooTypography.screenCaptionStyle,
+                  style: TextStyle(
+                    fontFamily: LaooTypography.fontFamily,
+                    fontSize: LaooTypography.sectionTitle,
+                    color: Colors.red,
+                  ),
                   children: [
                     TextSpan(text: 'ยืนยันการลบ '),
                     TextSpan(
@@ -800,7 +812,7 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
                 child: ConstrainedBox(
                   constraints: BoxConstraints(minWidth: constraints.maxWidth),
                   child: SingleChildScrollView(
-                    child: DataTable(
+                    child: PinnedDataTable(
                       border: TableBorder(
                         top: BorderSide(
                           color: Theme.of(context).dividerColor,
@@ -830,12 +842,7 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
                         fontWeight: FontWeight.w700,
                       ),
                       columns: [
-                        const DataColumn(
-                          label: SizedBox(
-                            width: 28,
-                            child: Center(child: Text('ID')),
-                          ),
-                        ),
+                        LaooTableColumns.id,
                         DataColumn(
                           label: SizedBox(
                             width: 82,
@@ -895,11 +902,28 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
                                 ),
                                 DataCell(
                                   SizedBox(
-                                    width: 120,
+                                    width: 160,
                                     child: Center(
                                       child: Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
+                                          if (widget.menuScope !=
+                                                  WorkspaceMenuScope.support &&
+                                              _canEdit)
+                                            IconButton(
+                                              tooltip: 'ระบบที่เปิดใช้',
+                                              visualDensity:
+                                                  VisualDensity.compact,
+                                              onPressed: () =>
+                                                  _openModules(item),
+                                              icon: Icon(
+                                                Icons.apps_outlined,
+                                                size: 18,
+                                                color: Theme.of(
+                                                  context,
+                                                ).colorScheme.primary,
+                                              ),
+                                            ),
                                           if (widget.menuScope !=
                                                   WorkspaceMenuScope.support &&
                                               _canEdit)
@@ -992,7 +1016,7 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
                                                     context,
                                                   ).colorScheme.primary,
                                                   fontWeight: FontWeight.w700,
-                                                  fontSize: 12,
+                                                  fontSize: 14,
                                                 ),
                                               ),
                                             ],
@@ -1092,6 +1116,14 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
               children: [
                 Row(
                   children: [
+                    if (widget.menuScope != WorkspaceMenuScope.support &&
+                        _canEdit)
+                      IconButton(
+                        tooltip: 'ระบบที่เปิดใช้',
+                        visualDensity: VisualDensity.compact,
+                        onPressed: () => _openModules(item),
+                        icon: Icon(Icons.apps_outlined, color: primary),
+                      ),
                     if (widget.menuScope != WorkspaceMenuScope.support &&
                         _canEdit)
                       IconButton(
@@ -1233,7 +1265,11 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
                 ),
                 child: Text(
                   'กำหนดผู้ดูแลระบบ - ${item.companyNameTh}',
-                  style: LaooTypography.screenCaptionStyle,
+                  style: TextStyle(
+                    color: primary,
+                    fontSize: LaooTypography.sectionTitle,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
               content: Stack(

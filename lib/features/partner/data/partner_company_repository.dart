@@ -79,4 +79,30 @@ class PartnerCompanyRepository {
       body: {'username': username, 'password': password},
     );
   }
+
+  Future<List<PartnerCompanyFeature>> getCompanyFeatures(int companyId) async {
+    final data = await _api.get('/api/partner/companies/$companyId/features');
+    return (data as List<dynamic>)
+        .map(
+          (item) =>
+              PartnerCompanyFeature.fromJson(item as Map<String, dynamic>),
+        )
+        .toList();
+  }
+
+  Future<void> updateCompanyFeatures(
+    int companyId,
+    Map<String, bool> features,
+  ) async {
+    await _api.put(
+      '/api/partner/companies/$companyId/features',
+      body: {
+        'features': features.entries
+            .map(
+              (entry) => {'featureCode': entry.key, 'isEnabled': entry.value},
+            )
+            .toList(),
+      },
+    );
+  }
 }

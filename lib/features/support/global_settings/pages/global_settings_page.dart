@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../../../app/theme/laoo_typography.dart';
 
 import '../../../../app/theme/workspace_theme_presets.dart';
 import '../../../../core/widgets/timed_snack_bar.dart';
@@ -102,7 +101,11 @@ class _GlobalSettingsPageState extends State<GlobalSettingsPage> {
                     Expanded(
                       child: Text(
                         'กำหนดค่าส่วนกลาง',
-                        style: LaooTypography.screenCaptionStyle,
+                        style: TextStyle(
+                          color: accent,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                     FilledButton(

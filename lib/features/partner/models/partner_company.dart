@@ -71,3 +71,28 @@ class PartnerCompanyInput {
     'adminPassword': adminPassword,
   };
 }
+
+class PartnerCompanyFeature {
+  const PartnerCompanyFeature({
+    required this.featureCode,
+    required this.featureName,
+    required this.isEnabled,
+    required this.sortOrder,
+    this.featureDescription,
+  });
+
+  final String featureCode;
+  final String featureName;
+  final String? featureDescription;
+  final bool isEnabled;
+  final int sortOrder;
+
+  factory PartnerCompanyFeature.fromJson(Map<String, dynamic> json) =>
+      PartnerCompanyFeature(
+        featureCode: json['featureCode'] as String,
+        featureName: json['featureName'] as String,
+        featureDescription: json['featureDescription'] as String?,
+        isEnabled: json['isEnabled'] as bool? ?? false,
+        sortOrder: (json['sortOrder'] as num?)?.toInt() ?? 0,
+      );
+}

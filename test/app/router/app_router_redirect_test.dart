@@ -172,16 +172,16 @@ void main() {
     test('allows a direct menu URL only with VIEW permission by MenuCode', () {
       expect(
         redirect(
-          path: RoutePaths.branch,
+          path: RoutePaths.technicalInfo,
           isAuthenticated: true,
           isLaooSupport: true,
-          allowedMenuCodes: const {'01003'},
+          allowedMenuCodes: const {'01004'},
         ),
         isNull,
       );
       expect(
         redirect(
-          path: RoutePaths.branch,
+          path: RoutePaths.technicalInfo,
           isAuthenticated: true,
           isLaooSupport: true,
           allowedMenuCodes: const {'01001', '01002'},

@@ -20,6 +20,7 @@ class LoginRequest {
 
 class LoginUser {
   const LoginUser({
+    required this.userType,
     required this.loginMode,
     required this.projectId,
     required this.projectCode,
@@ -28,13 +29,18 @@ class LoginUser {
     required this.canLoginAsUser,
     required this.showSupportBanner,
     this.laooUserId,
+    this.partnerUserId,
+    this.partnerId,
     this.userId,
     this.companyId,
     this.branchId,
   });
 
+  final String userType;
   final String loginMode;
   final int? laooUserId;
+  final int? partnerUserId;
+  final int? partnerId;
   final int? userId;
   final int? companyId;
   final int? branchId;
@@ -47,8 +53,11 @@ class LoginUser {
 
   factory LoginUser.fromJson(Map<String, dynamic> json) {
     return LoginUser(
+      userType: json['userType'] as String? ?? '',
       loginMode: json['loginMode'] as String? ?? '',
       laooUserId: _toNullableInt(json['laooUserId']),
+      partnerUserId: _toNullableInt(json['partnerUserId']),
+      partnerId: _toNullableInt(json['partnerId']),
       userId: _toNullableInt(json['userId']),
       companyId: _toNullableInt(json['companyId']),
       branchId: _toNullableInt(json['branchId']),
@@ -63,8 +72,11 @@ class LoginUser {
 
   Map<String, dynamic> toJson() {
     return {
+      'userType': userType,
       'loginMode': loginMode,
       'laooUserId': laooUserId,
+      'partnerUserId': partnerUserId,
+      'partnerId': partnerId,
       'userId': userId,
       'companyId': companyId,
       'branchId': branchId,

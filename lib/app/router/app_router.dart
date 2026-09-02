@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/auth/app_auth_controller.dart';
@@ -9,7 +10,6 @@ import '../../features/landing/presentation/pages/landing_page.dart';
 import '../../features/home/presentation/pages/authenticated_home_page.dart';
 import '../../features/support/partner/pages/partner_module_page.dart';
 import '../../features/partner/pages/partner_company_page.dart';
-import '../../features/partner/pages/partner_company_feature_page.dart';
 import '../../features/partner/pages/partner_company_user_page.dart';
 import '../../features/support/company_setup/pages/company_setup_page.dart';
 import '../../features/support/presentation/pages/support_home_page.dart';
@@ -31,6 +31,15 @@ import '../../features/support/partner_user/pages/partner_user_page.dart';
 import '../../features/access/role_group/pages/role_group_page.dart';
 import '../../features/access/menu_permission/pages/menu_permission_page.dart';
 import '../../features/access/sub_permission/pages/sub_permission_page.dart';
+import '../../features/meeting/pages/meeting_building_page.dart';
+import '../../features/meeting/pages/meeting_facility_page.dart';
+import '../../features/meeting/pages/meeting_food_page.dart';
+import '../../features/meeting/pages/meeting_food_plan_page.dart';
+import '../../features/meeting/pages/meeting_invitation_page.dart';
+import '../../features/meeting/pages/meeting_room_approval_page.dart';
+import '../../features/meeting/pages/meeting_room_booking_page.dart';
+import '../../features/meeting/pages/meeting_room_page.dart';
+import '../../features/support/organization/pages/organization_supervisor_page.dart';
 import 'app_menu_route_registry.dart';
 import 'route_names.dart';
 import 'route_paths.dart';
@@ -190,11 +199,6 @@ final GoRouter appRouter = GoRouter(
           const PartnerCompanyPage(menuScope: WorkspaceMenuScope.partner),
     ),
     GoRoute(
-      path: RoutePaths.partnerCompanyFeatures,
-      name: RouteNames.partnerCompanyFeatures,
-      builder: (context, state) => const PartnerCompanyFeaturePage(),
-    ),
-    GoRoute(
       path: RoutePaths.partnerBranches,
       name: RouteNames.partnerBranches,
       builder: (context, state) =>
@@ -216,6 +220,7 @@ final GoRouter appRouter = GoRouter(
       builder: (context, state) => const PartnerModulePage(),
     ),
     ..._placeholderRoutes,
+    ..._meetingRoutes,
     GoRoute(
       path: RoutePaths.companySetup,
       name: RouteNames.companySetup,
@@ -355,6 +360,7 @@ String _navigationSessionKey(AuthSession session) => <Object?>[
   session.projectId,
   session.userType,
   session.laooUserId,
+  session.partnerUserId,
   session.userId,
   session.partnerId,
   session.companyId,
@@ -512,13 +518,242 @@ final List<GoRoute> _placeholderRoutes = [
     builder: (context, state) => const OrganizationStructurePage(),
   ),
   _scopePlaceholder(
-    RoutePaths.salesManagement,
-    RouteNames.salesManagement,
-    'บริหารงานขาย',
+    RoutePaths.assetLocations,
+    RouteNames.assetLocations,
+    'ผังสถานที่และห้องพัก',
     WorkspaceMenuScope.company,
-    'salesManagement',
+    'assetLocations',
+  ),
+  _scopePlaceholder(
+    RoutePaths.assetItems,
+    RouteNames.assetItems,
+    'ทะเบียนอุปกรณ์และ QR Code',
+    WorkspaceMenuScope.company,
+    'assetItems',
+  ),
+  _scopePlaceholder(
+    RoutePaths.assetCustomers,
+    RouteNames.assetCustomers,
+    'ทะเบียนลูกค้าภายนอก',
+    WorkspaceMenuScope.company,
+    'assetCustomers',
+  ),
+  _scopePlaceholder(
+    RoutePaths.cmTickets,
+    RouteNames.cmTickets,
+    'รายการแจ้งซ่อมทั้งหมด',
+    WorkspaceMenuScope.company,
+    'cmTickets',
+  ),
+  _scopePlaceholder(
+    RoutePaths.cmQrPortal,
+    RouteNames.cmQrPortal,
+    'จัดการ QR Code แจ้งซ่อม',
+    WorkspaceMenuScope.company,
+    'cmQrPortal',
+  ),
+  _scopePlaceholder(
+    RoutePaths.pmPlans,
+    RouteNames.pmPlans,
+    'แผนและรอบเวลา PM',
+    WorkspaceMenuScope.company,
+    'pmPlans',
+  ),
+  _scopePlaceholder(
+    RoutePaths.pmChecklists,
+    RouteNames.pmChecklists,
+    'รายการตรวจเช็กมาตรฐาน',
+    WorkspaceMenuScope.company,
+    'pmChecklists',
+  ),
+  _scopePlaceholder(
+    RoutePaths.pmCalendar,
+    RouteNames.pmCalendar,
+    'ปฏิทินงานบำรุงรักษา',
+    WorkspaceMenuScope.company,
+    'pmCalendar',
+  ),
+  _scopePlaceholder(
+    RoutePaths.jobDispatch,
+    RouteNames.jobDispatch,
+    'กระดานจ่ายงานช่าง',
+    WorkspaceMenuScope.company,
+    'jobDispatch',
+  ),
+  _scopePlaceholder(
+    RoutePaths.jobWorkOrders,
+    RouteNames.jobWorkOrders,
+    'ทะเบียนใบงานทั้งหมด',
+    WorkspaceMenuScope.company,
+    'jobWorkOrders',
+  ),
+  _scopePlaceholder(
+    RoutePaths.jobCloseout,
+    RouteNames.jobCloseout,
+    'บันทึกปิดงานและตรวจรับ',
+    WorkspaceMenuScope.company,
+    'jobCloseout',
+  ),
+  _scopePlaceholder(
+    RoutePaths.inventoryItems,
+    RouteNames.inventoryItems,
+    'รายการอะไหล่และวัสดุ',
+    WorkspaceMenuScope.company,
+    'inventoryItems',
+  ),
+  _scopePlaceholder(
+    RoutePaths.inventoryUsage,
+    RouteNames.inventoryUsage,
+    'เบิก-จ่ายอะไหล่ตามใบงาน',
+    WorkspaceMenuScope.company,
+    'inventoryUsage',
+  ),
+  _scopePlaceholder(
+    RoutePaths.reportsDashboard,
+    RouteNames.reportsDashboard,
+    'แดชบอร์ดภาพรวมงานบริการ',
+    WorkspaceMenuScope.company,
+    'reportsDashboard',
+  ),
+  _scopePlaceholder(
+    RoutePaths.reportsHistory,
+    RouteNames.reportsHistory,
+    'ประวัติการซ่อมและค่าใช้จ่าย',
+    WorkspaceMenuScope.company,
+    'reportsHistory',
+  ),
+  _scopePlaceholder(
+    RoutePaths.reportsSatisfaction,
+    RouteNames.reportsSatisfaction,
+    'รายงานผลประเมินความพึงพอใจ',
+    WorkspaceMenuScope.company,
+    'reportsSatisfaction',
+  ),
+  _portalPlaceholder(
+    RoutePaths.portalRequest,
+    RouteNames.portalRequest,
+    'แจ้งซ่อม / ขอใช้บริการ',
+  ),
+  _portalPlaceholder(
+    RoutePaths.portalTracking,
+    RouteNames.portalTracking,
+    'ติดตามสถานะงานซ่อม',
+  ),
+  _portalPlaceholder(
+    RoutePaths.portalHistory,
+    RouteNames.portalHistory,
+    'ประวัติการซ่อมและค่าบริการ',
+  ),
+  _portalPlaceholder(
+    RoutePaths.portalPmSchedule,
+    RouteNames.portalPmSchedule,
+    'รอบบำรุงรักษาของห้อง',
+  ),
+  _portalPlaceholder(
+    RoutePaths.portalEvaluation,
+    RouteNames.portalEvaluation,
+    'ประเมินความพึงพอใจ',
+  ),
+  _portalPlaceholder(
+    RoutePaths.portalComplaint,
+    RouteNames.portalComplaint,
+    'แจ้งเรื่องร้องเรียน',
   ),
 ];
+
+final List<GoRoute> _meetingRoutes = [
+  GoRoute(
+    path: RoutePaths.meetingRoomBookings,
+    name: RouteNames.meetingRoomBookings,
+    builder: (context, state) => const MeetingRoomBookingPage(),
+  ),
+  GoRoute(
+    path: RoutePaths.meetingRoomApprovals,
+    name: RouteNames.meetingRoomApprovals,
+    builder: (context, state) => const MeetingRoomApprovalPage(),
+  ),
+  GoRoute(
+    path: RoutePaths.meetingRoomCalendar,
+    name: RouteNames.meetingRoomCalendar,
+    builder: (context, state) =>
+        const MeetingRoomBookingPage(initialCalendar: true, menuCode: '21002'),
+  ),
+  GoRoute(
+    path: RoutePaths.meetingInvitationRsvp,
+    name: RouteNames.meetingInvitationRsvp,
+    builder: (context, state) => const MeetingInvitationPage(),
+  ),
+  GoRoute(
+    path: RoutePaths.meetingFoodPlans,
+    name: RouteNames.meetingFoodPlans,
+    builder: (context, state) => const MeetingFoodPlanPage(),
+  ),
+  _companyPlaceholder(
+    RoutePaths.roomCheckIn,
+    RouteNames.roomCheckIn,
+    'เช็กอินและคืนห้อง',
+  ),
+  _companyPlaceholder(
+    RoutePaths.roomSupportTasks,
+    RouteNames.roomSupportTasks,
+    'งานเตรียมห้องและอุปกรณ์',
+  ),
+  _companyPlaceholder(
+    RoutePaths.roomIssues,
+    RouteNames.roomIssues,
+    'แจ้งปัญหาห้องประชุม',
+  ),
+  GoRoute(
+    path: RoutePaths.meetingBuildings,
+    name: RouteNames.meetingBuildings,
+    builder: (context, state) => const MeetingBuildingPage(),
+  ),
+  GoRoute(
+    path: RoutePaths.meetingRooms,
+    name: RouteNames.meetingRooms,
+    builder: (context, state) => const MeetingRoomPage(),
+  ),
+  GoRoute(
+    path: RoutePaths.meetingFacilities,
+    name: RouteNames.meetingFacilities,
+    builder: (context, state) => const MeetingFacilityPage(),
+  ),
+  GoRoute(
+    path: RoutePaths.meetingFoods,
+    name: RouteNames.meetingFoods,
+    builder: (context, state) => const MeetingFoodPage(),
+  ),
+  GoRoute(
+    path: RoutePaths.companySupervisors,
+    name: RouteNames.companySupervisors,
+    builder: (context, state) => const OrganizationSupervisorPage(),
+  ),
+  _companyPlaceholder(
+    RoutePaths.meetingRoomUtilizationReport,
+    RouteNames.meetingRoomUtilizationReport,
+    'รายงานการใช้ห้อง',
+  ),
+  _companyPlaceholder(
+    RoutePaths.meetingNoShowReport,
+    RouteNames.meetingNoShowReport,
+    'รายงาน No-show',
+  ),
+  _companyPlaceholder(
+    RoutePaths.meetingFeedbackReport,
+    RouteNames.meetingFeedbackReport,
+    'ผลประเมินห้องประชุม',
+  ),
+];
+
+GoRoute _companyPlaceholder(String path, String name, String title) => GoRoute(
+  path: path,
+  name: name,
+  builder: (context, state) => CompanyModulePlaceholderPage(
+    title: title,
+    menuScope: WorkspaceMenuScope.company,
+    activeMenu: name,
+  ),
+);
 
 GoRoute _scopePlaceholder(
   String path,
@@ -549,3 +784,12 @@ GoRoute _placeholder(
         SupportPlaceholderPage(title: title, activeMenu: activeMenu),
   );
 }
+
+GoRoute _portalPlaceholder(String path, String name, String title) => GoRoute(
+  path: path,
+  name: name,
+  builder: (context, state) => Scaffold(
+    appBar: AppBar(title: const Text('Laoo Service')),
+    body: Center(child: Text('$title อยู่ในแผนพัฒนา Phase 1')),
+  ),
+);

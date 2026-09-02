@@ -2,8 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../../core/api/api_exception.dart';
 import '../../../../core/company_setup/company_setup_controller.dart';
+import '../../../../core/widgets/pinned_data_table.dart';
 import '../../../../app/theme/workspace_theme_presets.dart';
-import '../../../../app/theme/laoo_typography.dart';
 import '../../../support/presentation/widgets/support_workspace_shell.dart';
 import '../data/role_group_repository.dart';
 import '../models/role_group.dart';
@@ -175,7 +175,11 @@ class _RoleGroupPageState extends State<RoleGroupPage> {
             Expanded(
               child: Text(
                 'ยืนยันการลบข้อมูล',
-                style: LaooTypography.screenCaptionStyle,
+                style: TextStyle(
+                  color: accent,
+                  fontSize: 19,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
           ],
@@ -755,7 +759,7 @@ class _ListState extends State<_List> {
                                                 fontWeight: FontWeight.w700,
                                               ),
                                         ),
-                                        child: DataTable(
+                                        child: PinnedDataTable(
                                           horizontalMargin: 8,
                                           columnSpacing: 20,
                                           dividerThickness: .6,
@@ -769,17 +773,7 @@ class _ListState extends State<_List> {
                                                     .withValues(alpha: 0.12),
                                               ),
                                           columns: [
-                                            DataColumn(
-                                              label: const SizedBox(
-                                                width: 80,
-                                                child: Padding(
-                                                  padding: EdgeInsets.only(
-                                                    left: 12,
-                                                  ),
-                                                  child: Text('ID'),
-                                                ),
-                                              ),
-                                            ),
+                                            LaooTableColumns.id,
                                             DataColumn(
                                               label: const SizedBox(
                                                 width: 120,
@@ -1132,7 +1126,7 @@ class _PageButton extends StatelessWidget {
                     : Text(
                         label,
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: 14,
                           color: selected ? Colors.white : primary,
                           fontWeight: FontWeight.w600,
                         ),
@@ -1212,14 +1206,11 @@ class _FormState extends State<_Form> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Row(
-                  children: [
-                    WorkspacePageTitle(
-                      title:
-                          'กลุ่มสิทธิ์ > ${widget.editing == null ? 'เพิ่ม' : 'แก้ไข'}',
-                      favoriteKey: widget.favoriteKey,
-                    ),
-                    const Spacer(),
+                WorkspaceActionHeader(
+                  title:
+                      'กลุ่มสิทธิ์ > ${widget.editing == null ? 'เพิ่ม' : 'แก้ไข'}',
+                  favoriteKey: widget.favoriteKey,
+                  actions: [
                     OutlinedButton.icon(
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Theme.of(c).colorScheme.primary,
@@ -1231,7 +1222,6 @@ class _FormState extends State<_Form> {
                       icon: const Icon(Icons.close),
                       label: const Text('ยกเลิก'),
                     ),
-                    const SizedBox(width: 8),
                     FilledButton.icon(
                       onPressed: widget.loading == true
                           ? null

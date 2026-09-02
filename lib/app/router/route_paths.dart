@@ -10,10 +10,30 @@ abstract final class RoutePaths {
   static const String companyTemporaryReceipts = '/company/temporary-receipts';
   static const String companyDeliveryNotes = '/company/delivery-notes';
   static const String companyTaxInvoices = '/company/tax-invoices';
-  static const String salesManagement = '/company/sales-management';
+  static const String assetLocations = '/asset/locations';
+  static const String assetItems = '/asset/items';
+  static const String assetCustomers = '/asset/customers';
+  static const String cmTickets = '/cm/tickets';
+  static const String cmQrPortal = '/cm/qr-portal';
+  static const String pmPlans = '/pm/plans';
+  static const String pmChecklists = '/pm/checklists';
+  static const String pmCalendar = '/pm/calendar';
+  static const String jobDispatch = '/jobs/dispatch';
+  static const String jobWorkOrders = '/jobs/work-orders';
+  static const String jobCloseout = '/jobs/closeout';
+  static const String inventoryItems = '/inventory/items';
+  static const String inventoryUsage = '/inventory/usage';
+  static const String reportsDashboard = '/reports/dashboard';
+  static const String reportsHistory = '/reports/history';
+  static const String reportsSatisfaction = '/reports/satisfaction';
+  static const String portalRequest = '/portal/request';
+  static const String portalTracking = '/portal/tracking';
+  static const String portalHistory = '/portal/history';
+  static const String portalPmSchedule = '/portal/pm-schedule';
+  static const String portalEvaluation = '/portal/evaluation';
+  static const String portalComplaint = '/portal/complaint';
   static const String companyBranches = '/company/branches';
   static const String partnerCompanies = '/partner/companies';
-  static const String partnerCompanyFeatures = '/partner/company-features';
   static const String partnerBranches = '/partner/branches';
   static const String partnerUsers = '/partner/users';
   static const String supportHome = '/support';
@@ -47,4 +67,22 @@ abstract final class RoutePaths {
   static const String partnerMenuPermissions = '/partner/menu-permissions';
   static const String laooEmployees = '/support/employees';
   static const String laooUsers = '/support/users';
+  static const String companySupervisors = '/company/supervisors';
+  static const String meetingRoomBookings = '/company/meeting-room-bookings';
+  static const String meetingRoomApprovals = '/company/meeting-room-approvals';
+  static const String meetingRoomCalendar = '/company/meeting-room-calendar';
+  static const String meetingInvitationRsvp = '/company/meeting-invitations';
+  static const String meetingFoodPlans = '/company/meeting-food-plans';
+  static const String roomCheckIn = '/company/room-check-in';
+  static const String roomSupportTasks = '/company/room-support-tasks';
+  static const String roomIssues = '/company/room-issues';
+  static const String meetingBuildings = '/company/meeting-buildings';
+  static const String meetingRooms = '/company/meeting-rooms';
+  static const String meetingFacilities = '/company/meeting-facilities';
+  static const String meetingFoods = '/company/meeting-foods';
+  static const String meetingRoomUtilizationReport =
+      '/company/reports/meeting-room-utilization';
+  static const String meetingNoShowReport = '/company/reports/meeting-no-show';
+  static const String meetingFeedbackReport =
+      '/company/reports/meeting-feedback';
 }

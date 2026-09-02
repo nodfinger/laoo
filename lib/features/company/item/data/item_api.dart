@@ -10,20 +10,23 @@ class ItemApi {
     ),
   );
 
-  Future<Map<String, dynamic>> codeSettings() async => Map<String, dynamic>.from(
-    await _client.get('/api/company/items/code-settings') as Map,
-  );
+  Future<Map<String, dynamic>> codeSettings() async =>
+      Map<String, dynamic>.from(
+        await _client.get('/api/company/items/code-settings') as Map,
+      );
 
-  Future<Map<String, dynamic>> imageSettings() async => Map<String, dynamic>.from(
-    await _client.get('/api/company/items/image-settings') as Map,
-  );
+  Future<Map<String, dynamic>> imageSettings() async =>
+      Map<String, dynamic>.from(
+        await _client.get('/api/company/items/image-settings') as Map,
+      );
 
   Future<String?> previewCode({String? groupCode, String? typeCode}) async {
     final result = Map<String, dynamic>.from(
       await _client.post(
-        '/api/company/items/code-preview',
-        body: {'itemGroupCode': groupCode, 'itemTypeCode': typeCode},
-      ) as Map,
+            '/api/company/items/code-preview',
+            body: {'itemGroupCode': groupCode, 'itemTypeCode': typeCode},
+          )
+          as Map,
     );
     return result['code']?.toString();
   }

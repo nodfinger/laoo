@@ -5,6 +5,7 @@ abstract final class LaooColors {
 
   /// Global light-page background. Cards and controls remain white for contrast.
   static const background = Color(0xFFF8F9FB);
+  static const pageCaption = Color(0xFF000000);
   static const surfaceSoft = Color(0xFFF7FAF8);
   static const textPrimary = Color(0xFF17221A);
   static const textSecondary = Color(0xFF66746A);
@@ -38,6 +39,7 @@ abstract final class LaooLayout {
   static const cardMargin = 10.0;
   static const cardPadding = 10.0;
   static const cardSpacing = 10.0;
+  static const dialogInsetPadding = 24.0;
 
   /// Standard total height for pagination cards across document/list screens.
   static const paginationCardHeight = 56.0;
@@ -47,4 +49,26 @@ abstract final class LaooShadows {
   static const soft = <BoxShadow>[
     BoxShadow(color: Color(0x10000000), blurRadius: 24, offset: Offset(0, 10)),
   ];
+}
+
+abstract final class LaooDataTable {
+  static const TableColumnWidth idColumnWidth = FixedColumnWidth(48);
+  static const double horizontalMargin = 12;
+  static const double columnSpacing = 24;
+  static const double dividerThickness = 1;
+
+  static WidgetStateProperty<Color?> rowColor(Color primary) {
+    return WidgetStateProperty.resolveWith((states) {
+      if (states.contains(WidgetState.selected)) {
+        return primary.withValues(alpha: 0.14);
+      }
+      if (states.contains(WidgetState.pressed)) {
+        return primary.withValues(alpha: 0.12);
+      }
+      if (states.contains(WidgetState.hovered)) {
+        return primary.withValues(alpha: 0.08);
+      }
+      return null;
+    });
+  }
 }

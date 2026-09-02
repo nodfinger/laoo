@@ -40,46 +40,46 @@ class _DashboardContent extends StatelessWidget {
         elevation: 2,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         child: SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'หน้าหลัก',
-            style: Theme.of(
-              context,
-            ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'ยินดีต้อนรับ ${session?.displayName ?? session?.username ?? '-'}',
-          ),
-          const SizedBox(height: 24),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _InfoCard(
-                icon: Icons.badge_outlined,
-                label: 'ประเภทผู้ใช้งาน',
-                value: session?.userType ?? '-',
+              Text(
+                'หน้าหลัก',
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
               ),
-              _InfoCard(
-                icon: Icons.business_outlined,
-                label: 'บริษัท / Partner',
-                value: session?.partnerId != null
-                    ? 'Partner #${session!.partnerId}'
-                    : 'Company #${session?.companyId ?? '-'}',
+              const SizedBox(height: 8),
+              Text(
+                'ยินดีต้อนรับ ${session?.displayName ?? session?.username ?? '-'}',
               ),
-              _InfoCard(
-                icon: Icons.folder_outlined,
-                label: 'Project',
-                value: session?.projectCode ?? '-',
+              const SizedBox(height: 24),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  _InfoCard(
+                    icon: Icons.badge_outlined,
+                    label: 'ประเภทผู้ใช้งาน',
+                    value: session?.userType ?? '-',
+                  ),
+                  _InfoCard(
+                    icon: Icons.business_outlined,
+                    label: 'บริษัท / Partner',
+                    value: session?.partnerId != null
+                        ? 'Partner #${session!.partnerId}'
+                        : 'Company #${session?.companyId ?? '-'}',
+                  ),
+                  _InfoCard(
+                    icon: Icons.folder_outlined,
+                    label: 'Project',
+                    value: session?.projectCode ?? '-',
+                  ),
+                ],
               ),
             ],
           ),
-        ],
-      ),
         ),
       ),
     );

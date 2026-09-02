@@ -8,6 +8,7 @@ import '../../../../app/theme/laoo_typography.dart';
 import '../../../../app/theme/workspace_theme_presets.dart';
 import '../../../../core/company_setup/company_setup_controller.dart';
 import '../../../../core/navigation/navigation_menu_repository.dart';
+import '../../../../core/widgets/pinned_data_table.dart';
 import '../../../../core/widgets/timed_snack_bar.dart';
 import '../../../support/presentation/widgets/support_workspace_shell.dart';
 import '../../delivery_note/services/delivery_note_receipt_pdf_service.dart';
@@ -329,7 +330,13 @@ class _TemporaryReceiptActionPageState
           children: [
             Icon(Icons.delete_outline, color: LaooColors.error),
             SizedBox(width: 8),
-            Text('ยืนยันการลบข้อมูล', style: LaooTypography.screenCaptionStyle),
+            Text(
+              'ยืนยันการลบข้อมูล',
+              style: TextStyle(
+                color: LaooColors.error,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ],
         ),
         content: const Text('ต้องการลบรายการรับเงินนี้หรือไม่?'),
@@ -532,17 +539,11 @@ class _TemporaryReceiptActionPageState
                             horizontal: 16,
                             vertical: 14,
                           ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: WorkspacePageTitle(
-                                  title:
-                                      '$_menuName > ${_isEdit ? 'แก้ไข' : 'เพิ่ม'}',
-                                  favoriteKey: _activeMenu,
-                                  titleColor: Colors.black,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
+                          child: WorkspaceActionHeader(
+                            title:
+                                '$_menuName > ${_isEdit ? 'แก้ไข' : 'เพิ่ม'}',
+                            favoriteKey: _activeMenu,
+                            actions: [
                               FilledButton.icon(
                                 onPressed: _payments.isEmpty
                                     ? null
@@ -556,7 +557,6 @@ class _TemporaryReceiptActionPageState
                                 icon: const Icon(Icons.print_outlined),
                                 label: const Text('พิมพ์'),
                               ),
-                              const SizedBox(width: 4),
                               OutlinedButton.icon(
                                 onPressed: () =>
                                     context.go('/company/temporary-receipts'),
@@ -568,7 +568,6 @@ class _TemporaryReceiptActionPageState
                                 icon: const Icon(Icons.close),
                                 label: const Text('ยกเลิก'),
                               ),
-                              const SizedBox(width: 4),
                               FilledButton.icon(
                                 onPressed: _canSave && !_saving ? _save : null,
                                 style: FilledButton.styleFrom(
@@ -911,13 +910,13 @@ class _TemporaryReceiptActionPageState
                               else
                                 SizedBox(
                                   width: constraints.maxWidth,
-                                  child: DataTable(
+                                  child: PinnedDataTable(
                                     headingRowColor: WidgetStatePropertyAll(
                                       accent.withValues(alpha: .09),
                                     ),
                                     dividerThickness: .5,
                                     columns: const [
-                                      DataColumn(label: Text('ID')),
+                                      LaooTableColumns.id,
                                       DataColumn(label: Text('Action')),
                                       DataColumn(label: Text('ช่องทางรับเงิน')),
                                       DataColumn(label: Text('เลขที่อ้างอิง')),
@@ -1132,7 +1131,14 @@ class _PaymentDialogState extends State<_PaymentDialog> {
         children: [
           Icon(Icons.payments_outlined),
           SizedBox(width: 8),
-          Text('รายการรับเงิน', style: LaooTypography.screenCaptionStyle),
+          Text(
+            'รายการรับเงิน',
+            style: TextStyle(
+              color: LaooColors.textPrimary,
+              fontSize: LaooTypography.workspaceCaption,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ],
       ),
       content: SizedBox(

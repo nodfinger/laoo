@@ -372,55 +372,35 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
                       horizontal: 8,
                       vertical: 14,
                     ),
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.centerLeft,
-                      child: SizedBox(
-                        width: (constraints.maxWidth - 16)
-                            .clamp(0.0, double.infinity)
-                            .toDouble(),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            Expanded(
-                              child: WorkspacePageTitle(
-                                title: title,
-                                titleColor: Colors.black,
-                              ),
-                            ),
-                            const Text('สถานะใช้งาน'),
-                            const SizedBox(width: 6),
-                            Switch(
-                              value: _active,
-                              onChanged: (v) => setState(() => _active = v),
-                            ),
-                            const SizedBox(width: 12),
-                            const Text('แสดงหน้า Online'),
-                            const SizedBox(width: 6),
-                            Switch(
-                              value: _showShop,
-                              onChanged: (v) => setState(() => _showShop = v),
-                            ),
-                            const SizedBox(width: 12),
-                            OutlinedButton.icon(
-                              onPressed: widget.onCancel,
-                              style: OutlinedButton.styleFrom(
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                              ),
-                              icon: const Icon(Icons.close),
-                              label: const Text('ยกเลิก'),
-                            ),
-                            const SizedBox(width: 8),
-                            FilledButton.icon(
-                              onPressed: _saving ? null : _save,
-                              icon: const Icon(Icons.save_outlined),
-                              label: const Text('บันทึก'),
-                            ),
-                          ],
+                    child: WorkspaceActionHeader(
+                      title: title,
+                      actions: [
+                        const Text('สถานะใช้งาน'),
+                        Switch(
+                          value: _active,
+                          onChanged: (v) => setState(() => _active = v),
                         ),
-                      ),
+                        const Text('แสดงหน้า Online'),
+                        Switch(
+                          value: _showShop,
+                          onChanged: (v) => setState(() => _showShop = v),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: widget.onCancel,
+                          style: OutlinedButton.styleFrom(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                          icon: const Icon(Icons.close),
+                          label: const Text('ยกเลิก'),
+                        ),
+                        FilledButton.icon(
+                          onPressed: _saving ? null : _save,
+                          icon: const Icon(Icons.save_outlined),
+                          label: const Text('บันทึก'),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -667,7 +647,7 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
           ),
           Text(
             'สูงสุด 5 รูป | ไม่เกิน ${widget.maxItemImageSizeMB.toStringAsFixed(2)} MB ต่อรูป | ถ้าเกินระบบจะลดขนาดให้อัตโนมัติ',
-            style: const TextStyle(fontSize: 11),
+            style: const TextStyle(fontSize: 14),
           ),
           const SizedBox(height: 8),
           if (cover == null)
@@ -735,7 +715,7 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
           if (large)
             Text(
               isCover ? 'รูปหน้าปก' : 'รูปสินค้า',
-              style: TextStyle(color: accent, fontSize: 11),
+              style: TextStyle(color: accent, fontSize: 14),
             ),
           Row(
             mainAxisSize: MainAxisSize.min,
@@ -844,7 +824,7 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
       readOnly: true,
       decoration: InputDecoration(
         floatingLabelBehavior: FloatingLabelBehavior.always,
-        labelStyle: const TextStyle(fontSize: 12),
+        labelStyle: const TextStyle(fontSize: 14),
         labelText:
             '\u0e2a\u0e15\u0e4a\u0e2d\u0e01\u0e04\u0e07\u0e40\u0e2b\u0e25\u0e37\u0e2d',
         filled: true,
@@ -860,7 +840,7 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
       readOnly: true,
       decoration: InputDecoration(
         floatingLabelBehavior: FloatingLabelBehavior.always,
-        labelStyle: const TextStyle(fontSize: 12),
+        labelStyle: const TextStyle(fontSize: 14),
         labelText: 'เธชเธ•เนเธญเธเธเน€เธซเธฅเธทเธญ',
         filled: true,
         fillColor: accent.withValues(alpha: .08),

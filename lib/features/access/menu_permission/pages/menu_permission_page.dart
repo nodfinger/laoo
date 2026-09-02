@@ -1,15 +1,17 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 
+import '../../../../app/theme/laoo_design_tokens.dart';
+import '../../../../app/theme/laoo_typography.dart';
 import '../../../../core/api/api_exception.dart';
 import '../../../../core/company_setup/company_setup_controller.dart';
 import '../../../../features/support/presentation/widgets/support_workspace_shell.dart';
 import '../../../../app/theme/workspace_theme_presets.dart';
-import '../../../../app/theme/laoo_typography.dart';
 import '../../role_group/data/role_group_repository.dart';
 import '../../role_group/models/role_group.dart';
 import '../data/menu_permission_repository.dart';
 import '../models/menu_permission_row.dart';
+import '../models/menu_permission_selection.dart';
 import '../../../profile/data/user_profile_repository.dart';
 
 class MenuPermissionPage extends StatefulWidget {
@@ -167,7 +169,11 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
                     const Expanded(
                       child: Text(
                         'ยืนยันลบข้อมูลกลุ่มสิทธิ์',
-                        style: LaooTypography.screenCaptionStyle,
+                        style: TextStyle(
+                          color: Colors.red,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                   ],
@@ -269,9 +275,7 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
   String _thai(Object e) =>
       e is ApiException ? e.message : 'โหลดข้อมูลสิทธิ์ไม่สำเร็จ';
   bool _visible(int type, String action) =>
-      action == 'VIEW' ||
-      (type == 1 && {'CREATE', 'EDIT', 'DELETE'}.contains(action)) ||
-      (type == 2 && action == 'EDIT');
+      MenuPermissionSelection.isActionVisible(type, action);
   List<MenuPermissionRow> get _filteredRows => _selectedMenuGroup == null
       ? _rows
       : _rows.where((e) => e.menuGroupCode == _selectedMenuGroup).toList();
@@ -283,20 +287,36 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
             ? all
             : [...all, row],
       );
-  void _change(MenuPermissionRow row, String action, bool value) => setState(
-    () => _rows = _rows.map((e) {
-      if (e.menuCode != row.menuCode) return e;
-      if (action == 'VIEW' && !value) {
-        return e.copy(view: false, create: false, edit: false, delete: false);
-      }
-      return e.copy(
-        view: action == 'VIEW' ? value : null,
-        create: action == 'CREATE' ? value : null,
-        edit: action == 'EDIT' ? value : null,
-        delete: action == 'DELETE' ? value : null,
-      );
-    }).toList(),
-  );
+  void _change(MenuPermissionRow row, String action, bool value) {
+    if (!_canEdit) return;
+    setState(
+      () => _rows = _rows
+          .map(
+            (item) => item.menuCode == row.menuCode
+                ? MenuPermissionSelection.applyToRow(item, action, value)
+                : item,
+          )
+          .toList(),
+    );
+  }
+
+  void _changeGroup(String menuGroupCode, String action, bool value) {
+    if (!_canEdit) return;
+    setState(
+      () => _rows = MenuPermissionSelection.applyToGroup(
+        _rows,
+        menuGroupCode,
+        action,
+        value,
+      ),
+    );
+  }
+
+  bool? _groupValue(String menuGroupCode, String action) =>
+      MenuPermissionSelection.groupValue(_rows, menuGroupCode, action);
+
+  bool _groupHasAction(String menuGroupCode, String action) =>
+      MenuPermissionSelection.hasAction(_rows, menuGroupCode, action);
 
   @override
   Widget build(BuildContext context) => SupportWorkspaceShell(
@@ -331,19 +351,14 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Row(
-                            children: [
-                              WorkspacePageTitle(
-                                title: 'สิทธิ์เมนู',
-                                favoriteKey: widget.scope == 'laoo'
-                                    ? '12004'
-                                    : widget.scope == 'partner'
-                                    ? '11004'
-                                    : '10004',
-                                titleColor: Colors.black,
-                              ),
-                              const Spacer(),
-                              const SizedBox(width: 8),
+                          WorkspaceActionHeader(
+                            title: 'สิทธิ์เมนู',
+                            favoriteKey: widget.scope == 'laoo'
+                                ? '12004'
+                                : widget.scope == 'partner'
+                                ? '11004'
+                                : '10004',
+                            actions: [
                               DecoratedBox(
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(4),
@@ -365,7 +380,6 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
                                   ),
                                 ),
                               ),
-                              if (_canDelete) const SizedBox(width: 8),
                               if (_canDelete)
                                 FilledButton.icon(
                                   style: FilledButton.styleFrom(
@@ -380,8 +394,6 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
                                   ),
                                   label: const Text('ลบสิทธิ์ทั้งหมด'),
                                 ),
-                              if (_canDelete && _canEdit)
-                                const SizedBox(width: 8),
                               if (_canEdit)
                                 FilledButton.icon(
                                   onPressed: _saving || _selectedGroup == null
@@ -416,6 +428,7 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
                           Expanded(
                             child: DropdownButtonFormField<int>(
                               initialValue: _selectedGroup,
+                              isExpanded: true,
                               style: TextStyle(
                                 fontSize: 14,
                                 color: Theme.of(context).colorScheme.onSurface,
@@ -452,6 +465,7 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
                           Expanded(
                             child: DropdownButtonFormField<String>(
                               initialValue: _selectedMenuGroup,
+                              isExpanded: true,
                               style: TextStyle(
                                 fontSize: 14,
                                 color: Theme.of(context).colorScheme.onSurface,
@@ -554,7 +568,7 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
   Widget _table(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        if (_card || constraints.maxWidth < 600) {
+        if (_card || constraints.maxWidth < 900) {
           return _mobileCards(context);
         }
         final columns = _tableColumns(context);
@@ -573,8 +587,6 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
                 constraints: BoxConstraints(minWidth: constraints.maxWidth),
                 child: DataTable(
                   headingRowColor: WidgetStatePropertyAll(headerColor),
-                  horizontalMargin: 24,
-                  columnSpacing: 0,
                   columns: columns,
                   rows: const [],
                 ),
@@ -586,8 +598,6 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
                     constraints: BoxConstraints(minWidth: constraints.maxWidth),
                     child: DataTable(
                       headingRowHeight: 0,
-                      horizontalMargin: 24,
-                      columnSpacing: 0,
                       columns: columns,
                       rows: _tableRows(context),
                     ),
@@ -602,46 +612,31 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
   }
 
   List<DataColumn> _tableColumns(BuildContext context) => [
-    DataColumn(
-      columnWidth: const FlexColumnWidth(2.4),
-      label: _menuHeaderCell(context),
-    ),
-    DataColumn(
-      columnWidth: const FlexColumnWidth(),
-      headingRowAlignment: MainAxisAlignment.center,
-      label: _headerCell(context, 'แสดง'),
-    ),
-    DataColumn(
-      columnWidth: const FlexColumnWidth(),
-      headingRowAlignment: MainAxisAlignment.center,
-      label: _headerCell(context, 'เพิ่ม'),
-    ),
-    DataColumn(
-      columnWidth: const FlexColumnWidth(),
-      headingRowAlignment: MainAxisAlignment.center,
-      label: _headerCell(context, 'แก้ไข'),
-    ),
-    DataColumn(
-      columnWidth: const FlexColumnWidth(),
-      headingRowAlignment: MainAxisAlignment.center,
-      label: _headerCell(context, 'ลบ'),
-    ),
+    DataColumn(label: _menuHeaderCell(context)),
+    DataColumn(label: _headerCell(context, 'แสดง')),
+    DataColumn(label: _headerCell(context, 'เพิ่ม')),
+    DataColumn(label: _headerCell(context, 'แก้ไข')),
+    DataColumn(label: _headerCell(context, 'ลบ')),
   ];
 
   Widget _mobileCards(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
+    final groups = _menuGroups
+        .where(
+          (group) => _filteredRows.any(
+            (row) => row.menuGroupCode == group.menuGroupCode,
+          ),
+        )
+        .toList();
     return ListView.separated(
       padding: const EdgeInsets.only(bottom: 24),
-      itemCount: _filteredRows.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 8),
+      itemCount: groups.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 6),
       itemBuilder: (context, index) {
-        final row = _filteredRows[index];
-        final actions = <(String, String, bool)>[
-          ('ดู', 'VIEW', row.canView),
-          ('เพิ่ม', 'CREATE', row.canCreate),
-          ('แก้ไข', 'EDIT', row.canEdit),
-          ('ลบ', 'DELETE', row.canDelete),
-        ];
+        final group = groups[index];
+        final groupRows = _filteredRows
+            .where((row) => row.menuGroupCode == group.menuGroupCode)
+            .toList();
         return Card(
           margin: EdgeInsets.zero,
           color: Colors.white,
@@ -652,53 +647,147 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
             borderRadius: BorderRadius.circular(4),
             side: BorderSide.none,
           ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(14, 12, 10, 10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  row.menuName,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: primary, fontWeight: FontWeight.w700),
-                ),
-                if (row.menuGroupName.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    row.menuGroupName,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 4,
-                  children: actions.map((action) {
-                    final enabled = _visible(row.screenType, action.$2);
-                    return Row(
-                      mainAxisSize: MainAxisSize.min,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                color: primary.withValues(alpha: .07),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       children: [
-                        _permissionCheckbox(
-                          value: action.$3,
-                          onChanged: enabled
-                              ? (value) =>
-                                    _change(row, action.$2, value ?? false)
-                              : null,
+                        Icon(
+                          Icons.folder_open_outlined,
+                          size: 20,
+                          color: primary,
                         ),
-                        Text(action.$1),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            group.menuGroupName,
+                            style: TextStyle(
+                              color: primary,
+                              fontSize: LaooTypography.sectionTitle,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          '${groupRows.length} เมนู',
+                          style: TextStyle(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                            fontSize: LaooTypography.caption,
+                          ),
+                        ),
                       ],
-                    );
-                  }).toList(),
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      children:
+                          const [
+                            ('แสดง', 'VIEW'),
+                            ('เพิ่ม', 'CREATE'),
+                            ('แก้ไข', 'EDIT'),
+                            ('ลบ', 'DELETE'),
+                          ].map((action) {
+                            if (!_groupHasAction(
+                              group.menuGroupCode,
+                              action.$2,
+                            )) {
+                              return const SizedBox.shrink();
+                            }
+                            return _permissionControl(
+                              context,
+                              label: action.$1,
+                              value: _groupValue(
+                                group.menuGroupCode,
+                                action.$2,
+                              ),
+                              enabled: _canEdit,
+                              tristate: true,
+                              emphasized: true,
+                              onChanged: (value) => _changeGroup(
+                                group.menuGroupCode,
+                                action.$2,
+                                value,
+                              ),
+                            );
+                          }).toList(),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+              for (var rowIndex = 0; rowIndex < groupRows.length; rowIndex++)
+                _mobilePermissionRow(
+                  context,
+                  groupRows[rowIndex],
+                  showDivider: rowIndex > 0,
+                ),
+            ],
           ),
         );
       },
+    );
+  }
+
+  Widget _mobilePermissionRow(
+    BuildContext context,
+    MenuPermissionRow row, {
+    required bool showDivider,
+  }) {
+    final actions = <(String, String, bool)>[
+      ('แสดง', 'VIEW', row.canView),
+      ('เพิ่ม', 'CREATE', row.canCreate),
+      ('แก้ไข', 'EDIT', row.canEdit),
+      ('ลบ', 'DELETE', row.canDelete),
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (showDivider) const Divider(height: 1, color: LaooColors.border),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                row.menuName,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: LaooColors.textPrimary,
+                  fontSize: LaooTypography.tableBody,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                children: actions.map((action) {
+                  final visible = _visible(row.screenType, action.$2);
+                  if (!visible) return const SizedBox.shrink();
+                  final enabled =
+                      _canEdit && (action.$2 == 'VIEW' || row.canView);
+                  return _permissionControl(
+                    context,
+                    label: action.$1,
+                    value: action.$3,
+                    enabled: enabled,
+                    onChanged: (value) => _change(row, action.$2, value),
+                  );
+                }).toList(),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -710,20 +799,40 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
         lastGroup = row.menuGroupCode;
         result.add(
           DataRow(
+            color: WidgetStatePropertyAll(
+              Theme.of(tableContext).colorScheme.primary.withValues(alpha: .06),
+            ),
             cells: [
               DataCell(
-                Text(
-                  row.menuGroupName,
-                  style: TextStyle(
-                    color: Theme.of(tableContext).colorScheme.primary,
-                    fontWeight: FontWeight.w700,
+                SizedBox(
+                  width: 220,
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.folder_open_outlined,
+                        size: 20,
+                        color: Theme.of(tableContext).colorScheme.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          row.menuGroupName,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Theme.of(tableContext).colorScheme.primary,
+                            fontSize: LaooTypography.tableHeader,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
-              const DataCell(SizedBox.shrink()),
-              const DataCell(SizedBox.shrink()),
-              const DataCell(SizedBox.shrink()),
-              const DataCell(SizedBox.shrink()),
+              _groupCell(tableContext, row.menuGroupCode, 'VIEW'),
+              _groupCell(tableContext, row.menuGroupCode, 'CREATE'),
+              _groupCell(tableContext, row.menuGroupCode, 'EDIT'),
+              _groupCell(tableContext, row.menuGroupCode, 'DELETE'),
             ],
           ),
         );
@@ -743,70 +852,143 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
     return result;
   }
 
-  Widget _headerCell(BuildContext context, String text) => Center(
-    child: Text(
-      text,
-      textAlign: TextAlign.center,
-      style: TextStyle(
-        color: Theme.of(context).colorScheme.primary,
-        fontWeight: FontWeight.w700,
-        fontSize: 15,
+  Widget _headerCell(BuildContext context, String text) => SizedBox(
+    width: 100,
+    child: Center(
+      child: Text(
+        text,
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          color: Theme.of(context).colorScheme.primary,
+          fontWeight: FontWeight.w700,
+          fontSize: LaooTypography.tableHeader,
+        ),
       ),
     ),
   );
-  Widget _menuHeaderCell(BuildContext context) => Align(
-    alignment: Alignment.centerLeft,
-    child: Text(
-      'เมนู',
-      style: TextStyle(
-        color: Theme.of(context).colorScheme.primary,
-        fontWeight: FontWeight.w700,
-        fontSize: 15,
+  Widget _menuHeaderCell(BuildContext context) => SizedBox(
+    width: 220,
+    child: Align(
+      alignment: Alignment.centerLeft,
+      child: Text(
+        'เมนู',
+        style: TextStyle(
+          color: Theme.of(context).colorScheme.primary,
+          fontWeight: FontWeight.w700,
+          fontSize: LaooTypography.tableHeader,
+        ),
       ),
     ),
   );
   DataCell _cell(MenuPermissionRow row, String action, bool value) => DataCell(
-    Center(
-      child:
-          _visible(row.screenType, action) && (action == 'VIEW' || row.canView)
-          ? _permissionCheckbox(
-              value: value,
-              onChanged: (v) => _change(row, action, v ?? false),
-            )
-          : const SizedBox.shrink(),
+    SizedBox(
+      width: 100,
+      child: Center(
+        child:
+            _visible(row.screenType, action) &&
+                (action == 'VIEW' || row.canView)
+            ? _permissionCheckbox(
+                value: value,
+                enabled: _canEdit,
+                semanticLabel: '$action ${row.menuName}',
+                onChanged: (selected) => _change(row, action, selected),
+              )
+            : const SizedBox.shrink(),
+      ),
+    ),
+  );
+
+  DataCell _groupCell(
+    BuildContext context,
+    String menuGroupCode,
+    String action,
+  ) => DataCell(
+    SizedBox(
+      width: 100,
+      child: Center(
+        child: _groupHasAction(menuGroupCode, action)
+            ? _permissionCheckbox(
+                value: _groupValue(menuGroupCode, action),
+                enabled: _canEdit,
+                tristate: true,
+                semanticLabel: '$action ทั้งกลุ่ม',
+                onChanged: (selected) =>
+                    _changeGroup(menuGroupCode, action, selected),
+              )
+            : const SizedBox.shrink(),
+      ),
+    ),
+  );
+
+  Widget _permissionControl(
+    BuildContext context, {
+    required String label,
+    required bool? value,
+    required bool enabled,
+    required ValueChanged<bool> onChanged,
+    bool tristate = false,
+    bool emphasized = false,
+  }) => Container(
+    padding: const EdgeInsets.only(right: 6),
+    decoration: emphasized
+        ? BoxDecoration(
+            color: Colors.white.withValues(alpha: .78),
+            borderRadius: BorderRadius.circular(LaooRadius.xs),
+          )
+        : null,
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _permissionCheckbox(
+          value: value,
+          enabled: enabled,
+          tristate: tristate,
+          semanticLabel: label,
+          onChanged: onChanged,
+        ),
+        Text(
+          label,
+          style: TextStyle(
+            color: enabled
+                ? Theme.of(context).colorScheme.onSurface
+                : Theme.of(context).disabledColor,
+            fontSize: LaooTypography.tableBody,
+            fontWeight: emphasized ? FontWeight.w600 : FontWeight.w400,
+          ),
+        ),
+      ],
     ),
   );
 
   Widget _permissionCheckbox({
-    required bool value,
-    required ValueChanged<bool?>? onChanged,
+    required bool? value,
+    required bool enabled,
+    required ValueChanged<bool> onChanged,
+    required String semanticLabel,
+    bool tristate = false,
   }) {
-    final theme = Theme.of(context);
-    final primary = theme.colorScheme.primary;
-    final enabled = onChanged != null;
-    return Semantics(
-      checked: value,
-      enabled: enabled,
-      child: Checkbox(
-        value: value,
-        onChanged: onChanged,
-        checkColor: Colors.white,
-        fillColor: WidgetStateProperty.resolveWith((states) {
-          if (states.contains(WidgetState.disabled)) {
-            return theme.colorScheme.surfaceContainerHighest;
-          }
-          if (states.contains(WidgetState.selected)) return primary;
-          return Colors.white;
-        }),
-        overlayColor: WidgetStatePropertyAll(primary.withValues(alpha: .12)),
-        side: BorderSide(
-          color: enabled
-              ? primary.withValues(alpha: .72)
-              : theme.colorScheme.outlineVariant,
-          width: 1.6,
-        ),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
-        visualDensity: VisualDensity.compact,
+    final primary = Theme.of(context).colorScheme.primary;
+    return Checkbox(
+      value: value,
+      tristate: tristate,
+      semanticLabel: semanticLabel,
+      onChanged: enabled ? (_) => onChanged(value != true) : null,
+      visualDensity: VisualDensity.compact,
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(LaooRadius.xs),
+      ),
+      side: BorderSide(
+        color: enabled ? primary.withValues(alpha: .72) : LaooColors.border,
+        width: 1.4,
+      ),
+      checkColor: Colors.white,
+      fillColor: WidgetStateProperty.resolveWith((states) {
+        if (!states.contains(WidgetState.selected)) return Colors.transparent;
+        return enabled ? primary : LaooColors.textSecondary;
+      }),
+      overlayColor: WidgetStatePropertyAll(
+        primary.withValues(alpha: enabled ? .10 : 0),
       ),
     );
   }

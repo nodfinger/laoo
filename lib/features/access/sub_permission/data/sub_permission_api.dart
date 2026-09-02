@@ -22,15 +22,14 @@ class SubPermissionApi {
         as List,
   );
 
-  Future<Set<String>> currentCodes(String menuCode) async =>
-      Set<String>.from(
-        (await _client.get(
-                  '/api/company/sub-permissions/current',
-                  query: {'menuCode': menuCode},
-                )
-                as List)
-            .map((value) => value.toString().trim()),
-      );
+  Future<Set<String>> currentCodes(String menuCode) async => Set<String>.from(
+    (await _client.get(
+              '/api/company/sub-permissions/current',
+              query: {'menuCode': menuCode},
+            )
+            as List)
+        .map((value) => value.toString().trim()),
+  );
 
   Future<void> saveEmployees(
     String menuCode,

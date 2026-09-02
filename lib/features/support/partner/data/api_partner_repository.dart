@@ -56,12 +56,14 @@ class ApiPartnerRepository implements PartnerRepository {
       body: {'isActive': isActive},
     );
   }
+
   @override
   Future<void> deletePartner(int partnerId) async {
     await _apiClient.delete('/api/support/partners/$partnerId');
   }
 
-  Future<void> createPartnerAdmin(int partnerId, {
+  Future<void> createPartnerAdmin(
+    int partnerId, {
     required String username,
     required String password,
   }) async {
@@ -77,17 +79,20 @@ class ApiPartnerRepository implements PartnerRepository {
     );
   }
 
-  Future<void> updatePartnerAdmin(int userId, {
+  Future<void> updatePartnerAdmin(
+    int userId, {
     required String username,
     required String password,
   }) async {
-    await _apiClient.put('/api/support/partner-users/$userId', body: {
-      'username': username,
-      if (password.isNotEmpty) 'password': password,
-      'displayName': '$username Admin',
-      'isPartnerAdmin': true,
-      'isActive': true,
-    });
+    await _apiClient.put(
+      '/api/support/partner-users/$userId',
+      body: {
+        'username': username,
+        if (password.isNotEmpty) 'password': password,
+        'displayName': '$username Admin',
+        'isPartnerAdmin': true,
+        'isActive': true,
+      },
+    );
   }
-
 }

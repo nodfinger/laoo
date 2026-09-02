@@ -7,6 +7,7 @@ class AuthSession {
     this.displayName,
     this.projectCode,
     this.projectId,
+    this.partnerUserId,
     this.partnerId,
     this.companyId,
     this.branchId,
@@ -23,6 +24,7 @@ class AuthSession {
   final String? projectCode;
 
   final int? projectId;
+  final int? partnerUserId;
   final int? partnerId;
   final int? companyId;
   final int? branchId;
@@ -37,6 +39,7 @@ class AuthSession {
     String? displayName,
     String? projectCode,
     int? projectId,
+    int? partnerUserId,
     int? partnerId,
     int? companyId,
     int? branchId,
@@ -51,6 +54,7 @@ class AuthSession {
       displayName: displayName ?? this.displayName,
       projectCode: projectCode ?? this.projectCode,
       projectId: projectId ?? this.projectId,
+      partnerUserId: partnerUserId ?? this.partnerUserId,
       partnerId: partnerId ?? this.partnerId,
       companyId: companyId ?? this.companyId,
       branchId: branchId ?? this.branchId,

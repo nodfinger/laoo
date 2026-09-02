@@ -35,7 +35,10 @@ class HttpService {
     bool authenticated = true,
   }) async {
     final response = await _client
-        .get(_buildUri(path, query), headers: await _headers(authenticated: authenticated))
+        .get(
+          _buildUri(path, query),
+          headers: await _headers(authenticated: authenticated),
+        )
         .timeout(ApiConfig.requestTimeout);
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return response.bodyBytes;

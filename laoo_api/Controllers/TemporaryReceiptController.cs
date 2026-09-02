@@ -7,7 +7,7 @@ using Microsoft.Data.SqlClient;
 
 namespace LaooApi.Controllers;
 
-[ApiController, Authorize]
+[ApiController, Authorize, LaooApi.Security.RequireCompanyFeature("SALES")]
 [Route("api/company/temporary-receipts")]
 public sealed class TemporaryReceiptController(IConfiguration configuration) : ControllerBase
 {

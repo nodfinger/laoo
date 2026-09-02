@@ -124,14 +124,10 @@ class _ItemFormState extends State<ItemForm> {
       child: ListView(
         padding: const EdgeInsets.all(24),
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: WorkspacePageTitle(
-                  title:
-                      'ข้อมูลสินค้า > ${_data['itemID'] == null ? 'เพิ่ม' : 'แก้ไข'}',
-                ),
-              ),
+          WorkspaceActionHeader(
+            title:
+                'ข้อมูลสินค้า > ${_data['itemID'] == null ? 'เพิ่ม' : 'แก้ไข'}',
+            actions: [
               OutlinedButton.icon(
                 onPressed: widget.onCancel,
                 style: OutlinedButton.styleFrom(
@@ -142,7 +138,6 @@ class _ItemFormState extends State<ItemForm> {
                 icon: const Icon(Icons.close),
                 label: const Text('ยกเลิก'),
               ),
-              const SizedBox(width: 8),
               FilledButton.icon(
                 onPressed: _saving ? null : _save,
                 icon: const Icon(Icons.save_outlined),

@@ -10,6 +10,7 @@ import '../../../../app/theme/workspace_theme_presets.dart';
 import '../../../../core/auth/app_auth_controller.dart';
 import '../../../../core/company_setup/company_setup_controller.dart';
 import '../../../../core/navigation/navigation_menu_repository.dart';
+import '../../../../core/widgets/pinned_data_table.dart';
 import '../../../../core/widgets/timed_snack_bar.dart';
 import '../../../support/presentation/widgets/support_workspace_shell.dart';
 import '../data/quotation_api.dart';
@@ -284,85 +285,55 @@ class _QuotationDocumentActionPageState
   }
 
   Widget _buildCaptionCard(Color accent) => _card(
-    LayoutBuilder(
-      builder: (context, constraints) {
-        final title = WorkspacePageTitle(
-          title:
-              '${_menuName.isEmpty ? 'ใบเสนอราคา' : _menuName} > ${_isEdit ? 'แก้ไข' : 'เพิ่ม'}',
-          favoriteKey: 'companyQuotations',
-          titleColor: Colors.black,
-          titleFontSize: LaooTypography.pageTitle,
-        );
-        final actions = Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          alignment: WrapAlignment.end,
-          children: [
-            FilledButton.icon(
-              onPressed: _exportingPdf ? null : _exportPdf,
-              icon: _exportingPdf
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.print_outlined),
-              label: const Text('พิมพ์'),
-              style: FilledButton.styleFrom(
-                backgroundColor: accent,
-                foregroundColor: Colors.white,
-                minimumSize: const Size(0, LaooTypography.buttonHeight),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(LaooRadius.xs),
-                ),
-              ),
+    WorkspaceActionHeader(
+      title:
+          '${_menuName.isEmpty ? 'ใบเสนอราคา' : _menuName} > ${_isEdit ? 'แก้ไข' : 'เพิ่ม'}',
+      favoriteKey: 'companyQuotations',
+      actions: [
+        FilledButton.icon(
+          onPressed: _exportingPdf ? null : _exportPdf,
+          icon: _exportingPdf
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.print_outlined),
+          label: const Text('พิมพ์'),
+          style: FilledButton.styleFrom(
+            backgroundColor: accent,
+            foregroundColor: Colors.white,
+            minimumSize: const Size(0, LaooTypography.buttonHeight),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(LaooRadius.xs),
             ),
-            OutlinedButton.icon(
-              onPressed: _saving
-                  ? null
-                  : () => context.go('/company/quotations'),
-              icon: const Icon(Icons.close),
-              label: const Text('ยกเลิก'),
-              style: OutlinedButton.styleFrom(
-                minimumSize: const Size(0, LaooTypography.buttonHeight),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(LaooRadius.xs),
-                ),
-              ),
+          ),
+        ),
+        OutlinedButton.icon(
+          onPressed: _saving ? null : () => context.go('/company/quotations'),
+          icon: const Icon(Icons.close),
+          label: const Text('ยกเลิก'),
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(0, LaooTypography.buttonHeight),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(LaooRadius.xs),
             ),
-            FilledButton.icon(
-              onPressed: _saving ? null : _save,
-              icon: const Icon(Icons.save_outlined),
-              label: const Text('บันทึก'),
-              style: FilledButton.styleFrom(
-                backgroundColor: accent,
-                foregroundColor: Colors.white,
-                minimumSize: const Size(0, LaooTypography.buttonHeight),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(LaooRadius.xs),
-                ),
-              ),
+          ),
+        ),
+        FilledButton.icon(
+          onPressed: _saving ? null : _save,
+          icon: const Icon(Icons.save_outlined),
+          label: const Text('บันทึก'),
+          style: FilledButton.styleFrom(
+            backgroundColor: accent,
+            foregroundColor: Colors.white,
+            minimumSize: const Size(0, LaooTypography.buttonHeight),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(LaooRadius.xs),
             ),
-          ],
-        );
-        if (constraints.maxWidth < 680) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              title,
-              const SizedBox(height: 8),
-              Align(alignment: Alignment.centerRight, child: actions),
-            ],
-          );
-        }
-        return Row(
-          children: [
-            Expanded(child: title),
-            const SizedBox(width: 8),
-            actions,
-          ],
-        );
-      },
+          ),
+        ),
+      ],
     ),
   );
 
@@ -436,7 +407,7 @@ class _QuotationDocumentActionPageState
               )
               ? _paymentType
               : null,
-          style: const TextStyle(fontSize: 12, color: LaooColors.textPrimary),
+          style: const TextStyle(fontSize: 14, color: LaooColors.textPrimary),
           decoration: _dec('ประเภทเครดิต'),
           items: _creditTypes
               .map(
@@ -695,27 +666,27 @@ class _QuotationDocumentActionPageState
             final discountTypeField = DropdownButtonFormField<String>(
               initialValue: _discountType,
               style: const TextStyle(
-                fontSize: 12,
+                fontSize: 14,
                 color: LaooColors.textPrimary,
               ),
               decoration: _dec('ลดแบบ'),
               items: const [
                 DropdownMenuItem(
                   value: 'N',
-                  child: Text('ไม่ลด', style: TextStyle(fontSize: 12)),
+                  child: Text('ไม่ลด', style: TextStyle(fontSize: 14)),
                 ),
                 DropdownMenuItem(
                   value: 'P',
                   child: Text(
                     'เปอร์เซ็นต์ (%)',
-                    style: TextStyle(fontSize: 12),
+                    style: TextStyle(fontSize: 14),
                   ),
                 ),
                 DropdownMenuItem(
                   value: 'A',
                   child: Text(
                     'จำนวนเงิน (บาท)',
-                    style: TextStyle(fontSize: 12),
+                    style: TextStyle(fontSize: 14),
                   ),
                 ),
               ],
@@ -811,7 +782,7 @@ class _QuotationDocumentActionPageState
     width: double.infinity,
     child: SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      child: DataTable(
+      child: PinnedDataTable(
         headingRowColor: WidgetStatePropertyAll(accent.withValues(alpha: .10)),
         headingTextStyle: TextStyle(
           color: accent,
@@ -819,7 +790,7 @@ class _QuotationDocumentActionPageState
           fontWeight: FontWeight.w700,
         ),
         columns: [
-          const DataColumn(label: Text('ID')),
+          LaooTableColumns.id,
           const DataColumn(label: Text('Action')),
           if (_showItemImages) const DataColumn(label: Text('รูปสินค้า')),
           const DataColumn(label: Text('รหัสสินค้า')),
@@ -1108,7 +1079,14 @@ class _QuotationDocumentActionPageState
               children: [
                 Icon(icon, color: accent),
                 const SizedBox(width: 8),
-                Text(title, style: LaooTypography.screenCaptionStyle),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: LaooColors.textPrimary,
+                    fontSize: LaooTypography.pageTitle,
+                    fontWeight: LaooTypography.pageTitleWeight,
+                  ),
+                ),
               ],
             ),
             content: SizedBox(
@@ -1286,7 +1264,14 @@ class _QuotationDocumentActionPageState
               child: Icon(Icons.delete_outline, color: accent),
             ),
             const SizedBox(width: 12),
-            Text('ยืนยันการลบข้อมูล', style: LaooTypography.screenCaptionStyle),
+            Text(
+              'ยืนยันการลบข้อมูล',
+              style: TextStyle(
+                color: accent,
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ],
         ),
         content: Column(

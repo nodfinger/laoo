@@ -2,12 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/app_menu_route_registry.dart';
-import '../../../../app/router/route_names.dart';
-import '../../../../app/theme/laoo_design_tokens.dart';
 import '../../../../core/favorites/user_favorite_repository.dart';
 import '../../../../core/navigation/navigation_menu.dart';
-import '../../../../core/navigation/navigation_icon_resolver.dart';
 import '../../../../core/navigation/navigation_menu_repository.dart';
+import '../../../../core/navigation/navigation_icon_resolver.dart';
 import '../widgets/support_workspace_shell.dart';
 
 class SupportHomePage extends StatelessWidget {
@@ -19,19 +17,7 @@ class SupportHomePage extends StatelessWidget {
       pageTitle: 'หน้าหลัก',
       activeMenu: 'home',
       showMobileMenuButton: true,
-      child: LayoutBuilder(
-        builder: (context, constraints) => constraints.maxWidth < 600
-            ? const _MobileSupportHomeContent()
-            : SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 1250),
-                    child: const _WorkspaceContent(),
-                  ),
-                ),
-              ),
-      ),
+      child: const _MobileSupportHomeContent(),
     );
   }
 }
@@ -69,7 +55,8 @@ class _MobileSupportHomeContentState extends State<_MobileSupportHomeContent> {
         .where(
           (item) =>
               visibleCodes.contains(item.menuCode.trim().toUpperCase()) &&
-              AppMenuRouteRegistry.byMenuCode(item.menuCode) != null,
+              (AppMenuRouteRegistry.byMenuCode(item.menuCode) != null ||
+                  (item.routePath?.trim().isNotEmpty ?? false)),
         )
         .toList();
     for (final item in favorites.where((item) => !valid.contains(item))) {
@@ -108,8 +95,16 @@ class _MobileSupportHomeContentState extends State<_MobileSupportHomeContent> {
           });
         }
 
+        final width = MediaQuery.sizeOf(context).width;
+        final tileSize = width >= 900 ? 124.0 : 80.0;
+        final horizontalPadding = width >= 900 ? 24.0 : 10.0;
         return SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(10, 16, 10, 24),
+          padding: EdgeInsets.fromLTRB(
+            horizontalPadding,
+            16,
+            horizontalPadding,
+            24,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -126,8 +121,11 @@ class _MobileSupportHomeContentState extends State<_MobileSupportHomeContent> {
                             _MobileMenuTile(
                               label: favorite.menuName,
                               icon: _icon(favorite.iconName),
-                              size: 80,
-                              onTap: () => _openMenu(favorite.menuCode),
+                              size: tileSize,
+                              onTap: () => _openMenu(
+                                favorite.menuCode,
+                                routePath: favorite.routePath,
+                              ),
                             ),
                         ],
                       ),
@@ -142,7 +140,7 @@ class _MobileSupportHomeContentState extends State<_MobileSupportHomeContent> {
                       _MobileMenuTile(
                         label: group.name,
                         icon: _icon(group.iconName),
-                        size: 80,
+                        size: tileSize,
                         selected: group.code == selected.code,
                         onTap: () =>
                             setState(() => _selectedGroupCode = group.code),
@@ -162,8 +160,9 @@ class _MobileSupportHomeContentState extends State<_MobileSupportHomeContent> {
                       _MobileMenuTile(
                         label: item.name,
                         icon: _icon(item.iconName),
-                        size: 80,
-                        onTap: () => _openMenu(item.code),
+                        size: tileSize,
+                        onTap: () =>
+                            _openMenu(item.code, routePath: item.routePath),
                       ),
                   ],
                 ),
@@ -175,13 +174,17 @@ class _MobileSupportHomeContentState extends State<_MobileSupportHomeContent> {
     );
   }
 
-  void _openMenu(String menuCode) {
-    final route = AppMenuRouteRegistry.byMenuCode(menuCode)?.goRouteName;
-    if (route != null) context.goNamed(route);
+  void _openMenu(String menuCode, {String? routePath}) {
+    final route = AppMenuRouteRegistry.byMenuCode(menuCode);
+    if (route != null) {
+      context.goNamed(route.goRouteName);
+      return;
+    }
+    final path = routePath?.trim();
+    if (path != null && path.isNotEmpty) context.go(path);
   }
 
-  IconData _icon(String? name) =>
-      NavigationIconResolver.resolve(name, fallback: Icons.apps_outlined);
+  IconData _icon(String? name) => resolveNavigationIcon(name);
 }
 
 class _MobileSection extends StatelessWidget {
@@ -299,130 +302,4 @@ class _MobileEmptyTile extends StatelessWidget {
     padding: const EdgeInsets.all(12),
     child: Text(text, style: Theme.of(context).textTheme.bodySmall),
   );
-}
-
-class _WorkspaceContent extends StatelessWidget {
-  const _WorkspaceContent();
-
-  @override
-  Widget build(BuildContext context) {
-    final accent = Theme.of(context).colorScheme.primary;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'เมนูหลัก',
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
-        ),
-        const SizedBox(height: 16),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final width = constraints.maxWidth;
-            final columns = width >= 1100
-                ? 4
-                : width >= 720
-                ? 3
-                : width >= 480
-                ? 2
-                : 1;
-            const gap = 14.0;
-            final itemWidth = (width - gap * (columns - 1)) / columns;
-
-            final cards = [
-              _MenuCard(
-                icon: Icons.handshake_outlined,
-                title: 'Partner',
-                accent: accent,
-                onTap: () => context.goNamed(RouteNames.partner),
-              ),
-              _MenuCard(
-                icon: Icons.support_agent_outlined,
-                title: 'Laoo User',
-                accent: accent,
-                onTap: () => context.goNamed(RouteNames.laooUser),
-              ),
-              _MenuCard(
-                icon: Icons.admin_panel_settings_outlined,
-                title: 'Role / Permission',
-                accent: accent,
-                onTap: () => context.goNamed(RouteNames.permission),
-              ),
-              _MenuCard(
-                icon: Icons.receipt_long_outlined,
-                title: 'Audit Log',
-                accent: accent,
-                onTap: () => context.goNamed(RouteNames.audit),
-              ),
-            ];
-
-            return Wrap(
-              spacing: gap,
-              runSpacing: gap,
-              children: [
-                for (final card in cards)
-                  SizedBox(width: itemWidth, height: 130, child: card),
-              ],
-            );
-          },
-        ),
-      ],
-    );
-  }
-}
-
-class _MenuCard extends StatelessWidget {
-  const _MenuCard({
-    required this.icon,
-    required this.title,
-    required this.accent,
-    this.onTap,
-  });
-
-  final IconData icon;
-  final String title;
-  final Color accent;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      color: Theme.of(context).colorScheme.surface,
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(LaooRadius.md),
-        side: const BorderSide(color: LaooColors.border),
-      ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(LaooRadius.md),
-        child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: accent.withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(icon, color: accent, size: 21),
-              ),
-              const Spacer(),
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }

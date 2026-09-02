@@ -260,14 +260,7 @@ class DeliveryNoteReceiptPdfService {
     }).toList();
 
     return pw.TableHelper.fromTextArray(
-      headers: const [
-        'ลำดับ',
-        'รายการ',
-        'จำนวน',
-        'หน่วย',
-        'ราคา',
-        'รวมเงิน',
-      ],
+      headers: const ['ลำดับ', 'รายการ', 'จำนวน', 'หน่วย', 'ราคา', 'รวมเงิน'],
       data: rows,
       border: pw.TableBorder.all(color: PdfColors.grey300, width: .5),
       headerDecoration: pw.BoxDecoration(color: primary.shade(0.12)),

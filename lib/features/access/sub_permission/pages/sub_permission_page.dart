@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../../../app/theme/workspace_theme_presets.dart';
-import '../../../../app/theme/laoo_typography.dart';
 import '../../../../core/widgets/timed_snack_bar.dart';
 import '../../../support/presentation/widgets/support_workspace_shell.dart';
 import '../data/sub_permission_api.dart';
@@ -89,7 +88,11 @@ class _SubPermissionPageState extends State<SubPermissionPage> {
                         children: [
                           Text(
                             _caption,
-                            style: LaooTypography.screenCaptionStyle,
+                            style: const TextStyle(
+                              color: Colors.black,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ],
                       ),
@@ -174,7 +177,7 @@ class _SubPermissionPageState extends State<SubPermissionPage> {
                   padding: const EdgeInsets.only(top: 4),
                   child: Text(
                     '${point['employeeNames']}',
-                    style: TextStyle(color: accent, fontSize: 12),
+                    style: TextStyle(color: accent, fontSize: 14),
                   ),
                 ),
               if ('${point['permissionPointDescription'] ?? ''}'
@@ -276,7 +279,7 @@ class _SubPermissionPageState extends State<SubPermissionPage> {
                                   value: name,
                                   child: Text(
                                     name,
-                                    style: const TextStyle(fontSize: 12),
+                                    style: const TextStyle(fontSize: 14),
                                   ),
                                 ),
                               )

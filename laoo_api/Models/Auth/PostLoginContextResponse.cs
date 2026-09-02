@@ -1,4 +1,4 @@
-namespace Laoo.Api.Models.Auth;
+namespace Laoo.Service.Api.Models.Auth;
 
 public static class AuthUserTypes
 {

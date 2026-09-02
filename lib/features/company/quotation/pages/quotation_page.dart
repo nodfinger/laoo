@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -9,6 +8,7 @@ import '../../../../app/theme/workspace_theme_presets.dart';
 import '../../../../core/auth/app_auth_controller.dart';
 import '../../../../core/company_setup/company_setup_controller.dart';
 import '../../../../core/navigation/navigation_menu_repository.dart';
+import '../../../../core/widgets/pinned_data_table.dart';
 import '../../../../core/widgets/timed_snack_bar.dart';
 import '../../../support/presentation/widgets/support_workspace_shell.dart';
 import '../data/quotation_api.dart';
@@ -342,8 +342,12 @@ class _QuotationListPageState extends State<QuotationListPage> {
                                       children: [
                                         Text(
                                           _menuName,
-                                          style:
-                                              LaooTypography.screenCaptionStyle,
+                                          style: TextStyle(
+                                            color: LaooColors.textPrimary,
+                                            fontSize: LaooTypography.pageTitle,
+                                            fontWeight:
+                                                LaooTypography.pageTitleWeight,
+                                          ),
                                         ),
                                         const SizedBox(width: 8),
                                         Icon(Icons.star_outline, color: accent),
@@ -558,11 +562,11 @@ class _QuotationListPageState extends State<QuotationListPage> {
     ),
     child: ClipRRect(
       borderRadius: BorderRadius.circular(4),
-      child: DataTable(
+      child: PinnedDataTable(
         headingRowColor: WidgetStatePropertyAll(accent.withValues(alpha: .10)),
         headingTextStyle: TextStyle(color: accent, fontWeight: FontWeight.w700),
         columns: const [
-          DataColumn(label: Text('ID')),
+          LaooTableColumns.id,
           DataColumn(label: Text('Action')),
           DataColumn(label: Text('เลขที่เอกสาร')),
           DataColumn(label: Text('วันที่เอกสาร')),
@@ -803,48 +807,21 @@ class _QuotationActionPageState extends State<QuotationActionPage> {
                     ),
                     child: Padding(
                       padding: const EdgeInsets.all(LaooLayout.cardPadding),
-                      child: Column(
-                        children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Expanded(
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    WorkspacePageTitle(
-                                      title: '',
-                                      favoriteKey: 'companyQuotations',
-                                      titleColor: Colors.transparent,
-                                      titleFontSize: 1,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      '$_menuName > เพิ่ม',
-                                      style: LaooTypography.screenCaptionStyle,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Wrap(
-                                spacing: 8,
-                                children: [
-                                  OutlinedButton.icon(
-                                    onPressed: _saving
-                                        ? null
-                                        : () =>
-                                              context.go('/company/quotations'),
-                                    icon: const Icon(Icons.close),
-                                    label: const Text('ยกเลิก'),
-                                  ),
-                                  FilledButton.icon(
-                                    onPressed: _saving ? null : _save,
-                                    icon: const Icon(Icons.save_outlined),
-                                    label: const Text('บันทึก'),
-                                  ),
-                                ],
-                              ),
-                            ],
+                      child: WorkspaceActionHeader(
+                        title: '$_menuName > เพิ่ม',
+                        favoriteKey: 'companyQuotations',
+                        actions: [
+                          OutlinedButton.icon(
+                            onPressed: _saving
+                                ? null
+                                : () => context.go('/company/quotations'),
+                            icon: const Icon(Icons.close),
+                            label: const Text('ยกเลิก'),
+                          ),
+                          FilledButton.icon(
+                            onPressed: _saving ? null : _save,
+                            icon: const Icon(Icons.save_outlined),
+                            label: const Text('บันทึก'),
                           ),
                         ],
                       ),
@@ -1082,7 +1059,7 @@ class _QuotationActionPageState extends State<QuotationActionPage> {
       children: [
         Text(
           label,
-          style: const TextStyle(fontSize: 12, color: LaooColors.textSecondary),
+          style: const TextStyle(fontSize: 14, color: LaooColors.textSecondary),
         ),
         const SizedBox(height: 2),
         Text(value, style: const TextStyle(color: LaooColors.textPrimary)),
@@ -1102,7 +1079,7 @@ class _QuotationActionPageState extends State<QuotationActionPage> {
       width: double.infinity,
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
-        child: DataTable(
+        child: PinnedDataTable(
           headingRowColor: WidgetStatePropertyAll(
             accent.withValues(alpha: .10),
           ),
@@ -1111,7 +1088,7 @@ class _QuotationActionPageState extends State<QuotationActionPage> {
             fontWeight: FontWeight.w700,
           ),
           columns: const [
-            DataColumn(label: Text('ID')),
+            LaooTableColumns.id,
             DataColumn(label: Text('Action')),
             DataColumn(
               label: Text(

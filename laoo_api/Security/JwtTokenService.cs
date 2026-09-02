@@ -33,6 +33,7 @@ public sealed class JwtTokenService
         };
 
         AddIfValue(claims, "laoo_user_id", user.LaooUserId);
+        AddIfValue(claims, "partner_user_id", user.PartnerUserId);
         AddIfValue(claims, "partner_id", user.PartnerId);
         AddIfValue(claims, "user_id", user.UserId);
         AddIfValue(claims, "company_id", user.CompanyId);

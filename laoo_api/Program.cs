@@ -2,8 +2,8 @@ using System.Text;
 using LaooApi.Data;
 using LaooApi.Security;
 using LaooApi.Services;
-using Laoo.Api.Endpoints;
-using Laoo.Api.Infrastructure.Database;
+using Laoo.Service.Api.Endpoints;
+using Laoo.Service.Api.Infrastructure.Database;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.RateLimiting;
@@ -44,7 +44,7 @@ builder.Services.AddSingleton<ISqlConnectionChecker, SqlConnectionChecker>();
 var dataProtection = builder.Services
     .AddDataProtection()
     .SetApplicationName(
-        builder.Configuration["DataProtection:ApplicationName"] ?? "Laoo.Api");
+        builder.Configuration["DataProtection:ApplicationName"] ?? "Laoo.Service.Api");
 var keyRingPath = builder.Configuration["DataProtection:KeyRingPath"]?.Trim();
 if (!string.IsNullOrWhiteSpace(keyRingPath))
 {

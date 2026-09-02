@@ -3,12 +3,11 @@ import 'package:flutter/foundation.dart';
 import 'company_setup_context.dart';
 import 'company_setup_service.dart';
 
-final CompanySetupController companySetupController =
-    CompanySetupController();
+final CompanySetupController companySetupController = CompanySetupController();
 
 class CompanySetupController extends ChangeNotifier {
   CompanySetupController({CompanySetupService? service})
-      : _service = service ?? CompanySetupService();
+    : _service = service ?? CompanySetupService();
 
   final CompanySetupService _service;
   CompanySetupContext? _current;

@@ -33,6 +33,29 @@ void main() {
       expect(await storage.readRememberedUsername(), 't');
     },
   );
+
+  test('persists the complete partner identity and owner scope', () async {
+    SharedPreferences.setMockInitialValues(const {});
+    final storage = AuthStorage(secureTokenStore: _MemorySecureTokenStore());
+
+    await storage.save(
+      AuthSession(
+        accessToken: 'partner-token',
+        expiresAt: DateTime.now().toUtc().add(const Duration(hours: 1)),
+        userType: 'PARTNER_USER',
+        username: 'l',
+        projectId: 7,
+        partnerUserId: 11,
+        partnerId: 22,
+      ),
+    );
+
+    final restored = await storage.read();
+    expect(restored?.userType, 'PARTNER_USER');
+    expect(restored?.projectId, 7);
+    expect(restored?.partnerUserId, 11);
+    expect(restored?.partnerId, 22);
+  });
 }
 
 class _MemorySecureTokenStore implements SecureTokenStore {

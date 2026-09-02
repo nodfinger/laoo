@@ -1,8 +1,8 @@
-using Laoo.Api.Contracts.Common;
-using Laoo.Api.Contracts.SystemInfo;
-using Laoo.Api.Infrastructure.Database;
+using Laoo.Service.Api.Contracts.Common;
+using Laoo.Service.Api.Contracts.SystemInfo;
+using Laoo.Service.Api.Infrastructure.Database;
 
-namespace Laoo.Api.Endpoints;
+namespace Laoo.Service.Api.Endpoints;
 
 public static class SystemInfoEndpoints
 {

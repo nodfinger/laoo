@@ -16,8 +16,7 @@ class CompanySetupRuntimeView extends StatelessWidget {
           return const SizedBox.shrink();
         }
 
-        final dateText =
-            CompanyDateFormatter.formatCurrentDate(setup);
+        final dateText = CompanyDateFormatter.formatCurrentDate(setup);
 
         return Row(
           mainAxisSize: MainAxisSize.min,

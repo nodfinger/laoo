@@ -65,6 +65,11 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
   bool _saving = false;
   bool _canEdit = false;
   String? _message;
+  String _ownerType = '';
+  String? _partnerNameTh;
+  String? _partnerAddress;
+  String? _partnerTelephone;
+  String? _partnerEmail;
 
   @override
   void initState() {
@@ -94,6 +99,11 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
       final customerOptions = results[2] as List<Map<String, dynamic>>;
       if (!mounted) return;
       _ownerCode.text = setup.ownerCode;
+      _ownerType = setup.ownerType;
+      _partnerNameTh = setup.partnerNameTh;
+      _partnerAddress = setup.partnerAddress;
+      _partnerTelephone = setup.partnerTelephone;
+      _partnerEmail = setup.partnerEmail;
       _ownerName.text = setup.name;
       _titleHeader.text = setup.titleHeader;
       _customerNameTh.text = setup.customerNameTh ?? '';
@@ -304,7 +314,8 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
               child: SizedBox(
                 width: widget.additionalOnly ? 420 : double.infinity,
                 child: DropdownButtonFormField<String>(
-                  initialValue: _runItemOptions.any((x) => '${x['code']}' == _runItem)
+                  initialValue:
+                      _runItemOptions.any((x) => '${x['code']}' == _runItem)
                       ? _runItem
                       : null,
                   decoration: const InputDecoration(
@@ -332,7 +343,7 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
                 child: TextFormField(
                   controller: _markItem,
                   enabled: _canEdit,
-                  style: const TextStyle(fontSize: 12),
+                  style: const TextStyle(fontSize: 14),
                   decoration: const InputDecoration(
                     labelText: 'สัญลักษณ์ก่อนลำดับสินค้า',
                   ),
@@ -349,7 +360,7 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
                   enabled: _canEdit,
                   keyboardType: TextInputType.number,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  style: const TextStyle(fontSize: 12),
+                  style: const TextStyle(fontSize: 14),
                   decoration: const InputDecoration(
                     labelText: 'จำนวนหลักของสินค้า',
                   ),
@@ -368,7 +379,8 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
               child: SizedBox(
                 width: widget.additionalOnly ? 420 : double.infinity,
                 child: DropdownButtonFormField<String>(
-                  initialValue: _runCusOptions.any((x) => '${x['code']}' == _runCus)
+                  initialValue:
+                      _runCusOptions.any((x) => '${x['code']}' == _runCus)
                       ? _runCus
                       : null,
                   decoration: const InputDecoration(
@@ -396,7 +408,7 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
                 child: TextFormField(
                   controller: _markCus,
                   enabled: _canEdit,
-                  style: const TextStyle(fontSize: 12),
+                  style: const TextStyle(fontSize: 14),
                   decoration: const InputDecoration(
                     labelText: 'สัญลักษณ์ก่อนลำดับลูกค้า',
                   ),
@@ -413,7 +425,7 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
                   enabled: _canEdit,
                   keyboardType: TextInputType.number,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  style: const TextStyle(fontSize: 12),
+                  style: const TextStyle(fontSize: 14),
                   decoration: const InputDecoration(
                     labelText: 'จำนวนหลักรหัสลูกค้า',
                   ),
@@ -469,21 +481,14 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
                             horizontal: 16,
                             vertical: 16,
                           ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Expanded(
-                                child: WorkspacePageTitle(
-                                  title: widget.additionalOnly
-                                      ? 'กำหนดค่าระบบเพิ่มเติม'
-                                      : 'กำหนดค่าระบบ',
-                                  favoriteKey: widget.additionalOnly
-                                      ? '05003'
-                                      : '05001',
-                                  titleColor: Colors.black,
-                                  titleFontSize: 18,
-                                ),
-                              ),
+                          child: WorkspaceActionHeader(
+                            title: widget.additionalOnly
+                                ? 'กำหนดค่าระบบเพิ่มเติม'
+                                : 'กำหนดค่าระบบ',
+                            favoriteKey: widget.additionalOnly
+                                ? '05003'
+                                : '05001',
+                            actions: [
                               _TopActions(
                                 saving: _saving,
                                 canSave: _canEdit,
@@ -509,6 +514,15 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
                           email: _email,
                         ),
                         const SizedBox(height: 8),
+                        if (_ownerType == 'C') ...[
+                          _PartnerInfoCard(
+                            nameTh: _partnerNameTh,
+                            address: _partnerAddress,
+                            telephone: _partnerTelephone,
+                            email: _partnerEmail,
+                          ),
+                          const SizedBox(height: 8),
+                        ],
                       ],
                       if (widget.additionalOnly) _runItemCard(preset.primary),
                       if (!widget.additionalOnly) ...[
@@ -554,6 +568,184 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
               ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _PartnerInfoCard extends StatelessWidget {
+  const _PartnerInfoCard({
+    required this.nameTh,
+    required this.address,
+    required this.telephone,
+    required this.email,
+  });
+
+  final String? nameTh;
+  final String? address;
+  final String? telephone;
+  final String? email;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Card(
+      margin: EdgeInsets.zero,
+      color: colors.surface,
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            const gap = 12.0;
+            final useTwoColumns = constraints.maxWidth >= 700;
+            final itemWidth = useTwoColumns
+                ? (constraints.maxWidth - gap) / 2
+                : constraints.maxWidth;
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: colors.primary.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Icon(
+                        Icons.handshake_outlined,
+                        color: colors.primary,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Partner',
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                          Text(
+                            'ข้อมูลผู้ดูแลระบบของลูกค้า',
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: colors.onSurfaceVariant),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(
+                      Icons.lock_outline_rounded,
+                      size: 18,
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: gap,
+                  runSpacing: gap,
+                  children: [
+                    SizedBox(
+                      width: itemWidth,
+                      child: _PartnerInfoItem(
+                        icon: Icons.badge_outlined,
+                        label: 'ชื่อ Partner (ภาษาไทย)',
+                        value: nameTh,
+                      ),
+                    ),
+                    SizedBox(
+                      width: itemWidth,
+                      child: _PartnerInfoItem(
+                        icon: Icons.phone_outlined,
+                        label: 'เบอร์โทร',
+                        value: telephone,
+                      ),
+                    ),
+                    SizedBox(
+                      width: itemWidth,
+                      child: _PartnerInfoItem(
+                        icon: Icons.location_on_outlined,
+                        label: 'ที่อยู่',
+                        value: address,
+                      ),
+                    ),
+                    SizedBox(
+                      width: itemWidth,
+                      child: _PartnerInfoItem(
+                        icon: Icons.mail_outline_rounded,
+                        label: 'Email',
+                        value: email,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _PartnerInfoItem extends StatelessWidget {
+  const _PartnerInfoItem({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String? value;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final displayValue = value?.trim().isNotEmpty == true ? value!.trim() : '-';
+
+    return Container(
+      constraints: const BoxConstraints(minHeight: 72),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerLowest,
+        border: Border.all(color: colors.outlineVariant),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 19, color: colors.primary),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                SelectableText(
+                  displayValue,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -909,7 +1101,7 @@ class _PasswordPolicyField extends StatelessWidget {
       initialValue: const [1, 2, 3].contains(value) ? value : 3,
       style: Theme.of(
         context,
-      ).textTheme.bodyMedium?.copyWith(fontSize: 13, height: 1.35),
+      ).textTheme.bodyMedium?.copyWith(fontSize: 14, height: 1.35),
       decoration: const InputDecoration(
         labelText: 'Password Policy',
         contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
@@ -919,18 +1111,18 @@ class _PasswordPolicyField extends StatelessWidget {
           value: 1,
           child: Text(
             '1 - อิสระ อย่างน้อย 1 ตัว',
-            style: TextStyle(fontSize: 13),
+            style: TextStyle(fontSize: 14),
           ),
         ),
         DropdownMenuItem(
           value: 2,
-          child: Text('2 - ขั้นต่ำ 4 ตัว', style: TextStyle(fontSize: 13)),
+          child: Text('2 - ขั้นต่ำ 4 ตัว', style: TextStyle(fontSize: 14)),
         ),
         DropdownMenuItem(
           value: 3,
           child: Text(
             '3 - ขั้นต่ำ 6 ตัว + เงื่อนไข',
-            style: TextStyle(fontSize: 13),
+            style: TextStyle(fontSize: 14),
           ),
         ),
       ],
@@ -1167,7 +1359,7 @@ class _SectionHeader extends StatelessWidget {
               textAlign: TextAlign.right,
               style: TextStyle(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
-                fontSize: 12,
+                fontSize: 14,
               ),
             ),
           ),

@@ -4,11 +4,9 @@ import '../../../../core/auth/auth_session.dart';
 import '../models/company_context.dart';
 
 class CompanyContextService {
-  CompanyContextService({
-    ApiClient? apiClient,
-    AuthStorage? authStorage,
-  })  : _api = apiClient ?? ApiClient(),
-        _storage = authStorage ?? AuthStorage();
+  CompanyContextService({ApiClient? apiClient, AuthStorage? authStorage})
+    : _api = apiClient ?? ApiClient(),
+      _storage = authStorage ?? AuthStorage();
 
   final ApiClient _api;
   final AuthStorage _storage;
@@ -94,6 +92,7 @@ class CompanyContextService {
         expiresAt: DateTime.parse(expiresAtText),
         projectCode: current.projectCode,
         projectId: current.projectId,
+        partnerUserId: current.partnerUserId,
         partnerId: current.partnerId,
         companyId: companyId,
         branchId: current.branchId,

@@ -5,17 +5,12 @@ abstract final class CompanyDateFormatter {
     return formatDate(DateTime.now(), setup);
   }
 
-  static String formatDate(
-    DateTime value,
-    CompanySetupContext setup,
-  ) {
+  static String formatDate(DateTime value, CompanySetupContext setup) {
     return formatDateByYearFormat(value, setup.yearFormat);
   }
 
   static String formatDateByYearFormat(DateTime value, String yearFormat) {
-    final year = _useBuddhistEra(yearFormat)
-        ? value.year + 543
-        : value.year;
+    final year = _useBuddhistEra(yearFormat) ? value.year + 543 : value.year;
 
     return '${_two(value.day)}/${_two(value.month)}/$year';
   }
@@ -33,6 +28,5 @@ abstract final class CompanyDateFormatter {
     }
   }
 
-  static String _two(int value) =>
-      value.toString().padLeft(2, '0');
+  static String _two(int value) => value.toString().padLeft(2, '0');
 }

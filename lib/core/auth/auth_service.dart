@@ -51,10 +51,12 @@ class AuthService {
     var session = AuthSession(
       accessToken: token,
       expiresAt: DateTime.parse(expiresAtText),
+      userType: user?['userType'] as String?,
       projectCode: user?['projectCode'] as String?,
       username: user?['username'] as String?,
       displayName: user?['displayName'] as String?,
       projectId: _toInt(user?['projectId']),
+      partnerUserId: _toInt(user?['partnerUserId']),
       partnerId: _toInt(user?['partnerId']),
       companyId: _toInt(user?['companyId']),
       branchId: _toInt(user?['branchId']),
@@ -125,6 +127,8 @@ class AuthService {
             as Map<String, dynamic>;
 
     final projects = context['projects'];
+    final contextUserType = context['userType'] as String?;
+    final contextUserId = _toInt(context['userId']);
     final contextPartnerId = _toInt(context['partnerId']);
 
     String? projectCode = session.projectCode;
@@ -139,9 +143,18 @@ class AuthService {
     }
 
     return session.copyWith(
-      userType: context['userType'] as String?,
+      userType: contextUserType,
       projectCode: projectCode,
       projectId: projectId,
+      laooUserId: contextUserType == 'LAOO_SUPPORT'
+          ? contextUserId
+          : session.laooUserId,
+      partnerUserId: contextUserType == 'PARTNER_USER'
+          ? contextUserId
+          : session.partnerUserId,
+      userId: contextUserType == 'COMPANY_USER'
+          ? contextUserId
+          : session.userId,
       partnerId: contextPartnerId ?? session.partnerId,
     );
   }

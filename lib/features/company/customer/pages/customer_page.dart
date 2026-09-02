@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/widgets/timed_snack_bar.dart';
+import '../../../../core/widgets/pinned_data_table.dart';
 import '../../../../app/theme/workspace_theme_presets.dart';
-import '../../../../app/theme/laoo_typography.dart';
 import '../../../../core/company_setup/company_date_formatter.dart';
 import '../../../../core/company_setup/company_setup_controller.dart';
 import '../../../../features/support/presentation/widgets/support_workspace_shell.dart';
@@ -261,7 +261,11 @@ class _CustomerFilesDialogState extends State<CustomerFilesDialog> {
             Expanded(
               child: Text(
                 'ยืนยันการลบข้อมูล',
-                style: LaooTypography.screenCaptionStyle,
+                style: TextStyle(
+                  color: widget.accent,
+                  fontSize: 19,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
           ],
@@ -337,7 +341,13 @@ class _CustomerFilesDialogState extends State<CustomerFilesDialog> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('แก้ไขคำอธิบาย', style: LaooTypography.screenCaptionStyle),
+            Text(
+              'แก้ไขคำอธิบาย',
+              style: TextStyle(
+                color: widget.accent,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
             const SizedBox(height: 8),
             Divider(color: widget.accent.withValues(alpha: .5), thickness: 1),
           ],
@@ -419,7 +429,11 @@ class _CustomerFilesDialogState extends State<CustomerFilesDialog> {
             const SizedBox(width: 10),
             Text(
               isCard ? 'แนบนามบัตร' : 'แนบเอกสารลูกค้า',
-              style: LaooTypography.screenCaptionStyle,
+              style: TextStyle(
+                color: Colors.black,
+                fontSize: 24,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
         ),
@@ -467,7 +481,7 @@ class _CustomerFilesDialogState extends State<CustomerFilesDialog> {
                 ),
               ),
             ),
-          Text(pendingFileName ?? '', style: const TextStyle(fontSize: 11)),
+          Text(pendingFileName ?? '', style: const TextStyle(fontSize: 14)),
           TextField(
             controller: description,
             decoration: InputDecoration(
@@ -483,7 +497,7 @@ class _CustomerFilesDialogState extends State<CustomerFilesDialog> {
                 borderSide: BorderSide(color: widget.accent, width: 2),
               ),
             ),
-            style: const TextStyle(fontSize: 12),
+            style: const TextStyle(fontSize: 14),
           ),
         ],
       ],
@@ -549,7 +563,7 @@ class _CustomerFilesDialogState extends State<CustomerFilesDialog> {
                     children: [
                       Text(
                         '${file['extension'] ?? ''}  ${file['fileSize'] ?? 0} bytes',
-                        style: const TextStyle(fontSize: 10),
+                        style: const TextStyle(fontSize: 14),
                       ),
                       if ('${file['description'] ?? ''}'.trim().isNotEmpty)
                         Text(
@@ -846,7 +860,7 @@ class _CustomerPageState extends State<CustomerPage> {
                   child: DropdownButtonFormField<String>(
                     initialValue: groupFilter,
                     isExpanded: true,
-                    style: const TextStyle(fontSize: 12, height: 1.35),
+                    style: const TextStyle(fontSize: 14, height: 1.35),
                     decoration: const InputDecoration(labelText: 'กลุ่มลูกค้า'),
                     items: [
                       const DropdownMenuItem(
@@ -924,7 +938,7 @@ class _CustomerPageState extends State<CustomerPage> {
                     child: DropdownButtonFormField<String>(
                       initialValue: groupFilter,
                       isExpanded: true,
-                      style: const TextStyle(fontSize: 12, height: 1.35),
+                      style: const TextStyle(fontSize: 14, height: 1.35),
                       decoration: const InputDecoration(
                         labelText: 'กลุ่มลูกค้า',
                       ),
@@ -938,7 +952,7 @@ class _CustomerPageState extends State<CustomerPage> {
                             value: x,
                             child: Text(
                               _masterDisplay(_groupMasters, x),
-                              style: const TextStyle(fontSize: 12),
+                              style: const TextStyle(fontSize: 14),
                             ),
                           ),
                         ),
@@ -954,7 +968,7 @@ class _CustomerPageState extends State<CustomerPage> {
                     child: DropdownButtonFormField<String>(
                       initialValue: businessFilter,
                       isExpanded: true,
-                      style: const TextStyle(fontSize: 12, height: 1.35),
+                      style: const TextStyle(fontSize: 14, height: 1.35),
                       decoration: const InputDecoration(
                         labelText: 'ประเภทธุรกิจ',
                       ),
@@ -968,7 +982,7 @@ class _CustomerPageState extends State<CustomerPage> {
                             value: x,
                             child: Text(
                               _masterDisplay(_businessMasters, x),
-                              style: const TextStyle(fontSize: 12),
+                              style: const TextStyle(fontSize: 14),
                             ),
                           ),
                         ),
@@ -1008,24 +1022,26 @@ class _CustomerPageState extends State<CustomerPage> {
     List<Map<String, dynamic>> data,
     Color accent,
     double width,
-  ) => Card(
-    margin: const EdgeInsets.symmetric(horizontal: 16),
-    color: Colors.white,
-    surfaceTintColor: Colors.transparent,
-    elevation: 0,
-    clipBehavior: Clip.antiAlias,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(4),
-      side: BorderSide.none,
-    ),
-    child: Theme(
-      data: Theme.of(context).copyWith(dividerColor: Colors.grey.shade300),
-      child: SingleChildScrollView(
+  ) => SizedBox(
+    width: double.infinity,
+    height: 58 + (data.length * 64),
+    child: Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      color: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(4),
+        side: BorderSide.none,
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.grey.shade300),
         child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minWidth: width < 900 ? 900 : width),
-            child: DataTable(
+          child: SizedBox(
+            width: width,
+            child: PinnedDataTable(
               border: TableBorder(
                 horizontalInside: BorderSide(
                   color: Colors.grey.shade300,
@@ -1037,27 +1053,26 @@ class _CustomerPageState extends State<CustomerPage> {
               ),
               dataRowMinHeight: 52,
               dataRowMaxHeight: 64,
-              columns:
-                  [
-                        'ID',
-                        'Action',
-                        'แนบไฟล์',
-                        'รหัสลูกค้า',
-                        'ชื่อลูกค้า',
-                        'โทรศัพท์',
-                      ]
-                      .map(
-                        (h) => DataColumn(
-                          label: Text(
-                            h,
-                            style: TextStyle(
-                              color: accent,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      )
-                      .toList(),
+              columns: [
+                LaooTableColumns.id,
+                ...[
+                  'Action',
+                  'แนบไฟล์',
+                  'รหัสลูกค้า',
+                  'ชื่อลูกค้า',
+                  'โทรศัพท์',
+                ].map(
+                  (h) => DataColumn(
+                    label: Text(
+                      h,
+                      style: TextStyle(
+                        color: accent,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
               rows: data
                   .map(
                     (x) => DataRow(
@@ -1385,7 +1400,11 @@ class _CustomerPageState extends State<CustomerPage> {
                     Expanded(
                       child: Text(
                         'ยืนยันการลบข้อมูล',
-                        style: LaooTypography.screenCaptionStyle,
+                        style: TextStyle(
+                          color: accent,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ],
@@ -1787,23 +1806,16 @@ class _CustomerFormState extends State<CustomerForm> {
             ),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: WorkspacePageTitle(
-                      title:
-                          'ข้อมูลลูกค้า > ${widget.initial['customerID'] == null ? 'เพิ่ม' : 'แก้ไข'}',
-                      favoriteKey: '09001',
-                      titleColor: Colors.black,
-                    ),
-                  ),
+              child: WorkspaceActionHeader(
+                title:
+                    'ข้อมูลลูกค้า > ${widget.initial['customerID'] == null ? 'เพิ่ม' : 'แก้ไข'}',
+                favoriteKey: '09001',
+                actions: [
                   const Text('สถานะติดต่อ'),
-                  const SizedBox(width: 6),
                   Switch(
                     value: _active,
                     onChanged: (value) => setState(() => _active = value),
                   ),
-                  const SizedBox(width: 12),
                   OutlinedButton.icon(
                     onPressed: widget.onCancel,
                     style: OutlinedButton.styleFrom(
@@ -1814,7 +1826,6 @@ class _CustomerFormState extends State<CustomerForm> {
                     icon: const Icon(Icons.close),
                     label: const Text('ยกเลิก'),
                   ),
-                  const SizedBox(width: 8),
                   FilledButton.icon(
                     onPressed: saving ? null : save,
                     style: FilledButton.styleFrom(
@@ -2412,7 +2423,7 @@ class _CustomerFormState extends State<CustomerForm> {
         ),
         child: Text(
           _salespersonLabel,
-          style: const TextStyle(fontSize: 12),
+          style: const TextStyle(fontSize: 14),
           overflow: TextOverflow.ellipsis,
         ),
       ),
@@ -2456,7 +2467,11 @@ class _CustomerFormState extends State<CustomerForm> {
                     const Expanded(
                       child: Text(
                         'เลือกผู้รับผิดชอบการขาย',
-                        style: LaooTypography.screenCaptionStyle,
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                   ],
@@ -2711,7 +2726,7 @@ class _CustomerFormState extends State<CustomerForm> {
             ),
             Text(
               _pendingBusinessCardName ?? '',
-              style: const TextStyle(fontSize: 11),
+              style: const TextStyle(fontSize: 14),
             ),
           ],
           if (businessCards.isNotEmpty) ...[
@@ -2727,7 +2742,7 @@ class _CustomerFormState extends State<CustomerForm> {
           const SizedBox(height: 4),
           const Text(
             'รองรับรูปภาพนามบัตร และเอกสาร Word, Excel, PDF, TXT, CSV ขนาดไม่เกิน 10 MB ต่อไฟล์',
-            style: TextStyle(fontSize: 11, color: Colors.grey),
+            style: TextStyle(fontSize: 14, color: Colors.grey),
           ),
         ],
       ),
@@ -2755,12 +2770,12 @@ class _CustomerFormState extends State<CustomerForm> {
         initialValue: valid,
         isExpanded: true,
         style: TextStyle(
-          fontSize: 12,
+          fontSize: 14,
           color: Theme.of(context).colorScheme.onSurface,
         ),
         decoration: InputDecoration(
           labelText: '* $label',
-          labelStyle: const TextStyle(fontSize: 12),
+          labelStyle: const TextStyle(fontSize: 14),
         ),
         items: options.map((x) {
           final code = '${x['code'] ?? x['masterCode'] ?? ''}';
@@ -2769,7 +2784,7 @@ class _CustomerFormState extends State<CustomerForm> {
             value: code,
             child: Text(
               name,
-              style: const TextStyle(fontSize: 12),
+              style: const TextStyle(fontSize: 14),
               overflow: TextOverflow.ellipsis,
             ),
           );

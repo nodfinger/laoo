@@ -8,6 +8,7 @@ import '../../../../app/theme/laoo_design_tokens.dart';
 import '../../../../app/theme/laoo_typography.dart';
 import '../../../../app/theme/workspace_theme_presets.dart';
 import '../../../../core/navigation/navigation_menu_repository.dart';
+import '../../../../core/widgets/pinned_data_table.dart';
 import '../../../../core/widgets/timed_snack_bar.dart';
 import '../../../support/presentation/widgets/support_workspace_shell.dart';
 import '../data/pre_order_api.dart';
@@ -262,7 +263,11 @@ class _PreOrderActionPageState extends State<PreOrderActionPage> {
                 const SizedBox(width: 8),
                 Text(
                   'เลือกใบเสนอราคา',
-                  style: LaooTypography.screenCaptionStyle,
+                  style: TextStyle(
+                    color: LaooColors.textPrimary,
+                    fontSize: LaooTypography.workspaceCaption,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ],
             ),
@@ -439,7 +444,11 @@ class _PreOrderActionPageState extends State<PreOrderActionPage> {
                 const SizedBox(width: 8),
                 Text(
                   index == null ? 'เพิ่มรายการสินค้า' : 'แก้ไขรายการสินค้า',
-                  style: LaooTypography.screenCaptionStyle,
+                  style: const TextStyle(
+                    color: LaooColors.textPrimary,
+                    fontSize: LaooTypography.workspaceCaption,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ],
             ),
@@ -663,7 +672,10 @@ class _PreOrderActionPageState extends State<PreOrderActionPage> {
           children: [
             Icon(Icons.delete_outline, color: Colors.red),
             SizedBox(width: 8),
-            Text('ยืนยันการลบข้อมูล', style: LaooTypography.screenCaptionStyle),
+            Text(
+              'ยืนยันการลบข้อมูล',
+              style: TextStyle(color: Colors.red, fontWeight: FontWeight.w700),
+            ),
           ],
         ),
         content: Column(
@@ -1046,14 +1058,14 @@ class _PreOrderActionPageState extends State<PreOrderActionPage> {
                 scrollDirection: Axis.horizontal,
                 child: ConstrainedBox(
                   constraints: BoxConstraints(minWidth: constraints.maxWidth),
-                  child: DataTable(
+                  child: PinnedDataTable(
                     headingRowColor: WidgetStatePropertyAll(
                       accent.withValues(alpha: .10),
                     ),
                     dividerThickness: .6,
                     columnSpacing: 18,
                     columns: const [
-                      DataColumn(label: Text('ID')),
+                      LaooTableColumns.id,
                       DataColumn(label: Text('Action')),
                       DataColumn(label: Text('รหัสสินค้า')),
                       DataColumn(label: Text('ชื่อสินค้า')),
@@ -1269,16 +1281,11 @@ class _PreOrderActionPageState extends State<PreOrderActionPage> {
                             horizontal: 16,
                             vertical: 14,
                           ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: WorkspacePageTitle(
-                                  title:
-                                      '$_menuName > ${_isEdit ? 'แก้ไข' : 'เพิ่ม'}',
-                                  favoriteKey: _activeMenu,
-                                  titleColor: Colors.black,
-                                ),
-                              ),
+                          child: WorkspaceActionHeader(
+                            title:
+                                '$_menuName > ${_isEdit ? 'แก้ไข' : 'เพิ่ม'}',
+                            favoriteKey: _activeMenu,
+                            actions: [
                               OutlinedButton.icon(
                                 style: TextButton.styleFrom(
                                   foregroundColor: accent,
@@ -1291,7 +1298,6 @@ class _PreOrderActionPageState extends State<PreOrderActionPage> {
                                 icon: const Icon(Icons.close),
                                 label: const Text('ยกเลิก'),
                               ),
-                              const SizedBox(width: 8),
                               FilledButton.icon(
                                 style: FilledButton.styleFrom(
                                   backgroundColor: accent,

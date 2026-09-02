@@ -1,4 +1,4 @@
-namespace Laoo.Api.Infrastructure.Database;
+namespace Laoo.Service.Api.Infrastructure.Database;
 
 public interface ISqlConnectionChecker
 {

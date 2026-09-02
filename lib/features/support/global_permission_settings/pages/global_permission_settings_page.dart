@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../../../app/theme/laoo_typography.dart';
 import '../../../../app/theme/workspace_theme_presets.dart';
 import '../../../../core/widgets/timed_snack_bar.dart';
 import '../../presentation/widgets/support_workspace_shell.dart';
@@ -68,7 +67,11 @@ class _GlobalPermissionSettingsPageState
                     Expanded(
                       child: Text(
                         _caption,
-                        style: LaooTypography.screenCaptionStyle,
+                        style: TextStyle(
+                          color: accent,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                   ],
@@ -229,7 +232,11 @@ class _GlobalPermissionSettingsPageState
                 children: [
                   Text(
                     'เพิ่มประเภทสิทธิ์',
-                    style: LaooTypography.screenCaptionStyle,
+                    style: TextStyle(
+                      color: accent,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                   const SizedBox(height: 10),
                   Container(
@@ -360,7 +367,11 @@ class _GlobalPermissionSettingsPageState
                 children: [
                   Text(
                     'แก้ไขประเภทสิทธิ์',
-                    style: LaooTypography.screenCaptionStyle,
+                    style: TextStyle(
+                      color: accent,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                   const SizedBox(height: 10),
                   Container(
@@ -488,7 +499,11 @@ class _GlobalPermissionSettingsPageState
                     const SizedBox(width: 12),
                     Text(
                       'ยืนยันการลบข้อมูล',
-                      style: LaooTypography.screenCaptionStyle,
+                      style: TextStyle(
+                        color: accent,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ],
                 ),

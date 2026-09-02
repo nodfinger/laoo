@@ -31,8 +31,8 @@ class _LaooAppState extends State<LaooApp> {
 
     if (appAuthController.isAuthenticated) {
       try {
-          await companySetupController.load();
-          WindowTitleService.setTitle(companySetupController.appTitle);
+        await companySetupController.load();
+        WindowTitleService.setTitle(companySetupController.appTitle);
       } catch (error) {
         debugPrint('Unable to load Company Setup: $error');
       }
@@ -52,10 +52,7 @@ class _LaooAppState extends State<LaooApp> {
           GlobalWidgetsLocalizations.delegate,
           GlobalCupertinoLocalizations.delegate,
         ],
-        supportedLocales: const [
-          Locale('th', 'TH'),
-          Locale('en', 'US'),
-        ],
+        supportedLocales: const [Locale('th', 'TH'), Locale('en', 'US')],
         routerConfig: appRouter,
       ),
     );

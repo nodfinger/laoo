@@ -28,10 +28,12 @@ public sealed class MenuPermissionController(IConfiguration configuration) : Con
               CAST(CASE WHEN MAX(CASE WHEN RP.ActionCode='DELETE' AND RP.IsAllowed=1 THEN 1 ELSE 0 END)=1 THEN 1 ELSE 0 END AS bit)
             FROM dbo.TDADMainMenu M
             INNER JOIN dbo.TDADMenuGroup G ON G.MenuGroupCode=M.MenuGroupCode AND G.IsActive=1
+            INNER JOIN dbo.TDADProjectMenuGroup PG ON PG.ProjectID=@ProjectID AND PG.MenuGroupCode=G.MenuGroupCode AND PG.IsActive=1
+            INNER JOIN dbo.TDADProjectMenu PM ON PM.ProjectID=@ProjectID AND PM.MenuCode=M.MenuCode AND PM.MenuGroupCode=G.MenuGroupCode AND PM.IsActive=1
             LEFT JOIN dbo.TDADRoleGroupPermission RP ON RP.MenuCode=M.MenuCode AND RP.RoleGroupID=@RoleGroupID AND RP.ProjectID=@ProjectID
             WHERE M.IsActive=1 AND M.IsVisible=1
               AND UPPER(LTRIM(RTRIM(G.AudienceType))) IN (N'A',@AudienceType)
-            GROUP BY M.MenuCode,M.MenuName,M.MenuGroupCode,G.MenuGroupName,G.SortOrder,M.ScreenType,M.SortOrder ORDER BY G.SortOrder,M.SortOrder,M.MenuCode;
+            GROUP BY M.MenuCode,M.MenuName,M.MenuGroupCode,G.MenuGroupName,PG.SortOrder,M.ScreenType,PM.SortOrder ORDER BY PG.SortOrder,PM.SortOrder,M.MenuCode;
             """;
         await using var command = new SqlCommand(sql, connection);
         Add(command,"@RoleGroupID",SqlDbType.BigInt,roleGroupId); Add(command,"@ProjectID",SqlDbType.BigInt,targetScope.ProjectId); Add(command,"@AudienceType",SqlDbType.Char,prefix switch { "10" => "C", "12" => "L", _ => "P" });
@@ -122,6 +124,8 @@ public sealed class MenuPermissionController(IConfiguration configuration) : Con
             SELECT @ScreenType=M.ScreenType
             FROM dbo.TDADMainMenu M
             INNER JOIN dbo.TDADMenuGroup G ON G.MenuGroupCode=M.MenuGroupCode AND G.IsActive=1
+            INNER JOIN dbo.TDADProjectMenuGroup PG ON PG.ProjectID=@ProjectID AND PG.MenuGroupCode=G.MenuGroupCode AND PG.IsActive=1
+            INNER JOIN dbo.TDADProjectMenu PM ON PM.ProjectID=@ProjectID AND PM.MenuCode=M.MenuCode AND PM.MenuGroupCode=G.MenuGroupCode AND PM.IsActive=1
             WHERE M.MenuCode=@MenuCode AND M.IsActive=1
               AND UPPER(LTRIM(RTRIM(G.AudienceType))) IN (N'A',@AudienceType);
             IF @ScreenType IS NULL THROW 50010,'MENU_SCOPE_INVALID',1;

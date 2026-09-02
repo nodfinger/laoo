@@ -9,6 +9,7 @@ import '../../../../app/theme/laoo_typography.dart';
 import '../../../../app/theme/workspace_theme_presets.dart';
 import '../../../../core/company_setup/company_setup_controller.dart';
 import '../../../../core/navigation/navigation_menu_repository.dart';
+import '../../../../core/widgets/pinned_data_table.dart';
 import '../../../../core/widgets/timed_snack_bar.dart';
 import '../../../profile/data/user_profile_repository.dart';
 import '../../../support/presentation/widgets/support_workspace_shell.dart';
@@ -274,7 +275,14 @@ class _TemporaryReceiptListPageState extends State<TemporaryReceiptListPage> {
           children: [
             Icon(Icons.delete_outline, color: LaooColors.error),
             SizedBox(width: 8),
-            Text('ยืนยันการลบข้อมูล', style: LaooTypography.screenCaptionStyle),
+            Text(
+              'ยืนยันการลบข้อมูล',
+              style: TextStyle(
+                color: LaooColors.error,
+                fontSize: LaooTypography.workspaceCaption,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ],
         ),
         content: Column(
@@ -408,14 +416,14 @@ class _TemporaryReceiptListPageState extends State<TemporaryReceiptListPage> {
       padding: EdgeInsets.zero,
       child: SizedBox(
         width: width,
-        child: DataTable(
+        child: PinnedDataTable(
           headingRowColor: WidgetStatePropertyAll(
             accent.withValues(alpha: .09),
           ),
           dividerThickness: .5,
           columnSpacing: 18,
           columns: const [
-            DataColumn(label: Text('ID')),
+            LaooTableColumns.id,
             DataColumn(label: Text('Action')),
             DataColumn(label: Text('เลขที่เอกสาร')),
             DataColumn(label: Text('วันที่')),
@@ -540,7 +548,7 @@ class _TemporaryReceiptListPageState extends State<TemporaryReceiptListPage> {
                               child: WorkspacePageTitle(
                                 title: _menuName,
                                 favoriteKey: _activeMenu,
-                                titleColor: Colors.black,
+                                titleColor: LaooColors.textPrimary,
                               ),
                             ),
                             if (!compact) ...[
