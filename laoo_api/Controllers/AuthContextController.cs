@@ -400,26 +400,31 @@ public sealed class AuthContextController : ControllerBase
         long projectId,
         CancellationToken cancellationToken)
     {
-        var sql = $$"""
+        const string sql = """
             SELECT project.ProjectID, project.ProjectCode, project.ProjectNameTH,
                    project.ProjectNameEN,
-                   CAST(CASE WHEN EXISTS
-                   (
-                       SELECT 1 FROM dbo.TDADUserProject AS userProject
-                       WHERE userProject.UserID = u.UserID
-                         AND userProject.CompanyID = u.CompanyID
-                         AND userProject.ProjectID = project.ProjectID
-                         AND userProject.IsActive = 1
-                         AND userProject.IsDefault = 1
-                   ) THEN 1 ELSE 0 END AS bit) AS IsDefault
+                   userProject.IsDefault
             FROM dbo.TDADUser AS u
+            INNER JOIN dbo.TDADUserProject AS userProject
+                ON userProject.UserID=u.UserID
+               AND userProject.CompanyID=u.CompanyID
+               AND userProject.IsActive=1
+            INNER JOIN dbo.TDSTCompanySetUp AS company
+                ON company.CompanyID=u.CompanyID AND company.IsActive=1
+            INNER JOIN dbo.TDADCompanyProject AS companyProject
+                ON companyProject.ProjectID=userProject.ProjectID
+               AND companyProject.PartnerID=company.PartnerID
+               AND companyProject.CompanyID=company.CompanyID
+               AND companyProject.IsEnabled=1
+               AND (companyProject.StartDate IS NULL OR companyProject.StartDate<=CONVERT(date,SYSUTCDATETIME()))
+               AND (companyProject.ExpireDate IS NULL OR companyProject.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))
             INNER JOIN dbo.TDADProject AS project
-                ON project.ProjectID = @ProjectID
+                ON project.ProjectID = userProject.ProjectID
                AND project.IsActive = 1
             WHERE u.UserID = @UserID
               AND u.CompanyID = @CompanyID
               AND u.IsActive = 1
-              AND {{AuthenticationProjectAccess.CompanySql}};
+            ORDER BY userProject.IsDefault DESC, project.ProjectID;
             """;
 
         await using var command = CreateIdentityCommand(sql, connection, userId, projectId);

@@ -9,6 +9,7 @@ using Microsoft.Data.SqlClient;
 namespace LaooApi.Controllers;
 
 [ApiController, Authorize]
+[LaooApi.Security.RequireCompanyProject("LAOO_SERVICE")]
 [Route("api/company/items")]
 public sealed class ItemController(IConfiguration configuration, IWebHostEnvironment environment) : ControllerBase
 {

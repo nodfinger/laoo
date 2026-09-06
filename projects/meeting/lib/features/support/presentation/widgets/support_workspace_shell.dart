@@ -301,7 +301,7 @@ class SupportWorkspaceShell extends StatelessWidget {
             ),
           ),
           cardTheme: baseTheme.cardTheme.copyWith(
-            color: preset.surface,
+            color: LaooColors.white,
             surfaceTintColor: Colors.transparent,
             margin: const EdgeInsets.all(LaooLayout.cardMargin),
             shape: RoundedRectangleBorder(

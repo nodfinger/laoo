@@ -64,8 +64,9 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
   }
 
   void _syncDefaultViewMode() {
-    if (mounted)
+    if (mounted) {
       setState(() => _showCards = userDefaultViewModeNotifier.value == 'CARD');
+    }
   }
 
   Future<void> _captionLoad() async {
@@ -87,7 +88,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
         _facilityRepo.get(),
         _branchRepo.get(),
       ]);
-      if (mounted)
+      if (mounted) {
         setState(() {
           _rooms = List<Map<String, dynamic>>.from(data[0] as List);
           _actions = Map<String, bool>.from(data[1] as Map);
@@ -96,12 +97,14 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
           _branches = List<Map<String, dynamic>>.from(data[4] as List);
           _loading = false;
         });
+      }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _message = _error(e, 'โหลดข้อมูลห้องประชุมไม่สำเร็จ');
           _loading = false;
         });
+      }
     }
   }
 
@@ -124,7 +127,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
             child: Image.network(
               _imageUrl(value),
               fit: BoxFit.contain,
-              errorBuilder: (_, __, ___) => const Padding(
+              errorBuilder: (_, _, _) => const Padding(
                 padding: EdgeInsets.all(24),
                 child: Text('ไม่สามารถโหลดรูปได้'),
               ),
@@ -157,7 +160,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                 width: 56,
                 height: 56,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => const SizedBox(
+                errorBuilder: (_, _, _) => const SizedBox(
                   width: 56,
                   height: 56,
                   child: Icon(Icons.broken_image_outlined),
@@ -203,7 +206,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                     child: Image.network(
                       _imageUrl(url),
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Icon(
+                      errorBuilder: (_, _, _) => Icon(
                         Icons.broken_image_outlined,
                         color: preset.border,
                       ),
@@ -412,7 +415,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
     final picked = await _pickFacilities(
       preset,
       selected,
-      roomName: room['code'].toString() + ' ' + room['nameTh'].toString(),
+      roomName: '${room['code']} ${room['nameTh']}',
     );
     if (picked == null) return;
     try {
@@ -425,8 +428,9 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
         await _load();
       }
     } catch (error) {
-      if (mounted)
+      if (mounted) {
         setState(() => _message = _error(error, 'บันทึกอุปกรณ์ไม่สำเร็จ'));
+      }
     }
   }
 
@@ -485,17 +489,19 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                     unit['unitType'] == 'DEP' && unit['isActive'] != false,
               )
               .toList();
-      if (departments.isNotEmpty)
+      if (departments.isNotEmpty) {
         departmentId = departments.first['orgUnitId'] as int;
+      }
       final current = await _repo.contacts((room['roomId'] as num).toInt());
       selected.addAll(
         current.map((item) => (item['employeeId'] as num).toInt()),
       );
     } catch (error) {
-      if (mounted)
+      if (mounted) {
         setState(
           () => _message = _error(error, 'โหลดข้อมูลผู้ดูแลห้องไม่สำเร็จ'),
         );
+      }
     }
     final search = TextEditingController();
     String? dialogMessage;
@@ -507,8 +513,9 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
           final term = search.text.trim().toLowerCase();
           final filtered = employees.where((item) {
             if (departmentId != null &&
-                item['departmentOrgUnitId'] != departmentId)
+                item['departmentOrgUnitId'] != departmentId) {
               return false;
+            }
             final value = [
               item['employeeCode'],
               item['fullName'],
@@ -538,7 +545,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                   color: preset.primary.withValues(alpha: .12),
                   padding: const EdgeInsets.all(12),
                   child: Text(
-                    room['code'].toString() + ' ' + room['nameTh'].toString(),
+                    '${room['code']} ${room['nameTh']}',
                     style: TextStyle(
                       color: preset.primary,
                       fontSize: 16,
@@ -605,7 +612,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                   Expanded(
                     child: ListView.separated(
                       itemCount: filtered.length,
-                      separatorBuilder: (_, __) =>
+                      separatorBuilder: (_, _) =>
                           Divider(color: preset.border, height: 1),
                       itemBuilder: (_, index) {
                         final item = filtered[index];
@@ -617,10 +624,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                           controlAffinity: ListTileControlAffinity.leading,
                           contentPadding: EdgeInsets.zero,
                           title: Text(
-                            item['employeeCode'].toString() +
-                                ' | ' +
-                                item['fullName'].toString() +
-                                (nick.isEmpty ? '' : ' | $nick'),
+                            '${item['employeeCode']} | ${item['fullName']}${nick.isEmpty ? '' : ' | $nick'}',
                           ),
                           onChanged: (value) => refresh(() {
                             if (value == true) {
@@ -707,11 +711,13 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                     unit['unitType'] == 'DEP' && unit['isActive'] != false,
               )
               .toList();
-      if (departments.isNotEmpty)
+      if (departments.isNotEmpty) {
         departmentId = (departments.first['orgUnitId'] as num).toInt();
+      }
     } catch (error) {
-      if (mounted)
+      if (mounted) {
         setState(() => _message = _error(error, 'โหลดกฎห้องประชุมไม่สำเร็จ'));
+      }
       return;
     }
 
@@ -891,8 +897,9 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                     ValueListenableBuilder<String>(
                       valueListenable: modeNotifier,
                       builder: (context, currentMode, _) {
-                        if (currentMode != 'SELECTED')
+                        if (currentMode != 'SELECTED') {
                           return const SizedBox.shrink();
+                        }
                         return StatefulBuilder(
                           builder: (context, refreshApprovers) => Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -968,7 +975,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                               SwitchListTile(
                                 contentPadding: EdgeInsets.zero,
                                 value: requireAll,
-                                activeColor: preset.primary,
+                                activeThumbColor: preset.primary,
                                 title: const Text('ต้องอนุมัติครบทุกคน'),
                                 onChanged: (value) =>
                                     refreshApprovers(() => requireAll = value),
@@ -1447,7 +1454,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                   context: context,
                   builder: (_) => Dialog(
                     child: InteractiveViewer(
-                      child: Image.memory(file!.bytes!, fit: BoxFit.contain),
+                      child: Image.memory(file.bytes!, fit: BoxFit.contain),
                     ),
                   ),
                 ),
@@ -1461,13 +1468,13 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
             }
             if (url?.isNotEmpty == true) {
               return InkWell(
-                onTap: () => _showRoomImage(url!),
+                onTap: () => _showRoomImage(url),
                 child: Image.network(
                   _imageUrl(url!),
                   width: 130,
                   height: 82,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => SizedBox(
+                  errorBuilder: (_, _, _) => SizedBox(
                     width: 130,
                     height: 82,
                     child: Icon(
@@ -1572,9 +1579,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                                 (b) => DropdownMenuItem<int>(
                                   value: b['branchId'] as int,
                                   child: Text(
-                                    b['branchCode'].toString() +
-                                        ' ' +
-                                        b['branchNameTh'].toString(),
+                                    '${b['branchCode']} ${b['branchNameTh']}',
                                   ),
                                 ),
                               )
@@ -1602,9 +1607,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                                 (b) => DropdownMenuItem<int>(
                                   value: b['buildingId'] as int,
                                   child: Text(
-                                    b['code'].toString() +
-                                        ' ' +
-                                        b['nameTh'].toString(),
+                                    '${b['code']} ${b['nameTh']}',
                                   ),
                                 ),
                               )
@@ -1633,9 +1636,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                                 (f) => DropdownMenuItem<int>(
                                   value: f['floorId'] as int,
                                   child: Text(
-                                    f['code'].toString() +
-                                        ' ' +
-                                        f['nameTh'].toString(),
+                                    '${f['code']} ${f['nameTh']}',
                                   ),
                                 ),
                               )
@@ -1795,9 +1796,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                             facilityValues,
                             roomName: item == null
                                 ? null
-                                : item['code'].toString() +
-                                      ' ' +
-                                      item['nameTh'].toString(),
+                                : '${item['code']} ${item['nameTh']}',
                           );
                           if (picked != null) {
                             refresh(
@@ -1833,15 +1832,19 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                         ),
                         onPressed: () {
                           if (branchId == null) branchError = 'กรุณาเลือกสาขา';
-                          if (buildingId == null)
+                          if (buildingId == null) {
                             buildingError = 'กรุณาเลือกอาคาร';
+                          }
                           if (floorId == null) floorError = 'กรุณาเลือกชั้น';
-                          if (code.text.trim().isEmpty)
+                          if (code.text.trim().isEmpty) {
                             codeError = 'กรุณากรอกรหัสห้อง';
-                          if (name.text.trim().isEmpty)
+                          }
+                          if (name.text.trim().isEmpty) {
                             nameError = 'กรุณากรอกชื่อห้อง';
-                          if (capacity.text.trim().isEmpty)
+                          }
+                          if (capacity.text.trim().isEmpty) {
                             capacityError = 'กรุณากรอกความจุ';
+                          }
                           final parsedCapacity = int.tryParse(
                             capacity.text.trim(),
                           );
@@ -1913,8 +1916,9 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
       withData: true,
     );
     final f = result?.files.single;
-    if (f?.bytes != null && f!.size <= 1024 * 1024)
+    if (f?.bytes != null && f!.size <= 1024 * 1024) {
       await _repo.uploadImage(id, kind, f.bytes!, f.name);
+    }
   }
 
   Future<Map<int, Map<String, dynamic>>?> _pickFacilities(
@@ -1955,7 +1959,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                     vertical: 10,
                   ),
                   child: Text(
-                    roomName!,
+                    roomName,
                     style: TextStyle(
                       color: preset.primary,
                       fontSize: LaooTypography.sectionTitle,
@@ -2149,8 +2153,9 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
         await _load();
       }
     } catch (error) {
-      if (mounted)
+      if (mounted) {
         setState(() => _message = _error(error, 'ลบข้อมูลไม่สำเร็จ'));
+      }
     }
   }
 
@@ -2377,7 +2382,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                               style: const TextStyle(
                                 fontSize: LaooTypography.comboBox,
                               ),
-                              value: _filterBranchId,
+                              initialValue: _filterBranchId,
                               decoration: const InputDecoration(
                                 labelText: 'สาขา',
                               ),
@@ -2418,7 +2423,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                               style: const TextStyle(
                                 fontSize: LaooTypography.comboBox,
                               ),
-                              value:
+                              initialValue:
                                   filterBuildings.any(
                                     (b) => b['buildingId'] == _filterBuildingId,
                                   )
@@ -2463,7 +2468,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                               style: const TextStyle(
                                 fontSize: LaooTypography.comboBox,
                               ),
-                              value:
+                              initialValue:
                                   filterFloors.any(
                                     (f) => f['floorId'] == _filterFloorId,
                                   )

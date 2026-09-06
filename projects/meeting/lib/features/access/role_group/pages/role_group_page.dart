@@ -502,8 +502,9 @@ class _ListState extends State<_List> {
   }
 
   void _syncDefaultViewMode() {
-    if (mounted)
+    if (mounted) {
       setState(() => _showCards = userDefaultViewModeNotifier.value == 'CARD');
+    }
   }
 
   void _sort(int column, bool ascending) => setState(() {

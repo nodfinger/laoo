@@ -7,6 +7,7 @@ using Microsoft.Data.SqlClient;
 namespace LaooApi.Controllers;
 
 [ApiController, Route("api/company/meeting-food-plans"), Authorize]
+[LaooApi.Security.RequireCompanyProject("LAOO_MEETING")]
 public sealed class MeetingFoodPlanController(IConfiguration configuration) : ControllerBase
 {
     private const string ScreenCode = "21005";
@@ -192,11 +193,7 @@ GROUP BY B.BookingID,B.BookingNo,B.Subject,B.BookingStatus,R.RoomCode,R.RoomName
     { Add(command, "@company", company); Add(command, "@user", user); Add(command, "@search", string.IsNullOrWhiteSpace(search) ? null : search.Trim()); }
     private async Task<bool> Allowed(SqlConnection connection, string action, CancellationToken token)
     {
-        if (!Scope(out var company, out var user) || !long.TryParse(User.FindFirstValue("project_id"), out var project)) return false;
-        const string sql = "SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADUser WHERE UserID=@user AND CompanyID=@company AND IsActive=1 AND IsCompanyAdmin=1) OR EXISTS(SELECT 1 FROM dbo.TDADUserPermission UP INNER JOIN dbo.TDADPermission P ON P.PermissionID=UP.PermissionID AND P.ProjectID=UP.ProjectID WHERE UP.UserID=@user AND UP.ProjectID=@project AND UP.IsAllowed=1 AND UP.IsActive=1 AND P.IsActive=1 AND P.ScreenCode=@screen AND P.ActionCode=@action) THEN 1 ELSE 0 END";
-        await using var command = new SqlCommand(sql, connection);
-        Add(command, "@user", user); Add(command, "@company", company); Add(command, "@project", project); Add(command, "@screen", ScreenCode); Add(command, "@action", action);
-        return Convert.ToBoolean(await command.ExecuteScalarAsync(token));
+        return await LaooApi.Security.CompanyProjectPermission.IsAllowedAsync(connection, User, ScreenCode, action, token);
     }
     private bool Scope(out long company, out long user)
     {

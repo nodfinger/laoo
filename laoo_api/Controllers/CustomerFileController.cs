@@ -8,6 +8,7 @@ using Microsoft.Data.SqlClient;
 namespace LaooApi.Controllers;
 
 [ApiController, Authorize]
+[LaooApi.Security.RequireCompanyProject("LAOO_SERVICE")]
 [Route("api/company/customers/{customerId:long}/files")]
 public sealed class CustomerFileController(IConfiguration configuration, IWebHostEnvironment environment) : ControllerBase
 {

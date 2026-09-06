@@ -1,5 +1,17 @@
 namespace LaooApi.Models.Navigation;
 
+public sealed class NavigationProjectResponse
+{
+    public long ProjectId { get; init; }
+    public string ProjectCode { get; init; } = string.Empty;
+    public string ProjectName { get; init; } = string.Empty;
+    public string ProjectType { get; init; } = string.Empty;
+    public string? IconName { get; init; }
+    public int SortOrder { get; init; }
+    public bool IsExpandedDefault { get; init; }
+    public List<NavigationMenuGroupResponse> MenuGroups { get; init; } = [];
+}
+
 public sealed class NavigationMenuGroupResponse
 {
     public string MenuGroupCode { get; init; } = string.Empty;

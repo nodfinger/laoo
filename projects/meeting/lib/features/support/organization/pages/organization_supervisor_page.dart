@@ -38,7 +38,7 @@ class _OrganizationSupervisorPageState
 
   Future<void> _loadCaption() async {
     final value = await NavigationMenuRepository().resolveMenuName(
-      menuCode: '23005',
+      menuCode: '10007',
       routeName: 'companySupervisors',
       fallback: 'กำหนดผู้บังคับบัญชา',
     );
@@ -67,11 +67,12 @@ class _OrganizationSupervisorPageState
         _loading = false;
       });
     } catch (error) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _loading = false;
           _message = _error(error, 'โหลดข้อมูลผู้บังคับบัญชาไม่สำเร็จ');
         });
+      }
     }
   }
 
@@ -100,10 +101,11 @@ class _OrganizationSupervisorPageState
       setState(() => _message = 'บันทึกผู้บังคับบัญชาสำเร็จ');
       await _load();
     } catch (error) {
-      if (mounted)
+      if (mounted) {
         setState(
           () => _message = _error(error, 'บันทึกผู้บังคับบัญชาไม่สำเร็จ'),
         );
+      }
     } finally {
       if (mounted) setState(() => _saving.remove(unitId));
     }
@@ -266,8 +268,9 @@ class _OrganizationSupervisorPageState
     }
     for (final department in departments) {
       final id = (department['orgUnitId'] as num).toInt();
-      if (!used.contains(id))
+      if (!used.contains(id)) {
         blocks.add(_groupBlock(department, const [], preset));
+      }
     }
     return blocks;
   }
@@ -278,7 +281,7 @@ class _OrganizationSupervisorPageState
     return SupportWorkspaceShell(
       menuScope: WorkspaceMenuScope.company,
       pageTitle: _caption,
-      activeMenu: '23005',
+      activeMenu: '10007',
       child: Stack(
         children: [
           Padding(
@@ -289,7 +292,7 @@ class _OrganizationSupervisorPageState
                 WorkspaceSectionCard(
                   child: WorkspacePageTitle(
                     title: _caption,
-                    favoriteKey: '23005',
+                    favoriteKey: '10007',
                   ),
                 ),
                 const SizedBox(height: 8),

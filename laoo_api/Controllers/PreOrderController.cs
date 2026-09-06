@@ -8,6 +8,7 @@ using Microsoft.Data.SqlClient;
 namespace LaooApi.Controllers;
 
 [ApiController, Authorize, LaooApi.Security.RequireCompanyFeature("SALES")]
+[LaooApi.Security.RequireCompanyProject("LAOO_SERVICE")]
 [Route("api/company/pre-orders")]
 public sealed class PreOrderController(IConfiguration configuration) : ControllerBase
 {

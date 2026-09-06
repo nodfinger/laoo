@@ -1,5 +1,4 @@
 import '../api/api_client.dart';
-import '../config/app_config.dart';
 import '../constants/api_endpoints.dart';
 import 'auth_session.dart';
 import 'auth_storage.dart';
@@ -25,11 +24,7 @@ class AuthService {
     final result = await _apiClient.post(
       ApiEndpoints.login,
       authenticated: false,
-      body: {
-        'username': username,
-        'password': password,
-        'projectCode': AppConfig.projectCode,
-      },
+      body: {'username': username, 'password': password},
     );
 
     final json = result as Map<String, dynamic>;
@@ -77,7 +72,7 @@ class AuthService {
     await _apiClient.post(
       '/api/auth/forgot-password',
       authenticated: false,
-      body: {'username': username.trim(), 'projectCode': AppConfig.projectCode},
+      body: {'username': username.trim()},
     );
   }
 
@@ -135,11 +130,17 @@ class AuthService {
     int? projectId = session.projectId;
 
     if (projects is List && projects.isNotEmpty) {
-      final first = projects.first as Map<String, dynamic>;
+      final projectMaps = projects.whereType<Map<String, dynamic>>().toList();
+      if (projectMaps.isNotEmpty) {
+        final selected = projectMaps.firstWhere(
+          (project) => _toInt(project['projectId']) == session.projectId,
+          orElse: () => projectMaps.first,
+        );
 
-      projectCode = first['projectCode'] as String? ?? projectCode;
+        projectCode = selected['projectCode'] as String? ?? projectCode;
 
-      projectId = _toInt(first['projectId']) ?? projectId;
+        projectId = _toInt(selected['projectId']) ?? projectId;
+      }
     }
 
     return session.copyWith(

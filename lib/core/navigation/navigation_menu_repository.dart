@@ -7,6 +7,7 @@ class NavigationMenuRepository {
   final ApiClient _api;
 
   Future<List<NavigationMenuGroup>>? _menuCache;
+  Future<List<NavigationProject>>? _projectCache;
   static const Map<String, String> _routeFallbackNames = {
     'company': 'ผู้ใช้บริการ/ลูกค้า',
   };
@@ -29,6 +30,20 @@ class NavigationMenuRepository {
       _menuCache = _loadMenus();
     }
     return _menuCache!;
+  }
+
+  Future<List<NavigationProject>> getProjects({bool refresh = false}) {
+    if (refresh || _projectCache == null) {
+      _projectCache = _loadProjects();
+    }
+    return _projectCache!;
+  }
+
+  Future<List<NavigationProject>> _loadProjects() async {
+    final data = await _api.get('/api/navigation/projects');
+    return (data as List<dynamic>)
+        .map((item) => NavigationProject.fromJson(item as Map<String, dynamic>))
+        .toList();
   }
 
   Future<List<NavigationMenuGroup>> _loadMenus() async {

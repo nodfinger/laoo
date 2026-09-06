@@ -34,7 +34,7 @@ abstract final class LaooLayout {
   static const double cardPadding = 10;
   static const double captionCardPaddingVertical = 12;
   static const double dialogInsetPadding = 24;
-  static const double paginationCardHeight = 40;
+  static const double paginationCardHeight = 56;
 }
 
 abstract final class LaooRadius {

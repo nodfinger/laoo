@@ -9,6 +9,7 @@ namespace LaooApi.Controllers;
 [ApiController]
 [Route("api/company/meeting-room-bookings")]
 [Authorize]
+[LaooApi.Security.RequireCompanyProject("LAOO_MEETING")]
 public sealed class MeetingRoomBookingController(IConfiguration configuration) : ControllerBase
 {
     private const string ScreenCode = "21001";
@@ -1121,31 +1122,7 @@ ORDER BY UE.EmployeeID;
         CancellationToken token,
         string screenCode = ScreenCode)
     {
-        if (!TryCompany(out var companyId) || !TryUser(out var userId) || !long.TryParse(User.FindFirstValue("project_id"), out var projectId)) return false;
-        const string sql = """
-SELECT CASE WHEN
-    EXISTS (SELECT 1 FROM dbo.TDADUser U WHERE U.UserID=@user AND U.CompanyID=@company AND U.IsActive=1 AND U.IsCompanyAdmin=1)
- OR EXISTS
-    (SELECT 1 FROM dbo.TDADUserPermission UP
-     INNER JOIN dbo.TDADPermission P ON P.PermissionID=UP.PermissionID AND P.ProjectID=UP.ProjectID
-     WHERE UP.UserID=@user AND UP.ProjectID=@project AND UP.IsAllowed=1 AND UP.IsActive=1
-       AND P.IsActive=1 AND P.ScreenCode=@screen AND P.ActionCode=@action)
- OR EXISTS
-    (SELECT 1 FROM dbo.TDADUser U
-     INNER JOIN dbo.TDADUserEmployee UE ON UE.UserID=U.UserID AND UE.CompanyID=U.CompanyID
-     INNER JOIN dbo.TDADEmployeeRoleGroup ERG ON ERG.EmployeeID=UE.EmployeeID AND ERG.IsActive=1
-     INNER JOIN dbo.TDADRoleGroup RG ON RG.RoleGroupID=ERG.RoleGroupID AND RG.ScopeType='C'
-        AND RG.CompanyID=U.CompanyID AND RG.ProjectID=@project AND RG.IsActive=1
-     INNER JOIN dbo.TDADRoleGroupPermission RP ON RP.RoleGroupID=RG.RoleGroupID AND RP.ProjectID=@project
-        AND RP.MenuCode=@screen AND RP.ActionCode=@action AND RP.IsAllowed=1
-     WHERE U.UserID=@user AND U.CompanyID=@company AND U.IsActive=1
-       AND ERG.EffectiveFrom<=CONVERT(date,SYSUTCDATETIME())
-       AND (ERG.EffectiveTo IS NULL OR ERG.EffectiveTo>=CONVERT(date,SYSUTCDATETIME())))
-THEN 1 ELSE 0 END;
-""";
-        await using var command = new SqlCommand(sql, connection);
-        Add(command, "@user", userId); Add(command, "@company", companyId); Add(command, "@project", projectId); Add(command, "@screen", screenCode); Add(command, "@action", action);
-        return Convert.ToBoolean(await command.ExecuteScalarAsync(token));
+        return await LaooApi.Security.CompanyProjectPermission.IsAllowedAsync(connection, User, screenCode, action, token);
     }
 
     private async Task<SqlConnection> Open(CancellationToken token)

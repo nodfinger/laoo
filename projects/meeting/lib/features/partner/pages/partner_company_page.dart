@@ -1189,33 +1189,36 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
       final start = (page - 2).clamp(0, _pageCount - 5);
       pageIndexes.addAll(List<int>.generate(5, (index) => start + index));
     }
-    return Wrap(
-      spacing: 6,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        _pagerArrow(
-          icon: Icons.chevron_left_rounded,
-          tooltip: 'หน้าก่อนหน้า',
-          enabled: page > 0,
-          onPressed: () => setState(() => _currentPage--),
-        ),
-        if (_pageCount > 7 && pageIndexes.first > 0) ...[
-          _pageNumberButton(0, page),
-          if (pageIndexes.first > 1) const Text('...'),
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Wrap(
+        spacing: 6,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          _pagerArrow(
+            icon: Icons.chevron_left_rounded,
+            tooltip: 'หน้าก่อนหน้า',
+            enabled: page > 0,
+            onPressed: () => setState(() => _currentPage--),
+          ),
+          if (_pageCount > 7 && pageIndexes.first > 0) ...[
+            _pageNumberButton(0, page),
+            if (pageIndexes.first > 1) const Text('...'),
+          ],
+          for (final i in pageIndexes) _pageNumberButton(i, page),
+          if (_pageCount > 7 && pageIndexes.last < _pageCount - 1) ...[
+            if (pageIndexes.last < _pageCount - 2) const Text('...'),
+            _pageNumberButton(_pageCount - 1, page),
+          ],
+          _pagerArrow(
+            icon: Icons.chevron_right_rounded,
+            tooltip: 'หน้าถัดไป',
+            enabled: page < _pageCount - 1,
+            onPressed: () => setState(() => _currentPage++),
+          ),
+          Text('$first-$last จาก ${_items.length}'),
         ],
-        for (final i in pageIndexes) _pageNumberButton(i, page),
-        if (_pageCount > 7 && pageIndexes.last < _pageCount - 1) ...[
-          if (pageIndexes.last < _pageCount - 2) const Text('...'),
-          _pageNumberButton(_pageCount - 1, page),
-        ],
-        _pagerArrow(
-          icon: Icons.chevron_right_rounded,
-          tooltip: 'หน้าถัดไป',
-          enabled: page < _pageCount - 1,
-          onPressed: () => setState(() => _currentPage++),
-        ),
-        Text('$first-$last จาก ${_items.length}'),
-      ],
+      ),
     );
   }
 

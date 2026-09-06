@@ -1,3 +1,41 @@
+class NavigationProject {
+  const NavigationProject({
+    required this.id,
+    required this.code,
+    required this.name,
+    required this.type,
+    required this.menuGroups,
+    this.iconName,
+    this.isExpandedDefault = false,
+  });
+
+  final int id;
+  final String code;
+  final String name;
+  final String type;
+  final String? iconName;
+  final bool isExpandedDefault;
+  final List<NavigationMenuGroup> menuGroups;
+
+  bool get isCore => type.trim().toUpperCase() == 'CORE';
+
+  factory NavigationProject.fromJson(Map<String, dynamic> json) =>
+      NavigationProject(
+        id: (json['projectId'] as num).toInt(),
+        code: json['projectCode'] as String,
+        name: json['projectName'] as String,
+        type: json['projectType'] as String,
+        iconName: json['iconName'] as String?,
+        isExpandedDefault: json['isExpandedDefault'] as bool? ?? false,
+        menuGroups: ((json['menuGroups'] as List<dynamic>?) ?? const [])
+            .map(
+              (group) =>
+                  NavigationMenuGroup.fromJson(group as Map<String, dynamic>),
+            )
+            .toList(),
+      );
+}
+
 class NavigationMenuGroup {
   const NavigationMenuGroup({
     required this.code,

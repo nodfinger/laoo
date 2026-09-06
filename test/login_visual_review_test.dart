@@ -39,10 +39,6 @@ void main() {
     );
     await tester.runAsync(() async {
       await precacheImage(
-        const AssetImage('assets/images/laoo_login_service_hero.png'),
-        tester.element(find.byType(LoginPage)),
-      );
-      await precacheImage(
         const AssetImage('assets/images/laoo_app_icon.png'),
         tester.element(find.byType(LoginPage)),
       );
@@ -50,6 +46,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('เข้าสู่ระบบ'), findsWidgets);
+    expect(find.text('Simple today. Ready Tomorrow.'), findsOneWidget);
     expect(find.text('ชื่อผู้ใช้งาน'), findsOneWidget);
     expect(find.text('รหัสผ่าน'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -73,6 +70,32 @@ void main() {
       size: const Size(390, 844),
       goldenName: 'login_mobile',
     );
+  });
+
+  testWidgets('short mobile viewport can scroll through every login action', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(412, 600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: LaooTheme.fromKey(LaooThemeKey.green),
+        home: const LoginPage(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final registerButton = find.widgetWithText(OutlinedButton, 'สมัครใช้งาน');
+    expect(registerButton, findsOneWidget);
+    await tester.ensureVisible(registerButton);
+    await tester.pumpAndSettle();
+
+    expect(registerButton, findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('login form keeps validation and password visibility', (

@@ -26,7 +26,7 @@ class PartnerPage extends StatelessWidget {
         ],
       ),
       body: const Padding(
-        padding: const EdgeInsets.all(LaooLayout.cardMargin),
+        padding: EdgeInsets.all(LaooLayout.cardMargin),
         child: _PartnerFoundationNotice(),
       ),
     );

@@ -47,22 +47,24 @@ abstract final class AppTheme {
         elevation: 1,
         margin: const EdgeInsets.all(LaooLayout.cardMargin),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
           side: BorderSide.none,
         ),
       ),
       dialogTheme: DialogThemeData(
-        backgroundColor: LaooColors.background,
+        backgroundColor: LaooColors.white,
         surfaceTintColor: Colors.transparent,
         insetPadding: const EdgeInsets.all(LaooLayout.dialogInsetPadding),
         titleTextStyle: LaooTypography.popupTitleStyle,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
           side: BorderSide.none,
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
+        ),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(

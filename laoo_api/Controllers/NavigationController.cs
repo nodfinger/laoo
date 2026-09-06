@@ -19,30 +19,69 @@ public sealed class NavigationController : ControllerBase
     [HttpGet("menus")]
     public async Task<ActionResult<List<NavigationMenuGroupResponse>>> GetMenus(CancellationToken cancellationToken)
     {
+        var projects = await LoadProjectsAsync(cancellationToken);
+        if (projects is null) return Forbid();
+        var groups = projects
+            .SelectMany(project => project.MenuGroups)
+            .GroupBy(group => group.MenuGroupCode)
+            .Select(group => group.First())
+            .ToList();
+        return Ok(groups);
+    }
+
+    [HttpGet("projects")]
+    public async Task<ActionResult<List<NavigationProjectResponse>>> GetProjects(CancellationToken cancellationToken)
+    {
+        var projects = await LoadProjectsAsync(cancellationToken);
+        return projects is null ? Forbid() : Ok(projects);
+    }
+
+    private async Task<List<NavigationProjectResponse>?> LoadProjectsAsync(CancellationToken cancellationToken)
+    {
         var userType = User.FindFirstValue("user_type");
-        if (userType is not ("PARTNER_USER" or "COMPANY_USER" or "LAOO_SUPPORT"))
-            return Forbid();
-        if (LongClaim("project_id") is not long projectId)
-            return Forbid();
+        if (userType is not ("PARTNER_USER" or "COMPANY_USER" or "LAOO_SUPPORT") ||
+            LongClaim("project_id") is not long projectId)
+            return null;
 
         await using var connection = new SqlConnection(_configuration.GetConnectionString("LaooDatabase"));
         await connection.OpenAsync(cancellationToken);
-        var admin = await IsAdminAsync(connection, userType!, cancellationToken);
-        var allowedFeatures = admin ? null : await LoadAllowedFeaturesAsync(connection, userType!, cancellationToken);
+        var admin = await IsAdminAsync(connection, userType, cancellationToken);
+        var allowedFeatures = admin ? null : await LoadAllowedFeaturesAsync(connection, userType, cancellationToken);
         var audienceType = userType == "PARTNER_USER" ? "P" : userType == "COMPANY_USER" ? "C" : "L";
         const string sql = """
-SELECT G.MenuGroupCode, G.MenuGroupName, G.IconName AS GroupIconName, G.SortOrder AS GroupSortOrder,
+WITH AllowedProjects AS
+(
+    SELECT @ProjectID AS ProjectID
+    WHERE @UserType <> N'COMPANY_USER'
+    UNION
+    SELECT UPR.ProjectID
+    FROM dbo.TDADUserProject UPR
+    INNER JOIN dbo.TDADProject PR ON PR.ProjectID=UPR.ProjectID AND PR.IsActive=1
+    INNER JOIN dbo.TDSTCompanySetUp C ON C.CompanyID=UPR.CompanyID AND C.IsActive=1
+    INNER JOIN dbo.TDADCompanyProject CP
+        ON CP.ProjectID=UPR.ProjectID AND CP.CompanyID=UPR.CompanyID
+       AND CP.PartnerID=C.PartnerID AND CP.IsEnabled=1
+       AND (CP.StartDate IS NULL OR CP.StartDate<=CONVERT(date,SYSUTCDATETIME()))
+       AND (CP.ExpireDate IS NULL OR CP.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))
+    WHERE @UserType=N'COMPANY_USER'
+      AND UPR.UserID=@UserID AND UPR.CompanyID=@CompanyID AND UPR.IsActive=1
+)
+SELECT PR.ProjectID,PR.ProjectCode,PR.ProjectNameTH,PR.ProjectType,PR.IconName,
+       PR.SortOrder,PR.IsExpandedDefault,
+       G.MenuGroupCode, G.MenuGroupName, G.IconName AS GroupIconName, G.SortOrder AS GroupSortOrder,
        G.IsExpandedDefault, M.MenuCode, M.MenuName, M.RouteName, M.RoutePath, M.FeatureCode,
        M.IconName, M.SortOrder, M.IsFavoriteAllowed
-FROM dbo.TDADMenuGroup G
+FROM AllowedProjects AP
+INNER JOIN dbo.TDADProject PR ON PR.ProjectID=AP.ProjectID AND PR.IsActive=1
 INNER JOIN dbo.TDADProjectMenuGroup PG
-    ON PG.MenuGroupCode = G.MenuGroupCode AND PG.ProjectID = @ProjectID AND PG.IsActive = 1
+    ON PG.ProjectID = AP.ProjectID AND PG.IsActive = 1
+INNER JOIN dbo.TDADMenuGroup G
+    ON G.MenuGroupCode=PG.MenuGroupCode AND G.IsActive=1
 INNER JOIN dbo.TDADMainMenu M ON M.MenuGroupCode = G.MenuGroupCode AND M.IsActive = 1 AND M.IsVisible = 1
 INNER JOIN dbo.TDADProjectMenu PM
     ON PM.MenuCode = M.MenuCode AND PM.MenuGroupCode = G.MenuGroupCode
-   AND PM.ProjectID = @ProjectID AND PM.IsActive = 1
-WHERE G.IsActive = 1
-  AND UPPER(LTRIM(RTRIM(G.AudienceType))) IN (N'A',@AudienceType)
+   AND PM.ProjectID = AP.ProjectID AND PM.IsActive = 1
+WHERE UPPER(LTRIM(RTRIM(G.AudienceType))) IN (N'A',@AudienceType)
   AND (
         ISNULL(G.OpenOption, 0) = 0
         OR @UserType <> N'COMPANY_USER'
@@ -54,7 +93,7 @@ WHERE G.IsActive = 1
                 SELECT 1
                 FROM dbo.TDADCompanyFeature CF
                 INNER JOIN dbo.TDADFeature F ON F.FeatureCode = CF.FeatureCode AND F.IsActive = 1
-                WHERE CF.ProjectID = @ProjectID
+                WHERE CF.ProjectID = AP.ProjectID
                   AND CF.CompanyID = @CompanyID
                   AND CF.FeatureCode = M.FeatureCode
                   AND CF.IsEnabled = 1
@@ -63,25 +102,44 @@ WHERE G.IsActive = 1
             )
         )
       )
-ORDER BY PG.SortOrder, PM.SortOrder, M.MenuCode;
+ORDER BY PR.SortOrder,PG.SortOrder,PM.SortOrder,M.MenuCode;
 """;
         await using var command = new SqlCommand(sql, connection);
         command.Parameters.Add("@AudienceType", SqlDbType.Char).Value = audienceType;
         command.Parameters.Add("@UserType", SqlDbType.NVarChar, 30).Value = userType;
         command.Parameters.Add("@ProjectID", SqlDbType.BigInt).Value = projectId;
         command.Parameters.Add("@CompanyID", SqlDbType.BigInt).Value = LongClaim("company_id") is long companyId ? companyId : DBNull.Value;
+        command.Parameters.Add("@UserID", SqlDbType.BigInt).Value = LongClaim("user_id") is long userId ? userId : DBNull.Value;
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        var all = new List<(NavigationMenuGroupResponse Group, NavigationMenuItemResponse Item)>();
+        var all = new List<(NavigationProjectResponse Project, NavigationMenuGroupResponse Group, NavigationMenuItemResponse Item)>();
         while (await reader.ReadAsync(cancellationToken))
         {
-            var group = new NavigationMenuGroupResponse { MenuGroupCode = reader.GetString(0).Trim(), MenuGroupName = reader.GetString(1), IconName = N(reader, 2), SortOrder = reader.GetInt32(3), IsExpandedDefault = reader.GetBoolean(4) };
-            var item = new NavigationMenuItemResponse { MenuCode = reader.GetString(5), MenuName = reader.GetString(6), RouteName = N(reader, 7), RoutePath = N(reader, 8), FeatureCode = N(reader, 9), IconName = N(reader, 10), SortOrder = reader.GetInt32(11), IsFavoriteAllowed = reader.GetBoolean(12) };
+            var project = new NavigationProjectResponse { ProjectId = reader.GetInt64(0), ProjectCode = reader.GetString(1), ProjectName = reader.GetString(2), ProjectType = reader.GetString(3), IconName = N(reader, 4), SortOrder = reader.GetInt32(5), IsExpandedDefault = reader.GetBoolean(6) };
+            var group = new NavigationMenuGroupResponse { MenuGroupCode = reader.GetString(7).Trim(), MenuGroupName = reader.GetString(8), IconName = N(reader, 9), SortOrder = reader.GetInt32(10), IsExpandedDefault = reader.GetBoolean(11) };
+            var item = new NavigationMenuItemResponse { MenuCode = reader.GetString(12), MenuName = reader.GetString(13), RouteName = N(reader, 14), RoutePath = N(reader, 15), FeatureCode = N(reader, 16), IconName = N(reader, 17), SortOrder = reader.GetInt32(18), IsFavoriteAllowed = reader.GetBoolean(19) };
             if (admin || allowedFeatures!.Contains(item.MenuCode))
-            {
-                all.Add((group, item));
-            }
+                all.Add((project, group, item));
         }
-        return Ok(all.GroupBy(x => x.Group.MenuGroupCode).Select(g => { var first = g.First().Group; first.Items.AddRange(g.Select(x => x.Item)); return first; }).ToList());
+
+        return all
+            .GroupBy(x => x.Project.ProjectId)
+            .Select(projectRows =>
+            {
+                var project = projectRows.First().Project;
+                project.MenuGroups.AddRange(projectRows
+                    .GroupBy(x => x.Group.MenuGroupCode)
+                    .Select(groupRows =>
+                    {
+                        var group = groupRows.First().Group;
+                        group.Items.AddRange(groupRows
+                            .GroupBy(x => x.Item.MenuCode)
+                            .Select(items => items.First().Item));
+                        return group;
+                    }));
+                return project;
+            })
+            .OrderBy(project => project.SortOrder)
+            .ToList();
     }
 
     private async Task<bool> IsAdminAsync(SqlConnection connection, string userType, CancellationToken token)
@@ -176,14 +234,16 @@ SELECT P.ScreenCode
 FROM dbo.TDADUserPermission UP
 INNER JOIN dbo.TDADPermission P ON P.PermissionID=UP.PermissionID AND P.ProjectID=UP.ProjectID
 INNER JOIN dbo.TDADUser U ON U.UserID=UP.UserID AND U.IsActive=1
-WHERE U.UserID=@ID AND U.CompanyID=@OwnerID AND UP.ProjectID=@ProjectID AND UP.IsAllowed=1 AND UP.IsActive=1 AND P.IsActive=1 AND P.ActionCode='VIEW'
+INNER JOIN dbo.TDADUserProject UPR ON UPR.UserID=U.UserID AND UPR.CompanyID=U.CompanyID AND UPR.ProjectID=UP.ProjectID AND UPR.IsActive=1
+WHERE U.UserID=@ID AND U.CompanyID=@OwnerID AND UP.IsAllowed=1 AND UP.IsActive=1 AND P.IsActive=1 AND P.ActionCode='VIEW'
 UNION
 SELECT RP.MenuCode
 FROM dbo.TDADUser U
 INNER JOIN dbo.TDADUserEmployee UE ON UE.UserID=U.UserID
 INNER JOIN dbo.TDADEmployeeRoleGroup ERG ON ERG.EmployeeID=UE.EmployeeID
-INNER JOIN dbo.TDADRoleGroup RG ON RG.RoleGroupID=ERG.RoleGroupID AND RG.ScopeType='C' AND RG.CompanyID=U.CompanyID AND RG.ProjectID=@ProjectID
-INNER JOIN dbo.TDADRoleGroupPermission RP ON RP.RoleGroupID=RG.RoleGroupID AND RP.ProjectID=@ProjectID AND RP.ActionCode='VIEW' AND RP.IsAllowed=1
+INNER JOIN dbo.TDADRoleGroup RG ON RG.RoleGroupID=ERG.RoleGroupID AND RG.ScopeType='C' AND RG.CompanyID=U.CompanyID
+INNER JOIN dbo.TDADRoleGroupPermission RP ON RP.RoleGroupID=RG.RoleGroupID AND RP.ProjectID=RG.ProjectID AND RP.ActionCode='VIEW' AND RP.IsAllowed=1
+INNER JOIN dbo.TDADUserProject UPR ON UPR.UserID=U.UserID AND UPR.CompanyID=U.CompanyID AND UPR.ProjectID=RG.ProjectID AND UPR.IsActive=1
 WHERE U.UserID=@ID AND U.CompanyID=@OwnerID AND U.IsActive=1 AND ERG.IsActive=1 AND ERG.EffectiveFrom<=CONVERT(date,SYSUTCDATETIME()) AND (ERG.EffectiveTo IS NULL OR ERG.EffectiveTo>=CONVERT(date,SYSUTCDATETIME()));
 """;
         }

@@ -1111,7 +1111,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
               style: OutlinedButton.styleFrom(
                 padding: EdgeInsets.zero,
                 foregroundColor: Colors.grey.shade600,
-                side: BorderSide(color: LaooColors.border),
+                side: BorderSide.none,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(LaooRadius.xs),
                 ),
@@ -1119,36 +1119,39 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
               child: child,
             ),
     );
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        circleButton(
-          onPressed: _currentPage > 1
-              ? () => _goToPage(_currentPage - 1)
-              : null,
-          child: const Icon(Icons.chevron_left, size: 20),
-        ),
-        ...List.generate(_totalPages, (index) {
-          final page = index + 1;
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: circleButton(
-              onPressed: () => _goToPage(page),
-              selected: page == _currentPage,
-              child: Text('$page'),
-            ),
-          );
-        }),
-        circleButton(
-          onPressed: _currentPage < _totalPages
-              ? () => _goToPage(_currentPage + 1)
-              : null,
-          child: const Icon(Icons.chevron_right, size: 20),
-        ),
-        Text('$first-$last จาก $_totalCount'),
-      ],
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          circleButton(
+            onPressed: _currentPage > 1
+                ? () => _goToPage(_currentPage - 1)
+                : null,
+            child: const Icon(Icons.chevron_left, size: 20),
+          ),
+          ...List.generate(_totalPages, (index) {
+            final page = index + 1;
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: circleButton(
+                onPressed: () => _goToPage(page),
+                selected: page == _currentPage,
+                child: Text('$page'),
+              ),
+            );
+          }),
+          circleButton(
+            onPressed: _currentPage < _totalPages
+                ? () => _goToPage(_currentPage + 1)
+                : null,
+            child: const Icon(Icons.chevron_right, size: 20),
+          ),
+          Text('$first-$last จาก $_totalCount'),
+        ],
+      ),
     );
   }
 

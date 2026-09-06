@@ -105,4 +105,28 @@ class PartnerCompanyRepository {
       },
     );
   }
+
+  Future<List<PartnerCompanyProject>> getCompanyProjects(int companyId) async {
+    final data = await _api.get('/api/partner/companies/$companyId/projects');
+    return (data as List<dynamic>)
+        .map(
+          (item) =>
+              PartnerCompanyProject.fromJson(item as Map<String, dynamic>),
+        )
+        .toList();
+  }
+
+  Future<void> updateCompanyProjects(
+    int companyId,
+    Map<int, bool> projects,
+  ) async {
+    await _api.put(
+      '/api/partner/companies/$companyId/projects',
+      body: {
+        'projects': projects.entries
+            .map((entry) => {'projectId': entry.key, 'isEnabled': entry.value})
+            .toList(),
+      },
+    );
+  }
 }

@@ -579,63 +579,67 @@ class _PartnerListPageState extends State<PartnerListPage> {
       }
     }
 
-    return Wrap(
-      spacing: 6,
-      runSpacing: 8,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        OutlinedButton(
-          onPressed: page > 0
-              ? () => setState(() => _currentPage = page - 1)
-              : null,
-          style: OutlinedButton.styleFrom(
-            foregroundColor: Colors.grey.shade600,
-            side: BorderSide(color: LaooColors.border),
-            visualDensity: VisualDensity.compact,
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(LaooRadius.xs),
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Wrap(
+        spacing: 6,
+        runSpacing: 8,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          OutlinedButton(
+            onPressed: page > 0
+                ? () => setState(() => _currentPage = page - 1)
+                : null,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.grey.shade600,
+              side: BorderSide.none,
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(LaooRadius.xs),
+              ),
             ),
+            child: const Icon(Icons.chevron_left),
           ),
-          child: const Icon(Icons.chevron_left),
-        ),
-        if (pageCount > 7 && pageIndexes.first > 0) ...[
-          _pageNumberButton(0, page, accent),
-          if (pageIndexes.first > 1)
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 2),
-              child: Text('...'),
+          if (pageCount > 7 && pageIndexes.first > 0) ...[
+            _pageNumberButton(0, page, accent),
+            if (pageIndexes.first > 1)
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 2),
+                child: Text('...'),
+              ),
+          ],
+          for (final index in pageIndexes)
+            _pageNumberButton(index, page, accent),
+          if (pageCount > 7 && pageIndexes.last < pageCount - 1) ...[
+            if (pageIndexes.last < pageCount - 2)
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 2),
+                child: Text('...'),
+              ),
+            _pageNumberButton(pageCount - 1, page, accent),
+          ],
+          OutlinedButton(
+            onPressed: page + 1 < pageCount
+                ? () => setState(() => _currentPage = page + 1)
+                : null,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.grey.shade600,
+              side: BorderSide.none,
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(LaooRadius.xs),
+              ),
             ),
-        ],
-        for (final index in pageIndexes) _pageNumberButton(index, page, accent),
-        if (pageCount > 7 && pageIndexes.last < pageCount - 1) ...[
-          if (pageIndexes.last < pageCount - 2)
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 2),
-              child: Text('...'),
-            ),
-          _pageNumberButton(pageCount - 1, page, accent),
-        ],
-        OutlinedButton(
-          onPressed: page + 1 < pageCount
-              ? () => setState(() => _currentPage = page + 1)
-              : null,
-          style: OutlinedButton.styleFrom(
-            foregroundColor: Colors.grey.shade600,
-            side: BorderSide(color: LaooColors.border),
-            visualDensity: VisualDensity.compact,
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(LaooRadius.xs),
-            ),
+            child: const Icon(Icons.chevron_right),
           ),
-          child: const Icon(Icons.chevron_right),
-        ),
-        Text(
-          '$firstRow-$lastRow จาก ${_partners.length}',
-          style: const TextStyle(color: LaooColors.textSecondary),
-        ),
-      ],
+          Text(
+            '$firstRow-$lastRow จาก ${_partners.length}',
+            style: const TextStyle(color: LaooColors.textSecondary),
+          ),
+        ],
+      ),
     );
   }
 

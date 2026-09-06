@@ -96,3 +96,42 @@ class PartnerCompanyFeature {
         sortOrder: (json['sortOrder'] as num?)?.toInt() ?? 0,
       );
 }
+
+class PartnerCompanyProject {
+  const PartnerCompanyProject({
+    required this.projectId,
+    required this.projectCode,
+    required this.projectNameTh,
+    required this.projectType,
+    required this.isEnabled,
+    required this.sortOrder,
+    this.projectNameEn,
+    this.description,
+    this.iconName,
+  });
+
+  final int projectId;
+  final String projectCode;
+  final String projectNameTh;
+  final String? projectNameEn;
+  final String? description;
+  final String projectType;
+  final String? iconName;
+  final bool isEnabled;
+  final int sortOrder;
+
+  bool get isCore => projectType.trim().toUpperCase() == 'CORE';
+
+  factory PartnerCompanyProject.fromJson(Map<String, dynamic> json) =>
+      PartnerCompanyProject(
+        projectId: (json['projectId'] as num).toInt(),
+        projectCode: json['projectCode'] as String,
+        projectNameTh: json['projectNameTh'] as String,
+        projectNameEn: json['projectNameEn'] as String?,
+        description: json['description'] as String?,
+        projectType: json['projectType'] as String,
+        iconName: json['iconName'] as String?,
+        isEnabled: json['isEnabled'] as bool? ?? false,
+        sortOrder: (json['sortOrder'] as num?)?.toInt() ?? 0,
+      );
+}

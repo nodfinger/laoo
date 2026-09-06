@@ -37,8 +37,8 @@ class CompanySetupContext {
 
   factory CompanySetupContext.fromJson(Map<String, dynamic> json) {
     return CompanySetupContext(
-      name: _text(json['name'], 'Laoo Solutions'),
-      titleHeader: _text(json['titleHeader'], 'Laoo Solutions'),
+      name: _text(json['name'], 'Laoo Platform'),
+      titleHeader: _text(json['titleHeader'], 'Laoo Platform'),
       rowStd: _positiveInt(json['rowSTD'] ?? json['rowStd'], 50),
       rowCardStd: _positiveInt(json['rowCardSTD'] ?? json['rowCardStd'], 12),
       timeAlert: _positiveInt(json['timeAlert'], 30),

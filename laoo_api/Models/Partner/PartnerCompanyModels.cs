@@ -50,6 +50,30 @@ public sealed class PartnerCompanyFeatureResponse
     public int SortOrder { get; init; }
 }
 
+public sealed class PartnerCompanyProjectResponse
+{
+    public long ProjectId { get; init; }
+    public string ProjectCode { get; init; } = string.Empty;
+    public string ProjectNameTh { get; init; } = string.Empty;
+    public string? ProjectNameEn { get; init; }
+    public string? Description { get; init; }
+    public string ProjectType { get; init; } = string.Empty;
+    public string? IconName { get; init; }
+    public int SortOrder { get; init; }
+    public bool IsEnabled { get; init; }
+}
+
+public sealed class PartnerCompanyProjectUpdateRequest
+{
+    public List<PartnerCompanyProjectUpdateItem> Projects { get; init; } = [];
+}
+
+public sealed class PartnerCompanyProjectUpdateItem
+{
+    public long ProjectId { get; init; }
+    public bool IsEnabled { get; init; }
+}
+
 public sealed class PartnerCompanyFeatureUpdateRequest
 {
     public List<PartnerCompanyFeatureUpdateItem> Features { get; init; } = [];

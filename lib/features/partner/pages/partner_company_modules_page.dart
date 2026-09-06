@@ -24,8 +24,8 @@ class PartnerCompanyModulesPage extends StatefulWidget {
 
 class _PartnerCompanyModulesPageState extends State<PartnerCompanyModulesPage> {
   final PartnerCompanyRepository _repository = PartnerCompanyRepository();
-  List<PartnerCompanyFeature> _features = const [];
-  Map<String, bool> _selection = const {};
+  List<PartnerCompanyProject> _projects = const [];
+  Map<int, bool> _selection = const {};
   bool _loading = true;
   bool _saving = false;
   String? _error;
@@ -42,15 +42,14 @@ class _PartnerCompanyModulesPageState extends State<PartnerCompanyModulesPage> {
       _error = null;
     });
     try {
-      final features = await _repository.getCompanyFeatures(
+      final projects = await _repository.getCompanyProjects(
         widget.company.companyId,
       );
       if (!mounted) return;
       setState(() {
-        _features = features;
+        _projects = projects;
         _selection = {
-          for (final feature in features)
-            feature.featureCode: feature.isEnabled,
+          for (final project in projects) project.projectId: project.isEnabled,
         };
       });
     } catch (error) {
@@ -61,13 +60,13 @@ class _PartnerCompanyModulesPageState extends State<PartnerCompanyModulesPage> {
   }
 
   Future<void> _save() async {
-    if (_saving || _features.isEmpty) return;
+    if (_saving || _projects.isEmpty) return;
     setState(() {
       _saving = true;
       _error = null;
     });
     try {
-      await _repository.updateCompanyFeatures(
+      await _repository.updateCompanyProjects(
         widget.company.companyId,
         _selection,
       );
@@ -142,7 +141,7 @@ class _PartnerCompanyModulesPageState extends State<PartnerCompanyModulesPage> {
                             const SizedBox(height: 12),
                             if (_loading)
                               const _LoadingFeatures()
-                            else if (_features.isEmpty)
+                            else if (_projects.isEmpty)
                               const _EmptyFeatures()
                             else
                               _featureGrid(context, compact: compact),
@@ -281,7 +280,7 @@ class _PartnerCompanyModulesPageState extends State<PartnerCompanyModulesPage> {
           ],
         ),
         Text(
-          'เปิด $enabledCount จาก ${_features.length} ระบบ',
+          'เปิด $enabledCount จาก ${_projects.length} ระบบ',
           style: Theme.of(
             context,
           ).textTheme.bodySmall?.copyWith(color: LaooColors.textSecondary),
@@ -294,9 +293,9 @@ class _PartnerCompanyModulesPageState extends State<PartnerCompanyModulesPage> {
     if (compact) {
       return Column(
         children: [
-          for (var index = 0; index < _features.length; index++) ...[
-            _featureRow(_features[index]),
-            if (index < _features.length - 1) const SizedBox(height: 6),
+          for (var index = 0; index < _projects.length; index++) ...[
+            _projectRow(_projects[index]),
+            if (index < _projects.length - 1) const SizedBox(height: 6),
           ],
         ],
       );
@@ -310,16 +309,16 @@ class _PartnerCompanyModulesPageState extends State<PartnerCompanyModulesPage> {
           spacing: spacing,
           runSpacing: spacing,
           children: [
-            for (final feature in _features)
-              SizedBox(width: itemWidth, child: _featureRow(feature)),
+            for (final project in _projects)
+              SizedBox(width: itemWidth, child: _projectRow(project)),
           ],
         );
       },
     );
   }
 
-  Widget _featureRow(PartnerCompanyFeature feature) {
-    final enabled = _selection[feature.featureCode] == true;
+  Widget _projectRow(PartnerCompanyProject project) {
+    final enabled = _selection[project.projectId] == true;
     final primary = Theme.of(context).colorScheme.primary;
     return AnimatedContainer(
       duration: const Duration(milliseconds: 160),
@@ -341,7 +340,7 @@ class _PartnerCompanyModulesPageState extends State<PartnerCompanyModulesPage> {
               color: LaooColors.white,
               borderRadius: BorderRadius.circular(LaooRadius.xs),
             ),
-            child: Icon(_iconFor(feature.featureCode), color: primary),
+            child: Icon(_iconFor(project.projectCode), color: primary),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -350,7 +349,7 @@ class _PartnerCompanyModulesPageState extends State<PartnerCompanyModulesPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  feature.featureName,
+                  project.projectNameTh,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     fontWeight: LaooTypography.emphasizedWeight,
                     color: LaooColors.textPrimary,
@@ -359,9 +358,9 @@ class _PartnerCompanyModulesPageState extends State<PartnerCompanyModulesPage> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  feature.featureDescription?.trim().isNotEmpty == true
-                      ? feature.featureDescription!
-                      : feature.featureCode,
+                  project.description?.trim().isNotEmpty == true
+                      ? project.description!
+                      : project.projectCode,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -378,18 +377,19 @@ class _PartnerCompanyModulesPageState extends State<PartnerCompanyModulesPage> {
             children: [
               Switch.adaptive(
                 value: enabled,
-                onChanged: _saving
+                onChanged: _saving || project.isCore
                     ? null
                     : (value) => setState(() {
-                        _selection = {
-                          ..._selection,
-                          feature.featureCode: value,
-                        };
+                        _selection = {..._selection, project.projectId: value};
                       }),
                 activeThumbColor: primary,
               ),
               Text(
-                enabled ? 'เปิดใช้งาน' : 'ปิดใช้งาน',
+                project.isCore
+                    ? 'ระบบหลัก'
+                    : enabled
+                    ? 'เปิดใช้งาน'
+                    : 'ปิดใช้งาน',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: enabled ? primary : LaooColors.textSecondary,
                   fontWeight: LaooTypography.emphasizedWeight,
@@ -403,10 +403,9 @@ class _PartnerCompanyModulesPageState extends State<PartnerCompanyModulesPage> {
   }
 
   static IconData _iconFor(String code) => switch (code) {
-    'SALES' => Icons.point_of_sale_outlined,
-    'SERVICE' => Icons.home_repair_service_outlined,
-    'ATTENDANCE' => Icons.schedule_outlined,
-    'VISITOR' => Icons.badge_outlined,
+    'LAOO' => Icons.hub_outlined,
+    'LAOO_SERVICE' => Icons.home_repair_service_outlined,
+    'LAOO_MEETING' => Icons.meeting_room_outlined,
     _ => Icons.apps_outlined,
   };
 }

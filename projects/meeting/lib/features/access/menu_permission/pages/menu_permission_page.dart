@@ -56,8 +56,9 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
   }
 
   void _syncDefaultViewMode() {
-    if (mounted)
+    if (mounted) {
       setState(() => _showCards = userDefaultViewModeNotifier.value == 'CARD');
+    }
   }
 
   Future<void> _loadActions() async {

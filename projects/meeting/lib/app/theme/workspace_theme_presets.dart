@@ -59,11 +59,11 @@ class WorkspaceThemePreset {
         subtitleTextStyle: TextStyle(color: textSecondary),
       ),
       cardTheme: CardThemeData(
-        color: surface,
+        color: LaooColors.white,
         surfaceTintColor: Colors.transparent,
         margin: const EdgeInsets.all(LaooLayout.cardMargin),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
           side: BorderSide.none,
         ),
       ),
@@ -125,24 +125,32 @@ class WorkspaceThemePreset {
           height: LaooTypography.bodyLineHeight,
         ),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
           borderSide: BorderSide(color: border),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
           borderSide: BorderSide(color: border),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
           borderSide: BorderSide(color: primary, width: 1.5),
         ),
       ),
+      dropdownMenuTheme: DropdownMenuThemeData(
+        textStyle: const TextStyle(
+          fontFamily: LaooTypography.fontFamily,
+          fontFamilyFallback: LaooTypography.fontFallback,
+          fontSize: LaooTypography.inputText,
+          color: Colors.black,
+        ),
+      ),
       dialogTheme: DialogThemeData(
-        backgroundColor: LaooColors.background,
+        backgroundColor: LaooColors.white,
         surfaceTintColor: Colors.transparent,
         insetPadding: const EdgeInsets.all(LaooLayout.dialogInsetPadding),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
           side: BorderSide.none,
         ),
         titleTextStyle: LaooTypography.popupTitleStyle,
@@ -177,6 +185,9 @@ class WorkspaceThemePreset {
             height: LaooTypography.bodyLineHeight,
             fontWeight: FontWeight.w700,
           ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(LaooRadius.xs),
+          ),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -191,6 +202,9 @@ class WorkspaceThemePreset {
             height: LaooTypography.bodyLineHeight,
             fontWeight: FontWeight.w700,
           ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(LaooRadius.xs),
+          ),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
@@ -204,6 +218,9 @@ class WorkspaceThemePreset {
             fontSize: LaooTypography.button,
             height: LaooTypography.bodyLineHeight,
             fontWeight: FontWeight.w700,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(LaooRadius.xs),
           ),
         ),
       ),

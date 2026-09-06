@@ -2549,23 +2549,23 @@ class _ApiRoleScopedSidebar extends StatefulWidget {
 
 class _ApiRoleScopedSidebarState extends State<_ApiRoleScopedSidebar> {
   late final NavigationMenuRepository _repository;
-  late Future<List<NavigationMenuGroup>> _menus;
+  late Future<List<NavigationProject>> _projects;
 
   @override
   void initState() {
     super.initState();
     _repository = NavigationMenuRepository();
-    _menus = _repository.getMenus();
+    _projects = _repository.getProjects();
   }
 
   void _reload() {
-    setState(() => _menus = _repository.getMenus(refresh: true));
+    setState(() => _projects = _repository.getProjects(refresh: true));
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<NavigationMenuGroup>>(
-      future: _menus,
+    return FutureBuilder<List<NavigationProject>>(
+      future: _projects,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           final unauthorized =
@@ -2593,13 +2593,18 @@ class _ApiRoleScopedSidebarState extends State<_ApiRoleScopedSidebar> {
     );
   }
 
-  Widget _buildSidebar(BuildContext context, List<NavigationMenuGroup> groups) {
+  Widget _buildSidebar(BuildContext context, List<NavigationProject> projects) {
     final currentPath = GoRouter.of(
       context,
     ).routerDelegate.currentConfiguration.uri.path;
     // Keep the exact groups returned by Navigation API. The backend is the
     // source of truth for user type, owner scope and VIEW permission.
-    final menuGroups = groups.where((group) => group.items.isNotEmpty).toList();
+    final menuProjects = projects
+        .where(
+          (project) =>
+              project.menuGroups.any((group) => group.items.isNotEmpty),
+        )
+        .toList();
     final homeRoute = widget.menuScope == WorkspaceMenuScope.support
         ? RouteNames.supportHome
         : RouteNames.authenticatedHome;
@@ -2626,43 +2631,62 @@ class _ApiRoleScopedSidebarState extends State<_ApiRoleScopedSidebar> {
                   onTap: () => context.goNamed(homeRoute),
                 ),
                 const SizedBox(height: 2),
-                ...menuGroups
-                    .where((group) => group.items.isNotEmpty)
-                    .map(
-                      (group) => _MenuGroup(
-                        title: group.name,
-                        accent: widget.preset.primary,
-                        initiallyExpanded:
-                            group.isExpandedDefault ||
-                            group.items.any((item) {
+                ...menuProjects.map((project) {
+                  final projectActive = project.menuGroups.any(
+                    (group) => group.items.any((item) {
+                      final spec = AppMenuRouteRegistry.byMenuCode(item.code);
+                      return spec?.path == currentPath;
+                    }),
+                  );
+                  return _ProjectMenu(
+                    code: project.code,
+                    title: project.name,
+                    icon: _iconFor(project.iconName),
+                    accent: widget.preset.primary,
+                    initiallyExpanded:
+                        project.isExpandedDefault || projectActive,
+                    children: project.menuGroups
+                        .where((group) => group.items.isNotEmpty)
+                        .map(
+                          (group) => _MenuGroup(
+                            storageKey: '${project.code}-${group.code}',
+                            title: group.name,
+                            accent: widget.preset.primary,
+                            initiallyExpanded:
+                                group.isExpandedDefault ||
+                                group.items.any((item) {
+                                  final spec = AppMenuRouteRegistry.byMenuCode(
+                                    item.code,
+                                  );
+                                  return spec?.path == currentPath;
+                                }),
+                            children: group.items.map((item) {
                               final spec = AppMenuRouteRegistry.byMenuCode(
                                 item.code,
                               );
-                              return spec?.path == currentPath;
-                            }),
-                        children: group.items.map((item) {
-                          final spec = AppMenuRouteRegistry.byMenuCode(
-                            item.code,
-                          );
-                          return _MenuItem(
-                            label: item.name,
-                            icon: _iconFor(item.iconName),
-                            selected: spec?.path == currentPath,
-                            accent: widget.itemForeground,
-                            selectedAccent: widget.preset.primary,
-                            selectedForeground: widget.selectedForeground,
-                            onTap:
-                                spec == null &&
-                                    (item.routePath?.trim().isEmpty ?? true)
-                                ? null
-                                : () {
-                                    final path = spec?.path ?? item.routePath!;
-                                    context.go(path.trim());
-                                  },
-                          );
-                        }).toList(),
-                      ),
-                    ),
+                              return _MenuItem(
+                                label: item.name,
+                                icon: _iconFor(item.iconName),
+                                selected: spec?.path == currentPath,
+                                accent: widget.itemForeground,
+                                selectedAccent: widget.preset.primary,
+                                selectedForeground: widget.selectedForeground,
+                                onTap:
+                                    spec == null &&
+                                        (item.routePath?.trim().isEmpty ?? true)
+                                    ? null
+                                    : () {
+                                        final path =
+                                            spec?.path ?? item.routePath!;
+                                        context.go(path.trim());
+                                      },
+                              );
+                            }).toList(),
+                          ),
+                        )
+                        .toList(),
+                  );
+                }),
               ],
             ),
           ),
@@ -2727,12 +2751,14 @@ class _ApiRoleScopedSidebarState extends State<_ApiRoleScopedSidebar> {
 
 class _MenuGroup extends StatelessWidget {
   const _MenuGroup({
+    required this.storageKey,
     required this.title,
     required this.accent,
     required this.children,
     this.initiallyExpanded = false,
   });
 
+  final String storageKey;
   final String title;
   final Color accent;
   final List<Widget> children;
@@ -2743,12 +2769,12 @@ class _MenuGroup extends StatelessWidget {
     return Theme(
       data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
       child: ExpansionTile(
-        key: PageStorageKey<String>('support-menu-$title'),
+        key: PageStorageKey<String>('support-menu-$storageKey'),
         initiallyExpanded: initiallyExpanded,
-        tilePadding: const EdgeInsets.symmetric(horizontal: 8),
+        tilePadding: const EdgeInsets.only(left: 20, right: 8),
         childrenPadding: EdgeInsets.zero,
         visualDensity: const VisualDensity(horizontal: 0, vertical: -4),
-        minTileHeight: 30,
+        minTileHeight: 32,
         iconColor: accent,
         collapsedIconColor: accent,
         title: Text(
@@ -2758,6 +2784,54 @@ class _MenuGroup extends StatelessWidget {
             fontWeight: LaooTypography.normalWeight,
             color: accent,
             height: 1,
+          ),
+        ),
+        children: children,
+      ),
+    );
+  }
+}
+
+class _ProjectMenu extends StatelessWidget {
+  const _ProjectMenu({
+    required this.code,
+    required this.title,
+    required this.icon,
+    required this.accent,
+    required this.children,
+    this.initiallyExpanded = false,
+  });
+
+  final String code;
+  final String title;
+  final IconData icon;
+  final Color accent;
+  final List<Widget> children;
+  final bool initiallyExpanded;
+
+  @override
+  Widget build(BuildContext context) {
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        key: PageStorageKey<String>('support-project-$code'),
+        initiallyExpanded: initiallyExpanded,
+        tilePadding: const EdgeInsets.symmetric(horizontal: 8),
+        childrenPadding: EdgeInsets.zero,
+        visualDensity: const VisualDensity(horizontal: 0, vertical: -3),
+        minTileHeight: 36,
+        iconColor: accent,
+        collapsedIconColor: accent,
+        leading: Icon(icon, size: 19, color: accent),
+        title: Text(
+          title,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: LaooTypography.menuGroup,
+            fontWeight: LaooTypography.emphasizedWeight,
+            color: accent,
+            height: LaooTypography.bodyLineHeight,
           ),
         ),
         children: children,
@@ -2827,60 +2901,38 @@ class _BrandHeader extends StatelessWidget {
               padding: EdgeInsets.symmetric(horizontal: compact ? 4 : 16),
               child: Row(
                 children: [
-                  if (compact)
-                    Container(
-                      width: 46,
-                      height: 46,
-                      decoration: BoxDecoration(
-                        color: iconBackground,
-                        borderRadius: BorderRadius.circular(13),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.26),
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: preset.primary.withValues(alpha: 0.18),
-                            blurRadius: 10,
-                            offset: const Offset(0, 3),
-                          ),
-                        ],
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        'L',
-                        style: TextStyle(
-                          color: iconColor,
-                          fontSize: 28,
-                          fontWeight: FontWeight.w800,
-                          height: 1,
-                        ),
-                      ),
-                    )
-                  else
-                    ValueListenableBuilder<Uint8List?>(
-                      valueListenable: userProfileAvatarNotifier,
-                      builder: (_, image, _) => Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          color: iconBackground,
-                          borderRadius: BorderRadius.circular(9),
-                          image: image == null
-                              ? null
-                              : DecorationImage(
-                                  image: MemoryImage(image),
-                                  fit: BoxFit.cover,
-                                ),
-                        ),
-                        child: image == null
-                            ? Icon(
-                                Icons.home_work_outlined,
-                                size: 19,
-                                color: iconColor,
-                              )
-                            : null,
+                  Container(
+                    width: compact ? 46 : 32,
+                    height: compact ? 46 : 32,
+                    decoration: BoxDecoration(
+                      color: iconBackground,
+                      borderRadius: BorderRadius.circular(compact ? 13 : 9),
+                      border: compact
+                          ? Border.all(
+                              color: Colors.white.withValues(alpha: 0.26),
+                            )
+                          : null,
+                      boxShadow: compact
+                          ? [
+                              BoxShadow(
+                                color: preset.primary.withValues(alpha: 0.18),
+                                blurRadius: 10,
+                                offset: const Offset(0, 3),
+                              ),
+                            ]
+                          : null,
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      'L',
+                      style: TextStyle(
+                        color: iconColor,
+                        fontSize: compact ? 28 : 19,
+                        fontWeight: FontWeight.w800,
+                        height: 1,
                       ),
                     ),
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Column(

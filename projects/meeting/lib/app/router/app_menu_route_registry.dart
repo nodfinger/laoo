@@ -147,8 +147,8 @@ abstract final class AppMenuRouteRegistry {
       path: RoutePaths.companyEmployees,
       scope: AppMenuScope.company,
     ),
-    '23005': AppMenuRouteSpec(
-      menuCode: '23005',
+    '10007': AppMenuRouteSpec(
+      menuCode: '10007',
       databaseRouteName: 'companySupervisors',
       goRouteName: RouteNames.companySupervisors,
       path: RoutePaths.companySupervisors,

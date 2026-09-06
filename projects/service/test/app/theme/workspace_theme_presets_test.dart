@@ -34,7 +34,10 @@ void main() {
       final theme = preset.toThemeData();
 
       expect(theme.colorScheme.primary, preset.primary);
-      expect(theme.scaffoldBackgroundColor, preset.background);
+      expect(
+        theme.scaffoldBackgroundColor,
+        preset.isDark ? preset.background : const Color(0xFFF8F9FB),
+      );
       expect(theme.colorScheme.surface, preset.surface);
       expect(
         theme.brightness,

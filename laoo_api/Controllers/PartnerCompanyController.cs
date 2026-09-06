@@ -138,6 +138,150 @@ ORDER BY F.SortOrder, F.FeatureCode;
         }
     }
 
+    [HttpGet("{companyId:long}/projects")]
+    public async Task<ActionResult<List<PartnerCompanyProjectResponse>>> GetProjects(
+        long companyId,
+        CancellationToken cancellationToken)
+    {
+        var partnerId = PartnerId();
+        if (partnerId is null) return Forbid();
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        if (!await IsPartnerAdminAsync(connection, cancellationToken) &&
+            !await AllowedAsync(connection, "VIEW", cancellationToken)) return Forbid();
+
+        const string sql = """
+IF NOT EXISTS
+(
+    SELECT 1 FROM dbo.TDSTCompanySetUp
+    WHERE CompanyID=@CompanyID AND PartnerID=@PartnerID AND IsActive=1
+)
+    THROW 50011,'COMPANY_NOT_FOUND',1;
+
+SELECT P.ProjectID,P.ProjectCode,P.ProjectNameTH,P.ProjectNameEN,P.DescriptionText,
+       P.ProjectType,P.IconName,P.SortOrder,
+       CONVERT(bit,CASE WHEN P.ProjectType=N'CORE' THEN 1 ELSE ISNULL(CP.IsEnabled,0) END) IsEnabled
+FROM dbo.TDADProject P
+LEFT JOIN dbo.TDADCompanyProject CP
+  ON CP.ProjectID=P.ProjectID AND CP.PartnerID=@PartnerID AND CP.CompanyID=@CompanyID
+WHERE P.IsActive=1
+ORDER BY P.SortOrder,P.ProjectID;
+""";
+        await using var command = new SqlCommand(sql, connection);
+        command.Parameters.Add("@PartnerID", SqlDbType.BigInt).Value = partnerId.Value;
+        command.Parameters.Add("@CompanyID", SqlDbType.BigInt).Value = companyId;
+        try
+        {
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            var result = new List<PartnerCompanyProjectResponse>();
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                result.Add(new PartnerCompanyProjectResponse
+                {
+                    ProjectId = reader.GetInt64(0), ProjectCode = reader.GetString(1),
+                    ProjectNameTh = reader.GetString(2), ProjectNameEn = N(reader, 3),
+                    Description = N(reader, 4), ProjectType = reader.GetString(5),
+                    IconName = N(reader, 6), SortOrder = reader.GetInt32(7),
+                    IsEnabled = reader.GetBoolean(8)
+                });
+            }
+            return Ok(result);
+        }
+        catch (SqlException ex) when (ex.Number == 50011)
+        {
+            return NotFound(new { message = "ไม่พบลูกค้าในขอบเขตของ Partner นี้" });
+        }
+    }
+
+    [HttpPut("{companyId:long}/projects")]
+    public async Task<IActionResult> UpdateProjects(
+        long companyId,
+        PartnerCompanyProjectUpdateRequest request,
+        CancellationToken cancellationToken)
+    {
+        var partnerId = PartnerId();
+        var partnerUserId = LongClaim("partner_user_id");
+        if (partnerId is null || partnerUserId is null) return Forbid();
+        if (request.Projects.Count == 0)
+            return BadRequest(new { message = "กรุณาระบุระบบที่ต้องการเปิดหรือปิด" });
+        if (request.Projects.Select(item => item.ProjectId).Distinct().Count() != request.Projects.Count)
+            return BadRequest(new { message = "พบ Project ซ้ำในคำขอ" });
+
+        await using var connection = await OpenConnectionAsync(cancellationToken);
+        if (!await IsPartnerAdminAsync(connection, cancellationToken)) return Forbid();
+        await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            const string companySql = "SELECT COUNT(1) FROM dbo.TDSTCompanySetUp WITH (UPDLOCK,HOLDLOCK) WHERE CompanyID=@CompanyID AND PartnerID=@PartnerID AND IsActive=1";
+            await using (var companyCommand = new SqlCommand(companySql, connection, transaction))
+            {
+                companyCommand.Parameters.Add("@CompanyID", SqlDbType.BigInt).Value = companyId;
+                companyCommand.Parameters.Add("@PartnerID", SqlDbType.BigInt).Value = partnerId.Value;
+                if (Convert.ToInt32(await companyCommand.ExecuteScalarAsync(cancellationToken)) == 0)
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    return NotFound(new { message = "ไม่พบลูกค้าในขอบเขตของ Partner นี้" });
+                }
+            }
+
+            const string upsertSql = """
+DECLARE @ProjectType nvarchar(20)=(SELECT ProjectType FROM dbo.TDADProject WHERE ProjectID=@ProjectID AND IsActive=1);
+IF @ProjectType IS NULL THROW 50020,'PROJECT_NOT_FOUND',1;
+IF @ProjectType=N'CORE' AND @IsEnabled=0 THROW 50021,'CORE_PROJECT_REQUIRED',1;
+
+UPDATE dbo.TDADCompanyProject
+SET PartnerID=@PartnerID,IsEnabled=@IsEnabled,UpdateDate=SYSUTCDATETIME(),UpdatedBy=@UserID
+WHERE CompanyID=@CompanyID AND ProjectID=@ProjectID;
+IF @@ROWCOUNT=0
+    INSERT dbo.TDADCompanyProject(ProjectID,PartnerID,CompanyID,IsEnabled,IsTrial,CreatedBy)
+    VALUES(@ProjectID,@PartnerID,@CompanyID,@IsEnabled,0,@UserID);
+
+IF @IsEnabled=1
+BEGIN
+    INSERT dbo.TDADUserProject(CompanyID,UserID,ProjectID,IsDefault,IsActive,CreateDate)
+    SELECT U.CompanyID,U.UserID,@ProjectID,0,1,SYSUTCDATETIME()
+    FROM dbo.TDADUser U
+    WHERE U.CompanyID=@CompanyID AND U.IsActive=1 AND U.IsCompanyAdmin=1
+      AND NOT EXISTS
+          (SELECT 1 FROM dbo.TDADUserProject UP
+           WHERE UP.CompanyID=U.CompanyID AND UP.UserID=U.UserID AND UP.ProjectID=@ProjectID);
+
+    UPDATE UP SET IsActive=1,UpdateDate=SYSUTCDATETIME()
+    FROM dbo.TDADUserProject UP
+    INNER JOIN dbo.TDADUser U ON U.UserID=UP.UserID AND U.CompanyID=UP.CompanyID
+    WHERE UP.CompanyID=@CompanyID AND UP.ProjectID=@ProjectID AND U.IsCompanyAdmin=1 AND UP.IsActive=0;
+END;
+""";
+            foreach (var item in request.Projects)
+            {
+                await using var command = new SqlCommand(upsertSql, connection, transaction);
+                command.Parameters.Add("@ProjectID", SqlDbType.BigInt).Value = item.ProjectId;
+                command.Parameters.Add("@PartnerID", SqlDbType.BigInt).Value = partnerId.Value;
+                command.Parameters.Add("@CompanyID", SqlDbType.BigInt).Value = companyId;
+                command.Parameters.Add("@IsEnabled", SqlDbType.Bit).Value = item.IsEnabled;
+                command.Parameters.Add("@UserID", SqlDbType.BigInt).Value = partnerUserId.Value;
+                await command.ExecuteNonQueryAsync(cancellationToken);
+            }
+
+            await transaction.CommitAsync(cancellationToken);
+            return NoContent();
+        }
+        catch (SqlException ex) when (ex.Number == 50020)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return BadRequest(new { message = "ไม่พบ Project ที่เปิดใช้งาน" });
+        }
+        catch (SqlException ex) when (ex.Number == 50021)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return BadRequest(new { message = "ข้อมูลส่วนกลางเป็นระบบหลักและไม่สามารถปิดได้" });
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+    }
+
     [HttpPut("{companyId:long}/features")]
     public async Task<IActionResult> UpdateFeatures(
         long companyId,
@@ -308,6 +452,8 @@ DECLARE @ProjectID bigint = (SELECT TOP 1 ProjectID FROM dbo.TDADProject WHERE P
 IF @ProjectID IS NULL THROW 50012, 'LAOO_PROJECT_NOT_FOUND', 1;
 INSERT INTO dbo.TDADUserProject (CompanyID, UserID, ProjectID, IsDefault, IsActive, CreateDate)
 VALUES (@CompanyID, @UserID, @ProjectID, 1, 1, SYSUTCDATETIME());
+INSERT INTO dbo.TDADCompanyProject (ProjectID, PartnerID, CompanyID, IsEnabled, IsTrial, CreatedBy)
+VALUES (@ProjectID, @PartnerID, @CompanyID, 1, 0, @PartnerUserID);
 INSERT INTO dbo.TDADBranch (CompanyID, BranchCode, BranchNameTH, BranchNameEN, IsActive, CreateDate)
 VALUES (@CompanyID, N'HO', @BranchNameTH, N'Head Office', 1, SYSUTCDATETIME());
 DECLARE @BranchID bigint = SCOPE_IDENTITY();
@@ -317,6 +463,9 @@ VALUES (@CompanyID, @BranchID, @UserID, 1, 1, SYSUTCDATETIME());
             await using var access = new SqlCommand(accessSql, connection, transaction);
             access.Parameters.Add("@CompanyID", SqlDbType.BigInt).Value = companyId;
             access.Parameters.Add("@UserID", SqlDbType.BigInt).Value = userId;
+            access.Parameters.Add("@PartnerID", SqlDbType.BigInt).Value = partnerId.Value;
+            access.Parameters.Add("@PartnerUserID", SqlDbType.BigInt).Value =
+                LongClaim("partner_user_id") is long creatorId ? creatorId : DBNull.Value;
             Add(access, "@BranchNameTH", SqlDbType.NVarChar, request.CompanyNameTh.Trim(), 200);
             await access.ExecuteNonQueryAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);

@@ -73,17 +73,17 @@ abstract final class LaooTheme {
         elevation: 0,
         margin: const EdgeInsets.all(LaooLayout.cardMargin),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(LaooRadius.lg),
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
           side: BorderSide.none,
         ),
       ),
       dialogTheme: DialogThemeData(
-        backgroundColor: LaooColors.background,
+        backgroundColor: LaooColors.white,
         surfaceTintColor: Colors.transparent,
         insetPadding: const EdgeInsets.all(LaooLayout.dialogInsetPadding),
         titleTextStyle: LaooTypography.popupTitleStyle,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(LaooRadius.lg),
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
           side: BorderSide.none,
         ),
       ),

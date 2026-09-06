@@ -12,9 +12,6 @@ import '../../../../core/company_setup/company_setup_controller.dart';
 import '../../../../core/platform/window_title_service.dart';
 import '../../../../core/widgets/auto_dismiss_message.dart';
 
-// เปลี่ยนภาพหน้า Login ได้จากจุดเดียว โดยไม่กระทบ Layout หรือ Login Flow
-const String _loginVisualAsset = 'assets/images/laoo_login_service_hero.png';
-
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
@@ -234,63 +231,45 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
-
-    if (width < 900) {
-      return _buildMobile();
-    }
-
-    return _buildDesktop();
-  }
-
-  Widget _buildDesktop() {
     return Scaffold(
-      backgroundColor: LaooColors.background,
+      backgroundColor: LaooColors.white,
       body: DecoratedBox(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [LaooColors.background, LaooColors.greenLight],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [LaooColors.white, LaooColors.greenLight],
           ),
         ),
         child: SafeArea(
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final panelHeight = (constraints.maxHeight - 48)
-                  .clamp(600.0, 620.0)
-                  .toDouble();
+              final isMobile = constraints.maxWidth < 600;
+              final horizontalPadding = isMobile ? 16.0 : 24.0;
+              final verticalPadding = isMobile ? 16.0 : 24.0;
+
               return SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
+                padding: EdgeInsets.symmetric(
+                  horizontal: horizontalPadding,
+                  vertical: verticalPadding,
+                ),
                 child: ConstrainedBox(
                   constraints: BoxConstraints(
-                    minHeight: constraints.maxHeight - 48,
+                    minHeight: constraints.maxHeight - (verticalPadding * 2),
                   ),
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 1180),
-                      child: SizedBox(
-                        height: panelHeight,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: LaooColors.white,
-                            borderRadius: BorderRadius.circular(LaooRadius.xl),
-                            boxShadow: LaooShadows.soft,
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(LaooRadius.xl),
-                            child: Row(
-                              children: [
-                                const Expanded(flex: 11, child: _LoginVisual()),
-                                Expanded(
-                                  flex: 10,
-                                  child: _buildLoginPanel(compact: false),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
+                  child: Align(
+                    alignment: isMobile
+                        ? Alignment.topCenter
+                        : Alignment.center,
+                    child: Container(
+                      width: double.infinity,
+                      constraints: const BoxConstraints(maxWidth: 430),
+                      decoration: BoxDecoration(
+                        color: LaooColors.white,
+                        borderRadius: BorderRadius.circular(LaooRadius.md),
+                        boxShadow: LaooShadows.soft,
                       ),
+                      child: _buildLoginPanel(compact: isMobile),
                     ),
                   ),
                 ),
@@ -302,39 +281,14 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  Widget _buildMobile() {
-    return Scaffold(
-      backgroundColor: LaooColors.white,
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) => SingleChildScrollView(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(minHeight: constraints.maxHeight),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const SizedBox(
-                    height: 124,
-                    child: _LoginVisual(compact: true),
-                  ),
-                  _buildLoginPanel(compact: true),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildLoginPanel({required bool compact}) {
     return Container(
       color: LaooColors.white,
       padding: EdgeInsets.fromLTRB(
-        compact ? 22 : 46,
-        compact ? 22 : 26,
-        compact ? 22 : 46,
-        compact ? 16 : 22,
+        compact ? 18 : 28,
+        compact ? 16 : 20,
+        compact ? 18 : 28,
+        compact ? 12 : 18,
       ),
       child: Center(
         child: ConstrainedBox(
@@ -346,10 +300,8 @@ class _LoginPageState extends State<LoginPage> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (!compact) ...[
-                    const _LoginBrandMark(),
-                    const SizedBox(height: 18),
-                  ],
+                  const _LoginBrandMark(),
+                  SizedBox(height: compact ? 12 : 14),
                   if (_loginError != null) ...[
                     AutoDismissMessage(
                       key: ValueKey((_loginError, _loginAlertError)),
@@ -370,7 +322,7 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   const SizedBox(height: 4),
                   const Text(
-                    'ยินดีต้อนรับกลับสู่ Laoo Service',
+                    'ยินดีต้อนรับกลับสู่ Laoo Platform',
                     style: TextStyle(
                       fontSize: LaooTypography.body,
                       height: LaooTypography.bodyLineHeight,
@@ -560,7 +512,7 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ),
                   const Text(
-                    '© Laoo Solutions',
+                    '© Laoo 2026',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: LaooColors.textSecondary,
@@ -634,152 +586,37 @@ class _LoginBrandMark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Column(
       children: [
         Image.asset(
           'assets/images/laoo_app_icon.png',
-          width: 42,
-          height: 42,
+          width: 36,
+          height: 36,
           filterQuality: FilterQuality.high,
           semanticLabel: 'Laoo Solutions',
         ),
-        const SizedBox(width: 12),
-        const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'LAOO SERVICE',
-              style: TextStyle(
-                fontSize: LaooTypography.sectionTitle,
-                fontWeight: LaooTypography.strongWeight,
-                color: LaooColors.greenDark,
-              ),
-            ),
-            Text(
-              'Service Management Platform',
-              style: TextStyle(
-                fontSize: LaooTypography.caption,
-                color: LaooColors.textSecondary,
-              ),
-            ),
-          ],
+        const SizedBox(height: 5),
+        const Text(
+          'LAOO PLATFORM',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: LaooTypography.sectionTitle,
+            fontWeight: LaooTypography.strongWeight,
+            color: LaooColors.greenDark,
+          ),
+        ),
+        const SizedBox(height: 1),
+        const Text(
+          'Simple today. Ready Tomorrow.',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: LaooTypography.bodySmall,
+            height: LaooTypography.bodyLineHeight,
+            fontWeight: LaooTypography.emphasizedWeight,
+            color: LaooColors.green,
+          ),
         ),
       ],
-    );
-  }
-}
-
-class _LoginVisual extends StatelessWidget {
-  const _LoginVisual({this.compact = false});
-
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) {
-    return ColoredBox(
-      color: LaooColors.greenDark,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          Image.asset(
-            _loginVisualAsset,
-            fit: BoxFit.cover,
-            alignment: Alignment.center,
-            filterQuality: FilterQuality.high,
-            semanticLabel: 'ภาพระบบบริหารงานบริการ Laoo Service',
-            errorBuilder: (_, _, _) =>
-                const ColoredBox(color: LaooColors.greenDark),
-          ),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: compact
-                    ? [
-                        LaooColors.greenDark.withValues(alpha: .32),
-                        LaooColors.greenDark.withValues(alpha: .9),
-                      ]
-                    : [
-                        LaooColors.greenDark.withValues(alpha: .15),
-                        LaooColors.greenDark.withValues(alpha: .95),
-                      ],
-              ),
-            ),
-          ),
-          Padding(
-            padding: EdgeInsets.all(compact ? 16 : 28),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Image.asset(
-                      'assets/images/laoo_app_icon.png',
-                      width: compact ? 36 : 48,
-                      height: compact ? 36 : 48,
-                      filterQuality: FilterQuality.high,
-                    ),
-                    const SizedBox(width: 10),
-                    const Text(
-                      'LAOO SERVICE',
-                      style: TextStyle(
-                        fontSize: LaooTypography.sectionTitle,
-                        fontWeight: LaooTypography.strongWeight,
-                        color: LaooColors.white,
-                      ),
-                    ),
-                  ],
-                ),
-                const Spacer(),
-                Text(
-                  compact
-                      ? 'บริหารงานบริการได้ง่ายในที่เดียว'
-                      : 'ระบบบริการที่พร้อม\nเติบโตไปกับธุรกิจของคุณ',
-                  maxLines: compact ? 1 : 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: LaooTypography.pageTitle,
-                    height: LaooTypography.titleLineHeight,
-                    fontWeight: LaooTypography.strongWeight,
-                    color: LaooColors.white,
-                  ),
-                ),
-                if (!compact) ...[
-                  const SizedBox(height: 12),
-                  const Text(
-                    'จัดการใบงาน ทรัพย์สิน อะไหล่ และบริการลูกค้า\nบนข้อมูลชุดเดียวที่ทุกทีมเข้าถึงได้',
-                    style: TextStyle(
-                      fontSize: LaooTypography.body,
-                      height: LaooTypography.bodyLineHeight,
-                      color: LaooColors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  const Row(
-                    children: [
-                      Icon(
-                        Icons.devices_rounded,
-                        size: 18,
-                        color: LaooColors.white,
-                      ),
-                      SizedBox(width: 8),
-                      Text(
-                        'รองรับ Web • Windows • Mobile',
-                        style: TextStyle(
-                          fontSize: LaooTypography.bodySmall,
-                          fontWeight: LaooTypography.emphasizedWeight,
-                          color: LaooColors.white,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

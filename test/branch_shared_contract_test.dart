@@ -7,7 +7,7 @@ void main() {
     expect(BranchScreenContracts.support.apiPath, '/api/support/branches');
     expect(BranchScreenContracts.partner.menuCode, '06002');
     expect(BranchScreenContracts.partner.apiPath, '/api/partner/branches');
-    expect(BranchScreenContracts.company.menuCode, '09002');
+    expect(BranchScreenContracts.company.menuCode, '13001');
     expect(BranchScreenContracts.company.apiPath, '/api/company/branches');
   });
 

@@ -50,6 +50,26 @@ DECLARE @MeetingProjectID bigint=(SELECT ProjectID FROM dbo.TDADProject WHERE Pr
 IF @CenterProjectID IS NULL OR @MeetingProjectID IS NULL
     THROW 51000,'Required projects LAOO and LAOO_MEETING were not found.',1;
 
+/* Move supervisor assignment from Meeting setup to Core access management. */
+IF NOT EXISTS(SELECT 1 FROM dbo.TDADMainMenu WHERE MenuCode='10007')
+BEGIN
+    UPDATE dbo.TDADMainMenu
+    SET SortOrder=SortOrder+1,UpdateDate=SYSDATETIME()
+    WHERE MenuGroupCode='10' AND SortOrder>=3;
+
+    UPDATE dbo.TDADProjectMenu
+    SET SortOrder=SortOrder+1,UpdateDate=SYSDATETIME()
+    WHERE ProjectID=@CenterProjectID AND MenuGroupCode='10' AND SortOrder>=3;
+
+    IF EXISTS(SELECT 1 FROM dbo.TDADMainMenu WHERE MenuCode='23005')
+    BEGIN
+        DELETE FROM dbo.TDADProjectMenu WHERE MenuCode='23005';
+        UPDATE dbo.TDADMainMenu
+        SET MenuCode='10007',MenuGroupCode='10',SortOrder=3,UpdateDate=SYSDATETIME()
+        WHERE MenuCode='23005';
+    END;
+END;
+
 DECLARE @Groups TABLE
 (
     MenuGroupCode char(2) PRIMARY KEY, MenuGroupName nvarchar(150), IconName nvarchar(100),
@@ -86,7 +106,7 @@ INSERT @Menus VALUES
 ('23002','23',N'ห้องประชุม',1,N'meetingRooms',N'/company/meeting-rooms',N'MEETING_ROOM',N'meeting_room',21,0),
 ('23003','23',N'อุปกรณ์ห้องประชุม',1,N'meetingFacilities',N'/company/meeting-facilities',N'MEETING_FACILITY',N'devices_other',20,0),
 ('23004','23',N'รายการอาหาร',1,N'meetingFoods',N'/company/meeting-foods',N'MEETING_FOOD',N'restaurant_menu',30,1),
-('23005','23',N'กำหนดผู้บังคับบัญชา',2,N'companySupervisors',N'/company/supervisors',N'SUPERVISOR_ASSIGNMENT',N'supervisor_account',4,1),
+('10007','10',N'กำหนดผู้บังคับบัญชา',2,N'companySupervisors',N'/company/supervisors',N'SUPERVISOR_ASSIGNMENT',N'supervisor_account',3,1),
 ('24001','24',N'รายงานการใช้ห้อง',3,N'meetingRoomUtilizationReport',N'/company/reports/meeting-room-utilization',N'MEETING_ROOM_UTILIZATION_REPORT',N'analytics',10,0),
 ('24002','24',N'รายงาน No-show',3,N'meetingNoShowReport',N'/company/reports/meeting-no-show',N'MEETING_NO_SHOW_REPORT',N'person_off',20,0),
 ('24003','24',N'ผลประเมินห้องประชุม',3,N'meetingFeedbackReport',N'/company/reports/meeting-feedback',N'MEETING_FEEDBACK_REPORT',N'reviews',30,0);
@@ -131,7 +151,8 @@ INSERT dbo.TDADProjectMenu(ProjectID,MenuCode,MenuGroupCode,SortOrder,IsActive)
 SELECT @MeetingProjectID,m.MenuCode,m.MenuGroupCode,m.SortOrder,1
 FROM dbo.TDADMainMenu m
 WHERE (EXISTS(SELECT 1 FROM @SharedMenus s WHERE s.MenuCode=m.MenuCode)
-       OR EXISTS(SELECT 1 FROM @Menus x WHERE x.MenuCode=m.MenuCode))
+       OR EXISTS(SELECT 1 FROM @Menus x
+                 WHERE x.MenuCode=m.MenuCode AND x.MenuGroupCode IN('21','22','23','24')))
   AND NOT EXISTS(SELECT 1 FROM dbo.TDADProjectMenu p WHERE p.ProjectID=@MeetingProjectID AND p.MenuCode=m.MenuCode);
 
 DECLARE @AdminPermissionID bigint=(SELECT PermissionID FROM dbo.TDADPermission

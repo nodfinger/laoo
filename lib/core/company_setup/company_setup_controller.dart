@@ -16,7 +16,7 @@ class CompanySetupController extends ChangeNotifier {
 
   String get appTitle {
     final value = _current?.name.trim() ?? '';
-    return value.isEmpty ? 'Laoo Solutions' : value;
+    return value.isEmpty ? 'Laoo Platform' : value;
   }
 
   String get versionText {

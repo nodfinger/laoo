@@ -23,7 +23,7 @@ public static class BranchScreenContracts
         new(BranchOwnerScope.Partner, "06002", "partnerBranches", 1, "PARTNER_BRANCH");
 
     public static readonly BranchScreenContract Company =
-        new(BranchOwnerScope.Company, "09002", "companyBranches", 1);
+        new(BranchOwnerScope.Company, "13001", "companyBranches", 1);
 
     public static BranchScreenContract FromRequestPath(string? path)
     {

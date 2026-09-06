@@ -18,7 +18,7 @@ abstract final class BranchScreenContracts {
   );
 
   static const company = ScreenContract(
-    menuCode: '09002',
+    menuCode: '13001',
     routeName: 'companyBranches',
     apiPath: '/api/company/branches',
     screenType: 1,

@@ -31,7 +31,7 @@ void main() {
     expect(find.byType(AutoDismissMessage), findsNothing);
   });
 
-  testWidgets('timed SnackBar uses fallback duration and close action', (
+  testWidgets('timed alert uses top-right overlay and close action', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -40,24 +40,21 @@ void main() {
           body: Builder(
             builder: (context) => TextButton(
               onPressed: () =>
-                  showTimedSnackBar(context, message: 'ทดสอบ SnackBar'),
-              child: const Text('แสดง'),
+                  showTimedSnackBar(context, message: 'Test overlay alert'),
+              child: const Text('Show'),
             ),
           ),
         ),
       ),
     );
 
-    await tester.tap(find.text('แสดง'));
+    await tester.tap(find.text('Show'));
     await tester.pumpAndSettle();
+    expect(find.byType(AutoDismissMessage), findsOneWidget);
+    expect(find.byIcon(Icons.close), findsOneWidget);
 
-    final snackBar = tester.widget<SnackBar>(find.byType(SnackBar));
-    expect(snackBar.duration, const Duration(seconds: 30));
-    expect(find.text('ปิด'), findsOneWidget);
-
-    await tester.tap(find.byType(SnackBarAction));
+    await tester.tap(find.byIcon(Icons.close));
     await tester.pumpAndSettle();
-
-    expect(find.byType(SnackBar), findsNothing);
+    expect(find.byType(AutoDismissMessage), findsNothing);
   });
 }

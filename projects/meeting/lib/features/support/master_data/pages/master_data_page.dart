@@ -593,7 +593,7 @@ class _MasterDataPageState extends State<MasterDataPage> {
                 child: Row(
                   children: [
                     Expanded(child: title),
-                    if (addButton != null) addButton,
+                    ?addButton,
                   ],
                 ),
               ),
