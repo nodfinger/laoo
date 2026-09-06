@@ -887,11 +887,7 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
                       ],
                     ),
                   ),
-                  const Divider(
-                    height: 1,
-                    thickness: 1,
-                    color: LaooColors.border,
-                  ),
+                  const SizedBox(height: LaooLayout.captionFilterSpacing),
                   WorkspaceSectionCard(
                     child: DropdownButtonFormField<int?>(
                       initialValue: _branchId,
