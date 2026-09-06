@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:laoo_service/service_feature.dart';
 
 import '../../../../core/auth/app_auth_controller.dart';
 import '../../../support/presentation/widgets/support_workspace_shell.dart';
 import '../../../partner/pages/partner_company_page.dart';
 import '../../../company/item/pages/item_page.dart';
-import '../../../company/customer/pages/customer_page.dart';
 
 class AuthenticatedHomePage extends StatelessWidget {
   const AuthenticatedHomePage({super.key});

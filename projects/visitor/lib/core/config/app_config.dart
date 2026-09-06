@@ -3,7 +3,7 @@ class AppConfig {
 
   static const String apiBaseUrl = String.fromEnvironment(
     'API_URL',
-    defaultValue: 'http://localhost:5082',
+    defaultValue: 'http://localhost:5080',
   );
 
   static const String projectCode = String.fromEnvironment(

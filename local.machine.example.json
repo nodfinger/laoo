@@ -1,0 +1,6 @@
+{
+  "role": "center-service",
+  "allowedProjects": ["LAOO", "LAOO_SERVICE"],
+  "webPort": 8080,
+  "apiPort": 5080
+}

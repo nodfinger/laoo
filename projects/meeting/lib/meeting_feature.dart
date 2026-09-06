@@ -1,4 +1,5 @@
 export 'features/meeting/meeting_feature_host.dart';
+export 'features/meeting/meeting_go_routes.dart';
 export 'features/meeting/meeting_route_contract.dart';
 export 'features/meeting/pages/meeting_building_page.dart';
 export 'features/meeting/pages/meeting_facility_page.dart';

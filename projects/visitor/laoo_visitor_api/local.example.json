@@ -1,8 +1,0 @@
-{
-  "ConnectionStrings": {
-    "LaooDatabase": "Server=YOUR_SERVER;Database=DBTDLaooService;User ID=YOUR_USER;Password=YOUR_PASSWORD;TrustServerCertificate=True"
-  },
-  "Jwt": {
-    "SecretKey": "REPLACE_WITH_THE_SHARED_SECRET_OF_AT_LEAST_32_CHARACTERS"
-  }
-}

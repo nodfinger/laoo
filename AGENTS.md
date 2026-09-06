@@ -100,6 +100,7 @@ ScreenType: 1
 - หม่อนสามารถตั้งชื่อ Table และ Field ได้เองโดยไม่ต้องถามชื่อจากพ่อ โดยต้องยึดมาตรฐาน Database และกติกาที่พ่ออนุมัติไว้
 - คำสั่งข้อมูล เช่น `SELECT`, `INSERT`, `UPDATE`, `DELETE`, การ Seed ข้อมูล และการแก้ข้อมูลทดสอบ ทำได้ตามขอบเขตงานโดยไม่ต้องถามซ้ำ
 - คำสั่งเปลี่ยนโครงสร้าง เช่น `ALTER`, `CREATE`, `DROP`, การลบ Table/Column และ Migration ที่กระทบ Schema ต้องถามและได้รับอนุมัติจากพ่อก่อน
+- แต่ละเครื่องรัน Migration ของ Project ที่ตนรับผิดชอบได้หลังอนุมัติ โดยต้อง Pull `main` ล่าสุดและใช้ `tools/scripts/run-migrations.ps1` เท่านั้น ห้ามรันไฟล์ SQL โดยตรง
 - หากการอ่าน/เขียนข้อมูลมีผลกระทบสำคัญต่อระบบ ต้องรายงาน SQL โดยย่อ ตาราง/ฟิลด์ ผลกระทบ และผลลัพธ์ให้พ่อทราบหลังดำเนินการ
 - หม่อนยังต้องยึดมาตรฐาน Database, ตั้งชื่อ Table/Field ตามกติกา และทำงานแบบปลอดภัย/ทำซ้ำได้เมื่อเหมาะสม
 
@@ -118,10 +119,13 @@ ScreenType: 1
 - ก่อน Commit/Push ขึ้น GitHub ให้ถามพ่อเพียงครั้งเดียวต่อชุดงาน โดยสรุปขอบเขตให้ครบถ้วน
 - หากพ่อตอบ `ok` หรือ `approve` ให้ถือว่าอนุมัติการ Commit/Push ของชุดงานที่สรุปไว้แล้ว และห้ามถามซ้ำในชุดงานเดียวกัน
 - หากพ่อสั่งตรง ๆ ว่า `หม่อน ขึ้น github` ให้ถือว่าเป็นคำสั่งอนุมัติให้ Commit/Push ได้ทันที โดยไม่ต้องถามซ้ำ
-- เครื่องนี้เป็นเครื่อง Center และเป็นผู้ดูแลการรวมงานเข้า `main`
-- เมื่อพ่ออนุมัติ Commit/Push หรือสั่งให้ Commit/Push บนเครื่อง Center ให้ถือว่ารวมถึงการสร้าง Pull Request และ Merge เข้า `main` ต่อเนื่องได้ทันที โดยไม่ต้องถามอนุมัติซ้ำ
+- ทุกเครื่องต้องอ่านบทบาทจาก `local.machine.json`: `center-service`, `meeting` หรือ `visitor`; ไฟล์นี้เป็น Local config และห้าม Commit
+- แต่ละเครื่องแก้และ Merge ได้เฉพาะ Project ตามบทบาทของตน; การแก้ Root/Shared จากเครื่อง Meeting หรือ Visitor ต้องแยก PR และตรวจ Center รวมก่อน Merge
+- เมื่อพ่ออนุมัติ Commit/Push หรือสั่งให้ Commit/Push ให้ถือว่ารวมถึงการสร้าง Pull Request และ Merge เข้า `main` ต่อเนื่องได้ทันที โดยไม่ต้องถามอนุมัติซ้ำ
 - ก่อน Merge ต้องตรวจว่า Working Tree ถูกต้อง ไม่มี Secret หรือ Build Artifact, การทดสอบที่เกี่ยวข้องผ่าน และ Pull Request ไม่มี Conflict หรือ Check ที่ล้มเหลว; ห้ามข้าม Branch Protection หรือบังคับ Merge
 - หลัง Merge ให้สลับกลับ `main`, ดึง `origin/main` แบบ `--ff-only`, ตรวจว่า Working Tree สะอาด แล้วรายงาน Commit บน `main` ให้พ่อทราบ
+- ทุกเครื่องต้องรันผ่าน Center host ที่ `8080/5080`; พอร์ตแยกของ Service, Meeting และ Visitor เป็น Legacy และห้ามใช้หลังผ่าน parity
+- ก่อน Merge ให้รัน `tools/scripts/verify-center.ps1 -Module <service|meeting|visitor>` ตาม Project ที่แก้
 
 ## Reporting Style
 
