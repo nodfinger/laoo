@@ -118,6 +118,10 @@ ScreenType: 1
 - ก่อน Commit/Push ขึ้น GitHub ให้ถามพ่อเพียงครั้งเดียวต่อชุดงาน โดยสรุปขอบเขตให้ครบถ้วน
 - หากพ่อตอบ `ok` หรือ `approve` ให้ถือว่าอนุมัติการ Commit/Push ของชุดงานที่สรุปไว้แล้ว และห้ามถามซ้ำในชุดงานเดียวกัน
 - หากพ่อสั่งตรง ๆ ว่า `หม่อน ขึ้น github` ให้ถือว่าเป็นคำสั่งอนุมัติให้ Commit/Push ได้ทันที โดยไม่ต้องถามซ้ำ
+- เครื่องนี้เป็นเครื่อง Center และเป็นผู้ดูแลการรวมงานเข้า `main`
+- เมื่อพ่ออนุมัติ Commit/Push หรือสั่งให้ Commit/Push บนเครื่อง Center ให้ถือว่ารวมถึงการสร้าง Pull Request และ Merge เข้า `main` ต่อเนื่องได้ทันที โดยไม่ต้องถามอนุมัติซ้ำ
+- ก่อน Merge ต้องตรวจว่า Working Tree ถูกต้อง ไม่มี Secret หรือ Build Artifact, การทดสอบที่เกี่ยวข้องผ่าน และ Pull Request ไม่มี Conflict หรือ Check ที่ล้มเหลว; ห้ามข้าม Branch Protection หรือบังคับ Merge
+- หลัง Merge ให้สลับกลับ `main`, ดึง `origin/main` แบบ `--ff-only`, ตรวจว่า Working Tree สะอาด แล้วรายงาน Commit บน `main` ให้พ่อทราบ
 
 ## Reporting Style
 
