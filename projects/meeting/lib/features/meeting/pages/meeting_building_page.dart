@@ -887,7 +887,11 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const Divider(
+                    height: 1,
+                    thickness: 1,
+                    color: LaooColors.border,
+                  ),
                   WorkspaceSectionCard(
                     child: DropdownButtonFormField<int?>(
                       initialValue: _branchId,
@@ -917,12 +921,12 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
                       },
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   if (_loading) const LinearProgressIndicator(),
                   Expanded(
                     child: ListView.separated(
                       itemCount: _items.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      separatorBuilder: (_, __) => const SizedBox(height: 6),
                       itemBuilder: (context, index) {
                         final building = _items[index];
                         final floors = List<Map<String, dynamic>>.from(
@@ -930,6 +934,13 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
                         );
                         return Card(
                           margin: EdgeInsets.zero,
+                          color: LaooColors.white,
+                          surfaceTintColor: Colors.transparent,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(LaooRadius.xs),
+                            side: BorderSide.none,
+                          ),
                           child: ExpansionTile(
                             tilePadding: const EdgeInsets.all(
                               LaooLayout.cardPadding,

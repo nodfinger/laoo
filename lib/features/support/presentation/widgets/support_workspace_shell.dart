@@ -42,7 +42,14 @@ class WorkspaceSectionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Card(
     margin: EdgeInsets.zero,
+    color: LaooColors.white,
+    surfaceTintColor: Colors.transparent,
+    elevation: 0,
     clipBehavior: Clip.antiAlias,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(LaooRadius.xs),
+      side: BorderSide.none,
+    ),
     child: Padding(padding: padding, child: child),
   );
 }
@@ -252,7 +259,7 @@ class SupportWorkspaceShell extends StatelessWidget {
           data: workspaceTheme,
           child: Builder(
             builder: (context) => Scaffold(
-              backgroundColor: preset.background,
+              backgroundColor: LaooColors.background,
               drawer: compact
                   ? ValueListenableBuilder<bool>(
                       valueListenable: workspaceButtonMenu,
