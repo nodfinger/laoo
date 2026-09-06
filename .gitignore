@@ -40,6 +40,9 @@ packages/**/pubspec.lock
 **/obj/
 /artifacts/
 
+# Runtime uploads belong on the deployed API storage, never in Git
+**/wwwroot/uploads/**
+
 # Symbolication related
 app.*.symbols
 
