@@ -204,6 +204,7 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
     String label,
     WorkspaceThemePreset preset, {
     String? errorText,
+    Color? labelColor,
   }) {
     final border = OutlineInputBorder(
       borderRadius: BorderRadius.circular(LaooRadius.xs),
@@ -213,11 +214,11 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
       labelText: label,
       errorText: errorText,
       labelStyle: TextStyle(
-        color: preset.primary,
+        color: labelColor ?? preset.primary,
         fontSize: LaooTypography.inputLabel,
       ),
       floatingLabelStyle: TextStyle(
-        color: preset.primary,
+        color: labelColor ?? preset.primary,
         fontSize: LaooTypography.inputLabel,
       ),
       border: border,
@@ -381,47 +382,88 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, refresh) => AlertDialog(
-          title: Row(
+          backgroundColor: preset.surface,
+          surfaceTintColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(LaooRadius.xs),
+          ),
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: LaooLayout.dialogInsetPadding,
+            vertical: 24,
+          ),
+          titlePadding: const EdgeInsets.fromLTRB(
+            LaooLayout.cardPadding,
+            LaooLayout.cardPadding,
+            LaooLayout.cardPadding,
+            0,
+          ),
+          contentPadding: const EdgeInsets.fromLTRB(
+            LaooLayout.cardPadding,
+            LaooLayout.cardPadding,
+            LaooLayout.cardPadding,
+            0,
+          ),
+          actionsPadding: const EdgeInsets.fromLTRB(
+            LaooLayout.cardPadding,
+            0,
+            LaooLayout.cardPadding,
+            LaooLayout.cardPadding,
+          ),
+          title: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Icon(Icons.restaurant_menu_outlined, color: preset.primary),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  item == null ? 'เพิ่มรายการอาหาร' : 'แก้ไขรายการอาหาร',
-                  style: LaooTypography.popupTitleStyle,
-                ),
+              Row(
+                children: [
+                  Icon(Icons.restaurant_menu_outlined, color: preset.primary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      item == null ? 'เพิ่มรายการอาหาร' : 'แก้ไขรายการอาหาร',
+                      style: LaooTypography.popupTitleStyle,
+                    ),
+                  ),
+                ],
               ),
+              const SizedBox(height: LaooLayout.cardSpacing),
+              const Divider(height: 1, color: LaooColors.border),
             ],
           ),
-          content: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 520),
+          content: SizedBox(
+            width: 520,
             child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Divider(height: 1, color: LaooColors.border),
-                  const SizedBox(height: 12),
                   TextField(
                     controller: code,
                     textCapitalization: TextCapitalization.characters,
                     onChanged: (_) => refresh(() => codeError = null),
-                    style: const TextStyle(fontSize: LaooTypography.inputText),
+                    style: const TextStyle(
+                      color: Colors.black,
+                      fontSize: LaooTypography.inputText,
+                    ),
                     decoration: _inputDecoration(
                       'รหัสอาหาร *',
                       preset,
                       errorText: codeError,
+                      labelColor: Colors.black,
                     ),
                   ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: name,
                     onChanged: (_) => refresh(() => nameError = null),
-                    style: const TextStyle(fontSize: LaooTypography.inputText),
+                    style: const TextStyle(
+                      color: Colors.black,
+                      fontSize: LaooTypography.inputText,
+                    ),
                     decoration: _inputDecoration(
                       'ชื่อรายการอาหาร *',
                       preset,
                       errorText: nameError,
+                      labelColor: Colors.black,
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -431,14 +473,15 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
                         _foodTypes.any((type) => type['code'] == selectedType)
                         ? selectedType
                         : null,
-                    style: TextStyle(
-                      color: preset.textPrimary,
+                    style: const TextStyle(
+                      color: Colors.black,
                       fontSize: LaooTypography.comboBox,
                     ),
                     decoration: _inputDecoration(
                       'ประเภทอาหาร *',
                       preset,
                       errorText: typeError,
+                      labelColor: Colors.black,
                     ),
                     items: _foodTypes
                         .map(
@@ -448,6 +491,7 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
                               '${type['name']}',
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
+                                color: Colors.black,
                                 fontSize: LaooTypography.comboBox,
                               ),
                             ),
@@ -503,6 +547,14 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
                         style: OutlinedButton.styleFrom(
                           foregroundColor: preset.primary,
                           side: BorderSide(color: preset.primary),
+                          minimumSize: const Size(
+                            0,
+                            LaooTypography.buttonHeight,
+                          ),
+                          visualDensity: VisualDensity.standard,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(LaooRadius.xs),
+                          ),
                         ),
                         onPressed: imageBusy
                             ? null
@@ -564,6 +616,9 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
                       fontSize: LaooTypography.inputHint,
                     ),
                   ),
+                  const SizedBox(height: LaooLayout.cardSpacing),
+                  const Divider(height: 1, color: LaooColors.border),
+                  const SizedBox(height: LaooLayout.cardSpacing),
                 ],
               ),
             ),
@@ -573,12 +628,35 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
               style: OutlinedButton.styleFrom(
                 foregroundColor: preset.primary,
                 side: BorderSide(color: preset.primary),
+                minimumSize: const Size(0, LaooTypography.buttonHeight),
+                visualDensity: VisualDensity.standard,
+                maximumSize: const Size(
+                  double.infinity,
+                  LaooTypography.buttonHeight,
+                ),
+                textStyle: const TextStyle(fontSize: LaooTypography.button),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(LaooRadius.xs),
+                ),
               ),
               onPressed: () => Navigator.pop(dialogContext),
               child: const Text('ยกเลิก'),
             ),
             FilledButton.icon(
-              style: FilledButton.styleFrom(backgroundColor: preset.primary),
+              style: FilledButton.styleFrom(
+                backgroundColor: preset.primary,
+                foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                minimumSize: const Size(0, LaooTypography.buttonHeight),
+                visualDensity: VisualDensity.standard,
+                maximumSize: const Size(
+                  double.infinity,
+                  LaooTypography.buttonHeight,
+                ),
+                textStyle: const TextStyle(fontSize: LaooTypography.button),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(LaooRadius.xs),
+                ),
+              ),
               onPressed: imageBusy
                   ? null
                   : () {
