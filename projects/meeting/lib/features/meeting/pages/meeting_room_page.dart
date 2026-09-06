@@ -7,6 +7,7 @@ import '../../../app/theme/workspace_theme_presets.dart';
 import '../../../app/theme/laoo_typography.dart';
 import '../../../app/router/route_paths.dart';
 import '../../../core/api/api_exception.dart';
+import '../../../core/auth/auth_storage.dart';
 import '../../../core/config/api_config.dart';
 import '../../../core/navigation/navigation_menu_repository.dart';
 import '../../../core/widgets/auto_dismiss_message.dart';
@@ -34,6 +35,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
   final _facilityRepo = MeetingFacilityRepository();
   final _branchRepo = BranchRepository();
   final _structure = MeetingStructureRepository();
+  final _authStorage = AuthStorage();
   final _search = TextEditingController();
   List<Map<String, dynamic>> _rooms = [],
       _facilities = [],
@@ -42,6 +44,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
   Map<String, bool> _actions = {};
   String _caption = '';
   String? _message;
+  String? _accessToken;
   bool _loading = true;
   bool _showCards = false;
   int _page = 0;
@@ -84,6 +87,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
+      _accessToken = await _authStorage.readAccessToken();
       final data = await Future.wait([
         _repo.get(),
         _repo.actions(),
@@ -113,10 +117,26 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
       ? (e.description == null ? e.message : '${e.message}\n${e.description}')
       : '$f\n$e';
   String _imageUrl(String value) {
-    final uri = Uri.tryParse(value.trim());
+    final normalized = value.trim().replaceAll('\\', '/');
+    final uri = Uri.tryParse(normalized);
     if (uri != null && uri.hasScheme) return uri.toString();
-    return Uri.parse(ApiConfig.baseUrl).resolve(value.trim()).toString();
+    final path = normalized.startsWith('/') ? normalized : '/$normalized';
+    return Uri.parse(ApiConfig.baseUrl).resolve(path).toString();
   }
+
+  String _roomImageEndpoint(Map<String, dynamic> item, String kind) {
+    final id = (item['roomId'] as num?)?.toInt();
+    final key = '${kind == 'room' ? 'room' : 'location'}ImageUrl';
+    final stored = item[key]?.toString().trim() ?? '';
+    if (id == null || stored.isEmpty) {
+      return '';
+    }
+    return '/api/company/meeting-rooms/$id/images/$kind';
+  }
+
+  Map<String, String>? get _imageHeaders => _accessToken == null
+      ? null
+      : {'Authorization': 'Bearer $_accessToken'};
 
   void _showRoomImage(String value) {
     showDialog<void>(
@@ -127,6 +147,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
           child: InteractiveViewer(
             child: Image.network(
               _imageUrl(value),
+              headers: _imageHeaders,
               fit: BoxFit.contain,
               errorBuilder: (_, __, ___) => const Padding(
                 padding: EdgeInsets.all(24),
@@ -140,8 +161,8 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
   }
 
   Widget _roomImages(Map<String, dynamic> item) {
-    final room = item['roomImageUrl']?.toString() ?? '';
-    final plan = item['locationImageUrl']?.toString() ?? '';
+    final room = _roomImageEndpoint(item, 'room');
+    final plan = _roomImageEndpoint(item, 'location');
     Widget image(String url, String label) => url.isEmpty
         ? Container(
             width: 56,
@@ -158,6 +179,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
               onTap: () => _showRoomImage(url),
               child: Image.network(
                 _imageUrl(url),
+                headers: _imageHeaders,
                 width: 56,
                 height: 56,
                 fit: BoxFit.cover,
@@ -180,8 +202,8 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
   }
 
   Widget _cardImages(Map<String, dynamic> item, WorkspaceThemePreset preset) {
-    final room = item['roomImageUrl']?.toString() ?? '';
-    final plan = item['locationImageUrl']?.toString() ?? '';
+    final room = _roomImageEndpoint(item, 'room');
+    final plan = _roomImageEndpoint(item, 'location');
     Widget image(String url, String label, IconData icon) {
       final content = Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -206,6 +228,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                     onTap: () => _showRoomImage(url),
                     child: Image.network(
                       _imageUrl(url),
+                      headers: _imageHeaders,
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => Icon(
                         Icons.broken_image_outlined,
@@ -1276,8 +1299,8 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                               width: .25,
                             ),
                           ),
-                          dataRowMinHeight: 84,
-                          dataRowMaxHeight: 96,
+                          dataRowMinHeight: 56,
+                          dataRowMaxHeight: 64,
                           columnSpacing: 12,
                           sortColumnIndex: _sortColumn,
                           sortAscending: _sortAscending,
@@ -1466,7 +1489,12 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
             });
           }
 
-          Widget preview(PlatformFile? file, String? url, IconData icon) {
+          Widget preview(
+            PlatformFile? file,
+            String? url,
+            IconData icon, {
+            String? requestUrl,
+          }) {
             if (file?.bytes != null) {
               return InkWell(
                 onTap: () => showDialog<void>(
@@ -1486,10 +1514,12 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
               );
             }
             if (url?.isNotEmpty == true) {
+              final source = requestUrl ?? url!;
               return InkWell(
-                onTap: () => _showRoomImage(url!),
+                onTap: () => _showRoomImage(source),
                 child: Image.network(
-                  _imageUrl(url!),
+                  _imageUrl(source),
+                  headers: _imageHeaders,
                   width: 130,
                   height: 82,
                   fit: BoxFit.cover,
@@ -1529,7 +1559,19 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                   ),
                 ),
                 const SizedBox(height: 6),
-                Center(child: preview(file, oldUrl, icon)),
+                Center(
+                  child: preview(
+                    file,
+                    oldUrl,
+                    icon,
+                    requestUrl: item == null
+                        ? null
+                        : _roomImageEndpoint(
+                            item,
+                            icon == Icons.map_outlined ? 'location' : 'room',
+                          ),
+                  ),
+                ),
                 const SizedBox(height: 6),
                 OutlinedButton.icon(
                   onPressed: onPick,
@@ -1545,17 +1587,34 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
           }
 
           return AlertDialog(
-            title: Row(
+            insetPadding: const EdgeInsets.all(LaooLayout.dialogInsetPadding),
+            backgroundColor: LaooColors.white,
+            surfaceTintColor: Colors.transparent,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(LaooRadius.xs),
+              side: BorderSide.none,
+            ),
+            titlePadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Icon(
-                  item == null ? Icons.add : Icons.edit_outlined,
-                  color: preset.primary,
+                Row(
+                  children: [
+                    Icon(
+                      item == null ? Icons.add : Icons.edit_outlined,
+                      color: preset.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        item == null ? 'เพิ่มห้องประชุม' : 'แก้ไขห้องประชุม',
+                        style: LaooTypography.popupTitleStyle,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  item == null ? 'เพิ่มห้องประชุม' : 'แก้ไขห้องประชุม',
-                  style: LaooTypography.popupTitleStyle,
-                ),
+                const SizedBox(height: 12),
+                const Divider(height: 1, thickness: 1, color: LaooColors.border),
               ],
             ),
             content: SizedBox(
@@ -1566,7 +1625,6 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Divider(color: preset.primary.withValues(alpha: .45)),
                     Row(
                       children: [
                         const Text('พร้อมใช้งาน'),
@@ -1581,6 +1639,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                         ),
                       ],
                     ),
+                    const SizedBox(height: 12),
                     LayoutBuilder(
                       builder: (context, box) {
                         final compact = box.maxWidth < 560;
@@ -1675,24 +1734,24 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                             ? Column(
                                 children: [
                                   branchField,
-                                  const SizedBox(height: 10),
+                                  const SizedBox(height: 12),
                                   buildingField,
-                                  const SizedBox(height: 10),
+                                  const SizedBox(height: 12),
                                   floorField,
                                 ],
                               )
                             : Row(
                                 children: [
                                   Expanded(child: branchField),
-                                  const SizedBox(width: 10),
+                                  const SizedBox(width: 12),
                                   Expanded(child: buildingField),
-                                  const SizedBox(width: 10),
+                                  const SizedBox(width: 12),
                                   Expanded(child: floorField),
                                 ],
                               );
                       },
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 12),
                     LayoutBuilder(
                       builder: (context, box) {
                         final compact = box.maxWidth < 560;
@@ -1743,9 +1802,9 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                             ? Column(
                                 children: [
                                   fields[0],
-                                  const SizedBox(height: 10),
+                                  const SizedBox(height: 12),
                                   nameField,
-                                  const SizedBox(height: 10),
+                                  const SizedBox(height: 12),
                                   fields[1],
                                 ],
                               )
@@ -1760,7 +1819,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                               );
                       },
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 12),
                     TextField(
                       controller: description,
                       style: const TextStyle(
@@ -1769,49 +1828,65 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                       maxLines: 1,
                       decoration: _roomInput('รายละเอียด', preset),
                     ),
-                    const SizedBox(height: 10),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: uploadColumn(
-                            title: 'รูปห้องประชุม',
-                            icon: Icons.meeting_room_outlined,
-                            file: roomImage,
-                            oldUrl: item?['roomImageUrl']?.toString(),
-                            onPick: () => pickImage(false),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: uploadColumn(
-                            title: 'รูปแผนผัง',
-                            icon: Icons.map_outlined,
-                            file: locationImage,
-                            oldUrl: item?['locationImageUrl']?.toString(),
-                            onPick: () => pickImage(true),
-                          ),
-                        ),
-                      ],
+                    const SizedBox(height: 12),
+                    LayoutBuilder(
+                      builder: (context, box) {
+                        final compact = box.maxWidth < 560;
+                        final roomUpload = uploadColumn(
+                          title: 'รูปห้องประชุม',
+                          icon: Icons.meeting_room_outlined,
+                          file: roomImage,
+                          oldUrl: item?['roomImageUrl']?.toString(),
+                          onPick: () => pickImage(false),
+                        );
+                        final locationUpload = uploadColumn(
+                          title: 'รูปแผนผัง',
+                          icon: Icons.map_outlined,
+                          file: locationImage,
+                          oldUrl: item?['locationImageUrl']?.toString(),
+                          onPick: () => pickImage(true),
+                        );
+                        return compact
+                            ? Column(
+                                children: [
+                                  roomUpload,
+                                  const SizedBox(height: 12),
+                                  locationUpload,
+                                ],
+                              )
+                            : Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(child: roomUpload),
+                                  const SizedBox(width: 16),
+                                  Expanded(child: locationUpload),
+                                ],
+                              );
+                      },
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
                     Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
                         'รูปขนาดไม่เกิน 1 MB',
-                        style: TextStyle(fontSize: 12, color: preset.primary),
+                        style: TextStyle(
+                          fontSize: LaooTypography.validation,
+                          color: preset.primary,
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
             ),
+            contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+            actionsPadding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
             actions: [
               Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Divider(color: preset.primary, height: 1),
-                  const SizedBox(height: 8),
+                  const Divider(height: 1, thickness: 1, color: LaooColors.border),
+                  const SizedBox(height: 12),
                   Row(
                     children: [
                       OutlinedButton.icon(
@@ -1839,13 +1914,24 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                         ),
                         label: Text(
                           'อุปกรณ์',
-                          style: TextStyle(color: preset.primary),
+                          style: TextStyle(
+                            color: preset.primary,
+                            fontSize: LaooTypography.button,
+                          ),
                         ),
                       ),
                       const Spacer(),
                       TextButton(
                         style: TextButton.styleFrom(
                           foregroundColor: preset.primary,
+                          minimumSize: const Size(0, LaooTypography.buttonHeight),
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(LaooRadius.xs),
+                          ),
+                          textStyle: const TextStyle(
+                            fontSize: LaooTypography.button,
+                          ),
                         ),
                         onPressed: () => Navigator.pop(dc),
                         child: const Text('ยกเลิก'),
@@ -1856,6 +1942,20 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                           foregroundColor: Theme.of(
                             context,
                           ).colorScheme.onPrimary,
+                          minimumSize: const Size(
+                            100,
+                            LaooTypography.buttonHeight,
+                          ),
+                          maximumSize: const Size(
+                            160,
+                            LaooTypography.buttonHeight,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(LaooRadius.xs),
+                          ),
+                          textStyle: const TextStyle(
+                            fontSize: LaooTypography.button,
+                          ),
                         ),
                         onPressed: () {
                           if (branchId == null) branchError = 'กรุณาเลือกสาขา';

@@ -14,6 +14,7 @@ import '../../profile/pages/user_profile_dialog.dart';
 import '../../support/presentation/widgets/support_workspace_shell.dart';
 import '../data/meeting_food_repository.dart';
 import '../meeting_feature_host.dart';
+import '../widgets/meeting_pagination_card.dart';
 
 String _foodImageUrl(String value) {
   final uri = Uri.tryParse(value.trim());
@@ -260,6 +261,13 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
               final item = _visibleItems[index];
               return Card(
                 margin: EdgeInsets.zero,
+                color: LaooColors.white,
+                surfaceTintColor: Colors.transparent,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(LaooRadius.xs),
+                  side: BorderSide.none,
+                ),
                 child: ListTile(
                   leading: _foodImage(item, preset, size: 52),
                   title: Text('${item['code']} | ${item['nameTh']}'),
@@ -270,11 +278,16 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
             },
           );
         }
-        return SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minWidth: constraints.maxWidth),
-            child: DataTable(
+        return WorkspaceSectionCard(
+          padding: EdgeInsets.zero,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minWidth: constraints.maxWidth),
+              child: DataTable(
+                horizontalMargin: LaooDataTable.horizontalMargin,
+                columnSpacing: LaooDataTable.columnSpacing,
+                dividerThickness: LaooDataTable.dividerThickness,
               headingRowColor: WidgetStatePropertyAll(
                 preset.primary.withValues(alpha: .10),
               ),
@@ -328,6 +341,7 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
                   ],
                 );
               }).toList(),
+              ),
             ),
           ),
         );
@@ -337,45 +351,17 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
 
   Widget _pagination(WorkspaceThemePreset preset) {
     final total = _filtered.length;
-    final start = total == 0 ? 0 : _currentPage * _pageSize + 1;
-    final end = ((_currentPage + 1) * _pageSize).clamp(0, total);
-    final neutral = Theme.of(context).colorScheme.surfaceContainerHighest;
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        OutlinedButton(
-          style: OutlinedButton.styleFrom(
-            backgroundColor: neutral,
-            side: BorderSide.none,
-          ),
-          onPressed: _currentPage > 0
-              ? () => setState(() => _currentPage--)
-              : null,
-          child: const Icon(Icons.chevron_left),
-        ),
-        FilledButton(
-          style: FilledButton.styleFrom(
-            backgroundColor: preset.primary,
-            disabledBackgroundColor: preset.primary,
-            disabledForegroundColor: Theme.of(context).colorScheme.onPrimary,
-          ),
-          onPressed: null,
-          child: Text('${_pageCount == 0 ? 0 : _currentPage + 1}'),
-        ),
-        OutlinedButton(
-          style: OutlinedButton.styleFrom(
-            backgroundColor: neutral,
-            side: BorderSide.none,
-          ),
-          onPressed: _currentPage < _pageCount - 1
-              ? () => setState(() => _currentPage++)
-              : null,
-          child: const Icon(Icons.chevron_right),
-        ),
-        Text('$start-$end จาก $total'),
-      ],
+    return MeetingPaginationCard(
+      total: total,
+      pageIndex: _currentPage,
+      pageSize: _pageSize,
+      primary: preset.primary,
+      onPrevious: _currentPage > 0
+          ? () => setState(() => _currentPage--)
+          : null,
+      onNext: _currentPage < _pageCount - 1
+          ? () => setState(() => _currentPage++)
+          : null,
     );
   }
 
@@ -723,11 +709,11 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
         children: [
           Padding(
             padding: const EdgeInsets.all(LaooLayout.cardMargin),
-            child: WorkspaceSectionCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  LayoutBuilder(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                WorkspaceSectionCard(
+                  child: LayoutBuilder(
                     builder: (context, constraints) => WorkspaceActionHeader(
                       title: _caption,
                       favoriteKey: '23004',
@@ -756,8 +742,10 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
                       ],
                     ),
                   ),
-                  const Divider(height: 17, color: LaooColors.border),
-                  LayoutBuilder(
+                ),
+                const SizedBox(height: LaooLayout.captionFilterSpacing),
+                WorkspaceSectionCard(
+                  child: LayoutBuilder(
                     builder: (context, constraints) => Wrap(
                       spacing: 8,
                       runSpacing: 8,
@@ -773,19 +761,18 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
                             style: const TextStyle(
                               fontSize: LaooTypography.inputText,
                             ),
-                            decoration:
-                                _inputDecoration(
-                                  'ค้นหารหัส ชื่อ หรือประเภท',
-                                  preset,
-                                ).copyWith(
-                                  prefixIcon: const Icon(Icons.search),
-                                  suffixIcon: IconButton(
-                                    tooltip: 'ค้นหา',
-                                    onPressed: () =>
-                                        setState(() => _currentPage = 0),
-                                    icon: const Icon(Icons.arrow_forward),
-                                  ),
-                                ),
+                            decoration: _inputDecoration(
+                              'ค้นหารหัส ชื่อ หรือประเภท',
+                              preset,
+                            ).copyWith(
+                              prefixIcon: const Icon(Icons.search),
+                              suffixIcon: IconButton(
+                                tooltip: 'ค้นหา',
+                                onPressed: () =>
+                                    setState(() => _currentPage = 0),
+                                icon: const Icon(Icons.arrow_forward),
+                              ),
+                            ),
                           ),
                         ),
                         FilledButton.icon(
@@ -819,7 +806,10 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
                               color: preset.textPrimary,
                               fontSize: LaooTypography.comboBox,
                             ),
-                            decoration: _inputDecoration('ประเภทอาหาร', preset),
+                            decoration: _inputDecoration(
+                              'ประเภทอาหาร',
+                              preset,
+                            ),
                             items: [
                               const DropdownMenuItem<String?>(
                                 value: null,
@@ -844,13 +834,13 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
                       ],
                     ),
                   ),
-                  const Divider(height: 17, color: LaooColors.border),
-                  if (_loading) const LinearProgressIndicator(),
-                  Expanded(child: _dataList(preset)),
-                  const Divider(height: 17, color: LaooColors.border),
-                  _pagination(preset),
-                ],
-              ),
+                ),
+                const SizedBox(height: LaooLayout.cardSpacing),
+                if (_loading) const LinearProgressIndicator(),
+                Expanded(child: _dataList(preset)),
+                const SizedBox(height: LaooLayout.cardSpacing),
+                _pagination(preset),
+              ],
             ),
           ),
           if (_message != null)

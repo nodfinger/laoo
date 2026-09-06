@@ -40,6 +40,49 @@ public sealed class MeetingRoomController(IConfiguration configuration, IWebHost
         return await cmd.ExecuteNonQueryAsync(token)==0 ? NotFound(new { message="ไม่พบห้องประชุม", description=$"RoomID {id} ไม่อยู่ในบริษัทของผู้ใช้งาน" }) : NoContent();
     }
 
+    [HttpGet("{id:long}/images/{kind}")]
+    public async Task<IActionResult> Image(long id, string kind, CancellationToken token)
+    {
+        if (!IsCompany() || CompanyId() is not long company ||
+            !new[] { "room", "location" }.Contains(kind, StringComparer.OrdinalIgnoreCase) ||
+            !await Permission("VIEW", token)) return Forbid();
+
+        await using var c = await Open(token);
+        var column = kind.Equals("location", StringComparison.OrdinalIgnoreCase)
+            ? "LocationImageUrl"
+            : "RoomImageUrl";
+        await using var command = new SqlCommand(
+            $"SELECT {column} FROM dbo.TDADMeetingRoom WHERE RoomID=@id AND CompanyID=@company",
+            c);
+        Add(command, "@id", id);
+        Add(command, "@company", company);
+        var stored = Convert.ToString(await command.ExecuteScalarAsync(token));
+        if (string.IsNullOrWhiteSpace(stored) ||
+            !stored.StartsWith("/uploads/meeting-rooms/", StringComparison.OrdinalIgnoreCase))
+            return NotFound(new { message = "ไม่พบรูปห้องประชุม", description = "ห้องประชุมนี้ยังไม่มีรูปภาพที่ใช้งานได้" });
+
+        var fileName = Path.GetFileName(stored);
+        if (string.IsNullOrWhiteSpace(fileName))
+            return NotFound(new { message = "ไม่พบรูปห้องประชุม", description = "เส้นทางรูปภาพไม่ถูกต้อง" });
+
+        var root = Path.Combine(
+            environment.WebRootPath ?? Path.Combine(environment.ContentRootPath, "wwwroot"),
+            "uploads",
+            "meeting-rooms");
+        var path = Path.Combine(root, fileName);
+        if (!System.IO.File.Exists(path))
+            return NotFound(new { message = "ไม่พบไฟล์รูปห้องประชุม", description = "กรุณาแนบรูปใหม่อีกครั้ง" });
+
+        var contentType = Path.GetExtension(fileName).ToLowerInvariant() switch
+        {
+            ".png" => "image/png",
+            ".webp" => "image/webp",
+            ".gif" => "image/gif",
+            _ => "image/jpeg",
+        };
+        return PhysicalFile(path, contentType);
+    }
+
     [HttpPost("{id:long}/images/{kind}")]
     public async Task<IActionResult> Upload(long id, string kind, IFormFile file, CancellationToken token)
     {

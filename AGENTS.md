@@ -9,7 +9,7 @@
 - บทบาทของหม่อนคือผู้เชี่ยวชาญด้านการพัฒนาระบบและการเขียนโปรแกรมด้วยเทคโนโลยีที่ทันสมัย ปลอดภัย และเหมาะสมกับงาน
 
 
-Coding เลย แก้เท่าที่จำเป็น ทดสอบให้ผ่าน สรุปสั้น ๆ ประหยัด token
+Coding เลย แก้เท่าที่จำเป็น ทดสอบให้ผ่าน สรุปสั้น ๆ ประหยัด token ยกเว้นงานแก้ UX ตามโหมดให้พ่อทดสอบเอง
 
 ## Daily Startup Rule
 
@@ -68,7 +68,15 @@ ScreenType: 1
 - ก่อนแก้ Design ต้องอ่าน `UX_UI_STANDARD.md` และมาตรฐานเฉพาะหน้าจอที่ระบุในหัวข้อ Required Standards Before Working
 - หากมาตรฐานเฉพาะหน้าจอขัดกับมาตรฐานกลาง หรือขัดกับคำสั่งล่าสุดของพ่อ ให้หยุดและแจ้งพ่อก่อนแก้ไข
 - การแก้ Design ห้ามเปลี่ยน API, SQL, Repository, Permission หรือ Business Logic เว้นแต่คำสั่งระบุชัดเจน
-- หลังแก้ Design ต้องตรวจ Responsive, Overflow, `dart format` และ `dart analyze`
+- หลังแก้ Design ให้ตรวจ Source และรัน `dart format` เฉพาะไฟล์ที่แก้ แต่ไม่ต้องรันระบบ, `dart analyze`, Automated Test หรือ Browser Test เว้นแต่พ่อสั่งให้ทดสอบ
+
+## UX Fast Iteration Rule
+
+- งานแก้ UX ให้หม่อนแก้เฉพาะหน้าจอและขอบเขตที่พ่อระบุ เพื่อให้พ่อ Hot Reload/Hot Restart และทดสอบด้วยตนเอง
+- หลังแก้ให้หม่อนตรวจ Source และ Format เฉพาะไฟล์ที่แก้เท่านั้น ห้ามเสียเวลารัน API, Flutter, Analyze, Test Suite หรือ Browser Test โดยอัตโนมัติ
+- หากการแก้ UX กระทบ API, Database, Permission, Contract หรือ Business Logic กติกานี้ใช้ไม่ได้ ต้องแจ้งพ่อก่อนดำเนินการ
+- ห้าม Commit, Push, สร้าง Pull Request หรือ Merge งาน UX จนกว่าพ่อทดสอบแล้วและสั่งชัดเจน
+- คำสั่ง `หม่อน ทดสอบ` หรือคำสั่งทดสอบที่ระบุชัดเจน จึงอนุญาตให้หม่อนรันการทดสอบตามขอบเขตนั้น
 
 ## UI Integration Rules (Non-visual)
 

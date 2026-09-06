@@ -301,19 +301,36 @@ class _MeetingFacilityPageState extends State<MeetingFacilityPage> {
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, refresh) => AlertDialog(
-          title: Row(
+          insetPadding: const EdgeInsets.all(LaooLayout.dialogInsetPadding),
+          backgroundColor: LaooColors.white,
+          surfaceTintColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(LaooRadius.xs),
+            side: BorderSide.none,
+          ),
+          titlePadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Icon(
-                item == null ? Icons.add : Icons.edit_outlined,
-                color: preset.primary,
+              Row(
+                children: [
+                  Icon(
+                    item == null ? Icons.add : Icons.edit_outlined,
+                    color: preset.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      item == null
+                          ? 'เพิ่มสิ่งอำนวยความสะดวก'
+                          : 'แก้ไขสิ่งอำนวยความสะดวก',
+                      style: LaooTypography.popupTitleStyle,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 8),
-              Text(
-                item == null
-                    ? 'เพิ่มสิ่งอำนวยความสะดวก'
-                    : 'แก้ไขสิ่งอำนวยความสะดวก',
-                style: LaooTypography.popupTitleStyle,
-              ),
+              const SizedBox(height: 12),
+              const Divider(height: 1, thickness: 1, color: LaooColors.border),
             ],
           ),
           content: SizedBox(
@@ -321,11 +338,6 @@ class _MeetingFacilityPageState extends State<MeetingFacilityPage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Divider(
-                  color: preset.primary.withValues(alpha: .45),
-                  height: 1,
-                ),
-                const SizedBox(height: 12),
                 TextField(
                   controller: code,
                   onChanged: (_) => refresh(() => codeError = null),
@@ -391,12 +403,24 @@ class _MeetingFacilityPageState extends State<MeetingFacilityPage> {
                   style: const TextStyle(fontSize: LaooTypography.inputText),
                   decoration: _facilityInputDecoration('รายละเอียด', preset),
                 ),
+                const SizedBox(height: 16),
+                const Divider(height: 1, thickness: 1, color: LaooColors.border),
               ],
             ),
           ),
+          contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+          actionsPadding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
           actions: [
             TextButton(
-              style: TextButton.styleFrom(foregroundColor: preset.primary),
+              style: TextButton.styleFrom(
+                foregroundColor: preset.primary,
+                minimumSize: const Size(0, LaooTypography.buttonHeight),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(LaooRadius.xs),
+                ),
+                textStyle: const TextStyle(fontSize: LaooTypography.button),
+              ),
               onPressed: () => Navigator.pop(dialogContext),
               child: const Text('ยกเลิก'),
             ),
@@ -404,6 +428,12 @@ class _MeetingFacilityPageState extends State<MeetingFacilityPage> {
               style: FilledButton.styleFrom(
                 backgroundColor: preset.primary,
                 foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                minimumSize: const Size(100, LaooTypography.buttonHeight),
+                maximumSize: const Size(160, LaooTypography.buttonHeight),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(LaooRadius.xs),
+                ),
+                textStyle: const TextStyle(fontSize: LaooTypography.button),
               ),
               onPressed: () {
                 if (code.text.trim().isEmpty) {
