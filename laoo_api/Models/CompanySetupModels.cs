@@ -4,6 +4,10 @@ public sealed record CompanySetupResponse(
     long? PKValue,
     string OwnerType,
     long? PartnerID,
+    string? PartnerNameTh,
+    string? PartnerAddress,
+    string? PartnerTelephone,
+    string? PartnerEmail,
     long? CompanyID,
     string OwnerCode,
     string OwnerName,
@@ -15,6 +19,12 @@ public sealed record CompanySetupResponse(
     string? CustomerEmail,
     string Name,
     string TitleHeader,
+    string? RunItem,
+    string? MarkItem,
+    int ItemDigit,
+    string? RunCus,
+    string? MarkCus,
+    int CustomerDigit,
     int RowSTD,
     int RowCardSTD,
     int TimeAlert,
@@ -36,6 +46,7 @@ public sealed record CompanySetupResponse(
     bool HasEmailPasswordCenter,
     bool HasPasswordEmpDefault,
     bool HasPasswordDirect);
+    
 
 public sealed class CompanySetupUpdateRequest
 {
@@ -47,6 +58,12 @@ public sealed class CompanySetupUpdateRequest
     public string? CustomerEmail { get; init; }
     public string Name { get; init; } = string.Empty;
     public string TitleHeader { get; init; } = string.Empty;
+    public string? RunItem { get; init; }
+    public string? MarkItem { get; init; }
+    public int ItemDigit { get; init; } = 3;
+    public string? RunCus { get; init; }
+    public string? MarkCus { get; init; }
+    public int CustomerDigit { get; init; } = 5;
     public int RowSTD { get; init; }
     public int RowCardSTD { get; init; }
     public int TimeAlert { get; init; }
@@ -66,3 +83,5 @@ public sealed class CompanySetupUpdateRequest
     public string? PasswordEmpDefault { get; init; }
     public string? PasswordDirect { get; init; }
 }
+
+public sealed record CompanySetupOption(string Code, string Name);

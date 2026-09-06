@@ -27,13 +27,16 @@ public sealed class SupportCompanyController : ControllerBase
         await connection.OpenAsync(cancellationToken);
         if (!await AllowedAsync(connection, "VIEW", cancellationToken)) return Forbid();
         const string sql = """
-SELECT C.CompanyID, C.PartnerID, C.CompanyCode, C.CompanyNameTH, C.CompanyNameEN, C.TaxID,
-       C.Email, C.Telephone, C.AddressText, C.IsActive, C.CreateDate, C.CreateBy, C.UpdateDate,
-       C.UpdateBy, C.ThemeName, P.PartnerNameTH
-FROM dbo.TDADCompany AS C
+SELECT C.CompanyID, C.PartnerID, C.CompanyCode, C.CustomerNameTH, C.CustomerNameEN, C.TaxID,
+       C.EmailAdmin, C.Telephone, C.AddressText, C.IsActive, C.CreateDate, C.CreateBy, C.UpdateDate,
+       C.UpdateBy, CAST(NULL AS nvarchar(100)), P.PartnerNameTH
+FROM dbo.TDSTCompanySetUp AS C
 INNER JOIN dbo.TDADPartner AS P ON P.PartnerID = C.PartnerID
 WHERE (@PartnerID IS NULL OR C.PartnerID = @PartnerID)
-  AND (@Search IS NULL OR C.CompanyCode LIKE N'%' + @Search + N'%' OR C.CompanyNameTH LIKE N'%' + @Search + N'%' OR ISNULL(C.CompanyNameEN,N'') LIKE N'%' + @Search + N'%')
+  AND C.CompanyID IS NOT NULL
+  AND C.CompanyCode IS NOT NULL
+  AND C.CustomerNameTH IS NOT NULL
+  AND (@Search IS NULL OR C.CompanyCode LIKE N'%' + @Search + N'%' OR C.CustomerNameTH LIKE N'%' + @Search + N'%' OR ISNULL(C.CustomerNameEN,N'') LIKE N'%' + @Search + N'%')
   AND (@IsActive IS NULL OR C.IsActive = @IsActive)
 ORDER BY C.CompanyCode;
 """;
@@ -73,21 +76,20 @@ ORDER BY C.CompanyCode;
         await connection.OpenAsync(cancellationToken);
         if (!await AllowedAsync(connection, "EDIT", cancellationToken)) return Forbid();
         const string sql = """
-UPDATE dbo.TDADCompany SET CompanyNameTH=@CompanyNameTH, CompanyNameEN=@CompanyNameEN, TaxID=@TaxID, IsActive=@IsActive,
-Email=@Email, Telephone=@Telephone, AddressText=@AddressText, ThemeName=@ThemeName,
+UPDATE dbo.TDSTCompanySetUp SET CustomerNameTH=@CustomerNameTH, CustomerNameEN=@CustomerNameEN, TaxID=@TaxID, IsActive=@IsActive,
+EmailAdmin=@Email, Telephone=@Telephone, AddressText=@AddressText,
 UpdateDate=SYSUTCDATETIME()
 WHERE CompanyID=@CompanyID;
 """;
         await using var command = new SqlCommand(sql, connection);
         command.Parameters.Add("@CompanyID", SqlDbType.BigInt).Value = companyId;
-        Add(command, "@CompanyNameTH", SqlDbType.NVarChar, request.CompanyNameTh.Trim(), 200);
-        Add(command, "@CompanyNameEN", SqlDbType.NVarChar, Null(request.CompanyNameEn), 200);
+        Add(command, "@CustomerNameTH", SqlDbType.NVarChar, request.CompanyNameTh.Trim(), 200);
+        Add(command, "@CustomerNameEN", SqlDbType.NVarChar, Null(request.CompanyNameEn), 200);
         Add(command, "@TaxID", SqlDbType.NVarChar, Null(request.TaxId), 20);
         Add(command, "@Email", SqlDbType.NVarChar, Null(request.Email), 320);
         Add(command, "@Telephone", SqlDbType.NVarChar, Null(request.Telephone), 50);
         Add(command, "@AddressText", SqlDbType.NVarChar, Null(request.AddressText), 1000);
         command.Parameters.Add("@IsActive", SqlDbType.Bit).Value = request.IsActive;
-        Add(command, "@ThemeName", SqlDbType.NVarChar, Null(request.ThemeName), 100);
         return await command.ExecuteNonQueryAsync(cancellationToken) == 0 ? NotFound() : NoContent();
     }
 
@@ -103,7 +105,7 @@ WHERE CompanyID=@CompanyID;
         dependency.Parameters.Add("@CompanyID", SqlDbType.BigInt).Value = companyId;
         if (Convert.ToInt64(await dependency.ExecuteScalarAsync(cancellationToken)) > 0)
             return Conflict(new { code = "COMPANY_IN_USE", message = "ไม่สามารถลบผู้ใช้บริการที่มีสาขาหรือผู้ใช้งานอยู่ได้" });
-        await using var command = new SqlCommand("DELETE FROM dbo.TDADCompany WHERE CompanyID=@CompanyID", connection);
+        await using var command = new SqlCommand("DELETE FROM dbo.TDSTCompanySetUp WHERE CompanyID=@CompanyID", connection);
         command.Parameters.Add("@CompanyID", SqlDbType.BigInt).Value = companyId;
         return await command.ExecuteNonQueryAsync(cancellationToken) == 0 ? NotFound() : NoContent();
     }

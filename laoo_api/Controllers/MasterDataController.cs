@@ -1,4 +1,5 @@
 using System.Data;
+using System.Globalization;
 using System.Security.Claims;
 using LaooApi.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -28,7 +29,7 @@ public sealed class MasterDataController : ControllerBase
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         var result = new List<MasterGroupResponse>();
         while (await reader.ReadAsync(cancellationToken))
-            result.Add(new(reader.GetString(0), reader.GetString(1)));
+            result.Add(new(TextValue(reader, 0) ?? string.Empty, TextValue(reader, 1) ?? string.Empty));
         return Ok(result);
     }
 
@@ -66,7 +67,7 @@ ORDER BY Seq, Name;";
         command.Parameters.Add("@Search", SqlDbType.NVarChar, 250).Value = string.IsNullOrWhiteSpace(search) ? DBNull.Value : search.Trim();
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         var result = new List<MasterDataResponse>();
-        while (await reader.ReadAsync(cancellationToken)) result.Add(new(reader.GetString(0), reader.GetString(1), reader.GetInt32(2), reader.IsDBNull(3) ? null : reader.GetString(3)));
+        while (await reader.ReadAsync(cancellationToken)) result.Add(new(TextValue(reader, 0) ?? string.Empty, TextValue(reader, 1) ?? string.Empty, reader.GetInt32(2), TextValue(reader, 3)));
         return Ok(result);
     }
 
@@ -112,14 +113,19 @@ ORDER BY Seq, Name;";
         if (Convert.ToInt32(await duplicate.ExecuteScalarAsync(cancellationToken)) > 0) return Conflict(new { message = "ชื่อซ้ำในกลุ่มข้อมูลนี้" });
         const string sql = "IF EXISTS (SELECT 1 FROM dbo.TDSTMaster WHERE MasterGroupCode=@GroupCode AND MasterCode=@Code AND OwnerType=@OwnerType AND ISNULL(OwnerPartnerID,0)=ISNULL(@PartnerID,0) AND ISNULL(OwnerCompanyID,0)=ISNULL(@CompanyID,0)) UPDATE dbo.TDSTMaster SET Name=@Name, Seq=@Seq, ShortCode=@ShortCode, UpdateDate=SYSUTCDATETIME() WHERE MasterGroupCode=@GroupCode AND MasterCode=@Code AND OwnerType=@OwnerType AND ISNULL(OwnerPartnerID,0)=ISNULL(@PartnerID,0) AND ISNULL(OwnerCompanyID,0)=ISNULL(@CompanyID,0); ELSE INSERT dbo.TDSTMaster(MasterGroupCode,MasterCode,Name,Seq,OrderBy,ShortCode,OwnerType,OwnerPartnerID,OwnerCompanyID) VALUES(@GroupCode,@Code,@Name,@Seq,N'Seq',@ShortCode,@OwnerType,@PartnerID,@CompanyID);";
         await using var command = new SqlCommand(sql, connection); AddScope(command, scope);
-        command.Parameters.Add("@GroupCode", SqlDbType.NVarChar, 10).Value = groupCode.Trim(); command.Parameters.Add("@Code", SqlDbType.NVarChar, 10).Value = code; command.Parameters.Add("@Name", SqlDbType.NVarChar, 250).Value = request.Name.Trim(); command.Parameters.Add("@Seq", SqlDbType.Int).Value = request.Seq; command.Parameters.Add("@ShortCode", SqlDbType.NVarChar, 50).Value = string.IsNullOrWhiteSpace(request.ShortCode) ? DBNull.Value : request.ShortCode.Trim();
+        command.Parameters.Add("@GroupCode", SqlDbType.NVarChar, 10).Value = groupCode.Trim(); command.Parameters.Add("@Code", SqlDbType.NVarChar, 10).Value = code; command.Parameters.Add("@Name", SqlDbType.NVarChar, 250).Value = request.Name.Trim(); command.Parameters.Add("@Seq", SqlDbType.Int).Value = request.Seq; command.Parameters.Add("@ShortCode", SqlDbType.NVarChar, 50).Value = string.IsNullOrWhiteSpace(request.ShortCode) ? DBNull.Value : request.ShortCode.Trim().ToUpperInvariant();
         await command.ExecuteNonQueryAsync(cancellationToken);
-        return Ok(new MasterDataResponse(code, request.Name.Trim(), request.Seq, string.IsNullOrWhiteSpace(request.ShortCode) ? null : request.ShortCode.Trim()));
+        return Ok(new MasterDataResponse(code, request.Name.Trim(), request.Seq, string.IsNullOrWhiteSpace(request.ShortCode) ? null : request.ShortCode.Trim().ToUpperInvariant()));
     }
 
     private (string Type, long? Partner, long? Company) ResolveOwner() =>
         long.TryParse(User.FindFirstValue("company_id"), out var company) ? ("C", null, company) :
         long.TryParse(User.FindFirstValue("partner_id"), out var partner) ? ("P", partner, null) : ("L", null, null);
+
+    private static string? TextValue(SqlDataReader reader, int ordinal) =>
+        reader.IsDBNull(ordinal)
+            ? null
+            : Convert.ToString(reader.GetValue(ordinal), CultureInfo.InvariantCulture);
 
     private static void AddScope(SqlCommand command, (string Type, long? Partner, long? Company) scope)
     {

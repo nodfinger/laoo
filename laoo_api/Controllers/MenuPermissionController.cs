@@ -28,16 +28,18 @@ public sealed class MenuPermissionController(IConfiguration configuration) : Con
               CAST(CASE WHEN MAX(CASE WHEN RP.ActionCode='DELETE' AND RP.IsAllowed=1 THEN 1 ELSE 0 END)=1 THEN 1 ELSE 0 END AS bit)
             FROM dbo.TDADMainMenu M
             INNER JOIN dbo.TDADMenuGroup G ON G.MenuGroupCode=M.MenuGroupCode AND G.IsActive=1
+            INNER JOIN dbo.TDADProjectMenuGroup PG ON PG.ProjectID=@ProjectID AND PG.MenuGroupCode=G.MenuGroupCode AND PG.IsActive=1
+            INNER JOIN dbo.TDADProjectMenu PM ON PM.ProjectID=@ProjectID AND PM.MenuCode=M.MenuCode AND PM.MenuGroupCode=G.MenuGroupCode AND PM.IsActive=1
             LEFT JOIN dbo.TDADRoleGroupPermission RP ON RP.MenuCode=M.MenuCode AND RP.RoleGroupID=@RoleGroupID AND RP.ProjectID=@ProjectID
             WHERE M.IsActive=1 AND M.IsVisible=1
               AND UPPER(LTRIM(RTRIM(G.AudienceType))) IN (N'A',@AudienceType)
-            GROUP BY M.MenuCode,M.MenuName,M.MenuGroupCode,G.MenuGroupName,G.SortOrder,M.ScreenType,M.SortOrder ORDER BY G.SortOrder,M.SortOrder,M.MenuCode;
+            GROUP BY M.MenuCode,M.MenuName,M.MenuGroupCode,G.MenuGroupName,PG.SortOrder,M.ScreenType,PM.SortOrder ORDER BY PG.SortOrder,PM.SortOrder,M.MenuCode;
             """;
         await using var command = new SqlCommand(sql, connection);
         Add(command,"@RoleGroupID",SqlDbType.BigInt,roleGroupId); Add(command,"@ProjectID",SqlDbType.BigInt,targetScope.ProjectId); Add(command,"@AudienceType",SqlDbType.Char,prefix switch { "10" => "C", "12" => "L", _ => "P" });
         await using var reader = await command.ExecuteReaderAsync(token);
         var result = new List<MenuPermissionMatrixResponse>();
-        while (await reader.ReadAsync(token)) result.Add(new MenuPermissionMatrixResponse { MenuCode=reader.GetString(0), MenuName=reader.GetString(1), MenuGroupCode=reader.GetString(2).Trim(), MenuGroupName=reader.GetString(3), ScreenType=reader.GetInt32(4), CanView=reader.GetBoolean(5), CanCreate=reader.GetBoolean(6), CanEdit=reader.GetBoolean(7), CanDelete=reader.GetBoolean(8) });
+        while (await reader.ReadAsync(token)) result.Add(new MenuPermissionMatrixResponse { MenuCode=reader.GetString(0), MenuName=reader.GetString(1), MenuGroupCode=reader.GetString(2).Trim(), MenuGroupName=reader.GetString(3), ScreenType=reader.IsDBNull(4) ? 1 : reader.GetInt32(4), CanView=reader.GetBoolean(5), CanCreate=reader.GetBoolean(6), CanEdit=reader.GetBoolean(7), CanDelete=reader.GetBoolean(8) });
         return Ok(result);
     }
 
@@ -122,6 +124,8 @@ public sealed class MenuPermissionController(IConfiguration configuration) : Con
             SELECT @ScreenType=M.ScreenType
             FROM dbo.TDADMainMenu M
             INNER JOIN dbo.TDADMenuGroup G ON G.MenuGroupCode=M.MenuGroupCode AND G.IsActive=1
+            INNER JOIN dbo.TDADProjectMenuGroup PG ON PG.ProjectID=@ProjectID AND PG.MenuGroupCode=G.MenuGroupCode AND PG.IsActive=1
+            INNER JOIN dbo.TDADProjectMenu PM ON PM.ProjectID=@ProjectID AND PM.MenuCode=M.MenuCode AND PM.MenuGroupCode=G.MenuGroupCode AND PM.IsActive=1
             WHERE M.MenuCode=@MenuCode AND M.IsActive=1
               AND UPPER(LTRIM(RTRIM(G.AudienceType))) IN (N'A',@AudienceType);
             IF @ScreenType IS NULL THROW 50010,'MENU_SCOPE_INVALID',1;
@@ -137,7 +141,7 @@ public sealed class MenuPermissionController(IConfiguration configuration) : Con
             FROM (VALUES (N'VIEW',@CanView),(N'CREATE',@CanCreate),(N'EDIT',@CanEdit),(N'DELETE',@CanDelete)) A(ActionCode,IsRequested)
             WHERE A.IsRequested=1
               AND (@CanView=1 OR A.ActionCode=N'VIEW')
-              AND ((@ScreenType=1 AND A.ActionCode IN (N'VIEW',N'CREATE',N'EDIT',N'DELETE')) OR (@ScreenType=2 AND A.ActionCode IN (N'VIEW',N'EDIT')) OR (@ScreenType=3 AND A.ActionCode=N'VIEW'));
+              AND ((@ScreenType IN (1,4) AND A.ActionCode IN (N'VIEW',N'CREATE',N'EDIT',N'DELETE')) OR (@ScreenType=2 AND A.ActionCode IN (N'VIEW',N'EDIT')) OR (@ScreenType=3 AND A.ActionCode=N'VIEW'));
             """;
         await using var command = new SqlCommand(sql,connection,transaction);
         Add(command,"@RoleGroupID",SqlDbType.BigInt,roleGroupId); BindScope(command,targetScope.ProjectId,targetScope.ScopeType,targetScope.OwnerId); Add(command,"@AudienceType",SqlDbType.Char,audienceType); Add(command,"@MenuCode",SqlDbType.NVarChar,request.MenuCode,20); Add(command,"@CanView",SqlDbType.Bit,request.CanView); Add(command,"@CanCreate",SqlDbType.Bit,request.CanCreate); Add(command,"@CanEdit",SqlDbType.Bit,request.CanEdit); Add(command,"@CanDelete",SqlDbType.Bit,request.CanDelete); await command.ExecuteNonQueryAsync(token);
@@ -200,10 +204,9 @@ public sealed class MenuPermissionController(IConfiguration configuration) : Con
         var userType=User.FindFirstValue("user_type")??string.Empty;
         if(scope=="partner"&&userType.Equals("PARTNER_USER",StringComparison.OrdinalIgnoreCase)&&ClaimLong("partner_id") is long partnerId){targetScope=new RoleGroupScope(projectId.Value,'P',partnerId);return true;}
         if(scope=="customer"&&userType.Equals("COMPANY_USER",StringComparison.OrdinalIgnoreCase)&&ClaimLong("company_id") is long companyId){targetScope=new RoleGroupScope(projectId.Value,'C',companyId);return true;}
-        if((scope is "laoo" or "support")&&userType.Equals("LAOO_SUPPORT",StringComparison.OrdinalIgnoreCase)&&ClaimLong("laoo_user_id").HasValue){targetScope=new RoleGroupScope(projectId.Value,'L',0);return true;}
         return false;
     }
-    private static bool TryScope(string value,out string prefix,out string screen){var scope=value.Trim().ToLowerInvariant(); prefix=scope=="customer"?"10":scope=="partner"?"11":scope is "laoo" or "support"?"12":""; screen=prefix switch { "10" => "10004", "11" => "11004", "12" => "12004", _ => string.Empty }; return prefix.Length>0;}
+    private static bool TryScope(string value,out string prefix,out string screen){var scope=value.Trim().ToLowerInvariant(); prefix=scope=="customer"?"10":scope=="partner"?"11":""; screen=prefix switch { "10" => "10004", "11" => "11004", _ => string.Empty }; return prefix.Length>0;}
     private async Task<SqlConnection> OpenAsync(CancellationToken token){var connection=new SqlConnection(configuration.GetConnectionString("LaooDatabase")); await connection.OpenAsync(token); return connection;}
     private static void Add(SqlCommand command,string name,SqlDbType type,object? value,int size=0){var parameter=size>0?command.Parameters.Add(name,type,size):command.Parameters.Add(name,type); parameter.Value=value??DBNull.Value;}
     private static void BindScope(SqlCommand command,long project,char scope,long owner){ Add(command,"@ProjectID",SqlDbType.BigInt,project); Add(command,"@ScopeType",SqlDbType.Char,scope); Add(command,"@PartnerID",SqlDbType.BigInt,scope=='P'?owner:null); Add(command,"@CompanyID",SqlDbType.BigInt,scope=='C'?owner:null); }

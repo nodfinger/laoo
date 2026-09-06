@@ -18,13 +18,31 @@ Coding เลย แก้เท่าที่จำเป็น ทดสอ�
 ## Required Standards Before Working
 
 - ก่อนเริ่มงานต้องอ่านและยึดกติกาจาก `AGENTS.md` ก่อนเสมอ
+- งาน Design ทุกงานต้องเริ่มอ่าน `docs/standards/UX_UI_STANDARD.md` แล้วอ่านมาตรฐานเฉพาะประเภทหน้าจอที่เกี่ยวข้อง
+- หน้า List/Card ต้องอ่าน `docs/standards/LIST_CARD_UI_STANDARD.md` และ `docs/standards/PAGINATION_UI_STANDARD.md`
+- หน้า Action (Add/Edit/View) ต้องอ่าน `docs/standards/ACTION_UI_STANDARD.md`
+- Popup, Dialog, Alert และ Confirm ต้องอ่าน `docs/standards/POPUP_UI_STANDARD.md`
 - งาน Font และ Typography ต้องอ่าน `docs/standards/TYPOGRAPHY_STANDARD.md`
-- งาน UX/UI, Screen Flow และรูปแบบหน้าจอ ต้องอ่าน `docs/standards/UX_UI_STANDARD.md`
-- งาน Pagination, ปุ่มเลื่อนหน้า, RowSTD และข้อความแสดงจำนวนรายการ ต้องอ่าน `docs/standards/PAGINATION_UI_STANDARD.md`
 - หากเอกสารมาตรฐานขัดกัน ให้หยุดและแจ้งพ่อก่อน Coding ห้ามเลือกใช้เองโดยเดา
 - ห้ามกำหนด Font, UX/UI หรือ Pagination ขัดกับเอกสารมาตรฐาน เว้นแต่พ่ออนุมัติเป็นกรณีพิเศษ
 
 ## ScreenType Declaration
+
+## ScreenType = 4: Document Header–Detail
+
+- `ScreenType = 4` ใช้สำหรับหน้าจอเอกสารที่มีโครงสร้าง Header และ Detail เช่น ใบเสนอราคา ใบสั่งซื้อ ใบส่งของ และเอกสารทางธุรกิจอื่น ๆ
+- หน้าจอ List ต้องแสดงรายการเอกสารตามมาตรฐานเดียวกับหน้าจอ CRUD และรองรับ Filter, Pagination และการแสดงสถานะเอกสาร
+- ต้องตรวจ Permission แยกตาม Action ได้แก่ `VIEW`, `CREATE`, `EDIT` และ `DELETE` ก่อนแสดงหรือดำเนินการกับปุ่มแต่ละรายการ
+- ผู้ใช้ที่มีสิทธิ์ `CREATE` สามารถเพิ่มเอกสาร ผู้ใช้ที่มีสิทธิ์ `EDIT` สามารถแก้ไข และผู้ใช้ที่มีสิทธิ์ `DELETE` ต้องยืนยันก่อนลบ
+- หน้า Action ของเอกสารต้องแบ่งเป็น 2 ส่วนชัดเจน:
+  - **Header**: ข้อมูลหลักของเอกสาร เช่น เลขที่เอกสาร วันที่ ลูกค้า ผู้เสนอราคา สถานะ และหมายเหตุ
+  - **Detail**: รายการสินค้า/บริการ รองรับปุ่ม `เพิ่มรายการ`, แก้ไข และลบรายการ
+- การบันทึก Header และ Detail ต้องทำเป็น Transaction เดียวกัน หากส่วนใดล้มเหลวต้อง Rollback ทั้งเอกสาร
+- Detail ต้องตรวจความถูกต้องของข้อมูล เช่น สินค้าต้องอยู่ใน Company เดียวกัน จำนวนต้องมากกว่า 0 และราคาต้องเป็นตัวเลข
+- เลขที่เอกสารต้องสร้างและตรวจสอบความซ้ำใน Backend ทุกครั้งที่บันทึก เพื่อป้องกันเลขที่ชนกัน
+- หลังบันทึกสำเร็จให้แสดง Success Notification และคงผู้ใช้ไว้ในหน้าเดิมตาม Flow ของเอกสาร
+- Caption ของหน้าจอต้องอ่านจาก `TDADMainMenu.MenuName` ตาม `MenuCode` ห้ามกำหนดชื่อซ้ำแบบ Hard-code
+- `ScreenType = 4` เป็นข้อกำหนดด้าน Flow ของหน้าจอ ไม่ได้แทนสิทธิ์ผู้ใช้ และต้องตรวจ Permission ของ Backend ซ้ำทุกครั้ง
 
 - สำหรับหน้าจอใหม่ พ่อจะแจ้ง `MenuCode` และค่า `ScreenType` ให้หม่อนก่อนเริ่มสร้างหน้าจอ
 - `TDADMainMenu.ScreenType` เป็น Source of Truth ของประเภทหน้าจอ และเป็นชนิดข้อมูล `int`
@@ -46,44 +64,23 @@ ScreenType: 1
 
 ## UI Screen Design Rules
 
-- ชื่อเมนูและ Caption ห้ามอ่านคนละแหล่งหรือ hard-code แยกกัน ให้ใช้ Resolver ส่วนกลางที่อ่าน `MenuName` จาก Navigation API/`TDADMainMenu` โดยค้นจาก `MenuCode` หรือ `RouteName`; Sidebar, List และ Action Form ต้องได้รับค่าเดียวกันจากส่วนกลาง
-- Sidebar ต้องแสดงเฉพาะรายการที่ Navigation API อ่านจาก `TDADMainMenu` และผ่านสิทธิ์ `VIEW` ของผู้ Login ใน Project ปัจจุบัน ห้ามเติมเมนูสำรองหรือเมนู hard-code ฝั่ง Client; ใช้ `MenuCode` เป็นตัวตนหลักเพื่อจับคู่กับ Route Registry ส่วนกลาง และ cache เมนูต้องไม่แชร์ข้าม Session/User
+- เอกสาร Design หลักของระบบอยู่ใน `docs/standards/` และเป็น Source of Truth ห้ามคัดลอกกฎรายละเอียดมาซ้ำใน `AGENTS.md`
+- ก่อนแก้ Design ต้องอ่าน `UX_UI_STANDARD.md` และมาตรฐานเฉพาะหน้าจอที่ระบุในหัวข้อ Required Standards Before Working
+- หากมาตรฐานเฉพาะหน้าจอขัดกับมาตรฐานกลาง หรือขัดกับคำสั่งล่าสุดของพ่อ ให้หยุดและแจ้งพ่อก่อนแก้ไข
+- การแก้ Design ห้ามเปลี่ยน API, SQL, Repository, Permission หรือ Business Logic เว้นแต่คำสั่งระบุชัดเจน
+- หลังแก้ Design ต้องตรวจ Responsive, Overflow, `dart format` และ `dart analyze`
 
-- หน้าผู้ใช้บริการของ Support ต้องใช้ `MenuName` จาก `TDADMainMenu` เป็น Caption เดียวกันใน Shell, List และ Action Screen; หน้า List ต้องแสดงคอลัมน์ `Partner` ถัดจาก `Action` และมี Partner Filter ด้านบนเมื่อข้อมูลอยู่ภายใต้หลาย Partner
+## UI Integration Rules (Non-visual)
 
-- CRUD Action Screen ต้องจัด Caption และชุดปุ่ม `ยกเลิก`/`บันทึก` ให้อยู่บรรทัดเดียวกันเสมอ โดยให้ Caption อยู่ด้านซ้ายและปุ่มอยู่ด้านขวา ทั้งด้านบนและด้านล่างของ Form เมื่อมีการแสดงปุ่มทั้งสองตำแหน่ง
-- หลัง Add, Edit, Delete หรือ Action ที่ทำรายการสำเร็จทุกครั้ง ต้องแสดง Success Notification ในหน้าเดิมหรือหน้าปลายทางตาม Flow โดยมีข้อความสรุปผล ไอคอนสำเร็จ และปุ่มปิด
+- ชื่อเมนูและ Caption ต้องใช้ Resolver ส่วนกลางที่อ่าน `MenuName` จาก Navigation API/`TDADMainMenu` โดยค้นจาก `MenuCode` หรือ `RouteName`; Sidebar, List และ Action Form ต้องได้รับค่าเดียวกัน
+- Sidebar ต้องแสดงเฉพาะเมนูจาก Navigation API ที่ผ่านสิทธิ์ `VIEW` ของผู้ Login ใน Project ปัจจุบัน ห้ามเติมเมนูสำรองหรือเมนู hard-code ฝั่ง Client
+- หน้าผู้ใช้บริการของ Support ต้องใช้ `MenuName` จาก `TDADMainMenu`; หน้า List ต้องแสดง Partner และ Partner Filter เมื่อข้อมูลอยู่ภายใต้หลาย Partner
+- ComboBox ที่อ่าน `TDSTMaster` ต้องอ้าง `MasterGroupCode` ผ่านตัวแปรกลาง Prefix `Ms` และเปิดการจัดการ Master ตาม Permission
+- หน้าจอแบ่งตาม `ScreenType`: `1 = CRUD`, `2 = UpdateOnly`, `3 = ShowOnly`, `4 = Document Header–Detail`
+- ทุก Action ต้องตรวจทั้ง `ScreenType` และ Permission ของผู้ใช้ และ Backend ต้องตรวจซ้ำ
+- Action Form หลาย Field ต้องเปิดเต็ม Content Area ภายใน Shared Workspace ห้ามสร้าง Shell ซ้อนหรือใช้ Popup แทน
+- ก่อนสร้าง Action Screen ต้องตรวจ ActionCode, Flow, Permission และปลายทางหลัง Save/Cancel จาก Feature Specification; หากไม่ระบุให้ถามพ่อก่อน
 
-- เมื่อจะสร้างหน้าจอใหม่ ต้องอ่าน `AGENTS.md` ก่อนเริ่มสร้างหน้าจอนั้น; การแก้ไขหน้าจอเดิมไม่ต้องอ่านซ้ำทุกครั้ง
-- หน้าจอที่ใช้ ComboBox ซึ่งอ่านข้อมูลจาก `TDSTMaster` ต้องมี popup สำหรับบริหารจัดการข้อมูลตามสิทธิ์ของผู้ใช้
-- ComboBox ที่อ่านข้อมูลจาก `TDSTMaster` ต้องมีปุ่มเปิด Popup สำหรับเพิ่ม แก้ไข และลบข้อมูล โดยตรวจสอบ Permission ของผู้ใช้ทุก Action; หากไม่มีสิทธิ์ให้ซ่อนหรือปิด Action นั้น
-- การแสดงรายการใน Popup และ ComboBox ต้องอ่านข้อมูลตาม `MasterGroupCode` ที่กำหนดจากตัวแปรกลาง ห้ามใส่รหัสกลุ่มเป็น String กระจายในหน้าจอ
-- ชื่อตัวแปรกลางของ `MasterGroupCode` ให้ใช้ Prefix `Ms` ตามความหมาย เช่น `MasterGroupCode='001'` จังหวัดใช้ `MsProv` และ `MasterGroupCode='002'` หน่วยบรรจุใช้ `MsUnit`; เมื่อระบบเรียกใช้ข้อมูล Master ต้องอ้างผ่านตัวแปรกลางเสมอ
-- หน้าจอระบบแบ่งเป็น 3 รูปแบบตาม `ScreenType` ที่พ่อประกาศ: `CRUD`, `UpdateOnly` หรือ `ShowOnly`
-- ทุกหน้าจอต้องเต็มความกว้างของ Content Area ใช้โทนสีและตัวอักษรตามมาตรฐานระบบ ด้านบนใช้ `Caption` ที่อ่านจาก `MenuName` และ Data List ให้ระบบเฉลี่ยความกว้างคอลัมน์เอง
-- หัวข้อย่อยของหน้าจอ รวมถึง Caption รูปแบบ `MenuName > Action` ต้องใช้สีตัวอักษรจาก Style/Theme ที่ผู้ใช้เลือก เช่น สีหลักของ Style และห้ามกำหนดสีตายตัวเฉพาะหน้าจอ
-- แบบ `CRUD`: มี List พร้อม Filter, ปุ่มเพิ่ม, Pagination, คอลัมน์ `ID` ที่รันเลข 1,2,3 และคอลัมน์ `Action` แก้ไข/ลบตาม Permission; Form ต้องมีปุ่มด้านบนและล่างชิดขวาตาม Action, ปุ่มลบเป็นสีแดงเสมอ, เพิ่มแล้วล้างข้อมูลอยู่หน้าเดิม, แก้ไขหรือลบแล้วกลับ List
-- แบบ `UpdateOnly`: มี Filter และ Pagination; รองรับทั้งแก้ไขในหน้าเดียวหรือเลือกจาก List แล้วเปิดหน้าแก้ไข โดยมีปุ่มบันทึก/ยกเลิกด้านบนและล่างชิดขวา และบันทึกแล้วกลับ List
-- แบบ `ShowOnly`: มี Filter และ Pagination แต่ไม่มี Action เปลี่ยนข้อมูลใด ๆ
-- `CRUD Action Screen` ไม่ใช่ ScreenType ตัวที่ 4 แต่เป็นหน้าจอ Action ลูกของหน้าจอ `CRUD` และต้องสืบทอด `MenuCode`, `ScreenType` และ Permission Context จากหน้าจอแม่
-- เมื่อกด Add, Edit, View หรือ Custom Action ที่ต้องเปิด Form/ข้อมูลหลาย Field ให้เปิดเป็นหน้าเต็มพื้นที่ Content Area ภายใน Shared Workspace โดยคง Sidebar และ Top Bar เดิม ห้ามเปิดเป็น Dialog/Popup และห้ามสร้าง Shell ใหม่
-- Action Screen ต้องแสดง Caption รูปแบบ `{MenuName} > {Action}` และมีปุ่ม Action ด้านบนและล่างชิดขวาตาม Flow
-- Dialog/Popup ใช้ได้เฉพาะงานสั้น ๆ เช่น Confirm Delete, Confirm Action หรือ Lookup/จัดการ Master ขนาดเล็กที่ได้รับอนุมัติ ไม่ใช้แทนหน้าจอ Action หลัก
-- ก่อนสร้าง Action Screen ต้องตรวจ ActionCode, Flow, Permission และปลายทางหลัง Save/Cancel จาก Feature Specification; หากไม่ระบุให้ถามพ่อก่อน ห้ามเดา
-- ในหน้า List ปุ่มหรือไอคอน `Edit` ใช้สีเขียวตามสีหลักของ Theme และ `Delete` ใช้สีแดงเสมอ
-- หน้า List ต้องใช้ปุ่มเพิ่มแบบมีไอคอน `+` และข้อความ `เพิ่ม`; ช่องค้นหาไม่ใช้ Auto Search เป็นค่าเริ่มต้น ให้มีไอคอนแว่นขยายด้านซ้ายและไอคอนลูกศรด้านขวาสุด และค้นหาเมื่อกดลูกศรหรือ `Enter` เท่านั้น; ช่องค้นหาต้องมีความกว้างกระชับ ไม่ยืดยาวเต็มแถว และต้องมีปุ่ม `ล้าง Filter` กับปุ่ม Refresh
-- ตาราง List ต้องมีหัวตารางพื้นอ่อน แถวข้อมูลแบ่งเส้นอย่างชัดเจน, Column 1 เป็น `ID`, Column 2 เป็น `Action` และใช้รูปแบบสี/ระยะห่างตาม Theme กลาง
-- หลังเพิ่ม/แก้ไข/ลบสำเร็จ ต้องแสดงกล่องแจ้งเตือนด้านบนโทนสีเขียวอ่อน พร้อมไอคอนสำเร็จ ข้อความสรุปผลการทำรายการ และปุ่มปิด
-- หน้า Action ต้องแสดง Caption และสถานะ Action ให้ชัดเจน เช่น `Partner > เพิ่ม` หรือ `Partner > แก้ไข`
-- ช่องว่างระหว่าง Caption กับ Form ต้องกระชับ ไม่เว้นห่างมาก โดยใช้ระยะมาตรฐานประมาณ `8px`
-- ปุ่ม `ยกเลิก` ทุกหน้าจอต้องจัดข้อความให้อยู่กึ่งกลาง ลด Padding ด้านบน และใช้ความสูงปุ่มมาตรฐานจาก Theme กลาง
-- ปุ่มที่อยู่ในชุดเดียวกัน เช่น `ยกเลิก` และ `บันทึก` ต้องใช้ความสูงเดียวกัน `48px` จาก `LaooTypography.buttonHeight`, จัดข้อความ/ไอคอนกึ่งกลางแนวตั้ง และห้ามกำหนดความสูงเฉพาะหน้าจอ
-- Label ที่ยังไม่ได้ Focus ใน TextBox ให้ใช้ขนาด Hint ที่อ่านง่ายและไม่ใหญ่เกินไป; เมื่อ Focus แล้วจึงใช้ขนาด Floating Label ตาม Typography กลาง
-- Dialog ยืนยันการลบต้องใช้กรอบและหัวข้อโทนสีแดง, กล่องข้อความพื้นหลังแดงอ่อน, ปุ่ม `ลบ` สีแดงพร้อมไอคอน และปุ่ม `ยกเลิก` แบบ TextButton; ขนาดตัวอักษรให้ใช้ Typography tokens ของระบบ
-- มาตรฐานฟอนต์ภาษาไทยของระบบใช้ `Noto Sans Thai` ที่ bundle มากับแอปเป็นฟอนต์หลัก และ fallback เป็น `Noto Sans Thai`, `Tahoma`, `Arial` ตามลำดับ เพื่อรองรับ Windows, Mobile และ Web โดยไม่ต้องติดตั้งฟอนต์เพิ่ม
-- ทุกหน้าจอต้องใช้ Typography จากส่วนกลาง ห้ามกำหนด `fontFamily` หรือขนาดฟอนต์กระจายในหน้าจอโดยไม่จำเป็น: Caption/หัวข้อหน้า `18px` น้ำหนัก `700`, Section `16px`, Label/Floating Label `16px`, ข้อความใน TextBox และตาราง `13px`, Hint/Validation `12px`, ปุ่ม `13px` น้ำหนัก `600–700`
-- ข้อความภาษาไทยต้องอ่านคมและไม่ล้น โดยใช้ Line Height จาก Theme กลาง: หัวข้อประมาณ `1.3`, Label ประมาณ `1.4`, เนื้อหา/ช่องกรอกประมาณ `1.45–1.5` และไม่ใช้ Letter Spacing ติดลบ
-- การปรับ Typography ต้องทำที่ `LaooTypography`, `LaooTheme` และ `WorkspaceThemePreset` ซึ่งเป็นส่วนกลาง เพื่อให้ทุกหน้าจอใช้มาตรฐานเดียวกัน
 
 ## Database Write Approval
 
@@ -159,3 +156,94 @@ ScreenType: 1
 - เมื่อดำเนินการเสร็จและไม่มีประเด็นค้าง ให้รายงานสั้น ๆ ตามรูปแบบงานเสร็จเดิมว่า `พ่อเสร็จแล้ว`
 
 - Alert/ข้อความแจ้งเตือนทุกหน้าจอต้องอ่านค่า TDSTCompanySetUp.TimeAlert จาก CompanySetupController และหายอัตโนมัติภายในเวลาที่กำหนด โดยยังสามารถกดปิดเองได้
+- Alert ทุกชนิด (Success, Error, Warning, Info) ต้องแสดงเป็น overlay ที่มุมขวาบนของพื้นที่เนื้อหาเสมอ ห้ามใช้ SnackBar ที่แสดงติดขอบล่างเป็นค่าเริ่มต้น
+- รูปสินค้าใหม่ต้องเก็บเป็นไฟล์ที่ API Server ภายใต้ `laoo_api/wwwroot/uploads/items/{CompanyID}/{ItemID}` และเก็บ path/metadata ใน `TDIVItemImage`; ห้ามเพิ่ม binary รูปใหม่ลงฐานข้อมูล
+
+## LAOO Authentication and Data Ownership Baseline
+
+หัวข้อนี้เป็นกติกากลางที่ AI ต้องอ่านก่อนแก้ไขงาน Login, สิทธิ์, Partner, Customer หรือข้อมูลสาขา
+
+### Login Flow
+
+1. ผู้ใช้ส่ง Username/Password เข้า Authentication API
+2. API ตรวจสอบประเภทผู้ใช้และค้นหาเฉพาะตารางของประเภทนั้น ห้ามนำผู้ใช้ข้ามขอบเขตมาปนกัน
+   - `LAOO_SUPPORT` ใช้ `dbo.TDADLaooUser` และสิทธิ์โครงการจาก `dbo.TDADLaooUserProject`
+   - `PARTNER_USER` ใช้ `dbo.TDADPartnerUser` และต้องผูกกับ `dbo.TDADPartner`
+   - `COMPANY_USER` ใช้ `dbo.TDADUser` และต้องผูกกับ `dbo.TDSTCompanySetUp` รวมถึง `dbo.TDADPartner`
+3. เมื่อ Login สำเร็จ API ต้องออก Session/JWT พร้อม UserType, UserID, PartnerID/CompanyID ตามประเภท และ Project ที่ใช้งาน
+4. ทุก API ต้องตรวจ Session, OwnerID และขอบเขตข้อมูลซ้ำที่ Backend ห้ามเชื่อค่า Scope/ID จาก Client อย่างเดียว
+5. การ Logout ต้องล้าง Session/JWT ฝั่ง Client และไม่ใช้ข้อมูลเมนูหรือสิทธิ์ค้างจากผู้ใช้คนก่อน
+
+### Data Ownership Flow
+
+ลำดับเจ้าของข้อมูลของระบบคือ:
+
+`LAOO → Partner → Customer (Company) → Branch → Employee/User`
+
+- LAOO เป็นเจ้าของระบบกลาง สร้างและดูแล Partner
+- Partner เป็นเจ้าของข้อมูล Customer ของตนเอง และเป็นผู้ดำเนินการสร้าง/แก้ไข Customer กับสาขาต่อ
+- Customer ต้องอยู่ใน `dbo.TDSTCompanySetUp` โดยมี `PartnerID` ระบุเจ้าของ Partner
+- ข้อมูล Customer, Branch, Employee และ User ต้องกรองด้วย `CompanyID` เสมอ
+- Partner ต้องกรองข้อมูลด้วย `PartnerID` เสมอ
+- ห้ามใช้ `dbo.TDADCompany` หรือ `dbo.TDADCompany_OLD`; ตาราง Customer หลักคือ `dbo.TDSTCompanySetUp`
+- ห้ามอ่านข้อมูลของ Partner/Customer รายอื่นเพียงเพราะผู้ใช้มี MenuCode หรือ ID ที่ถูกต้อง
+
+### Admin Rule
+
+- Admin มีสิทธิ์เข้าได้ทุกเมนูและทุก Action ภายในขอบเขตของตนเอง โดย Backend ต้องตรวจ Admin Bypass ให้ครบ
+- LAOO Admin: ทุกเมนูในขอบเขต LAOO แต่ไม่ใช่การเข้าถึงข้อมูล Partner/Customer โดยไม่มี Scope ที่ถูกต้อง
+- Partner Admin: ทุกเมนูและข้อมูลของ Partner ตนเอง รวมถึงการจัดการ Customer ที่อยู่ใต้ Partner ตนเอง
+- Customer Admin: ทุกเมนูและข้อมูลของ Customer/Branch/Employee ภายใต้ `CompanyID` ของตนเอง
+- ผู้ใช้ทั่วไปต้องผ่าน Permission ราย Menu/Action และ Role Group ตามปกติ
+- UI ซ่อนปุ่มตามสิทธิ์ได้ แต่ API ต้องตรวจซ้ำทุก Create, View, Edit, Delete และ Custom Action
+
+### Initial Tables for AI Reference
+
+- Identity/Login: `dbo.TDADLaooUser`, `dbo.TDADPartnerUser`, `dbo.TDADUser`
+- Ownership: `dbo.TDADPartner`, `dbo.TDSTCompanySetUp`, `dbo.TDADBranch`
+- User relations: `dbo.TDADPartnerUserEmployee`, `dbo.TDADUserEmployee`, `dbo.TDADUserBranch`, `dbo.TDADUserProject`, `dbo.TDADLaooUserProject`
+- Employee/Role: `dbo.TDADEmployee`, `dbo.TDADEmployeeRoleGroup`, `dbo.TDADRoleGroup`, `dbo.TDADRoleGroupPermission`
+- Direct permissions: `dbo.TDADLaooUserPermission`, `dbo.TDADPartnerUserPermission`, `dbo.TDADUserPermission`, `dbo.TDADPermission`
+- Navigation: `dbo.TDADMenuGroup`, `dbo.TDADMainMenu`; เมนูต้องอ่านจาก Navigation API และกรองตาม User Scope/Permission
+- User profile/theme: `dbo.TDADUserProfile`
+- System setup: `dbo.TDSTCompanySetUp`; ใช้ `TimeAlert`, Password Policy, Theme/Setup ตาม OwnerType และ PartnerID/CompanyID
+- Technical metadata: `dbo.TDSTTableName`, `dbo.TDSTMDName`, `dbo.TDSTMDSystem`, `dbo.TDSTScreen`, `dbo.TDSTScreenAPI`, `dbo.TDSTScreenField`, `dbo.TDSTScreenTable`, `dbo.TDSTScreenPermission`
+
+### Mandatory Query Rules
+
+- Query ของ Partner ต้องมีเงื่อนไข `PartnerID` ของ Session
+- Query ของ Customer ต้องมีเงื่อนไข `CompanyID` ของ Session และตรวจความสัมพันธ์กับ `PartnerID`
+- Query ของ Branch/Employee/User ต้องมี `CompanyID` และตรวจสถานะ Active ตามกติกาหน้าจอ
+- การสร้างข้อมูลลูกต้องบันทึกความสัมพันธ์เจ้าของให้ครบใน Transaction เดียวกัน
+- ก่อนเปลี่ยน Schema หรือชื่อตารางต้องตรวจ Controller, Repository, FK และข้อมูลจริงก่อนเสมอ
+
+## Menu Style: SLIDE and BUTTON/CARD
+
+- `MenuStyleCode` เป็นค่ากำหนดรูปแบบเมนูของ User แต่ละคน และต้องอ่านจาก User Profile ห้ามใช้ค่าคงที่แทน User
+- ค่า `SLIDE` ใช้ Sidebar/Drawer เป็นเมนูหลัก; Desktop แสดง Sidebar ตาม Layout และ Mobile ใช้ปุ่ม Hamburger เปิด Drawer
+- ค่า `BUTTON` ใช้หน้า Home แบบปุ่ม Card แบ่งเป็นเมนูลัดและกลุ่มเมนู โดยใช้เมนูจาก Navigation API และตรวจ Permission ก่อนแสดงทุก Card
+- เมื่ออยู่โหมด `BUTTON` และเปิดหน้าจอปลายทางแล้ว ต้องแสดงหน้าจอปลายทางเต็ม Content Area ห้ามให้ Card Menu ทับหรือบังข้อมูล
+- เมื่ออยู่โหมด `BUTTON` บน Mobile ต้องยังมีปุ่ม Hamburger มุมซ้ายบน เพื่อเปิดเมนูแบบ Slide ได้เสมอ
+- ปุ่ม Hamburger ต้องไม่ถูกซ่อนเพียงเพราะเลือก Menu Style เป็น `BUTTON`
+- เมื่อเข้าหน้า Home ให้เลือกและแสดงกลุ่มเมนูแรกที่ผู้ใช้มีสิทธิ์เป็นค่าเริ่มต้นเสมอ
+- เมนูลัดต้องกรองเฉพาะ MenuCode ที่ยัง Active, Visible, ผ่าน Permission และมี Route Registry ที่ใช้งานได้; รายการ stale ห้ามแสดงเป็น Card
+- กด Logo ต้องกลับหน้า Home ตาม User Scope ปัจจุบัน โดยไม่สร้าง Shell ใหม่และไม่ข้ามขอบเขต LAOO/Partner/Customer
+- การเปลี่ยน Menu Style ต้องอัปเดต Shell, Sidebar/Drawer, Home Card และ Navigation Flow ให้สอดคล้องกันทันที และต้องไม่ใช้ค่าเมนูค้างจาก User ก่อนหน้า
+- สีของเมนู, Card, Icon, Caption และสถานะ Active ต้องอ่านจาก User Style/Workspace Theme; ห้ามกำหนดสีฟ้าหรือสีอื่นตายตัวในหน้าจอ
+- Card Menu ใช้พื้นขาว/พื้นผิวของ Theme พร้อมเงาและขอบมน; Card ที่ Active ใช้สีหลักของ Theme แบบโปร่งแสง และข้อความต้องใช้สีตาม Theme
+- แถบรายการโปรดในโหมด `LIST` ต้องแสดงเป็นข้อความแนวนอนคั่นด้วย `|` เช่น `เมนูลัด 1 | เมนูลัด 2` โดยไม่มีเส้นขอบหรือ ActionChip; โหมด `BUTTON/CARD` ใช้รูปแบบปุ่มเดิมได้
+- การแสดง/ซ่อนเมนูต้องมาจาก Navigation API และ Permission ของ Session ปัจจุบันเท่านั้น ห้ามเติมเมนูสำรองแบบ hard-code ฝั่ง Client
+## Mandatory Alert Delete Rule
+
+- Before creating or changing any delete-confirmation Popup, the AI must read `alertdelete.md` at the project root. `alertdelete.mb` is the legacy alias.
+- The implementation must follow every layout, color, permission, and error-description rule in `alertdelete.md`.
+- This rule applies to all screens, including List, Card, Action, and nested Popup screens.
+
+## Error Description Standard
+
+- เมื่อระบบเกิด Error ทุกจุดต้องแสดงคำอธิบาย (Description) ที่อ่านเข้าใจได้แก่ผู้ใช้ ไม่แสดงเฉพาะชื่อ Exception, Stack Trace หรือรหัส HTTP เช่น `400`, `403`, `500` เท่านั้น
+- Error Response จาก API ต้องมีข้อความสรุปสาเหตุและแนวทางแก้ไขที่เหมาะสม โดยไม่เปิดเผยข้อมูลลับ, SQL Statement, Connection String หรือ Stack Trace ให้ผู้ใช้เห็น
+- ฝั่ง UI ต้องแปลง Error จาก API และ Network ให้เป็นข้อความภาษาที่ผู้ใช้เข้าใจได้ พร้อมแสดงรายละเอียดทางเทคนิคเพิ่มเติมใน Log สำหรับผู้พัฒนา
+- ข้อความ Error ที่แสดงบนหน้าจอต้องระบุอย่างน้อย: เกิดข้อผิดพลาดในรายการใด, สาเหตุโดยย่อ และสิ่งที่ผู้ใช้ควรทำต่อ
+- หาก API ส่ง Error ที่ไม่มี Description ให้ UI ใช้ข้อความสำรองที่อธิบายได้ เช่น `ไม่สามารถบันทึกข้อมูลได้ กรุณาตรวจสอบข้อมูลและลองใหม่อีกครั้ง` ห้ามแสดงเพียง `ApiException (500)`
+- งานที่ดำเนินการเสร็จทุกครั้ง ต้องแจ้งผู้ใช้ว่า “เสร็จแล้วพ่อ” และส่งเสียงแจ้งเตือนผ่านลำโพง Windows ด้วย PowerShell `[Console]::Beep(880,300)` หากสภาพแวดล้อมอนุญาต

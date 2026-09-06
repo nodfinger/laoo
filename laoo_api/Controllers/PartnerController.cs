@@ -94,7 +94,7 @@ WHERE
         OR EXISTS
         (
             SELECT 1
-            FROM dbo.TDADCompany AS C
+            FROM dbo.TDSTCompanySetUp AS C
             WHERE C.CompanyID = @CompanyID
               AND C.PartnerID = P.PartnerID
         )
@@ -196,7 +196,7 @@ WHERE P.PartnerID = @RequestedPartnerID
       OR EXISTS
       (
           SELECT 1
-          FROM dbo.TDADCompany AS C
+          FROM dbo.TDSTCompanySetUp AS C
           WHERE C.CompanyID = @CompanyID
             AND C.PartnerID = P.PartnerID
       )
@@ -449,7 +449,7 @@ WHERE P.PartnerID = @RequestedPartnerID
       OR EXISTS
       (
           SELECT 1
-          FROM dbo.TDADCompany AS C
+          FROM dbo.TDSTCompanySetUp AS C
           WHERE C.CompanyID = @CompanyID
             AND C.PartnerID = P.PartnerID
       )
@@ -515,7 +515,7 @@ WHERE P.PartnerID = @RequestedPartnerID
       OR EXISTS
       (
           SELECT 1
-          FROM dbo.TDADCompany AS C
+          FROM dbo.TDSTCompanySetUp AS C
           WHERE C.CompanyID = @CompanyID
             AND C.PartnerID = P.PartnerID
       )
@@ -573,7 +573,7 @@ WHERE P.PartnerID = @RequestedPartnerID
 
         const string dependencySql = @"
 SELECT COUNT_BIG(1)
-FROM dbo.TDADCompany
+FROM dbo.TDSTCompanySetUp
 WHERE PartnerID = @RequestedPartnerID;";
 
         await using (var dependencyCommand =
@@ -758,12 +758,17 @@ END;";
     private PartnerScope? ResolveScope()
     {
         var loginMode = User.FindFirstValue("login_mode");
+        var userType = User.FindFirstValue("user_type");
         var laooUserId = ReadLongClaim("laoo_user_id");
-        if (string.Equals(
-                loginMode,
-                "LAOO",
-                StringComparison.OrdinalIgnoreCase)
-            && laooUserId.HasValue)
+        var isLaooSupport = string.Equals(
+            loginMode,
+            "LAOO",
+            StringComparison.OrdinalIgnoreCase)
+            || string.Equals(
+                userType,
+                "LAOO_SUPPORT",
+                StringComparison.OrdinalIgnoreCase);
+        if (isLaooSupport && laooUserId.HasValue)
         {
             return new PartnerScope(true, null, null);
         }

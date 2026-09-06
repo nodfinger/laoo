@@ -192,13 +192,13 @@ public sealed class RoleGroupController(IConfiguration configuration) : Controll
         var userType = User.FindFirstValue("user_type") ?? string.Empty;
         if (scope == 'P' && userType.Equals("PARTNER_USER", StringComparison.OrdinalIgnoreCase) && ClaimLong("partner_id") is long partnerId) owner = partnerId;
         else if (scope == 'C' && userType.Equals("COMPANY_USER", StringComparison.OrdinalIgnoreCase) && ClaimLong("company_id") is long companyId) owner = companyId;
-        else if (scope != 'L' || !userType.Equals("LAOO_SUPPORT", StringComparison.OrdinalIgnoreCase) || !ClaimLong("laoo_user_id").HasValue) return false;
+        else return false;
         project = projectId;
         return true;
     }
-    private long? OwnerId(char scope) => scope == 'L' ? 0 : ClaimLong(scope == 'P' ? "partner_id" : "company_id");
+    private long? OwnerId(char scope) => ClaimLong(scope == 'P' ? "partner_id" : "company_id");
     private long? PartnerUserId() { var subject = User.FindFirstValue("sub") ?? User.FindFirstValue(ClaimTypes.NameIdentifier); return subject?.StartsWith("partner:", StringComparison.OrdinalIgnoreCase) == true && long.TryParse(subject[8..], out var id) ? id : null; }
-    private static bool TryScope(string value, out char scope, out string screen) { var s = value.Trim().ToLowerInvariant(); scope = s == "partner" ? 'P' : s == "customer" ? 'C' : s is "laoo" or "support" ? 'L' : ' '; screen = scope switch { 'P' => "11003", 'C' => "10003", 'L' => "12003", _ => string.Empty }; return scope != ' '; }
+    private static bool TryScope(string value, out char scope, out string screen) { var s = value.Trim().ToLowerInvariant(); scope = s == "partner" ? 'P' : s == "customer" ? 'C' : ' '; screen = scope switch { 'P' => "11003", 'C' => "10003", _ => string.Empty }; return scope != ' '; }
     private async Task<SqlConnection> OpenAsync(CancellationToken token) { var c = new SqlConnection(configuration.GetConnectionString("LaooDatabase")); await c.OpenAsync(token); return c; }
     private static void BindScope(SqlCommand c, long project, char scope, long owner) { Add(c, "@ProjectID", SqlDbType.BigInt, project); Add(c, "@ScopeType", SqlDbType.Char, scope); Add(c, "@PartnerID", SqlDbType.BigInt, scope == 'P' ? owner : null); Add(c, "@CompanyID", SqlDbType.BigInt, scope == 'C' ? owner : null); }
     private static void BindRequest(SqlCommand c, RoleGroupUpsertRequest r) { Add(c, "@RoleCode", SqlDbType.NVarChar, r.RoleCode.Trim(), 50); Add(c, "@RoleNameTH", SqlDbType.NVarChar, r.RoleNameTh.Trim(), 200); Add(c, "@Description", SqlDbType.NVarChar, Null(r.Description), 500); Add(c, "@IsActive", SqlDbType.Bit, r.IsActive); }

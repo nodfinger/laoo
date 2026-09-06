@@ -84,6 +84,13 @@ public sealed class PasswordService
 
     public static string GetPolicyMessage(int policyCode) => NormalizePolicyCode(policyCode) switch
     {
+        1 => "Password ต้องมีความยาวอย่างน้อย 1 ตัวอักษร",
+        2 => "Password ต้องมีความยาวอย่างน้อย 4 ตัวอักษร",
+        _ => "Password ต้องมีความยาวอย่างน้อย 6 ตัวอักษร และต้องประกอบด้วยตัวพิมพ์ใหญ่ ตัวพิมพ์เล็ก และอักขระพิเศษ"
+    };
+
+    private static string GetPolicyMessageLegacy(int policyCode) => NormalizePolicyCode(policyCode) switch
+    {
         1 => "Password เธ•เนเธญเธเธกเธตเธญเธขเนเธฒเธเธเนเธญเธข 1 เธ•เธฑเธงเธญเธฑเธเธฉเธฃ",
         2 => "Password เธ•เนเธญเธเธกเธตเธญเธขเนเธฒเธเธเนเธญเธข 4 เธ•เธฑเธงเธญเธฑเธเธฉเธฃ",
         _ => "Password เธ•เนเธญเธเธกเธตเธญเธขเนเธฒเธเธเนเธญเธข 6 เธ•เธฑเธง เธเธฃเนเธญเธกเธ•เธฑเธงเธเธดเธกเธเนเนเธซเธเน เธ•เธฑเธงเธเธดเธกเธเนเน€เธฅเนเธ เนเธฅเธฐเธญเธฑเธเธเธฃเธฐเธเธดเน€เธจเธฉ"

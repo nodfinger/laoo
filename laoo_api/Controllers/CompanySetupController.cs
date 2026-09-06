@@ -52,6 +52,7 @@ public sealed class CompanySetupController : ControllerBase
     [HttpPut]
     public async Task<ActionResult<CompanySetupResponse>> UpdateAsync(
         [FromBody] CompanySetupUpdateRequest request,
+        [FromQuery] bool additionalOnly,
         CancellationToken cancellationToken)
     {
         var owner = ResolveOwner();
@@ -74,32 +75,9 @@ public sealed class CompanySetupController : ControllerBase
             return Forbid();
         await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(cancellationToken);
 
-        if (owner.Value.CompanyID is not null)
-        {
-            const string companySql = """
-UPDATE dbo.TDADCompany
-SET CompanyNameTH=@CompanyNameTH, CompanyNameEN=@CompanyNameEN,
-    AddressText=@AddressText, Telephone=@Telephone, TaxID=@TaxID,
-    Email=@Email, UpdateDate=SYSUTCDATETIME(), UpdateBy=@ActorID
-WHERE CompanyID=@CompanyID;
-""";
-            await using var companyCommand = new SqlCommand(companySql, connection, transaction);
-            Add(companyCommand, "@CompanyNameTH", SqlDbType.NVarChar, NullIfBlank(request.CustomerNameTh), 200);
-            Add(companyCommand, "@CompanyNameEN", SqlDbType.NVarChar, NullIfBlank(request.CustomerNameEn), 200);
-            Add(companyCommand, "@AddressText", SqlDbType.NVarChar, NullIfBlank(request.AddressText), 1000);
-            Add(companyCommand, "@Telephone", SqlDbType.NVarChar, NullIfBlank(request.Telephone), 50);
-            Add(companyCommand, "@TaxID", SqlDbType.NVarChar, NullIfBlank(request.TaxID), 20);
-            Add(companyCommand, "@Email", SqlDbType.NVarChar, NullIfBlank(request.CustomerEmail), 320);
-            Add(companyCommand, "@CompanyID", SqlDbType.BigInt, owner.Value.CompanyID);
-            Add(companyCommand, "@ActorID", SqlDbType.BigInt, actorId);
-            if (await companyCommand.ExecuteNonQueryAsync(cancellationToken) == 0)
-            {
-                await transaction.RollbackAsync(cancellationToken);
-                return NotFound(new { message = "ไม่พบข้อมูลลูกค้าที่กำลังแก้ไข" });
-            }
-        }
-
         const string sql = """
+SET QUOTED_IDENTIFIER ON;
+SET ANSI_NULLS ON;
 UPDATE dbo.TDSTCompanySetUp
 SET
     CustomerNameTH = @CustomerNameTH,
@@ -170,17 +148,76 @@ WHERE OwnerType = @OwnerType
         Add(command, "@CompanyID", SqlDbType.BigInt, owner.Value.CompanyID);
 
         var affected = await command.ExecuteNonQueryAsync(cancellationToken);
-        if (affected > 0)
-            await transaction.CommitAsync(cancellationToken);
+        if (additionalOnly)
+        await using (var runItem = new SqlCommand("""
+IF EXISTS (
+    SELECT 1
+    FROM dbo.TDSTCompanySetupSystem
+    WHERE ProjectID=@ProjectID
+      AND OwnerType=@OwnerType
+      AND ISNULL(PartnerID,0)=ISNULL(@PartnerID,0)
+      AND ISNULL(CompanyID,0)=ISNULL(@CompanyID,0)
+)
+    UPDATE dbo.TDSTCompanySetupSystem
+    SET RunItem=@RunItem,
+        MarkItem=@MarkItem,
+        ItemDigit=@ItemDigit,
+        RunCus=@RunCus,
+        MarkCus=@MarkCus,
+        CustomerDigit=@CustomerDigit,
+        IsActive=1,
+        UpdateDate=SYSUTCDATETIME()
+    WHERE ProjectID=@ProjectID
+      AND OwnerType=@OwnerType
+      AND ISNULL(PartnerID,0)=ISNULL(@PartnerID,0)
+      AND ISNULL(CompanyID,0)=ISNULL(@CompanyID,0);
+ELSE
+    INSERT dbo.TDSTCompanySetupSystem
+        (ProjectID,OwnerType,PartnerID,CompanyID,RunItem,MarkItem,ItemDigit,RunCus,MarkCus,CustomerDigit,IsActive,CreateDate)
+    VALUES
+        (@ProjectID,@OwnerType,@PartnerID,@CompanyID,@RunItem,@MarkItem,@ItemDigit,@RunCus,@MarkCus,@CustomerDigit,1,SYSUTCDATETIME());
+""", connection, transaction))
+        {
+            Add(runItem, "@ProjectID", SqlDbType.BigInt, owner.Value.ProjectID);
+            Add(runItem, "@OwnerType", SqlDbType.Char, owner.Value.OwnerType, 1);
+            Add(runItem, "@PartnerID", SqlDbType.BigInt, owner.Value.PartnerID);
+            Add(runItem, "@CompanyID", SqlDbType.BigInt, owner.Value.CompanyID);
+            Add(runItem, "@RunItem", SqlDbType.NVarChar, NullIfBlank(request.RunItem), 10);
+            Add(runItem, "@MarkItem", SqlDbType.NVarChar, NullIfBlank(request.MarkItem), 20);
+            Add(runItem, "@ItemDigit", SqlDbType.Int, request.ItemDigit);
+            Add(runItem, "@RunCus", SqlDbType.NVarChar, NullIfBlank(request.RunCus), 10);
+            Add(runItem, "@MarkCus", SqlDbType.NVarChar, NullIfBlank(request.MarkCus), 20);
+            Add(runItem, "@CustomerDigit", SqlDbType.Int, request.CustomerDigit);
+            await runItem.ExecuteNonQueryAsync(cancellationToken);
+        }
         if (affected == 0)
             return NotFound(new { message = "ไม่พบ Setup ของเจ้าของที่ Login อยู่" });
+
+        await transaction.CommitAsync(cancellationToken);
 
         var response = await LoadOwnerSetupAsync(
             connection, owner.Value, cancellationToken);
 
-        return response is null
-            ? NotFound(new { message = "ไม่พบข้อมูลหลังบันทึก" })
-            : Ok(response);
+        if (response is null)
+            return NotFound(new { message = "ไม่พบข้อมูลหลังบันทึก ItemDigit" });
+
+        if (additionalOnly && response.ItemDigit != request.ItemDigit)
+            return StatusCode(StatusCodes.Status500InternalServerError, new
+            {
+                message = "บันทึก ItemDigit ไม่สำเร็จ",
+                description = $"ค่าที่ส่งคือ {request.ItemDigit} แต่ค่าที่อ่านกลับจากฐานข้อมูลคือ {response.ItemDigit}"
+            });
+
+        if (additionalOnly && (response.CustomerDigit != request.CustomerDigit ||
+            !string.Equals(response.RunCus, request.RunCus, StringComparison.OrdinalIgnoreCase)))
+            return StatusCode(StatusCodes.Status500InternalServerError, new
+            {
+                message = "บันทึกการตั้งค่ารหัสลูกค้าไม่สำเร็จ",
+                description = $"ค่าที่ส่ง RunCus={request.RunCus}, CustomerDigit={request.CustomerDigit} " +
+                              $"แต่ค่าที่อ่านกลับ RunCus={response.RunCus}, CustomerDigit={response.CustomerDigit}"
+            });
+
+        return Ok(response);
     }
 
     [HttpGet("actions")]
@@ -189,6 +226,28 @@ WHERE OwnerType = @OwnerType
         await using var connection = CreateConnection();
         await connection.OpenAsync(cancellationToken);
         return Ok(new { view = await AllowedAsync(connection, "VIEW", cancellationToken), edit = await AllowedAsync(connection, "EDIT", cancellationToken) });
+    }
+
+    [HttpGet("run-item-options")]
+    public async Task<ActionResult<List<CompanySetupOption>>> RunItemOptions(
+        [FromQuery] string? groupCode,
+        CancellationToken cancellationToken)
+    {
+        await using var connection = CreateConnection();
+        await connection.OpenAsync(cancellationToken);
+        if (!await AllowedAsync(connection, "VIEW", cancellationToken)) return Forbid();
+        const string sql = "SELECT Code,Name FROM dbo.TDSTMasterCont WHERE GroupCode=@GroupCode ORDER BY Seq,Code";
+        await using var command = new SqlCommand(sql, connection);
+        Add(command, "@GroupCode", SqlDbType.NVarChar,
+            string.IsNullOrWhiteSpace(groupCode)
+                ? MasterConstCodes.ItemCodeGeneration
+                : groupCode.Trim(),
+            10);
+        var result = new List<CompanySetupOption>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+            result.Add(new CompanySetupOption(reader.GetString(0), reader.GetString(1)));
+        return Ok(result);
     }
 
     private async Task<bool> AllowedAsync(SqlConnection connection, string action, CancellationToken token)
@@ -221,18 +280,22 @@ WHERE OwnerType = @OwnerType
         // A selected company is the most specific runtime context, including
         // when a LAOO support user is working on behalf of that company.
         var companyId = GetLongClaim("company_id");
+        var projectId = GetLongClaim("project_id");
+        if (projectId is null)
+            return null;
+
         if (companyId is not null)
-            return new OwnerScope("C", null, companyId);
+            return new OwnerScope(projectId.Value, "C", null, companyId);
 
         var partnerId = GetLongClaim("partner_id");
         if (partnerId is not null)
-            return new OwnerScope("P", partnerId, null);
+            return new OwnerScope(projectId.Value, "P", partnerId, null);
 
         var loginMode = User.FindFirstValue("login_mode");
 
         // LAOO account owns the single LAOO setup.
         if (string.Equals(loginMode, "LAOO", StringComparison.OrdinalIgnoreCase))
-            return new OwnerScope("L", null, null);
+            return new OwnerScope(projectId.Value, "L", null, null);
 
         return null;
     }
@@ -243,29 +306,83 @@ WHERE OwnerType = @OwnerType
         CancellationToken cancellationToken)
     {
         const string sql = """
+SET QUOTED_IDENTIFIER ON;
+SET ANSI_NULLS ON;
 SELECT
     S.PKValue,
     S.OwnerType,
     S.PartnerID,
+    P.PartnerNameTH AS PartnerNameTh,
+    P.AddressText AS PartnerAddress,
+    P.Telephone AS PartnerTelephone,
+    P.Email AS PartnerEmail,
     S.CompanyID,
     CASE
         WHEN S.OwnerType = 'L' THEN N'LAOO'
-        WHEN S.OwnerType = 'P' THEN P.PartnerCode
-        ELSE C.CompanyCode
+        WHEN S.OwnerType = 'P' THEN COALESCE(P.PartnerCode, S.CompanyCode)
+        ELSE S.CompanyCode
     END AS OwnerCode,
     CASE
         WHEN S.OwnerType = 'L' THEN N'Laoo Solutions'
-        WHEN S.OwnerType = 'P' THEN P.PartnerCode
-        ELSE COALESCE(NULLIF(C.CompanyNameTH, N''), C.CompanyCode)
+        WHEN S.OwnerType = 'P' THEN COALESCE(P.PartnerCode, S.CompanyCode)
+        ELSE COALESCE(NULLIF(S.CustomerNameTH, N''), S.CompanyCode)
     END AS OwnerName,
-    COALESCE(C.CompanyNameTH, S.CustomerNameTH) AS CustomerNameTh,
-    COALESCE(C.CompanyNameEN, S.CustomerNameEN) AS CustomerNameEn,
-    COALESCE(C.AddressText, S.AddressText) AS AddressText,
-    COALESCE(C.Telephone, S.Telephone) AS Telephone,
-    COALESCE(C.TaxID, S.TaxID) AS TaxID,
-    C.Email AS CustomerEmail,
+    S.CustomerNameTH AS CustomerNameTh,
+    S.CustomerNameEN AS CustomerNameEn,
+    S.AddressText AS AddressText,
+    S.Telephone AS Telephone,
+    S.TaxID AS TaxID,
+    CAST(NULL AS nvarchar(320)) AS CustomerEmail,
     S.Name,
     S.TitleHeader,
+    (SELECT TOP 1 RunItem
+       FROM dbo.TDSTCompanySetupSystem AS SS
+      WHERE SS.ProjectID = @ProjectID
+        AND SS.OwnerType = S.OwnerType
+        AND ISNULL(SS.PartnerID,0)=ISNULL(@PartnerID,0)
+        AND ISNULL(SS.CompanyID,0)=ISNULL(@CompanyID,0)
+        AND SS.IsActive=1
+    ORDER BY ISNULL(SS.UpdateDate, SS.CreateDate) DESC, SS.PKValue DESC) AS RunItem,
+    (SELECT TOP 1 MarkItem
+       FROM dbo.TDSTCompanySetupSystem AS SS
+      WHERE SS.ProjectID = @ProjectID
+        AND SS.OwnerType = S.OwnerType
+        AND ISNULL(SS.PartnerID,0)=ISNULL(@PartnerID,0)
+        AND ISNULL(SS.CompanyID,0)=ISNULL(@CompanyID,0)
+        AND SS.IsActive=1
+      ORDER BY ISNULL(SS.UpdateDate, SS.CreateDate) DESC, SS.PKValue DESC) AS MarkItem,
+    (SELECT TOP 1 ItemDigit
+       FROM dbo.TDSTCompanySetupSystem AS SS
+      WHERE SS.ProjectID = @ProjectID
+        AND SS.OwnerType = S.OwnerType
+        AND ISNULL(SS.PartnerID,0)=ISNULL(@PartnerID,0)
+        AND ISNULL(SS.CompanyID,0)=ISNULL(@CompanyID,0)
+        AND SS.IsActive=1
+      ORDER BY ISNULL(SS.UpdateDate, SS.CreateDate) DESC, SS.PKValue DESC) AS ItemDigit,
+    (SELECT TOP 1 RunCus
+       FROM dbo.TDSTCompanySetupSystem AS SS
+      WHERE SS.ProjectID = @ProjectID
+        AND SS.OwnerType = S.OwnerType
+        AND ISNULL(SS.PartnerID,0)=ISNULL(@PartnerID,0)
+        AND ISNULL(SS.CompanyID,0)=ISNULL(@CompanyID,0)
+        AND SS.IsActive=1
+    ORDER BY ISNULL(SS.UpdateDate, SS.CreateDate) DESC, SS.PKValue DESC) AS RunCus,
+    (SELECT TOP 1 MarkCus
+       FROM dbo.TDSTCompanySetupSystem AS SS
+      WHERE SS.ProjectID = @ProjectID
+        AND SS.OwnerType = S.OwnerType
+        AND ISNULL(SS.PartnerID,0)=ISNULL(@PartnerID,0)
+        AND ISNULL(SS.CompanyID,0)=ISNULL(@CompanyID,0)
+        AND SS.IsActive=1
+      ORDER BY ISNULL(SS.UpdateDate, SS.CreateDate) DESC, SS.PKValue DESC) AS MarkCus,
+    (SELECT TOP 1 CustomerDigit
+       FROM dbo.TDSTCompanySetupSystem AS SS
+      WHERE SS.ProjectID = @ProjectID
+        AND SS.OwnerType = S.OwnerType
+        AND ISNULL(SS.PartnerID,0)=ISNULL(@PartnerID,0)
+        AND ISNULL(SS.CompanyID,0)=ISNULL(@CompanyID,0)
+        AND SS.IsActive=1
+      ORDER BY ISNULL(SS.UpdateDate, SS.CreateDate) DESC, SS.PKValue DESC) AS CustomerDigit,
     S.RowSTD,
     S.RowCardSTD,
     S.TimeAlert,
@@ -290,8 +407,6 @@ SELECT
 FROM dbo.TDSTCompanySetUp AS S
 LEFT JOIN dbo.TDADPartner AS P
     ON P.PartnerID = S.PartnerID
-LEFT JOIN dbo.TDADCompany AS C
-    ON C.CompanyID = S.CompanyID
 WHERE S.OwnerType = @OwnerType
   AND (
         (@OwnerType = 'L' AND S.PartnerID IS NULL AND S.CompanyID IS NULL)
@@ -304,6 +419,7 @@ WHERE S.OwnerType = @OwnerType
         Add(command, "@OwnerType", SqlDbType.Char, owner.OwnerType, 1);
         Add(command, "@PartnerID", SqlDbType.BigInt, owner.PartnerID);
         Add(command, "@CompanyID", SqlDbType.BigInt, owner.CompanyID);
+        Add(command, "@ProjectID", SqlDbType.BigInt, owner.ProjectID);
 
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         if (!await reader.ReadAsync(cancellationToken))
@@ -337,6 +453,10 @@ WHERE S.OwnerType = @OwnerType
             NLong("PKValue"),
             reader.GetString(reader.GetOrdinal("OwnerType")),
             NLong("PartnerID"),
+            NString("PartnerNameTh"),
+            NString("PartnerAddress"),
+            NString("PartnerTelephone"),
+            NString("PartnerEmail"),
             NLong("CompanyID"),
             reader.GetString(reader.GetOrdinal("OwnerCode")),
             reader.GetString(reader.GetOrdinal("OwnerName")),
@@ -348,6 +468,16 @@ WHERE S.OwnerType = @OwnerType
             NString("CustomerEmail"),
             reader.GetString(reader.GetOrdinal("Name")),
             reader.GetString(reader.GetOrdinal("TitleHeader")),
+            NString("RunItem"),
+            NString("MarkItem"),
+            reader.IsDBNull(reader.GetOrdinal("ItemDigit"))
+                ? 3
+                : Convert.ToInt32(reader.GetValue(reader.GetOrdinal("ItemDigit"))),
+            NString("RunCus"),
+            NString("MarkCus"),
+            reader.IsDBNull(reader.GetOrdinal("CustomerDigit"))
+                ? 5
+                : Convert.ToInt32(reader.GetValue(reader.GetOrdinal("CustomerDigit"))),
             reader.GetInt32(reader.GetOrdinal("RowSTD")),
             reader.GetInt32(reader.GetOrdinal("RowCardSTD")),
             reader.GetInt32(reader.GetOrdinal("TimeAlert")),
@@ -428,6 +558,10 @@ WHERE S.OwnerType = @OwnerType
             return "จำนวน Card ต้องมากกว่า 0";
         if (request.TimeAlert <= 0)
             return "เวลา Alert ต้องมากกว่า 0";
+        if (request.ItemDigit is < 1 or > 10)
+            return "จำนวนหลักของสินค้าต้องอยู่ระหว่าง 1 ถึง 10";
+        if (request.CustomerDigit is < 1 or > 10)
+            return "จำนวนหลักของลูกค้าต้องอยู่ระหว่าง 1 ถึง 10";
         if (request.OrgStructureType is not (1 or 2))
             return "รูปแบบโครงสร้างองค์กรต้องเป็น 1 หรือ 2";
         if (request.PasswordPolicyCode is not (1 or 2 or 3))
@@ -463,6 +597,7 @@ WHERE S.OwnerType = @OwnerType
     }
 
     private readonly record struct OwnerScope(
+        long ProjectID,
         string OwnerType,
         long? PartnerID,
         long? CompanyID);

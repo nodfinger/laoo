@@ -44,8 +44,8 @@ public sealed class CompanyContextController : ControllerBase
 SELECT
     CompanyID,
     CompanyCode,
-    COALESCE(NULLIF(CompanyNameTH, N''), CompanyCode) AS CompanyName
-FROM dbo.TDADCompany
+    COALESCE(NULLIF(CustomerNameTH, N''), CompanyCode) AS CompanyName
+FROM dbo.TDSTCompanySetUp
 WHERE IsActive = 1
 ORDER BY CompanyCode;
 """;
@@ -97,8 +97,8 @@ ORDER BY CompanyCode;
 SELECT
     CompanyID,
     CompanyCode,
-    COALESCE(NULLIF(CompanyNameTH, N''), CompanyCode) AS CompanyName
-FROM dbo.TDADCompany
+    COALESCE(NULLIF(CustomerNameTH, N''), CompanyCode) AS CompanyName
+FROM dbo.TDSTCompanySetUp
 WHERE CompanyID = @CompanyID
   AND IsActive = 1;
 """;

@@ -38,7 +38,7 @@ public sealed class DatabaseRouteResolver
         {
             const string partnerSql = """
             SELECT PartnerID
-            FROM dbo.TDADCompany
+            FROM dbo.TDSTCompanySetUp
             WHERE CompanyID = @CompanyID
               AND IsActive = 1;
             """;

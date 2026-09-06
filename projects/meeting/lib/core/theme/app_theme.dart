@@ -1,0 +1,85 @@
+import 'package:flutter/material.dart';
+
+import '../../app/theme/laoo_design_tokens.dart';
+import '../../app/theme/laoo_typography.dart';
+
+abstract final class AppTheme {
+  static const Color primaryGreen = Color(0xFF16A321);
+  static const Color darkGreen = Color(0xFF087A2A);
+  static const Color background = Color(0xFFF4F8F4);
+
+  static ThemeData get light {
+    final colorScheme = ColorScheme.fromSeed(
+      seedColor: primaryGreen,
+      brightness: Brightness.light,
+    );
+
+    final base = ThemeData(
+      useMaterial3: true,
+      colorScheme: colorScheme,
+      progressIndicatorTheme: ProgressIndicatorThemeData(
+        color: colorScheme.primary,
+        linearTrackColor: colorScheme.primary.withValues(alpha: 0.14),
+        circularTrackColor: colorScheme.primary.withValues(alpha: 0.14),
+      ),
+      scaffoldBackgroundColor: background,
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 15,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: primaryGreen, width: 1.8),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Colors.red),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Colors.red, width: 1.8),
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          minimumSize: const Size.fromHeight(48),
+          backgroundColor: primaryGreen,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          textStyle: const TextStyle(
+            fontSize: LaooTypography.button,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+    return base.copyWith(
+      textTheme: LaooTypography.contentTextTheme(base.textTheme),
+      dataTableTheme: DataTableThemeData(
+        dataRowColor: LaooDataTable.rowColor(colorScheme.primary),
+        horizontalMargin: LaooDataTable.horizontalMargin,
+        columnSpacing: LaooDataTable.columnSpacing,
+        dividerThickness: LaooDataTable.dividerThickness,
+        headingTextStyle: TextStyle(
+          fontSize: LaooTypography.tableHeader,
+          fontWeight: FontWeight.w700,
+        ),
+        dataTextStyle: const TextStyle(fontSize: LaooTypography.tableBody),
+      ),
+    );
+  }
+}

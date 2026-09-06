@@ -3,7 +3,7 @@
 ตำแหน่งติดตั้ง:
 
 ```text
-C:\laoo\laoo_api
+C:\laooplatformplatformplatform\laoo\laoo_api
 ```
 
 ## สำคัญ
@@ -28,13 +28,13 @@ laoo_api.csproj เดิม
 1. เปลี่ยนชื่อโฟลเดอร์เดิม:
 
 ```powershell
-Rename-Item C:\laoo\laoo_api C:\laoo\laoo_api_backup
+Rename-Item C:\laooplatformplatformplatform\laoo\laoo_api C:\laooplatformplatformplatform\laoo\laoo_api_backup
 ```
 
 2. สร้างโฟลเดอร์ใหม่และแตก ZIP ลงไป:
 
 ```powershell
-New-Item -ItemType Directory C:\laoo\laoo_api
+New-Item -ItemType Directory C:\laooplatformplatformplatform\laoo\laoo_api
 ```
 
 3. คัดลอก `local.json` เดิมจากโฟลเดอร์ Backup กลับมา หรือสร้างจาก `local.example.json`
@@ -42,14 +42,14 @@ New-Item -ItemType Directory C:\laoo\laoo_api
 4. รัน SQL ตามลำดับ:
 
 ```text
-C:\laoo\scripts\phase1\MIGRATE_DATABASE_ROUTING_V1.sql
-C:\laoo\scripts\phase1\MIGRATE_AUTH_CONSTRAINTS_V1.sql
+C:\laooplatformplatform\scripts\phase1\MIGRATE_DATABASE_ROUTING_V1.sql
+C:\laooplatformplatform\scripts\phase1\MIGRATE_AUTH_CONSTRAINTS_V1.sql
 ```
 
 5. รัน API:
 
 ```powershell
-cd C:\laoo\laoo_api
+cd C:\laooplatformplatformplatform\laoo\laoo_api
 dotnet run --project .\laoo_api.csproj
 ```
 

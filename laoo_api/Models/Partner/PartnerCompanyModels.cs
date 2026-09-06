@@ -40,3 +40,47 @@ public sealed class PartnerCompanyAdminUpsertRequest
     public string Username { get; init; } = string.Empty;
     public string Password { get; init; } = string.Empty;
 }
+
+public sealed class PartnerCompanyFeatureResponse
+{
+    public string FeatureCode { get; init; } = string.Empty;
+    public string FeatureName { get; init; } = string.Empty;
+    public string? FeatureDescription { get; init; }
+    public bool IsEnabled { get; init; }
+    public int SortOrder { get; init; }
+}
+
+public sealed class PartnerCompanyProjectResponse
+{
+    public long ProjectId { get; init; }
+    public string ProjectCode { get; init; } = string.Empty;
+    public string ProjectNameTh { get; init; } = string.Empty;
+    public string? ProjectNameEn { get; init; }
+    public string? Description { get; init; }
+    public string ProjectType { get; init; } = string.Empty;
+    public string? IconName { get; init; }
+    public int SortOrder { get; init; }
+    public bool IsEnabled { get; init; }
+}
+
+public sealed class PartnerCompanyProjectUpdateRequest
+{
+    public List<PartnerCompanyProjectUpdateItem> Projects { get; init; } = [];
+}
+
+public sealed class PartnerCompanyProjectUpdateItem
+{
+    public long ProjectId { get; init; }
+    public bool IsEnabled { get; init; }
+}
+
+public sealed class PartnerCompanyFeatureUpdateRequest
+{
+    public List<PartnerCompanyFeatureUpdateItem> Features { get; init; } = [];
+}
+
+public sealed class PartnerCompanyFeatureUpdateItem
+{
+    public string FeatureCode { get; init; } = string.Empty;
+    public bool IsEnabled { get; init; }
+}

@@ -1,0 +1,11 @@
+name: laoo_shared_admin
+description: Shared administration features for LAOO applications.
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  laoo_shared_core:
+    path: ../laoo_shared_core

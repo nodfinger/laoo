@@ -318,21 +318,24 @@ public sealed class DatabaseSeeder
         CancellationToken cancellationToken)
     {
         const string sql = """
-        IF NOT EXISTS (SELECT 1 FROM dbo.TDADCompany WHERE CompanyCode = N'DEMO')
+        IF NOT EXISTS (SELECT 1 FROM dbo.TDSTCompanySetUp WHERE CompanyCode = N'DEMO')
         BEGIN
-            INSERT INTO dbo.TDADCompany
+            DECLARE @CompanyID bigint = ISNULL((SELECT MAX(CompanyID) FROM dbo.TDSTCompanySetUp WITH (UPDLOCK, HOLDLOCK)), 0) + 1;
+            INSERT INTO dbo.TDSTCompanySetUp
             (
-                PartnerID, CompanyCode, CompanyNameTH, CompanyNameEN, IsActive
+                CompanyID, PartnerID, CompanyCode, CustomerNameTH, CustomerNameEN,
+                Name, TitleHeader, RowSTD, RowCardSTD, TimeAlert, OrgStructureType,
+                OwnerType, IsActive, CreateDate
             )
             VALUES
             (
-                @PartnerID, N'DEMO', N'บริษัทตัวอย่าง Laoo',
-                N'Laoo Demo Company', 1
+                @CompanyID, @PartnerID, N'DEMO', N'Demo Company Laoo', N'Laoo Demo Company',
+                N'Demo Company Laoo', N'Laoo Demo Company', 30, 30, 5, 1, N'C', 1, SYSUTCDATETIME()
             );
         END;
 
         SELECT CompanyID
-        FROM dbo.TDADCompany
+        FROM dbo.TDSTCompanySetUp
         WHERE CompanyCode = N'DEMO';
         """;
 

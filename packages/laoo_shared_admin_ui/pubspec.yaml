@@ -1,0 +1,18 @@
+name: laoo_shared_admin_ui
+description: Shared administration UI for LAOO applications.
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  laoo_shared_admin:
+    path: ../laoo_shared_admin
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0

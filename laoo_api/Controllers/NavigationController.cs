@@ -19,79 +19,200 @@ public sealed class NavigationController : ControllerBase
     [HttpGet("menus")]
     public async Task<ActionResult<List<NavigationMenuGroupResponse>>> GetMenus(CancellationToken cancellationToken)
     {
+        var projects = await LoadProjectsAsync(cancellationToken);
+        if (projects is null) return Forbid();
+        var groups = projects
+            .SelectMany(project => project.MenuGroups)
+            .GroupBy(group => group.MenuGroupCode)
+            .Select(group => group.First())
+            .ToList();
+        return Ok(groups);
+    }
+
+    [HttpGet("projects")]
+    public async Task<ActionResult<List<NavigationProjectResponse>>> GetProjects(CancellationToken cancellationToken)
+    {
+        var projects = await LoadProjectsAsync(cancellationToken);
+        return projects is null ? Forbid() : Ok(projects);
+    }
+
+    private async Task<List<NavigationProjectResponse>?> LoadProjectsAsync(CancellationToken cancellationToken)
+    {
         var userType = User.FindFirstValue("user_type");
-        if (userType is not ("PARTNER_USER" or "COMPANY_USER" or "LAOO_SUPPORT"))
-            return Forbid();
+        if (userType is not ("PARTNER_USER" or "COMPANY_USER" or "LAOO_SUPPORT") ||
+            LongClaim("project_id") is not long projectId)
+            return null;
 
         await using var connection = new SqlConnection(_configuration.GetConnectionString("LaooDatabase"));
         await connection.OpenAsync(cancellationToken);
-        var admin = await IsAdminAsync(connection, userType!, cancellationToken);
-        var allowedFeatures = admin ? null : await LoadAllowedFeaturesAsync(connection, userType!, cancellationToken);
+        var admin = await IsAdminAsync(connection, userType, cancellationToken);
+        var allowedFeatures = admin ? null : await LoadAllowedFeaturesAsync(connection, userType, cancellationToken);
         var audienceType = userType == "PARTNER_USER" ? "P" : userType == "COMPANY_USER" ? "C" : "L";
         const string sql = """
-SELECT G.MenuGroupCode, G.MenuGroupName, G.IconName AS GroupIconName, G.SortOrder AS GroupSortOrder,
+WITH AllowedProjects AS
+(
+    SELECT @ProjectID AS ProjectID
+    WHERE @UserType <> N'COMPANY_USER'
+    UNION
+    SELECT UPR.ProjectID
+    FROM dbo.TDADUserProject UPR
+    INNER JOIN dbo.TDADProject PR ON PR.ProjectID=UPR.ProjectID AND PR.IsActive=1
+    INNER JOIN dbo.TDSTCompanySetUp C ON C.CompanyID=UPR.CompanyID AND C.IsActive=1
+    INNER JOIN dbo.TDADCompanyProject CP
+        ON CP.ProjectID=UPR.ProjectID AND CP.CompanyID=UPR.CompanyID
+       AND CP.PartnerID=C.PartnerID AND CP.IsEnabled=1
+       AND (CP.StartDate IS NULL OR CP.StartDate<=CONVERT(date,SYSUTCDATETIME()))
+       AND (CP.ExpireDate IS NULL OR CP.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))
+    WHERE @UserType=N'COMPANY_USER'
+      AND UPR.UserID=@UserID AND UPR.CompanyID=@CompanyID AND UPR.IsActive=1
+)
+SELECT PR.ProjectID,PR.ProjectCode,PR.ProjectNameTH,PR.ProjectType,PR.IconName,
+       PR.SortOrder,PR.IsExpandedDefault,
+       G.MenuGroupCode, G.MenuGroupName, G.IconName AS GroupIconName, G.SortOrder AS GroupSortOrder,
        G.IsExpandedDefault, M.MenuCode, M.MenuName, M.RouteName, M.RoutePath, M.FeatureCode,
        M.IconName, M.SortOrder, M.IsFavoriteAllowed
-FROM dbo.TDADMenuGroup G
+FROM AllowedProjects AP
+INNER JOIN dbo.TDADProject PR ON PR.ProjectID=AP.ProjectID AND PR.IsActive=1
+INNER JOIN dbo.TDADProjectMenuGroup PG
+    ON PG.ProjectID = AP.ProjectID AND PG.IsActive = 1
+INNER JOIN dbo.TDADMenuGroup G
+    ON G.MenuGroupCode=PG.MenuGroupCode AND G.IsActive=1
 INNER JOIN dbo.TDADMainMenu M ON M.MenuGroupCode = G.MenuGroupCode AND M.IsActive = 1 AND M.IsVisible = 1
-WHERE G.IsActive = 1
-  AND UPPER(LTRIM(RTRIM(G.AudienceType))) IN (N'A',@AudienceType)
-ORDER BY G.SortOrder, M.SortOrder, M.MenuCode;
+INNER JOIN dbo.TDADProjectMenu PM
+    ON PM.MenuCode = M.MenuCode AND PM.MenuGroupCode = G.MenuGroupCode
+   AND PM.ProjectID = AP.ProjectID AND PM.IsActive = 1
+WHERE UPPER(LTRIM(RTRIM(G.AudienceType))) IN (N'A',@AudienceType)
+  AND (
+        ISNULL(G.OpenOption, 0) = 0
+        OR @UserType <> N'COMPANY_USER'
+        OR (
+            ISNULL(G.OpenOption, 0) = 1
+            AND M.FeatureCode IS NOT NULL
+            AND EXISTS
+            (
+                SELECT 1
+                FROM dbo.TDADCompanyFeature CF
+                INNER JOIN dbo.TDADFeature F ON F.FeatureCode = CF.FeatureCode AND F.IsActive = 1
+                WHERE CF.ProjectID = AP.ProjectID
+                  AND CF.CompanyID = @CompanyID
+                  AND CF.FeatureCode = M.FeatureCode
+                  AND CF.IsEnabled = 1
+                  AND (CF.StartDate IS NULL OR CF.StartDate <= CONVERT(date, SYSUTCDATETIME()))
+                  AND (CF.ExpireDate IS NULL OR CF.ExpireDate >= CONVERT(date, SYSUTCDATETIME()))
+            )
+        )
+      )
+ORDER BY PR.SortOrder,PG.SortOrder,PM.SortOrder,M.MenuCode;
 """;
         await using var command = new SqlCommand(sql, connection);
         command.Parameters.Add("@AudienceType", SqlDbType.Char).Value = audienceType;
+        command.Parameters.Add("@UserType", SqlDbType.NVarChar, 30).Value = userType;
+        command.Parameters.Add("@ProjectID", SqlDbType.BigInt).Value = projectId;
+        command.Parameters.Add("@CompanyID", SqlDbType.BigInt).Value = LongClaim("company_id") is long companyId ? companyId : DBNull.Value;
+        command.Parameters.Add("@UserID", SqlDbType.BigInt).Value = LongClaim("user_id") is long userId ? userId : DBNull.Value;
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        var all = new List<(NavigationMenuGroupResponse Group, NavigationMenuItemResponse Item)>();
+        var all = new List<(NavigationProjectResponse Project, NavigationMenuGroupResponse Group, NavigationMenuItemResponse Item)>();
         while (await reader.ReadAsync(cancellationToken))
         {
-            var group = new NavigationMenuGroupResponse { MenuGroupCode = reader.GetString(0).Trim(), MenuGroupName = reader.GetString(1), IconName = N(reader, 2), SortOrder = reader.GetInt32(3), IsExpandedDefault = reader.GetBoolean(4) };
-            var item = new NavigationMenuItemResponse { MenuCode = reader.GetString(5), MenuName = reader.GetString(6), RouteName = N(reader, 7), RoutePath = N(reader, 8), FeatureCode = N(reader, 9), IconName = N(reader, 10), SortOrder = reader.GetInt32(11), IsFavoriteAllowed = reader.GetBoolean(12) };
-            if (admin ||
-                allowedFeatures!.Contains(item.MenuCode) ||
-                (item.FeatureCode is not null && allowedFeatures.Contains(item.FeatureCode)))
-            {
-                all.Add((group, item));
-            }
+            var project = new NavigationProjectResponse { ProjectId = reader.GetInt64(0), ProjectCode = reader.GetString(1), ProjectName = reader.GetString(2), ProjectType = reader.GetString(3), IconName = N(reader, 4), SortOrder = reader.GetInt32(5), IsExpandedDefault = reader.GetBoolean(6) };
+            var group = new NavigationMenuGroupResponse { MenuGroupCode = reader.GetString(7).Trim(), MenuGroupName = reader.GetString(8), IconName = N(reader, 9), SortOrder = reader.GetInt32(10), IsExpandedDefault = reader.GetBoolean(11) };
+            var item = new NavigationMenuItemResponse { MenuCode = reader.GetString(12), MenuName = reader.GetString(13), RouteName = N(reader, 14), RoutePath = N(reader, 15), FeatureCode = N(reader, 16), IconName = N(reader, 17), SortOrder = reader.GetInt32(18), IsFavoriteAllowed = reader.GetBoolean(19) };
+            if (admin || allowedFeatures!.Contains(item.MenuCode))
+                all.Add((project, group, item));
         }
-        return Ok(all.GroupBy(x => x.Group.MenuGroupCode).Select(g => { var first = g.First().Group; first.Items.AddRange(g.Select(x => x.Item)); return first; }).ToList());
+
+        return all
+            .GroupBy(x => x.Project.ProjectId)
+            .Select(projectRows =>
+            {
+                var project = projectRows.First().Project;
+                project.MenuGroups.AddRange(projectRows
+                    .GroupBy(x => x.Group.MenuGroupCode)
+                    .Select(groupRows =>
+                    {
+                        var group = groupRows.First().Group;
+                        group.Items.AddRange(groupRows
+                            .GroupBy(x => x.Item.MenuCode)
+                            .Select(items => items.First().Item));
+                        return group;
+                    }));
+                return project;
+            })
+            .OrderBy(project => project.SortOrder)
+            .ToList();
     }
 
     private async Task<bool> IsAdminAsync(SqlConnection connection, string userType, CancellationToken token)
     {
-        if (userType == "LAOO_SUPPORT") return false;
+        if (userType == "LAOO_SUPPORT")
+        {
+            if (LongClaim("laoo_user_id") is not long laooUserId ||
+                LongClaim("project_id") is not long projectId) return false;
+            const string laooAdminSql = """
+SELECT CASE WHEN EXISTS
+(
+    SELECT 1
+    FROM dbo.TDADLaooUserPermission UP
+    INNER JOIN dbo.TDADPermission P
+        ON P.PermissionID=UP.PermissionID
+       AND P.ProjectID=UP.ProjectID
+       AND P.ScreenCode=N'*'
+       AND P.ActionCode=N'ADMIN'
+       AND P.IsActive=1
+    INNER JOIN dbo.TDADLaooUser U
+        ON U.LaooUserID=UP.LaooUserID
+       AND U.IsSupportUser=1
+       AND U.IsActive=1
+    WHERE UP.LaooUserID=@ID
+      AND UP.ProjectID=@ProjectID
+      AND UP.IsAllowed=1
+      AND UP.IsActive=1
+) THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END;
+""";
+            await using var laooAdminCommand = new SqlCommand(laooAdminSql, connection);
+            laooAdminCommand.Parameters.Add("@ID", SqlDbType.BigInt).Value = laooUserId;
+            laooAdminCommand.Parameters.Add("@ProjectID", SqlDbType.BigInt).Value = projectId;
+            return Convert.ToBoolean(await laooAdminCommand.ExecuteScalarAsync(token));
+        }
         var sql = userType == "PARTNER_USER"
-            ? "SELECT CASE WHEN EXISTS (SELECT 1 FROM dbo.TDADPartnerUser WHERE PartnerID=@PartnerID AND NormalizedUsername=@Username AND IsPartnerAdmin=1 AND IsActive=1) THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END"
-            : "SELECT IsCompanyAdmin FROM dbo.TDADUser WHERE UserID=@ID AND IsActive=1";
+            ? "SELECT CASE WHEN EXISTS (SELECT 1 FROM dbo.TDADPartnerUser WHERE PartnerUserID=@ID AND PartnerID=@OwnerID AND IsPartnerAdmin=1 AND IsActive=1) THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END"
+            : "SELECT CASE WHEN EXISTS (SELECT 1 FROM dbo.TDADUser WHERE UserID=@ID AND CompanyID=@OwnerID AND IsCompanyAdmin=1 AND IsActive=1) THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END";
         await using var command = new SqlCommand(sql, connection);
         if (userType == "PARTNER_USER")
         {
-            var partnerId = User.FindFirstValue("partner_id");
-            if (!long.TryParse(partnerId, out var parsedPartnerId)) return false;
-            command.Parameters.Add("@PartnerID", SqlDbType.BigInt).Value = parsedPartnerId;
-            command.Parameters.Add("@Username", SqlDbType.NVarChar, 100).Value = Username().ToUpperInvariant();
+            if (LongClaim("partner_user_id") is not long partnerUserId ||
+                LongClaim("partner_id") is not long partnerId) return false;
+            command.Parameters.Add("@ID", SqlDbType.BigInt).Value = partnerUserId;
+            command.Parameters.Add("@OwnerID", SqlDbType.BigInt).Value = partnerId;
         }
         else
         {
-            var raw = User.FindFirstValue("user_id");
-            if (!long.TryParse(raw, out var id)) return false;
-            command.Parameters.Add("@ID", SqlDbType.BigInt).Value = id;
+            if (LongClaim("user_id") is not long userId ||
+                LongClaim("company_id") is not long companyId) return false;
+            command.Parameters.Add("@ID", SqlDbType.BigInt).Value = userId;
+            command.Parameters.Add("@OwnerID", SqlDbType.BigInt).Value = companyId;
         }
         return Convert.ToBoolean(await command.ExecuteScalarAsync(token));
     }
 
     private async Task<HashSet<string>> LoadAllowedFeaturesAsync(SqlConnection connection, string userType, CancellationToken token)
     {
-        if (!long.TryParse(User.FindFirstValue("project_id"), out var projectId)) return [];
-        var permissionTable = userType == "PARTNER_USER" ? "TDADPartnerUserPermission" : userType == "COMPANY_USER" ? "TDADUserPermission" : "TDADLaooUserPermission";
-        var idColumn = userType == "PARTNER_USER" ? "PartnerUserID" : userType == "COMPANY_USER" ? "UserID" : "LaooUserID";
-        var claimName = userType == "COMPANY_USER" ? "user_id" : "laoo_user_id";
-        var raw = User.FindFirstValue(claimName)?.Replace("laoo:", "");
-        var sql = userType == "PARTNER_USER" ? $"""
+        if (LongClaim("project_id") is not long projectId) return [];
+        long userId;
+        long? ownerId = null;
+        string sql;
+        if (userType == "PARTNER_USER")
+        {
+            if (LongClaim("partner_user_id") is not long partnerUserId ||
+                LongClaim("partner_id") is not long partnerId) return [];
+            userId = partnerUserId;
+            ownerId = partnerId;
+            sql = """
 SELECT P.ScreenCode
 FROM dbo.TDADPartnerUserPermission UP
 INNER JOIN dbo.TDADPermission P ON P.PermissionID=UP.PermissionID AND P.ProjectID=UP.ProjectID
-INNER JOIN dbo.TDADPartnerUser U ON U.PartnerUserID=UP.PartnerUserID
-WHERE U.NormalizedUsername=@Username AND UP.ProjectID=@ProjectID AND UP.IsAllowed=1 AND UP.IsActive=1 AND P.IsActive=1 AND P.ActionCode='VIEW'
+INNER JOIN dbo.TDADPartnerUser U ON U.PartnerUserID=UP.PartnerUserID AND U.IsActive=1
+WHERE U.PartnerUserID=@ID AND U.PartnerID=@OwnerID AND UP.ProjectID=@ProjectID AND UP.IsAllowed=1 AND UP.IsActive=1 AND P.IsActive=1 AND P.ActionCode='VIEW'
 UNION
 SELECT RP.MenuCode
 FROM dbo.TDADPartnerUser U
@@ -99,36 +220,57 @@ INNER JOIN dbo.TDADPartnerUserEmployee PUE ON PUE.PartnerUserID=U.PartnerUserID
 INNER JOIN dbo.TDADEmployeeRoleGroup ERG ON ERG.EmployeeID=PUE.EmployeeID
 INNER JOIN dbo.TDADRoleGroup RG ON RG.RoleGroupID=ERG.RoleGroupID AND RG.ScopeType='P' AND RG.PartnerID=U.PartnerID AND RG.ProjectID=@ProjectID
 INNER JOIN dbo.TDADRoleGroupPermission RP ON RP.RoleGroupID=RG.RoleGroupID AND RP.ProjectID=@ProjectID AND RP.ActionCode='VIEW' AND RP.IsAllowed=1
-WHERE U.NormalizedUsername=@Username AND U.IsActive=1 AND ERG.IsActive=1 AND ERG.EffectiveFrom<=CONVERT(date,SYSUTCDATETIME()) AND (ERG.EffectiveTo IS NULL OR ERG.EffectiveTo>=CONVERT(date,SYSUTCDATETIME()));
-""" : $"""
+WHERE U.PartnerUserID=@ID AND U.PartnerID=@OwnerID AND U.IsActive=1 AND ERG.IsActive=1 AND ERG.EffectiveFrom<=CONVERT(date,SYSUTCDATETIME()) AND (ERG.EffectiveTo IS NULL OR ERG.EffectiveTo>=CONVERT(date,SYSUTCDATETIME()));
+""";
+        }
+        else if (userType == "COMPANY_USER")
+        {
+            if (LongClaim("user_id") is not long companyUserId ||
+                LongClaim("company_id") is not long companyId) return [];
+            userId = companyUserId;
+            ownerId = companyId;
+            sql = """
 SELECT P.ScreenCode
-FROM dbo.{permissionTable} UP
+FROM dbo.TDADUserPermission UP
 INNER JOIN dbo.TDADPermission P ON P.PermissionID=UP.PermissionID AND P.ProjectID=UP.ProjectID
-WHERE UP.{idColumn}=@ID AND UP.ProjectID=@ProjectID AND UP.IsAllowed=1 AND UP.IsActive=1 AND P.IsActive=1 AND P.ActionCode='VIEW'
+INNER JOIN dbo.TDADUser U ON U.UserID=UP.UserID AND U.IsActive=1
+INNER JOIN dbo.TDADUserProject UPR ON UPR.UserID=U.UserID AND UPR.CompanyID=U.CompanyID AND UPR.ProjectID=UP.ProjectID AND UPR.IsActive=1
+WHERE U.UserID=@ID AND U.CompanyID=@OwnerID AND UP.IsAllowed=1 AND UP.IsActive=1 AND P.IsActive=1 AND P.ActionCode='VIEW'
 UNION
 SELECT RP.MenuCode
 FROM dbo.TDADUser U
 INNER JOIN dbo.TDADUserEmployee UE ON UE.UserID=U.UserID
 INNER JOIN dbo.TDADEmployeeRoleGroup ERG ON ERG.EmployeeID=UE.EmployeeID
-INNER JOIN dbo.TDADRoleGroup RG ON RG.RoleGroupID=ERG.RoleGroupID AND RG.ScopeType='C' AND RG.CompanyID=U.CompanyID AND RG.ProjectID=@ProjectID
-INNER JOIN dbo.TDADRoleGroupPermission RP ON RP.RoleGroupID=RG.RoleGroupID AND RP.ProjectID=@ProjectID AND RP.ActionCode='VIEW' AND RP.IsAllowed=1
-WHERE U.UserID=@ID AND U.IsActive=1 AND ERG.IsActive=1 AND ERG.EffectiveFrom<=CONVERT(date,SYSUTCDATETIME()) AND (ERG.EffectiveTo IS NULL OR ERG.EffectiveTo>=CONVERT(date,SYSUTCDATETIME()));
+INNER JOIN dbo.TDADRoleGroup RG ON RG.RoleGroupID=ERG.RoleGroupID AND RG.ScopeType='C' AND RG.CompanyID=U.CompanyID
+INNER JOIN dbo.TDADRoleGroupPermission RP ON RP.RoleGroupID=RG.RoleGroupID AND RP.ProjectID=RG.ProjectID AND RP.ActionCode='VIEW' AND RP.IsAllowed=1
+INNER JOIN dbo.TDADUserProject UPR ON UPR.UserID=U.UserID AND UPR.CompanyID=U.CompanyID AND UPR.ProjectID=RG.ProjectID AND UPR.IsActive=1
+WHERE U.UserID=@ID AND U.CompanyID=@OwnerID AND U.IsActive=1 AND ERG.IsActive=1 AND ERG.EffectiveFrom<=CONVERT(date,SYSUTCDATETIME()) AND (ERG.EffectiveTo IS NULL OR ERG.EffectiveTo>=CONVERT(date,SYSUTCDATETIME()));
 """;
-        await using var command = new SqlCommand(sql, connection);
-        command.Parameters.Add("@ProjectID", SqlDbType.BigInt).Value = projectId;
-        if (userType == "PARTNER_USER") command.Parameters.Add("@Username", SqlDbType.NVarChar, 100).Value = Username().ToUpperInvariant();
+        }
         else
         {
-            if (!long.TryParse(raw, out var id)) return [];
-            command.Parameters.Add("@ID", SqlDbType.BigInt).Value = id;
+            if (LongClaim("laoo_user_id") is not long laooUserId) return [];
+            userId = laooUserId;
+            sql = """
+SELECT P.ScreenCode
+FROM dbo.TDADLaooUserPermission UP
+INNER JOIN dbo.TDADPermission P ON P.PermissionID=UP.PermissionID AND P.ProjectID=UP.ProjectID
+INNER JOIN dbo.TDADLaooUser U ON U.LaooUserID=UP.LaooUserID AND U.IsActive=1
+WHERE U.LaooUserID=@ID AND UP.ProjectID=@ProjectID AND UP.IsAllowed=1 AND UP.IsActive=1 AND P.IsActive=1 AND P.ActionCode='VIEW';
+""";
         }
+        await using var command = new SqlCommand(sql, connection);
+        command.Parameters.Add("@ProjectID", SqlDbType.BigInt).Value = projectId;
+        command.Parameters.Add("@ID", SqlDbType.BigInt).Value = userId;
+        if (ownerId.HasValue)
+            command.Parameters.Add("@OwnerID", SqlDbType.BigInt).Value = ownerId.Value;
         await using var reader = await command.ExecuteReaderAsync(token);
         var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         while (await reader.ReadAsync(token)) result.Add(reader.GetString(0));
         return result;
     }
 
-    private string Username() => (User.Identity?.Name ?? User.FindFirstValue("unique_name") ?? string.Empty).Trim();
+    private long? LongClaim(string name) => long.TryParse(User.FindFirstValue(name), out var value) ? value : null;
 
     private static string? N(SqlDataReader reader, int index) => reader.IsDBNull(index) ? null : reader.GetString(index);
 }

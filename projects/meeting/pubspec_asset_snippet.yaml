@@ -1,0 +1,7 @@
+# เพิ่มใต้ส่วน flutter: ใน pubspec.yaml
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/laoo_login_logo.png

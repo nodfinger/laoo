@@ -1,0 +1,4 @@
+เพิ่ม dependencies เหล่านี้ใน pubspec.yaml ภายใต้ dependencies:
+
+  http: ^1.2.2
+  shared_preferences: ^2.3.2

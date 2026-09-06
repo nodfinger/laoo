@@ -29,19 +29,19 @@ public sealed class AuthenticationService
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.Username) ||
-            string.IsNullOrWhiteSpace(request.Password) ||
-            string.IsNullOrWhiteSpace(request.ProjectCode))
+            string.IsNullOrWhiteSpace(request.Password))
         {
             return InvalidCredentials();
         }
 
         var username = request.Username.Trim().ToUpperInvariant();
-        var projectCode = request.ProjectCode.Trim().ToUpperInvariant();
+        var projectCode = request.ProjectCode?.Trim().ToUpperInvariant();
         await using var connection = _connections.CreateConnection();
         await connection.OpenAsync(cancellationToken);
 
-        var project = await FindProjectAsync(
+        var project = await FindLoginProjectAsync(
             connection,
+            username,
             projectCode,
             cancellationToken);
         if (project is null)
@@ -77,6 +77,7 @@ public sealed class AuthenticationService
                 null,
                 null,
                 null,
+                null,
                 project.Value.Id,
                 project.Value.Code,
                 laoo.Username,
@@ -108,6 +109,7 @@ public sealed class AuthenticationService
                     "PARTNER_USER",
                     "PARTNER",
                     null,
+                    partner.Id,
                     partner.PartnerId,
                     null,
                     null,
@@ -143,6 +145,7 @@ public sealed class AuthenticationService
                 "COMPANY_USER",
                 "USER",
                 null,
+                null,
                 company.PartnerId,
                 company.Id,
                 company.CompanyId,
@@ -164,6 +167,7 @@ public sealed class AuthenticationService
                 authenticated.UserType,
                 authenticated.LoginMode,
                 authenticated.LaooUserId,
+                authenticated.PartnerUserId,
                 authenticated.PartnerId,
                 authenticated.UserId,
                 authenticated.CompanyId,
@@ -260,19 +264,81 @@ public sealed class AuthenticationService
     private static LoginResponse Failed(string message) =>
         new(false, message, null, null, null);
 
-    private static async Task<(long Id, string Code)?> FindProjectAsync(
+    private static async Task<(long Id, string Code)?> FindLoginProjectAsync(
         SqlConnection connection,
-        string projectCode,
+        string username,
+        string? projectCode,
         CancellationToken cancellationToken)
     {
         const string sql = """
-            SELECT TOP (1) ProjectID, ProjectCode
-            FROM dbo.TDADProject
-            WHERE ProjectCode = @ProjectCode
-              AND IsActive = 1;
+            SELECT TOP (1) project.ProjectID, project.ProjectCode
+            FROM dbo.TDADProject AS project
+            WHERE project.IsActive = 1
+              AND (@ProjectCode IS NULL OR project.ProjectCode = @ProjectCode)
+              AND
+              (
+                  EXISTS
+                  (
+                      SELECT 1
+                      FROM dbo.TDADLaooUser AS u
+                      INNER JOIN dbo.TDADLaooUserProject AS up
+                          ON up.LaooUserID=u.LaooUserID
+                         AND up.ProjectID=project.ProjectID
+                         AND up.IsActive=1 AND up.CanAccess=1
+                      WHERE u.NormalizedUsername=@Username
+                        AND u.IsSupportUser=1 AND u.IsActive=1
+                  )
+                  OR EXISTS
+                  (
+                      SELECT 1
+                      FROM dbo.TDADUser AS u
+                      INNER JOIN dbo.TDADUserProject AS up
+                          ON up.UserID=u.UserID AND up.CompanyID=u.CompanyID
+                         AND up.ProjectID=project.ProjectID AND up.IsActive=1
+                      INNER JOIN dbo.TDSTCompanySetUp AS company
+                          ON company.CompanyID=u.CompanyID AND company.IsActive=1
+                      INNER JOIN dbo.TDADPartner AS partner
+                          ON partner.PartnerID=company.PartnerID AND partner.IsActive=1
+                      INNER JOIN dbo.TDADCompanyProject AS companyProject
+                          ON companyProject.ProjectID=project.ProjectID
+                         AND companyProject.PartnerID=company.PartnerID
+                         AND companyProject.CompanyID=company.CompanyID
+                         AND companyProject.IsEnabled=1
+                         AND (companyProject.StartDate IS NULL OR companyProject.StartDate<=CONVERT(date,SYSUTCDATETIME()))
+                         AND (companyProject.ExpireDate IS NULL OR companyProject.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))
+                      WHERE u.NormalizedUsername=@Username AND u.IsActive=1
+                  )
+                  OR EXISTS
+                  (
+                      SELECT 1
+                      FROM dbo.TDADPartnerUser AS u
+                      INNER JOIN dbo.TDADPartner AS partner
+                          ON partner.PartnerID=u.PartnerID AND partner.IsActive=1
+                      WHERE u.NormalizedUsername=@Username AND u.IsActive=1
+                        AND
+                        (
+                            u.IsPartnerAdmin=1
+                            OR EXISTS
+                            (
+                                SELECT 1
+                                FROM dbo.TDADPartnerUserPermission AS permission
+                                WHERE permission.PartnerUserID=u.PartnerUserID
+                                  AND permission.ProjectID=project.ProjectID
+                                  AND permission.IsAllowed=1
+                                  AND permission.IsActive=1
+                            )
+                        )
+                  )
+              )
+            ORDER BY
+              CASE WHEN @ProjectCode IS NOT NULL THEN 0 ELSE 1 END,
+              CASE WHEN project.ProjectCode=N'LAOO' THEN 0 ELSE 1 END,
+              project.ProjectID;
             """;
         await using var command = new SqlCommand(sql, connection);
-        command.Parameters.AddWithValue("@ProjectCode", projectCode);
+        command.Parameters.Add("@Username", SqlDbType.NVarChar, 256).Value = username;
+        command.Parameters.Add("@ProjectCode", SqlDbType.NVarChar, 50).Value =
+            string.IsNullOrWhiteSpace(projectCode) ? DBNull.Value : projectCode;
         await using var reader =
             await command.ExecuteReaderAsync(cancellationToken);
         return await reader.ReadAsync(cancellationToken)
@@ -357,11 +423,15 @@ public sealed class AuthenticationService
         CancellationToken cancellationToken)
     {
         var sql = $$"""
-            SELECT TOP (1)
+            SELECT TOP (2)
                 u.UserID, company.PartnerID, u.CompanyID, branch.BranchID,
-                u.Username, u.PasswordHash, u.DisplayName, u.LockedUntil
+                u.Username, u.PasswordHash,
+                CASE WHEN employee.EmployeeID IS NULL THEN u.DisplayName
+                     ELSE employee.FullName + CASE WHEN NULLIF(LTRIM(RTRIM(employee.NickName)), N'') IS NULL THEN N'' ELSE N' | ' + employee.NickName END
+                END AS DisplayName,
+                u.LockedUntil
             FROM dbo.TDADUser AS u
-            INNER JOIN dbo.TDADCompany AS company
+            INNER JOIN dbo.TDSTCompanySetUp AS company
                 ON company.CompanyID = u.CompanyID
                AND company.IsActive = 1
             INNER JOIN dbo.TDADPartner AS partner
@@ -383,6 +453,18 @@ public sealed class AuthenticationService
                   AND userBranch.IsActive = 1
                 ORDER BY userBranch.IsDefault DESC, userBranch.UserBranchID
             ) AS branch
+            OUTER APPLY
+            (
+                SELECT TOP (1) employee.EmployeeID, employee.FullName, employee.NickName
+                FROM dbo.TDADUserEmployee AS userEmployee
+                INNER JOIN dbo.TDADEmployee AS employee
+                    ON employee.EmployeeID = userEmployee.EmployeeID
+                   AND employee.CompanyID = u.CompanyID
+                   AND employee.IsActive = 1
+                WHERE userEmployee.UserID = u.UserID
+                  AND userEmployee.CompanyID = u.CompanyID
+                ORDER BY employee.EmployeeID
+            ) AS employee
             WHERE u.NormalizedUsername = @Username
               AND u.IsActive = 1
               AND {{AuthenticationProjectAccess.CompanySql}};
@@ -392,7 +474,7 @@ public sealed class AuthenticationService
         await using var reader =
             await command.ExecuteReaderAsync(cancellationToken);
         if (!await reader.ReadAsync(cancellationToken)) return null;
-        return new CompanyRow(
+        var result = new CompanyRow(
             reader.GetInt64(0),
             reader.GetInt64(1),
             reader.GetInt64(2),
@@ -401,6 +483,8 @@ public sealed class AuthenticationService
             reader.GetString(5),
             reader.GetString(6),
             reader.IsDBNull(7) ? null : reader.GetDateTime(7));
+        if (await reader.ReadAsync(cancellationToken)) return null;
+        return result;
     }
 
     private static async Task RegisterFailedLoginAsync(

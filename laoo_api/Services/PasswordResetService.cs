@@ -372,7 +372,7 @@ public sealed class PasswordResetService(
                     U.Username,
                     COALESCE(NULLIF(U.Email, N''), Employee.Email)
                 FROM dbo.TDADUser AS U
-                INNER JOIN dbo.TDADCompany AS Company
+                INNER JOIN dbo.TDSTCompanySetUp AS Company
                     ON Company.CompanyID = U.CompanyID
                    AND Company.IsActive = 1
                 INNER JOIN dbo.TDADPartner AS Partner
@@ -530,7 +530,7 @@ public sealed class PasswordResetService(
                   AND EXISTS
                   (
                       SELECT 1
-                      FROM dbo.TDADCompany AS Company
+                      FROM dbo.TDSTCompanySetUp AS Company
                       INNER JOIN dbo.TDADPartner AS Partner
                           ON Partner.PartnerID = Company.PartnerID
                          AND Partner.IsActive = 1

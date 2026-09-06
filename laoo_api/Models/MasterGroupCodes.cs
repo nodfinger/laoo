@@ -10,6 +10,7 @@ public static class MasterGroupCodes
     public const string CustomerGroup = "005";
     public const string ItemGroup = "006";
     public const string ItemType = "007";
+    public const string FoodType = "011";
 
     public static readonly IReadOnlyDictionary<string, string> VariableNames =
         new Dictionary<string, string>(StringComparer.Ordinal)
@@ -21,5 +22,6 @@ public static class MasterGroupCodes
             [CustomerGroup] = "MsCusGroup",
             [ItemGroup] = "MsItemGroup",
             [ItemType] = "MsItemType",
+            [FoodType] = "MsFoodType",
         };
 }
