@@ -1,5 +1,5 @@
 name: laoo_meeting
-description: "LAOO Meeting application."
+description: "LAOO Meeting business feature package for the Center host."
 publish_to: 'none'
 
 version: 1.0.0+1

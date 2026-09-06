@@ -98,4 +98,4 @@
 - `lib/features/meeting/pages/meeting_room_booking_page.dart`
 - `lib/features/meeting/widgets/meeting_room_calendar_view.dart`
 - `lib/features/meeting/data/meeting_room_booking_repository.dart`
-- `laoo_meeting_api/Controllers/MeetingRoomBookingController.cs`
+- `packages/dotnet/Laoo.Meeting.Module/Controllers/MeetingRoomBookingController.cs`

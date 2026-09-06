@@ -20,6 +20,10 @@ dependencies:
     path: packages/laoo_shared_core
   laoo_meeting:
     path: projects/meeting
+  laoo_service:
+    path: projects/service
+  laoo_visitor:
+    path: projects/visitor
 
   cupertino_icons: ^1.0.8
   flutter_riverpod: ^3.4.2

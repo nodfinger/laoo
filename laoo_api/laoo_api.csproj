@@ -21,7 +21,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\packages\dotnet\Laoo.Shared.Contracts\Laoo.Shared.Contracts.csproj" />
+    <ProjectReference Include="..\projects\service\packages\dotnet\Laoo.Service.Module\Laoo.Service.Module.csproj" />
     <ProjectReference Include="..\projects\meeting\packages\dotnet\Laoo.Meeting.Module\Laoo.Meeting.Module.csproj" />
+    <ProjectReference Include="..\projects\visitor\packages\dotnet\Laoo.Visitor.Module\Laoo.Visitor.Module.csproj" />
   </ItemGroup>
 
 </Project>

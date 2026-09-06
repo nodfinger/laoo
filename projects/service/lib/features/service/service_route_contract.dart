@@ -1,0 +1,210 @@
+import 'package:laoo_shared_core/laoo_shared_core.dart';
+
+abstract final class ServiceProject {
+  static const code = 'LAOO_SERVICE';
+}
+
+abstract final class ServiceRoutes {
+  static const all = <FeatureRouteContract>[
+    FeatureRouteContract(
+      projectCode: ServiceProject.code,
+      menuCode: '09001',
+      screenType: 1,
+      routeName: 'companyCustomers',
+      routePath: '/company/customers',
+    ),
+    FeatureRouteContract(
+      projectCode: ServiceProject.code,
+      menuCode: '09003',
+      screenType: 4,
+      routeName: 'companyQuotations',
+      routePath: '/company/quotations',
+    ),
+    FeatureRouteContract(
+      projectCode: ServiceProject.code,
+      menuCode: '09004',
+      screenType: 4,
+      routeName: 'companyPreOrders',
+      routePath: '/company/pre-orders',
+    ),
+    FeatureRouteContract(
+      projectCode: ServiceProject.code,
+      menuCode: '09005',
+      screenType: 4,
+      routeName: 'companyTemporaryReceipts',
+      routePath: '/company/temporary-receipts',
+    ),
+    FeatureRouteContract(
+      projectCode: ServiceProject.code,
+      menuCode: '09006',
+      screenType: 4,
+      routeName: 'companyDeliveryNotes',
+      routePath: '/company/delivery-notes',
+    ),
+    FeatureRouteContract(
+      projectCode: ServiceProject.code,
+      menuCode: '09007',
+      screenType: 4,
+      routeName: 'companyTaxInvoices',
+      routePath: '/company/tax-invoices',
+    ),
+    FeatureRouteContract(
+      projectCode: ServiceProject.code,
+      menuCode: '14001',
+      screenType: 1,
+      routeName: 'assetLocations',
+      routePath: '/asset/locations',
+    ),
+    FeatureRouteContract(
+      projectCode: ServiceProject.code,
+      menuCode: '14002',
+      screenType: 1,
+      routeName: 'assetItems',
+      routePath: '/asset/items',
+    ),
+    FeatureRouteContract(
+      projectCode: ServiceProject.code,
+      menuCode: '14003',
+      screenType: 1,
+      routeName: 'assetCustomers',
+      routePath: '/asset/customers',
+    ),
+    FeatureRouteContract(
+      projectCode: ServiceProject.code,
+      menuCode: '15001',
+      screenType: 1,
+      routeName: 'cmTickets',
+      routePath: '/cm/tickets',
+    ),
+    FeatureRouteContract(
+      projectCode: ServiceProject.code,
+      menuCode: '15002',
+      screenType: 3,
+      routeName: 'cmQrPortal',
+      routePath: '/cm/qr-portal',
+    ),
+    FeatureRouteContract(
+      projectCode: ServiceProject.code,
+      menuCode: '16001',
+      screenType: 1,
+      routeName: 'pmPlans',
+      routePath: '/pm/plans',
+    ),
+    FeatureRouteContract(
+      projectCode: ServiceProject.code,
+      menuCode: '16002',
+      screenType: 1,
+      routeName: 'pmChecklists',
+      routePath: '/pm/checklists',
+    ),
+    FeatureRouteContract(
+      projectCode: ServiceProject.code,
+      menuCode: '16003',
+      screenType: 3,
+      routeName: 'pmCalendar',
+      routePath: '/pm/calendar',
+    ),
+    FeatureRouteContract(
+      projectCode: ServiceProject.code,
+      menuCode: '17001',
+      screenType: 2,
+      routeName: 'jobDispatch',
+      routePath: '/jobs/dispatch',
+    ),
+    FeatureRouteContract(
+      projectCode: ServiceProject.code,
+      menuCode: '17002',
+      screenType: 1,
+      routeName: 'jobWorkOrders',
+      routePath: '/jobs/work-orders',
+    ),
+    FeatureRouteContract(
+      projectCode: ServiceProject.code,
+      menuCode: '17003',
+      screenType: 2,
+      routeName: 'jobCloseout',
+      routePath: '/jobs/closeout',
+    ),
+    FeatureRouteContract(
+      projectCode: ServiceProject.code,
+      menuCode: '08002',
+      screenType: 1,
+      routeName: 'inventoryItems',
+      routePath: '/inventory/items',
+    ),
+    FeatureRouteContract(
+      projectCode: ServiceProject.code,
+      menuCode: '08003',
+      screenType: 1,
+      routeName: 'inventoryUsage',
+      routePath: '/inventory/usage',
+    ),
+    FeatureRouteContract(
+      projectCode: ServiceProject.code,
+      menuCode: '19001',
+      screenType: 3,
+      routeName: 'reportsDashboard',
+      routePath: '/reports/dashboard',
+    ),
+    FeatureRouteContract(
+      projectCode: ServiceProject.code,
+      menuCode: '19002',
+      screenType: 3,
+      routeName: 'reportsHistory',
+      routePath: '/reports/history',
+    ),
+    FeatureRouteContract(
+      projectCode: ServiceProject.code,
+      menuCode: '19003',
+      screenType: 3,
+      routeName: 'reportsSatisfaction',
+      routePath: '/reports/satisfaction',
+    ),
+    FeatureRouteContract(
+      projectCode: ServiceProject.code,
+      menuCode: '20001',
+      screenType: 1,
+      routeName: 'portalRequest',
+      routePath: '/portal/request',
+    ),
+    FeatureRouteContract(
+      projectCode: ServiceProject.code,
+      menuCode: '20002',
+      screenType: 3,
+      routeName: 'portalTracking',
+      routePath: '/portal/tracking',
+    ),
+    FeatureRouteContract(
+      projectCode: ServiceProject.code,
+      menuCode: '20003',
+      screenType: 3,
+      routeName: 'portalHistory',
+      routePath: '/portal/history',
+    ),
+    FeatureRouteContract(
+      projectCode: ServiceProject.code,
+      menuCode: '20004',
+      screenType: 3,
+      routeName: 'portalPmSchedule',
+      routePath: '/portal/pm-schedule',
+    ),
+    FeatureRouteContract(
+      projectCode: ServiceProject.code,
+      menuCode: '20005',
+      screenType: 2,
+      routeName: 'portalEvaluation',
+      routePath: '/portal/evaluation',
+    ),
+    FeatureRouteContract(
+      projectCode: ServiceProject.code,
+      menuCode: '20006',
+      screenType: 1,
+      routeName: 'portalComplaint',
+      routePath: '/portal/complaint',
+      goRouteName: 'portal-complaint',
+    ),
+  ];
+
+  static FeatureRouteContract byMenuCode(String menuCode) =>
+      all.singleWhere((route) => route.menuCode == menuCode);
+}

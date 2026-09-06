@@ -1,4 +1,7 @@
-import 'package:laoo_meeting/meeting_feature.dart' show MeetingMenuCodes;
+import 'package:laoo_meeting/meeting_feature.dart'
+    show MeetingMenuCodes, MeetingRoutes;
+import 'package:laoo_service/service_feature.dart' show ServiceRoutes;
+import 'package:laoo_visitor/visitor_feature.dart' show VisitorRoutes;
 
 import 'route_names.dart';
 import 'route_paths.dart';
@@ -22,7 +25,7 @@ class AppMenuRouteSpec {
 }
 
 abstract final class AppMenuRouteRegistry {
-  static const Map<String, AppMenuRouteSpec> _byMenuCode = {
+  static final Map<String, AppMenuRouteSpec> _byMenuCode = {
     '01001': AppMenuRouteSpec(
       menuCode: '01001',
       databaseRouteName: 'partner',
@@ -576,6 +579,30 @@ abstract final class AppMenuRouteRegistry {
       path: RoutePaths.laooUsers,
       scope: AppMenuScope.support,
     ),
+    for (final route in ServiceRoutes.all)
+      route.menuCode: AppMenuRouteSpec(
+        menuCode: route.menuCode,
+        databaseRouteName: route.routeName,
+        goRouteName: route.effectiveGoRouteName,
+        path: route.routePath,
+        scope: AppMenuScope.company,
+      ),
+    for (final route in MeetingRoutes.all)
+      route.menuCode: AppMenuRouteSpec(
+        menuCode: route.menuCode,
+        databaseRouteName: route.name,
+        goRouteName: route.name,
+        path: route.path,
+        scope: AppMenuScope.company,
+      ),
+    for (final route in VisitorRoutes.implemented)
+      route.menuCode: AppMenuRouteSpec(
+        menuCode: route.menuCode,
+        databaseRouteName: route.routeName,
+        goRouteName: route.effectiveGoRouteName,
+        path: route.routePath,
+        scope: AppMenuScope.company,
+      ),
   };
 
   static AppMenuRouteSpec? byMenuCode(String menuCode) =>

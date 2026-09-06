@@ -28,6 +28,19 @@ final UserFavoriteRepository _userFavoriteRepository = UserFavoriteRepository();
 
 enum WorkspaceMenuScope { support, partner, company }
 
+typedef ServiceWorkspaceShellBuilder =
+    Widget Function({
+      required String pageTitle,
+      required String activeMenu,
+      required Widget child,
+    });
+
+ServiceWorkspaceShellBuilder? _serviceWorkspaceShellBuilder;
+
+void configureServiceWorkspaceShell(ServiceWorkspaceShellBuilder builder) {
+  _serviceWorkspaceShellBuilder = builder;
+}
+
 class WorkspacePageTitle extends StatelessWidget {
   const WorkspacePageTitle({
     super.key,
@@ -199,6 +212,14 @@ class SupportWorkspaceShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hostBuilder = _serviceWorkspaceShellBuilder;
+    if (hostBuilder != null && menuScope == WorkspaceMenuScope.company) {
+      return hostBuilder(
+        pageTitle: pageTitle,
+        activeMenu: activeMenu ?? '',
+        child: child,
+      );
+    }
     return ValueListenableBuilder<WorkspaceThemePreset>(
       valueListenable: workspaceThemeController,
       builder: (context, preset, _) {

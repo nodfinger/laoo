@@ -11,6 +11,7 @@
 .svn/
 .swiftpm/
 migrate_working_dir/
+local.machine.json
 
 # IntelliJ related
 *.iml
@@ -37,6 +38,7 @@ packages/**/pubspec.lock
 # .NET build artifacts
 **/bin/
 **/obj/
+/artifacts/
 
 # Symbolication related
 app.*.symbols
