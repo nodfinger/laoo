@@ -14,6 +14,7 @@ import '../../../app/theme/laoo_design_tokens.dart';
 import '../../../app/theme/workspace_theme_presets.dart';
 import '../../../app/theme/laoo_typography.dart';
 import '../data/meeting_structure_repository.dart';
+import '../meeting_feature_host.dart';
 
 class UpperCaseTextFormatter extends TextInputFormatter {
   @override
@@ -847,8 +848,7 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
   Widget build(BuildContext context) {
     return ValueListenableBuilder<WorkspaceThemePreset>(
       valueListenable: workspaceThemeController,
-      builder: (context, preset, _) => SupportWorkspaceShell(
-        menuScope: WorkspaceMenuScope.company,
+      builder: (context, preset, _) => buildMeetingWorkspaceShell(
         pageTitle: 'อาคารและชั้น',
         activeMenu: '23001',
         child: Stack(

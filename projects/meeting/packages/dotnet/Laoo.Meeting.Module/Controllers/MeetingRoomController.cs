@@ -1,13 +1,13 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 
-namespace LaooApi.Controllers;
+namespace LaooMeetingApi.Controllers;
 
 [ApiController, Route("api/company/meeting-rooms"), Authorize]
-[LaooApi.Security.RequireCompanyProject("LAOO_MEETING")]
+[LaooMeetingApi.Security.RequireCompanyProject("LAOO_MEETING")]
 public sealed class MeetingRoomController(IConfiguration configuration, IWebHostEnvironment environment) : ControllerBase
 {
     private const string ScreenCode = "23002";
@@ -82,7 +82,7 @@ public sealed class MeetingRoomController(IConfiguration configuration, IWebHost
         catch { await tx.RollbackAsync(token); throw; }
     }
 
-    private async Task<bool> Permission(string action,CancellationToken t){await using var c=await Open(t);return await Allowed(c,action,t);} private Task<bool> Allowed(SqlConnection c,string action,CancellationToken t)=>LaooApi.Security.CompanyProjectPermission.IsAllowedAsync(c,User,ScreenCode,action,t);
+    private async Task<bool> Permission(string action,CancellationToken t){await using var c=await Open(t);return await Allowed(c,action,t);} private async Task<bool> Allowed(SqlConnection c,string action,CancellationToken t){if(!IsCompany()||CompanyId() is null||!long.TryParse(User.FindFirstValue("project_id"),out var p)||!long.TryParse(User.FindFirstValue("user_id"),out var u))return false;const string s="SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADUser WHERE UserID=@u AND CompanyID=@c AND IsActive=1 AND IsCompanyAdmin=1) OR EXISTS(SELECT 1 FROM dbo.TDADUserPermission UP JOIN dbo.TDADPermission P ON P.PermissionID=UP.PermissionID AND P.ProjectID=UP.ProjectID WHERE UP.UserID=@u AND UP.ProjectID=@p AND UP.IsAllowed=1 AND UP.IsActive=1 AND P.IsActive=1 AND P.ScreenCode=@screen AND P.ActionCode=@action) THEN 1 ELSE 0 END";await using var q=new SqlCommand(s,c);Add(q,"@u",u);Add(q,"@c",CompanyId()??0);Add(q,"@p",p);Add(q,"@screen",ScreenCode);Add(q,"@action",action);return Convert.ToBoolean(await q.ExecuteScalarAsync(t));}
     private async Task<SqlConnection> Open(CancellationToken t){var c=new SqlConnection(configuration.GetConnectionString("LaooDatabase"));await c.OpenAsync(t);return c;} private bool IsCompany()=>string.Equals(User.FindFirstValue("user_type"),"COMPANY_USER",StringComparison.OrdinalIgnoreCase); private long? CompanyId()=>long.TryParse(User.FindFirstValue("company_id"),out var id)&&id>0?id:null; private static string? N(SqlDataReader r,int i)=>r.IsDBNull(i)?null:r.GetString(i); private static long? I(SqlDataReader r,int i)=>r.IsDBNull(i)?null:Convert.ToInt64(r.GetValue(i)); private static void Add(SqlCommand c,string n,object? v)=>c.Parameters.AddWithValue(n,v??DBNull.Value);
 }
 public sealed record RoomRequest(long? BuildingId,long? FloorId,string Code,string NameTh,int? Capacity,string? Description,List<RoomFacilityItem>? FacilityItems,bool IsActive=true);

@@ -1,14 +1,14 @@
 using System.Data;
 using System.Security.Claims;
-using LaooApi.Models;
+using LaooMeetingApi.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 
-namespace LaooApi.Controllers;
+namespace LaooMeetingApi.Controllers;
 
 [ApiController, Route("api/company/meeting-foods"), Authorize]
-[LaooApi.Security.RequireCompanyProject("LAOO_MEETING")]
+[LaooMeetingApi.Security.RequireCompanyProject("LAOO_MEETING")]
 public sealed class MeetingFoodController(IConfiguration configuration, IWebHostEnvironment environment) : ControllerBase
 {
     private const string ScreenCode = "23004";
@@ -216,7 +216,34 @@ END";
 
     private async Task<bool> Allowed(SqlConnection connection, string action, CancellationToken token)
     {
-        return await LaooApi.Security.CompanyProjectPermission.IsAllowedAsync(connection, User, ScreenCode, action, token);
+        if (!IsCompany() || CompanyId() is null ||
+            !long.TryParse(User.FindFirstValue("project_id"), out var project) ||
+            !long.TryParse(User.FindFirstValue("user_id"), out var user)) return false;
+        const string sql = @"
+SELECT CASE WHEN EXISTS
+(
+    SELECT 1 FROM dbo.TDADUser U
+    WHERE U.UserID=@user AND U.CompanyID=@company
+      AND U.IsActive=1 AND U.IsCompanyAdmin=1
+)
+OR EXISTS
+(
+    SELECT 1
+    FROM dbo.TDADUserPermission UP
+    INNER JOIN dbo.TDADPermission P
+      ON P.PermissionID=UP.PermissionID AND P.ProjectID=UP.ProjectID
+    WHERE UP.UserID=@user AND UP.ProjectID=@project
+      AND UP.IsAllowed=1 AND UP.IsActive=1 AND P.IsActive=1
+      AND P.ScreenCode=@screen AND P.ActionCode=@action
+)
+THEN 1 ELSE 0 END";
+        await using var command = new SqlCommand(sql, connection);
+        Add(command, "@user", user);
+        Add(command, "@company", CompanyId() ?? 0);
+        Add(command, "@project", project);
+        Add(command, "@screen", ScreenCode);
+        Add(command, "@action", action);
+        return Convert.ToBoolean(await command.ExecuteScalarAsync(token));
     }
 
     private async Task<SqlConnection> Open(CancellationToken token)

@@ -6,7 +6,7 @@ import '../../../../app/theme/workspace_theme_presets.dart';
 import '../../../../core/api/api_exception.dart';
 import '../../../../core/navigation/navigation_menu_repository.dart';
 import '../../../../core/widgets/auto_dismiss_message.dart';
-import '../../../meeting/data/meeting_company_directory_repository.dart';
+import '../../employee/data/employee_repository.dart';
 import '../data/organization_supervisor_repository.dart';
 import '../../presentation/widgets/support_workspace_shell.dart';
 
@@ -21,7 +21,9 @@ class OrganizationSupervisorPage extends StatefulWidget {
 class _OrganizationSupervisorPageState
     extends State<OrganizationSupervisorPage> {
   final _repository = OrganizationSupervisorRepository();
-  final _employeeRepository = MeetingEmployeeDirectoryRepository();
+  final _employeeRepository = EmployeeRepository(
+    scope: EmployeeOwnerScope.company,
+  );
   List<Map<String, dynamic>> _rows = [];
   List<Map<String, dynamic>> _employees = [];
   String _caption = 'กำหนดผู้บังคับบัญชา';
@@ -52,13 +54,13 @@ class _OrganizationSupervisorPageState
         _repository.list(),
         _employeeRepository.list(isActive: true, page: 1, pageSize: 500),
       ]);
-      final employeeResult = result[1] as Map;
+      final employeeResult = result[1] as EmployeeListResult;
       if (!mounted) return;
       setState(() {
         _rows = List<Map<String, dynamic>>.from(result[0] as List);
-        _employees = List<Map<String, dynamic>>.from(
-          employeeResult['items'] as List? ?? const [],
-        );
+        _employees = employeeResult.items
+            .map((employee) => employee.toJson())
+            .toList(growable: false);
         _loading = false;
       });
     } catch (error) {

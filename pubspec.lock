@@ -389,6 +389,13 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.0.0"
+  laoo_meeting:
+    dependency: "direct main"
+    description:
+      path: "projects/meeting"
+      relative: true
+    source: path
+    version: "1.0.0+1"
   laoo_shared_admin:
     dependency: "direct main"
     description:

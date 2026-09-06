@@ -9,6 +9,7 @@ import '../../../core/widgets/auto_dismiss_message.dart';
 import '../../support/presentation/widgets/support_workspace_shell.dart';
 import '../../profile/pages/user_profile_dialog.dart';
 import '../data/meeting_facility_repository.dart';
+import '../meeting_feature_host.dart';
 
 class MeetingFacilityPage extends StatefulWidget {
   const MeetingFacilityPage({super.key});
@@ -550,8 +551,7 @@ class _MeetingFacilityPageState extends State<MeetingFacilityPage> {
   @override
   Widget build(BuildContext context) {
     final preset = workspaceThemeController.value;
-    return SupportWorkspaceShell(
-      menuScope: WorkspaceMenuScope.company,
+    return buildMeetingWorkspaceShell(
       pageTitle: _caption,
       activeMenu: '23003',
       child: Stack(

@@ -18,6 +18,8 @@ dependencies:
     path: packages/laoo_shared_admin_ui
   laoo_shared_core:
     path: packages/laoo_shared_core
+  laoo_meeting:
+    path: projects/meeting
 
   cupertino_icons: ^1.0.8
   flutter_riverpod: ^3.4.2

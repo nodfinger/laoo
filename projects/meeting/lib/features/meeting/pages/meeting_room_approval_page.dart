@@ -8,6 +8,7 @@ import '../../../core/navigation/navigation_menu_repository.dart';
 import '../../../core/widgets/auto_dismiss_message.dart';
 import '../../support/presentation/widgets/support_workspace_shell.dart';
 import '../data/meeting_room_booking_repository.dart';
+import '../meeting_feature_host.dart';
 
 class MeetingRoomApprovalPage extends StatefulWidget {
   const MeetingRoomApprovalPage({super.key});
@@ -661,8 +662,7 @@ class _MeetingRoomApprovalPageState extends State<MeetingRoomApprovalPage> {
   @override
   Widget build(BuildContext context) {
     final preset = workspaceThemeController.value;
-    return SupportWorkspaceShell(
-      menuScope: WorkspaceMenuScope.company,
+    return buildMeetingWorkspaceShell(
       pageTitle: _caption,
       activeMenu: '21004',
       child: Stack(

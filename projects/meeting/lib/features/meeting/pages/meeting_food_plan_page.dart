@@ -9,6 +9,7 @@ import '../../../core/navigation/navigation_menu_repository.dart';
 import '../../../core/widgets/auto_dismiss_message.dart';
 import '../../support/presentation/widgets/support_workspace_shell.dart';
 import '../data/meeting_food_plan_repository.dart';
+import '../meeting_feature_host.dart';
 
 class MeetingFoodPlanPage extends StatefulWidget {
   const MeetingFoodPlanPage({super.key});
@@ -550,8 +551,7 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
   Widget build(BuildContext context) {
     return ValueListenableBuilder<WorkspaceThemePreset>(
       valueListenable: workspaceThemeController,
-      builder: (context, preset, _) => SupportWorkspaceShell(
-        menuScope: WorkspaceMenuScope.company,
+      builder: (context, preset, _) => buildMeetingWorkspaceShell(
         pageTitle: _caption,
         activeMenu: '21005',
         child: Stack(

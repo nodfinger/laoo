@@ -1,3 +1,5 @@
+import 'package:laoo_meeting/meeting_feature.dart' show MeetingRouteNames;
+
 abstract final class RouteNames {
   static const String landing = 'landing';
   static const String login = 'login';
@@ -66,20 +68,20 @@ abstract final class RouteNames {
   static const String laooEmployees = 'laooEmployees';
   static const String laooUsers = 'laooUsers';
   static const String companySupervisors = 'companySupervisors';
-  static const String meetingRoomBookings = 'meetingRoomBookings';
-  static const String meetingRoomApprovals = 'meetingRoomApprovals';
-  static const String meetingRoomCalendar = 'meetingRoomCalendar';
-  static const String meetingInvitationRsvp = 'meetingInvitationRsvp';
-  static const String meetingFoodPlans = 'meetingFoodPlans';
-  static const String roomCheckIn = 'roomCheckIn';
-  static const String roomSupportTasks = 'roomSupportTasks';
-  static const String roomIssues = 'roomIssues';
-  static const String meetingBuildings = 'meetingBuildings';
-  static const String meetingRooms = 'meetingRooms';
-  static const String meetingFacilities = 'meetingFacilities';
-  static const String meetingFoods = 'meetingFoods';
+  static const String meetingRoomBookings = MeetingRouteNames.bookings;
+  static const String meetingRoomApprovals = MeetingRouteNames.approvals;
+  static const String meetingRoomCalendar = MeetingRouteNames.calendar;
+  static const String meetingInvitationRsvp = MeetingRouteNames.invitations;
+  static const String meetingFoodPlans = MeetingRouteNames.foodPlans;
+  static const String roomCheckIn = MeetingRouteNames.roomCheckIn;
+  static const String roomSupportTasks = MeetingRouteNames.roomSupportTasks;
+  static const String roomIssues = MeetingRouteNames.roomIssues;
+  static const String meetingBuildings = MeetingRouteNames.buildings;
+  static const String meetingRooms = MeetingRouteNames.rooms;
+  static const String meetingFacilities = MeetingRouteNames.facilities;
+  static const String meetingFoods = MeetingRouteNames.foods;
   static const String meetingRoomUtilizationReport =
-      'meetingRoomUtilizationReport';
-  static const String meetingNoShowReport = 'meetingNoShowReport';
-  static const String meetingFeedbackReport = 'meetingFeedbackReport';
+      MeetingRouteNames.utilizationReport;
+  static const String meetingNoShowReport = MeetingRouteNames.noShowReport;
+  static const String meetingFeedbackReport = MeetingRouteNames.feedbackReport;
 }
