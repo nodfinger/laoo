@@ -10,6 +10,7 @@ import '../../support/presentation/widgets/support_workspace_shell.dart';
 import '../../profile/pages/user_profile_dialog.dart';
 import '../data/meeting_facility_repository.dart';
 import '../meeting_feature_host.dart';
+import '../widgets/meeting_pagination_card.dart';
 
 class MeetingFacilityPage extends StatefulWidget {
   const MeetingFacilityPage({super.key});
@@ -125,10 +126,18 @@ class _MeetingFacilityPageState extends State<MeetingFacilityPage> {
       return cardMode
           ? ListView.separated(
               itemCount: _visibleItems.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 8),
+              separatorBuilder: (_, _) => const SizedBox(height: 6),
               itemBuilder: (context, index) {
                 final item = _visibleItems[index];
                 return Card(
+                  margin: EdgeInsets.zero,
+                  color: LaooColors.white,
+                  surfaceTintColor: Colors.transparent,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(LaooRadius.xs),
+                    side: BorderSide.none,
+                  ),
                   child: ListTile(
                     title: Text('${item['code']} | ${item['nameTh']}'),
                     subtitle: Text(
@@ -140,21 +149,29 @@ class _MeetingFacilityPageState extends State<MeetingFacilityPage> {
                 );
               },
             )
-          : Card(
-              margin: EdgeInsets.zero,
-              clipBehavior: Clip.antiAlias,
+          : WorkspaceSectionCard(
+              padding: EdgeInsets.zero,
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: ConstrainedBox(
                   constraints: BoxConstraints(minWidth: constraints.maxWidth),
                   child: DataTable(
+                    horizontalMargin: LaooDataTable.horizontalMargin,
+                    columnSpacing: LaooDataTable.columnSpacing,
+                    dividerThickness: LaooDataTable.dividerThickness,
                     headingRowColor: WidgetStatePropertyAll(
                       preset.primary.withValues(alpha: .10),
                     ),
                     headingTextStyle: TextStyle(
                       color: preset.primary,
+                      fontSize: LaooTypography.tableHeader,
                       fontWeight: FontWeight.w700,
                     ),
+                    dataTextStyle: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontSize: LaooTypography.tableBody,
+                    ),
+                    dataRowColor: LaooDataTable.rowColor(preset.primary),
                     dataRowMinHeight: 48,
                     dataRowMaxHeight: 56,
                     border: TableBorder(
@@ -227,61 +244,17 @@ class _MeetingFacilityPageState extends State<MeetingFacilityPage> {
 
   Widget _pagination(WorkspaceThemePreset preset) {
     final total = _filtered.length;
-    final start = total == 0 ? 0 : _currentPage * _pageSize + 1;
-    final end = ((_currentPage + 1) * _pageSize).clamp(0, total);
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        OutlinedButton(
-          style: OutlinedButton.styleFrom(
-            backgroundColor: Theme.of(
-              context,
-            ).colorScheme.surfaceContainerHighest,
-            foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
-            side: BorderSide.none,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(LaooRadius.xs),
-            ),
-          ),
-          onPressed: _currentPage > 0
-              ? () => setState(() => _currentPage--)
-              : null,
-          child: const Icon(Icons.chevron_left),
-        ),
-        FilledButton(
-          style: FilledButton.styleFrom(
-            backgroundColor: preset.primary,
-            disabledBackgroundColor: preset.primary,
-            disabledForegroundColor: Theme.of(context).colorScheme.onPrimary,
-            foregroundColor: Theme.of(context).colorScheme.onPrimary,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(LaooRadius.xs),
-            ),
-            padding: const EdgeInsets.all(14),
-          ),
-          onPressed: null,
-          child: Text('${_pageCount == 0 ? 0 : _currentPage + 1}'),
-        ),
-        OutlinedButton(
-          style: OutlinedButton.styleFrom(
-            backgroundColor: Theme.of(
-              context,
-            ).colorScheme.surfaceContainerHighest,
-            foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
-            side: BorderSide.none,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(LaooRadius.xs),
-            ),
-          ),
-          onPressed: _currentPage < _pageCount - 1
-              ? () => setState(() => _currentPage++)
-              : null,
-          child: const Icon(Icons.chevron_right),
-        ),
-        Text('$start-$end จาก $total'),
-      ],
+    return MeetingPaginationCard(
+      total: total,
+      pageIndex: _currentPage,
+      pageSize: _pageSize,
+      primary: preset.primary,
+      onPrevious: _currentPage > 0
+          ? () => setState(() => _currentPage--)
+          : null,
+      onNext: _currentPage < _pageCount - 1
+          ? () => setState(() => _currentPage++)
+          : null,
     );
   }
 
@@ -558,11 +531,11 @@ class _MeetingFacilityPageState extends State<MeetingFacilityPage> {
         children: [
           Padding(
             padding: const EdgeInsets.all(LaooLayout.cardMargin),
-            child: WorkspaceSectionCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                WorkspaceSectionCard(
+                  child: Row(
                     children: [
                       Expanded(
                         child: WorkspacePageTitle(
@@ -600,8 +573,10 @@ class _MeetingFacilityPageState extends State<MeetingFacilityPage> {
                         ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  LayoutBuilder(
+                ),
+                const SizedBox(height: LaooLayout.captionFilterSpacing),
+                WorkspaceSectionCard(
+                  child: LayoutBuilder(
                     builder: (context, constraints) => Wrap(
                       spacing: 8,
                       runSpacing: 8,
@@ -701,13 +676,13 @@ class _MeetingFacilityPageState extends State<MeetingFacilityPage> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  if (_loading) const LinearProgressIndicator(),
-                  Expanded(child: _facilityList(preset)),
-                  const SizedBox(height: 8),
-                  _pagination(preset),
-                ],
-              ),
+                ),
+                const SizedBox(height: LaooLayout.cardSpacing),
+                if (_loading) const LinearProgressIndicator(),
+                Expanded(child: _facilityList(preset)),
+                const SizedBox(height: LaooLayout.cardSpacing),
+                _pagination(preset),
+              ],
             ),
           ),
           if (_message != null)

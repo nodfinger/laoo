@@ -6,7 +6,8 @@
 
 - ใช้พื้นหลังและ Design Token จากส่วนกลางเท่านั้น
 - ส่วน Caption, Filter, Table/List และ Pagination เป็น Card สีขาวเต็มความกว้างของ Content Area
-- Card ของแต่ละ Section จัดให้ติดกันและใช้เส้น `LaooColors.border` คั่น ห้ามใช้ช่องว่างหรือกรอบสีสร้างขอบซ้ำ
+- Caption Card และ Filter Card ต้องแยกเป็นคนละ Card และเว้นระยะห่าง `6px` พอดี
+- Filter, Table/List และ Pagination ต้องแยกเป็น Card คนละ Section โดยใช้ `LaooLayout.cardSpacing` ระหว่าง Section และใช้เส้น `LaooColors.border` ภายในจุดที่มาตรฐานกำหนด ห้ามใช้กรอบสีสร้างขอบซ้ำ
 - Margin ซ้าย บน ขวาของ Content ใช้ `LaooLayout.cardMargin`
 - Card ทุกตัวไม่มีเส้นกรอบสีและใช้มุมโค้ง `LaooRadius.xs`
 
@@ -49,5 +50,5 @@
 ## Prompt สำหรับส่งให้ AI
 
 ```text
-ปรับหน้า List/Card นี้ตาม docs/standards/UX_UI_STANDARD.md, LIST_CARD_UI_STANDARD.md, PAGINATION_UI_STANDARD.md และ TYPOGRAPHY_STANDARD.md ใช้ Caption จาก MenuName, Card สีขาวไม่มีกรอบสี, Filter/Table/Pagination เต็มความกว้าง, Action ตาม Permission และ User Style เมื่อหน้าจอแคบกว่า 900px ให้เป็น Card Mode อัตโนมัติ โดย Card รายการแต่ละใบห่างกัน 6px พอดี ห้ามพึ่ง Card default margin ห้ามแก้ API, SQL, Repository หรือ Business Logic และต้องตรวจ Responsive, Overflow, dart format และ dart analyze
+ปรับหน้า List/Card นี้ตาม docs/standards/UX_UI_STANDARD.md, LIST_CARD_UI_STANDARD.md, PAGINATION_UI_STANDARD.md และ TYPOGRAPHY_STANDARD.md ใช้ Caption จาก MenuName, Caption Card กับ Filter Card ห่างกัน 6px, Card สีขาวไม่มีกรอบสี, Filter/Table/Pagination เต็มความกว้าง, Action ตาม Permission และ User Style เมื่อหน้าจอแคบกว่า 900px ให้เป็น Card Mode อัตโนมัติ โดย Card รายการแต่ละใบห่างกัน 6px พอดี ห้ามพึ่ง Card default margin ห้ามแก้ API, SQL, Repository หรือ Business Logic และต้องตรวจ Responsive, Overflow, dart format และ dart analyze
 ```

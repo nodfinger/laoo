@@ -92,6 +92,7 @@ class WorkspaceSectionCard extends StatelessWidget {
         color: LaooColors.white,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
+        clipBehavior: Clip.antiAlias,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(LaooRadius.xs),
           side: BorderSide.none,
