@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:laoo_meeting/meeting_feature.dart';
 
 import '../../core/auth/app_auth_controller.dart';
 import '../../core/auth/auth_session.dart';
@@ -31,14 +32,6 @@ import '../../features/support/partner_user/pages/partner_user_page.dart';
 import '../../features/access/role_group/pages/role_group_page.dart';
 import '../../features/access/menu_permission/pages/menu_permission_page.dart';
 import '../../features/access/sub_permission/pages/sub_permission_page.dart';
-import '../../features/meeting/pages/meeting_building_page.dart';
-import '../../features/meeting/pages/meeting_facility_page.dart';
-import '../../features/meeting/pages/meeting_food_page.dart';
-import '../../features/meeting/pages/meeting_food_plan_page.dart';
-import '../../features/meeting/pages/meeting_invitation_page.dart';
-import '../../features/meeting/pages/meeting_room_approval_page.dart';
-import '../../features/meeting/pages/meeting_room_booking_page.dart';
-import '../../features/meeting/pages/meeting_room_page.dart';
 import '../../features/support/organization/pages/organization_supervisor_page.dart';
 import 'app_menu_route_registry.dart';
 import 'route_names.dart';

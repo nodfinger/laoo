@@ -3,10 +3,10 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 
-namespace LaooApi.Controllers;
+namespace LaooMeetingApi.Controllers;
 
 [ApiController, Route("api/company/meeting-rooms/{roomId:long}/rules"), Authorize]
-[LaooApi.Security.RequireCompanyProject("LAOO_MEETING")]
+[LaooMeetingApi.Security.RequireCompanyProject("LAOO_MEETING")]
 public sealed class MeetingRoomRuleController(IConfiguration configuration) : ControllerBase
 {
     private const string ScreenCode = "23002";
@@ -83,7 +83,7 @@ public sealed class MeetingRoomRuleController(IConfiguration configuration) : Co
     }
 
     private async Task<bool> Permission(string action, CancellationToken token) { await using var c = await Open(token); return await Allowed(c, action, token); }
-    private Task<bool> Allowed(SqlConnection c, string action, CancellationToken token) => LaooApi.Security.CompanyProjectPermission.IsAllowedAsync(c, User, ScreenCode, action, token);
+    private async Task<bool> Allowed(SqlConnection c, string action, CancellationToken token) { if (!CanCompany() || CompanyId() is null || !long.TryParse(User.FindFirstValue("project_id"), out var project) || !long.TryParse(User.FindFirstValue("user_id"), out var user)) return false; const string sql = "SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADUser WHERE UserID=@user AND CompanyID=@company AND IsActive=1 AND IsCompanyAdmin=1) OR EXISTS(SELECT 1 FROM dbo.TDADUserPermission UP JOIN dbo.TDADPermission P ON P.PermissionID=UP.PermissionID AND P.ProjectID=UP.ProjectID WHERE UP.UserID=@user AND UP.ProjectID=@project AND UP.IsAllowed=1 AND UP.IsActive=1 AND P.IsActive=1 AND P.ScreenCode=@screen AND P.ActionCode=@action) THEN 1 ELSE 0 END"; await using var cmd = new SqlCommand(sql, c); Add(cmd, "@user", user); Add(cmd, "@company", CompanyId() ?? 0); Add(cmd, "@project", project); Add(cmd, "@screen", ScreenCode); Add(cmd, "@action", action); return Convert.ToBoolean(await cmd.ExecuteScalarAsync(token)); }
     private async Task<SqlConnection> Open(CancellationToken token) { var c = new SqlConnection(configuration.GetConnectionString("LaooDatabase")); await c.OpenAsync(token); return c; }
     private bool CanCompany() => string.Equals(User.FindFirstValue("user_type"), "COMPANY_USER", StringComparison.OrdinalIgnoreCase);
     private long? CompanyId() => long.TryParse(User.FindFirstValue("company_id"), out var id) && id > 0 ? id : null;

@@ -29,7 +29,9 @@ builder.Logging.AddConfiguration(builder.Configuration.GetSection("Logging"));
 builder.Logging.AddConsole();
 builder.Logging.AddDebug();
 
-builder.Services.AddControllers();
+builder.Services
+    .AddControllers()
+    .AddApplicationPart(typeof(LaooMeetingApi.Controllers.MeetingRoomBookingController).Assembly);
 builder.Services.AddProblemDetails(options =>
 {
     options.CustomizeProblemDetails = context =>

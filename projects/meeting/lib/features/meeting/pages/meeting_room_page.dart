@@ -18,6 +18,7 @@ import '../data/meeting_structure_repository.dart';
 import '../../support/employee/data/employee_repository.dart';
 import '../../support/organization/data/organization_repository.dart';
 import '../../profile/pages/user_profile_dialog.dart';
+import '../meeting_feature_host.dart';
 
 class MeetingRoomPage extends StatefulWidget {
   const MeetingRoomPage({super.key});
@@ -2254,8 +2255,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
               _filterBuildingId == null || f['buildingId'] == _filterBuildingId,
         )
         .toList();
-    return SupportWorkspaceShell(
-      menuScope: WorkspaceMenuScope.company,
+    return buildMeetingWorkspaceShell(
       pageTitle: _caption,
       activeMenu: '23002',
       child: Stack(

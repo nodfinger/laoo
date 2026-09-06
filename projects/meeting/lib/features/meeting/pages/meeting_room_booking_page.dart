@@ -11,6 +11,7 @@ import '../../../core/widgets/combo_box_text.dart';
 import '../../support/presentation/widgets/support_workspace_shell.dart';
 import '../data/meeting_room_booking_repository.dart';
 import '../widgets/meeting_room_calendar_view.dart';
+import '../meeting_feature_host.dart';
 
 class MeetingRoomBookingPage extends StatefulWidget {
   const MeetingRoomBookingPage({
@@ -1227,8 +1228,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
   @override
   Widget build(BuildContext context) {
     final preset = workspaceThemeController.value;
-    return SupportWorkspaceShell(
-      menuScope: WorkspaceMenuScope.company,
+    return buildMeetingWorkspaceShell(
       pageTitle: _caption,
       activeMenu: widget.menuCode,
       child: Stack(

@@ -1,3 +1,5 @@
+import '../../features/meeting/meeting_route_contract.dart';
+
 abstract final class RoutePaths {
   static const String landing = '/';
   static const String login = '/login';
@@ -32,21 +34,20 @@ abstract final class RoutePaths {
   static const String partnerMenuPermissions = '/partner/menu-permissions';
   static const String laooEmployees = '/support/employees';
   static const String laooUsers = '/support/users';
-  static const String meetingRoomBookings = '/company/meeting-room-bookings';
-  static const String meetingRoomApprovals = '/company/meeting-room-approvals';
-  static const String meetingRoomCalendar = '/company/meeting-room-calendar';
-  static const String meetingInvitationRsvp = '/company/meeting-invitations';
-  static const String meetingFoodPlans = '/company/meeting-food-plans';
-  static const String roomCheckIn = '/company/room-check-in';
-  static const String roomSupportTasks = '/company/room-support-tasks';
-  static const String roomIssues = '/company/room-issues';
-  static const String meetingBuildings = '/company/meeting-buildings';
-  static const String meetingRooms = '/company/meeting-rooms';
-  static const String meetingFacilities = '/company/meeting-facilities';
-  static const String meetingFoods = '/company/meeting-foods';
+  static const String meetingRoomBookings = MeetingRoutePaths.bookings;
+  static const String meetingRoomApprovals = MeetingRoutePaths.approvals;
+  static const String meetingRoomCalendar = MeetingRoutePaths.calendar;
+  static const String meetingInvitationRsvp = MeetingRoutePaths.invitations;
+  static const String meetingFoodPlans = MeetingRoutePaths.foodPlans;
+  static const String roomCheckIn = MeetingRoutePaths.roomCheckIn;
+  static const String roomSupportTasks = MeetingRoutePaths.roomSupportTasks;
+  static const String roomIssues = MeetingRoutePaths.roomIssues;
+  static const String meetingBuildings = MeetingRoutePaths.buildings;
+  static const String meetingRooms = MeetingRoutePaths.rooms;
+  static const String meetingFacilities = MeetingRoutePaths.facilities;
+  static const String meetingFoods = MeetingRoutePaths.foods;
   static const String meetingRoomUtilizationReport =
-      '/company/reports/meeting-room-utilization';
-  static const String meetingNoShowReport = '/company/reports/meeting-no-show';
-  static const String meetingFeedbackReport =
-      '/company/reports/meeting-feedback';
+      MeetingRoutePaths.utilizationReport;
+  static const String meetingNoShowReport = MeetingRoutePaths.noShowReport;
+  static const String meetingFeedbackReport = MeetingRoutePaths.feedbackReport;
 }

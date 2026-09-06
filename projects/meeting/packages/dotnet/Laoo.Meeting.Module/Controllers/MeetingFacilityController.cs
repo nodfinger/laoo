@@ -7,6 +7,7 @@ using Microsoft.Data.SqlClient;
 namespace LaooMeetingApi.Controllers;
 
 [ApiController, Route("api/company/meeting-facilities"), Authorize]
+[LaooMeetingApi.Security.RequireCompanyProject("LAOO_MEETING")]
 public sealed class MeetingFacilityController(IConfiguration configuration) : ControllerBase
 {
     private const string ScreenCode = "23003";
