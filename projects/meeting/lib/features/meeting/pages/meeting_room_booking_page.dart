@@ -12,6 +12,7 @@ import '../../support/presentation/widgets/support_workspace_shell.dart';
 import '../data/meeting_room_booking_repository.dart';
 import '../widgets/meeting_room_calendar_view.dart';
 import '../meeting_feature_host.dart';
+import 'meeting_food_plan_page.dart';
 
 class MeetingRoomBookingPage extends StatefulWidget {
   const MeetingRoomBookingPage({
@@ -65,6 +66,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
   int? _floorId;
   int? _selectedRoomId;
   int? _editingId;
+  int? _foodPlanBookingId;
   DateTime _startDate = DateTime.now();
   DateTime _endDate = DateTime.now();
   TimeOfDay _startTime = const TimeOfDay(hour: 9, minute: 0);
@@ -1233,45 +1235,61 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
       activeMenu: widget.menuCode,
       child: Stack(
         children: [
-          Positioned.fill(
-            child: ColoredBox(
-              color: LaooColors.background,
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(LaooLayout.cardMargin),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _captionCard(preset),
-                    const SizedBox(height: 8),
-                    if (_loading)
-                      const LinearProgressIndicator()
-                    else if (_workspaceMode == 'CALENDAR')
-                      MeetingRoomCalendarView(
-                        repository: _repository,
-                        preset: preset,
-                        branches: _branches,
-                        buildings: _buildings,
-                        floors: _floors,
-                        rooms: _rooms,
-                        canCreate: _actions['create'] == true,
-                        canEdit: _actions['edit'] == true,
-                        onCreateBooking: _startBookingFromCalendar,
-                        onEditBooking: _editBooking,
-                      )
-                    else if (_myBookingsOnly)
-                      _bookingList(preset)
-                    else ...[
-                      _filterCard(preset),
+          if (_foodPlanBookingId != null)
+            Positioned.fill(
+              child: MeetingFoodPlanPage(
+                key: ValueKey(_foodPlanBookingId),
+                bookingId: _foodPlanBookingId,
+                parentCaption: _caption,
+                parentMenuCode: widget.menuCode,
+                onClose: () {
+                  setState(() => _foodPlanBookingId = null);
+                  _loadBookings().catchError((Object error) {
+                    if (mounted) _showError(error, 'โหลดรายการจองไม่สำเร็จ');
+                  });
+                },
+              ),
+            )
+          else
+            Positioned.fill(
+              child: ColoredBox(
+                color: LaooColors.background,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(LaooLayout.cardMargin),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _captionCard(preset),
                       const SizedBox(height: 8),
-                      _bookingSelector(preset),
-                      const SizedBox(height: 8),
-                      _bookingList(preset),
+                      if (_loading)
+                        const LinearProgressIndicator()
+                      else if (_workspaceMode == 'CALENDAR')
+                        MeetingRoomCalendarView(
+                          repository: _repository,
+                          preset: preset,
+                          branches: _branches,
+                          buildings: _buildings,
+                          floors: _floors,
+                          rooms: _rooms,
+                          canCreate: _actions['create'] == true,
+                          canEdit: _actions['edit'] == true,
+                          onCreateBooking: _startBookingFromCalendar,
+                          onEditBooking: _editBooking,
+                        )
+                      else if (_myBookingsOnly)
+                        _bookingList(preset)
+                      else ...[
+                        _filterCard(preset),
+                        const SizedBox(height: 8),
+                        _bookingSelector(preset),
+                        const SizedBox(height: 8),
+                        _bookingList(preset),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
             ),
-          ),
         ],
       ),
     );
@@ -1955,11 +1973,8 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
     final selected = id == _selectedRoomId;
     final available = !availability || room['isAvailable'] == true;
     final imageUrl = room['roomImageUrl']?.toString();
-    final conflicts = _maps(room['conflictingBookings']);
+    final bookingsForSelectedDate = _maps(room['bookingsForSelectedDate']);
     final conflictsExpanded = id != null && _expandedConflictRooms.contains(id);
-    final visibleConflicts = conflictsExpanded
-        ? conflicts
-        : conflicts.take(3).toList();
     return Card(
       margin: EdgeInsets.zero,
       color: LaooColors.white,
@@ -2024,14 +2039,17 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
                 ),
               ],
             ),
-            if (!available && conflicts.isNotEmpty) ...[
+            if (bookingsForSelectedDate.isNotEmpty) ...[
               const SizedBox(height: 6),
               _conflictPanel(
                 id: id,
                 preset: preset,
-                conflicts: conflicts,
-                visibleConflicts: visibleConflicts,
+                conflicts: bookingsForSelectedDate,
+                visibleConflicts: conflictsExpanded
+                    ? bookingsForSelectedDate
+                    : bookingsForSelectedDate.take(3).toList(),
                 expanded: conflictsExpanded,
+                title: 'รายการจองวันที่เลือก',
               ),
             ],
             if (_searchMode == 'ROOM') ...[
@@ -2051,6 +2069,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
     required List<Map<String, dynamic>> conflicts,
     required List<Map<String, dynamic>> visibleConflicts,
     required bool expanded,
+    String? title,
   }) => Container(
     width: double.infinity,
     padding: const EdgeInsets.symmetric(vertical: 8),
@@ -2058,6 +2077,17 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (title != null) ...[
+          Text(
+            title,
+            style: const TextStyle(
+              color: LaooColors.textPrimary,
+              fontSize: LaooTypography.inputText,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 4),
+        ],
         ...visibleConflicts.asMap().entries.map((entry) {
           final conflict = entry.value;
           return Column(
@@ -2237,6 +2267,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
           color: preset.primary.withValues(alpha: .08),
           child: Text(
             '${room['code'] ?? ''} | ${room['nameTh'] ?? ''}\n'
+            'รองรับสูงสุด ${room['capacity'] ?? '-'} คน\n'
             '${_formatDate(_startDate)}${_multipleDays ? ' - ${_formatDate(_endDate)}' : ''} | ${_formatTime(_startTime)} - ${_formatTime(_endTime)}',
             style: TextStyle(
               color: preset.primary,
@@ -2409,9 +2440,15 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
   ) {
     final status = item['status']?.toString();
     final editable = status != 'CANCELLED' && status != 'REJECTED';
-    return Row(
-      mainAxisSize: MainAxisSize.min,
+    return Wrap(
       children: [
+        if (item['canManageFoodPlan'] == true)
+          IconButton(
+            tooltip: 'กำหนดเมนูอาหาร',
+            onPressed: () =>
+                setState(() => _foodPlanBookingId = _int(item['bookingId'])),
+            icon: Icon(Icons.restaurant_menu_outlined, color: preset.primary),
+          ),
         if (item['canManageParticipants'] == true)
           IconButton(
             tooltip: 'เชิญผู้เข้าร่วมประชุม',

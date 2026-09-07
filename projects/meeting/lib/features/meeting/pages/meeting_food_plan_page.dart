@@ -12,7 +12,17 @@ import '../data/meeting_food_plan_repository.dart';
 import '../meeting_feature_host.dart';
 
 class MeetingFoodPlanPage extends StatefulWidget {
-  const MeetingFoodPlanPage({super.key});
+  const MeetingFoodPlanPage({
+    super.key,
+    this.bookingId,
+    this.onClose,
+    this.parentCaption,
+    this.parentMenuCode,
+  });
+  final int? bookingId;
+  final VoidCallback? onClose;
+  final String? parentCaption;
+  final String? parentMenuCode;
   @override
   State<MeetingFoodPlanPage> createState() => _MeetingFoodPlanPageState();
 }
@@ -21,7 +31,6 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
   final _repository = MeetingFoodPlanRepository();
   final _search = TextEditingController();
   List<Map<String, dynamic>> _items = [];
-  Map<String, bool> _actions = {};
   Map<String, dynamic>? _detail;
   Set<int> _selectedFoodIds = {};
   DateTime? _cutoff;
@@ -33,12 +42,19 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
   String _caption = '';
   String? _message;
   bool _messageError = false;
+  String? _foodError;
+  String? _cutoffError;
+  bool get _canEdit => _detail?['canManageFoodPlan'] == true;
 
   @override
   void initState() {
     super.initState();
     _loadCaption();
-    _load();
+    if (widget.bookingId == null) {
+      _load();
+    } else {
+      _open({'bookingId': widget.bookingId});
+    }
   }
 
   @override
@@ -59,18 +75,13 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final values = await Future.wait([
-        _repository.list(search: _search.text, page: _page),
-        _repository.actions(),
-      ]);
+      final result = await _repository.list(search: _search.text, page: _page);
       if (!mounted) return;
-      final result = values[0];
       setState(() {
         _items = List<Map<String, dynamic>>.from(
           result['items'] as List? ?? const [],
         );
         _total = (result['total'] as num?)?.toInt() ?? 0;
-        _actions = values[1] as Map<String, bool>;
       });
     } catch (error) {
       _notify(_error(error, 'โหลดข้อมูลไม่สำเร็จ'), true);
@@ -98,6 +109,8 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
       if (!mounted) return;
       setState(() {
         _detail = detail;
+        _foodError = null;
+        _cutoffError = null;
         _selectedFoodIds = foods
             .where((food) => food['selected'] == true)
             .map((food) => (food['foodId'] as num).toInt())
@@ -109,6 +122,15 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
       _notify(_error(error, 'เปิดข้อมูลไม่สำเร็จ'), true);
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  void _close() {
+    if (widget.onClose != null) {
+      widget.onClose!();
+    } else {
+      setState(() => _detail = null);
+      _load();
     }
   }
 
@@ -141,11 +163,20 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
 
   Future<void> _save() async {
     final detail = _detail;
-    if (detail == null || _cutoff == null) return;
-    if (_planActive && _selectedFoodIds.isEmpty) {
-      _notify('กรุณาเลือกอาหารอย่างน้อย 1 รายการ', true);
-      return;
-    }
+    if (detail == null || !_canEdit) return;
+    final start = DateTime.parse('${detail['startDateTime']}').toLocal();
+    setState(() {
+      _foodError = _planActive && _selectedFoodIds.isEmpty
+          ? 'กรุณาเลือกอาหารอย่างน้อย 1 รายการ'
+          : null;
+      _cutoffError =
+          _cutoff == null ||
+              !_cutoff!.isAfter(DateTime.now()) ||
+              !_cutoff!.isBefore(start)
+          ? 'เวลาปิดรับต้องมากกว่าเวลาปัจจุบันและก่อนเริ่มประชุม'
+          : null;
+    });
+    if (_foodError != null || _cutoffError != null) return;
     setState(() => _saving = true);
     try {
       await _repository.save(
@@ -155,9 +186,9 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
         isActive: _planActive,
       );
       if (!mounted) return;
-      setState(() => _detail = null);
+      await _open({'bookingId': detail['bookingId']});
+      if (!mounted) return;
       _notify('บันทึกเมนูอาหารสำหรับการประชุมสำเร็จ');
-      await _load();
     } catch (error) {
       _notify(_error(error, 'บันทึกข้อมูลไม่สำเร็จ'), true);
     } finally {
@@ -246,7 +277,7 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
     final image = food['imageUrl']?.toString() ?? '';
     return InkWell(
       borderRadius: BorderRadius.circular(LaooRadius.xs),
-      onTap: _saving
+      onTap: _saving || !_canEdit
           ? null
           : () => setState(() {
               selected ? _selectedFoodIds.remove(id) : _selectedFoodIds.add(id);
@@ -304,7 +335,7 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
             Checkbox(
               value: selected,
               activeColor: preset.primary,
-              onChanged: _saving
+              onChanged: _saving || !_canEdit
                   ? null
                   : (_) => setState(
                       () => selected
@@ -330,17 +361,33 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
         children: [
           WorkspaceSectionCard(
             child: WorkspaceActionHeader(
-              title: '$_caption > กำหนดเมนู',
-              favoriteKey: '21005',
+              title: '${widget.parentCaption ?? _caption} > กำหนดเมนูอาหาร',
+              favoriteKey: widget.parentMenuCode ?? '21005',
               actions: [
                 OutlinedButton(
-                  onPressed: _saving
-                      ? null
-                      : () => setState(() => _detail = null),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: preset.primary,
+                    side: BorderSide(color: preset.primary),
+                    minimumSize: const Size(0, LaooTypography.buttonHeight),
+                    visualDensity: VisualDensity.standard,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(LaooRadius.xs),
+                    ),
+                  ),
+                  onPressed: _saving ? null : _close,
                   child: const Text('ยกเลิก'),
                 ),
                 FilledButton.icon(
-                  onPressed: _saving ? null : _save,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: preset.primary,
+                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                    minimumSize: const Size(0, LaooTypography.buttonHeight),
+                    visualDensity: VisualDensity.standard,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(LaooRadius.xs),
+                    ),
+                  ),
+                  onPressed: _saving || !_canEdit ? null : _save,
                   icon: const Icon(Icons.save_outlined),
                   label: Text(_saving ? 'กำลังบันทึก...' : 'บันทึก'),
                 ),
@@ -352,6 +399,20 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
             child: WorkspaceSectionCard(
               child: ListView(
                 children: [
+                  Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      const Text('เปิดให้ผู้เข้าร่วมสั่งอาหาร'),
+                      Switch.adaptive(
+                        value: _planActive,
+                        activeTrackColor: preset.primary,
+                        onChanged: _saving || !_canEdit
+                            ? null
+                            : (value) => setState(() => _planActive = value),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
@@ -364,21 +425,19 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  SwitchListTile.adaptive(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('เปิดให้ผู้เข้าร่วมสั่งอาหาร'),
-                    value: _planActive,
-                    activeTrackColor: preset.primary,
-                    onChanged: _saving
-                        ? null
-                        : (value) => setState(() => _planActive = value),
-                  ),
-                  const SizedBox(height: 8),
                   OutlinedButton.icon(
-                    onPressed: _saving ? null : _pickCutoff,
+                    onPressed: _saving || !_canEdit ? null : _pickCutoff,
                     icon: const Icon(Icons.schedule_outlined),
                     label: Text('ปิดรับคำสั่ง: ${_date(_cutoff)}'),
                   ),
+                  if (_cutoffError != null)
+                    Text(
+                      _cutoffError!,
+                      style: const TextStyle(
+                        color: LaooColors.error,
+                        fontSize: LaooTypography.inputHint,
+                      ),
+                    ),
                   const SizedBox(height: 12),
                   const Text(
                     'รายการอาหารที่เปิดให้เลือก',
@@ -394,6 +453,14 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
                       child: _foodCard(food, preset),
                     ),
                   ),
+                  if (_foodError != null)
+                    Text(
+                      _foodError!,
+                      style: const TextStyle(
+                        color: LaooColors.error,
+                        fontSize: LaooTypography.inputHint,
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -480,10 +547,7 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
                             ),
                             trailing: Wrap(
                               children: [
-                                if ((item['orderCutoffDateTime'] == null &&
-                                        _actions['create'] == true) ||
-                                    (item['orderCutoffDateTime'] != null &&
-                                        _actions['edit'] == true))
+                                if (item['canManageFoodPlan'] == true)
                                   IconButton(
                                     tooltip: 'กำหนดเมนู',
                                     onPressed: () => _open(item),
@@ -492,8 +556,7 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
                                       color: preset.primary,
                                     ),
                                   ),
-                                if (item['orderCutoffDateTime'] != null &&
-                                    _actions['delete'] == true)
+                                if (item['canDeleteFoodPlan'] == true)
                                   IconButton(
                                     tooltip: 'ลบเมนูอาหาร',
                                     onPressed: () => _deletePlan(item),
@@ -551,12 +614,33 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
   Widget build(BuildContext context) {
     return ValueListenableBuilder<WorkspaceThemePreset>(
       valueListenable: workspaceThemeController,
-      builder: (context, preset, _) => buildMeetingWorkspaceShell(
-        pageTitle: _caption,
-        activeMenu: '21005',
-        child: Stack(
+      builder: (context, preset, _) {
+        final content = Stack(
           children: [
-            _detail == null ? _list(preset) : _action(preset),
+            if (_detail != null)
+              _action(preset)
+            else if (widget.bookingId == null)
+              _list(preset)
+            else
+              Center(
+                child: _loading
+                    ? const CircularProgressIndicator()
+                    : Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text('ไม่สามารถเปิดชุดอาหารของการจองนี้ได้'),
+                          OutlinedButton(
+                            onPressed: _close,
+                            child: const Text('กลับรายการจอง'),
+                          ),
+                          TextButton(
+                            onPressed: () =>
+                                _open({'bookingId': widget.bookingId}),
+                            child: const Text('ลองใหม่'),
+                          ),
+                        ],
+                      ),
+              ),
             if (_message != null)
               Positioned(
                 top: 12,
@@ -568,8 +652,15 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
                 ),
               ),
           ],
-        ),
-      ),
+        );
+        return widget.bookingId != null
+            ? content
+            : buildMeetingWorkspaceShell(
+                pageTitle: _caption,
+                activeMenu: '21005',
+                child: content,
+              );
+      },
     );
   }
 }

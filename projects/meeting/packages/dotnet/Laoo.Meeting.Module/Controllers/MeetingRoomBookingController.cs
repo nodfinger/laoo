@@ -3,6 +3,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
+using LaooMeetingApi.Security;
 
 namespace LaooMeetingApi.Controllers;
 
@@ -539,7 +540,9 @@ SELECT B.BookingID,B.BookingNo,B.RoomID,R.RoomCode,R.RoomNameTH,B.Subject,B.Desc
        B.AttendeeCount,B.BookingStatus,B.ApprovalMode,B.Remark,B.RequesterUserID,
        E.EmployeeCode,NULLIF(E.FullName,''),
        MIN(S.StartDateTime) AS StartDateTime,MAX(S.EndDateTime) AS EndDateTime,COUNT_BIG(S.BookingSlotID) AS SlotCount,
-       BR.BranchNameTH,BD.BuildingNameTH,F.FloorNameTH
+       BR.BranchNameTH,BD.BuildingNameTH,F.FloorNameTH,
+       CASE WHEN {MeetingFoodPlanAccess.OwnershipSql} THEN 1 ELSE 0 END AS FoodPlanScope,
+       CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADMeetingBookingFoodPlan FP WHERE FP.BookingID=B.BookingID AND FP.CompanyID=@company) THEN 1 ELSE 0 END AS HasFoodPlan
 FROM dbo.TDADMeetingRoomBooking B
 INNER JOIN dbo.TDADMeetingRoom R ON R.RoomID=B.RoomID AND R.CompanyID=B.CompanyID
 INNER JOIN dbo.TDADMeetingRoomBookingSlot S ON S.BookingID=B.BookingID
@@ -563,6 +566,9 @@ OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY;
         Add(command, "@skip", (page - 1) * pageSize);
         Add(command, "@take", pageSize);
         var canManageAllParticipants = await IsCompanyAdmin(connection, companyId, userId, token);
+        var foodView = await MeetingFoodPlanAccess.Allowed(connection, User, "VIEW", token);
+        var foodCreate = foodView && await MeetingFoodPlanAccess.Allowed(connection, User, "CREATE", token);
+        var foodEdit = foodView && await MeetingFoodPlanAccess.Allowed(connection, User, "EDIT", token);
         await using var reader = await command.ExecuteReaderAsync(token);
         var items = new List<object>();
         while (await reader.ReadAsync(token)) items.Add(new
@@ -587,6 +593,8 @@ OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY;
             branchName = Text(reader, 17),
             buildingName = Text(reader, 18),
             floorName = Text(reader, 19),
+            canManageFoodPlan = MeetingFoodPlanAccess.CanManage(reader.GetString(8), reader.GetDateTime(15),
+                reader.GetInt32(20) == 1, reader.GetInt32(21) == 1 ? foodEdit : foodCreate),
             canManageParticipants = reader.GetString(8) is "PENDING" or "APPROVED" &&
                                     (reader.GetInt64(11) == userId || canManageAllParticipants),
         });
@@ -785,6 +793,18 @@ ORDER BY A.ApprovalOrder,E.EmployeeCode;
                     endDateTime = conflict.End,
                 })
                 .ToList();
+            var bookingsForSelectedDate = roomConflicts
+                .Where(conflict => conflict.End > DateTime.Now)
+                .Select(conflict => new
+                {
+                    conflict.BookingId,
+                    conflict.BookingNo,
+                    conflict.Subject,
+                    conflict.RequesterName,
+                    startDateTime = conflict.Start,
+                    endDateTime = conflict.End,
+                })
+                .ToList();
             return new
             {
                 room.RoomId, room.RoomCode, room.RoomNameTh, room.Capacity, room.Description,
@@ -793,6 +813,7 @@ ORDER BY A.ApprovalOrder,E.EmployeeCode;
                 isAvailable = reason is null,
                 unavailableReason = reason,
                 conflictingBookings = matchingConflicts,
+                bookingsForSelectedDate,
             };
         });
         return Ok(result);
