@@ -271,8 +271,9 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
                 ),
                 child: ListTile(
                   leading: _foodImage(item, preset, size: 52),
-                  title: Text('${item['code']} | ${item['nameTh']}'),
-                  subtitle: Text('ประเภท: ${item['foodTypeName'] ?? '-'}'),
+                  title: Text(
+                    '${item['foodTypeName'] ?? '-'} | ${item['nameTh']}',
+                  ),
                   trailing: _actionsFor(item, preset),
                 ),
               );
@@ -289,59 +290,57 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
                 horizontalMargin: LaooDataTable.horizontalMargin,
                 columnSpacing: LaooDataTable.columnSpacing,
                 dividerThickness: LaooDataTable.dividerThickness,
-              headingRowColor: WidgetStatePropertyAll(
-                preset.primary.withValues(alpha: .10),
-              ),
-              headingTextStyle: TextStyle(
-                color: preset.primary,
-                fontSize: LaooTypography.tableHeader,
-                fontWeight: FontWeight.w700,
-              ),
-              dataTextStyle: const TextStyle(
-                fontSize: LaooTypography.tableBody,
-              ),
-              dataRowColor: LaooDataTable.rowColor(preset.primary),
-              border: const TableBorder(
-                horizontalInside: BorderSide(color: LaooColors.border),
-              ),
-              columns: const [
-                DataColumn(
-                  columnWidth: LaooDataTable.idColumnWidth,
-                  numeric: true,
-                  label: Align(
-                    alignment: Alignment.centerRight,
-                    child: Text('ID'),
+                headingRowColor: WidgetStatePropertyAll(
+                  preset.primary.withValues(alpha: .10),
+                ),
+                headingTextStyle: TextStyle(
+                  color: preset.primary,
+                  fontSize: LaooTypography.tableHeader,
+                  fontWeight: FontWeight.w700,
+                ),
+                dataTextStyle: const TextStyle(
+                  fontSize: LaooTypography.tableBody,
+                ),
+                dataRowColor: LaooDataTable.rowColor(preset.primary),
+                border: const TableBorder(
+                  horizontalInside: BorderSide(color: LaooColors.border),
+                ),
+                columns: const [
+                  DataColumn(
+                    columnWidth: LaooDataTable.idColumnWidth,
+                    numeric: true,
+                    label: Align(
+                      alignment: Alignment.centerRight,
+                      child: Text('ID'),
+                    ),
                   ),
-                ),
-                DataColumn(
-                  headingRowAlignment: MainAxisAlignment.center,
-                  label: Text('Action'),
-                ),
-                DataColumn(label: Text('รูป')),
-                DataColumn(label: Text('รหัส')),
-                DataColumn(label: Text('ชื่อรายการอาหาร')),
-                DataColumn(label: Text('ประเภทอาหาร')),
-              ],
-              rows: _visibleItems.asMap().entries.map((entry) {
-                final item = entry.value;
-                return DataRow(
-                  cells: [
-                    DataCell(
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: Text(
-                          '${_currentPage * _pageSize + entry.key + 1}',
+                  DataColumn(
+                    headingRowAlignment: MainAxisAlignment.center,
+                    label: Text('Action'),
+                  ),
+                  DataColumn(label: Text('รูป')),
+                  DataColumn(label: Text('ประเภทอาหาร')),
+                  DataColumn(label: Text('ชื่อรายการอาหาร')),
+                ],
+                rows: _visibleItems.asMap().entries.map((entry) {
+                  final item = entry.value;
+                  return DataRow(
+                    cells: [
+                      DataCell(
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: Text(
+                            '${_currentPage * _pageSize + entry.key + 1}',
+                          ),
                         ),
                       ),
-                    ),
-                    DataCell(Center(child: _actionsFor(item, preset))),
-                    DataCell(_foodImage(item, preset, size: 44)),
-                    DataCell(Text('${item['code']}')),
-                    DataCell(Text('${item['nameTh']}')),
-                    DataCell(Text('${item['foodTypeName'] ?? '-'}')),
-                  ],
-                );
-              }).toList(),
+                      DataCell(Center(child: _actionsFor(item, preset))),
+                      DataCell(_foodImage(item, preset, size: 44)),
+                      DataCell(Text('${item['foodTypeName'] ?? '-'}')),
+                      DataCell(Text('${item['nameTh']}')),
+                    ],
+                  );
+                }).toList(),
               ),
             ),
           ),
@@ -508,6 +507,10 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
                             width: 88,
                             height: 72,
                             fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) => Icon(
+                              Icons.broken_image_outlined,
+                              color: preset.primary,
+                            ),
                           ),
                         )
                       else if (item != null)
@@ -551,14 +554,17 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
                                 if (source == null || !dialogContext.mounted) {
                                   return;
                                 }
+                                final sourceBytes = Uint8List.fromList(source);
                                 refresh(() {
+                                  selectedImage = sourceBytes;
+                                  selectedImageName = picked!.files.single.name;
                                   imageBusy = true;
                                   imageError = null;
                                 });
                                 try {
                                   final compressed = await compute(
                                     _compressFoodImage,
-                                    Uint8List.fromList(source),
+                                    sourceBytes,
                                   );
                                   if (!dialogContext.mounted) return;
                                   refresh(() {
@@ -683,8 +689,7 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
   }
 
   Future<void> _saveFoodForm(
-    BuildContext dialogContext,
-    {
+    BuildContext dialogContext, {
     required Map<String, dynamic>? item,
     required TextEditingController name,
     required String selectedType,
@@ -695,18 +700,15 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
   }) async {
     setSaving(true);
     try {
-      final savedId = await _repository.save(
-        {
-          if (item?['code'] != null) 'code': item!['code'],
-          'nameTh': name.text.trim(),
-          'foodTypeCode': selectedType,
-        },
-        id: (item?['foodId'] as num?)?.toInt(),
-      );
+      final savedId = await _repository.save({
+        if (item?['code'] != null) 'code': item!['code'],
+        'nameTh': name.text.trim(),
+        'foodTypeCode': selectedType,
+      }, id: (item?['foodId'] as num?)?.toInt());
       if (selectedImage != null) {
         await _repository.uploadImage(
           savedId,
-          selectedImage!,
+          selectedImage,
           selectedImageName ?? 'food.jpg',
         );
       }
@@ -849,18 +851,19 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
                             style: const TextStyle(
                               fontSize: LaooTypography.inputText,
                             ),
-                            decoration: _inputDecoration(
-                              'ค้นหารหัส ชื่อ หรือประเภท',
-                              preset,
-                            ).copyWith(
-                              prefixIcon: const Icon(Icons.search),
-                              suffixIcon: IconButton(
-                                tooltip: 'ค้นหา',
-                                onPressed: () =>
-                                    setState(() => _currentPage = 0),
-                                icon: const Icon(Icons.arrow_forward),
-                              ),
-                            ),
+                            decoration:
+                                _inputDecoration(
+                                  'ค้นหารหัส ชื่อ หรือประเภท',
+                                  preset,
+                                ).copyWith(
+                                  prefixIcon: const Icon(Icons.search),
+                                  suffixIcon: IconButton(
+                                    tooltip: 'ค้นหา',
+                                    onPressed: () =>
+                                        setState(() => _currentPage = 0),
+                                    icon: const Icon(Icons.arrow_forward),
+                                  ),
+                                ),
                           ),
                         ),
                         FilledButton.icon(
@@ -894,10 +897,7 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
                               color: preset.textPrimary,
                               fontSize: LaooTypography.comboBox,
                             ),
-                            decoration: _inputDecoration(
-                              'ประเภทอาหาร',
-                              preset,
-                            ),
+                            decoration: _inputDecoration('ประเภทอาหาร', preset),
                             items: [
                               const DropdownMenuItem<String?>(
                                 value: null,

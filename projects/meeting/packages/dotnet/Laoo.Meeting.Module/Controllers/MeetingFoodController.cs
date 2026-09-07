@@ -49,6 +49,16 @@ ORDER BY F.FoodCode";
                 Text(reader, 4),
                 Text(reader, 5)));
         }
+        result.Sort((left, right) =>
+        {
+            var typeOrder = string.Compare(
+                left.FoodTypeName ?? string.Empty,
+                right.FoodTypeName ?? string.Empty,
+                StringComparison.CurrentCulture);
+            return typeOrder != 0
+                ? typeOrder
+                : string.Compare(left.NameTh, right.NameTh, StringComparison.CurrentCulture);
+        });
         return Ok(result);
     }
 
@@ -166,8 +176,9 @@ DECLARE @code nvarchar(50)=NULLIF(LTRIM(RTRIM(@requestedCode)),N'');
 IF @id IS NULL AND @code IS NULL
 BEGIN
     DECLARE @lockResult int;
+    DECLARE @lockResource nvarchar(255)=N'TDADMeetingFood:Code:'+CONVERT(nvarchar(30),@company);
     EXEC @lockResult=sp_getapplock
-        @Resource=N'TDADMeetingFood:Code:'+CONVERT(nvarchar(30),@company),
+        @Resource=@lockResource,
         @LockMode='Exclusive',@LockOwner='Session',@LockTimeout=10000;
     IF @lockResult<0 THROW 50015,'FOOD_CODE_LOCK_FAILED',1;
     SELECT @code=N'FOOD'+RIGHT(N'000000'+CONVERT(nvarchar(20),ISNULL(MAX(TRY_CONVERT(int,SUBSTRING(FoodCode,5,20))),0)+1),6)
