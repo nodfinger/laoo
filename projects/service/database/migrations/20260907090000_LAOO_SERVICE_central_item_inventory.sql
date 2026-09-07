@@ -1,32 +1,11 @@
 SET XACT_ABORT ON;
-BEGIN TRANSACTION;
-
-DECLARE @LockResult int;
-EXEC @LockResult=sys.sp_getapplock @Resource=N'LAOO_SCHEMA_MIGRATION',@LockMode=N'Exclusive',@LockOwner=N'Transaction',@LockTimeout=60000;
-IF @LockResult<0 THROW 52300,N'Unable to acquire LAOO schema migration lock',1;
-
-IF OBJECT_ID(N'dbo.TDSTSchemaMigration',N'U') IS NULL
-BEGIN
-    CREATE TABLE dbo.TDSTSchemaMigration
-    (
-        ProjectCode nvarchar(30) NOT NULL,
-        MigrationCode nvarchar(100) NOT NULL,
-        Checksum varbinary(32) NOT NULL,
-        AppliedDate datetime2(3) NOT NULL CONSTRAINT DF_TDSTSchemaMigration_AppliedDate DEFAULT SYSUTCDATETIME(),
-        CONSTRAINT PK_TDSTSchemaMigration PRIMARY KEY(ProjectCode,MigrationCode)
-    );
-END;
-
-IF EXISTS(SELECT 1 FROM dbo.TDSTSchemaMigration WHERE ProjectCode=N'LAOO_SERVICE' AND MigrationCode=N'20260907090000')
-BEGIN
-    COMMIT TRANSACTION;
-    RETURN;
-END;
 
 IF COL_LENGTH(N'dbo.TDIVItem', N'ItemKindCode') IS NULL
     ALTER TABLE dbo.TDIVItem ADD ItemKindCode nvarchar(20) NULL;
 IF COL_LENGTH(N'dbo.TDIVItem', N'StockTrackingCode') IS NULL
     ALTER TABLE dbo.TDIVItem ADD StockTrackingCode nvarchar(20) NULL;
+
+GO
 
 UPDATE dbo.TDIVItem
 SET ItemKindCode = COALESCE(ItemKindCode, N'GOODS'),
@@ -35,6 +14,8 @@ WHERE ItemKindCode IS NULL OR StockTrackingCode IS NULL;
 
 ALTER TABLE dbo.TDIVItem ALTER COLUMN ItemKindCode nvarchar(20) NOT NULL;
 ALTER TABLE dbo.TDIVItem ALTER COLUMN StockTrackingCode nvarchar(20) NOT NULL;
+
+GO
 
 IF OBJECT_ID(N'dbo.CK_TDIVItem_ItemKindCode', N'C') IS NULL
     ALTER TABLE dbo.TDIVItem ADD CONSTRAINT CK_TDIVItem_ItemKindCode
@@ -186,14 +167,14 @@ BEGIN
     (
         StockReceiptDetailID bigint IDENTITY(1,1) NOT NULL CONSTRAINT PK_TDIVStockReceiptDetail PRIMARY KEY,
         StockReceiptID bigint NOT NULL,
-        LineNo int NOT NULL,
+        [LineNo] int NOT NULL,
         ItemID bigint NOT NULL,
         Quantity decimal(18,4) NOT NULL,
         UnitCost decimal(18,4) NOT NULL CONSTRAINT DF_TDIVStockReceiptDetail_UnitCost DEFAULT(0),
         Remark nvarchar(500) NULL,
         CONSTRAINT FK_TDIVStockReceiptDetail_Header FOREIGN KEY(StockReceiptID) REFERENCES dbo.TDIVStockReceipt(StockReceiptID) ON DELETE CASCADE,
         CONSTRAINT FK_TDIVStockReceiptDetail_Item FOREIGN KEY(ItemID) REFERENCES dbo.TDIVItem(ItemID),
-        CONSTRAINT UQ_TDIVStockReceiptDetail_Line UNIQUE(StockReceiptID,LineNo),
+        CONSTRAINT UQ_TDIVStockReceiptDetail_Line UNIQUE(StockReceiptID,[LineNo]),
         CONSTRAINT CK_TDIVStockReceiptDetail_Quantity CHECK(Quantity>0),
         CONSTRAINT CK_TDIVStockReceiptDetail_UnitCost CHECK(UnitCost>=0)
     );
@@ -331,11 +312,11 @@ BEGIN
     CREATE TABLE dbo.TDIVStockIssueDetail
     (
         StockIssueDetailID bigint IDENTITY(1,1) NOT NULL CONSTRAINT PK_TDIVStockIssueDetail PRIMARY KEY,
-        StockIssueID bigint NOT NULL,LineNo int NOT NULL,ItemID bigint NOT NULL,Quantity decimal(18,4) NOT NULL,
+        StockIssueID bigint NOT NULL,[LineNo] int NOT NULL,ItemID bigint NOT NULL,Quantity decimal(18,4) NOT NULL,
         Remark nvarchar(500) NULL,
         CONSTRAINT FK_TDIVStockIssueDetail_Header FOREIGN KEY(StockIssueID) REFERENCES dbo.TDIVStockIssue(StockIssueID) ON DELETE CASCADE,
         CONSTRAINT FK_TDIVStockIssueDetail_Item FOREIGN KEY(ItemID) REFERENCES dbo.TDIVItem(ItemID),
-        CONSTRAINT UQ_TDIVStockIssueDetail_Line UNIQUE(StockIssueID,LineNo),
+        CONSTRAINT UQ_TDIVStockIssueDetail_Line UNIQUE(StockIssueID,[LineNo]),
         CONSTRAINT CK_TDIVStockIssueDetail_Quantity CHECK(Quantity>0)
     );
 END;
@@ -350,7 +331,3 @@ BEGIN
     );
 END;
 
-INSERT dbo.TDSTSchemaMigration(ProjectCode,MigrationCode,Checksum)
-VALUES(N'LAOO_SERVICE',N'20260907090000',HASHBYTES('SHA2_256',N'central-item-inventory-v1'));
-
-COMMIT TRANSACTION;

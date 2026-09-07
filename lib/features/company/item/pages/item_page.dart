@@ -171,7 +171,12 @@ class _ItemPageState extends State<ItemPage> {
           message: 'ไม่สามารถโหลด$subjectได้',
           statusCode: error.statusCode,
           code: error.code,
-          details: error.message,
+          // Keep the structured API response so the user can see the
+          // server-provided description (and validation field errors).
+          details: error.details ??
+              (error.description == null
+                  ? null
+                  : <String, dynamic>{'description': error.description}),
         );
       }
       rethrow;
@@ -191,8 +196,21 @@ class _ItemPageState extends State<ItemPage> {
 
   String _readableError(Object error) {
     if (error is ApiException) {
+      final message = error.message.trim();
+      final description = error.description?.trim();
+      final parts = <String>[];
+      if (message.isNotEmpty && !message.contains('ApiException')) {
+        parts.add(message);
+      }
+      if (description != null &&
+          description.isNotEmpty &&
+          description != message &&
+          !message.contains(description)) {
+        parts.add('รายละเอียดเพิ่มเติม: $description');
+      }
+      if (parts.isNotEmpty) return parts.join('\n');
+
       if (error.statusCode == 403) {
-        final message = error.message.trim();
         if (message.isNotEmpty && !message.contains('ApiException')) {
           return message;
         }
@@ -200,10 +218,6 @@ class _ItemPageState extends State<ItemPage> {
       }
       if (error.statusCode == 401) {
         return 'ไม่สามารถดำเนินการกับข้อมูลสินค้าได้: Session หมดอายุ กรุณาเข้าสู่ระบบใหม่';
-      }
-      final message = error.message.trim();
-      if (message.isNotEmpty && !message.contains('ApiException')) {
-        return message;
       }
       return 'ไม่สามารถดำเนินการกับข้อมูลสินค้าได้: API ตอบกลับผิดพลาด (HTTP ${error.statusCode})';
     }
@@ -1083,7 +1097,7 @@ class _ItemPageState extends State<ItemPage> {
       if (mounted) setState(() => _editing = detail);
     } catch (e) {
       if (mounted) {
-        _show('ไม่สามารถเปิดหน้าแก้ไขสินค้าได้: $e');
+        _show('ไม่สามารถเปิดหน้าแก้ไขสินค้าได้:\n${_readableError(e)}');
       }
     }
   }

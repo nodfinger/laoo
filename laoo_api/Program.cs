@@ -7,6 +7,7 @@ using Laoo.Service.Api.Infrastructure.Database;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Data.SqlClient;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Threading.RateLimiting;
@@ -217,10 +218,26 @@ if (seedEnabled)
 
 var app = builder.Build();
 
-if (!app.Environment.IsDevelopment())
+app.UseExceptionHandler(errorApp => errorApp.Run(async context =>
 {
-    app.UseExceptionHandler();
-}
+    var exception = context.Features
+        .Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>()?.Error;
+    var description = exception switch
+    {
+        SqlException { Number: 207 or 208 } =>
+            "ฐานข้อมูลยังไม่ได้ติดตั้ง Schema ของทะเบียนสินค้า กรุณาให้ผู้ดูแลระบบรัน Migration สินค้าแล้วลองใหม่",
+        _ => "API ไม่สามารถดำเนินการได้ กรุณาตรวจสอบการเชื่อมต่อฐานข้อมูลหรือดู API log ด้วยรหัสติดตามนี้",
+    };
+
+    context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+    context.Response.ContentType = "application/json; charset=utf-8";
+    await context.Response.WriteAsJsonAsync(new
+    {
+        message = "เกิดข้อผิดพลาดในการเรียก API",
+        description,
+        traceId = context.TraceIdentifier,
+    });
+}));
 
 if (app.Environment.IsDevelopment())
 {
