@@ -22,12 +22,16 @@ public sealed class MeetingFoodController(IConfiguration configuration, IWebHost
         const string sql = @"
 SELECT F.FoodID,F.FoodCode,F.FoodNameTH,F.FoodTypeCode,T.Name,F.FoodImageUrl
 FROM dbo.TDADMeetingFood F
-LEFT JOIN dbo.TDSTMaster T
-  ON T.MasterGroupCode=@foodTypeGroup
- AND T.MasterCode=F.FoodTypeCode
- AND T.OwnerType='L'
- AND T.OwnerPartnerID IS NULL
- AND T.OwnerCompanyID IS NULL
+OUTER APPLY
+(
+    SELECT TOP (1) M.Name
+    FROM dbo.TDSTMaster M
+    WHERE M.MasterGroupCode=@foodTypeGroup
+      AND M.MasterCode=F.FoodTypeCode
+      AND M.IsActive=1
+      AND M.OwnerType='C'
+      AND M.OwnerCompanyID=@company
+) T
 WHERE F.CompanyID=@company
 ORDER BY F.FoodCode";
         await using var command = new SqlCommand(sql, connection);
@@ -51,19 +55,19 @@ ORDER BY F.FoodCode";
     [HttpGet("types")]
     public async Task<IActionResult> Types(CancellationToken token)
     {
-        if (!IsCompany() || CompanyId() is null) return Forbid();
+        if (!IsCompany() || CompanyId() is not long companyId) return Forbid();
         await using var connection = await Open(token);
         if (!await Allowed(connection, "VIEW", token)) return Forbid();
         const string sql = @"
 SELECT MasterCode,Name
 FROM dbo.TDSTMaster
 WHERE MasterGroupCode=@foodTypeGroup
-  AND OwnerType='L'
-  AND OwnerPartnerID IS NULL
-  AND OwnerCompanyID IS NULL
+  AND OwnerType='C'
+  AND OwnerCompanyID=@company
   AND IsActive=1
 ORDER BY ISNULL(Seq,0),Name";
         await using var command = new SqlCommand(sql, connection);
+        Add(command, "@company", companyId);
         Add(command, "@foodTypeGroup", MasterGroupCodes.FoodType);
         await using var reader = await command.ExecuteReaderAsync(token);
         var result = new List<object>();
@@ -150,25 +154,37 @@ ORDER BY ISNULL(Seq,0),Name";
 
     private async Task<IActionResult> Save(long? id, FoodRequest request, CancellationToken token)
     {
-        if (string.IsNullOrWhiteSpace(request.Code) || string.IsNullOrWhiteSpace(request.NameTh))
-            return BadRequest(new { message = "ข้อมูลรายการอาหารไม่ครบ", description = "กรุณาระบุรหัสและชื่อรายการอาหาร" });
+        if (string.IsNullOrWhiteSpace(request.NameTh))
+            return BadRequest(new { message = "ข้อมูลรายการอาหารไม่ครบ", description = "กรุณาระบุชื่อรายการอาหาร" });
         if (string.IsNullOrWhiteSpace(request.FoodTypeCode))
             return BadRequest(new { message = "กรุณาเลือกประเภทอาหาร", description = "ประเภทอาหารเป็นข้อมูลบังคับ" });
         if (!IsCompany() || CompanyId() is not long company || !await Permission(id is null ? "CREATE" : "EDIT", token)) return Forbid();
 
         await using var connection = await Open(token);
         const string sql = @"
+DECLARE @code nvarchar(50)=NULLIF(LTRIM(RTRIM(@requestedCode)),N'');
+IF @id IS NULL AND @code IS NULL
+BEGIN
+    DECLARE @lockResult int;
+    EXEC @lockResult=sp_getapplock
+        @Resource=N'TDADMeetingFood:Code:'+CONVERT(nvarchar(30),@company),
+        @LockMode='Exclusive',@LockOwner='Session',@LockTimeout=10000;
+    IF @lockResult<0 THROW 50015,'FOOD_CODE_LOCK_FAILED',1;
+    SELECT @code=N'FOOD'+RIGHT(N'000000'+CONVERT(nvarchar(20),ISNULL(MAX(TRY_CONVERT(int,SUBSTRING(FoodCode,5,20))),0)+1),6)
+    FROM dbo.TDADMeetingFood WITH (UPDLOCK,HOLDLOCK)
+    WHERE CompanyID=@company AND FoodCode LIKE N'FOOD[0-9]%';
+END;
 IF NOT EXISTS
 (
     SELECT 1 FROM dbo.TDSTMaster
     WHERE MasterGroupCode=@foodTypeGroup AND MasterCode=@foodType
-      AND OwnerType='L' AND OwnerPartnerID IS NULL AND OwnerCompanyID IS NULL
+      AND OwnerType='C' AND OwnerCompanyID=@company
       AND IsActive=1
 ) THROW 50014,'INVALID_FOOD_TYPE',1;
 IF EXISTS
 (
     SELECT 1 FROM dbo.TDADMeetingFood
-    WHERE CompanyID=@company AND FoodCode=@code
+    WHERE @code IS NOT NULL AND CompanyID=@company AND FoodCode=@code
       AND (@id IS NULL OR FoodID<>@id)
 ) THROW 50013,'DUPLICATE_FOOD',1;
 IF @id IS NULL
@@ -182,7 +198,7 @@ END
 ELSE
 BEGIN
     UPDATE dbo.TDADMeetingFood
-    SET FoodCode=@code,FoodNameTH=@name,FoodTypeCode=@foodType,
+    SET FoodCode=COALESCE(@code,FoodCode),FoodNameTH=@name,FoodTypeCode=@foodType,
         UpdateDate=SYSUTCDATETIME()
     WHERE FoodID=@id AND CompanyID=@company;
     SELECT @id;
@@ -190,7 +206,7 @@ END";
         await using var command = new SqlCommand(sql, connection);
         Add(command, "@id", id);
         Add(command, "@company", company);
-        Add(command, "@code", request.Code.Trim().ToUpperInvariant());
+        Add(command, "@requestedCode", request.Code?.Trim().ToUpperInvariant());
         Add(command, "@name", request.NameTh.Trim());
         Add(command, "@foodType", request.FoodTypeCode.Trim());
         Add(command, "@foodTypeGroup", MasterGroupCodes.FoodType);
@@ -268,5 +284,5 @@ THEN 1 ELSE 0 END";
     }
 }
 
-public sealed record FoodRequest(string Code, string NameTh, string FoodTypeCode);
+public sealed record FoodRequest(string? Code, string NameTh, string FoodTypeCode);
 public sealed record FoodRow(long FoodId, string Code, string NameTh, string FoodTypeCode, string? FoodTypeName, string? ImageUrl);

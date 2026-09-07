@@ -100,7 +100,16 @@ GROUP BY P.BookingParticipantID,P.BookingID,B.BookingNo,B.Subject,B.Description,
 SELECT F.FoodID,F.FoodCode,F.FoodNameTH,T.Name,F.FoodImageUrl
 FROM dbo.TDADMeetingBookingFoodOption O
 INNER JOIN dbo.TDADMeetingFood F ON F.FoodID=O.FoodID AND F.CompanyID=O.CompanyID
-LEFT JOIN dbo.TDSTMaster T ON T.MasterGroupCode='011' AND T.MasterCode=F.FoodTypeCode AND T.OwnerType='L'
+OUTER APPLY
+(
+    SELECT TOP (1) M.Name,M.Seq
+    FROM dbo.TDSTMaster M
+    WHERE M.MasterGroupCode='011'
+      AND M.MasterCode=F.FoodTypeCode
+      AND M.IsActive=1
+      AND M.OwnerType='C'
+      AND M.OwnerCompanyID=@company
+) T
 WHERE O.BookingID=@booking AND O.CompanyID=@company
 ORDER BY ISNULL(T.Seq,0),F.FoodCode;";
         await using var food = new SqlCommand(foodSql, connection); Add(food, "@booking", bookingId); Add(food, "@company", company);
