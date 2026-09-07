@@ -1,16 +1,6 @@
 SET XACT_ABORT ON;
-BEGIN TRANSACTION;
-
-DECLARE @LockResult int;
-EXEC @LockResult=sys.sp_getapplock @Resource=N'LAOO_SCHEMA_MIGRATION',@LockMode=N'Exclusive',@LockOwner=N'Transaction',@LockTimeout=60000;
-IF @LockResult<0 THROW 52305,N'Unable to acquire LAOO schema migration lock',1;
 IF OBJECT_ID(N'dbo.TDSTSchemaMigration',N'U') IS NULL
     THROW 52306,N'Run migration 20260907090000 before inventory menu migration',1;
-IF EXISTS(SELECT 1 FROM dbo.TDSTSchemaMigration WHERE ProjectCode=N'LAOO_SERVICE' AND MigrationCode=N'20260907092000')
-BEGIN
-    COMMIT TRANSACTION;
-    RETURN;
-END;
 
 DECLARE @Menus table
 (
@@ -31,7 +21,3 @@ INSERT dbo.TDADMainMenu(MenuCode,MenuGroupCode,MenuName,ScreenType,RouteName,Rou
 SELECT S.MenuCode,N'08',S.MenuName,S.ScreenType,S.RouteName,S.RoutePath,NULL,S.IconName,S.SortOrder,1,1,1
 FROM @Menus S WHERE NOT EXISTS(SELECT 1 FROM dbo.TDADMainMenu T WHERE T.MenuCode=S.MenuCode);
 
-INSERT dbo.TDSTSchemaMigration(ProjectCode,MigrationCode,Checksum)
-VALUES(N'LAOO_SERVICE',N'20260907092000',HASHBYTES('SHA2_256',N'inventory-menus-v1'));
-
-COMMIT TRANSACTION;

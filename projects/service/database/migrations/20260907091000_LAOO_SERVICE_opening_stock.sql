@@ -1,16 +1,6 @@
 SET XACT_ABORT ON;
-BEGIN TRANSACTION;
-
-DECLARE @LockResult int;
-EXEC @LockResult=sys.sp_getapplock @Resource=N'LAOO_SCHEMA_MIGRATION',@LockMode=N'Exclusive',@LockOwner=N'Transaction',@LockTimeout=60000;
-IF @LockResult<0 THROW 52303,N'Unable to acquire LAOO schema migration lock',1;
 IF OBJECT_ID(N'dbo.TDSTSchemaMigration',N'U') IS NULL
     THROW 52304,N'Run migration 20260907090000 before opening stock migration',1;
-IF EXISTS(SELECT 1 FROM dbo.TDSTSchemaMigration WHERE ProjectCode=N'LAOO_SERVICE' AND MigrationCode=N'20260907091000')
-BEGIN
-    COMMIT TRANSACTION;
-    RETURN;
-END;
 
 IF EXISTS
 (
@@ -68,7 +58,3 @@ IF EXISTS
 )
     THROW 52302,N'Warehouse totals do not match TDIVItem.StockBalance',1;
 
-INSERT dbo.TDSTSchemaMigration(ProjectCode,MigrationCode,Checksum)
-VALUES(N'LAOO_SERVICE',N'20260907091000',HASHBYTES('SHA2_256',N'opening-stock-v1'));
-
-COMMIT TRANSACTION;
