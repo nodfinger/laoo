@@ -9,9 +9,10 @@
 
 ## Popup Layout
 
-- Popup ใช้พื้นผิว Theme กลาง ไม่มี `BorderSide` หรือเส้นกรอบรอบนอกเฉพาะหน้า
+- Popup ทุกชนิดใช้พื้นหลังสีขาว (`Colors.white`) ไม่มี `BorderSide` หรือเส้นกรอบรอบนอกเฉพาะหน้า และห้ามเปลี่ยนสีพื้นหลังตาม User Style
+- กรอบ Popup ใช้มุมโค้ง `LaooRadius.xs` (`4px`) ทุกมุม
 - ระยะขอบ Popup ใช้ `LaooLayout.dialogInsetPadding`; Padding ภายในใช้ `LaooLayout.cardPadding`
-- Caption ใช้มาตรฐานกลาง `fontSize: 18`, `fontWeight: FontWeight.w700`, `color: Colors.black` ตาม `TYPOGRAPHY_STANDARD.md`; Icon หน้า Caption ใช้ Primary ตาม User Style
+- Caption ใช้มาตรฐานกลาง `fontSize: 18`, `fontWeight: FontWeight.w700`, `color: Colors.black` ตาม `TYPOGRAPHY_STANDARD.md`; ต้องมี Icon อยู่ด้านหน้า Caption และ Icon ใช้สีดำ (`Colors.black`) ยกเว้น Delete Confirmation ซึ่งใช้ Icon สีแดงตาม Semantic Pattern ของการลบ
 - ใช้เส้น `LaooColors.border` สีเทาอ่อนใต้ Caption และก่อนส่วนปุ่มด้านล่าง
 - Context Bar ที่แสดงรายการแม่/ห้อง/อาคารที่เลือก ใช้พื้น Primary แบบโปร่งแสงและข้อความขนาด `16px`
 - TextBox/ComboBox ใช้กรอบมาตรฐาน มุมโค้ง `4px`; Label และ Focus Border ใช้ Primary

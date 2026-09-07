@@ -162,20 +162,20 @@ class WorkspaceThemePreset {
         ),
       ),
       dialogTheme: DialogThemeData(
-        titleTextStyle: TextStyle(
-          fontFamily: LaooTypography.fontFamily,
-          fontFamilyFallback: LaooTypography.fontFallback,
-          fontSize: LaooTypography.sectionTitle,
-          height: LaooTypography.titleLineHeight,
-          fontWeight: FontWeight.w700,
-          color: textPrimary,
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        iconColor: Colors.black,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
+          side: BorderSide.none,
         ),
+        titleTextStyle: LaooTypography.popupTitleStyle,
         contentTextStyle: TextStyle(
           fontFamily: LaooTypography.fontFamily,
           fontFamilyFallback: LaooTypography.fontFallback,
           fontSize: LaooTypography.inputText,
           height: LaooTypography.bodyLineHeight,
-          color: textPrimary,
+          color: LaooColors.textPrimary,
         ),
         actionsPadding: const EdgeInsets.fromLTRB(18, 4, 18, 10),
       ),

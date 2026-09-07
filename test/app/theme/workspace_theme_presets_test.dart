@@ -43,6 +43,14 @@ void main() {
         theme.brightness,
         preset.isDark ? Brightness.dark : Brightness.light,
       );
+      expect(theme.dialogTheme.backgroundColor, Colors.white);
+      expect(theme.dialogTheme.surfaceTintColor, Colors.transparent);
+      expect(theme.dialogTheme.iconColor, Colors.black);
+      expect(theme.dialogTheme.titleTextStyle?.color, Colors.black);
+
+      final shape = theme.dialogTheme.shape! as RoundedRectangleBorder;
+      expect(shape.borderRadius, BorderRadius.circular(4));
+      expect(shape.side, BorderSide.none);
     }
   });
 }

@@ -72,6 +72,16 @@ abstract final class LaooTheme {
           side: BorderSide.none,
         ),
       ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        iconColor: Colors.black,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
+          side: BorderSide.none,
+        ),
+        titleTextStyle: LaooTypography.popupTitleStyle,
+      ),
     );
   }
 }
