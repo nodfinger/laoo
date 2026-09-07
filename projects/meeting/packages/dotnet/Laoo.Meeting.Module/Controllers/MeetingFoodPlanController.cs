@@ -83,7 +83,16 @@ OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY;";
 SELECT F.FoodID,F.FoodCode,F.FoodNameTH,F.FoodTypeCode,T.Name,F.FoodImageUrl,
        CASE WHEN O.BookingFoodOptionID IS NULL THEN 0 ELSE 1 END
 FROM dbo.TDADMeetingFood F
-LEFT JOIN dbo.TDSTMaster T ON T.MasterGroupCode='011' AND T.MasterCode=F.FoodTypeCode AND T.OwnerType='L'
+OUTER APPLY
+(
+    SELECT TOP (1) M.Name,M.Seq
+    FROM dbo.TDSTMaster M
+    WHERE M.MasterGroupCode='011'
+      AND M.MasterCode=F.FoodTypeCode
+      AND M.IsActive=1
+      AND M.OwnerType='C'
+      AND M.OwnerCompanyID=@company
+) T
 LEFT JOIN dbo.TDADMeetingBookingFoodOption O ON O.FoodID=F.FoodID AND O.BookingID=@booking AND O.CompanyID=F.CompanyID
 WHERE F.CompanyID=@company
 ORDER BY ISNULL(T.Seq,0),F.FoodCode;";

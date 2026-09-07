@@ -368,17 +368,16 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
 
   Future<void> _openForm({Map<String, dynamic>? item}) async {
     final preset = workspaceThemeController.value;
-    final code = TextEditingController(text: item?['code'] as String? ?? '');
     final name = TextEditingController(text: item?['nameTh'] as String? ?? '');
     String? selectedType = item?['foodTypeCode'] as String?;
-    String? codeError;
     String? nameError;
     String? typeError;
     Uint8List? selectedImage;
     String? selectedImageName;
     String? imageError;
     var imageBusy = false;
-    final value = await showDialog<Map<String, dynamic>>(
+    var saving = false;
+    await showDialog<void>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, refresh) => AlertDialog(
@@ -436,22 +435,6 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  TextField(
-                    controller: code,
-                    textCapitalization: TextCapitalization.characters,
-                    onChanged: (_) => refresh(() => codeError = null),
-                    style: const TextStyle(
-                      color: Colors.black,
-                      fontSize: LaooTypography.inputText,
-                    ),
-                    decoration: _inputDecoration(
-                      'รหัสอาหาร *',
-                      preset,
-                      errorText: codeError,
-                      labelColor: Colors.black,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
                   TextField(
                     controller: name,
                     onChanged: (_) => refresh(() => nameError = null),
@@ -657,43 +640,67 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
                   borderRadius: BorderRadius.circular(LaooRadius.xs),
                 ),
               ),
-              onPressed: imageBusy
+              onPressed: imageBusy || saving
                   ? null
                   : () {
-                      if (code.text.trim().isEmpty) {
-                        codeError = 'กรุณากรอกรหัสอาหาร';
-                      }
                       if (name.text.trim().isEmpty) {
                         nameError = 'กรุณากรอกชื่อรายการอาหาร';
                       }
                       if (selectedType == null) {
                         typeError = 'กรุณาเลือกประเภทอาหาร';
                       }
-                      if (codeError != null ||
-                          nameError != null ||
-                          typeError != null) {
+                      if (nameError != null || typeError != null) {
                         refresh(() {});
                         return;
                       }
-                      Navigator.pop(dialogContext, {
-                        'code': code.text.trim(),
-                        'nameTh': name.text.trim(),
-                        'foodTypeCode': selectedType,
-                      });
+                      _saveFoodForm(
+                        dialogContext,
+                        item: item,
+                        name: name,
+                        selectedType: selectedType!,
+                        selectedImage: selectedImage,
+                        selectedImageName: selectedImageName,
+                        setSaving: (value) => refresh(() => saving = value),
+                        resetForm: item == null
+                            ? () => refresh(() {
+                                name.clear();
+                                selectedType = null;
+                                selectedImage = null;
+                                selectedImageName = null;
+                                imageError = null;
+                              })
+                            : null,
+                      );
                     },
               icon: const Icon(Icons.save_outlined),
-              label: const Text('บันทึก'),
+              label: Text(saving ? 'กำลังบันทึก...' : 'บันทึก'),
             ),
           ],
         ),
       ),
     );
-    code.dispose();
     name.dispose();
-    if (value == null) return;
+  }
+
+  Future<void> _saveFoodForm(
+    BuildContext dialogContext,
+    {
+    required Map<String, dynamic>? item,
+    required TextEditingController name,
+    required String selectedType,
+    required Uint8List? selectedImage,
+    required String? selectedImageName,
+    required void Function(bool value) setSaving,
+    required VoidCallback? resetForm,
+  }) async {
+    setSaving(true);
     try {
       final savedId = await _repository.save(
-        value,
+        {
+          if (item?['code'] != null) 'code': item!['code'],
+          'nameTh': name.text.trim(),
+          'foodTypeCode': selectedType,
+        },
         id: (item?['foodId'] as num?)?.toInt(),
       );
       if (selectedImage != null) {
@@ -706,10 +713,13 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
       if (!mounted) return;
       _showMessage('บันทึกรายการอาหารสำเร็จ');
       await _load();
+      if (dialogContext.mounted) resetForm?.call();
     } catch (error) {
       if (mounted) {
         _showMessage(_errorText(error, 'บันทึกข้อมูลไม่สำเร็จ'), true);
       }
+    } finally {
+      if (dialogContext.mounted) setSaving(false);
     }
   }
 
