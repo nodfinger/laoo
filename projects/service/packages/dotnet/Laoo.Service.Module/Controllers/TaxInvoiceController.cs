@@ -1,5 +1,6 @@
 using System.Data;
 using System.Security.Claims;
+using LaooServiceModule.Infrastructure;
 using LaooServiceModule.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -91,7 +92,9 @@ public sealed class TaxInvoiceController(IConfiguration configuration) : Control
               SELECT I.ItemID,I.ItemCode,I.ItemName,I.UnitCode,I.UnitPrice,I.StockBalance,COALESCE(M.Name,I.UnitCode)
               FROM dbo.TDIVItem I
               LEFT JOIN dbo.TDSTMaster M ON M.OwnerType=N'C' AND M.OwnerCompanyID=I.CompanyID AND M.MasterGroupCode=@unitGroup AND M.MasterCode=I.UnitCode AND M.IsActive=1
-              WHERE I.CompanyID=@company AND I.IsActive=1 ORDER BY I.ItemCode
+              WHERE I.CompanyID=@company AND I.IsActive=1
+                AND EXISTS(SELECT 1 FROM dbo.TDIVItemUsage U WHERE U.CompanyID=I.CompanyID AND U.ItemID=I.ItemID AND U.UsageCode=N'SALE')
+              ORDER BY I.ItemCode
             """, token, r => new
             {
                 itemId = r.GetInt64(0), itemCode = Text(r, 1), itemName = Text(r, 2), unitCode = Text(r, 3), unitPrice = r.GetDecimal(4), stockBalance = r.GetDecimal(5), unitName = Text(r, 6)
@@ -160,6 +163,20 @@ public sealed class TaxInvoiceController(IConfiguration configuration) : Control
     [HttpPut("{id:long}")]
     public Task<IActionResult> Update(long id, [FromBody] TaxInvoiceUpsertRequest request, CancellationToken token) => Save(id, request, token);
 
+    [HttpPut("{id:long}/details/{detailId:long}/inventory")]
+    public async Task<IActionResult> SetInventory(long id, long detailId, [FromBody] InventoryAllocationRequest request, CancellationToken token)
+    {
+        await using var c=await Open(token);if(!await Can(c,"EDIT",token))return Forbid();await using var tx=(SqlTransaction)await c.BeginTransactionAsync(IsolationLevel.Serializable,token);
+        try
+        {
+            await using var update=new SqlCommand("UPDATE D SET WarehouseID=@warehouse FROM dbo.TDARTaxInvoiceDetail D JOIN dbo.TDARTaxInvoice H ON H.TaxInvoiceID=D.TaxInvoiceID WHERE H.TaxInvoiceID=@id AND D.TaxInvoiceDetailID=@detail AND H.CompanyID=@company AND H.StatusCode=N'DRAFT'",c,tx);
+            Add(update,"@warehouse",SqlDbType.BigInt,request.WarehouseId);Add(update,"@id",SqlDbType.BigInt,id);Add(update,"@detail",SqlDbType.BigInt,detailId);Add(update,"@company",SqlDbType.BigInt,CompanyId());
+            if(await update.ExecuteNonQueryAsync(token)==0){await tx.RollbackAsync(token);return NotFound(new{message="ไม่พบรายการใบกำกับภาษี",description="แก้คลังและ Serial ได้เฉพาะรายการในเอกสารสถานะร่างของ Company นี้"});}
+            await ReplaceSerials(c,tx,"TAX_INVOICE",detailId,request.SerialInstanceIds,token);await tx.CommitAsync(token);return Ok(new{message="บันทึกคลังและ Serial สำเร็จ"});
+        }
+        catch(Exception ex){await tx.RollbackAsync(token);return BadRequest(new{message="บันทึกคลังและ Serial ไม่สำเร็จ",description=ex.Message});}
+    }
+
     [HttpDelete("{id:long}")]
     public async Task<IActionResult> Delete(long id, CancellationToken token)
     {
@@ -175,6 +192,8 @@ public sealed class TaxInvoiceController(IConfiguration configuration) : Control
     [HttpPost("{id:long}/issue")]
     public async Task<IActionResult> Issue(long id, CancellationToken token)
     {
+        return await IssueInventory(id, token);
+#pragma warning disable CS0162
         await using var c = await Open(token);
         if (!await Can(c, "EDIT", token)) return Forbid();
         await using var tx = (SqlTransaction)await c.BeginTransactionAsync(IsolationLevel.Serializable, token);
@@ -219,6 +238,7 @@ public sealed class TaxInvoiceController(IConfiguration configuration) : Control
     [HttpPost("{id:long}/void")]
     public async Task<IActionResult> VoidDocument(long id, CancellationToken token)
     {
+        return await VoidInventory(id, token);
         await using var c = await Open(token);
         if (!await Can(c, "EDIT", token)) return Forbid();
         await using var tx = (SqlTransaction)await c.BeginTransactionAsync(IsolationLevel.Serializable, token);
@@ -250,6 +270,80 @@ public sealed class TaxInvoiceController(IConfiguration configuration) : Control
             return Ok(new { taxInvoiceId = id, statusCode = "VOID" });
         }
         catch (Exception ex) { await tx.RollbackAsync(token); return StatusCode(500, new { message = "ยกเลิกใบกำกับภาษีไม่สำเร็จ", description = ex.Message }); }
+    }
+
+#pragma warning restore CS0162
+    private async Task<IActionResult> IssueInventory(long id, CancellationToken token)
+    {
+        await using var c = await Open(token);
+        if (!await Can(c, "EDIT", token)) return Forbid();
+        await using var tx = (SqlTransaction)await c.BeginTransactionAsync(IsolationLevel.Serializable, token);
+        try
+        {
+            var status = await Scalar(c, tx, "SELECT StatusCode FROM dbo.TDARTaxInvoice WITH(UPDLOCK,HOLDLOCK) WHERE TaxInvoiceID=@id AND CompanyID=@company AND IsActive=1", id, token);
+            if (status != "DRAFT") return await RollbackConflict(tx, token, "ออกใบกำกับภาษีไม่ได้", "ออกเอกสารได้เฉพาะสถานะร่าง");
+            const string sql = "SELECT TaxInvoiceDetailID,ItemID,Quantity,PreOrderDetailID,QuotationDetailID,WarehouseID FROM dbo.TDARTaxInvoiceDetail WHERE TaxInvoiceID=@id ORDER BY [LineNo]";
+            var lines = new List<(long Detail,long Item,decimal Qty,long? Pre,long? Quote,long? Warehouse)>();
+            await using (var cmd = new SqlCommand(sql, c, tx))
+            {
+                Add(cmd,"@id",SqlDbType.BigInt,id); await using var reader = await cmd.ExecuteReaderAsync(token);
+                while (await reader.ReadAsync(token)) lines.Add((reader.GetInt64(0),reader.GetInt64(1),reader.GetDecimal(2),Long(reader,3),Long(reader,4),Long(reader,5)));
+            }
+            if (lines.Count == 0) return await RollbackBadRequest(tx, token, "ออกใบกำกับภาษีไม่ได้", "กรุณาเพิ่มสินค้าหรือบริการอย่างน้อย 1 รายการ");
+            foreach (var line in lines)
+            {
+                var serials = await SelectedSerials(c, tx, "TAX_INVOICE", line.Detail, token);
+                var sourceType = line.Pre.HasValue ? "PREORDER" : line.Quote.HasValue ? "QUOTATION" : "TAX_INVOICE";
+                var sourceDetail = line.Pre ?? line.Quote ?? line.Detail;
+                var issued = await InventoryStockService.IssueSaleAsync(c, tx, CompanyId(), UserId(), "TAX_INVOICE", id, line.Detail, line.Item, line.Qty, line.Warehouse, sourceType, sourceDetail, serials, token);
+                if (!issued.Success) return await RollbackConflict(tx, token, "ตัดสต็อกไม่สำเร็จ", issued.Error ?? "Inventory validation failed.");
+                if (!issued.AlreadyFulfilled && line.Pre.HasValue)
+                {
+                    await using var pre = new SqlCommand("UPDATE dbo.TDARPreOrderDetail WITH(UPDLOCK,HOLDLOCK) SET DeliveredQty=DeliveredQty+@qty WHERE PreOrderDetailID=@detail AND DeliveredQty+@qty<=AllocatedQty", c, tx);
+                    Add(pre,"@qty",SqlDbType.Decimal,line.Qty); Add(pre,"@detail",SqlDbType.BigInt,line.Pre.Value);
+                    if (await pre.ExecuteNonQueryAsync(token) == 0) return await RollbackConflict(tx, token, "จำนวนสินค้าเกินใบจอง", $"รายการอ้างอิง {line.Pre.Value} มีจำนวนคงเหลือไม่เพียงพอ");
+                }
+            }
+            await using (var done = new SqlCommand("UPDATE dbo.TDARTaxInvoice SET StatusCode=N'ISSUED',UpdateDate=SYSUTCDATETIME(),UpdatedBy=@user WHERE TaxInvoiceID=@id AND CompanyID=@company", c, tx))
+            { Add(done,"@id",SqlDbType.BigInt,id); Add(done,"@company",SqlDbType.BigInt,CompanyId()); Add(done,"@user",SqlDbType.BigInt,UserId()); await done.ExecuteNonQueryAsync(token); }
+            await tx.CommitAsync(token); return Ok(new { taxInvoiceId=id,statusCode="ISSUED" });
+        }
+        catch (Exception ex) { await tx.RollbackAsync(token); return StatusCode(500,new { message="ออกใบกำกับภาษีไม่สำเร็จ",description=ex.Message }); }
+    }
+
+    private async Task<IActionResult> VoidInventory(long id, CancellationToken token)
+    {
+        await using var c = await Open(token);
+        if (!await Can(c, "EDIT", token)) return Forbid();
+        await using var tx = (SqlTransaction)await c.BeginTransactionAsync(IsolationLevel.Serializable, token);
+        try
+        {
+            var status = await Scalar(c, tx, "SELECT StatusCode FROM dbo.TDARTaxInvoice WITH(UPDLOCK,HOLDLOCK) WHERE TaxInvoiceID=@id AND CompanyID=@company AND IsActive=1", id, token);
+            if (status != "ISSUED") return await RollbackConflict(tx, token, "ยกเลิกใบกำกับภาษีไม่ได้", "ยกเลิกได้เฉพาะเอกสารที่ออกแล้ว");
+            await using (var pre = new SqlCommand("UPDATE P SET DeliveredQty=CASE WHEN P.DeliveredQty>=F.Quantity THEN P.DeliveredQty-F.Quantity ELSE 0 END FROM dbo.TDARPreOrderDetail P JOIN dbo.TDARTaxInvoiceDetail D ON D.PreOrderDetailID=P.PreOrderDetailID JOIN dbo.TDIVInventoryFulfillment F ON F.FulfilledByDocumentDetailID=D.TaxInvoiceDetailID AND F.FulfilledByDocumentType=N'TAX_INVOICE' AND F.FulfilledByDocumentID=@id AND F.ReversedDate IS NULL WHERE D.TaxInvoiceID=@id", c, tx)) { Add(pre,"@id",SqlDbType.BigInt,id); await pre.ExecuteNonQueryAsync(token); }
+            await InventoryStockService.ReverseDocumentAsync(c, tx, CompanyId(), UserId(), "TAX_INVOICE", id, token);
+            await using (var done = new SqlCommand("UPDATE dbo.TDARTaxInvoice SET StatusCode=N'VOID',UpdateDate=SYSUTCDATETIME(),UpdatedBy=@user WHERE TaxInvoiceID=@id AND CompanyID=@company", c, tx))
+            { Add(done,"@id",SqlDbType.BigInt,id); Add(done,"@company",SqlDbType.BigInt,CompanyId()); Add(done,"@user",SqlDbType.BigInt,UserId()); await done.ExecuteNonQueryAsync(token); }
+            await tx.CommitAsync(token); return Ok(new { taxInvoiceId=id,statusCode="VOID" });
+        }
+        catch (Exception ex) { await tx.RollbackAsync(token); return StatusCode(500,new { message="ยกเลิกใบกำกับภาษีไม่สำเร็จ",description=ex.Message }); }
+    }
+
+    private async Task<List<long>> SelectedSerials(SqlConnection c, SqlTransaction tx, string type, long detail, CancellationToken token)
+    {
+        await using var cmd = new SqlCommand("SELECT ItemInstanceID FROM dbo.TDIVDocumentSerialSelection WHERE CompanyID=@company AND DocumentType=@type AND DocumentDetailID=@detail", c, tx);
+        Add(cmd,"@company",SqlDbType.BigInt,CompanyId()); Add(cmd,"@type",SqlDbType.NVarChar,type,30); Add(cmd,"@detail",SqlDbType.BigInt,detail);
+        var result = new List<long>(); await using var reader = await cmd.ExecuteReaderAsync(token); while (await reader.ReadAsync(token)) result.Add(reader.GetInt64(0)); return result;
+    }
+
+    private async Task ReplaceSerials(SqlConnection c,SqlTransaction tx,string type,long detail,IReadOnlyList<long>? serials,CancellationToken token)
+    {
+        await using(var clear=new SqlCommand("DELETE dbo.TDIVDocumentSerialSelection WHERE CompanyID=@company AND DocumentType=@type AND DocumentDetailID=@detail",c,tx)){Add(clear,"@company",SqlDbType.BigInt,CompanyId());Add(clear,"@type",SqlDbType.NVarChar,type,30);Add(clear,"@detail",SqlDbType.BigInt,detail);await clear.ExecuteNonQueryAsync(token);}
+        foreach(var serial in (serials??Array.Empty<long>()).Distinct())
+        {
+            await using var add=new SqlCommand("INSERT dbo.TDIVDocumentSerialSelection(CompanyID,DocumentType,DocumentDetailID,ItemInstanceID,CreatedBy) SELECT @company,@type,@detail,I.ItemInstanceID,@user FROM dbo.TDIVItemInstance I JOIN dbo.TDARTaxInvoiceDetail D ON D.TaxInvoiceDetailID=@detail WHERE I.ItemInstanceID=@serial AND I.CompanyID=@company AND I.ItemID=D.ItemID AND I.StatusCode=N'IN_STOCK'; IF @@ROWCOUNT=0 THROW 52322,N'Invalid serial selection',1",c,tx);
+            Add(add,"@company",SqlDbType.BigInt,CompanyId());Add(add,"@type",SqlDbType.NVarChar,type,30);Add(add,"@detail",SqlDbType.BigInt,detail);Add(add,"@serial",SqlDbType.BigInt,serial);Add(add,"@user",SqlDbType.BigInt,UserId());await add.ExecuteNonQueryAsync(token);
+        }
     }
 
     private async Task<IActionResult> Save(long? id, TaxInvoiceUpsertRequest request, CancellationToken token)
@@ -418,7 +512,7 @@ public sealed class TaxInvoiceController(IConfiguration configuration) : Control
 
     private async Task<(string Code, string Name, string Unit)?> Item(SqlConnection c, SqlTransaction tx, long id, CancellationToken token)
     {
-        await using var cmd = new SqlCommand("SELECT ItemCode,ItemName,UnitCode FROM dbo.TDIVItem WHERE ItemID=@id AND CompanyID=@company AND IsActive=1", c, tx);
+        await using var cmd = new SqlCommand("SELECT ItemCode,ItemName,UnitCode FROM dbo.TDIVItem I WHERE ItemID=@id AND CompanyID=@company AND IsActive=1 AND EXISTS(SELECT 1 FROM dbo.TDIVItemUsage U WHERE U.CompanyID=I.CompanyID AND U.ItemID=I.ItemID AND U.UsageCode=N'SALE')", c, tx);
         Add(cmd, "@id", SqlDbType.BigInt, id); Add(cmd, "@company", SqlDbType.BigInt, CompanyId()); await using var r = await cmd.ExecuteReaderAsync(token);
         return await r.ReadAsync(token) ? (Text(r, 0) ?? "", Text(r, 1) ?? "", Text(r, 2) ?? "") : null;
     }

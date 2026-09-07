@@ -141,6 +141,27 @@ abstract final class ServiceRoutes {
     ),
     FeatureRouteContract(
       projectCode: ServiceProject.code,
+      menuCode: '08004',
+      screenType: 1,
+      routeName: 'warehouses',
+      routePath: '/inventory/warehouses',
+    ),
+    FeatureRouteContract(
+      projectCode: ServiceProject.code,
+      menuCode: '08005',
+      screenType: 4,
+      routeName: 'stockReceipts',
+      routePath: '/inventory/stock-receipts',
+    ),
+    FeatureRouteContract(
+      projectCode: ServiceProject.code,
+      menuCode: '08006',
+      screenType: 1,
+      routeName: 'itemInstances',
+      routePath: '/inventory/item-instances',
+    ),
+    FeatureRouteContract(
+      projectCode: ServiceProject.code,
       menuCode: '19001',
       screenType: 3,
       routeName: 'reportsDashboard',

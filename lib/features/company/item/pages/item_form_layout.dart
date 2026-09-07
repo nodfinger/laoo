@@ -75,6 +75,8 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
       _note4,
       _note5;
   String? _group, _type, _unit;
+  String _itemKind = 'GOODS', _stockTracking = 'QUANTITY';
+  Set<String> _usageCodes = {'SALE'};
   bool _active = true, _showShop = false, _saving = false;
   List<Map<String, dynamic>> _packs = [];
   List<Map<String, dynamic>> _images = [];
@@ -132,6 +134,14 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
     _group = _data['itemGroupCode'];
     _type = _data['itemTypeCode'];
     _unit = _data['unitCode'];
+    _itemKind = '${_data['itemKindCode'] ?? 'GOODS'}'.toUpperCase();
+    _stockTracking = '${_data['stockTrackingCode'] ?? 'QUANTITY'}'
+        .toUpperCase();
+    _usageCodes = Set<String>.from(
+      (_data['usageCodes'] as List? ?? const ['SALE']).map(
+        (value) => '$value'.toUpperCase(),
+      ),
+    );
     if (_data['itemID'] == null) {
       _group ??= _firstCode(widget.groups);
       _type ??= _firstCode(widget.types);
@@ -275,6 +285,9 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
       'itemName': _name.text.trim(),
       'itemGroupCode': _group,
       'itemTypeCode': _type,
+      'itemKindCode': _itemKind,
+      'stockTrackingCode': _stockTracking,
+      'usageCodes': _usageCodes.toList()..sort(),
       'unitPrice': double.tryParse(_price.text) ?? 0,
       'unitCode': _unit,
       'costPrice': double.tryParse(_cost.text) ?? 0,
@@ -328,6 +341,9 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
           _images = [];
           _active = true;
           _showShop = false;
+          _itemKind = 'GOODS';
+          _stockTracking = 'QUANTITY';
+          _usageCodes = {'SALE'};
           _saving = false;
         });
       }
@@ -383,7 +399,9 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
                         const Text('แสดงหน้า Online'),
                         Switch(
                           value: _showShop,
-                          onChanged: (v) => setState(() => _showShop = v),
+                          onChanged: _usageCodes.contains('SALE')
+                              ? (v) => setState(() => _showShop = v)
+                              : null,
                         ),
                         OutlinedButton.icon(
                           onPressed: widget.onCancel,
@@ -439,6 +457,8 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
                                   _previewCode();
                                 }),
                               ]),
+                              const SizedBox(height: 12),
+                              _inventoryClassification(wide),
                               const SizedBox(height: 16),
                               _compactFields(wide),
                               const SizedBox(height: 16),
@@ -743,6 +763,101 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _inventoryClassification(bool wide) {
+    const kinds = {'GOODS': 'สินค้า/สิ่งของ', 'SERVICE': 'บริการ'};
+    const tracking = {
+      'NONE': 'ไม่ควบคุมสต็อก',
+      'QUANTITY': 'ควบคุมตามจำนวน',
+      'SERIAL': 'ควบคุมตาม Serial',
+    };
+    const usages = {
+      'SALE': 'ขาย',
+      'MATERIAL': 'วัสดุ',
+      'EQUIPMENT': 'อุปกรณ์',
+      'SPARE_PART': 'อะไหล่',
+    };
+    final kindField = DropdownButtonFormField<String>(
+      initialValue: _itemKind,
+      decoration: const InputDecoration(labelText: '* ชนิดพื้นฐาน'),
+      items: kinds.entries
+          .map(
+            (entry) =>
+                DropdownMenuItem(value: entry.key, child: Text(entry.value)),
+          )
+          .toList(),
+      onChanged: (value) => setState(() {
+        _itemKind = value ?? 'GOODS';
+        if (_itemKind == 'SERVICE') _stockTracking = 'NONE';
+      }),
+    );
+    final trackingField = DropdownButtonFormField<String>(
+      key: ValueKey('$_itemKind-$_stockTracking'),
+      initialValue: _stockTracking,
+      decoration: const InputDecoration(labelText: '* วิธีควบคุมสต็อก'),
+      items: tracking.entries
+          .where((entry) => _itemKind == 'GOODS' || entry.key == 'NONE')
+          .map(
+            (entry) =>
+                DropdownMenuItem(value: entry.key, child: Text(entry.value)),
+          )
+          .toList(),
+      onChanged: _itemKind == 'SERVICE'
+          ? null
+          : (value) => setState(() => _stockTracking = value ?? 'NONE'),
+    );
+    final usageField = FormField<Set<String>>(
+      initialValue: _usageCodes,
+      validator: (_) => _usageCodes.isEmpty
+          ? 'กรุณาเลือกวัตถุประสงค์อย่างน้อย 1 รายการ'
+          : null,
+      builder: (field) => InputDecorator(
+        decoration: InputDecoration(
+          labelText: '* วัตถุประสงค์',
+          errorText: field.errorText,
+        ),
+        child: Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: usages.entries.map((entry) {
+            final selected = _usageCodes.contains(entry.key);
+            return FilterChip(
+              label: Text(entry.value),
+              selected: selected,
+              onSelected: (value) => setState(() {
+                value
+                    ? _usageCodes.add(entry.key)
+                    : _usageCodes.remove(entry.key);
+                if (!_usageCodes.contains('SALE')) _showShop = false;
+                field.didChange(Set<String>.from(_usageCodes));
+              }),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+    if (!wide) {
+      return Column(
+        children: [
+          kindField,
+          const SizedBox(height: 12),
+          trackingField,
+          const SizedBox(height: 12),
+          usageField,
+        ],
+      );
+    }
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: kindField),
+        const SizedBox(width: 12),
+        Expanded(child: trackingField),
+        const SizedBox(width: 12),
+        Expanded(flex: 2, child: usageField),
+      ],
     );
   }
 

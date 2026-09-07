@@ -29,6 +29,7 @@
 - ทุกหน้าจอต้องเต็ม Content Area ภายใน Shared Workspace และไม่สร้าง Shell ซ้อน
 - เมื่อ Content Area แคบกว่า `900px` ต้องใช้ Responsive Layout ที่ไม่เกิด Overflow
 - Action ทุกชนิดต้องตรวจทั้ง `ScreenType` และ Permission ของ User; Backend ต้องตรวจซ้ำ
+- Error ทุกหน้าจอต้องแสดงข้อความหลักพร้อม `รายละเอียดเพิ่มเติม` ที่บอกสาเหตุหรือสิ่งที่ผู้ใช้ควรทำต่อ ตาม `POPUP_UI_STANDARD.md`; ห้ามแสดงข้อความ API แบบกว้างเพียงบรรทัดเดียว
 - แก้ UX/UI โดยไม่เปลี่ยน API, SQL, Repository หรือ Business Logic เว้นแต่คำสั่งระบุชัดเจน
 - หลังแก้ต้องตรวจ Responsive, Overflow, `dart format` และ `dart analyze` พร้อมสรุปไฟล์ที่แก้
 

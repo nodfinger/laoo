@@ -72,7 +72,7 @@ ORDER BY ISNULL(UpdateDate,CreateDate) DESC, PKValue DESC;
                 return Ok(new { code = (string?)null });
             }
             var previewRequest = new ItemUpsertRequest(
-                "", "", request.ItemGroupCode ?? "", request.ItemTypeCode ?? "", 0m, "", 0m, 0m, 0m,
+                "", "", request.ItemGroupCode ?? "", request.ItemTypeCode ?? "", "GOODS", "QUANTITY", ["SALE"], 0m, "", 0m, 0m, 0m,
                 null, null, null, null, null, null, null, null, null, true, false, null, null);
             var code = await GenerateItemCodeAsync(c, tx, previewRequest, token);
             await tx.RollbackAsync(token);
@@ -88,15 +88,19 @@ ORDER BY ISNULL(UpdateDate,CreateDate) DESC, PKValue DESC;
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<ItemListRow>>> List(
         [FromQuery] string? groupCode, [FromQuery] string? typeCode,
-        [FromQuery] string? search, CancellationToken token)
+        [FromQuery] string? itemKindCode, [FromQuery] string? stockTrackingCode,
+        [FromQuery] string? usageCode, [FromQuery] string? search, CancellationToken token)
     {
         await using var c = await OpenAsync(token);
         await EnsureImageStorageSchemaAsync(c, token);
         if (!await CanAsync(c, "VIEW", token)) return StatusCode(StatusCodes.Status403Forbidden, new { message = "ไม่สามารถโหลดรายการสินค้าได้", description = "ผู้ใช้งานไม่มีสิทธิ์ VIEW ของเมนูข้อมูลสินค้า (08001)" });
         const string sql = """
-SELECT I.ItemID,I.ItemCode,I.ItemName,I.ItemGroupCode,I.ItemTypeCode,I.UnitPrice,
+SELECT I.ItemID,I.ItemCode,I.ItemName,I.ItemGroupCode,I.ItemTypeCode,I.ItemKindCode,I.StockTrackingCode,
+       (SELECT STRING_AGG(UU.UsageCode,N',') FROM dbo.TDIVItemUsage UU WHERE UU.CompanyID=I.CompanyID AND UU.ItemID=I.ItemID) AS UsageCodes,
+       I.UnitPrice,
        COALESCE(CONVERT(nvarchar(200), U.Name), CONVERT(nvarchar(200), I.UnitCode)) AS UnitCode,
-       I.StockBalance,I.MinStock,I.PurchaseQuantity,I.OrderCode,I.OrderLink1,I.OrderLink2,I.IsActive,I.ShowShop,
+       COALESCE((SELECT SUM(B.Quantity) FROM dbo.TDIVStockBalance B WHERE B.CompanyID=I.CompanyID AND B.ItemID=I.ItemID),0) AS StockBalance,
+       I.MinStock,I.PurchaseQuantity,I.OrderCode,I.OrderLink1,I.OrderLink2,I.IsActive,I.ShowShop,
        (SELECT TOP 1 ItemImageID FROM dbo.TDIVItemImage X WHERE X.ItemID=I.ItemID AND X.IsCover=1 AND X.IsActive=1) AS CoverImageID
 FROM dbo.TDIVItem I
 LEFT JOIN dbo.TDSTMaster U
@@ -107,6 +111,9 @@ LEFT JOIN dbo.TDSTMaster U
 WHERE I.CompanyID=@company
   AND (@group='' OR I.ItemGroupCode=@group)
   AND (@type='' OR I.ItemTypeCode=@type)
+  AND (@kind='' OR I.ItemKindCode=@kind)
+  AND (@tracking='' OR I.StockTrackingCode=@tracking)
+  AND (@usage='' OR EXISTS(SELECT 1 FROM dbo.TDIVItemUsage IU WHERE IU.CompanyID=I.CompanyID AND IU.ItemID=I.ItemID AND IU.UsageCode=@usage))
   AND (@search='' OR I.ItemCode LIKE @like OR I.ItemName LIKE @like)
 ORDER BY I.ItemCode;
 """;
@@ -115,13 +122,16 @@ ORDER BY I.ItemCode;
         Add(cmd, "@unitGroupCode", SqlDbType.NVarChar, MasterConstCodes.cmsUnit, 10);
         Add(cmd, "@group", SqlDbType.NVarChar, groupCode?.Trim() ?? string.Empty, 50);
         Add(cmd, "@type", SqlDbType.NVarChar, typeCode?.Trim() ?? string.Empty, 50);
+        Add(cmd, "@kind", SqlDbType.NVarChar, itemKindCode?.Trim().ToUpperInvariant() ?? string.Empty, 20);
+        Add(cmd, "@tracking", SqlDbType.NVarChar, stockTrackingCode?.Trim().ToUpperInvariant() ?? string.Empty, 20);
+        Add(cmd, "@usage", SqlDbType.NVarChar, usageCode?.Trim().ToUpperInvariant() ?? string.Empty, 30);
         var q = search?.Trim() ?? string.Empty;
         Add(cmd, "@search", SqlDbType.NVarChar, q, 200);
         Add(cmd, "@like", SqlDbType.NVarChar, $"%{q}%", 210);
         var rows = new List<ItemListRow>();
         await using var r = await cmd.ExecuteReaderAsync(token);
         while (await r.ReadAsync(token))
-            rows.Add(new ItemListRow(r.GetInt64(0), r.GetString(1), r.GetString(2), TextValue(r, 3) ?? string.Empty, TextValue(r, 4) ?? string.Empty, r.GetDecimal(5), TextValue(r, 6) ?? string.Empty, r.GetDecimal(7), r.GetDecimal(8), r.GetDecimal(9), TextValue(r, 10), TextValue(r, 11), TextValue(r, 12), r.GetBoolean(13), r.GetBoolean(14), r.IsDBNull(15) ? null : r.GetInt64(15), null));
+            rows.Add(new ItemListRow(r.GetInt64(0), r.GetString(1), r.GetString(2), TextValue(r, 3) ?? string.Empty, TextValue(r, 4) ?? string.Empty, r.GetString(5), r.GetString(6), ParseUsageCodes(TextValue(r, 7)), r.GetDecimal(8), TextValue(r, 9) ?? string.Empty, r.GetDecimal(10), r.GetDecimal(11), r.GetDecimal(12), TextValue(r, 13), TextValue(r, 14), TextValue(r, 15), r.GetBoolean(16), r.GetBoolean(17), r.IsDBNull(18) ? null : r.GetInt64(18), null));
         await r.DisposeAsync();
         foreach (var index in Enumerable.Range(0, rows.Count))
             rows[index] = rows[index] with { CoverImageBase64 = await CoverImage(c, rows[index].ItemID, token) };
@@ -134,14 +144,14 @@ ORDER BY I.ItemCode;
         await using var c = await OpenAsync(token);
         await EnsureImageStorageSchemaAsync(c, token);
         if (!await CanAsync(c, "VIEW", token)) return Forbid();
-        const string itemSql = "SELECT ItemID,ItemCode,ItemName,ItemGroupCode,ItemTypeCode,UnitPrice,UnitCode,CostPrice,StockBalance,MinStock,PurchaseQuantity,RemarkItem1,Note1,Note2,Note3,Note4,Note5,OrderCode,OrderLink1,OrderLink2,IsActive,ShowShop FROM dbo.TDIVItem WHERE ItemID=@id AND CompanyID=@company";
+        const string itemSql = "SELECT ItemID,ItemCode,ItemName,ItemGroupCode,ItemTypeCode,ItemKindCode,StockTrackingCode,(SELECT STRING_AGG(U.UsageCode,N',') FROM dbo.TDIVItemUsage U WHERE U.CompanyID=I.CompanyID AND U.ItemID=I.ItemID),UnitPrice,UnitCode,CostPrice,COALESCE((SELECT SUM(B.Quantity) FROM dbo.TDIVStockBalance B WHERE B.CompanyID=I.CompanyID AND B.ItemID=I.ItemID),0),MinStock,PurchaseQuantity,RemarkItem1,Note1,Note2,Note3,Note4,Note5,OrderCode,OrderLink1,OrderLink2,IsActive,ShowShop FROM dbo.TDIVItem I WHERE ItemID=@id AND CompanyID=@company";
         await using var item = new SqlCommand(itemSql, c);
         Add(item, "@id", SqlDbType.BigInt, id); Add(item, "@company", SqlDbType.BigInt, CompanyID());
         await using var r = await item.ExecuteReaderAsync(token);
         if (!await r.ReadAsync(token)) return NotFound();
-        var values = new object[] { r.GetInt64(0), r.GetString(1), r.GetString(2), TextValue(r, 3) ?? string.Empty, TextValue(r, 4) ?? string.Empty, r.GetDecimal(5), TextValue(r, 6) ?? string.Empty, r.GetDecimal(7), r.GetDecimal(8), r.GetDecimal(9), r.GetDecimal(10), TextValue(r, 11), TextValue(r, 12), TextValue(r, 13), TextValue(r, 14), TextValue(r, 15), TextValue(r, 16), TextValue(r, 17), TextValue(r, 18), TextValue(r, 19), r.GetBoolean(20), r.GetBoolean(21) };
+        var values = new object?[] { r.GetInt64(0), r.GetString(1), r.GetString(2), TextValue(r, 3) ?? string.Empty, TextValue(r, 4) ?? string.Empty, r.GetString(5), r.GetString(6), ParseUsageCodes(TextValue(r, 7)), r.GetDecimal(8), TextValue(r, 9) ?? string.Empty, r.GetDecimal(10), r.GetDecimal(11), r.GetDecimal(12), r.GetDecimal(13), TextValue(r, 14), TextValue(r, 15), TextValue(r, 16), TextValue(r, 17), TextValue(r, 18), TextValue(r, 19), TextValue(r, 20), TextValue(r, 21), TextValue(r, 22), r.GetBoolean(23), r.GetBoolean(24) };
         await r.DisposeAsync();
-        var detail = new ItemDetail((long)values[0], (string)values[1], (string)values[2], (string)values[3], (string)values[4], (decimal)values[5], (string)values[6], (decimal)values[7], (decimal)values[8], (decimal)values[9], (decimal)values[10], (string?)values[11], (string?)values[12], (string?)values[13], (string?)values[14], (string?)values[15], (string?)values[16], (string?)values[17], (string?)values[18], (string?)values[19], (bool)values[20], (bool)values[21], await PackUnits(c, id, token), await Images(c, id, token));
+        var detail = new ItemDetail((long)values[0]!, (string)values[1]!, (string)values[2]!, (string)values[3]!, (string)values[4]!, (string)values[5]!, (string)values[6]!, (IReadOnlyList<string>)values[7]!, (decimal)values[8]!, (string)values[9]!, (decimal)values[10]!, (decimal)values[11]!, (decimal)values[12]!, (decimal)values[13]!, (string?)values[14], (string?)values[15], (string?)values[16], (string?)values[17], (string?)values[18], (string?)values[19], (string?)values[20], (string?)values[21], (string?)values[22], (bool)values[23]!, (bool)values[24]!, await PackUnits(c, id, token), await Images(c, id, token));
         return Ok(detail);
     }
 
@@ -276,13 +286,15 @@ ORDER BY M.Seq,M.MasterCode;
     {
         await using var c = await OpenAsync(token);
         if (!await CanAsync(c, "EDIT", token)) return Forbid();
-        const string sql = "UPDATE dbo.TDIVItem SET IsActive=@active,ShowShop=@showShop,UpdateDate=SYSUTCDATETIME() WHERE ItemID=@id AND CompanyID=@company";
+        const string sql = "UPDATE I SET IsActive=@active,ShowShop=@showShop,UpdateDate=SYSUTCDATETIME() FROM dbo.TDIVItem I WHERE I.ItemID=@id AND I.CompanyID=@company AND (@showShop=0 OR EXISTS(SELECT 1 FROM dbo.TDIVItemUsage U WHERE U.CompanyID=I.CompanyID AND U.ItemID=I.ItemID AND U.UsageCode=N'SALE'))";
         await using var cmd = new SqlCommand(sql, c);
         Add(cmd, "@active", SqlDbType.Bit, request.IsActive);
         Add(cmd, "@showShop", SqlDbType.Bit, request.ShowShop);
         Add(cmd, "@id", SqlDbType.BigInt, id);
         Add(cmd, "@company", SqlDbType.BigInt, CompanyID());
-        if (await cmd.ExecuteNonQueryAsync(token) == 0) return NotFound();
+        if (await cmd.ExecuteNonQueryAsync(token) == 0) return request.ShowShop
+            ? BadRequest(new { message = "ไม่สามารถเปิดแสดงหน้าร้านได้", description = "Item ต้องมีวัตถุประสงค์ SALE ก่อนเปิดแสดงหน้าร้าน" })
+            : NotFound();
         return NoContent();
     }
 
@@ -309,6 +321,12 @@ ORDER BY M.Seq,M.MasterCode;
             {
                 Add(clearPackUnits, "@id", SqlDbType.BigInt, id);
                 await clearPackUnits.ExecuteNonQueryAsync(token);
+            }
+            await using (var clearUsages = new SqlCommand("DELETE FROM dbo.TDIVItemUsage WHERE ItemID=@id AND CompanyID=@company", c, tx))
+            {
+                Add(clearUsages, "@id", SqlDbType.BigInt, id);
+                Add(clearUsages, "@company", SqlDbType.BigInt, CompanyID());
+                await clearUsages.ExecuteNonQueryAsync(token);
             }
             await using var cmd = new SqlCommand("DELETE FROM dbo.TDIVItem WHERE ItemID=@id AND CompanyID=@company", c, tx);
             Add(cmd, "@id", SqlDbType.BigInt, id); Add(cmd, "@company", SqlDbType.BigInt, CompanyID());
@@ -349,6 +367,23 @@ ORDER BY M.Seq,M.MasterCode;
         }
         var code = string.IsNullOrWhiteSpace(request.ItemCode) ? "AUTO" : request.ItemCode.Trim().ToUpperInvariant();
         var name = request.ItemName?.Trim() ?? string.Empty;
+        var itemKind = request.ItemKindCode?.Trim().ToUpperInvariant() ?? string.Empty;
+        var tracking = request.StockTrackingCode?.Trim().ToUpperInvariant() ?? string.Empty;
+        var usages = (request.UsageCodes ?? [])
+            .Select(x => x?.Trim().ToUpperInvariant() ?? string.Empty)
+            .Where(x => x.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (!ItemCatalogCodes.ItemKinds.Contains(itemKind))
+            return BadRequest(new { message = "ชนิดพื้นฐานไม่ถูกต้อง", description = "กรุณาเลือก GOODS หรือ SERVICE" });
+        if (!ItemCatalogCodes.StockTracking.Contains(tracking))
+            return BadRequest(new { message = "วิธีควบคุมสต็อกไม่ถูกต้อง", description = "กรุณาเลือก NONE, QUANTITY หรือ SERIAL" });
+        if (itemKind == "SERVICE" && tracking != "NONE")
+            return BadRequest(new { message = "บริการไม่สามารถควบคุมสต็อกได้", description = "Item ชนิด SERVICE ต้องใช้ StockTrackingCode เป็น NONE" });
+        if (usages.Length == 0 || usages.Any(x => !ItemCatalogCodes.Usages.Contains(x)))
+            return BadRequest(new { message = "วัตถุประสงค์ไม่ถูกต้อง", description = "Item ต้องมีอย่างน้อยหนึ่งค่าใน SALE, MATERIAL, EQUIPMENT หรือ SPARE_PART" });
+        if (request.ShowShop && !usages.Contains("SALE", StringComparer.OrdinalIgnoreCase))
+            return BadRequest(new { message = "ไม่สามารถเปิดแสดงหน้าร้านได้", description = "Item ต้องมีวัตถุประสงค์ SALE ก่อนเปิดแสดงหน้าร้าน" });
         if (code.Length == 0 || name.Length == 0) return BadRequest(new { message = "กรุณาระบุรหัสสินค้าและชื่อสินค้า" });
         if (request.Images is { Count: > 5 }) return BadRequest(new { message = "สินค้าเก็บรูปได้สูงสุด 5 รูป" });
         var savedImagePaths = new List<string>();
@@ -361,7 +396,7 @@ ORDER BY M.Seq,M.MasterCode;
                 code = await GenerateItemCodeAsync(c, tx, request, token);
                 if (code.Length == 0) return BadRequest(new { message = "กรุณาระบุรหัสสินค้า" });
                 await EnsureItemCodeAvailableAsync(c, tx, code, null, token);
-                const string sql = "INSERT dbo.TDIVItem(CompanyID,ItemGroupCode,ItemTypeCode,ItemCode,ItemName,UnitPrice,UnitCode,CostPrice,MinStock,PurchaseQuantity,RemarkItem1,Note1,Note2,Note3,Note4,Note5,OrderCode,OrderLink1,OrderLink2,IsActive,ShowShop) OUTPUT INSERTED.ItemID VALUES(@company,@group,@type,@code,@name,@price,@unit,@cost,@min,@purchase,@remark1,@note1,@note2,@note3,@note4,@note5,@order,@link1,@link2,@active,@showShop)";
+                const string sql = "INSERT dbo.TDIVItem(CompanyID,ItemGroupCode,ItemTypeCode,ItemKindCode,StockTrackingCode,ItemCode,ItemName,UnitPrice,UnitCode,CostPrice,MinStock,PurchaseQuantity,RemarkItem1,Note1,Note2,Note3,Note4,Note5,OrderCode,OrderLink1,OrderLink2,IsActive,ShowShop) OUTPUT INSERTED.ItemID VALUES(@company,@group,@type,@kind,@tracking,@code,@name,@price,@unit,@cost,@min,@purchase,@remark1,@note1,@note2,@note3,@note4,@note5,@order,@link1,@link2,@active,@showShop)";
                 await using var cmd = new SqlCommand(sql, c, tx);
                 Bind(cmd, request, code, name); itemId = (long)(await cmd.ExecuteScalarAsync(token))!;
             }
@@ -376,12 +411,27 @@ ORDER BY M.Seq,M.MasterCode;
                     code = Convert.ToString(await existing.ExecuteScalarAsync(token), CultureInfo.InvariantCulture)?.Trim().ToUpperInvariant() ?? string.Empty;
                 }
                 await EnsureItemCodeAvailableAsync(c, tx, code, id.Value, token);
-                const string sql = "UPDATE dbo.TDIVItem SET ItemGroupCode=@group,ItemTypeCode=@type,ItemCode=@code,ItemName=@name,UnitPrice=@price,UnitCode=@unit,CostPrice=@cost,MinStock=@min,PurchaseQuantity=@purchase,RemarkItem1=@remark1,Note1=@note1,Note2=@note2,Note3=@note3,Note4=@note4,Note5=@note5,OrderCode=@order,OrderLink1=@link1,OrderLink2=@link2,IsActive=@active,ShowShop=@showShop,UpdateDate=SYSUTCDATETIME() WHERE ItemID=@id AND CompanyID=@company";
+                const string sql = "UPDATE dbo.TDIVItem SET ItemGroupCode=@group,ItemTypeCode=@type,ItemKindCode=@kind,StockTrackingCode=@tracking,ItemCode=@code,ItemName=@name,UnitPrice=@price,UnitCode=@unit,CostPrice=@cost,MinStock=@min,PurchaseQuantity=@purchase,RemarkItem1=@remark1,Note1=@note1,Note2=@note2,Note3=@note3,Note4=@note4,Note5=@note5,OrderCode=@order,OrderLink1=@link1,OrderLink2=@link2,IsActive=@active,ShowShop=@showShop,UpdateDate=SYSUTCDATETIME() WHERE ItemID=@id AND CompanyID=@company";
                 await using var cmd = new SqlCommand(sql, c, tx);
                 // Bind already adds @company. Do not add it again to this command.
                 Bind(cmd, request, code, name); Add(cmd, "@id", SqlDbType.BigInt, id.Value);
                 if (await cmd.ExecuteNonQueryAsync(token) == 0) return NotFound();
                 itemId = id.Value;
+            }
+            await using (var clearUsage = new SqlCommand("DELETE FROM dbo.TDIVItemUsage WHERE CompanyID=@company AND ItemID=@id", c, tx))
+            {
+                Add(clearUsage, "@company", SqlDbType.BigInt, CompanyID());
+                Add(clearUsage, "@id", SqlDbType.BigInt, itemId);
+                await clearUsage.ExecuteNonQueryAsync(token);
+            }
+            foreach (var usage in usages)
+            {
+                await using var usageCommand = new SqlCommand("INSERT dbo.TDIVItemUsage(CompanyID,ItemID,UsageCode,CreatedBy) VALUES(@company,@id,@usage,@user)", c, tx);
+                Add(usageCommand, "@company", SqlDbType.BigInt, CompanyID());
+                Add(usageCommand, "@id", SqlDbType.BigInt, itemId);
+                Add(usageCommand, "@usage", SqlDbType.NVarChar, usage, 30);
+                Add(usageCommand, "@user", SqlDbType.BigInt, UserId());
+                await usageCommand.ExecuteNonQueryAsync(token);
             }
             await using (var clearUnits = new SqlCommand("DELETE FROM dbo.TDIVItemPackUnit WHERE ItemID=@id", c, tx)) { Add(clearUnits, "@id", SqlDbType.BigInt, itemId); await clearUnits.ExecuteNonQueryAsync(token); }
             foreach (var u in request.PackUnits ?? [])
@@ -688,5 +738,7 @@ END;
     }
     private static void Add(SqlCommand c, string name, SqlDbType type, object value, int size = 0) { var p = c.Parameters.Add(name, type); if (size > 0) p.Size = size; p.Value = value ?? DBNull.Value; }
     private static string? TextValue(SqlDataReader r, int ordinal) => r.IsDBNull(ordinal) ? null : Convert.ToString(r.GetValue(ordinal), CultureInfo.InvariantCulture);
-    private void Bind(SqlCommand c, ItemUpsertRequest r, string code, string name) { Add(c, "@company", SqlDbType.BigInt, CompanyID()); Add(c, "@group", SqlDbType.NVarChar, r.ItemGroupCode.Trim(), 50); Add(c, "@type", SqlDbType.NVarChar, r.ItemTypeCode.Trim(), 50); Add(c, "@code", SqlDbType.NVarChar, code, 50); Add(c, "@name", SqlDbType.NVarChar, name, 200); Add(c, "@price", SqlDbType.Decimal, r.UnitPrice); Add(c, "@unit", SqlDbType.NVarChar, r.UnitCode.Trim(), 50); Add(c, "@cost", SqlDbType.Decimal, r.CostPrice); Add(c, "@min", SqlDbType.Decimal, r.MinStock); Add(c, "@purchase", SqlDbType.Decimal, r.PurchaseQuantity); Add(c, "@remark1", SqlDbType.NVarChar, (object?)r.RemarkItem1?.Trim() ?? DBNull.Value, 2000); Add(c, "@note1", SqlDbType.NVarChar, (object?)r.Note1?.Trim() ?? DBNull.Value, 1000); Add(c, "@note2", SqlDbType.NVarChar, (object?)r.Note2?.Trim() ?? DBNull.Value, 1000); Add(c, "@note3", SqlDbType.NVarChar, (object?)r.Note3?.Trim() ?? DBNull.Value, 1000); Add(c, "@note4", SqlDbType.NVarChar, (object?)r.Note4?.Trim() ?? DBNull.Value, 1000); Add(c, "@note5", SqlDbType.NVarChar, (object?)r.Note5?.Trim() ?? DBNull.Value, 1000); Add(c, "@order", SqlDbType.NVarChar, (object?)r.OrderCode?.Trim() ?? DBNull.Value, 400); Add(c, "@link1", SqlDbType.NVarChar, (object?)r.OrderLink1?.Trim() ?? DBNull.Value, 2000); Add(c, "@link2", SqlDbType.NVarChar, (object?)r.OrderLink2?.Trim() ?? DBNull.Value, 2000); Add(c, "@active", SqlDbType.Bit, r.IsActive); Add(c, "@showShop", SqlDbType.Bit, r.ShowShop); }
+    private static IReadOnlyList<string> ParseUsageCodes(string? value) => string.IsNullOrWhiteSpace(value) ? [] : value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    private long UserId() => long.TryParse(User.FindFirstValue("user_id"), out var id) ? id : 0;
+    private void Bind(SqlCommand c, ItemUpsertRequest r, string code, string name) { Add(c, "@company", SqlDbType.BigInt, CompanyID()); Add(c, "@group", SqlDbType.NVarChar, r.ItemGroupCode.Trim(), 50); Add(c, "@type", SqlDbType.NVarChar, r.ItemTypeCode.Trim(), 50); Add(c, "@kind", SqlDbType.NVarChar, r.ItemKindCode.Trim().ToUpperInvariant(), 20); Add(c, "@tracking", SqlDbType.NVarChar, r.StockTrackingCode.Trim().ToUpperInvariant(), 20); Add(c, "@code", SqlDbType.NVarChar, code, 50); Add(c, "@name", SqlDbType.NVarChar, name, 200); Add(c, "@price", SqlDbType.Decimal, r.UnitPrice); Add(c, "@unit", SqlDbType.NVarChar, r.UnitCode.Trim(), 50); Add(c, "@cost", SqlDbType.Decimal, r.CostPrice); Add(c, "@min", SqlDbType.Decimal, r.MinStock); Add(c, "@purchase", SqlDbType.Decimal, r.PurchaseQuantity); Add(c, "@remark1", SqlDbType.NVarChar, (object?)r.RemarkItem1?.Trim() ?? DBNull.Value, 2000); Add(c, "@note1", SqlDbType.NVarChar, (object?)r.Note1?.Trim() ?? DBNull.Value, 1000); Add(c, "@note2", SqlDbType.NVarChar, (object?)r.Note2?.Trim() ?? DBNull.Value, 1000); Add(c, "@note3", SqlDbType.NVarChar, (object?)r.Note3?.Trim() ?? DBNull.Value, 1000); Add(c, "@note4", SqlDbType.NVarChar, (object?)r.Note4?.Trim() ?? DBNull.Value, 1000); Add(c, "@note5", SqlDbType.NVarChar, (object?)r.Note5?.Trim() ?? DBNull.Value, 1000); Add(c, "@order", SqlDbType.NVarChar, (object?)r.OrderCode?.Trim() ?? DBNull.Value, 400); Add(c, "@link1", SqlDbType.NVarChar, (object?)r.OrderLink1?.Trim() ?? DBNull.Value, 2000); Add(c, "@link2", SqlDbType.NVarChar, (object?)r.OrderLink2?.Trim() ?? DBNull.Value, 2000); Add(c, "@active", SqlDbType.Bit, r.IsActive); Add(c, "@showShop", SqlDbType.Bit, r.ShowShop); }
 }

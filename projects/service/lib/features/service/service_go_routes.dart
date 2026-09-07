@@ -8,6 +8,7 @@ import '../company/pre_order/pages/pre_order_page.dart';
 import '../company/quotation/pages/quotation_page.dart';
 import '../company/tax_invoice/pages/tax_invoice_page.dart';
 import '../company/temporary_receipt/pages/temporary_receipt_page.dart';
+import '../inventory/pages/inventory_pages.dart';
 import '../support/presentation/widgets/support_workspace_shell.dart';
 import 'service_route_contract.dart';
 
@@ -58,6 +59,11 @@ List<GoRoute> buildServiceFeatureRoutes() => [
       taxInvoiceId: int.tryParse(state.uri.queryParameters['id'] ?? ''),
     ),
   ),
+  _page('08002', (state) => const InventoryItemCatalogPage()),
+  _page('08003', (state) => const InventoryIssuePage()),
+  _page('08004', (state) => const WarehousePage()),
+  _page('08005', (state) => const StockReceiptPage()),
+  _page('08006', (state) => const SerialRegistryPage()),
   ..._workspacePlaceholders.entries.map(
     (entry) =>
         _workspacePlaceholder(ServiceRoutes.byMenuCode(entry.key), entry.value),
@@ -110,8 +116,6 @@ const _workspacePlaceholders = <String, String>{
   '17001': 'กระดานจ่ายงานช่าง',
   '17002': 'ทะเบียนใบงานทั้งหมด',
   '17003': 'บันทึกปิดงานและตรวจรับ',
-  '08002': 'รายการอะไหล่และวัสดุ',
-  '08003': 'เบิก-จ่ายอะไหล่ตามใบงาน',
   '19001': 'แดชบอร์ดภาพรวมงานบริการ',
   '19002': 'ประวัติการซ่อมและค่าใช้จ่าย',
   '19003': 'รายงานผลประเมินความพึงพอใจ',

@@ -6,6 +6,9 @@ public sealed record ItemListRow(
     string ItemName,
     string ItemGroupCode,
     string ItemTypeCode,
+    string ItemKindCode,
+    string StockTrackingCode,
+    IReadOnlyList<string> UsageCodes,
     decimal UnitPrice,
     string UnitCode,
     decimal StockBalance,
@@ -44,6 +47,9 @@ public sealed record ItemDetail(
     string ItemName,
     string ItemGroupCode,
     string ItemTypeCode,
+    string ItemKindCode,
+    string StockTrackingCode,
+    IReadOnlyList<string> UsageCodes,
     decimal UnitPrice,
     string UnitCode,
     decimal CostPrice,
@@ -69,6 +75,9 @@ public sealed record ItemUpsertRequest(
     string ItemName,
     string ItemGroupCode,
     string ItemTypeCode,
+    string ItemKindCode,
+    string StockTrackingCode,
+    IReadOnlyList<string> UsageCodes,
     decimal UnitPrice,
     string UnitCode,
     decimal CostPrice,
@@ -109,3 +118,21 @@ public sealed record ItemPriceRow(
 public sealed record ItemPricesRequest(IReadOnlyList<ItemPriceInput> Items);
 
 public sealed record ItemPriceInput(string PriceLevelCode, decimal SalePrice);
+
+public static class ItemCatalogCodes
+{
+    public static readonly HashSet<string> ItemKinds = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "GOODS", "SERVICE",
+    };
+
+    public static readonly HashSet<string> StockTracking = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "NONE", "QUANTITY", "SERIAL",
+    };
+
+    public static readonly HashSet<string> Usages = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "SALE", "MATERIAL", "EQUIPMENT", "SPARE_PART",
+    };
+}

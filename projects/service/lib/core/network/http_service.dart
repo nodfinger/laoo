@@ -185,6 +185,7 @@ class HttpService {
     }
 
     String message = 'เกิดข้อผิดพลาดในการเรียก API';
+    final descriptions = <String>[];
 
     if (data is Map<String, dynamic>) {
       message =
@@ -192,7 +193,7 @@ class HttpService {
       final description =
           data['description']?.toString() ?? data['detail']?.toString();
       if (description != null && description.trim().isNotEmpty) {
-        message = '$message: $description';
+        descriptions.add(description.trim());
       }
       final errors = data['errors'];
       if (errors is Map) {
@@ -206,12 +207,18 @@ class HttpService {
             .where((value) => value.trim().isNotEmpty)
             .join('\n');
         if (validationDetails.isNotEmpty) {
-          message = '$message\n$validationDetails';
+          descriptions.add(validationDetails);
         }
       }
     } else if (data is String && data.trim().isNotEmpty) {
       message = data;
     }
+
+    if (descriptions.isEmpty) {
+      descriptions.add(_fallbackErrorDescription(response.statusCode));
+    }
+    message =
+        '$message\nรายละเอียดเพิ่มเติม: ${descriptions.toSet().join('\n')}';
 
     throw ApiException(
       statusCode: response.statusCode,
@@ -219,6 +226,21 @@ class HttpService {
       details: data,
     );
   }
+
+  String _fallbackErrorDescription(int statusCode) => switch (statusCode) {
+    401 => 'Session หมดอายุหรือยังไม่ได้เข้าสู่ระบบ กรุณาเข้าสู่ระบบใหม่',
+    403 =>
+      'บัญชีนี้ไม่มีสิทธิ์ดำเนินการ กรุณาติดต่อผู้ดูแลระบบเพื่อตรวจสอบสิทธิ์',
+    404 => 'ไม่พบข้อมูลหรือบริการที่ร้องขอ กรุณาตรวจสอบรายการแล้วลองใหม่',
+    408 || 504 => 'ระบบใช้เวลาตอบสนองนานเกินไป กรุณาลองใหม่อีกครั้ง',
+    409 =>
+      'ข้อมูลมีการเปลี่ยนแปลงหรือกำลังถูกใช้งาน กรุณาโหลดข้อมูลใหม่แล้วลองอีกครั้ง',
+    422 => 'ข้อมูลบางรายการไม่ถูกต้อง กรุณาตรวจสอบข้อมูลที่กรอกแล้วลองใหม่',
+    >= 500 =>
+      'ระบบฝั่งเซิร์ฟเวอร์ขัดข้อง กรุณาลองใหม่อีกครั้งหรือติดต่อผู้ดูแลระบบ',
+    _ =>
+      'ไม่สามารถดำเนินการได้ กรุณาลองใหม่อีกครั้ง หากยังพบปัญหาให้ติดต่อผู้ดูแลระบบ',
+  };
 
   void dispose() {
     _client.close();

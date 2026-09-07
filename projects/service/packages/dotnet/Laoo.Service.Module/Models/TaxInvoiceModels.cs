@@ -28,5 +28,7 @@ public sealed class TaxInvoiceLineRequest
     public string? DiscountType { get; init; }
     public decimal DiscountPercent { get; init; }
     public decimal DiscountAmount { get; init; }
+    public long? WarehouseId { get; init; }
+    public IReadOnlyList<long> SerialInstanceIds { get; init; } = [];
     public string? Remark { get; init; }
 }
