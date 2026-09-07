@@ -135,7 +135,8 @@ public sealed class PreOrderController(IConfiguration configuration) : Controlle
              AND U.MasterCode=I.UnitCode
              AND U.OwnerType=N'C'
              AND U.OwnerCompanyID=I.CompanyID
-            WHERE I.CompanyID=@company AND I.IsActive=1
+            WHERE I.CompanyID=@company AND I.IsActive=1 AND I.ItemKindCode=N'GOODS'
+              AND EXISTS(SELECT 1 FROM dbo.TDIVItemUsage IU WHERE IU.CompanyID=I.CompanyID AND IU.ItemID=I.ItemID AND IU.UsageCode=N'SALE')
             ORDER BY I.ItemCode;
             """;
         await using (var command = new SqlCommand(itemSql, connection))
@@ -516,7 +517,7 @@ public sealed class PreOrderController(IConfiguration configuration) : Controlle
         var status = string.IsNullOrWhiteSpace(line.StatusCode) ? "WAITING_STOCK" : line.StatusCode.Trim().ToUpperInvariant();
         if (!DetailStatuses.Contains(status)) return (null, null, $"ไม่รองรับสถานะรายการ {status}");
 
-        const string itemSql = "SELECT ItemCode,ItemName,UnitCode FROM dbo.TDIVItem WHERE ItemID=@item AND CompanyID=@company AND IsActive=1";
+        const string itemSql = "SELECT ItemCode,ItemName,UnitCode FROM dbo.TDIVItem I WHERE ItemID=@item AND CompanyID=@company AND IsActive=1 AND ItemKindCode=N'GOODS' AND EXISTS(SELECT 1 FROM dbo.TDIVItemUsage U WHERE U.CompanyID=I.CompanyID AND U.ItemID=I.ItemID AND U.UsageCode=N'SALE')";
         await using var itemCommand = new SqlCommand(itemSql, connection, transaction);
         Add(itemCommand, "@item", SqlDbType.BigInt, line.ItemId);
         Add(itemCommand, "@company", SqlDbType.BigInt, CompanyId());

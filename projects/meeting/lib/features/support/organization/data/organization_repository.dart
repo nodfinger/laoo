@@ -1,34 +1,34 @@
 import '../../../../core/api/api_client.dart';
 
 class OrganizationRepository {
-  OrganizationRepository({ApiClient? api}) : _api = api ?? ApiClient();
-  final ApiClient _api;
-  Future<Map<String, bool>> actions() async { final data = await _api.get('/api/support/organization-structure/actions'); if (data is! Map) return const {}; return Map<String, bool>.fromEntries(data.entries.map((e) => MapEntry('${e.key}', e.value == true))); }
+  OrganizationRepository({ApiClient? api, bool company = false})
+    : _api = api ?? ApiClient(),
+      _path = company
+          ? '/api/company/organization-structure'
+          : '/api/support/organization-structure';
 
-  Future<Map<String, dynamic>> load() async => Map<String, dynamic>.from(
-        await _api.get(
-          '/api/support/organization-structure',
-        ) as Map,
-      );
+  final ApiClient _api;
+  final String _path;
+
+  Future<Map<String, bool>> actions() async {
+    final data = await _api.get('$_path/actions');
+    if (data is! Map) return const {};
+    return Map<String, bool>.fromEntries(
+      data.entries.map((e) => MapEntry('${e.key}', e.value == true)),
+    );
+  }
+
+  Future<Map<String, dynamic>> load() async =>
+      Map<String, dynamic>.from(await _api.get(_path) as Map);
 
   Future<void> create(Map<String, dynamic> body) async =>
-      _api.post(
-        '/api/support/organization-structure',
-        body: body,
-      );
+      _api.post(_path, body: body);
 
-  Future<void> updateMode(int mode) async => _api.put(
-        '/api/support/organization-structure/mode',
-        body: {'orgStructureType': mode},
-      );
+  Future<void> updateMode(int mode) async =>
+      _api.put('$_path/mode', body: {'orgStructureType': mode});
 
   Future<void> update(int id, Map<String, dynamic> body) async =>
-      _api.put(
-        '/api/support/organization-structure/$id',
-        body: body,
-      );
+      _api.put('$_path/$id', body: body);
 
-  Future<void> delete(int id) async => _api.delete(
-        '/api/support/organization-structure/$id',
-      );
+  Future<void> delete(int id) async => _api.delete('$_path/$id');
 }

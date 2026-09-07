@@ -34,6 +34,9 @@ class ItemApi {
   Future<List<Map<String, dynamic>>> list({
     String? groupCode,
     String? typeCode,
+    String? itemKindCode,
+    String? stockTrackingCode,
+    String? usageCode,
     String? search,
   }) async => List<Map<String, dynamic>>.from(
     await _client.get(
@@ -41,6 +44,10 @@ class ItemApi {
           query: {
             if (groupCode?.isNotEmpty == true) 'groupCode': groupCode!,
             if (typeCode?.isNotEmpty == true) 'typeCode': typeCode!,
+            if (itemKindCode?.isNotEmpty == true) 'itemKindCode': itemKindCode!,
+            if (stockTrackingCode?.isNotEmpty == true)
+              'stockTrackingCode': stockTrackingCode!,
+            if (usageCode?.isNotEmpty == true) 'usageCode': usageCode!,
             if (search?.trim().isNotEmpty == true) 'search': search!.trim(),
           },
         )

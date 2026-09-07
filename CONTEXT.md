@@ -43,3 +43,33 @@ _Avoid_: Repository แยก, สำเนา Core
 **Legacy Project Copy**:
 โฟลเดอร์หรือ repository เดิมที่เก็บไว้เพื่อกู้คืนหรือเทียบประวัติเท่านั้น และห้ามใช้พัฒนา Feature ใหม่
 _Avoid_: Active Project, Source of Truth
+
+## Inventory Language
+
+**Item**:
+ทะเบียนกลางของสิ่งที่ Company ซื้อ ขาย ใช้ หรือนำไปให้บริการ โดยรหัสเดียวอาจมีหลายวัตถุประสงค์
+_Avoid_: Product, Spare Part, Material เมื่อหมายถึงทะเบียนหลัก
+
+**Item Kind**:
+ลักษณะพื้นฐานของ Item ว่าเป็นสิ่งของ (`GOODS`) หรือบริการ (`SERVICE`)
+_Avoid_: Item Type, Usage
+
+**Stock Tracking**:
+ระดับการควบคุมคงเหลือของ Item ได้แก่ไม่ควบคุม (`NONE`), ตามจำนวน (`QUANTITY`) หรือตาม Serial (`SERIAL`)
+_Avoid_: Item Kind, Usage
+
+**Item Usage**:
+วัตถุประสงค์ที่ Item ถูกนำไปใช้ ได้แก่ขาย วัสดุ อุปกรณ์ หรืออะไหล่ โดย Item หนึ่งรายการมีได้หลาย Usage
+_Avoid_: Item Group, Item Type
+
+**Warehouse**:
+สถานที่เก็บ Item ภายใต้ Branch ซึ่งเป็นขอบเขตของยอดคงเหลือและการเคลื่อนไหว
+_Avoid_: Branch, Room
+
+**Item Instance**:
+หน่วยจริงหนึ่งชิ้นของ Item แบบ Serial ซึ่งมี Serial สถานะ และตำแหน่งปัจจุบันเฉพาะตัว
+_Avoid_: Item, Stock Balance
+
+**Inventory Fulfillment**:
+หลักฐานว่ารายการต้นทางถูกตัดสต็อกโดยเอกสารใดแล้ว เพื่อป้องกันการตัดจำนวนหรือ Serial ซ้ำ
+_Avoid_: Stock Movement, Invoice Line

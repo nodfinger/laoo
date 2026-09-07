@@ -25,5 +25,7 @@ public sealed class DeliveryNoteLineRequest
     public decimal PreviouslyDeliveredQty { get; init; }
     public decimal DeliveryQty { get; init; }
     public decimal UnitPrice { get; init; }
+    public long? WarehouseId { get; init; }
+    public IReadOnlyList<long> SerialInstanceIds { get; init; } = [];
     public string? Remark { get; init; }
 }

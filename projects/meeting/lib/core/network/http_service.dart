@@ -84,13 +84,26 @@ class HttpService {
     return _decode(response);
   }
 
-  Future<dynamic> upload(String path, {required List<int> bytes, required String filename}) async {
+  Future<dynamic> upload(
+    String path, {
+    required List<int> bytes,
+    required String filename,
+  }) async {
     final request = http.MultipartRequest('POST', _buildUri(path));
     final token = await _authStorage.readAccessToken();
-    if (token == null || token.isEmpty) throw const ApiException(statusCode: 401, message: 'ไม่พบ Access Token กรุณาเข้าสู่ระบบใหม่');
+    if (token == null || token.isEmpty) {
+      throw const ApiException(
+        statusCode: 401,
+        message: 'ไม่พบ Access Token กรุณาเข้าสู่ระบบใหม่',
+      );
+    }
     request.headers['Authorization'] = 'Bearer $token';
-    request.files.add(http.MultipartFile.fromBytes('file', bytes, filename: filename));
-    final response = await http.Response.fromStream(await request.send().timeout(ApiConfig.requestTimeout));
+    request.files.add(
+      http.MultipartFile.fromBytes('file', bytes, filename: filename),
+    );
+    final response = await http.Response.fromStream(
+      await request.send().timeout(ApiConfig.requestTimeout),
+    );
     return _decode(response);
   }
 
@@ -144,17 +157,40 @@ class HttpService {
     }
 
     String message = 'เกิดข้อผิดพลาดในการเรียก API';
+    final descriptions = <String>[];
 
     if (data is Map<String, dynamic>) {
       message =
           data['message']?.toString() ?? data['title']?.toString() ?? message;
-      final description = data['description']?.toString();
+      final description =
+          data['description']?.toString() ?? data['detail']?.toString();
       if (description != null && description.trim().isNotEmpty) {
-        message = '$message: $description';
+        descriptions.add(description.trim());
+      }
+      final errors = data['errors'];
+      if (errors is Map) {
+        final validationDetails = errors.entries
+            .map((entry) {
+              final value = entry.value is List
+                  ? (entry.value as List).join(', ')
+                  : entry.value.toString();
+              return '${entry.key}: $value';
+            })
+            .where((value) => value.trim().isNotEmpty)
+            .join('\n');
+        if (validationDetails.isNotEmpty) {
+          descriptions.add(validationDetails);
+        }
       }
     } else if (data is String && data.trim().isNotEmpty) {
       message = data;
     }
+
+    if (descriptions.isEmpty) {
+      descriptions.add(_fallbackErrorDescription(response.statusCode));
+    }
+    message =
+        '$message\nรายละเอียดเพิ่มเติม: ${descriptions.toSet().join('\n')}';
 
     throw ApiException(
       statusCode: response.statusCode,
@@ -162,6 +198,21 @@ class HttpService {
       details: data,
     );
   }
+
+  String _fallbackErrorDescription(int statusCode) => switch (statusCode) {
+    401 => 'Session หมดอายุหรือยังไม่ได้เข้าสู่ระบบ กรุณาเข้าสู่ระบบใหม่',
+    403 =>
+      'บัญชีนี้ไม่มีสิทธิ์ดำเนินการ กรุณาติดต่อผู้ดูแลระบบเพื่อตรวจสอบสิทธิ์',
+    404 => 'ไม่พบข้อมูลหรือบริการที่ร้องขอ กรุณาตรวจสอบรายการแล้วลองใหม่',
+    408 || 504 => 'ระบบใช้เวลาตอบสนองนานเกินไป กรุณาลองใหม่อีกครั้ง',
+    409 =>
+      'ข้อมูลมีการเปลี่ยนแปลงหรือกำลังถูกใช้งาน กรุณาโหลดข้อมูลใหม่แล้วลองอีกครั้ง',
+    422 => 'ข้อมูลบางรายการไม่ถูกต้อง กรุณาตรวจสอบข้อมูลที่กรอกแล้วลองใหม่',
+    >= 500 =>
+      'ระบบฝั่งเซิร์ฟเวอร์ขัดข้อง กรุณาลองใหม่อีกครั้งหรือติดต่อผู้ดูแลระบบ',
+    _ =>
+      'ไม่สามารถดำเนินการได้ กรุณาลองใหม่อีกครั้ง หากยังพบปัญหาให้ติดต่อผู้ดูแลระบบ',
+  };
 
   void dispose() {
     _client.close();

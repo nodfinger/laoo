@@ -6,6 +6,7 @@ import '../../../../core/widgets/timed_snack_bar.dart';
 import '../../../../core/widgets/pinned_data_table.dart';
 
 import '../../../../app/theme/laoo_typography.dart';
+import '../../../../app/theme/laoo_design_tokens.dart';
 import '../../../../app/theme/workspace_theme_presets.dart';
 import '../../../../core/company_setup/company_setup_controller.dart';
 import '../data/master_data_api.dart';
@@ -521,7 +522,7 @@ class _MasterDataPageState extends State<MasterDataPage> {
     return ColoredBox(
       color: const Color(0xFFF8F9FB),
       child: ListView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(LaooLayout.cardMargin),
         children: [
           Card(
             color: Colors.white,
@@ -604,8 +605,7 @@ class _MasterDataPageState extends State<MasterDataPage> {
               ),
             ),
           ),
-          const Divider(height: 1, color: Color(0xFFF5F6F7)),
-          const SizedBox(height: 8),
+          const SizedBox(height: LaooLayout.cardSpacing),
           Card(
             color: Colors.white,
             elevation: 0,
@@ -698,7 +698,7 @@ class _MasterDataPageState extends State<MasterDataPage> {
               ),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: LaooLayout.cardSpacing),
           LayoutBuilder(
             builder: (context, constraints) {
               if (_card || constraints.maxWidth < 600) {
@@ -716,104 +716,100 @@ class _MasterDataPageState extends State<MasterDataPage> {
                 ),
                 elevation: 0,
                 clipBehavior: Clip.antiAlias,
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(minWidth: constraints.maxWidth),
-                    child: PinnedDataTable(
-                      sortColumnIndex: _sortColumn,
-                      sortAscending: _sortAscending,
-                      border: TableBorder(
-                        top: BorderSide.none,
-                        bottom: BorderSide.none,
-                        left: BorderSide.none,
-                        right: BorderSide.none,
-                        horizontalInside: BorderSide(
-                          color: const Color(0xFFD1D5DB),
-                          width: .5,
-                        ),
-                      ),
-                      headingRowColor: WidgetStatePropertyAll(
-                        accent.withValues(alpha: .10),
-                      ),
-                      headingTextStyle: TextStyle(
-                        fontSize: LaooTypography.tableHeader,
-                        fontWeight: FontWeight.w700,
-                        color: accent,
-                      ),
-                      dataTextStyle: TextStyle(
-                        fontSize: LaooTypography.tableBody,
-                        color: theme.colorScheme.onSurface,
-                      ),
-                      columns: [
-                        LaooTableColumns.id,
-                        const DataColumn(
-                          label: SizedBox(
-                            width: 100,
-                            child: Center(child: Text('Action')),
-                          ),
-                        ),
-                        DataColumn(label: const Text('รหัส'), onSort: _sort),
-                        DataColumn(label: const Text('ชื่อ'), onSort: _sort),
-                        DataColumn(
-                          label: const Text('เรียงลำดับแสดง'),
-                          onSort: _sort,
-                        ),
-                        DataColumn(label: const Text('รหัสย่อ'), onSort: _sort),
-                      ],
-                      rows: _filteredRows.asMap().entries.map((entry) {
-                        final row = entry.value;
-                        return DataRow(
-                          cells: [
-                            DataCell(
-                              Text(
-                                '${(_currentPage * _pageSize) + entry.key + 1}',
-                              ),
-                            ),
-                            DataCell(
-                              SizedBox(
-                                width: 100,
-                                child: Center(
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      if (_canEdit)
-                                        IconButton(
-                                          tooltip: 'แก้ไข',
-                                          onPressed: () => _startEdit(row),
-                                          icon: Icon(
-                                            Icons.edit_outlined,
-                                            color: accent,
-                                          ),
-                                        ),
-                                      if (_canDelete)
-                                        IconButton(
-                                          tooltip: 'ลบ',
-                                          onPressed: () => _delete(row),
-                                          icon: const Icon(
-                                            Icons.delete_outline,
-                                            color: Colors.red,
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                            DataCell(Text(row.code)),
-                            DataCell(Text(row.name)),
-                            DataCell(Text('${row.seq}')),
-                            DataCell(Text(row.shortCode)),
-                          ],
-                        );
-                      }).toList(),
+                child: PinnedDataTable(
+                  horizontalMargin: 8,
+                  columnSpacing: 16,
+                  dataRowMinHeight: 48,
+                  dataRowMaxHeight: 56,
+                  sortColumnIndex: _sortColumn,
+                  sortAscending: _sortAscending,
+                  border: TableBorder(
+                    top: BorderSide.none,
+                    bottom: BorderSide.none,
+                    left: BorderSide.none,
+                    right: BorderSide.none,
+                    horizontalInside: BorderSide(
+                      color: const Color(0xFFD1D5DB),
+                      width: .5,
                     ),
                   ),
+                  headingRowColor: WidgetStatePropertyAll(
+                    accent.withValues(alpha: .10),
+                  ),
+                  headingTextStyle: TextStyle(
+                    fontSize: LaooTypography.tableHeader,
+                    fontWeight: FontWeight.w700,
+                    color: accent,
+                  ),
+                  dataTextStyle: TextStyle(
+                    fontSize: LaooTypography.tableBody,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                  columns: [
+                    LaooTableColumns.id,
+                    const DataColumn(
+                      label: SizedBox(
+                        width: 100,
+                        child: Center(child: Text('Action')),
+                      ),
+                    ),
+                    DataColumn(label: const Text('รหัส'), onSort: _sort),
+                    DataColumn(label: const Text('ชื่อ'), onSort: _sort),
+                    DataColumn(
+                      label: const Text('เรียงลำดับแสดง'),
+                      onSort: _sort,
+                    ),
+                    DataColumn(label: const Text('รหัสย่อ'), onSort: _sort),
+                  ],
+                  rows: _filteredRows.asMap().entries.map((entry) {
+                    final row = entry.value;
+                    return DataRow(
+                      cells: [
+                        DataCell(
+                          Text('${(_currentPage * _pageSize) + entry.key + 1}'),
+                        ),
+                        DataCell(
+                          SizedBox(
+                            width: 100,
+                            child: Center(
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (_canEdit)
+                                    IconButton(
+                                      tooltip: 'แก้ไข',
+                                      onPressed: () => _startEdit(row),
+                                      icon: Icon(
+                                        Icons.edit_outlined,
+                                        color: accent,
+                                      ),
+                                    ),
+                                  if (_canDelete)
+                                    IconButton(
+                                      tooltip: 'ลบ',
+                                      onPressed: () => _delete(row),
+                                      icon: const Icon(
+                                        Icons.delete_outline,
+                                        color: Colors.red,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        DataCell(Text(row.code)),
+                        DataCell(Text(row.name)),
+                        DataCell(Text('${row.seq}')),
+                        DataCell(Text(row.shortCode)),
+                      ],
+                    );
+                  }).toList(),
                 ),
               );
             },
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: LaooLayout.cardSpacing),
           Card(
             color: Colors.white,
             elevation: 0,

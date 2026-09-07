@@ -24,7 +24,11 @@
 - Success/Error Notification ต้องลอยมุมขวาบนของ Content Area ไม่ดัน Layout และไม่บังพื้นที่ข้อมูลหลัก
 - Notification ต้องหายอัตโนมัติตาม `TDSTCompanySetUp.TimeAlert` ผ่าน `CompanySetupController` และกดปิดเองได้
 - พื้นหลัง Notification ใช้ Primary ของ User Style ความทึบ `50%`; Error ใช้สีแดงได้
-- Error ต้องแสดงทั้ง `message` และ `description` ที่ API ส่งกลับมาเมื่อมีค่า
+- Error Notification ทุกจุดต้องแสดงอย่างน้อย 2 ส่วน: ข้อความหลัก (`message`) และ `รายละเอียดเพิ่มเติม` ที่อธิบายสาเหตุหรือสิ่งที่ผู้ใช้ควรทำต่อ
+- ห้ามแสดงเพียง `เกิดข้อผิดพลาดในการเรียก API`, ชื่อ Exception, Stack Trace หรือรหัส HTTP โดยไม่มีคำอธิบาย
+- ถ้า API ส่ง `description`, `detail` หรือ Validation `errors` ให้แสดงข้อมูลนั้นใต้ข้อความหลักโดยไม่แสดงซ้ำ
+- ถ้า API ไม่ส่งคำอธิบาย ให้ HTTP Client เติมข้อความสำรองตามสถานะ เช่น Session หมดอายุ, ไม่มีสิทธิ์, ไม่พบข้อมูล, ข้อมูลขัดแย้ง, Timeout หรือ Server ขัดข้อง
+- ข้อความสำหรับผู้ใช้ต้องไม่เปิดเผย SQL, Connection String, Secret, Stack Trace หรือรายละเอียดภายในระบบ
 
 ## Delete Confirmation
 

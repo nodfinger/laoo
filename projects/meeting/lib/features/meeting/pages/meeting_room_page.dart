@@ -31,7 +31,7 @@ class MeetingRoomPage extends StatefulWidget {
 class _MeetingRoomPageState extends State<MeetingRoomPage> {
   final _repo = MeetingRoomRepository();
   final _employeeRepo = EmployeeRepository();
-  final _organizationRepo = OrganizationRepository();
+  final _organizationRepo = OrganizationRepository(company: true);
   final _facilityRepo = MeetingFacilityRepository();
   final _branchRepo = BranchRepository();
   final _structure = MeetingStructureRepository();
@@ -44,6 +44,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
   Map<String, bool> _actions = {};
   String _caption = '';
   String? _message;
+  bool _messageError = false;
   String? _accessToken;
   bool _loading = true;
   bool _showCards = false;
@@ -54,6 +55,9 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
   int? _filterBuildingId;
   int? _filterFloorId;
   static const _size = 20;
+
+  Color _popupInputTextColor(WorkspaceThemePreset preset) =>
+      preset.isDark ? Colors.white : Colors.black87;
   @override
   void initState() {
     super.initState();
@@ -108,14 +112,29 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
       if (mounted)
         setState(() {
           _message = _error(e, 'โหลดข้อมูลห้องประชุมไม่สำเร็จ');
+          _messageError = true;
           _loading = false;
         });
     }
   }
 
-  String _error(Object e, String f) => e is ApiException
-      ? (e.description == null ? e.message : '${e.message}\n${e.description}')
-      : '$f\n$e';
+  String _error(Object e, String fallback) {
+    if (e is ApiException) {
+      final message = e.message.trim().isEmpty ? fallback : e.message.trim();
+      final description = e.description?.trim();
+      if (description == null ||
+          description.isEmpty ||
+          message.contains(description)) {
+        return message;
+      }
+      return '$message\nรายละเอียดเพิ่มเติม: $description';
+    }
+    final detail = e.toString().replaceFirst('Exception: ', '').trim();
+    return detail.isEmpty
+        ? '$fallback\nรายละเอียดเพิ่มเติม: ไม่ทราบสาเหตุจากระบบ'
+        : '$fallback\nรายละเอียดเพิ่มเติม: $detail';
+  }
+
   String _imageUrl(String value) {
     final normalized = value.trim().replaceAll('\\', '/');
     final uri = Uri.tryParse(normalized);
@@ -134,9 +153,8 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
     return '/api/company/meeting-rooms/$id/images/$kind';
   }
 
-  Map<String, String>? get _imageHeaders => _accessToken == null
-      ? null
-      : {'Authorization': 'Bearer $_accessToken'};
+  Map<String, String>? get _imageHeaders =>
+      _accessToken == null ? null : {'Authorization': 'Bearer $_accessToken'};
 
   void _showRoomImage(String value) {
     showDialog<void>(
@@ -448,12 +466,18 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
         'facilityItems': picked.values.toList(),
       }, id: room['roomId']);
       if (mounted) {
-        setState(() => _message = 'บันทึกอุปกรณ์สำเร็จ');
+        setState(() {
+          _message = 'บันทึกอุปกรณ์สำเร็จ';
+          _messageError = false;
+        });
         await _load();
       }
     } catch (error) {
       if (mounted)
-        setState(() => _message = _error(error, 'บันทึกอุปกรณ์ไม่สำเร็จ'));
+        setState(() {
+          _message = _error(error, 'บันทึกอุปกรณ์ไม่สำเร็จ');
+          _messageError = true;
+        });
     }
   }
 
@@ -521,12 +545,14 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
       );
     } catch (error) {
       if (mounted)
-        setState(
-          () => _message = _error(error, 'โหลดข้อมูลผู้ดูแลห้องไม่สำเร็จ'),
-        );
+        setState(() {
+          _message = _error(error, 'โหลดข้อมูลผู้ดูแลห้องไม่สำเร็จ');
+          _messageError = true;
+        });
     }
     final search = TextEditingController();
     String? dialogMessage;
+    bool dialogMessageError = false;
     bool saving = false;
     await showDialog<void>(
       context: context,
@@ -545,6 +571,8 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
             return term.isEmpty || value.contains(term);
           }).toList();
           return AlertDialog(
+            backgroundColor: LaooColors.white,
+            surfaceTintColor: Colors.transparent,
             title: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -586,6 +614,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                       padding: const EdgeInsets.only(bottom: 12),
                       child: AutoDismissMessage(
                         message: dialogMessage!,
+                        error: dialogMessageError,
                         onClose: () => refresh(() => dialogMessage = null),
                       ),
                     ),
@@ -684,6 +713,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                           refresh(() {
                             saving = false;
                             dialogMessage = 'บันทึกผู้ดูแลห้องสำเร็จ';
+                            dialogMessageError = false;
                           });
                           await _load();
                         } catch (error) {
@@ -693,6 +723,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                               error,
                               'บันทึกผู้ดูแลห้องไม่สำเร็จ',
                             );
+                            dialogMessageError = true;
                           });
                         }
                       },
@@ -744,7 +775,10 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
         departmentId = (departments.first['orgUnitId'] as num).toInt();
     } catch (error) {
       if (mounted)
-        setState(() => _message = _error(error, 'โหลดกฎห้องประชุมไม่สำเร็จ'));
+        setState(() {
+          _message = _error(error, 'โหลดกฎห้องประชุมไม่สำเร็จ');
+          _messageError = true;
+        });
       return;
     }
 
@@ -777,7 +811,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
     }
     String? dialogMessage;
     final inputStyle = TextStyle(
-      color: preset.textPrimary,
+      color: _popupInputTextColor(preset),
       fontSize: LaooTypography.inputText,
     );
     InputDecoration ruleInput(String label) => InputDecoration(
@@ -817,6 +851,8 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
         builder: (context, refresh) {
           final errorColor = Theme.of(context).colorScheme.error;
           return AlertDialog(
+            backgroundColor: LaooColors.white,
+            surfaceTintColor: Colors.transparent,
             title: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -993,7 +1029,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                                         })
                                         .join('\n'),
                                     style: TextStyle(
-                                      color: preset.textPrimary,
+                                      color: _popupInputTextColor(preset),
                                       fontSize: LaooTypography.inputText,
                                     ),
                                   ),
@@ -1067,6 +1103,8 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                     final confirmed = await showDialog<bool>(
                       context: dialogContext,
                       builder: (confirmContext) => AlertDialog(
+                        backgroundColor: LaooColors.white,
+                        surfaceTintColor: Colors.transparent,
                         title: Row(
                           children: [
                             Container(
@@ -1141,14 +1179,17 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                       await _repo.deleteRule((room['roomId'] as num).toInt());
                       if (!dialogContext.mounted) return;
                       Navigator.pop(dialogContext);
-                      setState(() => _message = 'ลบกฎห้องประชุมสำเร็จ');
+                      setState(() {
+                        _message = 'ลบกฎห้องประชุมสำเร็จ';
+                        _messageError = false;
+                      });
                     } catch (error) {
-                      refresh(
-                        () => dialogMessage = _error(
+                      refresh(() {
+                        dialogMessage = _error(
                           error,
                           'ลบกฎห้องประชุมไม่สำเร็จ',
-                        ),
-                      );
+                        );
+                      });
                     }
                   },
                   icon: const Icon(Icons.delete_outline, color: Colors.red),
@@ -1193,14 +1234,17 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                     }, ruleId: item?['ruleId'] as int?);
                     if (!dialogContext.mounted) return;
                     Navigator.pop(dialogContext);
-                    setState(() => _message = 'บันทึกกฎห้องประชุมสำเร็จ');
+                    setState(() {
+                      _message = 'บันทึกกฎห้องประชุมสำเร็จ';
+                      _messageError = false;
+                    });
                   } catch (error) {
-                    refresh(
-                      () => dialogMessage = _error(
+                    refresh(() {
+                      dialogMessage = _error(
                         error,
                         'บันทึกกฎห้องประชุมไม่สำเร็จ',
-                      ),
-                    );
+                      );
+                    });
                   }
                 },
                 child: const Text('บันทึก'),
@@ -1614,7 +1658,11 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                const Divider(height: 1, thickness: 1, color: LaooColors.border),
+                const Divider(
+                  height: 1,
+                  thickness: 1,
+                  color: LaooColors.border,
+                ),
               ],
             ),
             content: SizedBox(
@@ -1644,7 +1692,8 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                       builder: (context, box) {
                         final compact = box.maxWidth < 560;
                         final branchField = DropdownButtonFormField<int>(
-                          style: const TextStyle(
+                          style: TextStyle(
+                            color: _popupInputTextColor(preset),
                             fontSize: LaooTypography.comboBox,
                           ),
                           initialValue: branchId,
@@ -1674,7 +1723,8 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                           }),
                         );
                         final buildingField = DropdownButtonFormField<int>(
-                          style: const TextStyle(
+                          style: TextStyle(
+                            color: _popupInputTextColor(preset),
                             fontSize: LaooTypography.comboBox,
                           ),
                           initialValue: buildingId,
@@ -1702,7 +1752,8 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                           }),
                         );
                         final floorField = DropdownButtonFormField<int>(
-                          style: const TextStyle(
+                          style: TextStyle(
+                            color: _popupInputTextColor(preset),
                             fontSize: LaooTypography.comboBox,
                           ),
                           initialValue:
@@ -1761,7 +1812,8 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                             child: TextField(
                               controller: code,
                               onChanged: (_) => refresh(() => codeError = null),
-                              style: const TextStyle(
+                              style: TextStyle(
+                                color: _popupInputTextColor(preset),
                                 fontSize: LaooTypography.inputText,
                               ),
                               decoration: _roomInput(
@@ -1776,7 +1828,8 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                               controller: capacity,
                               onChanged: (_) =>
                                   refresh(() => capacityError = null),
-                              style: const TextStyle(
+                              style: TextStyle(
+                                color: _popupInputTextColor(preset),
                                 fontSize: LaooTypography.inputText,
                               ),
                               keyboardType: TextInputType.number,
@@ -1790,7 +1843,8 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                         final nameField = TextField(
                           controller: name,
                           onChanged: (_) => refresh(() => nameError = null),
-                          style: const TextStyle(
+                          style: TextStyle(
+                            color: _popupInputTextColor(preset),
                             fontSize: LaooTypography.inputText,
                           ),
                           decoration: _roomInput(
@@ -1822,7 +1876,8 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                     const SizedBox(height: 12),
                     TextField(
                       controller: description,
-                      style: const TextStyle(
+                      style: TextStyle(
+                        color: _popupInputTextColor(preset),
                         fontSize: LaooTypography.inputText,
                       ),
                       maxLines: 1,
@@ -1885,7 +1940,11 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Divider(height: 1, thickness: 1, color: LaooColors.border),
+                  const Divider(
+                    height: 1,
+                    thickness: 1,
+                    color: LaooColors.border,
+                  ),
                   const SizedBox(height: 12),
                   Row(
                     children: [
@@ -1924,7 +1983,10 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                       TextButton(
                         style: TextButton.styleFrom(
                           foregroundColor: preset.primary,
-                          minimumSize: const Size(0, LaooTypography.buttonHeight),
+                          minimumSize: const Size(
+                            0,
+                            LaooTypography.buttonHeight,
+                          ),
                           padding: const EdgeInsets.symmetric(horizontal: 16),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(LaooRadius.xs),
@@ -2025,11 +2087,17 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
           locationImage!.name,
         );
       }
-      setState(() => _message = 'บันทึกข้อมูลสำเร็จ');
+      setState(() {
+        _message = 'บันทึกข้อมูลสำเร็จ';
+        _messageError = false;
+      });
       await _load();
     } catch (e) {
       final message = _error(e, 'บันทึกข้อมูลไม่สำเร็จ');
-      setState(() => _message = message);
+      setState(() {
+        _message = message;
+        _messageError = true;
+      });
     }
   }
 
@@ -2061,6 +2129,8 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
       context: context,
       builder: (dc) => StatefulBuilder(
         builder: (context, refresh) => AlertDialog(
+          backgroundColor: LaooColors.white,
+          surfaceTintColor: Colors.transparent,
           title: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -2143,6 +2213,10 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                                     child: TextField(
                                       controller: quantities[id],
                                       keyboardType: TextInputType.number,
+                                      style: TextStyle(
+                                        color: _popupInputTextColor(preset),
+                                        fontSize: LaooTypography.inputText,
+                                      ),
                                       decoration: _roomInput('จำนวน', preset),
                                     ),
                                   ),
@@ -2151,6 +2225,10 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                                     flex: 2,
                                     child: TextField(
                                       controller: remarks[id],
+                                      style: TextStyle(
+                                        color: _popupInputTextColor(preset),
+                                        fontSize: LaooTypography.inputText,
+                                      ),
                                       decoration: _roomInput(
                                         'หมายเหตุ',
                                         preset,
@@ -2211,6 +2289,8 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
+        backgroundColor: LaooColors.white,
+        surfaceTintColor: Colors.transparent,
         title: Row(
           children: [
             Container(
@@ -2271,12 +2351,18 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
     try {
       await _repo.delete(room['roomId']);
       if (mounted) {
-        setState(() => _message = 'ลบข้อมูลสำเร็จ');
+        setState(() {
+          _message = 'ลบข้อมูลสำเร็จ';
+          _messageError = false;
+        });
         await _load();
       }
     } catch (error) {
       if (mounted)
-        setState(() => _message = _error(error, 'ลบข้อมูลไม่สำเร็จ'));
+        setState(() {
+          _message = _error(error, 'ลบข้อมูลไม่สำเร็จ');
+          _messageError = true;
+        });
     }
   }
 
@@ -2285,6 +2371,8 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
+        backgroundColor: LaooColors.white,
+        surfaceTintColor: Colors.transparent,
         title: Column(
           children: [
             Container(
@@ -2346,10 +2434,16 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
     if (ok == true) {
       try {
         await _repo.delete(r['roomId']);
-        setState(() => _message = 'ลบข้อมูลสำเร็จ');
+        setState(() {
+          _message = 'ลบข้อมูลสำเร็จ';
+          _messageError = false;
+        });
         await _load();
       } catch (e) {
-        setState(() => _message = _error(e, 'ลบข้อมูลไม่สำเร็จ'));
+        setState(() {
+          _message = _error(e, 'ลบข้อมูลไม่สำเร็จ');
+          _messageError = true;
+        });
       }
     }
   }
@@ -2642,6 +2736,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
               right: 12,
               child: AutoDismissMessage(
                 message: _message!,
+                error: _messageError,
                 onClose: () => setState(() => _message = null),
               ),
             ),
