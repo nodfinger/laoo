@@ -25,6 +25,10 @@
 
 ## Common Behavior
 
+- Shared Workspace Header ต้องใช้พื้นที่แนวตั้งอย่างประหยัด: Desktop สูง `52px` และ Mobile สูง `56px`
+- Desktop ต้องวางปุ่มหน้าแรก เมนูลัด และเมนูผู้ใช้ในแถวเดียวกัน; แสดงเมนูลัดโดยตรงได้สูงสุด `5` รายการตามพื้นที่ และรวมรายการที่เกินไว้ใน Popup `เพิ่มเติม`
+- Mobile แสดงเมนูลัดทั้งหมดผ่าน Popup รูปดาว และใช้ User Menu แบบ Compact; คำอธิบายสิทธิ์/ประเภทผู้ใช้แสดงภายใน User Menu ไม่วางเป็นบรรทัดที่สองบน Header
+- คำสั่งออกจากระบบอยู่ภายใน User Menu เพียงตำแหน่งเดียว ห้ามวางปุ่มซ้ำบน Workspace Header
 - Caption และชื่อเมนูต้องอ่านจาก Navigation API/`TDADMainMenu.MenuName` ผ่าน Resolver กลาง ห้าม hardcode แยกจาก Sidebar
 - ทุกหน้าจอต้องเต็ม Content Area ภายใน Shared Workspace และไม่สร้าง Shell ซ้อน
 - เมื่อ Content Area แคบกว่า `900px` ต้องใช้ Responsive Layout ที่ไม่เกิด Overflow
