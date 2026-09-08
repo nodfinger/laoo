@@ -62,6 +62,29 @@ ORDER BY F.FoodCode";
         return Ok(result);
     }
 
+    [HttpGet("{id:long}/image")]
+    public async Task<IActionResult> Image(long id, CancellationToken token)
+    {
+        if (!IsCompany() || CompanyId() is not long companyId) return Forbid();
+        await using var connection = await Open(token);
+        if (!await Allowed(connection, "VIEW", token)) return Forbid();
+        var webRoot = environment.WebRootPath ?? Path.Combine(environment.ContentRootPath, "wwwroot");
+        var folder = Path.Combine(webRoot, "uploads", "meeting-foods", companyId.ToString());
+        var path = Directory.Exists(folder)
+            ? Directory.EnumerateFiles(folder, id.ToString() + "_*", SearchOption.TopDirectoryOnly)
+                .OrderByDescending(System.IO.File.GetLastWriteTimeUtc)
+                .FirstOrDefault()
+            : null;
+        if (path is null || !System.IO.File.Exists(path)) return NotFound();
+        var contentType = Path.GetExtension(path).ToLowerInvariant() switch
+        {
+            ".png" => "image/png",
+            ".webp" => "image/webp",
+            _ => "image/jpeg",
+        };
+        return PhysicalFile(path, contentType);
+    }
+
     [HttpGet("types")]
     public async Task<IActionResult> Types(CancellationToken token)
     {
@@ -110,7 +133,8 @@ ORDER BY ISNULL(Seq,0),Name";
     public async Task<IActionResult> UploadImage(long id, IFormFile file, CancellationToken token)
     {
         const int maximumBytes = 70 * 1024;
-        if (!IsCompany() || CompanyId() is not long company || !await Permission("EDIT", token)) return Forbid();
+        if (!IsCompany() || CompanyId() is not long company ||
+            (!await Permission("EDIT", token) && !await Permission("CREATE", token))) return Forbid();
         if (file.Length == 0 || file.Length > maximumBytes)
             return BadRequest(new { message = "ขนาดรูปอาหารไม่ถูกต้อง", description = "กรุณาเลือกรูปที่บีบอัดแล้วไม่เกิน 70 KB" });
         var extension = Path.GetExtension(file.FileName).ToLowerInvariant();

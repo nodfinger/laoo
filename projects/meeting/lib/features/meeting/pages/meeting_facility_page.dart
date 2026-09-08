@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../widgets/meeting_popup.dart';
+
 import '../../../app/theme/laoo_design_tokens.dart';
 import '../../../app/theme/laoo_typography.dart';
 import '../../../app/theme/workspace_theme_presets.dart';
@@ -308,7 +310,8 @@ class _MeetingFacilityPageState extends State<MeetingFacilityPage> {
             borderRadius: BorderRadius.circular(LaooRadius.xs),
             side: BorderSide.none,
           ),
-          titlePadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+          titlePadding: const EdgeInsets.all(LaooLayout.cardPadding),
+          scrollable: true,
           title: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -404,12 +407,18 @@ class _MeetingFacilityPageState extends State<MeetingFacilityPage> {
                   decoration: _facilityInputDecoration('รายละเอียด', preset),
                 ),
                 const SizedBox(height: 16),
-                const Divider(height: 1, thickness: 1, color: LaooColors.border),
+                const Divider(
+                  height: 1,
+                  thickness: 1,
+                  color: LaooColors.border,
+                ),
               ],
             ),
           ),
-          contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
-          actionsPadding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: LaooLayout.cardPadding,
+          ),
+          actionsPadding: const EdgeInsets.all(LaooLayout.cardPadding),
           actions: [
             TextButton(
               style: TextButton.styleFrom(
@@ -483,59 +492,10 @@ class _MeetingFacilityPageState extends State<MeetingFacilityPage> {
   }
 
   Future<void> _delete(Map<String, dynamic> item) async {
-    final preset = workspaceThemeController.value;
-    final red = Theme.of(context).colorScheme.error;
     final ok = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Row(
-          children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: red.withValues(alpha: .10),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(Icons.delete_outline, color: red),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'ยืนยันการลบข้อมูล',
-                style: LaooTypography.popupTitleStyle,
-              ),
-            ),
-          ],
-        ),
-        content: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: red.withValues(alpha: .07),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Text(
-            'ต้องการลบ ${item['code']} - ${item['nameTh']} หรือไม่?\nข้อมูลที่ลบแล้วไม่สามารถเรียกคืนกลับมาได้',
-          ),
-        ),
-        actions: [
-          TextButton(
-            style: TextButton.styleFrom(foregroundColor: preset.primary),
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('ยกเลิก'),
-          ),
-          FilledButton.icon(
-            style: FilledButton.styleFrom(
-              backgroundColor: red,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () => Navigator.pop(dialogContext, true),
-            icon: const Icon(Icons.delete_outline),
-            label: const Text('ลบ'),
-          ),
-        ],
-      ),
+      builder: (dialogContext) =>
+          MeetingDeletePopup(record: '${item['code']} - ${item['nameTh']}'),
     );
     if (ok != true) return;
     try {

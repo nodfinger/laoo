@@ -849,10 +849,11 @@ class _MeetingRoomCalendarViewState extends State<MeetingRoomCalendarView> {
   Future<void> _showEvent(Map<String, dynamic> event) => showDialog<void>(
     context: context,
     builder: (dialogContext) => Dialog(
+      insetPadding: const EdgeInsets.all(LaooLayout.dialogInsetPadding),
       backgroundColor: LaooColors.white,
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(LaooRadius.sm),
+        borderRadius: BorderRadius.circular(LaooRadius.xs),
         side: BorderSide.none,
       ),
       child: ConstrainedBox(

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../widgets/meeting_popup.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image/image.dart' as img;
@@ -55,7 +57,8 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
   void _showBuildingImage(String url) {
     showDialog<void>(
       context: context,
-      builder: (_) => Dialog(
+      builder: (_) => MeetingImagePopup(
+        title: 'รูปอาคาร',
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 900, maxHeight: 700),
           child: InteractiveViewer(
@@ -164,15 +167,17 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
         builder: (context, refresh) {
           final preset = workspaceThemeController.value;
           return AlertDialog(
+            scrollable: true,
+            insetPadding: const EdgeInsets.all(LaooLayout.dialogInsetPadding),
             backgroundColor: LaooColors.white,
             surfaceTintColor: Colors.transparent,
             titlePadding: EdgeInsets.zero,
             actionsPadding: EdgeInsets.zero,
-            contentPadding: const EdgeInsets.fromLTRB(24, 8, 24, 12),
+            contentPadding: const EdgeInsets.all(LaooLayout.cardPadding),
             titleTextStyle: LaooTypography.popupTitleStyle,
             title: Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.all(LaooLayout.cardPadding),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -202,7 +207,7 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
             ),
             content: SizedBox(
               width: (MediaQuery.sizeOf(context).width - 48)
-                  .clamp(360.0, 720.0)
+                  .clamp(0.0, 720.0)
                   .toDouble(),
               child: Theme(
                 data: Theme.of(context).copyWith(
@@ -226,15 +231,15 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
                         filled: true,
                         fillColor: preset.surface,
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(LaooRadius.xs),
                           borderSide: BorderSide(color: preset.border),
                         ),
                         enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(LaooRadius.xs),
                           borderSide: BorderSide(color: preset.border),
                         ),
                         focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(LaooRadius.xs),
                           borderSide: BorderSide(
                             color: LaooColors.pageCaption,
                             width: 1.5,
@@ -306,7 +311,8 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
                               GestureDetector(
                                 onTap: () => showDialog<void>(
                                   context: context,
-                                  builder: (_) => Dialog(
+                                  builder: (_) => MeetingImagePopup(
+                                    title: 'รูปอาคาร',
                                     child: ConstrainedBox(
                                       constraints: const BoxConstraints(
                                         maxWidth: 900,
@@ -329,7 +335,9 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
                                   ),
                                 ),
                                 child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
+                                  borderRadius: BorderRadius.circular(
+                                    LaooRadius.xs,
+                                  ),
                                   child: Image.memory(
                                     Uint8List.fromList(bytes),
                                     width: 72,
@@ -351,7 +359,9 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
                                     ?.isNotEmpty ==
                                 true)
                               ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(
+                                  LaooRadius.xs,
+                                ),
                                 child: Image.network(
                                   _buildingImageUrl(
                                     item!['imageUrl'] as String,
@@ -443,7 +453,10 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
             actions: [
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+                padding: const EdgeInsets.all(LaooLayout.cardPadding),
+                decoration: const BoxDecoration(
+                  border: Border(top: BorderSide(color: LaooColors.border)),
+                ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
@@ -566,12 +579,14 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
                 orElse: () => null,
               );
           return AlertDialog(
+            scrollable: true,
+            insetPadding: const EdgeInsets.all(LaooLayout.dialogInsetPadding),
             titlePadding: EdgeInsets.zero,
             actionsPadding: EdgeInsets.zero,
-            contentPadding: const EdgeInsets.fromLTRB(24, 8, 24, 12),
+            contentPadding: const EdgeInsets.all(LaooLayout.cardPadding),
             title: Container(
               width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(16, 20, 16, 14),
+              padding: const EdgeInsets.all(LaooLayout.cardPadding),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -591,13 +606,17 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
                     ],
                   ),
                   const SizedBox(height: 10),
-                  Divider(color: preset.primary, thickness: 1, height: 1),
+                  const Divider(
+                    color: LaooColors.border,
+                    thickness: 1,
+                    height: 1,
+                  ),
                 ],
               ),
             ),
             content: SizedBox(
               width: (MediaQuery.sizeOf(context).width - 48)
-                  .clamp(360.0, 720.0)
+                  .clamp(0.0, 720.0)
                   .toDouble(),
               child: Theme(
                 data: Theme.of(context).copyWith(
@@ -626,15 +645,15 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
                       vertical: 12,
                     ),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(LaooRadius.xs),
                       borderSide: BorderSide(color: preset.border),
                     ),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(LaooRadius.xs),
                       borderSide: BorderSide(color: preset.border),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(LaooRadius.xs),
                       borderSide: BorderSide(color: preset.primary, width: 1.5),
                     ),
                     isDense: false,
@@ -651,7 +670,7 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
                       ),
                       decoration: BoxDecoration(
                         color: preset.primary.withValues(alpha: .10),
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(LaooRadius.xs),
                       ),
                       child: Text(
                         'สถานที่: ${selectedBranch?['branchCode'] ?? '-'} ${selectedBranch?['branchNameTh'] ?? '-'}\n'
@@ -700,7 +719,10 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
             actions: [
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+                padding: const EdgeInsets.all(LaooLayout.cardPadding),
+                decoration: const BoxDecoration(
+                  border: Border(top: BorderSide(color: LaooColors.border)),
+                ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
@@ -775,64 +797,10 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
   }
 
   Future<void> _confirmDeleteFloor(Map<String, dynamic> floor) async {
-    final preset = workspaceThemeController.value;
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Row(
-          children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: preset.primary.withValues(alpha: .10),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(Icons.delete_outline, color: preset.primary),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'ยืนยันการลบข้อมูล',
-                style: LaooTypography.popupTitleStyle,
-              ),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: preset.primary.withValues(alpha: .08),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                'ต้องการลบ ${floor['code']} - ${floor['nameTh']} หรือไม่?',
-                textAlign: TextAlign.center,
-              ),
-            ),
-            const SizedBox(height: 12),
-            const Text('ข้อมูลที่ลบแล้วไม่สามารถเรียกคืนกลับมาได้'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            style: TextButton.styleFrom(foregroundColor: preset.primary),
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('ยกเลิก'),
-          ),
-          FilledButton.icon(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () => Navigator.pop(dialogContext, true),
-            icon: const Icon(Icons.delete_outline),
-            label: const Text('ลบ'),
-          ),
-        ],
-      ),
+      builder: (dialogContext) =>
+          MeetingDeletePopup(record: '${floor['code']} - ${floor['nameTh']}'),
     );
     if (confirmed != true || !mounted) return;
     try {

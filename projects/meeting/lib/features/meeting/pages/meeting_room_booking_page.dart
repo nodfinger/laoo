@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../widgets/meeting_popup.dart';
+
 import '../../../app/theme/laoo_design_tokens.dart';
 import '../../../app/theme/laoo_typography.dart';
 import '../../../app/theme/workspace_theme_presets.dart';
@@ -209,6 +211,14 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
     }
   }
 
+  Future<void> _refreshAfterLocationFilterChanged() async {
+    if (_searchMode == 'ROOM') {
+      await _loadRoomScheduleBookings();
+    } else {
+      await _searchAvailableRooms();
+    }
+  }
+
   List<Map<String, dynamic>> get _filteredRooms => _rooms.where((room) {
     if (_branchId != null && _int(room['branchId']) != _branchId) return false;
     if (_buildingId != null && _int(room['buildingId']) != _buildingId) {
@@ -252,8 +262,8 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
     return result;
   }
 
-  String? _timeValidation() {
-    final startError = _startTimeValidation();
+  String? _timeValidation({bool validateStartTime = true}) {
+    final startError = validateStartTime ? _startTimeValidation() : null;
     if (startError != null) return startError;
     final start = _startTime.hour * 60 + _startTime.minute;
     final end = _endTime.hour * 60 + _endTime.minute;
@@ -274,7 +284,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
   }
 
   Future<void> _searchAvailableRooms({int? roomId}) async {
-    final timeError = _timeValidation();
+    final timeError = _timeValidation(validateStartTime: false);
     if (timeError != null) {
       _showMessage(timeError, error: true);
       return;
@@ -322,7 +332,9 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
       rangeComplete = !_multipleDays || !_awaitingRangeEnd;
       _availableRooms = [];
     });
-    if (!rangeComplete || _timeValidation() != null) return;
+    if (!rangeComplete || _timeValidation(validateStartTime: false) != null) {
+      return;
+    }
     if (_searchMode == 'ROOM' && _selectedRoomId == null) return;
     await _searchAvailableRooms(
       roomId: _searchMode == 'ROOM' ? _selectedRoomId : null,
@@ -348,10 +360,13 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
           ),
           timePickerTheme: TimePickerThemeData(
             backgroundColor: LaooColors.white,
-            helpTextStyle: TextStyle(
-              color: preset.primary,
-              fontSize: LaooTypography.sectionTitle,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(LaooRadius.xs),
+              side: BorderSide.none,
             ),
+            padding: const EdgeInsets.all(LaooLayout.cardPadding),
+            entryModeIconColor: preset.primary,
+            helpTextStyle: LaooTypography.popupTitleStyle,
             hourMinuteShape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(LaooRadius.xs),
               side: const BorderSide(color: LaooColors.border),
@@ -434,8 +449,12 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
     final result = await showDialog<List<TimeOfDay>>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
-        builder: (context, refresh) => AlertDialog(
-          title: const Text('กำหนดเวลา'),
+        builder: (context, refresh) => MeetingPopup(
+          scrollable: true,
+          title: const MeetingPopupTitle(
+            icon: Icons.schedule,
+            text: 'กำหนดเวลา',
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -448,6 +467,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
                     context: context,
                     initialTime: start,
                     initialEntryMode: TimePickerEntryMode.dial,
+                    builder: meetingPickerBuilder,
                   );
                   if (value != null) refresh(() => start = value);
                 },
@@ -461,6 +481,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
                     context: context,
                     initialTime: end,
                     initialEntryMode: TimePickerEntryMode.dial,
+                    builder: meetingPickerBuilder,
                   );
                   if (value != null) refresh(() => end = value);
                 },
@@ -554,7 +575,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
           surfaceTintColor: Colors.transparent,
           insetPadding: const EdgeInsets.all(LaooLayout.dialogInsetPadding),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(LaooRadius.sm),
+            borderRadius: BorderRadius.circular(LaooRadius.xs),
             side: BorderSide.none,
           ),
           child: ConstrainedBox(
@@ -850,41 +871,123 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
     final preset = workspaceThemeController.value;
     final id = _int(item['bookingId']);
     if (id == null) return;
-    final accepted = await showDialog<bool>(
+    var remarkText = '';
+    final remark = await showDialog<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Row(
+        backgroundColor: LaooColors.white,
+        surfaceTintColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(LaooLayout.dialogInsetPadding),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
+          side: BorderSide.none,
+        ),
+        titlePadding: const EdgeInsets.all(LaooLayout.cardPadding),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: LaooLayout.cardPadding,
+        ),
+        actionsPadding: const EdgeInsets.all(LaooLayout.cardPadding),
+        title: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.delete_outline, color: Colors.red),
-            const SizedBox(width: 8),
-            const Expanded(
-              child: Text(
-                'ยืนยันการยกเลิกการจอง',
-                style: LaooTypography.popupTitleStyle,
-              ),
+            Row(
+              children: [
+                const Icon(Icons.delete_outline, color: LaooColors.error),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'ยืนยันการยกเลิกการจอง',
+                    style: LaooTypography.popupTitleStyle,
+                  ),
+                ),
+              ],
             ),
+            const Divider(color: LaooColors.border),
           ],
         ),
-        content: Text(
-          'ต้องการยกเลิก ${item['bookingNo'] ?? ''} - ${item['subject'] ?? ''} หรือไม่?\nข้อมูลที่ยกเลิกแล้วจะไม่ใช้ตรวจเวลาชน',
+        content: SizedBox(
+          width: 460,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(LaooLayout.cardPadding),
+                  color: LaooColors.error.withValues(alpha: .08),
+                  child: Text(
+                    '${item['bookingNo'] ?? ''} - ${item['subject'] ?? ''}',
+                    style: const TextStyle(color: LaooColors.textPrimary),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'ต้องการยกเลิกการจองนี้หรือไม่?\nข้อมูลที่ยกเลิกแล้วจะไม่ใช้ตรวจเวลาชน',
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  initialValue: remarkText,
+                  maxLines: 3,
+                  maxLength: 1000,
+                  style: const TextStyle(
+                    color: LaooColors.textPrimary,
+                    fontSize: LaooTypography.inputText,
+                  ),
+                  decoration: InputDecoration(
+                    labelText: 'หมายเหตุ',
+                    floatingLabelStyle: TextStyle(color: preset.primary),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(LaooRadius.xs),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(LaooRadius.xs),
+                      borderSide: const BorderSide(color: LaooColors.border),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(LaooRadius.xs),
+                      borderSide: BorderSide(color: preset.primary),
+                    ),
+                  ),
+                  onChanged: (value) => remarkText = value,
+                ),
+                const Divider(color: LaooColors.border),
+              ],
+            ),
+          ),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
+            style: TextButton.styleFrom(
+              foregroundColor: preset.primary,
+              minimumSize: const Size(80, LaooTypography.buttonHeight),
+              visualDensity: VisualDensity.standard,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(LaooRadius.xs),
+              ),
+            ),
+            onPressed: () => Navigator.pop(dialogContext),
             child: Text('ยกเลิก', style: TextStyle(color: preset.primary)),
           ),
           FilledButton.icon(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () => Navigator.pop(dialogContext, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: LaooColors.error,
+              foregroundColor: LaooColors.white,
+              minimumSize: const Size(80, LaooTypography.buttonHeight),
+              visualDensity: VisualDensity.standard,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(LaooRadius.xs),
+              ),
+            ),
+            onPressed: () => Navigator.pop(dialogContext, remarkText.trim()),
             icon: const Icon(Icons.delete_outline),
             label: const Text('ยืนยัน'),
           ),
         ],
       ),
     );
-    if (accepted != true) return;
+    if (remark == null || !mounted) return;
     try {
-      await _repository.cancel(id);
+      await _repository.cancel(id, remark: remark);
       _showMessage('ยกเลิกรายการจองสำเร็จ');
       await Future.wait([
         _loadBookings(),
@@ -903,8 +1006,12 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
     final preset = workspaceThemeController.value;
     final remark = await showDialog<String>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('ยืนยันการถอยสถานะ'),
+      builder: (dialogContext) => MeetingPopup(
+        scrollable: true,
+        title: const MeetingPopupTitle(
+          icon: Icons.undo,
+          text: 'ยืนยันการถอยสถานะ',
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1000,13 +1107,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
                       .toLowerCase();
               return text.contains(keyword);
             }).toList();
-            return AlertDialog(
-              insetPadding: const EdgeInsets.all(LaooLayout.dialogInsetPadding),
-              backgroundColor: LaooColors.white,
-              surfaceTintColor: Colors.transparent,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(LaooRadius.xs),
-              ),
+            return MeetingPopup(
               title: Row(
                 children: [
                   Icon(Icons.group_add_outlined, color: preset.primary),
@@ -1435,6 +1536,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
                       _roomBookingCalendarVisible = false;
                     });
                     if (mode == 'ROOM') _loadRoomScheduleBookings();
+                    if (mode == 'DATE') _searchAvailableRooms();
                   },
                 );
                 if (MediaQuery.sizeOf(context).width < 600) {
@@ -1473,14 +1575,17 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
               items: _branches,
               idKey: 'branchId',
               nameKey: 'nameTh',
-              onChanged: (value) => setState(() {
-                _branchId = value;
-                _buildingId = null;
-                _floorId = null;
-                _selectedRoomId = null;
-                _availableRooms = [];
-                _roomBookingCalendarVisible = false;
-              }),
+              onChanged: (value) {
+                setState(() {
+                  _branchId = value;
+                  _buildingId = null;
+                  _floorId = null;
+                  _selectedRoomId = null;
+                  _availableRooms = [];
+                  _roomBookingCalendarVisible = false;
+                });
+                _refreshAfterLocationFilterChanged();
+              },
             ),
             _dropdown(
               width: 140,
@@ -1489,13 +1594,16 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
               items: _filteredBuildings,
               idKey: 'buildingId',
               nameKey: 'nameTh',
-              onChanged: (value) => setState(() {
-                _buildingId = value;
-                _floorId = null;
-                _selectedRoomId = null;
-                _availableRooms = [];
-                _roomBookingCalendarVisible = false;
-              }),
+              onChanged: (value) {
+                setState(() {
+                  _buildingId = value;
+                  _floorId = null;
+                  _selectedRoomId = null;
+                  _availableRooms = [];
+                  _roomBookingCalendarVisible = false;
+                });
+                _refreshAfterLocationFilterChanged();
+              },
             ),
             _dropdown(
               width: 110,
@@ -1504,12 +1612,15 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
               items: _filteredFloors,
               idKey: 'floorId',
               nameKey: 'nameTh',
-              onChanged: (value) => setState(() {
-                _floorId = value;
-                _selectedRoomId = null;
-                _availableRooms = [];
-                _roomBookingCalendarVisible = false;
-              }),
+              onChanged: (value) {
+                setState(() {
+                  _floorId = value;
+                  _selectedRoomId = null;
+                  _availableRooms = [];
+                  _roomBookingCalendarVisible = false;
+                });
+                _refreshAfterLocationFilterChanged();
+              },
             ),
             SizedBox(
               width: MediaQuery.sizeOf(context).width < 600
@@ -1974,7 +2085,6 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
     final available = !availability || room['isAvailable'] == true;
     final imageUrl = room['roomImageUrl']?.toString();
     final bookingsForSelectedDate = _maps(room['bookingsForSelectedDate']);
-    final conflictsExpanded = id != null && _expandedConflictRooms.contains(id);
     return Card(
       margin: EdgeInsets.zero,
       color: LaooColors.white,
@@ -2039,16 +2149,14 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
                 ),
               ],
             ),
-            if (bookingsForSelectedDate.isNotEmpty) ...[
+            if (availability) ...[
               const SizedBox(height: 6),
               _conflictPanel(
                 id: id,
                 preset: preset,
                 conflicts: bookingsForSelectedDate,
-                visibleConflicts: conflictsExpanded
-                    ? bookingsForSelectedDate
-                    : bookingsForSelectedDate.take(3).toList(),
-                expanded: conflictsExpanded,
+                visibleConflicts: bookingsForSelectedDate,
+                expanded: true,
                 title: 'รายการจองวันที่เลือก',
               ),
             ],
@@ -2088,6 +2196,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
           ),
           const SizedBox(height: 4),
         ],
+        if (conflicts.isEmpty) const Text('ไม่มีรายการจองในวันที่เลือก'),
         ...visibleConflicts.asMap().entries.map((entry) {
           final conflict = entry.value;
           return Column(
@@ -2133,7 +2242,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
             ],
           );
         }),
-        if (conflicts.length > 3)
+        if (conflicts.length > visibleConflicts.length)
           Align(
             alignment: Alignment.centerLeft,
             child: TextButton.icon(
@@ -2219,7 +2328,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
             }
           },
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 18),
         TextField(
           controller: _attendeeCount,
           keyboardType: TextInputType.number,
@@ -2237,7 +2346,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
             }
           },
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 18),
         TextField(
           controller: _description,
           maxLines: 2,

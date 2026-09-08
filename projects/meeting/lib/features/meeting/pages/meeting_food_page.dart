@@ -1,12 +1,15 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+
+import '../widgets/meeting_popup.dart';
 import 'package:image/image.dart' as img;
 
 import '../../../app/theme/laoo_design_tokens.dart';
 import '../../../app/theme/laoo_typography.dart';
 import '../../../app/theme/workspace_theme_presets.dart';
 import '../../../core/api/api_exception.dart';
+import '../../../core/auth/auth_storage.dart';
 import '../../../core/config/api_config.dart';
 import '../../../core/navigation/navigation_menu_repository.dart';
 import '../../../core/widgets/auto_dismiss_message.dart';
@@ -22,21 +25,31 @@ String _foodImageUrl(String value) {
   return Uri.parse(ApiConfig.baseUrl).resolve(value.trim()).toString();
 }
 
-Uint8List _compressFoodImage(Uint8List source) {
+String _foodImageEndpoint(Map<String, dynamic> item, String fallback) {
+  final foodId = (item['foodId'] as num?)?.toInt();
+  if (foodId == null) return _foodImageUrl(fallback);
+  return Uri.parse(ApiConfig.baseUrl)
+      .resolve('/api/company/meeting-foods/$foodId/image')
+      .replace(queryParameters: {'version': fallback})
+      .toString();
+}
+
+Future<Uint8List> _compressFoodImage(Uint8List source) async {
   const maximumBytes = 70 * 1024;
   var decoded = img.decodeImage(source);
   if (decoded == null) {
     throw const FormatException('ไม่สามารถอ่านไฟล์รูปภาพได้');
   }
   decoded = img.bakeOrientation(decoded);
-  if (decoded.width > 1280 || decoded.height > 1280) {
+  if (decoded.width > 800 || decoded.height > 800) {
     decoded = decoded.width >= decoded.height
-        ? img.copyResize(decoded, width: 1280)
-        : img.copyResize(decoded, height: 1280);
+        ? img.copyResize(decoded, width: 800)
+        : img.copyResize(decoded, height: 800);
   }
   var working = decoded;
   while (true) {
-    for (var quality = 88; quality >= 28; quality -= 10) {
+    for (final quality in [80, 60, 40]) {
+      if (kIsWeb) await Future<void>.delayed(const Duration(milliseconds: 16));
       final compressed = Uint8List.fromList(
         img.encodeJpg(working, quality: quality),
       );
@@ -59,6 +72,10 @@ class MeetingFoodPage extends StatefulWidget {
 
 class _MeetingFoodPageState extends State<MeetingFoodPage> {
   final _repository = MeetingFoodRepository();
+  String? _accessToken;
+  Map<String, String> get _imageHeaders => {
+    if (_accessToken != null) 'Authorization': 'Bearer $_accessToken',
+  };
   final _search = TextEditingController();
   List<Map<String, dynamic>> _items = [];
   List<Map<String, dynamic>> _foodTypes = [];
@@ -114,6 +131,7 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
         _repository.types(),
         _repository.actions(),
       ]);
+      _accessToken = await AuthStorage().readAccessToken();
       if (!mounted) return;
       setState(() {
         _items = List<Map<String, dynamic>>.from(result[0] as List);
@@ -182,10 +200,11 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
         child: Icon(Icons.restaurant_menu_outlined, color: preset.primary),
       );
     }
-    return ClipRRect(
+    final image = ClipRRect(
       borderRadius: BorderRadius.circular(LaooRadius.xs),
       child: Image.network(
-        _foodImageUrl(url),
+        _foodImageEndpoint(item, url),
+        headers: _imageHeaders,
         width: size,
         height: size,
         fit: BoxFit.cover,
@@ -196,6 +215,46 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
           color: preset.primary.withValues(alpha: .08),
           child: Icon(Icons.broken_image_outlined, color: preset.primary),
         ),
+      ),
+    );
+    return InkWell(
+      onTap: () => _showFoodImagePreview(item, preset),
+      borderRadius: BorderRadius.circular(LaooRadius.xs),
+      child: image,
+    );
+  }
+
+  Future<void> _showFoodImagePreview(
+    Map<String, dynamic> item,
+    WorkspaceThemePreset preset,
+  ) async {
+    final url = item['imageUrl']?.toString().trim() ?? '';
+    if (url.isEmpty) return;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => MeetingPopup(
+        title: MeetingPopupTitle(
+          icon: Icons.image_outlined,
+          text: '${item['nameTh'] ?? 'รูปอาหาร'}',
+        ),
+        content: InteractiveViewer(
+          child: Image.network(
+            _foodImageEndpoint(item, url),
+            headers: _imageHeaders,
+            fit: BoxFit.contain,
+            errorBuilder: (_, _, _) => const SizedBox(
+              width: 360,
+              height: 240,
+              child: Center(child: Icon(Icons.broken_image_outlined)),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('ปิด'),
+          ),
+        ],
       ),
     );
   }
@@ -380,15 +439,12 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, refresh) => AlertDialog(
-          backgroundColor: preset.surface,
+          backgroundColor: LaooColors.white,
           surfaceTintColor: Colors.transparent,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(LaooRadius.xs),
           ),
-          insetPadding: const EdgeInsets.symmetric(
-            horizontal: LaooLayout.dialogInsetPadding,
-            vertical: 24,
-          ),
+          insetPadding: const EdgeInsets.all(LaooLayout.dialogInsetPadding),
           titlePadding: const EdgeInsets.fromLTRB(
             LaooLayout.cardPadding,
             LaooLayout.cardPadding,
@@ -507,9 +563,14 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
                             width: 88,
                             height: 72,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, _, _) => Icon(
-                              Icons.broken_image_outlined,
-                              color: preset.primary,
+                            errorBuilder: (_, _, _) => const SizedBox(
+                              width: 88,
+                              height: 72,
+                              child: Center(
+                                child: Text(
+                                  'เปิดรูปไม่ได้ กรุณาเลือก JPG หรือ PNG',
+                                ),
+                              ),
                             ),
                           ),
                         )
@@ -542,40 +603,47 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
                             borderRadius: BorderRadius.circular(LaooRadius.xs),
                           ),
                         ),
-                        onPressed: imageBusy
+                        onPressed: imageBusy || saving
                             ? null
                             : () async {
-                                final picked = await FilePicker.platform
-                                    .pickFiles(
-                                      type: FileType.image,
-                                      withData: true,
-                                    );
-                                final source = picked?.files.single.bytes;
-                                if (source == null || !dialogContext.mounted) {
-                                  return;
-                                }
-                                final sourceBytes = Uint8List.fromList(source);
                                 refresh(() {
-                                  selectedImage = sourceBytes;
-                                  selectedImageName = picked!.files.single.name;
                                   imageBusy = true;
                                   imageError = null;
                                 });
                                 try {
-                                  final compressed = await compute(
-                                    _compressFoodImage,
-                                    sourceBytes,
+                                  final picked = await FilePicker.platform
+                                      .pickFiles(
+                                        type: FileType.image,
+                                        withData: true,
+                                      );
+                                  if (picked == null || !context.mounted) {
+                                    return;
+                                  }
+                                  final file = picked.files.single;
+                                  final source =
+                                      file.bytes ??
+                                      await file.xFile.readAsBytes();
+                                  if (!context.mounted) return;
+                                  if (source.isEmpty) {
+                                    throw const FormatException('ไฟล์รูปว่าง');
+                                  }
+                                  final sourceBytes = Uint8List.fromList(
+                                    source,
                                   );
-                                  if (!dialogContext.mounted) return;
                                   refresh(() {
-                                    selectedImage = compressed;
-                                    selectedImageName = 'food.jpg';
+                                    selectedImage = sourceBytes;
+                                    selectedImageName = file.name;
+                                    imageBusy = true;
+                                    imageError = null;
                                   });
                                 } catch (error) {
-                                  if (!dialogContext.mounted) return;
-                                  refresh(() => imageError = '$error');
+                                  if (!context.mounted) return;
+                                  refresh(
+                                    () => imageError =
+                                        'เลือกรูปอาหารไม่สำเร็จ กรุณาเลือกไฟล์ JPG, PNG หรือ WebP ที่เปิดดูได้แล้วลองใหม่',
+                                  );
                                 } finally {
-                                  if (dialogContext.mounted) {
+                                  if (context.mounted) {
                                     refresh(() => imageBusy = false);
                                   }
                                 }
@@ -590,14 +658,17 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
                               )
                             : const Icon(Icons.add_photo_alternate_outlined),
                         label: Text(
-                          imageBusy ? 'กำลังปรับรูป...' : 'เลือกรูปอาหาร',
+                          imageBusy ? 'กำลังอ่านรูป...' : 'เลือกรูปอาหาร',
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    imageError ?? 'ระบบจะปรับรูปเป็น JPG ขนาดไม่เกิน 70 KB',
+                    imageError ??
+                        (selectedImageName == null
+                            ? 'ระบบจะปรับรูปเป็น JPG ขนาดไม่เกิน 70 KB เมื่อบันทึก'
+                            : 'เลือกแล้ว: $selectedImageName — จะปรับขนาดเมื่อบันทึก'),
                     style: TextStyle(
                       color: imageError == null
                           ? preset.textSecondary
@@ -646,7 +717,7 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
                   borderRadius: BorderRadius.circular(LaooRadius.xs),
                 ),
               ),
-              onPressed: imageBusy || saving
+              onPressed: imageBusy || saving || imageError != null
                   ? null
                   : () {
                       if (name.text.trim().isEmpty) {
@@ -700,22 +771,33 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
   }) async {
     setSaving(true);
     try {
+      final uploadBytes = selectedImage == null
+          ? null
+          : await compute(_compressFoodImage, selectedImage);
+      if (!dialogContext.mounted) return;
       final savedId = await _repository.save({
         if (item?['code'] != null) 'code': item!['code'],
         'nameTh': name.text.trim(),
         'foodTypeCode': selectedType,
       }, id: (item?['foodId'] as num?)?.toInt());
-      if (selectedImage != null) {
-        await _repository.uploadImage(
+      if (uploadBytes != null) {
+        final uploadedUrl = await _repository.uploadImage(
           savedId,
-          selectedImage,
-          selectedImageName ?? 'food.jpg',
+          uploadBytes,
+          'food.jpg',
         );
+        if (item != null) item['imageUrl'] = uploadedUrl;
       }
       if (!mounted) return;
-      _showMessage('บันทึกรายการอาหารสำเร็จ');
-      await _load();
-      if (dialogContext.mounted) resetForm?.call();
+      if (item != null) {
+        if (dialogContext.mounted) Navigator.pop(dialogContext);
+        _showMessage('บันทึกรายการอาหารสำเร็จ');
+        await _load();
+      } else {
+        _showMessage('บันทึกรายการอาหารสำเร็จ');
+        await _load();
+        if (dialogContext.mounted) resetForm?.call();
+      }
     } catch (error) {
       if (mounted) {
         _showMessage(_errorText(error, 'บันทึกข้อมูลไม่สำเร็จ'), true);
@@ -726,57 +808,10 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
   }
 
   Future<void> _delete(Map<String, dynamic> item) async {
-    final preset = workspaceThemeController.value;
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.delete_outline, color: LaooColors.error),
-            SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'ยืนยันการลบข้อมูล',
-                style: LaooTypography.popupTitleStyle,
-              ),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Divider(height: 1, color: LaooColors.border),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: LaooColors.error.withValues(alpha: .08),
-                borderRadius: BorderRadius.circular(LaooRadius.xs),
-              ),
-              child: Text('${item['code']} | ${item['nameTh']}'),
-            ),
-            const SizedBox(height: 12),
-            const Text('ข้อมูลที่ลบแล้วไม่สามารถเรียกคืนกลับมาได้'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            style: TextButton.styleFrom(foregroundColor: preset.primary),
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('ยกเลิก'),
-          ),
-          FilledButton.icon(
-            style: FilledButton.styleFrom(
-              backgroundColor: LaooColors.error,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () => Navigator.pop(dialogContext, true),
-            icon: const Icon(Icons.delete_outline),
-            label: const Text('ลบ'),
-          ),
-        ],
-      ),
+      builder: (dialogContext) =>
+          MeetingDeletePopup(record: '${item['code']} | ${item['nameTh']}'),
     );
     if (confirmed != true) return;
     try {
