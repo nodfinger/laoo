@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app/theme/laoo_design_tokens.dart';
 import '../../../app/theme/laoo_typography.dart';
-import '../../support/presentation/widgets/support_workspace_shell.dart';
+import '../../../app/theme/workspace_theme_presets.dart';
 
 /// Standard layout for Meeting popups without existing header/footer dividers.
 class MeetingPopup extends StatelessWidget {
