@@ -714,7 +714,7 @@ ORDER BY E.EmployeeCode,E.FullName;
         await using var connection = await Open(token);
         const string sql = """
 SELECT B.BookingID,B.BookingNo,B.RoomID,B.Subject,B.Description,B.AttendeeCount,
-       B.BookingStatus,B.ApprovalMode,B.RequireAllApprovers,B.Remark,B.RequesterUserID
+       B.BookingStatus,B.ApprovalMode,B.RequireAllApprovers,B.Remark,B.RequesterUserID,B.CancelRemark
 FROM dbo.TDADMeetingRoomBooking B
 WHERE B.BookingID=@id AND B.CompanyID=@company;
 
@@ -742,6 +742,7 @@ ORDER BY A.ApprovalOrder,E.EmployeeCode;
             subject = reader.GetString(3), description = Text(reader, 4), attendeeCount = reader.GetInt32(5),
             status = reader.GetString(6), approvalMode = reader.GetString(7), requireAllApprovers = reader.GetBoolean(8),
             remark = Text(reader, 9), requesterUserId = reader.GetInt64(10),
+            cancelRemark = Text(reader, 11),
         };
         await reader.NextResultAsync(token);
         var slots = new List<object>();
@@ -770,7 +771,8 @@ ORDER BY A.ApprovalOrder,E.EmployeeCode;
         await using var connection = await Open(token);
         var rooms = await LoadRooms(connection, companyId, request, token);
         if (rooms.Count == 0) return Ok(Array.Empty<object>());
-        var conflicts = await LoadConflicts(connection, companyId, request.Slots!, request.ExcludeBookingId, token);
+        var conflicts = await LoadConflicts(connection, companyId, request.Slots!, request.ExcludeBookingId, token, wholeDays: true);
+        var now = DateTime.Now;
         var result = rooms.Select(room =>
         {
             var reason = AvailabilityReason(room, request.Slots!, request.AttendeeCount, conflicts);
@@ -794,7 +796,11 @@ ORDER BY A.ApprovalOrder,E.EmployeeCode;
                 })
                 .ToList();
             var bookingsForSelectedDate = roomConflicts
-                .Where(conflict => conflict.End > DateTime.Now)
+                .Where(conflict => conflict.End > now)
+                .Where(conflict => request.Slots!.Any(slot =>
+                    conflict.Start < Local(slot.StartDateTime).Date.AddDays(1) &&
+                    conflict.End > Local(slot.StartDateTime).Date))
+                .OrderBy(conflict => conflict.Start)
                 .Select(conflict => new
                 {
                     conflict.BookingId,
@@ -826,20 +832,25 @@ ORDER BY A.ApprovalOrder,E.EmployeeCode;
     public Task<IActionResult> Update(long id, BookingSaveRequest request, CancellationToken token) => Save(id, request, token);
 
     [HttpDelete("{id:long}")]
-    public async Task<IActionResult> Cancel(long id, CancellationToken token)
+    public async Task<IActionResult> Cancel(long id, CancellationToken token,
+        [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] BookingCancellationRequest? request = null)
     {
         if (!TryCompany(out var companyId) || !TryUser(out var userId) || !await Permission("DELETE", token)) return Forbid();
+        var remark = Clean(request?.Remark);
+        if (remark?.Length > 1000)
+            return BadRequest(Error("หมายเหตุยาวเกินกำหนด", "กรุณาระบุหมายเหตุยกเลิกการจองไม่เกิน 1,000 ตัวอักษร"));
         await using var connection = await Open(token);
         const string sql = """
 UPDATE dbo.TDADMeetingRoomBooking
-SET BookingStatus='CANCELLED',CancelDate=SYSUTCDATETIME(),UpdateDate=SYSUTCDATETIME(),UpdateBy=@user
+SET BookingStatus='CANCELLED',CancelRemark=@remark,CancelDate=SYSUTCDATETIME(),UpdateDate=SYSUTCDATETIME(),UpdateBy=@user
 WHERE BookingID=@id AND CompanyID=@company AND BookingStatus<>'CANCELLED';
 """;
         await using var command = new SqlCommand(sql, connection);
         Add(command, "@id", id); Add(command, "@company", companyId); Add(command, "@user", userId);
+        Add(command, "@remark", remark);
         return await command.ExecuteNonQueryAsync(token) == 0
             ? NotFound(Error("ไม่พบรายการจองที่ยกเลิกได้", $"BookingID {id} อาจถูกยกเลิกแล้วหรือไม่อยู่ในบริษัทของผู้ใช้งาน"))
-            : Ok(new { bookingId = id, status = "CANCELLED" });
+            : Ok(new { bookingId = id, status = "CANCELLED", cancelRemark = remark });
     }
 
     private async Task<IActionResult> Save(long? id, BookingSaveRequest request, CancellationToken token)
@@ -1022,10 +1033,15 @@ WHERE R.CompanyID=@company AND R.RoomID=@room AND R.IsActive=1;
         return null;
     }
 
-    private async Task<Dictionary<long, List<BookingConflict>>> LoadConflicts(SqlConnection connection, long companyId, List<BookingSlotRequest> slots, long? excludeBookingId, CancellationToken token, SqlTransaction? transaction = null, bool lockRows = false)
+    private async Task<Dictionary<long, List<BookingConflict>>> LoadConflicts(SqlConnection connection, long companyId, List<BookingSlotRequest> slots, long? excludeBookingId, CancellationToken token, SqlTransaction? transaction = null, bool lockRows = false, bool wholeDays = false)
     {
         var min = slots.Min(slot => Local(slot.StartDateTime));
         var max = slots.Max(slot => Local(slot.EndDateTime));
+        if (wholeDays)
+        {
+            min = min.Date;
+            max = max.Date.AddDays(1);
+        }
         var hint = lockRows ? "WITH (UPDLOCK,HOLDLOCK)" : string.Empty;
         var sql = $"""
 SELECT S.RoomID,S.StartDateTime,S.EndDateTime,B.BookingID,B.BookingNo,B.Subject,
@@ -1247,6 +1263,7 @@ public sealed record BookingSlotRequest(DateTime StartDateTime, DateTime EndDate
 public sealed record BookingSaveRequest(long RoomId, string Subject, string? Description, int AttendeeCount, List<BookingSlotRequest>? Slots, string? Remark);
 public sealed record ApprovalDecisionRequest(string Decision, string? Remark);
 public sealed record RollbackBookingRequest(string? Remark);
+public sealed record BookingCancellationRequest(string? Remark);
 public sealed record ParticipantSaveRequest(List<long>? EmployeeIds);
 public sealed record AvailabilityRequest(List<BookingSlotRequest>? Slots, long? RoomId, long? BranchId, long? BuildingId, long? FloorId, int? AttendeeCount, long? ExcludeBookingId);
 

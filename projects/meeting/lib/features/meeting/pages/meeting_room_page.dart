@@ -1,5 +1,7 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+
+import '../widgets/meeting_popup.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/laoo_design_tokens.dart';
@@ -159,7 +161,8 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
   void _showRoomImage(String value) {
     showDialog<void>(
       context: context,
-      builder: (_) => Dialog(
+      builder: (_) => MeetingImagePopup(
+        title: 'รูปห้องประชุม / แผนผัง',
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1100, maxHeight: 800),
           child: InteractiveViewer(
@@ -570,9 +573,8 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
             ].map((v) => v?.toString() ?? '').join(' ').toLowerCase();
             return term.isEmpty || value.contains(term);
           }).toList();
-          return AlertDialog(
-            backgroundColor: LaooColors.white,
-            surfaceTintColor: Colors.transparent,
+          return MeetingPopup(
+            footerDivider: false,
             title: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -583,9 +585,11 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                       color: preset.primary,
                     ),
                     const SizedBox(width: 8),
-                    Text(
-                      'กำหนดผู้ดูแลห้องประชุม',
-                      style: LaooTypography.popupTitleStyle,
+                    Expanded(
+                      child: Text(
+                        'กำหนดผู้ดูแลห้องประชุม',
+                        style: LaooTypography.popupTitleStyle,
+                      ),
                     ),
                   ],
                 ),
@@ -597,7 +601,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                     room['code'].toString() + ' ' + room['nameTh'].toString(),
                     style: TextStyle(
                       color: preset.primary,
-                      fontSize: 16,
+                      fontSize: LaooTypography.sectionTitle,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -625,14 +629,14 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                       labelText: 'แผนก',
                       labelStyle: TextStyle(color: preset.primary),
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(LaooRadius.xs),
                       ),
                       enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(LaooRadius.xs),
                         borderSide: BorderSide(color: preset.border),
                       ),
                       focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(LaooRadius.xs),
                         borderSide: BorderSide(
                           color: preset.primary,
                           width: 1.5,
@@ -690,7 +694,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                       },
                     ),
                   ),
-                  Divider(color: preset.primary, height: 1),
+                  const Divider(color: LaooColors.border, height: 1),
                 ],
               ),
             ),
@@ -850,9 +854,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, refresh) {
           final errorColor = Theme.of(context).colorScheme.error;
-          return AlertDialog(
-            backgroundColor: LaooColors.white,
-            surfaceTintColor: Colors.transparent,
+          return MeetingPopup(
             title: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -860,9 +862,11 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                   children: [
                     Icon(Icons.rule_outlined, color: preset.primary),
                     const SizedBox(width: 8),
-                    Text(
-                      'กำหนดกฎห้องประชุม',
-                      style: LaooTypography.popupTitleStyle,
+                    Expanded(
+                      child: Text(
+                        'กำหนดกฎห้องประชุม',
+                        style: LaooTypography.popupTitleStyle,
+                      ),
                     ),
                   ],
                 ),
@@ -1102,76 +1106,8 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                   onPressed: () async {
                     final confirmed = await showDialog<bool>(
                       context: dialogContext,
-                      builder: (confirmContext) => AlertDialog(
-                        backgroundColor: LaooColors.white,
-                        surfaceTintColor: Colors.transparent,
-                        title: Row(
-                          children: [
-                            Container(
-                              width: 42,
-                              height: 42,
-                              decoration: BoxDecoration(
-                                color: preset.primary.withValues(alpha: .10),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Icon(
-                                Icons.delete_outline,
-                                color: preset.primary,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Flexible(
-                              child: Text(
-                                'ยืนยันการลบข้อมูล',
-                                style: LaooTypography.popupTitleStyle,
-                              ),
-                            ),
-                          ],
-                        ),
-                        content: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: preset.primary.withValues(alpha: .08),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                'ต้องการลบ ${room['code']} - ${room['nameTh']} หรือไม่?',
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            const Text(
-                              'ข้อมูลที่ลบแล้วไม่สามารถเรียกคืนกลับมาได้',
-                              style: TextStyle(
-                                fontSize: LaooTypography.validation,
-                              ),
-                            ),
-                          ],
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () =>
-                                Navigator.pop(confirmContext, false),
-                            child: Text(
-                              'ยกเลิก',
-                              style: TextStyle(color: preset.primary),
-                            ),
-                          ),
-                          FilledButton.icon(
-                            style: FilledButton.styleFrom(
-                              backgroundColor: Colors.red,
-                              foregroundColor: Colors.white,
-                            ),
-                            onPressed: () =>
-                                Navigator.pop(confirmContext, true),
-                            icon: const Icon(Icons.delete_outline),
-                            label: const Text('ลบ'),
-                          ),
-                        ],
+                      builder: (confirmContext) => MeetingDeletePopup(
+                        record: '${room['code']} - ${room['nameTh']}',
                       ),
                     );
                     if (confirmed != true) return;
@@ -1540,20 +1476,41 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
             String? requestUrl,
           }) {
             if (file?.bytes != null) {
+              final bytes = file!.bytes!;
               return InkWell(
                 onTap: () => showDialog<void>(
                   context: context,
-                  builder: (_) => Dialog(
+                  builder: (_) => MeetingImagePopup(
+                    title: 'รูปห้องประชุม / แผนผัง',
                     child: InteractiveViewer(
-                      child: Image.memory(file!.bytes!, fit: BoxFit.contain),
+                      child: Image.memory(bytes, fit: BoxFit.contain),
                     ),
                   ),
                 ),
                 child: Image.memory(
-                  file!.bytes!,
+                  bytes,
                   width: 130,
                   height: 82,
                   fit: BoxFit.cover,
+                  cacheWidth: 260,
+                  cacheHeight: 164,
+                  filterQuality: FilterQuality.low,
+                  gaplessPlayback: true,
+                  frameBuilder:
+                      (context, child, frame, wasSynchronouslyLoaded) {
+                        if (wasSynchronouslyLoaded || frame != null)
+                          return child;
+                        return SizedBox(
+                          width: 130,
+                          height: 82,
+                          child: Center(
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: preset.primary,
+                            ),
+                          ),
+                        );
+                      },
                 ),
               );
             }
@@ -1638,7 +1595,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
               borderRadius: BorderRadius.circular(LaooRadius.xs),
               side: BorderSide.none,
             ),
-            titlePadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+            titlePadding: const EdgeInsets.all(LaooLayout.cardPadding),
             title: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -1934,8 +1891,10 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                 ),
               ),
             ),
-            contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
-            actionsPadding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: LaooLayout.cardPadding,
+            ),
+            actionsPadding: const EdgeInsets.all(LaooLayout.cardPadding),
             actions: [
               Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2131,6 +2090,16 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
         builder: (context, refresh) => AlertDialog(
           backgroundColor: LaooColors.white,
           surfaceTintColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(LaooRadius.xs),
+            side: BorderSide.none,
+          ),
+          insetPadding: const EdgeInsets.all(LaooLayout.dialogInsetPadding),
+          titlePadding: const EdgeInsets.all(LaooLayout.cardPadding),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: LaooLayout.cardPadding,
+          ),
+          actionsPadding: const EdgeInsets.all(LaooLayout.cardPadding),
           title: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -2161,7 +2130,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                 ),
               ],
               const SizedBox(height: 8),
-              Divider(color: preset.primary.withValues(alpha: .45), height: 1),
+              const Divider(color: LaooColors.border, height: 1),
             ],
           ),
           content: SizedBox(
@@ -2244,20 +2213,31 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                     }).toList(),
                   ),
                 ),
-                Divider(
-                  color: preset.primary.withValues(alpha: .45),
-                  height: 1,
-                ),
+                const Divider(color: LaooColors.border, height: 1),
               ],
             ),
           ),
           actions: [
             TextButton(
+              style: TextButton.styleFrom(
+                foregroundColor: preset.primary,
+                minimumSize: const Size(0, LaooTypography.buttonHeight),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(LaooRadius.xs),
+                ),
+              ),
               onPressed: () => Navigator.pop(dc),
-              child: Text('ยกเลิก', style: TextStyle(color: preset.primary)),
+              child: const Text('ยกเลิก'),
             ),
             FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: preset.primary),
+              style: FilledButton.styleFrom(
+                backgroundColor: preset.primary,
+                foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                minimumSize: const Size(0, LaooTypography.buttonHeight),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(LaooRadius.xs),
+                ),
+              ),
               onPressed: () => Navigator.pop(dc, {
                 for (final id in checked)
                   id: {
@@ -2285,67 +2265,10 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
   }
 
   Future<void> _confirmRoomDelete(Map<String, dynamic> room) async {
-    final preset = workspaceThemeController.value;
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: LaooColors.white,
-        surfaceTintColor: Colors.transparent,
-        title: Row(
-          children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: preset.primary.withValues(alpha: .10),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(Icons.delete_outline, color: preset.primary),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'ยืนยันการลบข้อมูล',
-                style: LaooTypography.popupTitleStyle,
-              ),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: preset.primary.withValues(alpha: .08),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                'ต้องการลบ ${room['code']} - ${room['nameTh']} หรือไม่?',
-                textAlign: TextAlign.center,
-              ),
-            ),
-            const SizedBox(height: 12),
-            const Text('ข้อมูลที่ลบแล้วไม่สามารถเรียกคืนกลับมาได้'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: Text('ยกเลิก', style: TextStyle(color: preset.primary)),
-          ),
-          FilledButton.icon(
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () => Navigator.pop(dialogContext, true),
-            icon: const Icon(Icons.delete_outline),
-            label: const Text('ลบ'),
-          ),
-        ],
-      ),
+      builder: (dialogContext) =>
+          MeetingDeletePopup(record: '${room['code']} - ${room['nameTh']}'),
     );
     if (confirmed != true) return;
     try {
@@ -2367,69 +2290,10 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
   }
 
   Future<void> _deleteLegacy(Map<String, dynamic> r) async {
-    final p = workspaceThemeController.value;
     final ok = await showDialog<bool>(
       context: context,
-      builder: (c) => AlertDialog(
-        backgroundColor: LaooColors.white,
-        surfaceTintColor: Colors.transparent,
-        title: Column(
-          children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              decoration: BoxDecoration(
-                color: Colors.red.withValues(alpha: .1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(Icons.delete_outline, color: Colors.red),
-            ),
-            const SizedBox(height: 14),
-            const Text(
-              'ยืนยันการลบข้อมูล',
-              style: LaooTypography.popupTitleStyle,
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.red.withValues(alpha: .08),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                'ต้องการลบ ${r['code']} - ${r['nameTh']} หรือไม่?',
-                textAlign: TextAlign.center,
-              ),
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'ข้อมูลที่ลบแล้วไม่สามารถเรียกคืนกลับมาได้',
-              style: TextStyle(fontSize: LaooTypography.validation),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            style: TextButton.styleFrom(foregroundColor: p.primary),
-            onPressed: () => Navigator.pop(c, false),
-            child: const Text('ยกเลิก'),
-          ),
-          FilledButton.icon(
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () => Navigator.pop(c, true),
-            icon: const Icon(Icons.delete_outline),
-            label: const Text('ลบ'),
-          ),
-        ],
-      ),
+      builder: (c) =>
+          MeetingDeletePopup(record: '${r['code']} - ${r['nameTh']}'),
     );
     if (ok == true) {
       try {

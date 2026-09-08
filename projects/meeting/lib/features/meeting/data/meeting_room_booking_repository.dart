@@ -143,7 +143,8 @@ class MeetingRoomBookingRepository {
     return Map<String, dynamic>.from(data as Map);
   }
 
-  Future<void> cancel(int id) async => _api.delete('$_path/$id');
+  Future<void> cancel(int id, {String? remark}) async =>
+      _api.delete('$_path/$id', body: {'remark': remark});
 
   Future<Map<String, dynamic>> rollback(int id, {String? remark}) async {
     final data = await _api.post(

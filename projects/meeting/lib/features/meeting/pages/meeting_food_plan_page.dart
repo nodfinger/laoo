@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../widgets/meeting_popup.dart';
+
 import '../../../app/theme/laoo_design_tokens.dart';
 import '../../../app/theme/laoo_typography.dart';
 import '../../../app/theme/workspace_theme_presets.dart';
@@ -33,6 +35,9 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
   List<Map<String, dynamic>> _items = [];
   Map<String, dynamic>? _detail;
   Set<int> _selectedFoodIds = {};
+  final Map<int, TextEditingController> _foodQuantities = {};
+  final Set<int> _quantityErrors = {};
+  String _foodTypeFilter = '';
   DateTime? _cutoff;
   bool _planActive = true;
   bool _loading = true;
@@ -60,6 +65,9 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
   @override
   void dispose() {
     _search.dispose();
+    for (final controller in _foodQuantities.values) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
@@ -115,6 +123,13 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
             .where((food) => food['selected'] == true)
             .map((food) => (food['foodId'] as num).toInt())
             .toSet();
+        _foodTypeFilter = '';
+        _quantityErrors.clear();
+        for (final food in foods) {
+          final id = (food['foodId'] as num).toInt();
+          _foodQuantities.putIfAbsent(id, () => TextEditingController()).text =
+              '${(food['quantity'] as num?)?.toInt() ?? 1}';
+        }
         _cutoff = savedCutoff?.toLocal() ?? defaultCutoff;
         _planActive = detail['isActive'] == true || savedCutoff == null;
       });
@@ -138,16 +153,138 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
     final now = DateTime.now();
     final selected = _cutoff ?? now.add(const Duration(hours: 1));
     final current = selected.isBefore(now) ? now : selected;
+    final preset = workspaceThemeController.value;
+    final baseTheme = Theme.of(context);
     final date = await showDatePicker(
       context: context,
       initialDate: current,
       firstDate: now,
       lastDate: now.add(const Duration(days: 366)),
+      builder: (context, child) => Theme(
+        data: baseTheme.copyWith(
+          colorScheme: baseTheme.colorScheme.copyWith(
+            primary: preset.primary,
+            surface: LaooColors.white,
+            onSurface: preset.textPrimary,
+            onPrimary: baseTheme.colorScheme.onPrimary,
+          ),
+          datePickerTheme: DatePickerThemeData(
+            backgroundColor: LaooColors.white,
+            surfaceTintColor: Colors.transparent,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(LaooRadius.xs),
+              side: BorderSide.none,
+            ),
+            headerHelpStyle: LaooTypography.popupTitleStyle,
+            dividerColor: LaooColors.border,
+            cancelButtonStyle: TextButton.styleFrom(
+              foregroundColor: preset.primary,
+              minimumSize: const Size(64, LaooTypography.buttonHeight),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(LaooRadius.xs),
+              ),
+            ),
+            confirmButtonStyle: TextButton.styleFrom(
+              foregroundColor: baseTheme.colorScheme.onPrimary,
+              backgroundColor: preset.primary,
+              minimumSize: const Size(64, LaooTypography.buttonHeight),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(LaooRadius.xs),
+              ),
+            ),
+            headerBackgroundColor: LaooColors.white,
+            headerForegroundColor: preset.textPrimary,
+            weekdayStyle: TextStyle(
+              color: preset.primary,
+              fontSize: LaooTypography.inputText,
+              fontWeight: FontWeight.w700,
+            ),
+            dayForegroundColor: WidgetStateProperty.resolveWith((states) {
+              if (states.contains(WidgetState.disabled)) {
+                return preset.textSecondary.withValues(alpha: .45);
+              }
+              if (states.contains(WidgetState.selected)) {
+                return baseTheme.colorScheme.onPrimary;
+              }
+              return preset.textPrimary;
+            }),
+            dayBackgroundColor: WidgetStateProperty.resolveWith(
+              (states) => states.contains(WidgetState.selected)
+                  ? preset.primary
+                  : Colors.transparent,
+            ),
+            todayForegroundColor: WidgetStatePropertyAll(preset.primary),
+            todayBackgroundColor: WidgetStatePropertyAll(
+              preset.primary.withValues(alpha: .10),
+            ),
+            todayBorder: BorderSide(color: preset.primary),
+          ),
+          iconButtonTheme: IconButtonThemeData(
+            style: IconButton.styleFrom(foregroundColor: preset.primary),
+          ),
+        ),
+        child: child!,
+      ),
     );
     if (date == null || !mounted) return;
     final time = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.fromDateTime(current),
+      builder: (context, child) => Theme(
+        data: baseTheme.copyWith(
+          colorScheme: baseTheme.colorScheme.copyWith(
+            primary: preset.primary,
+            surface: LaooColors.white,
+            onSurface: preset.textPrimary,
+            onPrimary: baseTheme.colorScheme.onPrimary,
+          ),
+          dialogTheme: DialogThemeData(
+            backgroundColor: LaooColors.white,
+            surfaceTintColor: Colors.transparent,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(LaooRadius.xs),
+            ),
+          ),
+          timePickerTheme: TimePickerThemeData(
+            backgroundColor: LaooColors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(LaooRadius.xs),
+              side: BorderSide.none,
+            ),
+            padding: const EdgeInsets.all(LaooLayout.cardPadding),
+            entryModeIconColor: preset.primary,
+            helpTextStyle: LaooTypography.popupTitleStyle,
+            cancelButtonStyle: TextButton.styleFrom(
+              foregroundColor: preset.primary,
+              minimumSize: const Size(64, LaooTypography.buttonHeight),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(LaooRadius.xs),
+              ),
+            ),
+            confirmButtonStyle: TextButton.styleFrom(
+              foregroundColor: baseTheme.colorScheme.onPrimary,
+              backgroundColor: preset.primary,
+              minimumSize: const Size(64, LaooTypography.buttonHeight),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(LaooRadius.xs),
+              ),
+            ),
+          ),
+          textButtonTheme: TextButtonThemeData(
+            style: TextButton.styleFrom(
+              foregroundColor: preset.primary,
+              minimumSize: const Size(64, LaooTypography.buttonHeight),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(LaooRadius.xs),
+              ),
+            ),
+          ),
+        ),
+        child: MediaQuery(
+          data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+          child: child!,
+        ),
+      ),
     );
     if (time == null) return;
     setState(
@@ -165,6 +302,16 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
     final detail = _detail;
     if (detail == null || !_canEdit) return;
     final start = DateTime.parse('${detail['startDateTime']}').toLocal();
+    final quantities = <int, int>{};
+    _quantityErrors.clear();
+    for (final id in _selectedFoodIds) {
+      final value = int.tryParse(_foodQuantities[id]?.text.trim() ?? '');
+      if (value == null || value <= 0 || value > 2147483647) {
+        _quantityErrors.add(id);
+      } else {
+        quantities[id] = value;
+      }
+    }
     setState(() {
       _foodError = _planActive && _selectedFoodIds.isEmpty
           ? 'กรุณาเลือกอาหารอย่างน้อย 1 รายการ'
@@ -176,13 +323,25 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
           ? 'เวลาปิดรับต้องมากกว่าเวลาปัจจุบันและก่อนเริ่มประชุม'
           : null;
     });
-    if (_foodError != null || _cutoffError != null) return;
+    if (_quantityErrors.isNotEmpty) {
+      setState(() {
+        _foodTypeFilter = '';
+        _foodError =
+            'กรุณาระบุจำนวนเต็มมากกว่า 0 และไม่เกิน 2147483647 ในรายการอาหารที่เลือก';
+      });
+    }
+    if (_foodError != null ||
+        _cutoffError != null ||
+        _quantityErrors.isNotEmpty) {
+      return;
+    }
     setState(() => _saving = true);
     try {
       await _repository.save(
         (detail['bookingId'] as num).toInt(),
         cutoff: _cutoff!,
         foodIds: _selectedFoodIds,
+        foodQuantities: quantities,
         isActive: _planActive,
       );
       if (!mounted) return;
@@ -199,38 +358,10 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
   Future<void> _deletePlan(Map<String, dynamic> item) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.delete_outline, color: LaooColors.error),
-            SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'ยืนยันการลบเมนูอาหาร',
-                style: LaooTypography.popupTitleStyle,
-              ),
-            ),
-          ],
-        ),
-        content: Text(
-          '${item['bookingNo'] ?? '-'} | ${item['subject']}\n'
-          'ผู้เข้าร่วมจะไม่เห็นรายการอาหารของการประชุมนี้',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('ยกเลิก'),
-          ),
-          FilledButton.icon(
-            style: FilledButton.styleFrom(
-              backgroundColor: LaooColors.error,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () => Navigator.pop(dialogContext, true),
-            icon: const Icon(Icons.delete_outline),
-            label: const Text('ลบ'),
-          ),
-        ],
+      builder: (dialogContext) => MeetingDeletePopup(
+        title: 'ยืนยันการลบเมนูอาหาร',
+        record: '${item['bookingNo'] ?? '-'} | ${item['subject']}',
+        description: 'ผู้เข้าร่วมจะไม่เห็นรายการอาหารของการประชุมนี้',
       ),
     );
     if (confirmed != true) return;
@@ -332,6 +463,29 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
                 ],
               ),
             ),
+            const SizedBox(width: 10),
+            SizedBox(
+              width: 110,
+              child: TextField(
+                controller: _foodQuantities[id],
+                enabled: selected && _canEdit && !_saving,
+                keyboardType: TextInputType.number,
+                style: const TextStyle(
+                  color: LaooColors.textPrimary,
+                  fontSize: LaooTypography.inputText,
+                ),
+                decoration: InputDecoration(
+                  labelText: 'จำนวน',
+                  errorText: selected && _quantityErrors.contains(id)
+                      ? 'ระบุจำนวนเต็ม > 0'
+                      : null,
+                  errorMaxLines: 2,
+                ),
+                onChanged: (_) => setState(() {
+                  _quantityErrors.remove(id);
+                }),
+              ),
+            ),
             Checkbox(
               value: selected,
               activeColor: preset.primary,
@@ -354,6 +508,21 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
     final foods = List<Map<String, dynamic>>.from(
       detail['foods'] as List? ?? const [],
     );
+    final foodTypes =
+        foods
+            .map((food) => '${food['foodTypeName'] ?? ''}'.trim())
+            .where((type) => type.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
+    final filteredFoods = _foodTypeFilter.isEmpty
+        ? foods
+        : foods
+              .where(
+                (food) =>
+                    '${food['foodTypeName'] ?? ''}'.trim() == _foodTypeFilter,
+              )
+              .toList();
     return Padding(
       padding: const EdgeInsets.all(LaooLayout.cardMargin),
       child: Column(
@@ -439,6 +608,32 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
                       ),
                     ),
                   const SizedBox(height: 12),
+                  SizedBox(
+                    width: 280,
+                    child: DropdownButtonFormField<String>(
+                      key: ValueKey(_foodTypeFilter),
+                      initialValue: _foodTypeFilter,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'ประเภทอาหาร',
+                      ),
+                      items: [
+                        const DropdownMenuItem<String>(
+                          value: '',
+                          child: Text('ทั้งหมด'),
+                        ),
+                        ...foodTypes.map(
+                          (type) => DropdownMenuItem<String>(
+                            value: type,
+                            child: Text(type),
+                          ),
+                        ),
+                      ],
+                      onChanged: (value) =>
+                          setState(() => _foodTypeFilter = value ?? ''),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   const Text(
                     'รายการอาหารที่เปิดให้เลือก',
                     style: TextStyle(
@@ -447,7 +642,7 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  ...foods.map(
+                  ...filteredFoods.map(
                     (food) => Padding(
                       padding: const EdgeInsets.only(bottom: 6),
                       child: _foodCard(food, preset),

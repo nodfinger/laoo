@@ -89,7 +89,7 @@ OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY;";
             await Allowed(connection, exists ? "EDIT" : "CREATE", token));
         const string sql = @"
 SELECT F.FoodID,F.FoodCode,F.FoodNameTH,F.FoodTypeCode,T.Name,F.FoodImageUrl,
-       CASE WHEN O.BookingFoodOptionID IS NULL THEN 0 ELSE 1 END
+       CASE WHEN O.BookingFoodOptionID IS NULL THEN 0 ELSE 1 END,ISNULL(O.Quantity,1)
 FROM dbo.TDADMeetingFood F
 OUTER APPLY
 (
@@ -113,6 +113,7 @@ ORDER BY ISNULL(T.Seq,0),F.FoodCode;";
             foodId = reader.GetInt64(0), code = reader.GetString(1), nameTh = reader.GetString(2),
             foodTypeCode = reader.GetString(3), foodTypeName = Text(reader, 4), imageUrl = Text(reader, 5),
             selected = reader.GetInt32(6) == 1,
+            quantity = reader.GetInt32(7),
         });
         return Ok(new { header.BookingId, header.BookingNo, header.Subject, header.RoomCode, header.RoomName, header.StartDateTime, header.EndDateTime, header.OrderCutoffDateTime, header.IsActive, canManageFoodPlan, foods });
     }
@@ -122,6 +123,10 @@ ORDER BY ISNULL(T.Seq,0),F.FoodCode;";
     {
         if (!Scope(out var company, out var user)) return Forbid();
         var foodIds = (request.FoodIds ?? []).Where(id => id > 0).Distinct().ToList();
+        if (request.FoodQuantities is not null &&
+            (request.FoodQuantities.Any(entry => entry.Value <= 0 || !foodIds.Contains(entry.Key)) ||
+             foodIds.Any(id => !request.FoodQuantities.ContainsKey(id))))
+            return BadRequest(Error("จำนวนอาหารไม่ถูกต้อง", "กรุณาระบุจำนวนเต็มมากกว่า 0 ให้ครบทุกอาหารที่เลือก"));
         if (request.IsActive && foodIds.Count == 0) return BadRequest(Error("ยังไม่ได้เลือกอาหาร", "กรุณาเลือกอย่างน้อย 1 รายการ"));
         await using var connection = await Open(token);
         var exists = await PlanExists(connection, bookingId, company, token);
@@ -164,8 +169,9 @@ DELETE FROM dbo.TDADMeetingBookingFoodOption WHERE BookingID=@booking AND Compan
             await save.ExecuteNonQueryAsync(token);
             foreach (var foodId in foodIds)
             {
-                await using var option = new SqlCommand("INSERT dbo.TDADMeetingBookingFoodOption(BookingID,CompanyID,FoodID,CreateBy) VALUES(@booking,@company,@food,@user)", connection, transaction);
+                await using var option = new SqlCommand("INSERT dbo.TDADMeetingBookingFoodOption(BookingID,CompanyID,FoodID,CreateBy,Quantity) VALUES(@booking,@company,@food,@user,@quantity)", connection, transaction);
                 Add(option, "@booking", bookingId); Add(option, "@company", company); Add(option, "@food", foodId); Add(option, "@user", user);
+                Add(option, "@quantity", request.FoodQuantities is null ? 1 : request.FoodQuantities[foodId]);
                 await option.ExecuteNonQueryAsync(token);
             }
             await transaction.CommitAsync(token);
@@ -241,5 +247,5 @@ GROUP BY B.BookingID,B.BookingNo,B.Subject,B.BookingStatus,R.RoomCode,R.RoomName
     private static void Add(SqlCommand command, string name, object? value) => command.Parameters.AddWithValue(name, value ?? DBNull.Value);
 }
 
-public sealed record FoodPlanRequest(DateTime OrderCutoffDateTime, List<long>? FoodIds, bool IsActive = true);
+public sealed record FoodPlanRequest(DateTime OrderCutoffDateTime, List<long>? FoodIds, bool IsActive = true, Dictionary<long, int>? FoodQuantities = null);
 public sealed record FoodPlanHeader(long BookingId, string? BookingNo, string Subject, string Status, string RoomCode, string RoomName, DateTime StartDateTime, DateTime EndDateTime, DateTime? OrderCutoffDateTime, bool IsActive);

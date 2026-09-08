@@ -33,11 +33,16 @@ class MeetingFoodPlanRepository {
     required DateTime cutoff,
     required Set<int> foodIds,
     required bool isActive,
+    Map<int, int>? foodQuantities,
   }) => _api.put(
     '$_path/$bookingId',
     body: {
       'orderCutoffDateTime': cutoff.toIso8601String(),
       'foodIds': foodIds.toList()..sort(),
+      if (foodQuantities != null)
+        'foodQuantities': {
+          for (final id in foodIds) '$id': foodQuantities[id] ?? 1,
+        },
       'isActive': isActive,
     },
   );
