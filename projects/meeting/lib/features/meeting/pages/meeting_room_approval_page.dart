@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../widgets/meeting_popup.dart';
+import '../widgets/meeting_participant_dialog.dart';
 
 import '../../../app/theme/laoo_design_tokens.dart';
 import '../../../app/theme/laoo_typography.dart';
@@ -11,6 +12,7 @@ import '../../../core/widgets/auto_dismiss_message.dart';
 import '../../support/presentation/widgets/support_workspace_shell.dart';
 import '../data/meeting_room_booking_repository.dart';
 import '../meeting_feature_host.dart';
+import 'meeting_food_plan_page.dart';
 
 class MeetingRoomApprovalPage extends StatefulWidget {
   const MeetingRoomApprovalPage({super.key});
@@ -33,6 +35,7 @@ class _MeetingRoomApprovalPageState extends State<MeetingRoomApprovalPage> {
   DateTime? _dateFrom;
   DateTime? _dateTo;
   int _page = 1;
+  int? _foodPlanBookingId;
   static const _pageSize = 30;
 
   @override
@@ -96,6 +99,9 @@ class _MeetingRoomApprovalPageState extends State<MeetingRoomApprovalPage> {
       }
     }
   }
+
+  static int? _int(Object? value) =>
+      value is num ? value.toInt() : int.tryParse(value?.toString() ?? '');
 
   String _error(Object error, String fallback) => error is ApiException
       ? '${error.message}${error.description == null ? '' : '\n${error.description}'}'
@@ -626,9 +632,37 @@ class _MeetingRoomApprovalPageState extends State<MeetingRoomApprovalPage> {
             ),
           ),
           const Divider(),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
+          Wrap(
+            alignment: WrapAlignment.end,
+            spacing: 6,
+            runSpacing: 6,
             children: [
+              if (status == 'APPROVED' && item['canManageParticipants'] == true)
+                OutlinedButton.icon(
+                  onPressed: () => _manageParticipants(item),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: preset.primary,
+                    side: BorderSide(color: preset.primary),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(LaooRadius.xs),
+                    ),
+                  ),
+                  icon: const Icon(Icons.group_add_outlined),
+                  label: const Text('เชิญผู้เข้าร่วมประชุม'),
+                ),
+              if (status == 'APPROVED' && item['canManageFoodPlan'] == true)
+                OutlinedButton.icon(
+                  onPressed: () => _manageFoodPlan(item),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: preset.primary,
+                    side: BorderSide(color: preset.primary),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(LaooRadius.xs),
+                    ),
+                  ),
+                  icon: const Icon(Icons.restaurant_menu_outlined),
+                  label: const Text('กำหนดชุดอาหาร'),
+                ),
               OutlinedButton.icon(
                 onPressed: () => _showHistory(item),
                 style: OutlinedButton.styleFrom(
@@ -641,7 +675,6 @@ class _MeetingRoomApprovalPageState extends State<MeetingRoomApprovalPage> {
                 icon: const Icon(Icons.history),
                 label: const Text('ประวัติ'),
               ),
-              const SizedBox(width: 8),
               if (status == 'PENDING' && _canEdit) ...[
                 OutlinedButton(
                   onPressed: () => _decide(item, 'REJECTED'),
@@ -653,7 +686,6 @@ class _MeetingRoomApprovalPageState extends State<MeetingRoomApprovalPage> {
                   ),
                   child: const Text('ไม่อนุมัติ'),
                 ),
-                const SizedBox(width: 8),
                 FilledButton(
                   onPressed: () => _decide(item, 'APPROVED'),
                   style: FilledButton.styleFrom(
@@ -685,68 +717,108 @@ class _MeetingRoomApprovalPageState extends State<MeetingRoomApprovalPage> {
     );
   }
 
+  Future<void> _manageParticipants(Map<String, dynamic> item) async {
+    final bookingId = _int(item['bookingId']);
+    if (bookingId == null) return;
+    try {
+      final saved = await showMeetingParticipantDialog(
+        context,
+        repository: _repository,
+        bookingId: bookingId,
+      );
+      if (saved && mounted) {
+        setState(() => _message = 'บันทึกผู้เข้าร่วมประชุมสำเร็จ');
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(
+          () => _message = _error(error, 'จัดการผู้เข้าร่วมประชุมไม่สำเร็จ'),
+        );
+      }
+    }
+  }
+
+  void _manageFoodPlan(Map<String, dynamic> item) {
+    final bookingId = _int(item['bookingId']);
+    if (bookingId != null) {
+      setState(() => _foodPlanBookingId = bookingId);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final preset = workspaceThemeController.value;
     return buildMeetingWorkspaceShell(
       pageTitle: _caption,
       activeMenu: '21004',
-      child: Stack(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(LaooLayout.cardMargin),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+      child: _foodPlanBookingId == null
+          ? Stack(
               children: [
-                WorkspaceSectionCard(
-                  child: WorkspaceActionHeader(
-                    title: _caption,
-                    favoriteKey: '21004',
-                    actions: [
-                      IconButton(
-                        tooltip: 'รีเฟรช',
-                        onPressed: _load,
-                        icon: Icon(Icons.refresh, color: preset.primary),
+                Padding(
+                  padding: const EdgeInsets.all(LaooLayout.cardMargin),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      WorkspaceSectionCard(
+                        child: WorkspaceActionHeader(
+                          title: _caption,
+                          favoriteKey: '21004',
+                          actions: [
+                            IconButton(
+                              tooltip: 'รีเฟรช',
+                              onPressed: _load,
+                              icon: Icon(Icons.refresh, color: preset.primary),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: LaooLayout.cardSpacing),
+                      _filterCard(preset),
+                      const SizedBox(height: LaooLayout.cardSpacing),
+                      Expanded(
+                        child: _loading
+                            ? const Center(child: CircularProgressIndicator())
+                            : _items.isEmpty
+                            ? const Center(child: Text('ไม่มีรายการรออนุมัติ'))
+                            : ListView.separated(
+                                padding: EdgeInsets.zero,
+                                itemCount: _items.length,
+                                separatorBuilder: (_, _) => const SizedBox(
+                                  height: LaooLayout.cardSpacing,
+                                ),
+                                itemBuilder: (_, index) =>
+                                    _itemCard(_items[index], preset),
+                              ),
+                      ),
+                      const SizedBox(height: LaooLayout.cardSpacing),
+                      WorkspaceSectionCard(
+                        padding: EdgeInsets.zero,
+                        child: _pagination(preset),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: LaooLayout.cardSpacing),
-                _filterCard(preset),
-                const SizedBox(height: LaooLayout.cardSpacing),
-                Expanded(
-                  child: _loading
-                      ? const Center(child: CircularProgressIndicator())
-                      : _items.isEmpty
-                      ? const Center(child: Text('ไม่มีรายการรออนุมัติ'))
-                      : ListView.separated(
-                          padding: EdgeInsets.zero,
-                          itemCount: _items.length,
-                          separatorBuilder: (_, _) =>
-                              const SizedBox(height: LaooLayout.cardSpacing),
-                          itemBuilder: (_, index) =>
-                              _itemCard(_items[index], preset),
-                        ),
-                ),
-                const SizedBox(height: LaooLayout.cardSpacing),
-                WorkspaceSectionCard(
-                  padding: EdgeInsets.zero,
-                  child: _pagination(preset),
-                ),
+                if (_message != null)
+                  Positioned(
+                    top: 12,
+                    right: 12,
+                    child: AutoDismissMessage(
+                      message: _message!,
+                      onClose: () => setState(() => _message = null),
+                    ),
+                  ),
               ],
+            )
+          : MeetingFoodPlanPage(
+              key: ValueKey(_foodPlanBookingId),
+              bookingId: _foodPlanBookingId!,
+              parentCaption: _caption,
+              parentMenuCode: '21004',
+              onClose: () {
+                setState(() => _foodPlanBookingId = null);
+                _load();
+              },
             ),
-          ),
-          if (_message != null)
-            Positioned(
-              top: 12,
-              right: 12,
-              child: AutoDismissMessage(
-                message: _message!,
-                onClose: () => setState(() => _message = null),
-              ),
-            ),
-        ],
-      ),
     );
   }
 }

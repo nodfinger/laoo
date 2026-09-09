@@ -18,6 +18,8 @@ abstract final class MeetingRouteNames {
   static const invitations = 'meetingInvitationRsvp';
   static const approvals = 'meetingRoomApprovals';
   static const foodPlans = 'meetingFoodPlans';
+  static const foodOrderSummary = 'meetingFoodOrderSummary';
+  static const attendance = 'meetingAttendance';
   static const roomCheckIn = 'roomCheckIn';
   static const roomSupportTasks = 'roomSupportTasks';
   static const roomIssues = 'roomIssues';
@@ -36,6 +38,8 @@ abstract final class MeetingMenuCodes {
   static const invitations = '21003';
   static const approvals = '21004';
   static const foodPlans = '21005';
+  static const foodOrderSummary = '21006';
+  static const attendance = '22004';
   static const roomCheckIn = '22001';
   static const roomSupportTasks = '22002';
   static const roomIssues = '22003';
@@ -54,6 +58,8 @@ abstract final class MeetingRoutePaths {
   static const invitations = '/company/meeting-invitations';
   static const approvals = '/company/meeting-room-approvals';
   static const foodPlans = '/company/meeting-food-plans';
+  static const foodOrderSummary = '/company/meeting-food-order-summary';
+  static const attendance = '/company/meeting-attendance';
   static const roomCheckIn = '/company/room-check-in';
   static const roomSupportTasks = '/company/room-support-tasks';
   static const roomIssues = '/company/room-issues';
@@ -96,6 +102,18 @@ abstract final class MeetingRoutes {
     screenType: 1,
     name: MeetingRouteNames.foodPlans,
     path: MeetingRoutePaths.foodPlans,
+  );
+  static const foodOrderSummary = MeetingRouteSpec(
+    menuCode: MeetingMenuCodes.foodOrderSummary,
+    screenType: 3,
+    name: MeetingRouteNames.foodOrderSummary,
+    path: MeetingRoutePaths.foodOrderSummary,
+  );
+  static const attendance = MeetingRouteSpec(
+    menuCode: MeetingMenuCodes.attendance,
+    screenType: 2,
+    name: MeetingRouteNames.attendance,
+    path: MeetingRoutePaths.attendance,
   );
   static const roomCheckIn = MeetingRouteSpec(
     menuCode: MeetingMenuCodes.roomCheckIn,
@@ -164,6 +182,8 @@ abstract final class MeetingRoutes {
     invitations,
     approvals,
     foodPlans,
+    foodOrderSummary,
+    attendance,
     roomCheckIn,
     roomSupportTasks,
     roomIssues,

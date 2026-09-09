@@ -40,4 +40,17 @@ class MeetingInvitationRepository {
     '$_path/$participantId/response',
     body: {'status': status, 'remark': remark},
   );
+
+  Future<void> saveFoodOrder(
+    int participantId, {
+    required Map<int, int> quantities,
+  }) => _api.put(
+    '$_path/$participantId/food-order',
+    body: {
+      'items': quantities.entries
+          .where((entry) => entry.value > 0)
+          .map((entry) => {'foodId': entry.key, 'quantity': entry.value})
+          .toList(),
+    },
+  );
 }
