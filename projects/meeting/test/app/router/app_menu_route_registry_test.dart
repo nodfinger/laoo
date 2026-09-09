@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:laoo_meeting/app/router/app_menu_route_registry.dart';
+import 'package:laoo_meeting/features/meeting/meeting_route_contract.dart';
 
 void main() {
   test('all TDADMainMenu codes have one routable registry entry', () {
@@ -37,9 +38,11 @@ void main() {
       '21003',
       '21004',
       '21005',
+      '21006',
       '22001',
       '22002',
       '22003',
+      '22004',
       '23001',
       '23002',
       '23003',
@@ -65,5 +68,12 @@ void main() {
     final specs = AppMenuRouteRegistry.byPath('/organization-structure');
 
     expect(specs.map((spec) => spec.menuCode).toSet(), {'10005', '11005'});
+  });
+
+  test('new meeting operational menus keep approved screen types', () {
+    expect(MeetingRoutes.foodOrderSummary.menuCode, '21006');
+    expect(MeetingRoutes.foodOrderSummary.screenType, 3);
+    expect(MeetingRoutes.attendance.menuCode, '22004');
+    expect(MeetingRoutes.attendance.screenType, 2);
   });
 }

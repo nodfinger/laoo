@@ -262,6 +262,20 @@ abstract final class AppMenuRouteRegistry {
       path: RoutePaths.meetingFoodPlans,
       scope: AppMenuScope.company,
     ),
+    MeetingMenuCodes.foodOrderSummary: AppMenuRouteSpec(
+      menuCode: MeetingMenuCodes.foodOrderSummary,
+      databaseRouteName: 'meetingFoodOrderSummary',
+      goRouteName: RouteNames.meetingFoodOrderSummary,
+      path: RoutePaths.meetingFoodOrderSummary,
+      scope: AppMenuScope.company,
+    ),
+    MeetingMenuCodes.attendance: AppMenuRouteSpec(
+      menuCode: MeetingMenuCodes.attendance,
+      databaseRouteName: 'meetingAttendance',
+      goRouteName: RouteNames.meetingAttendance,
+      path: RoutePaths.meetingAttendance,
+      scope: AppMenuScope.company,
+    ),
     MeetingMenuCodes.roomCheckIn: AppMenuRouteSpec(
       menuCode: MeetingMenuCodes.roomCheckIn,
       databaseRouteName: 'roomCheckIn',

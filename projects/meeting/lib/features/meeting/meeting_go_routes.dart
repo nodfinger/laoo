@@ -7,6 +7,8 @@ import 'pages/meeting_building_page.dart';
 import 'pages/meeting_facility_page.dart';
 import 'pages/meeting_food_page.dart';
 import 'pages/meeting_food_plan_page.dart';
+import 'pages/meeting_food_order_summary_page.dart';
+import 'pages/meeting_attendance_page.dart';
 import 'pages/meeting_invitation_page.dart';
 import 'pages/meeting_room_approval_page.dart';
 import 'pages/meeting_room_booking_page.dart';
@@ -17,6 +19,16 @@ List<GoRoute> buildMeetingFeatureRoutes() => [
     path: MeetingRoutePaths.bookings,
     name: MeetingRouteNames.bookings,
     builder: (context, state) => const MeetingRoomBookingPage(),
+  ),
+  GoRoute(
+    path: MeetingRoutePaths.foodOrderSummary,
+    name: MeetingRouteNames.foodOrderSummary,
+    builder: (context, state) => const MeetingFoodOrderSummaryPage(),
+  ),
+  GoRoute(
+    path: MeetingRoutePaths.attendance,
+    name: MeetingRouteNames.attendance,
+    builder: (context, state) => const MeetingAttendancePage(),
   ),
   GoRoute(
     path: MeetingRoutePaths.approvals,

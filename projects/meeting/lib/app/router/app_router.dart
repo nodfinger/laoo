@@ -28,6 +28,8 @@ import '../../features/meeting/pages/meeting_room_page.dart';
 import '../../features/meeting/pages/meeting_room_booking_page.dart';
 import '../../features/meeting/pages/meeting_room_approval_page.dart';
 import '../../features/meeting/pages/meeting_food_plan_page.dart';
+import '../../features/meeting/pages/meeting_food_order_summary_page.dart';
+import '../../features/meeting/pages/meeting_attendance_page.dart';
 import '../../features/meeting/pages/meeting_invitation_page.dart';
 import '../../features/access/role_group/pages/role_group_page.dart';
 import '../../features/access/menu_permission/pages/menu_permission_page.dart';
@@ -434,6 +436,16 @@ final List<GoRoute> _meetingRoomPlaceholderRoutes = [
     path: RoutePaths.meetingFoodPlans,
     name: RouteNames.meetingFoodPlans,
     builder: (context, state) => const MeetingFoodPlanPage(),
+  ),
+  GoRoute(
+    path: RoutePaths.meetingFoodOrderSummary,
+    name: RouteNames.meetingFoodOrderSummary,
+    builder: (context, state) => const MeetingFoodOrderSummaryPage(),
+  ),
+  GoRoute(
+    path: RoutePaths.meetingAttendance,
+    name: RouteNames.meetingAttendance,
+    builder: (context, state) => const MeetingAttendancePage(),
   ),
   _companyPlaceholder(
     RoutePaths.roomCheckIn,

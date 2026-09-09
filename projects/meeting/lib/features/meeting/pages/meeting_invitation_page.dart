@@ -10,6 +10,7 @@ import '../../../core/widgets/auto_dismiss_message.dart';
 import '../../support/presentation/widgets/support_workspace_shell.dart';
 import '../data/meeting_invitation_repository.dart';
 import '../meeting_feature_host.dart';
+import '../widgets/meeting_attendance_panel.dart';
 
 class MeetingInvitationPage extends StatefulWidget {
   const MeetingInvitationPage({super.key});
@@ -23,6 +24,7 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
   final _remark = TextEditingController();
   List<Map<String, dynamic>> _items = [];
   Map<String, bool> _actions = {};
+  Map<int, int> _foodQuantities = {};
   Map<String, dynamic>? _detail;
   String? _filterStatus;
   String _responseStatus = 'PENDING';
@@ -96,6 +98,13 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
         _detail = detail;
         _responseStatus = '${invitation['invitationStatus'] ?? 'PENDING'}';
         _remark.text = '${invitation['remark'] ?? ''}';
+        _foodQuantities = {
+          for (final food in List<Map<String, dynamic>>.from(
+            detail['foods'] as List? ?? const [],
+          ))
+            (food['foodId'] as num).toInt():
+                (food['orderQuantity'] as num?)?.toInt() ?? 0,
+        };
       });
     } catch (error) {
       _notify(_error(error, 'เปิดคำเชิญไม่สำเร็จ'), true);
@@ -121,6 +130,26 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
       await _load();
     } catch (error) {
       _notify(_error(error, 'บันทึกการตอบรับไม่สำเร็จ'), true);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _saveFoodOrder() async {
+    final detail = _detail;
+    if (detail == null) return;
+    final invitation = Map<String, dynamic>.from(detail['invitation'] as Map);
+    setState(() => _saving = true);
+    try {
+      await _repository.saveFoodOrder(
+        (invitation['participantId'] as num).toInt(),
+        quantities: _foodQuantities,
+      );
+      if (!mounted) return;
+      _notify('บันทึกรายการอาหารสำเร็จ');
+      await _open({'participantId': invitation['participantId']});
+    } catch (error) {
+      _notify(_error(error, 'บันทึกรายการอาหารไม่สำเร็จ'), true);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -169,6 +198,8 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
     final foods = List<Map<String, dynamic>>.from(
       detail['foods'] as List? ?? const [],
     );
+    final canRespond = invitation['canRespond'] == true;
+    final canOrder = invitation['canOrder'] == true;
     return Padding(
       padding: const EdgeInsets.all(LaooLayout.cardMargin),
       child: Column(
@@ -185,11 +216,17 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
                       : () => setState(() => _detail = null),
                   child: const Text('ยกเลิก'),
                 ),
-                if (_actions['edit'] == true)
+                if (_actions['edit'] == true && canRespond)
                   FilledButton.icon(
                     onPressed: _saving ? null : _save,
                     icon: const Icon(Icons.save_outlined),
                     label: Text(_saving ? 'กำลังบันทึก...' : 'บันทึก'),
+                  ),
+                if (_actions['edit'] == true && canOrder)
+                  FilledButton.icon(
+                    onPressed: _saving ? null : _saveFoodOrder,
+                    icon: const Icon(Icons.restaurant_menu_outlined),
+                    label: const Text('บันทึกรายการอาหาร'),
                   ),
               ],
             ),
@@ -243,7 +280,7 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
                                   : preset.primary,
                             ),
                             label: Text(option.$2),
-                            onSelected: _saving
+                            onSelected: _saving || !canRespond
                                 ? null
                                 : (_) => setState(
                                     () => _responseStatus = option.$1,
@@ -255,10 +292,20 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
                   TextField(
                     controller: _remark,
                     maxLines: 3,
+                    readOnly: !canRespond,
                     style: const TextStyle(fontSize: LaooTypography.inputText),
                     decoration: const InputDecoration(
                       labelText: 'หมายเหตุการตอบรับ',
                     ),
+                  ),
+                  MeetingAttendancePanel(
+                    key: ValueKey((
+                      invitation['bookingId'],
+                      invitation['participantId'],
+                    )),
+                    bookingId: (invitation['bookingId'] as num).toInt(),
+                    participantId: (invitation['participantId'] as num).toInt(),
+                    onMessage: (message, error) => _notify(message, error),
                   ),
                   const SizedBox(height: 16),
                   Row(
@@ -287,6 +334,8 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
                   ),
                   const SizedBox(height: 8),
                   ...foods.map((food) {
+                    final foodId = (food['foodId'] as num).toInt();
+                    final quantity = _foodQuantities[foodId] ?? 0;
                     final image = '${food['imageUrl'] ?? ''}';
                     return Card(
                       margin: const EdgeInsets.only(bottom: 6),
@@ -311,6 +360,41 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
                               ),
                         title: Text('${food['code']} | ${food['nameTh']}'),
                         subtitle: Text('${food['foodTypeName'] ?? '-'}'),
+                        trailing: canOrder
+                            ? Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    tooltip: 'ลดจำนวน',
+                                    onPressed: _saving || quantity == 0
+                                        ? null
+                                        : () => setState(
+                                            () => _foodQuantities[foodId] =
+                                                quantity - 1,
+                                          ),
+                                    icon: const Icon(
+                                      Icons.remove_circle_outline,
+                                    ),
+                                  ),
+                                  Text('$quantity'),
+                                  IconButton(
+                                    tooltip: 'เพิ่มจำนวน',
+                                    onPressed: _saving || quantity >= 99
+                                        ? null
+                                        : () => setState(
+                                            () => _foodQuantities[foodId] =
+                                                quantity + 1,
+                                          ),
+                                    icon: Icon(
+                                      Icons.add_circle_outline,
+                                      color: preset.primary,
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : quantity > 0
+                            ? Text('จำนวน $quantity')
+                            : null,
                       ),
                     );
                   }),
