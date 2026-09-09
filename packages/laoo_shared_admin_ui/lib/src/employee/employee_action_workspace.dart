@@ -75,6 +75,7 @@ class _EmployeeActionWorkspaceState extends State<EmployeeActionWorkspace> {
       'telephone',
       'username',
       'password',
+      'confirmPassword',
       'contactName1',
       'contactRelation1',
       'contactPhone1',
@@ -112,6 +113,7 @@ class _EmployeeActionWorkspaceState extends State<EmployeeActionWorkspace> {
 
   EmployeeRecord? get employee => widget.employee;
   bool get editing => employee != null;
+  bool get loginRequired => widget.repository.usesCompanyPerson;
   TextEditingController field(String key) => _fields[key]!;
 
   List<OrganizationUnitRecord> get _scopedUnits => widget.organizationUnits
@@ -444,19 +446,24 @@ class _EmployeeActionWorkspaceState extends State<EmployeeActionWorkspace> {
     onChanged: onChanged,
   );
 
-  Widget _textField(String label, String key, {bool required = false}) =>
-      TextFormField(
-        controller: field(key),
-        onTap: key == 'password' && field(key).text == '****'
-            ? field(key).clear
-            : null,
-        validator: required
-            ? (value) => value == null || value.trim().isEmpty
-                  ? 'กรุณากรอก${label.replaceAll(' *', '')}'
-                  : null
-            : null,
-        decoration: InputDecoration(labelText: label),
-      );
+  Widget _textField(
+    String label,
+    String key, {
+    bool required = false,
+    bool readOnly = false,
+  }) => TextFormField(
+    controller: field(key),
+    readOnly: readOnly,
+    onTap: key == 'password' && field(key).text == '****'
+        ? field(key).clear
+        : null,
+    validator: required
+        ? (value) => value == null || value.trim().isEmpty
+              ? 'กรุณากรอก${label.replaceAll(' *', '')}'
+              : null
+        : null,
+    decoration: InputDecoration(labelText: label),
+  );
 
   Widget _emailField() => TextFormField(
     controller: field('email'),
@@ -563,7 +570,12 @@ class _EmployeeActionWorkspaceState extends State<EmployeeActionWorkspace> {
       _sectionTitle(Icons.manage_accounts_outlined, 'User Login'),
       SizedBox(height: widget.tokens.cardSpacing),
       _fieldGrid(width, [
-        _textField('Username', 'username'),
+        _textField(
+          loginRequired ? 'Username *' : 'Username',
+          'username',
+          required: loginRequired,
+          readOnly: editing && loginRequired,
+        ),
         TextFormField(
           controller: field('password'),
           obscureText: true,
@@ -571,20 +583,40 @@ class _EmployeeActionWorkspaceState extends State<EmployeeActionWorkspace> {
               ? field('password').clear
               : null,
           validator: (value) {
-            if (field('username').text.trim().isEmpty) return null;
+            if (!loginRequired && field('username').text.trim().isEmpty) {
+              return null;
+            }
             if (!editing && (value == null || value.isEmpty)) {
               return 'กรุณากรอก Password';
             }
             return null;
           },
-          decoration: const InputDecoration(labelText: 'Password'),
+          decoration: InputDecoration(
+            labelText: editing ? 'กำหนด Password ใหม่' : 'Password *',
+            helperText: editing
+                ? 'เว้นว่างหากไม่ต้องการเปลี่ยน Password'
+                : 'Password ต้องผ่านนโยบายของ Company',
+          ),
+        ),
+        TextFormField(
+          controller: field('confirmPassword'),
+          obscureText: true,
+          validator: (value) {
+            final password = field('password').text;
+            if (password == '****' || password.isEmpty) return null;
+            return value == password ? null : 'ยืนยัน Password ไม่ตรงกัน';
+          },
+          decoration: InputDecoration(
+            labelText: editing ? 'ยืนยัน Password ใหม่' : 'ยืนยัน Password *',
+          ),
         ),
         DropdownButtonFormField<int>(
           key: ValueKey(('role', _roleGroupId)),
           initialValue: _roleGroupId,
           isExpanded: true,
           validator: (value) =>
-              field('username').text.trim().isNotEmpty && value == null
+              (loginRequired || field('username').text.trim().isNotEmpty) &&
+                  value == null
               ? 'กรุณาเลือกกลุ่มสิทธิ์'
               : null,
           decoration: const InputDecoration(labelText: 'กลุ่มสิทธิ์'),
@@ -982,6 +1014,7 @@ class _EmployeeActionWorkspaceState extends State<EmployeeActionWorkspace> {
     username: field('username').text,
     password: field('password').text == '****' ? null : field('password').text,
     roleGroupId: _roleGroupId,
+    loginRequired: loginRequired,
     formalImage: _imageInput(
       _formalImage,
       _formalImageName,

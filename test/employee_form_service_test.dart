@@ -25,43 +25,46 @@ void main() {
     });
   });
 
-  test('create saves employee, images, and user in order', () async {
-    final api = _RecordingApi();
-    final service = EmployeeFormService(
-      EmployeeRepository(api, scope: EmployeeOwnerScope.company),
-    );
-    final input = _validInput(
-      companyId: 9,
-      username: 'employee.one',
-      password: 'secret',
-      roleGroupId: 4,
-      formalImage: EmployeeImageInput(
-        bytes: Uint8List.fromList([1, 2]),
-        fileName: 'formal.jpg',
-        width: 320,
-        height: 480,
-      ),
-      carImage1: EmployeeImageInput(
-        bytes: Uint8List.fromList([3, 4]),
-        fileName: 'car.jpg',
-      ),
-    );
+  test(
+    'create saves company employee and user atomically before images',
+    () async {
+      final api = _RecordingApi();
+      final service = EmployeeFormService(
+        EmployeeRepository(api, scope: EmployeeOwnerScope.company),
+      );
+      final input = _validInput(
+        companyId: 9,
+        username: 'employee.one',
+        password: 'secret',
+        roleGroupId: 4,
+        formalImage: EmployeeImageInput(
+          bytes: Uint8List.fromList([1, 2]),
+          fileName: 'formal.jpg',
+          width: 320,
+          height: 480,
+        ),
+        carImage1: EmployeeImageInput(
+          bytes: Uint8List.fromList([3, 4]),
+          fileName: 'car.jpg',
+        ),
+      );
 
-    final id = await service.save(input, organizationMode: 1);
+      final id = await service.save(input, organizationMode: 1);
 
-    expect(id, 17);
-    expect(api.calls.map((call) => call.path), [
-      '/api/company/employees',
-      '/api/company/employees/17/image',
-      '/api/company/employees/17/car-image/1',
-      '/api/company/employees/17/user',
-    ]);
-    expect(api.calls.first.method, 'POST');
-    expect(api.calls.first.body?['employeeCode'], 'E001');
-    expect(api.calls[1].body?['companyId'], 9);
-    expect(api.calls.last.body?['roleGroupId'], 4);
-    expect(api.calls.last.body?['password'], 'secret');
-  });
+      expect(id, 17);
+      expect(api.calls.map((call) => call.path), [
+        '/api/company/employees',
+        '/api/company/employees/17/image',
+        '/api/company/employees/17/car-image/1',
+      ]);
+      expect(api.calls.first.method, 'POST');
+      expect(api.calls.first.body?['employeeCode'], 'E001');
+      expect(api.calls.first.body?['username'], 'employee.one');
+      expect(api.calls.first.body?['roleGroupId'], 4);
+      expect(api.calls.first.body?['password'], 'secret');
+      expect(api.calls[1].body?['companyId'], 9);
+    },
+  );
 
   test('edit updates employee and omits an empty password', () async {
     final api = _RecordingApi();
@@ -81,8 +84,41 @@ void main() {
     expect(id, 23);
     expect(api.calls.first.method, 'PUT');
     expect(api.calls.first.path, '/api/partner/customer-employees/23');
-    expect(api.calls.last.path, '/api/partner/customer-employees/23/user');
-    expect(api.calls.last.body, isNot(contains('password')));
+    expect(api.calls, hasLength(1));
+    expect(api.calls.first.body?['username'], 'employee.one');
+    expect(api.calls.first.body, isNot(contains('password')));
+  });
+
+  test('company employee requires a login and role group', () async {
+    final service = EmployeeFormService(
+      EmployeeRepository(_RecordingApi(), scope: EmployeeOwnerScope.company),
+    );
+
+    expect(
+      () => service.save(_validInput(), organizationMode: 1),
+      throwsA(isA<EmployeeFormValidationException>()),
+    );
+  });
+
+  test('partner employee keeps the existing separate user flow', () async {
+    final api = _RecordingApi();
+    final service = EmployeeFormService(
+      EmployeeRepository(api, scope: EmployeeOwnerScope.partner),
+    );
+
+    await service.save(
+      _validInput(
+        username: 'partner.employee',
+        password: 'secret',
+        roleGroupId: 8,
+      ),
+      organizationMode: 1,
+    );
+
+    expect(api.calls.map((call) => call.path), [
+      '/api/partner/employees',
+      '/api/partner/employees/17/user',
+    ]);
   });
 }
 

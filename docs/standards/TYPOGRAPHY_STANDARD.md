@@ -8,7 +8,7 @@
 - ข้อกำหนด Caption นี้ต้องใช้เหมือนกันทุกขนาดหน้าจอและทุก Responsive Breakpoint โดยต้องไม่ปิดกั้นการปรับขนาดข้อความจาก Accessibility ของระบบ
 - Section/หัวข้อย่อย: `16px`, น้ำหนัก `600-700`, line height ประมาณ `1.3`
 - Label/Floating Label: `16px`, line height ประมาณ `1.4`
-- TextBox, ComboBox และ Table: `13px`, line height ประมาณ `1.45-1.5`
+- TextBox, ComboBox และ Table: `14px`, line height ประมาณ `1.45-1.5` โดยใช้ `LaooTypography.inputText` และ `LaooTypography.comboBox`
 - Button: `13px`, น้ำหนัก `600-700`; ความสูงมาตรฐานอ่านจาก `LaooTypography.buttonHeight` (`48px`)
 - Hint/Validation/หมายเหตุ: `12px`
 - ห้ามใช้ Letter Spacing ติดลบกับข้อความภาษาไทย
@@ -17,5 +17,5 @@
 ## Prompt สำหรับส่งให้ AI
 
 ```text
-ตรวจ Typography ของหน้าจอนี้ตาม docs/standards/TYPOGRAPHY_STANDARD.md ใช้ NotoSansThai และค่า LaooTypography จากส่วนกลางเท่านั้น: Caption หลักของ List/Card/Action/Popup ต้อง fontSize 18, FontWeight.w700 และสีดำ; Section/Label 16px, TextBox/ComboBox/Table/Button 13px, Hint/Validation 12px และปุ่มสูง 48px ห้าม hardcode fontFamily/fontSize กระจายในหน้าจอ และต้องตรวจข้อความไทยกับ Overflow
+ตรวจ Typography ของหน้าจอนี้ตาม docs/standards/TYPOGRAPHY_STANDARD.md ใช้ NotoSansThai และค่า LaooTypography จากส่วนกลางเท่านั้น: Caption หลักของ List/Card/Action/Popup ต้อง fontSize 18, FontWeight.w700 และสีดำ; Section/Label 16px, TextBox/ComboBox/Table/Button 14px, Hint/Validation 12px และปุ่มสูง 48px ห้าม hardcode fontFamily/fontSize กระจายในหน้าจอ และต้องตรวจข้อความไทยกับ Overflow
 ```

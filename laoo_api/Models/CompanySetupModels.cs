@@ -29,6 +29,10 @@ public sealed record CompanySetupResponse(
     int RowCardSTD,
     int TimeAlert,
     int OrgStructureType,
+    string BusinessTypeCode,
+    string RequesterMode,
+    string RequesterCaption,
+    bool IsBusinessTypeLocked,
     int PasswordPolicyCode,
     string? YearFormat,
     string? VersionID,
@@ -68,6 +72,7 @@ public sealed class CompanySetupUpdateRequest
     public int RowCardSTD { get; init; }
     public int TimeAlert { get; init; }
     public int OrgStructureType { get; init; } = 1;
+    public string? BusinessTypeCode { get; init; }
     public int PasswordPolicyCode { get; init; } = 3;
     public string? YearFormat { get; init; }
     public string? VersionID { get; init; }

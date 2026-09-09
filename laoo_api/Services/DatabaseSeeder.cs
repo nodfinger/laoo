@@ -197,14 +197,18 @@ public sealed class DatabaseSeeder
             SELECT 1 FROM dbo.TDADUser WHERE NormalizedUsername = @NormalizedUsername
         )
         BEGIN
+            INSERT INTO dbo.TDADPerson
+            (CompanyID, FullName, IsActive, CreateDate)
+            VALUES (@CompanyID, N'Demo Admin', 1, SYSUTCDATETIME());
+            DECLARE @PersonID bigint = SCOPE_IDENTITY();
             INSERT INTO dbo.TDADUser
             (
-                CompanyID, Username, NormalizedUsername, PasswordHash, DisplayName,
+                CompanyID, PersonID, Username, NormalizedUsername, PasswordHash, DisplayName,
                 IsActive, FailedLoginCount, LastPasswordChangeDate, CreateDate
             )
             VALUES
             (
-                @CompanyID, @Username, @NormalizedUsername, @PasswordHash, N'Demo Admin',
+                @CompanyID, @PersonID, @Username, @NormalizedUsername, @PasswordHash, N'Demo Admin',
                 1, 0, SYSUTCDATETIME(), SYSUTCDATETIME()
             );
         END;

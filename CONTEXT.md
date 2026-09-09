@@ -73,3 +73,21 @@ _Avoid_: Item, Stock Balance
 **Inventory Fulfillment**:
 หลักฐานว่ารายการต้นทางถูกตัดสต็อกโดยเอกสารใดแล้ว เพื่อป้องกันการตัดจำนวนหรือ Serial ซ้ำ
 _Avoid_: Stock Movement, Invoice Line
+
+## People Language
+
+**Person**:
+ตัวตนกลางของบุคคลหนึ่งคนภายใน Company ซึ่งอาจมีหลายบทบาทและมีบัญชีเข้าใช้งานเดียวกัน
+_Avoid_: Employee, Resident, User เมื่อต้องการกล่าวถึงตัวบุคคล
+
+**Employee**:
+บทบาทการทำงานของ Person ภายใน Company ซึ่งมีข้อมูลเฉพาะงาน เช่น รหัสพนักงาน ฝ่าย แผนก และตำแหน่ง
+_Avoid_: Person, User
+
+**Resident**:
+บทบาทการพักอาศัยของ Person ซึ่งผูกกับสถานที่พักและช่วงเวลาการเข้าพัก
+_Avoid_: Employee, User, Tenant เมื่อหมายถึงผู้พักอาศัยทุกประเภท
+
+**User**:
+บัญชีที่ Person ใช้ยืนยันตัวตนและเข้าสู่ระบบ โดยหนึ่ง Person ภายใน Company มีบัญชีหลักเพียงหนึ่งบัญชี
+_Avoid_: Person, Employee, Resident

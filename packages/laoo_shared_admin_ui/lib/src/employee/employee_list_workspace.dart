@@ -335,7 +335,9 @@ class _EmployeeListWorkspaceState extends State<EmployeeListWorkspace> {
           sortAscending: _sortAscending,
           columns: [
             _column('ID', 0),
-            const DataColumn(label: Text('Action')),
+            const DataColumn(
+              label: SizedBox(width: 108, child: Center(child: Text('Action'))),
+            ),
             _column('แผนก', 2),
             _column('รหัสพนักงาน', 3),
             _column('ชื่อ-นามสกุล', 4),
@@ -432,30 +434,43 @@ class _EmployeeListWorkspaceState extends State<EmployeeListWorkspace> {
     );
   }
 
-  Widget _actions(EmployeeRecord item) => Wrap(
-    spacing: 2,
-    children: [
-      if (controller.canEdit)
-        IconButton(
-          tooltip: 'แก้ไข',
-          onPressed: () => widget.onEdit(item),
-          icon: const Icon(Icons.edit_outlined),
-        ),
-      if (widget.onUser != null && controller.canEdit)
-        IconButton(
-          tooltip: 'กำหนด User',
-          onPressed: () => widget.onUser!(item),
-          icon: const Icon(Icons.manage_accounts_outlined),
-        ),
-      if (controller.canDelete)
-        IconButton(
-          tooltip: 'ลบ',
-          onPressed: () => widget.onDelete(item),
-          color: Theme.of(context).colorScheme.error,
-          icon: const Icon(Icons.delete_outline),
-        ),
-      if (!controller.canEdit && !controller.canDelete) const Text('-'),
-    ],
+  Widget _actions(EmployeeRecord item) => SizedBox(
+    width: 108,
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        if (controller.canEdit)
+          IconButton(
+            tooltip: 'แก้ไข',
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            onPressed: () => widget.onEdit(item),
+            icon: const Icon(Icons.edit_outlined),
+          ),
+        if (widget.onUser != null && controller.canEdit)
+          IconButton(
+            tooltip: 'กำหนด User',
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            onPressed: () => widget.onUser!(item),
+            icon: const Icon(Icons.manage_accounts_outlined),
+          ),
+        if (controller.canDelete)
+          IconButton(
+            tooltip: 'ลบ',
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            onPressed: () => widget.onDelete(item),
+            color: Theme.of(context).colorScheme.error,
+            icon: const Icon(Icons.delete_outline),
+          ),
+        if (!controller.canEdit && !controller.canDelete) const Text('-'),
+      ],
+    ),
   );
 
   Widget _status(EmployeeRecord item) {

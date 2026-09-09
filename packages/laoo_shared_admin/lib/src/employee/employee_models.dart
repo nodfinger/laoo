@@ -7,6 +7,7 @@ class EmployeeRecord {
   final Map<String, dynamic> _values;
 
   int get employeeId => (_values['employeeId'] as num).toInt();
+  int? get personId => (_values['personId'] as num?)?.toInt();
   int get partnerId => (_values['partnerId'] as num).toInt();
   int? get companyId => (_values['companyId'] as num?)?.toInt();
   String get companyName => (_values['companyName'] ?? '').toString();
@@ -109,20 +110,27 @@ class EmployeeUpsertRequest {
 }
 
 class EmployeeUserRecord {
-  const EmployeeUserRecord({required this.username, this.roleGroupId});
+  const EmployeeUserRecord({
+    required this.username,
+    this.roleGroupId,
+    this.personId,
+  });
 
   factory EmployeeUserRecord.fromJson(Map<String, dynamic> json) =>
       EmployeeUserRecord(
         username: (json['username'] ?? '').toString(),
         roleGroupId: (json['roleGroupId'] as num?)?.toInt(),
+        personId: (json['personId'] as num?)?.toInt(),
       );
 
   final String username;
   final int? roleGroupId;
+  final int? personId;
 
   Object? operator [](String key) => switch (key) {
     'username' => username,
     'roleGroupId' => roleGroupId,
+    'personId' => personId,
     _ => null,
   };
 }

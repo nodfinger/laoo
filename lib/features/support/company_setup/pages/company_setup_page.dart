@@ -54,6 +54,10 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
   bool _messageIsError = false;
   String _yearFormat = CompanySetupConstants.yearFormatAd;
   int _orgStructureType = 1;
+  String _businessTypeCode = 'COMPANY';
+  String _requesterCaption = 'ผู้แจ้งซ่อม';
+  bool _isBusinessTypeLocked = true;
+  List<Map<String, dynamic>> _businessTypeOptions = const [];
   int _passwordPolicyCode = 3;
   String? _runItem;
   List<Map<String, dynamic>> _runItemOptions = const [];
@@ -93,10 +97,12 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
         _api.load(),
         _api.runItemOptions(),
         _api.runItemOptions(groupCode: CompanySetupConstants.cConstRunCus),
+        _api.businessTypeOptions(),
       ]);
       final setup = results[0] as CompanySetupModel;
       final itemOptions = results[1] as List<Map<String, dynamic>>;
       final customerOptions = results[2] as List<Map<String, dynamic>>;
+      final businessTypeOptions = results[3] as List<Map<String, dynamic>>;
       if (!mounted) return;
       _ownerCode.text = setup.ownerCode;
       _ownerType = setup.ownerType;
@@ -120,6 +126,10 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
       _customerDigit.text = setup.customerDigit.toString();
       _markCus.text = setup.markCus ?? '';
       _orgStructureType = setup.orgStructureType;
+      _businessTypeCode = setup.businessTypeCode;
+      _requesterCaption = setup.requesterCaption;
+      _isBusinessTypeLocked = setup.isBusinessTypeLocked;
+      _businessTypeOptions = businessTypeOptions;
       _passwordPolicyCode = setup.passwordPolicyCode;
       _versionId.text = setup.versionId ?? '';
       _emailHost.text = setup.emailHost ?? '';
@@ -231,6 +241,7 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
             markCus: _markCus.text,
             customerDigit: int.tryParse(_customerDigit.text) ?? 5,
             orgStructureType: _orgStructureType,
+            businessTypeCode: _businessTypeCode,
             passwordPolicyCode: _passwordPolicyCode,
             yearFormat: _yearFormat,
             versionId: _versionId.text,
@@ -515,6 +526,16 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
                         ),
                         const SizedBox(height: 8),
                         if (_ownerType == 'C') ...[
+                          _CompanyBusinessTypeCard(
+                            value: _businessTypeCode,
+                            options: _businessTypeOptions,
+                            requesterCaption: _requesterCaption,
+                            locked: _isBusinessTypeLocked,
+                            enabled: _canEdit,
+                            onChanged: (value) =>
+                                setState(() => _businessTypeCode = value),
+                          ),
+                          const SizedBox(height: 8),
                           _PartnerInfoCard(
                             nameTh: _partnerNameTh,
                             address: _partnerAddress,
@@ -566,6 +587,80 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
                   onClose: () => setState(() => _message = null),
                 ),
               ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CompanyBusinessTypeCard extends StatelessWidget {
+  const _CompanyBusinessTypeCard({
+    required this.value,
+    required this.options,
+    required this.requesterCaption,
+    required this.locked,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final String value;
+  final List<Map<String, dynamic>> options;
+  final String requesterCaption;
+  final bool locked;
+  final bool enabled;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
+    final selectable = options.any((item) => item['code']?.toString() == value);
+
+    return Card(
+      margin: EdgeInsets.zero,
+      color: Colors.white,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(4),
+        side: BorderSide.none,
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _SectionHeader(title: 'ลักษณะธุรกิจ'),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              initialValue: selectable ? value : null,
+              isExpanded: true,
+              decoration: const InputDecoration(labelText: 'ประเภทธุรกิจ *'),
+              items: options
+                  .map(
+                    (item) => DropdownMenuItem<String>(
+                      value: item['code']?.toString(),
+                      child: Text(item['name']?.toString() ?? ''),
+                    ),
+                  )
+                  .toList(),
+              onChanged: enabled && !locked
+                  ? (next) {
+                      if (next != null) onChanged(next);
+                    }
+                  : null,
+            ),
+            const SizedBox(height: 10),
+            Text(
+              locked
+                  ? 'ไม่สามารถเปลี่ยนได้ เนื่องจาก Company มีข้อมูลบุคคลแล้ว'
+                  : 'ใบแจ้งซ่อมจะอ้างอิงผู้แจ้งเป็น $requesterCaption',
+              style: TextStyle(
+                color: locked
+                    ? Theme.of(context).colorScheme.onSurfaceVariant
+                    : primary,
+                fontSize: 13,
+              ),
+            ),
           ],
         ),
       ),

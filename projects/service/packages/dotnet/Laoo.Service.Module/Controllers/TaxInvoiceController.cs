@@ -564,46 +564,8 @@ public sealed class TaxInvoiceController(IConfiguration configuration) : Control
     private async Task<List<object>> Rows<T>(SqlConnection c, string sql, CancellationToken token, Func<SqlDataReader, T> map, string? unitGroup = null) where T : class { await using var cmd = new SqlCommand(sql, c); Add(cmd, "@company", SqlDbType.BigInt, CompanyId()); if (unitGroup is not null) Add(cmd, "@unitGroup", SqlDbType.NVarChar, unitGroup, 20); var result = new List<object>(); await using var r = await cmd.ExecuteReaderAsync(token); while (await r.ReadAsync(token)) result.Add(map(r)); return result; }
     private static async Task<List<object>> RowsById<T>(SqlConnection c, string sql, long id, CancellationToken token, Func<SqlDataReader, T> map) where T : class { await using var cmd = new SqlCommand(sql, c); Add(cmd, "@id", SqlDbType.BigInt, id); var result = new List<object>(); await using var r = await cmd.ExecuteReaderAsync(token); while (await r.ReadAsync(token)) result.Add(map(r)); return result; }
 
-    private async Task<bool> Can(SqlConnection c, string action, CancellationToken token)
-    {
-        const string adminSql = "SELECT TOP (1) 1 FROM dbo.TDADUser WHERE UserID=@user AND CompanyID=@company AND IsActive=1 AND IsCompanyAdmin=1";
-        await using (var admin = new SqlCommand(adminSql, c))
-        {
-            Add(admin, "@user", SqlDbType.BigInt, UserId());
-            Add(admin, "@company", SqlDbType.BigInt, CompanyId());
-            if (await admin.ExecuteScalarAsync(token) is not null) return true;
-        }
-
-        const string directSql = """
-        SELECT TOP (1) 1
-        FROM dbo.TDADUserPermission UP
-        JOIN dbo.TDADPermission P ON P.PermissionID=UP.PermissionID AND P.ProjectID=UP.ProjectID
-        WHERE UP.UserID=@user AND UP.ProjectID=@project AND UP.IsAllowed=1 AND UP.IsActive=1
-          AND P.IsActive=1 AND P.ActionCode=@action AND P.ScreenCode=@screen
-        """;
-        await using (var direct = new SqlCommand(directSql, c))
-        {
-            Add(direct, "@user", SqlDbType.BigInt, UserId()); Add(direct, "@project", SqlDbType.BigInt, ProjectId());
-            Add(direct, "@action", SqlDbType.NVarChar, action, 20); Add(direct, "@screen", SqlDbType.NVarChar, ScreenCode, 20);
-            if (await direct.ExecuteScalarAsync(token) is not null) return true;
-        }
-
-        const string roleSql = """
-        SELECT TOP (1) 1
-        FROM dbo.TDADUser U
-        JOIN dbo.TDADUserEmployee UE ON UE.UserID=U.UserID
-        JOIN dbo.TDADEmployeeRoleGroup ERG ON ERG.EmployeeID=UE.EmployeeID
-        JOIN dbo.TDADRoleGroup RG ON RG.RoleGroupID=ERG.RoleGroupID AND RG.ScopeType='C' AND RG.CompanyID=U.CompanyID AND RG.ProjectID=@project
-        JOIN dbo.TDADRoleGroupPermission RP ON RP.RoleGroupID=RG.RoleGroupID AND RP.ProjectID=@project AND RP.MenuCode=@screen AND RP.ActionCode=@action AND RP.IsAllowed=1
-        WHERE U.UserID=@user AND U.CompanyID=@company AND U.IsActive=1 AND ERG.IsActive=1
-          AND ERG.EffectiveFrom<=CONVERT(date,SYSUTCDATETIME())
-          AND (ERG.EffectiveTo IS NULL OR ERG.EffectiveTo>=CONVERT(date,SYSUTCDATETIME()))
-        """;
-        await using var role = new SqlCommand(roleSql, c);
-        Add(role, "@user", SqlDbType.BigInt, UserId()); Add(role, "@company", SqlDbType.BigInt, CompanyId());
-        Add(role, "@project", SqlDbType.BigInt, ProjectId()); Add(role, "@action", SqlDbType.NVarChar, action, 20); Add(role, "@screen", SqlDbType.NVarChar, ScreenCode, 20);
-        return await role.ExecuteScalarAsync(token) is not null;
-    }
+    private Task<bool> Can(SqlConnection c, string action, CancellationToken token) =>
+        Laoo.Shared.Contracts.CompanyMenuAccess.IsAllowedAsync(c, User, ScreenCode, action, token);
 
     private async Task<SqlConnection> Open(CancellationToken token) { var c = new SqlConnection(_configuration.GetConnectionString("LaooDatabase")); await c.OpenAsync(token); return c; }
     private long UserId() => long.TryParse(User.FindFirstValue("user_id"), out var value) ? value : 0;

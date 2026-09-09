@@ -72,6 +72,23 @@ abstract final class LaooTheme {
           side: BorderSide.none,
         ),
       ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        iconColor: Colors.black,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
+          side: BorderSide.none,
+        ),
+        titleTextStyle: const TextStyle(
+          fontFamily: LaooTypography.fontFamily,
+          fontFamilyFallback: LaooTypography.fontFallback,
+          fontSize: LaooTypography.workspaceCaption,
+          height: LaooTypography.titleLineHeight,
+          fontWeight: FontWeight.w700,
+          color: Colors.black,
+        ),
+      ),
     );
   }
 }

@@ -5,7 +5,7 @@
 ## Required Reading by Screen Type
 
 - หน้า List หรือ Card: อ่าน `LIST_CARD_UI_STANDARD.md` และ `PAGINATION_UI_STANDARD.md`
-- หน้า Action (Add/Edit/View): อ่าน `ACTION_UI_STANDARD.md`
+- หน้า Action (Add/Edit/View): อ่าน `ACTION_UI_STANDARD.md`; สำหรับ `ScreenType = 1` (CRUD) ต้องใช้ Action Style ตามเอกสารนี้เสมอ ทั้งพื้นผิวสีขาว มุมกรอบและปุ่ม `4px`, Caption สีดำ, Icon ตาม User Style และ TextBox/ComboBox มีกรอบมุมโค้ง `4px`
 - Popup, Dialog, Alert และ Confirm: อ่าน `POPUP_UI_STANDARD.md`
 - งานที่เกี่ยวกับข้อความหรือขนาดตัวอักษร: อ่าน `TYPOGRAPHY_STANDARD.md`
 - ถ้างานครอบคลุมหลายประเภท ต้องอ่านทุกไฟล์ที่เกี่ยวข้องก่อนแก้ไข

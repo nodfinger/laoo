@@ -6,6 +6,9 @@ class CompanySetupContext {
     required this.rowCardStd,
     required this.timeAlert,
     required this.orgStructureType,
+    required this.businessTypeCode,
+    required this.requesterMode,
+    required this.requesterCaption,
     required this.yearFormat,
     required this.versionId,
     required this.themeName,
@@ -24,6 +27,9 @@ class CompanySetupContext {
   final int rowCardStd;
   final int timeAlert;
   final int orgStructureType;
+  final String businessTypeCode;
+  final String requesterMode;
+  final String requesterCaption;
   final String yearFormat;
   final String versionId;
   final String? themeName;
@@ -46,6 +52,9 @@ class CompanySetupContext {
           (json['orgStructureType'] as num?)?.toInt() ??
           int.tryParse('${json['orgStructureType']}') ??
           1,
+      businessTypeCode: _text(json['businessTypeCode'], 'COMPANY'),
+      requesterMode: _text(json['requesterMode'], 'EMPLOYEE'),
+      requesterCaption: _text(json['requesterCaption'], 'ผู้แจ้งซ่อม'),
       yearFormat: _text(json['yearFormat'], 'C').toUpperCase(),
       versionId: _text(json['versionID'] ?? json['versionId'], ''),
       themeName: _nullableText(json['themeName']),

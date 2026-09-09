@@ -1,5 +1,7 @@
 class MenuPermissionRow {
   const MenuPermissionRow({
+    this.projectId,
+    this.projectName,
     required this.menuCode,
     required this.menuName,
     required this.menuGroupCode,
@@ -10,11 +12,20 @@ class MenuPermissionRow {
     required this.canEdit,
     required this.canDelete,
   });
+  final int? projectId;
+  final String? projectName;
+  String get groupKey =>
+      projectId == null ? menuGroupCode : '$projectId:$menuGroupCode';
+  String get groupLabel => projectName == null || projectName!.isEmpty
+      ? menuGroupName
+      : '$projectName > $menuGroupName';
   final String menuCode, menuName, menuGroupCode, menuGroupName;
   final int screenType;
   final bool canView, canCreate, canEdit, canDelete;
   factory MenuPermissionRow.fromJson(Map<String, dynamic> json) =>
       MenuPermissionRow(
+        projectId: (json['projectId'] as num?)?.toInt(),
+        projectName: json['projectName'] as String?,
         menuCode: json['menuCode'] as String? ?? '',
         menuName: json['menuName'] as String? ?? '',
         menuGroupCode: json['menuGroupCode'] as String? ?? '',
@@ -26,6 +37,7 @@ class MenuPermissionRow {
         canDelete: _bool(json['canDelete']),
       );
   Map<String, dynamic> toJson() => {
+    if (projectId != null) 'projectId': projectId,
     'menuCode': menuCode,
     'canView': canView,
     'canCreate': canCreate,
@@ -38,6 +50,8 @@ class MenuPermissionRow {
     bool? edit,
     bool? delete,
   }) => MenuPermissionRow(
+    projectId: projectId,
+    projectName: projectName,
     menuCode: menuCode,
     menuName: menuName,
     menuGroupCode: menuGroupCode,

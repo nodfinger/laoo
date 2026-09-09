@@ -431,10 +431,15 @@ IF EXISTS (SELECT 1 FROM dbo.TDADLaooUser WHERE NormalizedUsername=@NormalizedUs
    OR EXISTS (SELECT 1 FROM dbo.TDADPartnerUser WHERE NormalizedUsername=@NormalizedUsername)
    OR EXISTS (SELECT 1 FROM dbo.TDADUser WHERE NormalizedUsername=@NormalizedUsername)
     THROW 50010, 'DUPLICATE_ADMIN_USERNAME', 1;
-INSERT INTO dbo.TDADUser
-    (CompanyID, Username, NormalizedUsername, PasswordHash, DisplayName, IsCompanyAdmin, IsActive, FailedLoginCount, LastPasswordChangeDate, CreateDate)
+INSERT INTO dbo.TDADPerson
+    (CompanyID, FullName, IsActive, CreateDate)
 VALUES
-    (@CompanyID, @Username, @NormalizedUsername, @PasswordHash, @DisplayName, 1, 1, 0, SYSUTCDATETIME(), SYSUTCDATETIME());
+    (@CompanyID, @DisplayName, 1, SYSUTCDATETIME());
+DECLARE @PersonID bigint = SCOPE_IDENTITY();
+INSERT INTO dbo.TDADUser
+    (CompanyID, PersonID, Username, NormalizedUsername, PasswordHash, DisplayName, IsCompanyAdmin, IsActive, FailedLoginCount, LastPasswordChangeDate, CreateDate)
+VALUES
+    (@CompanyID, @PersonID, @Username, @NormalizedUsername, @PasswordHash, @DisplayName, 1, 1, 0, SYSUTCDATETIME(), SYSUTCDATETIME());
 SELECT CAST(SCOPE_IDENTITY() AS BIGINT);
 """;
             await using var user = new SqlCommand(userSql, connection, transaction);
@@ -549,8 +554,11 @@ BEGIN
        OR EXISTS (SELECT 1 FROM dbo.TDADPartnerUser WHERE NormalizedUsername=@NormalizedUsername)
        OR EXISTS (SELECT 1 FROM dbo.TDADUser WHERE NormalizedUsername=@NormalizedUsername)
         THROW 50012, 'DUPLICATE_ADMIN_USERNAME', 1;
-    INSERT INTO dbo.TDADUser (CompanyID, Username, NormalizedUsername, PasswordHash, DisplayName, IsCompanyAdmin, IsActive, FailedLoginCount, LastPasswordChangeDate, CreateDate)
-    VALUES (@CompanyID, @Username, @NormalizedUsername, @PasswordHash, N'เธเธนเนเธ”เธนเนเธฅเธฃเธฐเธเธ', 1, 1, 0, SYSUTCDATETIME(), SYSUTCDATETIME());
+    INSERT INTO dbo.TDADPerson (CompanyID, FullName, IsActive, CreateDate)
+    VALUES (@CompanyID, @AdminDisplayName, 1, SYSUTCDATETIME());
+    DECLARE @PersonID bigint = SCOPE_IDENTITY();
+    INSERT INTO dbo.TDADUser (CompanyID, PersonID, Username, NormalizedUsername, PasswordHash, DisplayName, IsCompanyAdmin, IsActive, FailedLoginCount, LastPasswordChangeDate, CreateDate)
+    VALUES (@CompanyID, @PersonID, @Username, @NormalizedUsername, @PasswordHash, @AdminDisplayName, 1, 1, 0, SYSUTCDATETIME(), SYSUTCDATETIME());
 END
 ELSE
 BEGIN
@@ -569,6 +577,7 @@ END
         Add(command, "@Username", SqlDbType.NVarChar, username, 100);
         Add(command, "@NormalizedUsername", SqlDbType.NVarChar, username.ToUpperInvariant(), 100);
         Add(command, "@PasswordHash", SqlDbType.NVarChar, _passwordService.HashPassword(username, request.Password), 500);
+        Add(command, "@AdminDisplayName", SqlDbType.NVarChar, "ผู้ดูแลระบบ", 200);
         try { await command.ExecuteNonQueryAsync(cancellationToken); return NoContent(); }
         catch (SqlException ex) when (ex.Number == 50012) { return Conflict(new { message = "Username ผู้ดูแลระบบซ้ำ กรุณาใช้ Username อื่น" }); }
         catch (SqlException ex) when (ex.Number == 50010) { return Conflict(new { message = "Username เธเธนเนเธ”เธนเนเธฅเธฃเธฐเธเธเธเนเธณ เธเธฃเธธเธ“เธฒเนเธเน Username เธญเธทเนเธ" }); }

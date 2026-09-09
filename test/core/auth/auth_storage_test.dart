@@ -56,6 +56,30 @@ void main() {
     expect(restored?.partnerUserId, 11);
     expect(restored?.partnerId, 22);
   });
+
+  test('persists the company person identity and owner scope', () async {
+    SharedPreferences.setMockInitialValues(const {});
+    final storage = AuthStorage(secureTokenStore: _MemorySecureTokenStore());
+
+    await storage.save(
+      AuthSession(
+        accessToken: 'company-token',
+        expiresAt: DateTime.now().toUtc().add(const Duration(hours: 1)),
+        userType: 'COMPANY_USER',
+        username: 'c',
+        projectId: 7,
+        userId: 12,
+        companyId: 23,
+        personId: 33,
+      ),
+    );
+
+    final restored = await storage.read();
+    expect(restored?.userType, 'COMPANY_USER');
+    expect(restored?.userId, 12);
+    expect(restored?.companyId, 23);
+    expect(restored?.personId, 33);
+  });
 }
 
 class _MemorySecureTokenStore implements SecureTokenStore {

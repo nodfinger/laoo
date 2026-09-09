@@ -15,6 +15,8 @@ public sealed class PostLoginContextResponse
 
     public long? PartnerId { get; init; }
 
+    public long? PersonId { get; init; }
+
     public string Username { get; init; } = string.Empty;
 
     public string DisplayName { get; init; } = string.Empty;

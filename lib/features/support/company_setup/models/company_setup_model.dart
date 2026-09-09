@@ -21,6 +21,10 @@ class CompanySetupModel {
     required this.rowCardStd,
     required this.timeAlert,
     required this.orgStructureType,
+    required this.businessTypeCode,
+    required this.requesterMode,
+    required this.requesterCaption,
+    required this.isBusinessTypeLocked,
     required this.passwordPolicyCode,
     required this.isActive,
     required this.hasSuperUser,
@@ -75,6 +79,10 @@ class CompanySetupModel {
   final int rowCardStd;
   final int timeAlert;
   final int orgStructureType;
+  final String businessTypeCode;
+  final String requesterMode;
+  final String requesterCaption;
+  final bool isBusinessTypeLocked;
   final int passwordPolicyCode;
   final String? yearFormat;
   final String? versionId;
@@ -129,6 +137,10 @@ class CompanySetupModel {
       rowCardStd: asInt(json['rowCardSTD']) ?? asInt(json['rowCardStd']) ?? 30,
       timeAlert: asInt(json['timeAlert']) ?? 30,
       orgStructureType: asInt(json['orgStructureType']) ?? 1,
+      businessTypeCode: json['businessTypeCode']?.toString() ?? 'COMPANY',
+      requesterMode: json['requesterMode']?.toString() ?? 'EMPLOYEE',
+      requesterCaption: json['requesterCaption']?.toString() ?? 'ผู้แจ้งซ่อม',
+      isBusinessTypeLocked: asBool(json['isBusinessTypeLocked']),
       passwordPolicyCode: asInt(json['passwordPolicyCode']) ?? 3,
       yearFormat: json['yearFormat']?.toString(),
       versionId: json['versionID']?.toString() ?? json['versionId']?.toString(),
@@ -170,6 +182,7 @@ class CompanySetupUpdateInput {
     required this.rowCardStd,
     required this.timeAlert,
     required this.orgStructureType,
+    this.businessTypeCode,
     this.passwordPolicyCode = 3,
     this.yearFormat,
     this.versionId,
@@ -202,6 +215,7 @@ class CompanySetupUpdateInput {
   final int rowCardStd;
   final int timeAlert;
   final int orgStructureType;
+  final String? businessTypeCode;
   final int passwordPolicyCode;
   final String? yearFormat;
   final String? versionId;
@@ -234,6 +248,7 @@ class CompanySetupUpdateInput {
     'rowCardSTD': rowCardStd,
     'timeAlert': timeAlert,
     'orgStructureType': orgStructureType,
+    'businessTypeCode': businessTypeCode,
     'passwordPolicyCode': passwordPolicyCode,
     'yearFormat': yearFormat,
     'versionID': versionId,

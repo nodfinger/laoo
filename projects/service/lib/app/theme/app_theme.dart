@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'app_theme_key.dart';
+import 'laoo_design_tokens.dart';
 import 'laoo_typography.dart';
 
 abstract final class AppTheme {
@@ -41,6 +42,23 @@ abstract final class AppTheme {
         elevation: 1,
         margin: const EdgeInsets.all(8),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        iconColor: Colors.black,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
+          side: BorderSide.none,
+        ),
+        titleTextStyle: const TextStyle(
+          fontFamily: LaooTypography.fontFamily,
+          fontFamilyFallback: LaooTypography.fontFallback,
+          fontSize: LaooTypography.workspaceCaption,
+          height: LaooTypography.titleLineHeight,
+          fontWeight: FontWeight.w700,
+          color: Colors.black,
+        ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),

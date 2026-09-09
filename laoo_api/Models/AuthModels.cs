@@ -26,7 +26,8 @@ public sealed record LoginUserResponse(
     string Username,
     string DisplayName,
     bool CanLoginAsUser,
-    bool ShowSupportBanner);
+    bool ShowSupportBanner,
+    long? PersonId);
 
 public sealed record AuthenticatedUser(
     string SubjectId,
@@ -42,7 +43,8 @@ public sealed record AuthenticatedUser(
     string ProjectCode,
     string Username,
     string DisplayName,
-    bool CanLoginAsUser);
+    bool CanLoginAsUser,
+    long? PersonId = null);
 
 public sealed record TokenResult(
     string AccessToken,

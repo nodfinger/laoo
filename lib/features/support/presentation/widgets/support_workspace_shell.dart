@@ -2006,11 +2006,6 @@ class _FavoriteWorkspaceBarState extends State<_FavoriteWorkspaceBar> {
 
         return Row(
           children: [
-            Tooltip(
-              message: 'รายการโปรด',
-              child: Icon(Icons.star_outline_rounded, size: 18, color: accent),
-            ),
-            const SizedBox(width: 6),
             ...visible.map((item) => _favoriteButton(item, accent)),
             if (overflow.isNotEmpty) _overflowButton(overflow, accent),
           ],

@@ -28,4 +28,29 @@ void main() {
     expect(setup.partnerTelephone, '02-000-0000');
     expect(setup.partnerEmail, 'partner@example.com');
   });
+
+  test('parses business type and requester context from the API', () {
+    final setup = CompanySetupModel.fromJson({
+      'ownerType': 'C',
+      'ownerCode': 'C000001',
+      'ownerName': 'Demo',
+      'name': 'Demo',
+      'titleHeader': 'Demo',
+      'rowSTD': 30,
+      'rowCardSTD': 12,
+      'timeAlert': 30,
+      'orgStructureType': 1,
+      'passwordPolicyCode': 3,
+      'businessTypeCode': 'DORMITORY',
+      'requesterMode': 'RESIDENT',
+      'requesterCaption': 'ผู้พักอาศัยผู้แจ้งซ่อม',
+      'isBusinessTypeLocked': true,
+      'isActive': true,
+    });
+
+    expect(setup.businessTypeCode, 'DORMITORY');
+    expect(setup.requesterMode, 'RESIDENT');
+    expect(setup.requesterCaption, 'ผู้พักอาศัยผู้แจ้งซ่อม');
+    expect(setup.isBusinessTypeLocked, isTrue);
+  });
 }

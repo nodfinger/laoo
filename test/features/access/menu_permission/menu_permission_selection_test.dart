@@ -54,4 +54,43 @@ void main() {
 
     expect(MenuPermissionSelection.groupValue(rows, '01', 'VIEW'), isNull);
   });
+
+  test('same menu group code in different projects stays separate', () {
+    final core = MenuPermissionRow(
+      projectId: 1,
+      projectName: 'Core',
+      menuCode: 'CORE',
+      menuName: 'Core menu',
+      menuGroupCode: '01',
+      menuGroupName: 'Shared code',
+      screenType: 1,
+      canView: false,
+      canCreate: false,
+      canEdit: false,
+      canDelete: false,
+    );
+    final service = MenuPermissionRow(
+      projectId: 4,
+      projectName: 'Service',
+      menuCode: 'SERVICE',
+      menuName: 'Service menu',
+      menuGroupCode: '01',
+      menuGroupName: 'Shared code',
+      screenType: 1,
+      canView: false,
+      canCreate: false,
+      canEdit: false,
+      canDelete: false,
+    );
+
+    final updated = MenuPermissionSelection.applyToGroup(
+      [core, service],
+      core.groupKey,
+      'VIEW',
+      true,
+    );
+
+    expect(updated[0].canView, isTrue);
+    expect(updated[1].canView, isFalse);
+  });
 }

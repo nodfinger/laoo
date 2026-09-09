@@ -154,7 +154,8 @@ public sealed class AuthenticationService
                 project.Value.Code,
                 company.Username,
                 company.DisplayName,
-                false);
+                false,
+                company.PersonId);
         }
 
         var token = _tokens.CreateToken(authenticated);
@@ -177,7 +178,8 @@ public sealed class AuthenticationService
                 authenticated.Username,
                 authenticated.DisplayName,
                 authenticated.CanLoginAsUser,
-                false));
+                false,
+                authenticated.PersonId));
     }
 
     private async Task<bool> ValidatePasswordAsync(
@@ -429,7 +431,7 @@ public sealed class AuthenticationService
                 CASE WHEN employee.EmployeeID IS NULL THEN u.DisplayName
                      ELSE employee.FullName + CASE WHEN NULLIF(LTRIM(RTRIM(employee.NickName)), N'') IS NULL THEN N'' ELSE N' | ' + employee.NickName END
                 END AS DisplayName,
-                u.LockedUntil
+                u.LockedUntil, u.PersonID
             FROM dbo.TDADUser AS u
             INNER JOIN dbo.TDSTCompanySetUp AS company
                 ON company.CompanyID = u.CompanyID
@@ -482,7 +484,8 @@ public sealed class AuthenticationService
             reader.GetString(4),
             reader.GetString(5),
             reader.GetString(6),
-            reader.IsDBNull(7) ? null : reader.GetDateTime(7));
+            reader.IsDBNull(7) ? null : reader.GetDateTime(7),
+            reader.GetInt64(8));
         if (await reader.ReadAsync(cancellationToken)) return null;
         return result;
     }
@@ -608,5 +611,6 @@ public sealed class AuthenticationService
         string Username,
         string PasswordHash,
         string DisplayName,
-        DateTime? LockedUntil);
+        DateTime? LockedUntil,
+        long PersonId);
 }

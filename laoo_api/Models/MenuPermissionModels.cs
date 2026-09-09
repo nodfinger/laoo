@@ -2,6 +2,8 @@ namespace LaooApi.Models;
 
 public sealed class MenuPermissionMatrixResponse
 {
+    public long? ProjectId { get; init; }
+    public string? ProjectName { get; init; }
     public string MenuCode { get; init; } = string.Empty;
     public string MenuName { get; init; } = string.Empty;
     public string MenuGroupCode { get; init; } = string.Empty;
@@ -15,6 +17,7 @@ public sealed class MenuPermissionMatrixResponse
 
 public sealed class MenuPermissionSaveRequest
 {
+    public long? ProjectId { get; init; }
     public string MenuCode { get; init; } = string.Empty;
     public bool CanView { get; init; }
     public bool CanCreate { get; init; }

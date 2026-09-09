@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../../app/theme/laoo_design_tokens.dart';
+import '../../../core/navigation/navigation_menu_repository.dart';
 import '../../../core/widgets/timed_snack_bar.dart';
+import '../../profile/data/user_profile_repository.dart';
 import '../../support/presentation/widgets/support_workspace_shell.dart';
 import '../data/inventory_api.dart';
 
@@ -18,14 +21,23 @@ class _WarehousePageState extends State<WarehousePage> {
       _search = TextEditingController(),
       _code = TextEditingController(),
       _name = TextEditingController();
+  final _profile = UserProfileRepository();
   List<Map<String, dynamic>> _rows = const [], _branches = const [];
   Map<String, bool> _actions = const {};
   int? _editingId, _branchId;
-  bool _loading = true, _active = true, _default = false, _editing = false;
+  bool _loading = true,
+      _active = true,
+      _default = false,
+      _editing = false,
+      _card = false;
+  String _menuName = 'คลังสินค้า';
+  String? _branchError, _codeError, _nameError;
 
   @override
   void initState() {
     super.initState();
+    _resolveMenuName();
+    _loadViewMode();
     _load();
   }
 
@@ -36,6 +48,30 @@ class _WarehousePageState extends State<WarehousePage> {
     _code.dispose();
     _name.dispose();
     super.dispose();
+  }
+
+  Future<void> _resolveMenuName() async {
+    try {
+      final value = await NavigationMenuRepository().resolveMenuName(
+        menuCode: '08004',
+        routeName: 'warehouses',
+        fallback: _menuName,
+      );
+      if (mounted && value.trim().isNotEmpty) {
+        setState(() => _menuName = value.trim());
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _loadViewMode() async {
+    try {
+      final profile = await _profile.get();
+      if (mounted) {
+        setState(
+          () => _card = '${profile['defaultViewMode']}'.toUpperCase() == 'CARD',
+        );
+      }
+    } catch (_) {}
   }
 
   Future<void> _load() async {
@@ -75,6 +111,7 @@ class _WarehousePageState extends State<WarehousePage> {
           : (_branches.first['branchID'] as num).toInt();
       _active = true;
       _default = false;
+      _branchError = _codeError = _nameError = null;
     });
   }
 
@@ -87,19 +124,17 @@ class _WarehousePageState extends State<WarehousePage> {
       _branchId = (row['branchID'] as num).toInt();
       _active = row['isActive'] == true;
       _default = row['isDefault'] == true;
+      _branchError = _codeError = _nameError = null;
     });
   }
 
   Future<void> _save() async {
-    if (_branchId == null ||
-        _code.text.trim().isEmpty ||
-        _name.text.trim().isEmpty) {
-      showTimedSnackBar(
-        context,
-        message:
-            'ข้อมูลคลังไม่ครบ\nรายละเอียดเพิ่มเติม: กรุณาระบุสาขา รหัส และชื่อคลัง',
-        error: true,
-      );
+    setState(() {
+      _branchError = _branchId == null ? 'กรุณาเลือกสาขา' : null;
+      _codeError = _code.text.trim().isEmpty ? 'กรุณาระบุรหัสคลัง' : null;
+      _nameError = _name.text.trim().isEmpty ? 'กรุณาระบุชื่อคลัง' : null;
+    });
+    if (_branchError != null || _codeError != null || _nameError != null) {
       return;
     }
     try {
@@ -125,136 +160,473 @@ class _WarehousePageState extends State<WarehousePage> {
     }
   }
 
+  Future<void> _delete(Map<String, dynamic> row) async {
+    final name = '${row['warehouseCode']} | ${row['warehouseName']}';
+    final confirmed =
+        await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            backgroundColor: LaooColors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(LaooRadius.xs),
+            ),
+            titlePadding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            contentPadding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            title: const Row(
+              children: [
+                Icon(Icons.delete_outline, color: LaooColors.error),
+                SizedBox(width: 8),
+                Text(
+                  'ยืนยันการลบคลังสินค้า',
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Divider(color: LaooColors.border),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  color: const Color(0xFFFFEBEE),
+                  child: Text(name),
+                ),
+                const SizedBox(height: 10),
+                const Text('รายการที่ลบแล้วไม่สามารถเรียกคืนได้'),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('ยกเลิก'),
+              ),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: LaooColors.error,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(LaooRadius.xs),
+                  ),
+                ),
+                onPressed: () => Navigator.pop(context, true),
+                icon: const Icon(Icons.delete_outline),
+                label: const Text('ลบ'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (!confirmed) return;
+    try {
+      await _api.deleteWarehouse((row['warehouseID'] as num).toInt());
+      if (!mounted) return;
+      showTimedSnackBar(context, message: 'ปิดคลังสินค้าแล้ว');
+      await _load();
+    } catch (e) {
+      if (mounted) {
+        showTimedSnackBar(
+          context,
+          message: _inventoryError('ปิดคลังสินค้า', e),
+          error: true,
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) => SupportWorkspaceShell(
-    pageTitle: 'คลังสินค้า',
+    pageTitle: _menuName,
     activeMenu: 'warehouses',
     menuScope: WorkspaceMenuScope.company,
-    child: Padding(
-      padding: const EdgeInsets.all(8),
-      child: _editing ? _form() : _list(),
+    child: ColoredBox(
+      color: LaooColors.background,
+      child: Padding(
+        padding: const EdgeInsets.all(LaooLayout.cardMargin),
+        child: _editing ? _form() : _list(),
+      ),
     ),
   );
-  Widget _list() => Column(
-    children: [
-      _Header(
-        title: 'คลังสินค้า',
-        onAdd: _actions['create'] == true ? _new : null,
-      ),
-      const SizedBox(height: 6),
-      _Filter(controller: _search, onSearch: _load),
-      const SizedBox(height: 6),
-      Expanded(
-        child: Card(
-          margin: EdgeInsets.zero,
-          color: Colors.white,
-          child: _loading
-              ? const Center(child: CircularProgressIndicator())
-              : SingleChildScrollView(
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: DataTable(
-                      columns: const [
-                        DataColumn(label: Text('ID')),
-                        DataColumn(label: Text('Action')),
-                        DataColumn(label: Text('สาขา')),
-                        DataColumn(label: Text('รหัส')),
-                        DataColumn(label: Text('ชื่อคลัง')),
-                        DataColumn(label: Text('คลังหลัก')),
-                        DataColumn(label: Text('สถานะ')),
-                      ],
-                      rows: _rows
-                          .map(
-                            (row) => DataRow(
-                              cells: [
-                                DataCell(Text('${row['warehouseID']}')),
-                                DataCell(
-                                  IconButton(
-                                    onPressed: _actions['edit'] == true
-                                        ? () => _edit(row)
-                                        : null,
-                                    icon: const Icon(Icons.edit_outlined),
-                                  ),
-                                ),
-                                DataCell(Text('${row['branchName']}')),
-                                DataCell(Text('${row['warehouseCode']}')),
-                                DataCell(Text('${row['warehouseName']}')),
-                                DataCell(
-                                  Icon(
-                                    row['isDefault'] == true
-                                        ? Icons.check_circle
-                                        : Icons.remove_circle_outline,
-                                  ),
-                                ),
-                                DataCell(
-                                  Text(
-                                    row['isActive'] == true ? 'ใช้งาน' : 'ปิด',
-                                  ),
-                                ),
-                              ],
-                            ),
-                          )
-                          .toList(),
+  Widget _list() => LayoutBuilder(
+    builder: (context, constraints) {
+      final compact = constraints.maxWidth < 900;
+      final cardMode = compact || _card;
+      return Column(
+        children: [
+          _listHeader(context, compact: compact, cardMode: cardMode),
+          const SizedBox(height: 6),
+          _filterCard(context),
+          const SizedBox(height: LaooLayout.cardSpacing),
+          Expanded(child: _resultCard(context, cardMode: cardMode)),
+        ],
+      );
+    },
+  );
+
+  Widget _listHeader(
+    BuildContext context, {
+    required bool compact,
+    required bool cardMode,
+  }) {
+    final primary = Theme.of(context).colorScheme.primary;
+    return Card(
+      margin: EdgeInsets.zero,
+      color: LaooColors.white,
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+      child: Padding(
+        padding: const EdgeInsets.all(LaooLayout.cardPadding),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Icon(Icons.star_border_rounded, color: primary),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    _menuName,
+                    style: const TextStyle(
+                      color: Colors.black,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
+                if (!compact)
+                  OutlinedButton(
+                    onPressed: () => setState(() => _card = !cardMode),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(44, 40),
+                      padding: EdgeInsets.zero,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(LaooRadius.xs),
+                      ),
+                    ),
+                    child: Icon(
+                      cardMode
+                          ? Icons.list_alt_outlined
+                          : Icons.grid_view_rounded,
+                    ),
+                  ),
+                if (!compact) const SizedBox(width: 8),
+                if (_actions['create'] == true)
+                  FilledButton.icon(
+                    onPressed: _new,
+                    style: FilledButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(LaooRadius.xs),
+                      ),
+                    ),
+                    icon: const Icon(Icons.add),
+                    label: const Text('เพิ่มคลัง'),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            const Divider(height: 1, color: LaooColors.border),
+          ],
         ),
       ),
+    );
+  }
+
+  Widget _filterCard(BuildContext context) => Card(
+    margin: EdgeInsets.zero,
+    color: LaooColors.white,
+    elevation: 0,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+    child: Padding(
+      padding: const EdgeInsets.all(LaooLayout.cardPadding),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          SizedBox(
+            width: 260,
+            child: TextField(
+              controller: _search,
+              onSubmitted: (_) => _load(),
+              decoration: const InputDecoration(
+                prefixIcon: Icon(Icons.search),
+                suffixIcon: Icon(Icons.arrow_forward),
+                labelText: 'ค้นหารหัสหรือชื่อคลัง',
+              ),
+            ),
+          ),
+          FilledButton.icon(
+            onPressed: _load,
+            icon: const Icon(Icons.search),
+            label: const Text('ค้นหา'),
+          ),
+          OutlinedButton.icon(
+            onPressed: () {
+              _search.clear();
+              _load();
+            },
+            icon: const Icon(Icons.filter_alt_off_outlined),
+            label: const Text('ล้าง Filter'),
+          ),
+        ],
+      ),
+    ),
+  );
+
+  Widget _resultCard(BuildContext context, {required bool cardMode}) {
+    final primary = Theme.of(context).colorScheme.primary;
+    return Card(
+      margin: EdgeInsets.zero,
+      color: LaooColors.white,
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+      child: _loading
+          ? Center(child: CircularProgressIndicator(color: primary))
+          : _rows.isEmpty
+          ? const Center(child: Text('ไม่พบข้อมูลคลังสินค้า'))
+          : cardMode
+          ? ListView.separated(
+              padding: const EdgeInsets.all(LaooLayout.cardPadding),
+              itemCount: _rows.length,
+              separatorBuilder: (_, _) => const SizedBox(height: 6),
+              itemBuilder: (context, index) =>
+                  _warehouseCard(context, _rows[index], primary),
+            )
+          : SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: DataTable(
+                headingRowColor: WidgetStatePropertyAll(
+                  primary.withValues(alpha: .10),
+                ),
+                headingTextStyle: TextStyle(
+                  color: primary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+                dataTextStyle: const TextStyle(
+                  color: LaooColors.textPrimary,
+                  fontSize: 13,
+                ),
+                dataRowMinHeight: 48,
+                dataRowMaxHeight: 56,
+                columns: const [
+                  DataColumn(label: Text('ID')),
+                  DataColumn(label: Text('Action')),
+                  DataColumn(label: Text('สาขา')),
+                  DataColumn(label: Text('รหัสคลัง')),
+                  DataColumn(label: Text('ชื่อคลัง')),
+                  DataColumn(label: Text('คลังหลัก')),
+                  DataColumn(label: Text('สถานะ')),
+                ],
+                rows: _rows
+                    .map((row) => _warehouseDataRow(row, primary))
+                    .toList(),
+              ),
+            ),
+    );
+  }
+
+  DataRow _warehouseDataRow(Map<String, dynamic> row, Color primary) => DataRow(
+    cells: [
+      DataCell(Text('${row['warehouseID']}')),
+      DataCell(_rowActions(row, primary)),
+      DataCell(Text('${row['branchName']}')),
+      DataCell(Text('${row['warehouseCode']}')),
+      DataCell(Text('${row['warehouseName']}')),
+      DataCell(
+        Icon(
+          row['isDefault'] == true
+              ? Icons.check_circle_outline
+              : Icons.remove_circle_outline,
+          color: row['isDefault'] == true ? primary : LaooColors.textSecondary,
+        ),
+      ),
+      DataCell(_status(row, primary)),
     ],
   );
+
+  Widget _warehouseCard(
+    BuildContext context,
+    Map<String, dynamic> row,
+    Color primary,
+  ) => Card(
+    margin: EdgeInsets.zero,
+    color: LaooColors.white,
+    elevation: 0,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+    child: Padding(
+      padding: const EdgeInsets.all(LaooLayout.cardPadding),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.warehouse_outlined, color: primary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '${row['warehouseCode']} | ${row['warehouseName']}',
+                  style: const TextStyle(
+                    color: LaooColors.textPrimary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              _rowActions(row, primary),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Divider(height: 1, color: LaooColors.border),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 16,
+            runSpacing: 6,
+            children: [
+              Text('สาขา: ${row['branchName']}'),
+              Text('คลังหลัก: ${row['isDefault'] == true ? 'ใช่' : 'ไม่ใช่'}'),
+              _status(row, primary),
+            ],
+          ),
+        ],
+      ),
+    ),
+  );
+
+  Widget _rowActions(Map<String, dynamic> row, Color primary) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      if (_actions['edit'] == true)
+        IconButton(
+          tooltip: 'แก้ไข',
+          color: primary,
+          onPressed: () => _edit(row),
+          icon: const Icon(Icons.edit_outlined),
+        ),
+      if (_actions['delete'] == true)
+        IconButton(
+          tooltip: 'ลบ',
+          color: LaooColors.error,
+          onPressed: () => _delete(row),
+          icon: const Icon(Icons.delete_outline),
+        ),
+    ],
+  );
+
+  Widget _status(Map<String, dynamic> row, Color primary) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+    decoration: BoxDecoration(
+      color: (row['isActive'] == true ? primary : LaooColors.textSecondary)
+          .withValues(alpha: .10),
+      borderRadius: BorderRadius.circular(999),
+    ),
+    child: Text(
+      row['isActive'] == true ? 'ใช้งาน' : 'ปิด',
+      style: TextStyle(
+        color: row['isActive'] == true ? primary : LaooColors.textSecondary,
+        fontSize: 13,
+      ),
+    ),
+  );
+
   Widget _form() => ListView(
     children: [
-      _Header(
-        title: 'คลังสินค้า > ${_editingId == null ? 'เพิ่ม' : 'แก้ไข'}',
-        onBack: () => setState(() => _editing = false),
-        onSave: _save,
-      ),
-      const SizedBox(height: 6),
+      _formHeader(),
+      const SizedBox(height: LaooLayout.cardSpacing),
       Card(
         margin: EdgeInsets.zero,
-        color: Colors.white,
+        color: LaooColors.white,
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(LaooLayout.cardPadding),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
+              Wrap(
+                spacing: 24,
+                runSpacing: 12,
                 children: [
-                  const Text('สถานะใช้งาน'),
-                  Switch(
-                    value: _active,
-                    onChanged: (v) => setState(() => _active = v),
+                  _switchField(
+                    'สถานะใช้งาน',
+                    _active,
+                    (v) => setState(() => _active = v),
                   ),
-                  const SizedBox(width: 20),
-                  const Text('คลังหลัก'),
-                  Switch(
-                    value: _default,
-                    onChanged: (v) => setState(() => _default = v),
+                  _switchField(
+                    'คลังหลัก',
+                    _default,
+                    (v) => setState(() => _default = v),
                   ),
                 ],
               ),
               const SizedBox(height: 12),
-              DropdownButtonFormField<int>(
-                initialValue: _branchId,
-                decoration: const InputDecoration(labelText: '* สาขา'),
-                items: _branches
-                    .map(
-                      (x) => DropdownMenuItem(
-                        value: (x['branchID'] as num).toInt(),
-                        child: Text('${x['branchCode']} | ${x['branchName']}'),
+              LayoutBuilder(
+                builder: (context, constraints) => Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    SizedBox(
+                      width: constraints.maxWidth >= 760
+                          ? (constraints.maxWidth - 12) / 2
+                          : constraints.maxWidth,
+                      child: DropdownButtonFormField<int>(
+                        initialValue: _branchId,
+                        decoration: InputDecoration(
+                          labelText: 'สาขา *',
+                          errorText: _branchError,
+                        ),
+                        items: _branches
+                            .map(
+                              (x) => DropdownMenuItem(
+                                value: (x['branchID'] as num).toInt(),
+                                child: Text(
+                                  '${x['branchCode']} | ${x['branchName']}',
+                                ),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (v) => setState(() {
+                          _branchId = v;
+                          _branchError = null;
+                        }),
                       ),
-                    )
-                    .toList(),
-                onChanged: (v) => setState(() => _branchId = v),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _code,
-                decoration: const InputDecoration(labelText: '* รหัสคลัง'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _name,
-                decoration: const InputDecoration(labelText: '* ชื่อคลัง'),
+                    ),
+                    SizedBox(
+                      width: constraints.maxWidth >= 760
+                          ? (constraints.maxWidth - 12) / 2
+                          : constraints.maxWidth,
+                      child: TextField(
+                        controller: _code,
+                        decoration: InputDecoration(
+                          labelText: 'รหัสคลัง *',
+                          errorText: _codeError,
+                        ),
+                        onChanged: (_) {
+                          if (_codeError != null) {
+                            setState(() => _codeError = null);
+                          }
+                        },
+                      ),
+                    ),
+                    SizedBox(
+                      width: constraints.maxWidth,
+                      child: TextField(
+                        controller: _name,
+                        decoration: InputDecoration(
+                          labelText: 'ชื่อคลัง *',
+                          errorText: _nameError,
+                        ),
+                        onChanged: (_) {
+                          if (_nameError != null) {
+                            setState(() => _nameError = null);
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -262,6 +634,61 @@ class _WarehousePageState extends State<WarehousePage> {
       ),
     ],
   );
+
+  Widget _formHeader() => Card(
+    margin: EdgeInsets.zero,
+    color: LaooColors.white,
+    elevation: 0,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+    child: Padding(
+      padding: const EdgeInsets.all(LaooLayout.cardPadding),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.star_border_rounded,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  '$_menuName > ${_editingId == null ? 'เพิ่ม' : 'แก้ไข'}',
+                  style: const TextStyle(
+                    color: Colors.black,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              OutlinedButton(
+                onPressed: () => setState(() => _editing = false),
+                child: const Text('ยกเลิก'),
+              ),
+              const SizedBox(width: 8),
+              FilledButton.icon(
+                onPressed: _save,
+                icon: const Icon(Icons.save_outlined),
+                label: const Text('บันทึก'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Divider(height: 1, color: LaooColors.border),
+        ],
+      ),
+    ),
+  );
+
+  Widget _switchField(String label, bool value, ValueChanged<bool> onChanged) =>
+      Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label, style: const TextStyle(color: LaooColors.textPrimary)),
+          const SizedBox(width: 6),
+          Switch(value: value, onChanged: onChanged),
+        ],
+      );
 }
 
 class StockReceiptPage extends StatefulWidget {

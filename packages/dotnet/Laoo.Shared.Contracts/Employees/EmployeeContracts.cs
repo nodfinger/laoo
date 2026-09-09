@@ -39,6 +39,7 @@ public static class EmployeeScreenContracts
 public sealed class EmployeeResponse
 {
     public long EmployeeId { get; init; }
+    public long? PersonId { get; init; }
     public long PartnerId { get; init; }
     public long? CompanyId { get; init; }
     public long? DivisionOrgUnitId { get; init; }
@@ -103,6 +104,9 @@ public sealed class EmployeeUpsertRequest
     public string? CarColor2 { get; init; }
     public string? CarTypeCode2 { get; init; }
     public string? CarOilType2 { get; init; }
+    public string? Username { get; init; }
+    public string? Password { get; init; }
+    public long? RoleGroupId { get; init; }
 }
 
 public sealed class EmployeeImageUpsertRequest

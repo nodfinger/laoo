@@ -8,7 +8,7 @@ using Microsoft.Data.SqlClient;
 namespace LaooServiceModule.Controllers;
 
 [ApiController, Authorize]
-[LaooServiceModule.Security.RequireCompanyProject("LAOO_SERVICE")]
+[LaooServiceModule.Security.RequireCompanyProject("LAOO")]
 [Route("api/company/warehouses")]
 public sealed class WarehouseController(IConfiguration configuration) : ControllerBase
 {
@@ -28,7 +28,7 @@ public sealed class WarehouseController(IConfiguration configuration) : Controll
         if (!await Can(connection,"VIEW",token)) return Forbid();
         const string sql = """
 SELECT W.WarehouseID,W.BranchID,W.WarehouseCode,W.WarehouseName,W.IsDefault,W.IsActive,
-       COALESCE(CONVERT(nvarchar(200),B.BranchName),CONVERT(nvarchar(200),B.BranchCode),N'') BranchName
+       COALESCE(CONVERT(nvarchar(200),B.BranchNameTH),CONVERT(nvarchar(200),B.BranchCode),N'') BranchName
 FROM dbo.TDIVWarehouse W
 LEFT JOIN dbo.TDADBranch B ON B.BranchID=W.BranchID AND B.CompanyID=W.CompanyID
 WHERE W.CompanyID=@company AND (@search=N'' OR W.WarehouseCode LIKE @like OR W.WarehouseName LIKE @like)

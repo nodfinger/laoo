@@ -19,6 +19,7 @@ import '../../features/support/presentation/pages/support_placeholder_page.dart'
 import '../../features/support/presentation/widgets/support_workspace_shell.dart';
 import '../../features/support/technical_info/pages/technical_info_page.dart';
 import '../../features/support/branch/pages/branch_page.dart';
+import '../../features/support/locations/location_page.dart';
 import '../../features/support/master_data/pages/master_data_page.dart';
 import '../../features/support/organization/pages/organization_structure_page.dart';
 import '../../features/support/employee/pages/employee_shared_page.dart';
@@ -116,7 +117,14 @@ final GoRouter appRouter = GoRouter(
         activeMenu: 'companyProducts',
       ),
     ),
-    ...buildServiceFeatureRoutes(),
+    GoRoute(
+      path: RoutePaths.assetLocations,
+      name: RouteNames.assetLocations,
+      builder: (context, state) => const LocationPage(),
+    ),
+    ...buildServiceFeatureRoutes().where(
+      (route) => route.path != RoutePaths.assetLocations,
+    ),
     ...buildVisitorFeatureRoutes(),
     GoRoute(
       path: RoutePaths.companyBranches,

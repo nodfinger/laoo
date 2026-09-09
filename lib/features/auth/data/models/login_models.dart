@@ -34,6 +34,7 @@ class LoginUser {
     this.partnerId,
     this.userId,
     this.companyId,
+    this.personId,
     this.branchId,
   });
 
@@ -44,6 +45,7 @@ class LoginUser {
   final int? partnerId;
   final int? userId;
   final int? companyId;
+  final int? personId;
   final int? branchId;
   final int projectId;
   final String projectCode;
@@ -61,6 +63,7 @@ class LoginUser {
       partnerId: _toNullableInt(json['partnerId']),
       userId: _toNullableInt(json['userId']),
       companyId: _toNullableInt(json['companyId']),
+      personId: _toNullableInt(json['personId']),
       branchId: _toNullableInt(json['branchId']),
       projectId: _toInt(json['projectId']),
       projectCode: json['projectCode'] as String? ?? '',
@@ -80,6 +83,7 @@ class LoginUser {
       'partnerId': partnerId,
       'userId': userId,
       'companyId': companyId,
+      'personId': personId,
       'branchId': branchId,
       'projectId': projectId,
       'projectCode': projectCode,

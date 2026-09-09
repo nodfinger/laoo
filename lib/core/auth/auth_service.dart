@@ -54,6 +54,7 @@ class AuthService {
       partnerUserId: _toInt(user?['partnerUserId']),
       partnerId: _toInt(user?['partnerId']),
       companyId: _toInt(user?['companyId']),
+      personId: _toInt(user?['personId']),
       branchId: _toInt(user?['branchId']),
       userId: _toInt(user?['userId']),
       laooUserId: _toInt(user?['laooUserId']),
@@ -125,6 +126,7 @@ class AuthService {
     final contextUserType = context['userType'] as String?;
     final contextUserId = _toInt(context['userId']);
     final contextPartnerId = _toInt(context['partnerId']);
+    final contextPersonId = _toInt(context['personId']);
 
     String? projectCode = session.projectCode;
     int? projectId = session.projectId;
@@ -157,6 +159,7 @@ class AuthService {
           ? contextUserId
           : session.userId,
       partnerId: contextPartnerId ?? session.partnerId,
+      personId: contextPersonId ?? session.personId,
     );
   }
 

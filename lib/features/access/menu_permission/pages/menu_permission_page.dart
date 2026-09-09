@@ -26,12 +26,16 @@ class MenuPermissionPage extends StatefulWidget {
 }
 
 class _MenuPermissionPageState extends State<MenuPermissionPage> {
+  static const double _menuColumnWidth = 430;
+  static const double _permissionColumnWidth = 72;
+
   final _groups = RoleGroupRepository();
   final _permissions = MenuPermissionRepository();
   final _profile = UserProfileRepository();
   List<RoleGroup> _roleGroups = const [];
   List<MenuPermissionRow> _rows = const [];
   int? _selectedGroup;
+  String? _selectedSystemLevel;
   String? _selectedMenuGroup;
   bool _loading = true, _saving = false;
   bool _canEdit = false, _canDelete = false;
@@ -39,6 +43,7 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
   bool _error = false;
   Timer? _alertTimer;
   bool _card = false;
+  final Set<String> _collapsedMenuGroups = <String>{};
 
   @override
   void initState() {
@@ -106,7 +111,11 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
       if (mounted) {
         setState(() {
           _rows = rows;
+          _selectedSystemLevel = null;
           _selectedMenuGroup = null;
+          _collapsedMenuGroups
+            ..clear()
+            ..addAll(rows.map((row) => row.groupKey));
         });
       }
     } catch (e) {
@@ -276,23 +285,46 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
       e is ApiException ? e.message : 'โหลดข้อมูลสิทธิ์ไม่สำเร็จ';
   bool _visible(int type, String action) =>
       MenuPermissionSelection.isActionVisible(type, action);
-  List<MenuPermissionRow> get _filteredRows => _selectedMenuGroup == null
+  String _systemKey(MenuPermissionRow row) =>
+      row.projectId?.toString() ?? '_CORE';
+
+  String _systemLabel(MenuPermissionRow row) {
+    final projectName = row.projectName?.trim() ?? '';
+    return projectName.isEmpty ? 'ส่วนกลาง' : projectName;
+  }
+
+  List<MenuPermissionRow> get _systemLevels =>
+      _rows.fold<List<MenuPermissionRow>>(<MenuPermissionRow>[], (levels, row) {
+        return levels.any((item) => _systemKey(item) == _systemKey(row))
+            ? levels
+            : [...levels, row];
+      });
+
+  List<MenuPermissionRow> get _systemFilteredRows =>
+      _selectedSystemLevel == null
       ? _rows
-      : _rows.where((e) => e.menuGroupCode == _selectedMenuGroup).toList();
-  List<MenuPermissionRow> get _menuGroups => _rows
+      : _rows.where((row) => _systemKey(row) == _selectedSystemLevel).toList();
+
+  List<MenuPermissionRow> get _filteredRows => _selectedMenuGroup == null
+      ? _systemFilteredRows
+      : _systemFilteredRows
+            .where((row) => row.groupKey == _selectedMenuGroup)
+            .toList();
+
+  List<MenuPermissionRow> get _menuGroups => _systemFilteredRows
       .where((e) => e.menuGroupCode.isNotEmpty)
       .fold<List<MenuPermissionRow>>(
         <MenuPermissionRow>[],
-        (all, row) => all.any((e) => e.menuGroupCode == row.menuGroupCode)
-            ? all
-            : [...all, row],
+        (all, row) =>
+            all.any((e) => e.groupKey == row.groupKey) ? all : [...all, row],
       );
   void _change(MenuPermissionRow row, String action, bool value) {
     if (!_canEdit) return;
     setState(
       () => _rows = _rows
           .map(
-            (item) => item.menuCode == row.menuCode
+            (item) =>
+                item.projectId == row.projectId && item.menuCode == row.menuCode
                 ? MenuPermissionSelection.applyToRow(item, action, value)
                 : item,
           )
@@ -318,6 +350,17 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
   bool _groupHasAction(String menuGroupCode, String action) =>
       MenuPermissionSelection.hasAction(_rows, menuGroupCode, action);
 
+  bool _isGroupCollapsed(String menuGroupCode) =>
+      _collapsedMenuGroups.contains(menuGroupCode);
+
+  void _toggleMenuGroup(String menuGroupCode) {
+    setState(() {
+      if (!_collapsedMenuGroups.add(menuGroupCode)) {
+        _collapsedMenuGroups.remove(menuGroupCode);
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) => SupportWorkspaceShell(
     pageTitle: 'สิทธิ์เมนู',
@@ -334,7 +377,7 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
         builder: (context, _, _) => Stack(
           children: [
             Padding(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(10),
               child: Column(
                 children: [
                   Card(
@@ -423,87 +466,162 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
                         horizontal: 24,
                         vertical: 12,
                       ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: DropdownButtonFormField<int>(
-                              initialValue: _selectedGroup,
-                              isExpanded: true,
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Theme.of(context).colorScheme.onSurface,
-                              ),
-                              decoration: InputDecoration(
-                                labelText: 'กลุ่มสิทธิ์',
-                                labelStyle: TextStyle(
-                                  fontSize: 16,
-                                  color: Theme.of(context).colorScheme.primary,
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final fieldWidth = constraints.maxWidth < 760
+                              ? constraints.maxWidth
+                              : (constraints.maxWidth - 24) / 3;
+                          return Wrap(
+                            spacing: 12,
+                            runSpacing: 12,
+                            children: [
+                              SizedBox(
+                                width: fieldWidth,
+                                child: DropdownButtonFormField<int>(
+                                  initialValue: _selectedGroup,
+                                  isExpanded: true,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurface,
+                                  ),
+                                  decoration: InputDecoration(
+                                    labelText: 'กลุ่มสิทธิ์',
+                                    labelStyle: TextStyle(
+                                      fontSize: 16,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.primary,
+                                    ),
+                                    floatingLabelStyle: TextStyle(
+                                      fontSize: 16,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.primary,
+                                    ),
+                                  ),
+                                  items: _roleGroups
+                                      .map(
+                                        (g) => DropdownMenuItem(
+                                          value: g.id,
+                                          child: Text(
+                                            g.name,
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                        ),
+                                      )
+                                      .toList(),
+                                  onChanged: (v) {
+                                    setState(() => _selectedGroup = v);
+                                    _loadRows();
+                                  },
                                 ),
-                                floatingLabelStyle: TextStyle(
-                                  fontSize: 16,
-                                  color: Theme.of(context).colorScheme.primary,
-                                ),
                               ),
-                              items: _roleGroups
-                                  .map(
-                                    (g) => DropdownMenuItem(
-                                      value: g.id,
+                              SizedBox(
+                                width: fieldWidth,
+                                child: DropdownButtonFormField<String>(
+                                  initialValue: _selectedSystemLevel,
+                                  isExpanded: true,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurface,
+                                  ),
+                                  decoration: InputDecoration(
+                                    labelText: 'ระดับระบบ',
+                                    labelStyle: TextStyle(
+                                      fontSize: 16,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.primary,
+                                    ),
+                                    floatingLabelStyle: TextStyle(
+                                      fontSize: 16,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.primary,
+                                    ),
+                                  ),
+                                  items: [
+                                    const DropdownMenuItem<String>(
+                                      value: null,
                                       child: Text(
-                                        g.name,
-                                        style: const TextStyle(fontSize: 14),
+                                        'ทั้งหมด',
+                                        style: TextStyle(fontSize: 14),
                                       ),
                                     ),
-                                  )
-                                  .toList(),
-                              onChanged: (v) {
-                                setState(() => _selectedGroup = v);
-                                _loadRows();
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: DropdownButtonFormField<String>(
-                              initialValue: _selectedMenuGroup,
-                              isExpanded: true,
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Theme.of(context).colorScheme.onSurface,
-                              ),
-                              decoration: InputDecoration(
-                                labelText: 'กลุ่มเมนู',
-                                labelStyle: TextStyle(
-                                  fontSize: 16,
-                                  color: Theme.of(context).colorScheme.primary,
-                                ),
-                                floatingLabelStyle: TextStyle(
-                                  fontSize: 16,
-                                  color: Theme.of(context).colorScheme.primary,
+                                    ..._systemLevels.map(
+                                      (level) => DropdownMenuItem<String>(
+                                        value: _systemKey(level),
+                                        child: Text(
+                                          _systemLabel(level),
+                                          style: const TextStyle(fontSize: 14),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                  onChanged: (value) => setState(() {
+                                    _selectedSystemLevel = value;
+                                    _selectedMenuGroup = null;
+                                  }),
                                 ),
                               ),
-                              items: [
-                                const DropdownMenuItem<String>(
-                                  value: null,
-                                  child: Text(
-                                    'ทั้งหมด',
-                                    style: TextStyle(fontSize: 14),
+                              SizedBox(
+                                width: fieldWidth,
+                                child: DropdownButtonFormField<String>(
+                                  initialValue: _selectedMenuGroup,
+                                  isExpanded: true,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurface,
                                   ),
-                                ),
-                                ..._menuGroups.map(
-                                  (g) => DropdownMenuItem<String>(
-                                    value: g.menuGroupCode,
-                                    child: Text(
-                                      g.menuGroupName,
-                                      style: const TextStyle(fontSize: 14),
+                                  decoration: InputDecoration(
+                                    labelText: 'กลุ่มเมนู',
+                                    labelStyle: TextStyle(
+                                      fontSize: 16,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.primary,
+                                    ),
+                                    floatingLabelStyle: TextStyle(
+                                      fontSize: 16,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.primary,
                                     ),
                                   ),
+                                  items: [
+                                    const DropdownMenuItem<String>(
+                                      value: null,
+                                      child: Text(
+                                        'ทั้งหมด',
+                                        style: TextStyle(fontSize: 14),
+                                      ),
+                                    ),
+                                    ..._menuGroups.map(
+                                      (g) => DropdownMenuItem<String>(
+                                        value: g.groupKey,
+                                        child: Text(
+                                          g.menuGroupName,
+                                          style: const TextStyle(fontSize: 14),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                  onChanged: (value) => setState(
+                                    () => _selectedMenuGroup = value,
+                                  ),
                                 ),
-                              ],
-                              onChanged: (value) =>
-                                  setState(() => _selectedMenuGroup = value),
-                            ),
-                          ),
-                        ],
+                              ),
+                            ],
+                          );
+                        },
                       ),
                     ),
                   ),
@@ -586,6 +704,8 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
               ConstrainedBox(
                 constraints: BoxConstraints(minWidth: constraints.maxWidth),
                 child: DataTable(
+                  columnSpacing: 12,
+                  horizontalMargin: 16,
                   headingRowColor: WidgetStatePropertyAll(headerColor),
                   columns: columns,
                   rows: const [],
@@ -597,6 +717,8 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
                   child: ConstrainedBox(
                     constraints: BoxConstraints(minWidth: constraints.maxWidth),
                     child: DataTable(
+                      columnSpacing: 12,
+                      horizontalMargin: 16,
                       headingRowHeight: 0,
                       columns: columns,
                       rows: _tableRows(context),
@@ -623,9 +745,7 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
     final primary = Theme.of(context).colorScheme.primary;
     final groups = _menuGroups
         .where(
-          (group) => _filteredRows.any(
-            (row) => row.menuGroupCode == group.menuGroupCode,
-          ),
+          (group) => _filteredRows.any((row) => row.groupKey == group.groupKey),
         )
         .toList();
     return ListView.separated(
@@ -634,8 +754,9 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
       separatorBuilder: (_, _) => const SizedBox(height: 6),
       itemBuilder: (context, index) {
         final group = groups[index];
+        final collapsed = _isGroupCollapsed(group.groupKey);
         final groupRows = _filteredRows
-            .where((row) => row.menuGroupCode == group.menuGroupCode)
+            .where((row) => row.groupKey == group.groupKey)
             .toList();
         return Card(
           margin: EdgeInsets.zero,
@@ -666,7 +787,7 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            group.menuGroupName,
+                            group.groupLabel,
                             style: TextStyle(
                               color: primary,
                               fontSize: LaooTypography.sectionTitle,
@@ -683,6 +804,17 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
                             fontSize: LaooTypography.caption,
                           ),
                         ),
+                        IconButton(
+                          tooltip: collapsed ? 'ขยายกลุ่มเมนู' : 'ยุบกลุ่มเมนู',
+                          visualDensity: VisualDensity.compact,
+                          onPressed: () => _toggleMenuGroup(group.groupKey),
+                          icon: Icon(
+                            collapsed
+                                ? Icons.keyboard_arrow_down_outlined
+                                : Icons.keyboard_arrow_up_outlined,
+                            color: primary,
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 6),
@@ -696,24 +828,18 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
                             ('แก้ไข', 'EDIT'),
                             ('ลบ', 'DELETE'),
                           ].map((action) {
-                            if (!_groupHasAction(
-                              group.menuGroupCode,
-                              action.$2,
-                            )) {
+                            if (!_groupHasAction(group.groupKey, action.$2)) {
                               return const SizedBox.shrink();
                             }
                             return _permissionControl(
                               context,
                               label: action.$1,
-                              value: _groupValue(
-                                group.menuGroupCode,
-                                action.$2,
-                              ),
+                              value: _groupValue(group.groupKey, action.$2),
                               enabled: _canEdit,
                               tristate: true,
                               emphasized: true,
                               onChanged: (value) => _changeGroup(
-                                group.menuGroupCode,
+                                group.groupKey,
                                 action.$2,
                                 value,
                               ),
@@ -723,12 +849,13 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
                   ],
                 ),
               ),
-              for (var rowIndex = 0; rowIndex < groupRows.length; rowIndex++)
-                _mobilePermissionRow(
-                  context,
-                  groupRows[rowIndex],
-                  showDivider: rowIndex > 0,
-                ),
+              if (!collapsed)
+                for (var rowIndex = 0; rowIndex < groupRows.length; rowIndex++)
+                  _mobilePermissionRow(
+                    context,
+                    groupRows[rowIndex],
+                    showDivider: rowIndex > 0,
+                  ),
             ],
           ),
         );
@@ -795,8 +922,9 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
     final result = <DataRow>[];
     String? lastGroup;
     for (final row in _filteredRows) {
-      if (row.menuGroupCode != lastGroup) {
-        lastGroup = row.menuGroupCode;
+      if (row.groupKey != lastGroup) {
+        lastGroup = row.groupKey;
+        final collapsed = _isGroupCollapsed(row.groupKey);
         result.add(
           DataRow(
             color: WidgetStatePropertyAll(
@@ -805,9 +933,21 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
             cells: [
               DataCell(
                 SizedBox(
-                  width: 220,
+                  width: _menuColumnWidth,
                   child: Row(
                     children: [
+                      IconButton(
+                        tooltip: collapsed ? 'ขยายกลุ่มเมนู' : 'ยุบกลุ่มเมนู',
+                        visualDensity: VisualDensity.compact,
+                        onPressed: () => _toggleMenuGroup(row.groupKey),
+                        icon: Icon(
+                          collapsed
+                              ? Icons.keyboard_arrow_right_outlined
+                              : Icons.keyboard_arrow_down_outlined,
+                          size: 20,
+                          color: Theme.of(tableContext).colorScheme.primary,
+                        ),
+                      ),
                       Icon(
                         Icons.folder_open_outlined,
                         size: 20,
@@ -816,7 +956,7 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          row.menuGroupName,
+                          row.groupLabel,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             color: Theme.of(tableContext).colorScheme.primary,
@@ -829,14 +969,15 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
                   ),
                 ),
               ),
-              _groupCell(tableContext, row.menuGroupCode, 'VIEW'),
-              _groupCell(tableContext, row.menuGroupCode, 'CREATE'),
-              _groupCell(tableContext, row.menuGroupCode, 'EDIT'),
-              _groupCell(tableContext, row.menuGroupCode, 'DELETE'),
+              _groupCell(tableContext, row.groupKey, 'VIEW'),
+              _groupCell(tableContext, row.groupKey, 'CREATE'),
+              _groupCell(tableContext, row.groupKey, 'EDIT'),
+              _groupCell(tableContext, row.groupKey, 'DELETE'),
             ],
           ),
         );
       }
+      if (_isGroupCollapsed(row.groupKey)) continue;
       result.add(
         DataRow(
           cells: [
@@ -853,7 +994,7 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
   }
 
   Widget _headerCell(BuildContext context, String text) => SizedBox(
-    width: 100,
+    width: _permissionColumnWidth,
     child: Center(
       child: Text(
         text,
@@ -867,7 +1008,7 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
     ),
   );
   Widget _menuHeaderCell(BuildContext context) => SizedBox(
-    width: 220,
+    width: _menuColumnWidth,
     child: Align(
       alignment: Alignment.centerLeft,
       child: Text(
@@ -882,7 +1023,7 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
   );
   DataCell _cell(MenuPermissionRow row, String action, bool value) => DataCell(
     SizedBox(
-      width: 100,
+      width: _permissionColumnWidth,
       child: Center(
         child:
             _visible(row.screenType, action) &&
@@ -904,7 +1045,7 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
     String action,
   ) => DataCell(
     SizedBox(
-      width: 100,
+      width: _permissionColumnWidth,
       child: Center(
         child: _groupHasAction(menuGroupCode, action)
             ? _permissionCheckbox(

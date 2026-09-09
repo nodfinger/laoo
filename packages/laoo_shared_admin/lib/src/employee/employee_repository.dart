@@ -13,6 +13,7 @@ class EmployeeRepository {
   final EmployeeOwnerScope scope;
 
   ScreenContract get contract => EmployeeScreenContracts.forScope(scope);
+  bool get usesCompanyPerson => scope != EmployeeOwnerScope.partner;
 
   Future<Map<String, bool>> actions() async {
     final data = await _api.get('${contract.apiPath}/actions');

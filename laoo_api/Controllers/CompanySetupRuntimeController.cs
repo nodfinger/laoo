@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using System.Data;
 using System.Security.Claims;
+using LaooApi.Models;
 
 namespace LaooApi.Controllers;
 
@@ -58,6 +59,14 @@ public sealed class CompanySetupRuntimeController : ControllerBase
         var themeProjection = hasThemeName
             ? "ThemeName"
             : "CAST(NULL AS nvarchar(200)) AS ThemeName";
+        var hasBusinessTypeColumn = Convert.ToBoolean(
+            await ExecuteScalarAsync(
+                connection,
+                "SELECT CASE WHEN COL_LENGTH(N'dbo.TDSTCompanySetUp', N'BusinessTypeCode') IS NULL THEN CAST(0 AS bit) ELSE CAST(1 AS bit) END;",
+                cancellationToken));
+        var businessTypeProjection = hasBusinessTypeColumn
+            ? "BusinessTypeCode"
+            : "N'COMPANY'";
         var sql = $$"""
             SELECT TOP (1)
                 Name,
@@ -71,6 +80,7 @@ public sealed class CompanySetupRuntimeController : ControllerBase
                 RowCardSTD,
                 TimeAlert,
                 OrgStructureType,
+                {{businessTypeProjection}} AS BusinessTypeCode,
                 YearFormat,
                 VersionID,
                 {{themeProjection}},
@@ -112,6 +122,9 @@ public sealed class CompanySetupRuntimeController : ControllerBase
             });
         }
 
+        var businessTypeCode = CompanyBusinessType.Normalize(
+            ReadNullableString(reader, "BusinessTypeCode"));
+
         return Ok(new
         {
             name = ReadString(reader, "Name", "Laoo Solutions"),
@@ -128,6 +141,9 @@ public sealed class CompanySetupRuntimeController : ControllerBase
             rowCardSTD = ReadInt(reader, "RowCardSTD", 12),
             timeAlert = ReadInt(reader, "TimeAlert", 30),
             orgStructureType = ReadInt(reader, "OrgStructureType", 1),
+            businessTypeCode,
+            requesterMode = CompanyBusinessType.RequesterMode(businessTypeCode),
+            requesterCaption = CompanyBusinessType.RequesterCaption(businessTypeCode),
             yearFormat = ReadString(reader, "YearFormat", "C"),
             versionID = ReadString(reader, "VersionID", ""),
             themeName = ReadNullableString(reader, "ThemeName"),
@@ -162,6 +178,15 @@ public sealed class CompanySetupRuntimeController : ControllerBase
     {
         var raw = User.FindFirstValue(type);
         return long.TryParse(raw, out var value) ? value : null;
+    }
+
+    private static async Task<object?> ExecuteScalarAsync(
+        SqlConnection connection,
+        string sql,
+        CancellationToken cancellationToken)
+    {
+        await using var command = new SqlCommand(sql, connection);
+        return await command.ExecuteScalarAsync(cancellationToken);
     }
 
     private static string ReadString(

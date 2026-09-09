@@ -229,6 +229,13 @@ abstract final class AppMenuRouteRegistry {
       path: RoutePaths.companyCustomers,
       scope: AppMenuScope.company,
     ),
+    '09002': AppMenuRouteSpec(
+      menuCode: '09002',
+      databaseRouteName: 'companyBranches',
+      goRouteName: RouteNames.companyBranches,
+      path: RoutePaths.companyBranches,
+      scope: AppMenuScope.company,
+    ),
     '14001': AppMenuRouteSpec(
       menuCode: '14001',
       databaseRouteName: 'assetLocations',

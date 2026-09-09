@@ -10,6 +10,7 @@ class AuthSession {
     this.partnerUserId,
     this.partnerId,
     this.companyId,
+    this.personId,
     this.branchId,
     this.userId,
     this.laooUserId,
@@ -27,6 +28,7 @@ class AuthSession {
   final int? partnerUserId;
   final int? partnerId;
   final int? companyId;
+  final int? personId;
   final int? branchId;
   final int? userId;
   final int? laooUserId;
@@ -42,6 +44,7 @@ class AuthSession {
     int? partnerUserId,
     int? partnerId,
     int? companyId,
+    int? personId,
     int? branchId,
     int? userId,
     int? laooUserId,
@@ -57,6 +60,7 @@ class AuthSession {
       partnerUserId: partnerUserId ?? this.partnerUserId,
       partnerId: partnerId ?? this.partnerId,
       companyId: companyId ?? this.companyId,
+      personId: personId ?? this.personId,
       branchId: branchId ?? this.branchId,
       userId: userId ?? this.userId,
       laooUserId: laooUserId ?? this.laooUserId,

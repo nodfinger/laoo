@@ -52,5 +52,11 @@ class CompanySetupApi {
     return List<Map<String, dynamic>>.from(data);
   }
 
+  Future<List<Map<String, dynamic>>> businessTypeOptions() async {
+    final data = await _client.get('/api/company-setup/business-type-options');
+    if (data is! List) return const [];
+    return List<Map<String, dynamic>>.from(data);
+  }
+
   void dispose() => _client.dispose();
 }

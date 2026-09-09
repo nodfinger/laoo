@@ -373,15 +373,8 @@ public sealed class TemporaryReceiptController(IConfiguration configuration) : C
     private async Task<List<object>> ReadRows<T>(SqlConnection c, string sql, CancellationToken token, Func<SqlDataReader, T> map, long? id = null) where T : class
     { await using var cmd = new SqlCommand(sql, c); Add(cmd, id.HasValue ? "@id" : "@company", SqlDbType.BigInt, id ?? CompanyId()); var rows = new List<object>(); await using var r = await cmd.ExecuteReaderAsync(token); while (await r.ReadAsync(token)) rows.Add(map(r)); return rows; }
 
-    private async Task<bool> Can(SqlConnection connection, string action, CancellationToken token)
-    {
-        const string sql = """
-            SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADUser WHERE UserID=@user AND CompanyID=@company AND IsActive=1 AND IsCompanyAdmin=1)
-            OR EXISTS(SELECT 1 FROM dbo.TDADUserPermission UP INNER JOIN dbo.TDADPermission P ON P.PermissionID=UP.PermissionID AND P.ProjectID=UP.ProjectID WHERE UP.UserID=@user AND UP.ProjectID=@project AND UP.IsAllowed=1 AND UP.IsActive=1 AND P.IsActive=1 AND P.ActionCode=@action AND P.ScreenCode=@screen)
-            OR EXISTS(SELECT 1 FROM dbo.TDADUser U INNER JOIN dbo.TDADUserEmployee UE ON UE.UserID=U.UserID INNER JOIN dbo.TDADEmployeeRoleGroup ERG ON ERG.EmployeeID=UE.EmployeeID INNER JOIN dbo.TDADRoleGroup RG ON RG.RoleGroupID=ERG.RoleGroupID AND RG.ScopeType='C' AND RG.CompanyID=U.CompanyID AND RG.ProjectID=@project INNER JOIN dbo.TDADRoleGroupPermission RP ON RP.RoleGroupID=RG.RoleGroupID AND RP.ProjectID=@project AND RP.MenuCode=@screen AND RP.ActionCode=@action AND RP.IsAllowed=1 WHERE U.UserID=@user AND U.CompanyID=@company AND U.IsActive=1 AND ERG.IsActive=1 AND ERG.EffectiveFrom<=CONVERT(date,SYSUTCDATETIME()) AND(ERG.EffectiveTo IS NULL OR ERG.EffectiveTo>=CONVERT(date,SYSUTCDATETIME()))) THEN CAST(1 AS bit) ELSE CAST(0 AS bit) END;
-            """;
-        await using var cmd = new SqlCommand(sql, connection); Add(cmd, "@user", SqlDbType.BigInt, UserId()); Add(cmd, "@company", SqlDbType.BigInt, CompanyId()); Add(cmd, "@project", SqlDbType.BigInt, ProjectId()); Add(cmd, "@action", SqlDbType.NVarChar, action, 20); Add(cmd, "@screen", SqlDbType.NVarChar, ScreenCode, 20); return (bool)(await cmd.ExecuteScalarAsync(token) ?? false);
-    }
+    private Task<bool> Can(SqlConnection connection, string action, CancellationToken token) =>
+        Laoo.Shared.Contracts.CompanyMenuAccess.IsAllowedAsync(connection, User, ScreenCode, action, token);
 
     private async Task<SqlConnection> Open(CancellationToken token) { var c = new SqlConnection(_configuration.GetConnectionString("LaooDatabase")); await c.OpenAsync(token); return c; }
     private long UserId() => long.TryParse(User.FindFirstValue("user_id"), out var v) ? v : 0;

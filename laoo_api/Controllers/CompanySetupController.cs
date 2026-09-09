@@ -75,7 +75,51 @@ public sealed class CompanySetupController : ControllerBase
             return Forbid();
         await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(cancellationToken);
 
-        const string sql = """
+        var hasBusinessTypeColumn = await HasBusinessTypeColumnAsync(
+            connection, transaction, cancellationToken);
+        var requestedBusinessType = string.IsNullOrWhiteSpace(request.BusinessTypeCode)
+            ? null
+            : CompanyBusinessType.Normalize(request.BusinessTypeCode);
+        if (requestedBusinessType is not null
+            && !CompanyBusinessType.IsSupported(requestedBusinessType))
+        {
+            return BadRequest(new
+            {
+                message = "ประเภทธุรกิจไม่ถูกต้อง",
+                description = "กรุณาเลือกประเภทธุรกิจจากรายการที่ระบบกำหนด",
+            });
+        }
+
+        if (owner.Value.OwnerType == "C" && requestedBusinessType is not null)
+        {
+            if (!hasBusinessTypeColumn)
+            {
+                return BadRequest(new
+                {
+                    message = "ยังไม่พร้อมบันทึกประเภทธุรกิจ",
+                    description = "ฐานข้อมูลยังไม่ได้ติดตั้ง Schema ประเภทธุรกิจ Company กรุณาให้ผู้ดูแลรัน Migration ก่อน",
+                });
+            }
+
+            var currentBusinessType = await LoadBusinessTypeAsync(
+                connection, transaction, owner.Value.CompanyID!.Value, cancellationToken);
+            if (!string.Equals(currentBusinessType, requestedBusinessType, StringComparison.Ordinal)
+                && await HasBusinessDataAsync(
+                    connection, transaction, owner.Value.CompanyID!.Value, cancellationToken))
+            {
+                return BadRequest(new
+                {
+                    message = "ไม่สามารถเปลี่ยนประเภทธุรกิจได้",
+                    description = "Company มีข้อมูลพนักงานแล้ว จึงต้องคงประเภทธุรกิจเดิมเพื่อป้องกัน Flow ผู้แจ้งซ่อมไม่สอดคล้อง",
+                });
+            }
+        }
+
+        var businessTypeSet = hasBusinessTypeColumn
+            ? "BusinessTypeCode = COALESCE(@BusinessTypeCode, BusinessTypeCode),"
+            : string.Empty;
+
+        var sql = $$"""
 SET QUOTED_IDENTIFIER ON;
 SET ANSI_NULLS ON;
 UPDATE dbo.TDSTCompanySetUp
@@ -91,6 +135,7 @@ SET
     RowCardSTD = @RowCardSTD,
     TimeAlert = @TimeAlert,
     OrgStructureType = @OrgStructureType,
+    {{businessTypeSet}}
     PasswordPolicyCode = @PasswordPolicyCode,
     YearFormat = @YearFormat,
     VersionID = @VersionID,
@@ -115,7 +160,7 @@ WHERE OwnerType = @OwnerType
         (@OwnerType = 'L' AND PartnerID IS NULL AND CompanyID IS NULL)
         OR (@OwnerType = 'P' AND PartnerID = @PartnerID AND CompanyID IS NULL)
         OR (@OwnerType = 'C' AND CompanyID = @CompanyID)
-      );
+       );
 """;
 
         await using var command = new SqlCommand(sql, connection, transaction);
@@ -130,6 +175,7 @@ WHERE OwnerType = @OwnerType
         Add(command, "@RowCardSTD", SqlDbType.Int, request.RowCardSTD);
         Add(command, "@TimeAlert", SqlDbType.Int, request.TimeAlert);
         Add(command, "@OrgStructureType", SqlDbType.Int, request.OrgStructureType);
+        Add(command, "@BusinessTypeCode", SqlDbType.NVarChar, requestedBusinessType, 20);
         Add(command, "@PasswordPolicyCode", SqlDbType.TinyInt, PasswordService.NormalizePolicyCode(request.PasswordPolicyCode));
         Add(command, "@YearFormat", SqlDbType.NVarChar, NullIfBlank(request.YearFormat), 10);
         Add(command, "@VersionID", SqlDbType.NVarChar, NullIfBlank(request.VersionID), 50);
@@ -250,6 +296,28 @@ ELSE
         return Ok(result);
     }
 
+    [HttpGet("business-type-options")]
+    public async Task<ActionResult<List<CompanySetupOption>>> BusinessTypeOptions(
+        CancellationToken cancellationToken)
+    {
+        await using var connection = CreateConnection();
+        await connection.OpenAsync(cancellationToken);
+        if (!await AllowedAsync(connection, "VIEW", cancellationToken)) return Forbid();
+
+        const string sql = """
+            SELECT Code, Name
+            FROM dbo.TDSTMasterCont
+            WHERE GroupCode = N'012'
+            ORDER BY Seq, Code;
+            """;
+        await using var command = new SqlCommand(sql, connection);
+        var result = new List<CompanySetupOption>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+            result.Add(new CompanySetupOption(reader.GetString(0), reader.GetString(1)));
+        return Ok(result);
+    }
+
     private async Task<bool> AllowedAsync(SqlConnection connection, string action, CancellationToken token)
     {
         if (!long.TryParse(User.FindFirstValue("project_id"), out var projectId)) return false;
@@ -305,7 +373,12 @@ ELSE
         OwnerScope owner,
         CancellationToken cancellationToken)
     {
-        const string sql = """
+        var hasBusinessTypeColumn = await HasBusinessTypeColumnAsync(
+            connection, transaction: null, cancellationToken);
+        var businessTypeProjection = hasBusinessTypeColumn
+            ? "S.BusinessTypeCode"
+            : "N'COMPANY'";
+        var sql = $$"""
 SET QUOTED_IDENTIFIER ON;
 SET ANSI_NULLS ON;
 SELECT
@@ -387,6 +460,7 @@ SELECT
     S.RowCardSTD,
     S.TimeAlert,
     S.OrgStructureType,
+    {{businessTypeProjection}} AS BusinessTypeCode,
     CAST(COALESCE(S.PasswordPolicyCode, 3) AS tinyint) AS PasswordPolicyCode,
     S.YearFormat,
     S.VersionID,
@@ -421,6 +495,13 @@ WHERE S.OwnerType = @OwnerType
         Add(command, "@CompanyID", SqlDbType.BigInt, owner.CompanyID);
         Add(command, "@ProjectID", SqlDbType.BigInt, owner.ProjectID);
 
+        // Finish the lock lookup before opening the setup reader. The connection
+        // must also work when MultipleActiveResultSets is disabled.
+        var isBusinessTypeLocked = owner.OwnerType != "C"
+            || owner.CompanyID is null
+            || await HasBusinessDataAsync(
+                connection, transaction: null, owner.CompanyID.Value, cancellationToken);
+
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         if (!await reader.ReadAsync(cancellationToken))
             return null;
@@ -449,6 +530,7 @@ WHERE S.OwnerType = @OwnerType
             return reader.IsDBNull(i) ? null : reader.GetDateTime(i);
         }
 
+        var businessTypeCode = CompanyBusinessType.Normalize(NString("BusinessTypeCode"));
         return new CompanySetupResponse(
             NLong("PKValue"),
             reader.GetString(reader.GetOrdinal("OwnerType")),
@@ -482,6 +564,10 @@ WHERE S.OwnerType = @OwnerType
             reader.GetInt32(reader.GetOrdinal("RowCardSTD")),
             reader.GetInt32(reader.GetOrdinal("TimeAlert")),
             reader.GetInt32(reader.GetOrdinal("OrgStructureType")),
+            businessTypeCode,
+            CompanyBusinessType.RequesterMode(businessTypeCode),
+            CompanyBusinessType.RequesterCaption(businessTypeCode),
+            isBusinessTypeLocked,
             reader.GetByte(reader.GetOrdinal("PasswordPolicyCode")),
             NString("YearFormat"),
             NString("VersionID"),
@@ -499,6 +585,55 @@ WHERE S.OwnerType = @OwnerType
             reader.GetBoolean(reader.GetOrdinal("HasEmailPasswordCenter")),
             reader.GetBoolean(reader.GetOrdinal("HasPasswordEmpDefault")),
             reader.GetBoolean(reader.GetOrdinal("HasPasswordDirect")));
+    }
+
+    private static async Task<bool> HasBusinessTypeColumnAsync(
+        SqlConnection connection,
+        SqlTransaction? transaction,
+        CancellationToken cancellationToken)
+    {
+        const string sql = """
+            SELECT CASE WHEN COL_LENGTH(N'dbo.TDSTCompanySetUp', N'BusinessTypeCode') IS NULL
+                THEN CAST(0 AS bit) ELSE CAST(1 AS bit) END;
+            """;
+        await using var command = new SqlCommand(sql, connection, transaction);
+        return Convert.ToBoolean(await command.ExecuteScalarAsync(cancellationToken));
+    }
+
+    private static async Task<string> LoadBusinessTypeAsync(
+        SqlConnection connection,
+        SqlTransaction transaction,
+        long companyId,
+        CancellationToken cancellationToken)
+    {
+        const string sql = """
+            SELECT TOP (1) BusinessTypeCode
+            FROM dbo.TDSTCompanySetUp
+            WHERE OwnerType = 'C' AND CompanyID = @CompanyID;
+            """;
+        await using var command = new SqlCommand(sql, connection, transaction);
+        Add(command, "@CompanyID", SqlDbType.BigInt, companyId);
+        return CompanyBusinessType.Normalize(
+            Convert.ToString(await command.ExecuteScalarAsync(cancellationToken)));
+    }
+
+    private static async Task<bool> HasBusinessDataAsync(
+        SqlConnection connection,
+        SqlTransaction? transaction,
+        long companyId,
+        CancellationToken cancellationToken)
+    {
+        const string sql = """
+            SELECT CASE WHEN EXISTS
+            (
+                SELECT 1
+                FROM dbo.TDADEmployee
+                WHERE CompanyID = @CompanyID
+            ) THEN CAST(1 AS bit) ELSE CAST(0 AS bit) END;
+            """;
+        await using var command = new SqlCommand(sql, connection, transaction);
+        Add(command, "@CompanyID", SqlDbType.BigInt, companyId);
+        return Convert.ToBoolean(await command.ExecuteScalarAsync(cancellationToken));
     }
 
     private SqlConnection CreateConnection()

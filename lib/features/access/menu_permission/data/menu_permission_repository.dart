@@ -19,8 +19,13 @@ class MenuPermissionRepository {
   Future<List<MenuPermissionRow>> list(String scope, int groupId) async {
     final data =
         await _client.get(
-              '/api/menu-permissions',
-              query: {'scope': scope, 'roleGroupId': '$groupId'},
+              scope == 'customer'
+                  ? '/api/company-role-permissions'
+                  : '/api/menu-permissions',
+              query: {
+                if (scope != 'customer') 'scope': scope,
+                'roleGroupId': '$groupId',
+              },
             )
             as List<dynamic>;
     return data
@@ -33,11 +38,15 @@ class MenuPermissionRepository {
     int groupId,
     List<MenuPermissionRow> rows,
   ) async => _client.put(
-    '/api/menu-permissions?scope=$scope&roleGroupId=$groupId',
+    scope == 'customer'
+        ? '/api/company-role-permissions?roleGroupId=$groupId'
+        : '/api/menu-permissions?scope=$scope&roleGroupId=$groupId',
     body: rows.map((e) => e.toJson()).toList(),
   );
   Future<void> clear(String scope, int groupId) async => _client.delete(
-    '/api/menu-permissions',
-    query: {'scope': scope, 'roleGroupId': '$groupId'},
+    scope == 'customer'
+        ? '/api/company-role-permissions'
+        : '/api/menu-permissions',
+    query: {if (scope != 'customer') 'scope': scope, 'roleGroupId': '$groupId'},
   );
 }

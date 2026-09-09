@@ -4,6 +4,8 @@
 
 ## Layout
 
+- สำหรับ `ScreenType = 1` (CRUD) เมื่อเปิด Add/Edit/View ต้องใช้ Action Style ตาม `ACTION_UI_STANDARD.md` เสมอ ไม่ใช้ Layout ของหน้า List/Card แทนหน้า Action
+
 - ใช้พื้นหลังและ Design Token จากส่วนกลางเท่านั้น
 - ส่วน Caption, Filter, Table/List และ Pagination เป็น Card สีขาวเต็มความกว้างของ Content Area
 - Caption Card และ Filter Card ต้องแยกเป็นคนละ Card และเว้นระยะห่าง `6px` พอดี
@@ -21,11 +23,13 @@
 
 ## Filter Card
 
-- Filter Card เต็มความกว้างและ Responsive โดยใช้ `Wrap` หรือ Layout ที่ไม่ Overflow
-- ช่องค้นหากว้างประมาณ `260px`, มีกรอบมุมโค้ง `4px`, Icon ค้นหาซ้าย และลูกศรขวา
-- ไม่ Auto Search; ค้นหาเมื่อกด Enter, ลูกศร หรือปุ่ม `ค้นหา`
-- ปุ่ม `ค้นหา` เป็น Filled สี Primary และปุ่ม `ล้าง Filter` เป็น Outlined สี Primary
-- ComboBox กว้างประมาณ `280px`, มีกรอบมุมโค้ง `4px` และแสดงข้อความขนาดตาม Typography กลาง
+- Filter Card ใช้พื้นสีขาวเต็มความกว้าง ไม่มีเส้นกรอบสี และมุมโค้ง `LaooRadius.xs` (`4px`); Responsive โดยใช้ `Wrap` หรือ Layout ที่ไม่ Overflow
+- TextBox ทุกช่องใน Filter Card รวมช่องค้นหา ต้องมี `OutlineInputBorder` เส้นสี `LaooColors.border` และมุมโค้ง `LaooRadius.xs` (`4px`); เมื่อ Focus ใช้เส้นสี Primary ตาม User Style
+- ช่องค้นหากว้างประมาณ `260px`, มี Icon ค้นหาด้านซ้าย และไม่มีปุ่มลูกศรย้อนกลับ/โหลดใหม่ภายในชุด Filter
+- ไม่ Auto Search; ค้นหาเมื่อกด Enter หรือปุ่ม `ค้นหา`
+- ปุ่ม `ค้นหา` เป็น Filled สี Primary และปุ่ม `ล้าง Filter` เป็น Outlined สี Primary; ปุ่มสองรายการนี้เป็น Compact Filter Action สูง `40px` เพื่อให้แถบ Filter กระชับ (ปุ่ม Action Form และ Popup ยังคงสูง `48px`)
+- ComboBox ทุกช่องใน Filter Card มี `OutlineInputBorder` เส้นสี `LaooColors.border` มุมโค้ง `LaooRadius.xs` (`4px`) และเมื่อ Focus ใช้เส้นสี Primary ตาม User Style; ความกว้างประมาณ `280px` และแสดงข้อความขนาดตาม Typography กลาง
+- ชุดช่องค้นหา, ปุ่ม `ค้นหา` และปุ่ม `ล้าง Filter` ต้องเป็นกลุ่มเดียวกัน; เมื่อพื้นที่ไม่พอให้ย้ายทั้งชุดพร้อมกัน ห้ามแยกปุ่มไปคนละบรรทัดกับช่องค้นหา
 - ปุ่มทุกปุ่มใช้ Font `13px` และมุมโค้ง `4px`
 
 ## Table Mode
@@ -50,5 +54,5 @@
 ## Prompt สำหรับส่งให้ AI
 
 ```text
-ปรับหน้า List/Card นี้ตาม docs/standards/UX_UI_STANDARD.md, LIST_CARD_UI_STANDARD.md, PAGINATION_UI_STANDARD.md และ TYPOGRAPHY_STANDARD.md ใช้ Caption จาก MenuName, Caption Card กับ Filter Card ห่างกัน 6px, Card สีขาวไม่มีกรอบสี, Filter/Table/Pagination เต็มความกว้าง, Action ตาม Permission และ User Style เมื่อหน้าจอแคบกว่า 900px ให้เป็น Card Mode อัตโนมัติ โดย Card รายการแต่ละใบห่างกัน 6px พอดี ห้ามพึ่ง Card default margin ห้ามแก้ API, SQL, Repository หรือ Business Logic และต้องตรวจ Responsive, Overflow, dart format และ dart analyze
+ปรับหน้า List/Card นี้ตาม docs/standards/UX_UI_STANDARD.md, LIST_CARD_UI_STANDARD.md, PAGINATION_UI_STANDARD.md และ TYPOGRAPHY_STANDARD.md ใช้ Caption จาก MenuName, Caption Card กับ Filter Card ห่างกัน 6px, Card สีขาวไม่มีกรอบสี, TextBox และ ComboBox ใน Filter ใช้ OutlineInputBorder สี LaooColors.border มุมโค้ง 4px และ Focus สี Primary, ชุดค้นหา/ค้นหา/ล้าง Filter ห้ามแยกคนละบรรทัด, Filter/Table/Pagination เต็มความกว้าง, Action ตาม Permission และ User Style เมื่อหน้าจอแคบกว่า 900px ให้เป็น Card Mode อัตโนมัติ โดย Card รายการแต่ละใบห่างกัน 6px พอดี ห้ามพึ่ง Card default margin ห้ามแก้ API, SQL, Repository หรือ Business Logic และต้องตรวจ Responsive, Overflow, dart format และ dart analyze
 ```

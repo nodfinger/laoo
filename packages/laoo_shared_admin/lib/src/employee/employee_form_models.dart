@@ -62,6 +62,7 @@ class EmployeeFormInput {
     this.username,
     this.password,
     this.roleGroupId,
+    this.loginRequired = false,
     this.formalImage,
     this.carImage1,
     this.carImage2,
@@ -88,16 +89,18 @@ class EmployeeFormInput {
   final String? username;
   final String? password;
   final int? roleGroupId;
+  final bool loginRequired;
   final EmployeeImageInput? formalImage;
   final EmployeeImageInput? carImage1;
   final EmployeeImageInput? carImage2;
 
   bool get editing => employeeId != null;
 
-  String? validate({required int organizationMode}) {
+  String? validate({required int organizationMode, bool forceLogin = false}) {
     final normalizedEmail = _text(email);
     final normalizedUsername = _text(username);
     final normalizedPassword = password?.trim() ?? '';
+    final requiresLogin = loginRequired || forceLogin;
     if (!notifyByEmail && !notifyInSystem) {
       return 'กรุณาเลือกรูปแบบแจ้งเตือนอย่างน้อย 1 รูปแบบ';
     }
@@ -117,10 +120,13 @@ class EmployeeFormInput {
           ? 'กรุณาเลือกฝ่ายและแผนกก่อนบันทึก'
           : 'กรุณาเลือกแผนกก่อนบันทึก';
     }
-    if (normalizedUsername != null && !editing && normalizedPassword.isEmpty) {
+    if (requiresLogin && normalizedUsername == null) {
+      return 'กรุณากรอก Username สำหรับเข้าใช้งานระบบ';
+    }
+    if (requiresLogin && !editing && normalizedPassword.isEmpty) {
       return 'กรุณากรอก Username และ Password ให้ครบ';
     }
-    if (normalizedUsername != null && roleGroupId == null) {
+    if ((requiresLogin || normalizedUsername != null) && roleGroupId == null) {
       return 'กรุณาเลือกกลุ่มสิทธิ์';
     }
     return null;
@@ -154,6 +160,9 @@ class EmployeeFormInput {
     'carOilType2': _text(vehicle2.oilTypeCode),
     'startWorkDate': startWorkDate?.toIso8601String().split('T').first,
     'isActive': isActive,
+    'username': _text(username),
+    if ((password?.trim() ?? '').isNotEmpty) 'password': password!.trim(),
+    'roleGroupId': roleGroupId,
   });
 
   static String? _text(String? value) {
@@ -171,7 +180,10 @@ class EmployeeFormService {
     EmployeeFormInput input, {
     required int organizationMode,
   }) async {
-    final validation = input.validate(organizationMode: organizationMode);
+    final validation = input.validate(
+      organizationMode: organizationMode,
+      forceLogin: repository.usesCompanyPerson,
+    );
     if (validation != null) throw EmployeeFormValidationException(validation);
 
     final id = input.editing
@@ -205,7 +217,7 @@ class EmployeeFormService {
       );
     }
     final username = input.username?.trim() ?? '';
-    if (username.isNotEmpty) {
+    if (!repository.usesCompanyPerson && username.isNotEmpty) {
       final password = input.password?.trim();
       await repository.upsertEmployeeUser(
         id,

@@ -104,6 +104,7 @@ builder.Services.AddSingleton<JwtTokenService>();
 builder.Services.AddScoped<DatabaseSeeder>();
 builder.Services.AddScoped<AuthenticationService>();
 builder.Services.AddScoped<PasswordResetService>();
+builder.Services.AddScoped<CompanyPersonService>();
 
 var jwtOptions = builder.Configuration
     .GetSection(JwtOptions.SectionName)
@@ -224,8 +225,10 @@ app.UseExceptionHandler(errorApp => errorApp.Run(async context =>
         .Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>()?.Error;
     var description = exception switch
     {
-        SqlException { Number: 207 or 208 } =>
-            "ฐานข้อมูลยังไม่ได้ติดตั้ง Schema ของทะเบียนสินค้า กรุณาให้ผู้ดูแลระบบรัน Migration สินค้าแล้วลองใหม่",
+        SqlException { Number: 207 } =>
+            "API อ้างอิงคอลัมน์ที่ไม่พบในฐานข้อมูล กรุณาแจ้งผู้ดูแลตรวจสอบชื่อคอลัมน์และความเข้ากันได้ของ API กับฐานข้อมูล โดยใช้รหัสติดตามนี้ตรวจสอบ API log",
+        SqlException { Number: 208 } =>
+            "API อ้างอิงตารางหรือวิวที่ไม่พบในฐานข้อมูล กรุณาแจ้งผู้ดูแลตรวจสอบฐานข้อมูลที่เชื่อมต่อและโครงสร้างที่ API ต้องใช้ โดยใช้รหัสติดตามนี้ตรวจสอบ API log",
         _ => "API ไม่สามารถดำเนินการได้ กรุณาตรวจสอบการเชื่อมต่อฐานข้อมูลหรือดู API log ด้วยรหัสติดตามนี้",
     };
 

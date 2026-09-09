@@ -594,41 +594,8 @@ public sealed class PreOrderController(IConfiguration configuration) : Controlle
         return $"PO{Convert.ToInt32(await command.ExecuteScalarAsync(token)):D6}";
     }
 
-    private async Task<bool> Can(SqlConnection connection, string action, CancellationToken token)
-    {
-        const string sql = """
-            SELECT CASE WHEN EXISTS
-            (
-                SELECT 1 FROM dbo.TDADUser U
-                WHERE U.UserID=@user AND U.CompanyID=@company AND U.IsActive=1 AND U.IsCompanyAdmin=1
-            ) OR EXISTS
-            (
-                SELECT 1 FROM dbo.TDADUserPermission UP
-                INNER JOIN dbo.TDADPermission P ON P.PermissionID=UP.PermissionID AND P.ProjectID=UP.ProjectID
-                WHERE UP.UserID=@user AND UP.ProjectID=@project AND UP.IsAllowed=1 AND UP.IsActive=1
-                  AND P.IsActive=1 AND P.ActionCode=@action AND P.ScreenCode=@screen
-            ) OR EXISTS
-            (
-                SELECT 1 FROM dbo.TDADUser U
-                INNER JOIN dbo.TDADUserEmployee UE ON UE.UserID=U.UserID
-                INNER JOIN dbo.TDADEmployeeRoleGroup ERG ON ERG.EmployeeID=UE.EmployeeID
-                INNER JOIN dbo.TDADRoleGroup RG ON RG.RoleGroupID=ERG.RoleGroupID AND RG.ScopeType='C'
-                  AND RG.CompanyID=U.CompanyID AND RG.ProjectID=@project
-                INNER JOIN dbo.TDADRoleGroupPermission RP ON RP.RoleGroupID=RG.RoleGroupID
-                  AND RP.ProjectID=@project AND RP.MenuCode=@screen AND RP.ActionCode=@action AND RP.IsAllowed=1
-                WHERE U.UserID=@user AND U.CompanyID=@company AND U.IsActive=1 AND ERG.IsActive=1
-                  AND ERG.EffectiveFrom<=CONVERT(date,SYSUTCDATETIME())
-                  AND (ERG.EffectiveTo IS NULL OR ERG.EffectiveTo>=CONVERT(date,SYSUTCDATETIME()))
-            ) THEN CAST(1 AS bit) ELSE CAST(0 AS bit) END;
-            """;
-        await using var command = new SqlCommand(sql, connection);
-        Add(command, "@user", SqlDbType.BigInt, UserId());
-        Add(command, "@company", SqlDbType.BigInt, CompanyId());
-        Add(command, "@project", SqlDbType.BigInt, ProjectId());
-        Add(command, "@action", SqlDbType.NVarChar, action, 20);
-        Add(command, "@screen", SqlDbType.NVarChar, ScreenCode, 20);
-        return (bool)(await command.ExecuteScalarAsync(token) ?? false);
-    }
+    private Task<bool> Can(SqlConnection connection, string action, CancellationToken token) =>
+        Laoo.Shared.Contracts.CompanyMenuAccess.IsAllowedAsync(connection, User, ScreenCode, action, token);
 
     private async Task<SqlConnection> Open(CancellationToken token)
     {

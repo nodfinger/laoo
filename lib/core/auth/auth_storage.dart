@@ -18,6 +18,7 @@ class AuthStorage {
   static const _partnerUserIdKey = 'auth.partnerUserId';
   static const _partnerIdKey = 'auth.partnerId';
   static const _companyIdKey = 'auth.companyId';
+  static const _personIdKey = 'auth.personId';
   static const _branchIdKey = 'auth.branchId';
   static const _userIdKey = 'auth.userId';
   static const _laooUserIdKey = 'auth.laooUserId';
@@ -47,6 +48,7 @@ class AuthStorage {
     await _setNullableInt(prefs, _partnerUserIdKey, session.partnerUserId);
     await _setNullableInt(prefs, _partnerIdKey, session.partnerId);
     await _setNullableInt(prefs, _companyIdKey, session.companyId);
+    await _setNullableInt(prefs, _personIdKey, session.personId);
     await _setNullableInt(prefs, _branchIdKey, session.branchId);
     await _setNullableInt(prefs, _userIdKey, session.userId);
     await _setNullableInt(prefs, _laooUserIdKey, session.laooUserId);
@@ -84,6 +86,7 @@ class AuthStorage {
       partnerUserId: prefs.getInt(_partnerUserIdKey),
       partnerId: prefs.getInt(_partnerIdKey),
       companyId: prefs.getInt(_companyIdKey),
+      personId: prefs.getInt(_personIdKey),
       branchId: prefs.getInt(_branchIdKey),
       userId: prefs.getInt(_userIdKey),
       laooUserId: prefs.getInt(_laooUserIdKey),
@@ -157,6 +160,7 @@ class AuthStorage {
       _partnerUserIdKey,
       _partnerIdKey,
       _companyIdKey,
+      _personIdKey,
       _branchIdKey,
       _userIdKey,
       _laooUserIdKey,

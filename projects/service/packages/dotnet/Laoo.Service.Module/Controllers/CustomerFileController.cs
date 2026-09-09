@@ -132,14 +132,21 @@ VALUES(@company,@customer,@type,@original,@stored,@path,@extension,@content,@siz
     private async Task<bool> OwnsCustomerAsync(SqlConnection c, long customerId, CancellationToken token)
     { await using var cmd = new SqlCommand("SELECT COUNT(1) FROM dbo.TDARCustomer WHERE CustomerID=@customer AND CompanyID=@company", c); Add(cmd, "@customer", SqlDbType.BigInt, customerId); Add(cmd, "@company", SqlDbType.BigInt, CompanyID()); return Convert.ToInt32(await cmd.ExecuteScalarAsync(token)) > 0; }
     private async Task<bool> CanAsync(SqlConnection c, string action, CancellationToken token, string? permissionPointCode = null)
-    { const string sql = """
-SELECT CASE WHEN
-    EXISTS(SELECT 1 FROM dbo.TDADUser U WHERE U.UserID=@user AND U.CompanyID=@company AND U.IsActive=1 AND U.IsCompanyAdmin=1)
- OR EXISTS(SELECT 1 FROM dbo.TDADUserPermission UP INNER JOIN dbo.TDADPermission P ON P.PermissionID=UP.PermissionID AND P.ProjectID=UP.ProjectID WHERE UP.UserID=@user AND UP.ProjectID=@project AND UP.IsAllowed=1 AND UP.IsActive=1 AND P.IsActive=1 AND P.ActionCode=@action AND P.ScreenCode='09001')
- OR (@point IS NOT NULL AND EXISTS(SELECT 1 FROM dbo.TDADUser U INNER JOIN dbo.TDADUserEmployee UE ON UE.UserID=U.UserID INNER JOIN dbo.TDADUserPermissionPoint PP ON PP.EmployeeID=UE.EmployeeID AND PP.ProjectID=@project AND PP.CompanyID=@company AND PP.MenuCode='09001' AND PP.PermissionPointCode=@point AND PP.IsActive=1 AND PP.IsAllowed=1 WHERE U.UserID=@user AND U.CompanyID=@company AND U.IsActive=1))
- OR EXISTS(SELECT 1 FROM dbo.TDADUser U INNER JOIN dbo.TDADUserEmployee UE ON UE.UserID=U.UserID INNER JOIN dbo.TDADEmployeeRoleGroup ERG ON ERG.EmployeeID=UE.EmployeeID INNER JOIN dbo.TDADRoleGroup RG ON RG.RoleGroupID=ERG.RoleGroupID AND RG.ScopeType='C' AND RG.CompanyID=U.CompanyID AND RG.ProjectID=@project INNER JOIN dbo.TDADRoleGroupPermission RP ON RP.RoleGroupID=RG.RoleGroupID AND RP.ProjectID=@project AND RP.MenuCode='09001' AND RP.ActionCode=@action AND RP.IsAllowed=1 WHERE U.UserID=@user AND U.CompanyID=@company AND U.IsActive=1 AND ERG.IsActive=1 AND ERG.EffectiveFrom<=CONVERT(date,SYSUTCDATETIME()) AND (ERG.EffectiveTo IS NULL OR ERG.EffectiveTo>=CONVERT(date,SYSUTCDATETIME())))
- THEN CAST(1 AS bit) ELSE CAST(0 AS bit) END
-"""; await using var cmd = new SqlCommand(sql, c); Add(cmd, "@user", SqlDbType.BigInt, UserID()); Add(cmd, "@company", SqlDbType.BigInt, CompanyID()); Add(cmd, "@project", SqlDbType.BigInt, ProjectID()); Add(cmd, "@action", SqlDbType.NVarChar, action, 20); Add(cmd, "@point", SqlDbType.NVarChar, (object?)permissionPointCode ?? DBNull.Value, 80); return (bool)(await cmd.ExecuteScalarAsync(token) ?? false); }
+    {
+        if (await Laoo.Shared.Contracts.CompanyMenuAccess.IsAllowedAsync(c, User, "09001", action, token)) return true;
+        if (string.IsNullOrWhiteSpace(permissionPointCode)) return false;
+        const string sql = """
+SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADUser U
+ JOIN dbo.TDADUserEmployee UE ON UE.UserID=U.UserID AND UE.CompanyID=U.CompanyID AND UE.IsActive=1
+ JOIN dbo.TDADUserPermissionPoint PP ON PP.EmployeeID=UE.EmployeeID AND PP.ProjectID=@project AND PP.CompanyID=@company
+  AND PP.MenuCode='09001' AND PP.PermissionPointCode=@point AND PP.IsActive=1 AND PP.IsAllowed=1
+ WHERE U.UserID=@user AND U.CompanyID=@company AND U.IsActive=1) THEN CAST(1 AS bit) ELSE CAST(0 AS bit) END
+""";
+        await using var cmd = new SqlCommand(sql, c);
+        Add(cmd,"@user",SqlDbType.BigInt,UserID()); Add(cmd,"@company",SqlDbType.BigInt,CompanyID());
+        Add(cmd,"@project",SqlDbType.BigInt,ProjectID()); Add(cmd,"@point",SqlDbType.NVarChar,permissionPointCode,80);
+        return (bool)(await cmd.ExecuteScalarAsync(token) ?? false);
+    }
     private async Task<SqlConnection> OpenAsync(CancellationToken token) { var c = new SqlConnection(_configuration.GetConnectionString("LaooDatabase")); await c.OpenAsync(token); return c; }
     private long UserID() => long.TryParse(User.FindFirstValue("user_id"), out var value) ? value : 0;
     private long CompanyID() => long.TryParse(User.FindFirstValue("company_id"), out var value) ? value : 0;

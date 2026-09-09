@@ -33,7 +33,7 @@ class MenuPermissionSelection {
     bool value,
   ) => rows
       .map(
-        (row) => row.menuGroupCode == menuGroupCode
+        (row) => row.groupKey == menuGroupCode
             ? applyToRow(row, action, value)
             : row,
       )
@@ -47,7 +47,7 @@ class MenuPermissionSelection {
     final applicable = rows
         .where(
           (row) =>
-              row.menuGroupCode == menuGroupCode &&
+              row.groupKey == menuGroupCode &&
               isActionVisible(row.screenType, action),
         )
         .toList();
@@ -64,7 +64,7 @@ class MenuPermissionSelection {
     String action,
   ) => rows.any(
     (row) =>
-        row.menuGroupCode == menuGroupCode &&
+        row.groupKey == menuGroupCode &&
         isActionVisible(row.screenType, action),
   );
 

@@ -77,11 +77,17 @@ INNER JOIN dbo.TDADProjectMenuGroup PG
     ON PG.ProjectID = AP.ProjectID AND PG.IsActive = 1
 INNER JOIN dbo.TDADMenuGroup G
     ON G.MenuGroupCode=PG.MenuGroupCode AND G.IsActive=1
-INNER JOIN dbo.TDADMainMenu M ON M.MenuGroupCode = G.MenuGroupCode AND M.IsActive = 1 AND M.IsVisible = 1
 INNER JOIN dbo.TDADProjectMenu PM
-    ON PM.MenuCode = M.MenuCode AND PM.MenuGroupCode = G.MenuGroupCode
+    ON PM.MenuGroupCode = G.MenuGroupCode
    AND PM.ProjectID = AP.ProjectID AND PM.IsActive = 1
+INNER JOIN dbo.TDADMainMenu M ON M.MenuCode = PM.MenuCode AND M.IsActive = 1 AND M.IsVisible = 1
+INNER JOIN dbo.TDADMenuGroup OwnerGroup ON OwnerGroup.MenuGroupCode=M.MenuGroupCode AND OwnerGroup.IsActive=1
 WHERE UPPER(LTRIM(RTRIM(G.AudienceType))) IN (N'A',@AudienceType)
+  AND UPPER(LTRIM(RTRIM(OwnerGroup.AudienceType))) IN (N'A',@AudienceType)
+  -- Company accounts are managed through the Person/Employee workflow.
+  AND (@UserType <> N'COMPANY_USER' OR G.MenuGroupCode <> N'07')
+  -- The Company branch menu remains Company-only in the shared settings group.
+  AND (M.MenuCode <> N'13001' OR @UserType = N'COMPANY_USER')
   AND (
         ISNULL(G.OpenOption, 0) = 0
         OR @UserType <> N'COMPANY_USER'
@@ -239,12 +245,15 @@ WHERE U.UserID=@ID AND U.CompanyID=@OwnerID AND UP.IsAllowed=1 AND UP.IsActive=1
 UNION
 SELECT RP.MenuCode
 FROM dbo.TDADUser U
-INNER JOIN dbo.TDADUserEmployee UE ON UE.UserID=U.UserID
+INNER JOIN dbo.TDADUserEmployee UE ON UE.UserID=U.UserID AND UE.CompanyID=U.CompanyID AND UE.IsActive=1
+INNER JOIN dbo.TDADEmployee E ON E.EmployeeID=UE.EmployeeID AND E.CompanyID=U.CompanyID AND E.IsActive=1
 INNER JOIN dbo.TDADEmployeeRoleGroup ERG ON ERG.EmployeeID=UE.EmployeeID
-INNER JOIN dbo.TDADRoleGroup RG ON RG.RoleGroupID=ERG.RoleGroupID AND RG.ScopeType='C' AND RG.CompanyID=U.CompanyID
-INNER JOIN dbo.TDADRoleGroupPermission RP ON RP.RoleGroupID=RG.RoleGroupID AND RP.ProjectID=RG.ProjectID AND RP.ActionCode='VIEW' AND RP.IsAllowed=1
-INNER JOIN dbo.TDADUserProject UPR ON UPR.UserID=U.UserID AND UPR.CompanyID=U.CompanyID AND UPR.ProjectID=RG.ProjectID AND UPR.IsActive=1
-WHERE U.UserID=@ID AND U.CompanyID=@OwnerID AND U.IsActive=1 AND ERG.IsActive=1 AND ERG.EffectiveFrom<=CONVERT(date,SYSUTCDATETIME()) AND (ERG.EffectiveTo IS NULL OR ERG.EffectiveTo>=CONVERT(date,SYSUTCDATETIME()));
+INNER JOIN dbo.TDADRoleGroup RG ON RG.RoleGroupID=ERG.RoleGroupID AND RG.ScopeType='C' AND RG.CompanyID=U.CompanyID AND RG.IsActive=1
+INNER JOIN dbo.TDADRoleGroupPermission RP ON RP.RoleGroupID=RG.RoleGroupID AND RP.ActionCode='VIEW' AND RP.IsAllowed=1
+INNER JOIN dbo.TDADUserProject UPR ON UPR.UserID=U.UserID AND UPR.CompanyID=U.CompanyID AND UPR.ProjectID=RP.ProjectID AND UPR.IsActive=1
+WHERE U.UserID=@ID AND U.CompanyID=@OwnerID AND U.IsActive=1 AND ERG.IsActive=1
+ AND (RG.ProjectID=RP.ProjectID OR EXISTS(SELECT 1 FROM dbo.TDADProject Core WHERE Core.ProjectID=RG.ProjectID AND Core.ProjectCode='LAOO' AND Core.IsActive=1))
+ AND ERG.EffectiveFrom<=CONVERT(date,SYSUTCDATETIME()) AND (ERG.EffectiveTo IS NULL OR ERG.EffectiveTo>=CONVERT(date,SYSUTCDATETIME()));
 """;
         }
         else

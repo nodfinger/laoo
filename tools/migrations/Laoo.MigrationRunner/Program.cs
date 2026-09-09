@@ -34,7 +34,11 @@ await BootstrapLedger(connection, Path.Combine(root, "database", "MIGRATION_LEDG
 foreach (var file in files)
 {
     var migrationId = Path.GetFileNameWithoutExtension(file);
-    var sql = await File.ReadAllTextAsync(file, Encoding.UTF8);
+    // Git may materialize SQL files with LF or CRLF on Windows. Normalize
+    // line endings so an unchanged migration keeps the same checksum.
+    var sql = (await File.ReadAllTextAsync(file, Encoding.UTF8))
+        .Replace("\r\n", "\n", StringComparison.Ordinal)
+        .Replace('\r', '\n');
     var checksum = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(sql)));
     await ApplyMigration(connection, migrationId, options.ProjectCode, checksum, sql, options.AppliedBy);
 }

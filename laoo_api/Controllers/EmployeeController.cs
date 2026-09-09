@@ -2,6 +2,7 @@ using System.Data;
 using System.Security.Claims;
 using Laoo.Shared.Contracts.Employees;
 using LaooApi.Security;
+using LaooApi.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
@@ -12,7 +13,10 @@ namespace LaooApi.Controllers;
 [Route("api/partner/employees")]
 [Route("api/partner/customer-employees")]
 [Route("api/company/employees")]
-public sealed class EmployeeController(IConfiguration configuration, PasswordService passwordService) : ControllerBase
+public sealed class EmployeeController(
+    IConfiguration configuration,
+    PasswordService passwordService,
+    CompanyPersonService companyPersonService) : ControllerBase
 {
     private EmployeeScreenContract CurrentScreen => EmployeeScreenContracts.FromRequestPath(Request.Path.Value);
     private string ScreenCode => CurrentScreen.MenuCode;
@@ -36,7 +40,7 @@ public sealed class EmployeeController(IConfiguration configuration, PasswordSer
                    E.NickName,E.PositionCode,E.Email,E.Telephone,E.PersonalTelephone,
                    E.ContName1,E.ContRelation1,E.ContPhone1,E.ContName2,E.ContRelation2,E.ContPhone2,
                    E.StartWorkDate,CASE WHEN EXISTS (SELECT 1 FROM dbo.TDADEmployeeImage EI WHERE EI.EmployeeID=E.EmployeeID AND EI.ImageType=N'FORMAL' AND ISNULL(EI.IsActive,1)=1 AND DATALENGTH(EI.ImageData)>0) THEN 1 ELSE 0 END,E.IsActive
-                   ,E.CarID1,E.CarColor1,E.CarTypeCode1,E.CarOilType1,E.CarID2,E.CarColor2,E.CarTypeCode2,E.CarOilType2
+                   ,E.CarID1,E.CarColor1,E.CarTypeCode1,E.CarOilType1,E.CarID2,E.CarColor2,E.CarTypeCode2,E.CarOilType2,E.PersonID
             FROM dbo.TDADEmployee E
             LEFT JOIN dbo.TDADOrganizationUnit DV ON DV.OrgUnitID=E.DivisionOrgUnitID
             LEFT JOIN dbo.TDADOrganizationUnit DP ON DP.OrgUnitID=E.DepartmentOrgUnitID
@@ -86,6 +90,56 @@ public sealed class EmployeeController(IConfiguration configuration, PasswordSer
     {
         var scope = ResolveScope(companyId); if (scope is null) return Forbid();
         await using var c = await Open(token); if (!await Allowed(c, "DELETE", token)) return Forbid();
+        if (scope.Value.CompanyId.HasValue)
+        {
+            await using var transaction = (SqlTransaction)await c.BeginTransactionAsync(token);
+            const string deactivateSql = """
+DECLARE @PersonID bigint;
+SELECT @PersonID=PersonID
+FROM dbo.TDADEmployee WITH (UPDLOCK,HOLDLOCK)
+WHERE EmployeeID=@id AND PartnerID=@partner AND CompanyID=@company;
+IF @@ROWCOUNT=0 THROW 51105, 'EMPLOYEE_NOT_FOUND', 1;
+
+UPDATE dbo.TDADEmployee
+SET IsActive=0,UpdateDate=SYSUTCDATETIME()
+WHERE EmployeeID=@id AND CompanyID=@company;
+
+UPDATE U
+SET U.IsActive=0,U.UpdateDate=SYSUTCDATETIME()
+FROM dbo.TDADUser AS U
+INNER JOIN dbo.TDADUserEmployee AS UE
+  ON UE.UserID=U.UserID AND UE.CompanyID=U.CompanyID AND UE.IsActive=1
+WHERE UE.EmployeeID=@id AND U.CompanyID=@company;
+
+UPDATE dbo.TDADUserEmployee
+SET IsActive=0,UpdateDate=SYSUTCDATETIME()
+WHERE EmployeeID=@id AND CompanyID=@company AND IsActive=1;
+
+UPDATE dbo.TDADEmployeeRoleGroup
+SET IsActive=0,EffectiveTo=CONVERT(date,SYSUTCDATETIME()),
+    UpdatedUtc=SYSUTCDATETIME(),UpdatedBy=N'EmployeeController'
+WHERE EmployeeID=@id AND IsActive=1;
+
+UPDATE dbo.TDADPerson
+SET IsActive=0,UpdateDate=SYSUTCDATETIME()
+WHERE PersonID=@PersonID AND CompanyID=@company;
+""";
+            await using var deactivate = new SqlCommand(deactivateSql, c, transaction);
+            deactivate.Parameters.Add("@id", SqlDbType.BigInt).Value = id;
+            deactivate.Parameters.Add("@partner", SqlDbType.BigInt).Value = scope.Value.PartnerId;
+            deactivate.Parameters.Add("@company", SqlDbType.BigInt).Value = scope.Value.CompanyId.Value;
+            try
+            {
+                await deactivate.ExecuteNonQueryAsync(token);
+                await transaction.CommitAsync(token);
+                return NoContent();
+            }
+            catch (SqlException ex) when (ex.Number == 51105)
+            {
+                await transaction.RollbackAsync(token);
+                return NotFound(new { message = "ไม่พบข้อมูลพนักงาน", description = "พนักงานไม่อยู่ในขอบเขต Company ที่กำลังดำเนินการ" });
+            }
+        }
         await using var cmd = new SqlCommand("DELETE dbo.TDADEmployee WHERE EmployeeID=@id AND PartnerID=@partner AND ((@company IS NULL AND CompanyID IS NULL) OR CompanyID=@company)", c);
         cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = id;
         cmd.Parameters.Add("@partner", SqlDbType.BigInt).Value = scope.Value.PartnerId;
@@ -101,6 +155,43 @@ public sealed class EmployeeController(IConfiguration configuration, PasswordSer
         await using var c = await Open(token);
         if (scope.Value.CompanyId is long companyScope && !await CompanyBelongsToPartner(c, scope.Value.PartnerId, companyScope, token)) return Forbid();
         if (!await Allowed(c, id is null ? "CREATE" : "EDIT", token)) return Forbid();
+        var isCompanyEmployee = scope.Value.CompanyId.HasValue;
+        string? username = null;
+        string? normalizedUsername = null;
+        string? passwordHash = null;
+        long? projectId = null;
+        long? actorId = null;
+        if (isCompanyEmployee)
+        {
+            username = x.Username?.Trim();
+            if (string.IsNullOrWhiteSpace(username) || x.RoleGroupId is null)
+                return BadRequest(new
+                {
+                    message = "ข้อมูลบัญชีเข้าใช้งานไม่ครบ",
+                    description = "พนักงาน Company ต้องมี Username และกลุ่มสิทธิ์",
+                });
+            if (username.Length > 100)
+                return BadRequest(new { message = "Username ยาวเกินกำหนด", description = "Username ต้องไม่เกิน 100 ตัวอักษร" });
+            if (id is null && string.IsNullOrWhiteSpace(x.Password))
+                return BadRequest(new { message = "กรุณากรอก Password", description = "พนักงาน Company ใหม่ต้องมี Password สำหรับเข้าใช้งานระบบ" });
+            if (!long.TryParse(User.FindFirstValue("project_id"), out var resolvedProjectId)) return Forbid();
+            projectId = resolvedProjectId;
+            actorId = long.TryParse(User.FindFirstValue("user_id"), out var resolvedActorId)
+                ? resolvedActorId
+                : null;
+            var policyCode = await passwordService.GetPolicyAsync(c, "C", scope.Value.PartnerId, scope.Value.CompanyId, token);
+            if (!string.IsNullOrWhiteSpace(x.Password)
+                && !PasswordService.MeetsPolicy(username, x.Password, policyCode))
+                return BadRequest(new
+                {
+                    message = "Password ไม่ผ่านนโยบายของ Company",
+                    description = PasswordService.GetReadablePolicyMessage(policyCode),
+                });
+            normalizedUsername = username.ToUpperInvariant();
+            passwordHash = string.IsNullOrWhiteSpace(x.Password)
+                ? null
+                : passwordService.HashPassword(username, x.Password);
+        }
         const string sql = """
             IF EXISTS(SELECT 1 FROM dbo.TDADEmployee WHERE PartnerID=@partner AND ((@company IS NULL AND CompanyID IS NULL) OR CompanyID=@company) AND EmployeeCode=@code AND (@id IS NULL OR EmployeeID<>@id)) THROW 50001,'DUPLICATE_EMPLOYEE_CODE',1;
             IF @division IS NOT NULL AND NOT EXISTS(SELECT 1 FROM dbo.TDADOrganizationUnit WHERE OrgUnitID=@division AND UnitType='DIV' AND IsActive=1 AND ((@company IS NULL AND OwnerType='P' AND PartnerID=@partner) OR (@company IS NOT NULL AND OwnerType='C' AND CompanyID=@company))) THROW 50002,'INVALID_DIVISION',1;
@@ -109,7 +200,8 @@ public sealed class EmployeeController(IConfiguration configuration, PasswordSer
             ELSE UPDATE dbo.TDADEmployee SET PartnerID=@partner,CompanyID=@company,DivisionOrgUnitID=@division,DepartmentOrgUnitID=@department,EmployeeCode=@code,FullName=@name,NickName=@nick,PositionCode=@position,Email=@email,Telephone=@tel,PersonalTelephone=@personal,ContName1=@contName1,ContRelation1=@contRelation1,ContPhone1=@contPhone1,ContName2=@contName2,ContRelation2=@contRelation2,ContPhone2=@contPhone2,StartWorkDate=@start,CarID1=@carId1,CarColor1=@carColor1,CarTypeCode1=@carType1,CarOilType1=@carOil1,CarID2=@carId2,CarColor2=@carColor2,CarTypeCode2=@carType2,CarOilType2=@carOil2,IsActive=@active,UpdateDate=SYSUTCDATETIME() WHERE EmployeeID=@id AND PartnerID=@partner AND ((@company IS NULL AND CompanyID IS NULL) OR CompanyID=@company);
             SELECT CAST(CASE WHEN @id IS NULL THEN SCOPE_IDENTITY() ELSE @id END AS BIGINT);
             """;
-        await using var cmd = new SqlCommand(sql, c);
+        await using var transaction = (SqlTransaction)await c.BeginTransactionAsync(token);
+        await using var cmd = new SqlCommand(sql, c, transaction);
         cmd.Parameters.Add("@id", SqlDbType.BigInt).Value = id ?? (object)DBNull.Value;
         cmd.Parameters.Add("@partner", SqlDbType.BigInt).Value = scope.Value.PartnerId;
         cmd.Parameters.Add("@company", SqlDbType.BigInt).Value = scope.Value.CompanyId ?? (object)DBNull.Value;
@@ -122,9 +214,57 @@ public sealed class EmployeeController(IConfiguration configuration, PasswordSer
         Add(cmd, "@carId1", SqlDbType.NVarChar, x.CarID1, 50); Add(cmd, "@carColor1", SqlDbType.NVarChar, x.CarColor1, 100); Add(cmd, "@carType1", SqlDbType.NVarChar, x.CarTypeCode1, 50); Add(cmd, "@carOil1", SqlDbType.NVarChar, x.CarOilType1, 50);
         Add(cmd, "@carId2", SqlDbType.NVarChar, x.CarID2, 50); Add(cmd, "@carColor2", SqlDbType.NVarChar, x.CarColor2, 100); Add(cmd, "@carType2", SqlDbType.NVarChar, x.CarTypeCode2, 50); Add(cmd, "@carOil2", SqlDbType.NVarChar, x.CarOilType2, 50);
         cmd.Parameters.Add("@active", SqlDbType.Bit).Value = x.IsActive;
-        try { var savedId = Convert.ToInt64(await cmd.ExecuteScalarAsync(token)); return Ok(new { employeeId = savedId }); }
-        catch (SqlException ex) when (ex.Number == 50001) { return Conflict(new { message = "เธฃเธซเธฑเธชเธเธเธฑเธเธเธฒเธเธเนเธณ" }); }
-        catch (SqlException ex) when (ex.Number is 50002 or 50003) { return BadRequest(new { message = "เธเนเธฒเธขเธซเธฃเธทเธญเนเธเธเธเนเธกเนเธ–เธนเธเธ•เนเธญเธ" }); }
+        try
+        {
+            var savedId = Convert.ToInt64(await cmd.ExecuteScalarAsync(token));
+            CompanyEmployeeIdentityResult? identity = null;
+            if (isCompanyEmployee)
+            {
+                identity = await companyPersonService.UpsertEmployeeIdentityAsync(
+                    c,
+                    transaction,
+                    scope.Value.CompanyId!.Value,
+                    savedId,
+                    x,
+                    username!,
+                    normalizedUsername!,
+                    passwordHash,
+                    x.RoleGroupId!.Value,
+                    projectId!.Value,
+                    actorId,
+                    token);
+            }
+            await transaction.CommitAsync(token);
+            return Ok(new
+            {
+                employeeId = savedId,
+                personId = identity?.PersonId,
+                userId = identity?.UserId,
+                username,
+            });
+        }
+        catch (CompanyPersonException ex)
+        {
+            await transaction.RollbackAsync(token);
+            return BadRequest(new { message = ex.Message, description = ex.Description, code = ex.Code });
+        }
+        catch (SqlException ex) when (ex.Number is 51101 or 51104 or 2601 or 2627)
+        {
+            await transaction.RollbackAsync(token);
+            return ex.Number is 51101 or 2601 or 2627
+                ? Conflict(new { message = "Username นี้ถูกใช้งานแล้ว", description = "ระบบไม่อนุญาตให้ใช้ Username ซ้ำกับบัญชีอื่น" })
+                : BadRequest(new { message = "กลุ่มสิทธิ์ไม่ถูกต้อง", description = "กรุณาเลือกกลุ่มสิทธิ์ที่อยู่ใน Company และ Project ปัจจุบัน" });
+        }
+        catch (SqlException ex) when (ex.Number == 50001)
+        {
+            await transaction.RollbackAsync(token);
+            return Conflict(new { message = "รหัสพนักงานซ้ำ", description = "กรุณาใช้รหัสพนักงานอื่นภายใน Company เดียวกัน" });
+        }
+        catch (SqlException ex) when (ex.Number is 50002 or 50003)
+        {
+            await transaction.RollbackAsync(token);
+            return BadRequest(new { message = "ฝ่ายหรือแผนกไม่ถูกต้อง", description = "กรุณาเลือกฝ่ายและแผนกที่อยู่ใน Company ปัจจุบัน" });
+        }
     }
 
     [HttpGet("{id:long}/image")]
@@ -223,11 +363,17 @@ VALUES(@id,@carNo,@data,@type,@name,@size,@width,@height,1,SYSUTCDATETIME());
         await using var c = await Open(token); if (!await Allowed(c, "VIEW", token)) return Forbid();
         const string sql = """
 SELECT TOP 1 CASE WHEN E.CompanyID IS NULL THEN PU.Username ELSE U.Username END,
-  RG.RoleGroupID
+  RG.RoleGroupID,E.PersonID
 FROM dbo.TDADEmployee E
-LEFT JOIN dbo.TDADUserEmployee UE ON UE.EmployeeID=E.EmployeeID AND UE.CompanyID=E.CompanyID
-LEFT JOIN dbo.TDADUser U ON U.UserID=UE.UserID AND U.CompanyID=E.CompanyID AND U.IsActive=1
-LEFT JOIN dbo.TDADPartnerUserEmployee PUE ON PUE.EmployeeID=E.EmployeeID AND E.CompanyID IS NULL
+OUTER APPLY
+(
+ SELECT TOP (1) Link.UserID
+ FROM dbo.TDADUserEmployee Link
+ WHERE Link.EmployeeID=E.EmployeeID AND Link.CompanyID=E.CompanyID
+ ORDER BY Link.IsActive DESC,Link.UserEmployeeID DESC
+) UE
+LEFT JOIN dbo.TDADUser U ON U.UserID=UE.UserID AND U.CompanyID=E.CompanyID
+LEFT JOIN dbo.TDADPartnerUserEmployee PUE ON PUE.EmployeeID=E.EmployeeID AND E.CompanyID IS NULL AND PUE.IsActive=1
 LEFT JOIN dbo.TDADPartnerUser PU ON PU.PartnerUserID=PUE.PartnerUserID AND PU.PartnerID=E.PartnerID AND PU.IsActive=1
 OUTER APPLY (SELECT TOP 1 ERG.RoleGroupID FROM dbo.TDADEmployeeRoleGroup ERG WHERE ERG.EmployeeID=E.EmployeeID AND ERG.IsActive=1 AND ERG.EffectiveFrom<=CONVERT(date,SYSUTCDATETIME()) AND (ERG.EffectiveTo IS NULL OR ERG.EffectiveTo>=CONVERT(date,SYSUTCDATETIME())) ORDER BY ERG.EffectiveFrom DESC,ERG.EmployeeRoleGroupID DESC) RG
 WHERE E.EmployeeID=@id AND E.PartnerID=@partner AND ((@company IS NULL AND E.CompanyID IS NULL) OR E.CompanyID=@company)
@@ -239,7 +385,12 @@ ORDER BY CASE WHEN E.CompanyID IS NULL THEN PU.PartnerUserID ELSE U.UserID END D
         cmd.Parameters.Add("@company", SqlDbType.BigInt).Value = scope.Value.CompanyId ?? (object)DBNull.Value;
         await using var reader = await cmd.ExecuteReaderAsync(token);
         if (!await reader.ReadAsync(token)) return Ok(new { username = (string?)null, roleGroupId = (long?)null });
-        return Ok(new { username = reader.IsDBNull(0) ? null : reader.GetString(0), roleGroupId = reader.IsDBNull(1) ? (long?)null : reader.GetInt64(1) });
+        return Ok(new
+        {
+            username = reader.IsDBNull(0) ? null : reader.GetString(0),
+            roleGroupId = reader.IsDBNull(1) ? (long?)null : reader.GetInt64(1),
+            personId = reader.IsDBNull(2) ? (long?)null : reader.GetInt64(2),
+        });
     }
 
     [HttpPut("{id:long}/user")]
@@ -306,14 +457,17 @@ ELSE UPDATE dbo.TDADPartnerUser SET Username=@username,NormalizedUsername=@norma
                     var result = await find.ExecuteScalarAsync(token); userId = result is null or DBNull ? null : Convert.ToInt64(result);
                 }
                 const string sql = """
+IF @userId IS NOT NULL AND EXISTS
+   (SELECT 1 FROM dbo.TDADUser WHERE UserID=@userId AND CompanyID=@company AND NormalizedUsername<>@normalized)
+    THROW 50010,'USERNAME_IMMUTABLE',1;
 IF EXISTS (SELECT 1 FROM dbo.TDADLaooUser WHERE NormalizedUsername=@normalized)
    OR EXISTS (SELECT 1 FROM dbo.TDADPartnerUser WHERE NormalizedUsername=@normalized)
    OR EXISTS (SELECT 1 FROM dbo.TDADUser WHERE NormalizedUsername=@normalized AND (@userId IS NULL OR UserID<>@userId))
     THROW 50008,'USERNAME_EXISTS',1;
 IF @userId IS NULL
 BEGIN
- INSERT dbo.TDADUser(CompanyID,Username,NormalizedUsername,PasswordHash,DisplayName,IsCompanyAdmin,IsActive,FailedLoginCount,LastPasswordChangeDate,CreateDate)
- VALUES(@company,@username,@normalized,@hash,@displayName,0,1,0,SYSUTCDATETIME(),SYSUTCDATETIME());
+ INSERT dbo.TDADUser(CompanyID,PersonID,Username,NormalizedUsername,PasswordHash,DisplayName,IsCompanyAdmin,IsActive,FailedLoginCount,LastPasswordChangeDate,CreateDate)
+ VALUES(@company,(SELECT PersonID FROM dbo.TDADEmployee WHERE EmployeeID=@employee AND CompanyID=@company),@username,@normalized,@hash,@displayName,0,1,0,SYSUTCDATETIME(),SYSUTCDATETIME());
  SET @userId=CONVERT(BIGINT,SCOPE_IDENTITY());
  INSERT dbo.TDADUserEmployee(UserID,EmployeeID,CompanyID) VALUES(@userId,@employee,@company);
 END
@@ -330,6 +484,11 @@ WHERE P.ProjectID=@project AND P.IsActive=1
             if (request.RoleGroupId.HasValue) await AssignRoleGroupAsync(c, (SqlTransaction)transaction, id, employeeCompany, request.RoleGroupId.Value, scope.Value.PartnerId, token);
             await transaction.CommitAsync(token);
             return Ok(new { employeeId = id, username });
+        }
+        catch (SqlException ex) when (ex.Number == 50010)
+        {
+            await transaction.RollbackAsync(token);
+            return BadRequest(new { message = "ไม่สามารถเปลี่ยน Username ได้", description = "Username เป็นรหัสเข้าใช้งานถาวรของ Person" });
         }
         catch (SqlException ex) when (ex.Number is 50008 or 2601 or 2627) { await transaction.RollbackAsync(token); return Conflict(new { message = "Username นี้ถูกใช้งานแล้ว กรุณาใช้ Username อื่น", description = "ระบบไม่อนุญาตให้ Username ซ้ำกันทั้งระบบ" }); }
     }
@@ -402,8 +561,8 @@ IF EXISTS (SELECT 1 FROM dbo.TDADLaooUser WHERE NormalizedUsername=@normalized)
    OR EXISTS (SELECT 1 FROM dbo.TDADPartnerUser WHERE NormalizedUsername=@normalized)
    OR EXISTS (SELECT 1 FROM dbo.TDADUser WHERE NormalizedUsername=@normalized)
     THROW 50008,'USERNAME_EXISTS',1;
-INSERT dbo.TDADUser(CompanyID,Username,NormalizedUsername,PasswordHash,DisplayName,IsCompanyAdmin,IsActive,FailedLoginCount,LastPasswordChangeDate,CreateDate)
-VALUES(@company,@username,@normalized,@hash,@displayName,0,1,0,SYSUTCDATETIME(),SYSUTCDATETIME());
+INSERT dbo.TDADUser(CompanyID,PersonID,Username,NormalizedUsername,PasswordHash,DisplayName,IsCompanyAdmin,IsActive,FailedLoginCount,LastPasswordChangeDate,CreateDate)
+VALUES(@company,(SELECT PersonID FROM dbo.TDADEmployee WHERE EmployeeID=@employee AND CompanyID=@company),@username,@normalized,@hash,@displayName,0,1,0,SYSUTCDATETIME(),SYSUTCDATETIME());
 DECLARE @userId BIGINT = CONVERT(BIGINT,SCOPE_IDENTITY());
 INSERT dbo.TDADUserEmployee(UserID,EmployeeID,CompanyID) VALUES(@userId,@employee,@company);
 INSERT INTO dbo.TDADUserProject(CompanyID,UserID,ProjectID,IsDefault,IsActive,CreateDate)
@@ -447,7 +606,7 @@ WHERE P.ProjectID=@project AND P.IsActive=1
 
     private static EmployeeResponse Read(SqlDataReader r) => new()
     {
-        EmployeeId = r.GetInt64(1), PartnerId = r.GetInt64(2), CompanyId = NLong(r, 3), DivisionOrgUnitId = NLong(r, 4), DivisionName = NString(r, 5),
+        EmployeeId = r.GetInt64(1), PersonId = NLong(r, 32), PartnerId = r.GetInt64(2), CompanyId = NLong(r, 3), DivisionOrgUnitId = NLong(r, 4), DivisionName = NString(r, 5),
         DepartmentOrgUnitId = NLong(r, 6), DepartmentName = NString(r, 7), EmployeeCode = r.GetString(8), FullName = r.GetString(9),
         NickName = NString(r, 10), PositionCode = NString(r, 11), Email = NString(r, 12), Telephone = NString(r, 13), PersonalTelephone = NString(r, 14),
         ContName1 = NString(r, 15), ContRelation1 = NString(r, 16), ContPhone1 = NString(r, 17), ContName2 = NString(r, 18), ContRelation2 = NString(r, 19), ContPhone2 = NString(r, 20),

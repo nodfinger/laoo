@@ -12,11 +12,12 @@
 - Popup ทุกชนิดใช้พื้นหลังสีขาว (`Colors.white`) ไม่มี `BorderSide` หรือเส้นกรอบรอบนอกเฉพาะหน้า และห้ามเปลี่ยนสีพื้นหลังตาม User Style
 - กรอบ Popup ใช้มุมโค้ง `LaooRadius.xs` (`4px`) ทุกมุม
 - ระยะขอบ Popup ใช้ `LaooLayout.dialogInsetPadding`; Padding ภายในใช้ `LaooLayout.cardPadding`
+- Popup Action Form ใช้ความกว้างสูงสุด `480px` และต้องคำนวณให้ไม่เกินความกว้างหน้าจอหลังหัก `dialogInsetPadding` ทั้งสองด้าน; ห้ามปล่อยให้ Popup แคบตามความกว้างของ Field โดยไม่จำเป็น
 - Caption ใช้มาตรฐานกลาง `fontSize: 18`, `fontWeight: FontWeight.w700`, `color: Colors.black` ตาม `TYPOGRAPHY_STANDARD.md`; ต้องมี Icon อยู่ด้านหน้า Caption และ Icon ใช้สีดำ (`Colors.black`) ยกเว้น Delete Confirmation ซึ่งใช้ Icon สีแดงตาม Semantic Pattern ของการลบ
 - ใช้เส้น `LaooColors.border` สีเทาอ่อนใต้ Caption และก่อนส่วนปุ่มด้านล่าง
 - Context Bar ที่แสดงรายการแม่/ห้อง/อาคารที่เลือก ใช้พื้น Primary แบบโปร่งแสงและข้อความขนาด `16px`
 - TextBox/ComboBox ใช้กรอบมาตรฐาน มุมโค้ง `4px`; Label และ Focus Border ใช้ Primary
-- ปุ่มด้านล่างใช้ Font `13px`, สูง `48px`, มุมโค้ง `4px`; ยกเลิกใช้ Text/Outlined Primary และบันทึกใช้ Filled Primary
+- ปุ่มด้านล่างใช้ Font `13px`, สูง `48px`, มุมโค้ง `LaooRadius.xs` (`4px`); ต้องกำหนด `RoundedRectangleBorder(borderRadius: BorderRadius.circular(LaooRadius.xs))` ใน Style ของปุ่มโดยตรง ห้ามปล่อยให้รับรูปทรง pill จาก Theme; ยกเลิกใช้ Text/Outlined Primary และบันทึกใช้ Filled Primary
 - เมื่อ Popup แคบต้องจัด Field ลงบรรทัดใหม่โดยไม่ Overflow
 
 ## Validation and Notification

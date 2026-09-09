@@ -157,7 +157,7 @@ public sealed class AuthContextController : ControllerBase
                    CASE WHEN employee.EmployeeID IS NULL THEN u.DisplayName
                         ELSE employee.FullName + CASE WHEN NULLIF(LTRIM(RTRIM(employee.NickName)), N'') IS NULL THEN N'' ELSE N' | ' + employee.NickName END
                    END AS DisplayName,
-                   u.CompanyID
+                   u.CompanyID, u.PersonID
             FROM dbo.TDADUser AS u
             INNER JOIN dbo.TDSTCompanySetUp AS company
                 ON company.CompanyID = u.CompanyID
@@ -194,6 +194,7 @@ public sealed class AuthContextController : ControllerBase
         {
             UserType = AuthUserTypes.CompanyUser,
             UserId = reader.GetInt64(0),
+            PersonId = reader.GetInt64(4),
             Username = reader.GetString(1),
             DisplayName = reader.GetString(2),
             IsSupportUser = false,
