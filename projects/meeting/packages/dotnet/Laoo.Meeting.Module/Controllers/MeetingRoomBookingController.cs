@@ -51,15 +51,21 @@ public sealed class MeetingRoomBookingController(IConfiguration configuration) :
         pageSize = Math.Clamp(pageSize, 1, 100);
         await using var connection = await Open(token);
         if (!await Allowed(connection, "VIEW", token, ApprovalScreenCode)) return Forbid();
-        const string sql = """
+        var canManageAllParticipants = await IsCompanyAdmin(connection, companyId, userId, token);
+        var foodView = await MeetingFoodPlanAccess.Allowed(connection, User, "VIEW", token);
+        var foodCreate = foodView && await MeetingFoodPlanAccess.Allowed(connection, User, "CREATE", token);
+        var foodEdit = foodView && await MeetingFoodPlanAccess.Allowed(connection, User, "EDIT", token);
+        var sql = $"""
 WITH RankedApprovals AS (
 SELECT A.BookingApprovalID,A.BookingID,A.ApprovalOrder,
-       B.BookingNo,B.Subject,B.AttendeeCount,B.BookingStatus,
+       B.BookingNo,B.Subject,B.AttendeeCount,B.BookingStatus,B.RequesterUserID,
        R.RoomCode,R.RoomNameTH,
        BR.BranchNameTH,BD.BuildingNameTH,F.FloorNameTH,
        RE.EmployeeCode,NULLIF(RE.FullName,'') AS RequesterName,
         MIN(S.StartDateTime) AS StartDateTime,MAX(S.EndDateTime) AS EndDateTime,B.CreateDate AS CreateDate,
         COALESCE(B.StatusRemark,A.Remark,B.Remark) AS StatusRemark,A.ApprovalStatus,
+       CASE WHEN {MeetingFoodPlanAccess.OwnershipSql} THEN 1 ELSE 0 END AS FoodPlanScope,
+       CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADMeetingBookingFoodPlan FP WHERE FP.BookingID=B.BookingID AND FP.CompanyID=@company) THEN 1 ELSE 0 END AS HasFoodPlan,
        ROW_NUMBER() OVER (PARTITION BY A.BookingID ORDER BY
            CASE WHEN A.ApprovalStatus='PENDING' THEN 0 ELSE 1 END,
            A.ApprovalOrder,A.BookingApprovalID) AS RowNo
@@ -105,8 +111,8 @@ WHERE (A.ApprovalStatus='PENDING' AND (UE.UserID=@user OR EXISTS
        ORDER BY B2.CreateDate DESC,B2.BookingID DESC
    )
    AND (@search IS NULL OR @search='' OR B.BookingNo LIKE '%'+@search+'%' OR B.Subject LIKE '%'+@search+'%' OR R.RoomCode LIKE '%'+@search+'%' OR R.RoomNameTH LIKE '%'+@search+'%' OR RE.EmployeeCode LIKE '%'+@search+'%' OR RE.FullName LIKE '%'+@search+'%')
-GROUP BY A.BookingApprovalID,A.BookingID,A.ApprovalOrder,
-         B.BookingNo,B.Subject,B.AttendeeCount,B.BookingStatus,
+GROUP BY A.BookingApprovalID,A.BookingID,A.ApprovalOrder,B.BookingID,
+         B.BookingNo,B.Subject,B.AttendeeCount,B.BookingStatus,B.RequesterUserID,B.RoomID,
          R.RoomCode,R.RoomNameTH,BR.BranchNameTH,BD.BuildingNameTH,F.FloorNameTH,
           RE.EmployeeCode,RE.FullName,B.CreateDate,B.StatusRemark,B.Remark,A.Remark,A.ApprovalStatus
 )
@@ -134,17 +140,21 @@ OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY;
             subject = reader.GetString(4),
             attendeeCount = reader.GetInt32(5),
             status = reader.GetString(6),
-            roomCode = reader.GetString(7),
-            roomName = reader.GetString(8),
-            branchName = Text(reader, 9),
-            buildingName = Text(reader, 10),
-            floorName = Text(reader, 11),
-            requesterCode = Text(reader, 12),
-            requesterName = Text(reader, 13),
-            startDateTime = reader.GetDateTime(14),
-            endDateTime = reader.GetDateTime(15),
-             remark = Text(reader, 17),
-             approvalStatus = Text(reader, 18),
+            roomCode = reader.GetString(8),
+            roomName = reader.GetString(9),
+            branchName = Text(reader, 10),
+            buildingName = Text(reader, 11),
+            floorName = Text(reader, 12),
+            requesterCode = Text(reader, 13),
+            requesterName = Text(reader, 14),
+            startDateTime = reader.GetDateTime(15),
+            endDateTime = reader.GetDateTime(16),
+             remark = Text(reader, 18),
+             approvalStatus = Text(reader, 19),
+            canManageFoodPlan = MeetingFoodPlanAccess.CanManage(reader.GetString(6), reader.GetDateTime(16),
+                reader.GetInt32(20) == 1, reader.GetInt32(21) == 1 ? foodEdit : foodCreate),
+            canManageParticipants = reader.GetString(6) == "APPROVED" &&
+                                    (reader.GetInt64(7) == userId || canManageAllParticipants),
         });
         return Ok(new { items, page, pageSize });
     }
@@ -689,9 +699,29 @@ ORDER BY E.EmployeeCode,E.FullName;
                     return BadRequest(Error("ข้อมูลผู้เข้าร่วมไม่ถูกต้อง", $"ไม่พบพนักงาน ID {employeeId} ที่ยังใช้งานอยู่ในบริษัท"));
             }
 
-            await Execute(connection, transaction, "DELETE FROM dbo.TDADMeetingRoomBookingParticipant WHERE BookingID=@booking AND CompanyID=@company;", token, ("@booking", bookingId), ("@company", companyId));
+            var existingParticipants = new Dictionary<long, long>();
+            await using (var existing = new SqlCommand("SELECT EmployeeID,BookingParticipantID FROM dbo.TDADMeetingRoomBookingParticipant WITH (UPDLOCK,HOLDLOCK) WHERE BookingID=@booking AND CompanyID=@company", connection, transaction))
+            {
+                Add(existing, "@booking", bookingId); Add(existing, "@company", companyId);
+                await using var rows = await existing.ExecuteReaderAsync(token);
+                while (await rows.ReadAsync(token)) existingParticipants[rows.GetInt64(0)] = rows.GetInt64(1);
+            }
+            await using var readiness = new SqlCommand("SELECT CASE WHEN OBJECT_ID(N'dbo.TDADMeetingParticipantCheckIn',N'U') IS NULL THEN 0 ELSE 1 END", connection, transaction);
+            var attendanceReady = Convert.ToBoolean(await readiness.ExecuteScalarAsync(token));
+            foreach (var participant in existingParticipants.Where(item => !employeeIds.Contains(item.Key)))
+            {
+                if (attendanceReady)
+                {
+                    await using var checkIn = new SqlCommand("SELECT COUNT_BIG(*) FROM dbo.TDADMeetingParticipantCheckIn WITH (UPDLOCK,HOLDLOCK) WHERE CompanyID=@company AND BookingParticipantID=@participant", connection, transaction);
+                    Add(checkIn, "@company", companyId); Add(checkIn, "@participant", participant.Value);
+                    if (Convert.ToInt64(await checkIn.ExecuteScalarAsync(token)) > 0)
+                        return Conflict(Error("ลบผู้เข้าร่วมไม่ได้", "ผู้เข้าร่วมเช็กอินแล้ว กรุณาคงรายชื่อนี้ไว้เพื่อรักษาประวัติการเข้าร่วมและรับอาหาร"));
+                }
+                await Execute(connection, transaction, "DELETE FROM dbo.TDADMeetingRoomBookingParticipant WHERE BookingParticipantID=@participant AND BookingID=@booking AND CompanyID=@company;", token, ("@participant", participant.Value), ("@booking", bookingId), ("@company", companyId));
+            }
             foreach (var employeeId in employeeIds)
             {
+                if (existingParticipants.ContainsKey(employeeId)) continue;
                 const string insertSql = "INSERT dbo.TDADMeetingRoomBookingParticipant(BookingID,CompanyID,EmployeeID,InvitedByUserID) VALUES(@booking,@company,@employee,@user)";
                 await using var insert = new SqlCommand(insertSql, connection, transaction);
                 Add(insert, "@booking", bookingId); Add(insert, "@company", companyId); Add(insert, "@employee", employeeId); Add(insert, "@user", userId);
@@ -883,6 +913,14 @@ WHERE BookingID=@id AND CompanyID=@company AND BookingStatus<>'CANCELLED';
                     connection, transaction);
                 Add(previous, "@id", existingBookingId); Add(previous, "@company", companyId);
                 previousStatus = Convert.ToString(await previous.ExecuteScalarAsync(token));
+                await using var attendanceTable = new SqlCommand("SELECT CASE WHEN OBJECT_ID(N'dbo.TDADMeetingParticipantCheckIn',N'U') IS NULL THEN 0 ELSE 1 END", connection, transaction);
+                if (Convert.ToBoolean(await attendanceTable.ExecuteScalarAsync(token)))
+                {
+                    await using var attendance = new SqlCommand("SELECT COUNT_BIG(*) FROM dbo.TDADMeetingParticipantCheckIn C WITH (UPDLOCK,HOLDLOCK) INNER JOIN dbo.TDADMeetingRoomBookingSlot S ON S.BookingSlotID=C.BookingSlotID AND S.CompanyID=C.CompanyID WHERE S.BookingID=@booking AND S.CompanyID=@company", connection, transaction);
+                    Add(attendance, "@booking", existingBookingId); Add(attendance, "@company", companyId);
+                    if (Convert.ToInt64(await attendance.ExecuteScalarAsync(token)) > 0)
+                        return Conflict(Error("แก้ไขรายการจองไม่ได้", "มีผู้เข้าร่วมเช็กอินแล้ว ไม่สามารถเปลี่ยนรายการจองที่มีประวัติการเข้าร่วมได้"));
+                }
             }
             long bookingId;
             if (id is null)

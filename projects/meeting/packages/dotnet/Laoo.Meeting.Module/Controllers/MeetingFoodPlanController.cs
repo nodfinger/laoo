@@ -115,6 +115,7 @@ ORDER BY ISNULL(T.Seq,0),F.FoodCode;";
             selected = reader.GetInt32(6) == 1,
             quantity = reader.GetInt32(7),
         });
+        await reader.CloseAsync();
         return Ok(new { header.BookingId, header.BookingNo, header.Subject, header.RoomCode, header.RoomName, header.StartDateTime, header.EndDateTime, header.OrderCutoffDateTime, header.IsActive, canManageFoodPlan, foods });
     }
 

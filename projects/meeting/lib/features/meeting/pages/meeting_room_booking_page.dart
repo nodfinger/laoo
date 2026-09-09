@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../widgets/meeting_popup.dart';
+import '../widgets/meeting_participant_dialog.dart';
 
 import '../../../app/theme/laoo_design_tokens.dart';
 import '../../../app/theme/laoo_typography.dart';
@@ -9,7 +10,6 @@ import '../../../core/api/api_exception.dart';
 import '../../../core/config/api_config.dart';
 import '../../../core/navigation/navigation_menu_repository.dart';
 import '../../../core/widgets/auto_dismiss_message.dart';
-import '../../../core/widgets/combo_box_text.dart';
 import '../../support/presentation/widgets/support_workspace_shell.dart';
 import '../data/meeting_room_booking_repository.dart';
 import '../widgets/meeting_room_calendar_view.dart';
@@ -1065,214 +1065,13 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
   Future<void> _showParticipantDialog(Map<String, dynamic> item) async {
     final bookingId = _int(item['bookingId']);
     if (bookingId == null) return;
-    final preset = workspaceThemeController.value;
     try {
-      final data = await _repository.participants(bookingId);
-      if (!mounted) return;
-      final employees = _maps(data['employees']);
-      final selected = employees
-          .where((employee) => employee['selected'] == true)
-          .map((employee) => _int(employee['employeeId']))
-          .whereType<int>()
-          .toSet();
-      final searchController = TextEditingController();
-      var keyword = '';
-      int? departmentId;
-      final departmentMap = <int, String>{};
-      for (final employee in employees) {
-        final id = _int(employee['departmentOrgUnitId']);
-        final name = employee['departmentName']?.toString().trim() ?? '';
-        if (id != null && name.isNotEmpty) departmentMap[id] = name;
-      }
-      final departments = departmentMap.entries.toList()
-        ..sort((left, right) => left.value.compareTo(right.value));
-      final screen = MediaQuery.sizeOf(context);
-      final dialogWidth = screen.width < 720 ? screen.width - 64 : 650.0;
-      final dialogHeight = screen.height < 680 ? screen.height - 190 : 480.0;
-      final saved = await showDialog<bool>(
-        context: context,
-        builder: (dialogContext) => StatefulBuilder(
-          builder: (context, refresh) {
-            final filtered = employees.where((employee) {
-              if (departmentId != null &&
-                  _int(employee['departmentOrgUnitId']) != departmentId) {
-                return false;
-              }
-              if (keyword.isEmpty) return true;
-              final text =
-                  '${employee['employeeCode'] ?? ''} '
-                          '${employee['employeeName'] ?? ''} '
-                          '${employee['nickName'] ?? ''} '
-                          '${employee['departmentName'] ?? ''}'
-                      .toLowerCase();
-              return text.contains(keyword);
-            }).toList();
-            return MeetingPopup(
-              title: Row(
-                children: [
-                  Icon(Icons.group_add_outlined, color: preset.primary),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text(
-                      'เชิญผู้เข้าร่วมประชุม',
-                      style: LaooTypography.popupTitleStyle,
-                    ),
-                  ),
-                ],
-              ),
-              content: SizedBox(
-                width: dialogWidth,
-                height: dialogHeight,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(LaooLayout.cardPadding),
-                      color: preset.primary.withValues(alpha: .08),
-                      child: Text(
-                        '${data['bookingNo'] ?? '-'} | ${data['roomCode'] ?? '-'} ${data['roomName'] ?? '-'}\n'
-                        '${_bookingDateTime(data)}',
-                        style: TextStyle(
-                          color: preset.primary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    LayoutBuilder(
-                      builder: (context, constraints) {
-                        final search = TextField(
-                          controller: searchController,
-                          onChanged: (value) => refresh(
-                            () => keyword = value.trim().toLowerCase(),
-                          ),
-                          decoration: const InputDecoration(
-                            labelText: 'ค้นหารหัสหรือชื่อพนักงาน',
-                            prefixIcon: Icon(Icons.search),
-                          ),
-                        );
-                        final department = DropdownButtonFormField<int?>(
-                          initialValue: departmentId,
-                          isExpanded: true,
-                          decoration: const InputDecoration(labelText: 'แผนก'),
-                          items: [
-                            const DropdownMenuItem<int?>(
-                              value: null,
-                              child: LaooComboBoxText('ทั้งหมด'),
-                            ),
-                            ...departments.map(
-                              (entry) => DropdownMenuItem<int?>(
-                                value: entry.key,
-                                child: LaooComboBoxText(entry.value),
-                              ),
-                            ),
-                          ],
-                          onChanged: (value) =>
-                              refresh(() => departmentId = value),
-                        );
-                        if (constraints.maxWidth < 520) {
-                          return Column(
-                            children: [
-                              search,
-                              const SizedBox(height: 8),
-                              department,
-                            ],
-                          );
-                        }
-                        return Row(
-                          children: [
-                            Expanded(flex: 3, child: search),
-                            const SizedBox(width: 8),
-                            Expanded(flex: 2, child: department),
-                          ],
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 8),
-                    Text('เลือกแล้ว ${selected.length} คน'),
-                    const Divider(color: LaooColors.border),
-                    Expanded(
-                      child: filtered.isEmpty
-                          ? const Center(child: Text('ไม่พบพนักงาน'))
-                          : ListView.separated(
-                              itemCount: filtered.length,
-                              separatorBuilder: (_, _) => const Divider(
-                                height: 1,
-                                color: LaooColors.border,
-                              ),
-                              itemBuilder: (_, index) {
-                                final employee = filtered[index];
-                                final employeeId = _int(employee['employeeId']);
-                                final checked =
-                                    employeeId != null &&
-                                    selected.contains(employeeId);
-                                final details = <String>[
-                                  if ('${employee['nickName'] ?? ''}'
-                                      .isNotEmpty)
-                                    'ชื่อเล่น: ${employee['nickName']}',
-                                  if ('${employee['departmentName'] ?? ''}'
-                                      .isNotEmpty)
-                                    'แผนก: ${employee['departmentName']}',
-                                ];
-                                return CheckboxListTile(
-                                  value: checked,
-                                  activeColor: preset.primary,
-                                  dense: true,
-                                  controlAffinity:
-                                      ListTileControlAffinity.leading,
-                                  title: Text(
-                                    '${employee['employeeCode'] ?? '-'} | ${employee['employeeName'] ?? '-'}',
-                                  ),
-                                  subtitle: details.isEmpty
-                                      ? null
-                                      : Text(details.join(' | ')),
-                                  onChanged: employeeId == null
-                                      ? null
-                                      : (value) => refresh(() {
-                                          if (value == true) {
-                                            selected.add(employeeId);
-                                          } else {
-                                            selected.remove(employeeId);
-                                          }
-                                        }),
-                                );
-                              },
-                            ),
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  style: TextButton.styleFrom(
-                    foregroundColor: preset.primary,
-                    minimumSize: const Size(0, LaooTypography.buttonHeight),
-                  ),
-                  onPressed: () => Navigator.pop(dialogContext, false),
-                  child: const Text('ยกเลิก'),
-                ),
-                FilledButton.icon(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: preset.primary,
-                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                    minimumSize: const Size(0, LaooTypography.buttonHeight),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(LaooRadius.xs),
-                    ),
-                  ),
-                  onPressed: () => Navigator.pop(dialogContext, true),
-                  icon: const Icon(Icons.send_outlined),
-                  label: const Text('บันทึกคำเชิญ'),
-                ),
-              ],
-            );
-          },
-        ),
+      final saved = await showMeetingParticipantDialog(
+        context,
+        repository: _repository,
+        bookingId: bookingId,
       );
-      searchController.dispose();
-      if (saved != true) return;
-      await _repository.saveParticipants(bookingId, selected.toList()..sort());
-      _showMessage('บันทึกผู้เข้าร่วมประชุมสำเร็จ');
+      if (saved) _showMessage('บันทึกผู้เข้าร่วมประชุมสำเร็จ');
     } catch (error) {
       _showError(error, 'จัดการผู้เข้าร่วมประชุมไม่สำเร็จ');
     }
