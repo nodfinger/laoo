@@ -26,6 +26,13 @@ class AppMenuRouteSpec {
 
 abstract final class AppMenuRouteRegistry {
   static final Map<String, AppMenuRouteSpec> _byMenuCode = {
+    '08007': AppMenuRouteSpec(
+      menuCode: '08007',
+      databaseRouteName: 'companyVendors',
+      goRouteName: RouteNames.companyVendors,
+      path: RoutePaths.companyVendors,
+      scope: AppMenuScope.company,
+    ),
     '01001': AppMenuRouteSpec(
       menuCode: '01001',
       databaseRouteName: 'partner',

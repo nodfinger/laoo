@@ -41,7 +41,7 @@ abstract final class LaooTypography {
   static const double tableBody = 14;
 
   // Buttons / menus
-  static const double button = 14;
+  static const double button = 13;
 
   /// Shared button height keeps icon and text buttons visually aligned.
   static const double buttonHeight = 48;

@@ -1,4 +1,8 @@
 import 'package:go_router/go_router.dart';
+import 'package:flutter/material.dart';
+import '../../features/company/vendor/data/vendor_api.dart';
+import '../../core/navigation/navigation_menu_repository.dart';
+import '../../features/company/vendor/pages/vendor_page.dart';
 import 'package:laoo_meeting/meeting_feature.dart';
 import 'package:laoo_service/service_feature.dart';
 import 'package:laoo_visitor/visitor_feature.dart';
@@ -36,6 +40,32 @@ import 'route_paths.dart';
 
 final NavigationRouteAuthorization _navigationRouteAuthorization =
     NavigationRouteAuthorization();
+
+Future<Map<String, dynamic>?> _createReceiptVendor(BuildContext context) async {
+  final api = VendorApi();
+  Map<String, dynamic>? saved;
+  try {
+    final actions = await api.actions();
+    final caption = await NavigationMenuRepository().resolveMenuName(
+      menuCode: '08007',
+    );
+    if (!context.mounted || actions['create'] != true) return null;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => VendorForm(
+        api: api,
+        caption: caption,
+        canEdit: actions['edit'] == true,
+        onSaved: () {},
+        onResult: (value) => saved = value,
+      ),
+    );
+    return saved;
+  } finally {
+    api.dispose();
+  }
+}
 
 final GoRouter appRouter = GoRouter(
   initialLocation: RoutePaths.landing,
@@ -83,6 +113,11 @@ final GoRouter appRouter = GoRouter(
   },
   routes: [
     GoRoute(
+      path: RoutePaths.companyVendors,
+      name: RouteNames.companyVendors,
+      builder: (context, state) => const VendorPage(),
+    ),
+    GoRoute(
       path: RoutePaths.landing,
       name: RouteNames.landing,
       builder: (context, state) => const LandingPage(),
@@ -122,9 +157,9 @@ final GoRouter appRouter = GoRouter(
       name: RouteNames.assetLocations,
       builder: (context, state) => const LocationPage(),
     ),
-    ...buildServiceFeatureRoutes().where(
-      (route) => route.path != RoutePaths.assetLocations,
-    ),
+    ...buildServiceFeatureRoutes(
+      onCreateReceiptVendor: _createReceiptVendor,
+    ).where((route) => route.path != RoutePaths.assetLocations),
     ...buildVisitorFeatureRoutes(),
     GoRoute(
       path: RoutePaths.companyBranches,

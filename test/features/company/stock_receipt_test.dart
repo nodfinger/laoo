@@ -1,0 +1,193 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:laoo_service/features/inventory/data/inventory_api.dart';
+import 'package:laoo_service/features/inventory/pages/stock_receipt_page.dart';
+
+class ReceiptFakeApi extends InventoryApi {
+  int creates = 0, updates = 0;
+  bool allowCreate = true, fail = false;
+  Map<String, dynamic>? last;
+  @override
+  Future<Map<String, bool>> actions(String resource) async => {
+    'view': true,
+    'create': allowCreate,
+    'edit': true,
+    'delete': false,
+  };
+  @override
+  Future<List<Map<String, dynamic>>> receipts({String? search}) async => [];
+  @override
+  Future<Map<String, dynamic>> receiptLookup() async => {
+    'warehouses': [
+      {'warehouseID': 1, 'warehouseCode': 'W1', 'warehouseName': 'คลังหลัก'},
+    ],
+    'vendors': [
+      {'vendorID': 2, 'vendorCode': 'V1', 'vendorName': 'ผู้ขายทดสอบ'},
+    ],
+    'items': [
+      {
+        'itemID': 3,
+        'itemCode': 'HDD',
+        'itemName': 'ฮาร์ดดิสก์',
+        'unitCode': 'ชิ้น',
+        'stockTrackingCode': 'SERIAL',
+      },
+    ],
+    'canCreateVendor': false,
+  };
+  @override
+  Future<Map<String, dynamic>> saveReceipt(
+    Map<String, dynamic> body, {
+    int? id,
+  }) async {
+    last = body;
+    if (fail) throw Exception('เครือข่ายขัดข้อง');
+    if (id == null) {
+      creates++;
+    } else {
+      updates++;
+    }
+    return {
+      'stockReceiptID': 7,
+      'receiptCode': 'SR000007',
+      'items': [
+        for (var i = 0; i < (body['items'] as List).length; i++)
+          {
+            'lineNo': i + 1,
+            'serials': [
+              for (
+                var j = 0;
+                j < ((body['items'][i]['quantity']) as num).toInt();
+                j++
+              )
+                body['items'][i]['serialSourceCode'] == 'INTERNAL'
+                    ? 'IS-TEST-$j'
+                    : body['items'][i]['serials'][j]['serialNo'],
+            ],
+          },
+      ],
+    };
+  }
+}
+
+void main() {
+  setUp(() => SharedPreferences.setMockInitialValues({}));
+  Future<void> render(WidgetTester t, double width, Widget child) async {
+    t.view.physicalSize = Size(width, 1000);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.resetPhysicalSize);
+    addTearDown(t.view.resetDevicePixelRatio);
+    await t.pumpWidget(MaterialApp(home: Scaffold(body: child)));
+    await t.pumpAndSettle();
+  }
+
+  Future<void> tap(WidgetTester t, String label) async {
+    final f = find.text(label).last;
+    await t.ensureVisible(f);
+    await t.tap(f);
+    await t.pumpAndSettle();
+  }
+
+  for (final width in [390.0, 1100.0]) {
+    testWidgets('receipt form fits $width; first save does not write', (
+      t,
+    ) async {
+      final api = ReceiptFakeApi();
+      await render(
+        t,
+        width,
+        StockReceiptWorkspace(caption: 'รับสินค้าเข้าคลัง', api: api),
+      );
+      await tap(t, 'เพิ่ม');
+      await tap(t, 'เพิ่มรายการ');
+      final vendor = find.byWidgetPredicate(
+        (w) =>
+            w is DropdownButtonFormField<int> &&
+            w.decoration.labelText == 'ผู้ขาย *',
+      );
+      await t.ensureVisible(vendor);
+      await t.tap(vendor);
+      await t.pumpAndSettle();
+      await tap(t, 'V1 | ผู้ขายทดสอบ');
+      await tap(t, 'บันทึก');
+      expect(find.byType(ReceiptSerialDialog), findsOneWidget);
+      expect(api.creates, 0);
+      expect(t.takeException(), isNull);
+      await tap(t, 'กลับไปแก้ไข');
+      expect(api.creates, 0);
+      expect(find.text('V1 | ผู้ขายทดสอบ'), findsWidgets);
+    });
+  }
+  testWidgets('internal serials returned; second save updates same document', (
+    t,
+  ) async {
+    final api = ReceiptFakeApi();
+    await render(
+      t,
+      1100,
+      StockReceiptWorkspace(caption: 'รับสินค้าเข้าคลัง', api: api),
+    );
+    await tap(t, 'เพิ่ม');
+    await tap(t, 'รับสินค้า');
+    await tap(t, 'ยอดยกมา');
+    await tap(t, 'เพิ่มรายการ');
+    await tap(t, 'บันทึก');
+    await tap(t, 'Serial จากโรงงาน');
+    await tap(t, 'สร้างเลขภายใน');
+    expect(api.creates, 0);
+    await tap(t, 'บันทึกเอกสาร');
+    expect(api.creates, 1);
+    expect(find.text('IS-TEST-0'), findsOneWidget);
+    await tap(t, 'กลับเอกสาร');
+    await t.pump(const Duration(seconds: 30));
+    await tap(t, 'บันทึก');
+    await tap(t, 'บันทึกเอกสาร');
+    expect(api.creates, 1);
+    expect(api.updates, 1);
+    expect(t.takeException(), isNull);
+    await tap(t, 'กลับเอกสาร');
+    await t.pump(const Duration(seconds: 30));
+  });
+  testWidgets('duplicate factory serials prevent write and preserve input', (
+    t,
+  ) async {
+    final l = ReceiptDraftLine({
+      'itemID': 3,
+      'itemCode': 'HDD',
+      'itemName': 'ฮาร์ดดิสก์',
+      'stockTrackingCode': 'SERIAL',
+      'unitCode': 'ชิ้น',
+    })..quantity.text = '2';
+    l.setSerials(['SN1', ' sn1 ']);
+    var saves = 0;
+    await render(
+      t,
+      390,
+      ReceiptSerialDialog(
+        lines: [l],
+        onSave: () async {
+          saves++;
+          return true;
+        },
+      ),
+    );
+    await tap(t, 'บันทึกเอกสาร');
+    expect(saves, 0);
+    expect(find.text('Serial ซ้ำในเอกสาร'), findsNWidgets(2));
+    expect(l.serialValues, ['SN1', 'sn1']);
+    await t.pumpWidget(const SizedBox());
+    l.dispose();
+  });
+  testWidgets('no CREATE hides add', (t) async {
+    await render(
+      t,
+      390,
+      StockReceiptWorkspace(
+        caption: 'รับสินค้าเข้าคลัง',
+        api: ReceiptFakeApi()..allowCreate = false,
+      ),
+    );
+    expect(find.text('เพิ่ม'), findsNothing);
+  });
+}

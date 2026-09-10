@@ -1,6 +1,7 @@
 import 'package:laoo_meeting/meeting_feature.dart' show MeetingRouteNames;
 
 abstract final class RouteNames {
+  static const String companyVendors = 'company-vendors';
   static const String landing = 'landing';
   static const String login = 'login';
   static const String resetPassword = 'reset-password';

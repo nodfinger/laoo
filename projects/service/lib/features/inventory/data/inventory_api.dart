@@ -26,6 +26,21 @@ class InventoryApi {
       : _client.put('/api/company/warehouses/$id', body: body);
   Future<void> deleteWarehouse(int id) =>
       _client.delete('/api/company/warehouses/$id');
+  Future<Map<String, dynamic>> warehouseAccess(int id) async =>
+      Map<String, dynamic>.from(
+        await _client.get('/api/company/warehouses/$id/access') as Map,
+      );
+  Future<void> updateWarehouseAccess(
+    int id, {
+    required String accessModeCode,
+    required Iterable<int> userIds,
+  }) => _client.put(
+    '/api/company/warehouses/$id/access',
+    body: {
+      'accessModeCode': accessModeCode,
+      'userIds': userIds.toList(growable: false),
+    },
+  );
   Future<List<Map<String, dynamic>>> branches() async =>
       List<Map<String, dynamic>>.from(
         await _client.get('/api/company/warehouses/lookup') as List,
@@ -49,10 +64,15 @@ class InventoryApi {
       Map<String, dynamic>.from(
         await _client.get('/api/company/stock-receipts/$id') as Map,
       );
-  Future<void> saveReceipt(Map<String, dynamic> body, {int? id}) async =>
-      id == null
-      ? _client.post('/api/company/stock-receipts', body: body)
-      : _client.put('/api/company/stock-receipts/$id', body: body);
+  Future<Map<String, dynamic>> saveReceipt(
+    Map<String, dynamic> body, {
+    int? id,
+  }) async => Map<String, dynamic>.from(
+    await (id == null
+            ? _client.post('/api/company/stock-receipts', body: body)
+            : _client.put('/api/company/stock-receipts/$id', body: body))
+        as Map,
+  );
   Future<void> confirmReceipt(int id) =>
       _client.post('/api/company/stock-receipts/$id/confirm');
   Future<void> voidReceipt(int id) =>

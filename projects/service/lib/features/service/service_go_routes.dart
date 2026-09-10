@@ -9,10 +9,13 @@ import '../company/quotation/pages/quotation_page.dart';
 import '../company/tax_invoice/pages/tax_invoice_page.dart';
 import '../company/temporary_receipt/pages/temporary_receipt_page.dart';
 import '../inventory/pages/inventory_pages.dart';
+import '../inventory/pages/stock_receipt_page.dart';
 import '../support/presentation/widgets/support_workspace_shell.dart';
 import 'service_route_contract.dart';
 
-List<GoRoute> buildServiceFeatureRoutes() => [
+List<GoRoute> buildServiceFeatureRoutes({
+  ReceiptVendorCreator? onCreateReceiptVendor,
+}) => [
   _page('09001', (state) => const CustomerPage()),
   _page(
     '09003',
@@ -62,7 +65,10 @@ List<GoRoute> buildServiceFeatureRoutes() => [
   _page('08002', (state) => const InventoryItemCatalogPage()),
   _page('08003', (state) => const InventoryIssuePage()),
   _page('08004', (state) => const WarehousePage()),
-  _page('08005', (state) => const StockReceiptPage()),
+  _page(
+    '08005',
+    (state) => StockReceiptPage(onCreateVendor: onCreateReceiptVendor),
+  ),
   _page('08006', (state) => const SerialRegistryPage()),
   ..._workspacePlaceholders.entries.map(
     (entry) =>

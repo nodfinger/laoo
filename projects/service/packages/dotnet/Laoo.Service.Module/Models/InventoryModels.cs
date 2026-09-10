@@ -7,6 +7,10 @@ public sealed record WarehouseUpsertRequest(
     bool IsDefault,
     bool IsActive);
 
+public sealed record WarehouseAccessRequest(
+    string AccessModeCode,
+    IReadOnlyCollection<long>? UserIds);
+
 public sealed record StockReceiptSerialInput(string SerialNo);
 
 public sealed record StockReceiptLineRequest(
@@ -14,7 +18,8 @@ public sealed record StockReceiptLineRequest(
     decimal Quantity,
     decimal UnitCost,
     string? Remark,
-    IReadOnlyList<StockReceiptSerialInput>? Serials);
+    IReadOnlyList<StockReceiptSerialInput>? Serials,
+    string SerialSourceCode = "FACTORY");
 
 public sealed record StockReceiptUpsertRequest(
     long WarehouseID,
@@ -22,7 +27,9 @@ public sealed record StockReceiptUpsertRequest(
     string ReceiptType,
     string? ReferenceNo,
     string? Remark,
-    IReadOnlyList<StockReceiptLineRequest> Items);
+    IReadOnlyList<StockReceiptLineRequest> Items,
+    long? VendorID = null,
+    string? DeliveredBy = null);
 
 public sealed record ItemInstanceLocationRequest(
     string StatusCode,
