@@ -13,11 +13,9 @@ import '../../../core/auth/auth_storage.dart';
 import '../../../core/config/api_config.dart';
 import '../../../core/navigation/navigation_menu_repository.dart';
 import '../../../core/widgets/auto_dismiss_message.dart';
-import '../../support/branch/data/branch_repository.dart';
+import '../data/meeting_setup_lookup_repository.dart';
 import '../../support/presentation/widgets/support_workspace_shell.dart';
 import '../data/meeting_room_repository.dart';
-import '../data/meeting_facility_repository.dart';
-import '../data/meeting_structure_repository.dart';
 import '../../support/employee/data/employee_repository.dart';
 import '../../support/organization/data/organization_repository.dart';
 import '../../profile/pages/user_profile_dialog.dart';
@@ -34,9 +32,6 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
   final _repo = MeetingRoomRepository();
   final _employeeRepo = EmployeeRepository();
   final _organizationRepo = OrganizationRepository(company: true);
-  final _facilityRepo = MeetingFacilityRepository();
-  final _branchRepo = BranchRepository();
-  final _structure = MeetingStructureRepository();
   final _authStorage = AuthStorage();
   final _search = TextEditingController();
   List<Map<String, dynamic>> _rooms = [],
@@ -97,17 +92,22 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
       final data = await Future.wait([
         _repo.get(),
         _repo.actions(),
-        _structure.get(),
-        _facilityRepo.get(),
-        _branchRepo.get(company: true),
+        MeetingSetupLookupRepository().get('23002'),
       ]);
       if (mounted)
         setState(() {
           _rooms = List<Map<String, dynamic>>.from(data[0] as List);
           _actions = Map<String, bool>.from(data[1] as Map);
-          _buildings = List<Map<String, dynamic>>.from(data[2] as List);
-          _facilities = List<Map<String, dynamic>>.from(data[3] as List);
-          _branches = List<Map<String, dynamic>>.from(data[4] as List);
+          final lookup = data[2] as Map;
+          _buildings = List<Map<String, dynamic>>.from(
+            lookup['buildings'] as List,
+          );
+          _facilities = List<Map<String, dynamic>>.from(
+            lookup['facilities'] as List,
+          );
+          _branches = List<Map<String, dynamic>>.from(
+            lookup['branches'] as List,
+          );
           _loading = false;
         });
     } catch (e) {

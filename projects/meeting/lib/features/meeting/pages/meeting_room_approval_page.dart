@@ -29,7 +29,6 @@ class _MeetingRoomApprovalPageState extends State<MeetingRoomApprovalPage> {
   String _caption = 'รายการรออนุมัติห้องประชุม';
   String? _message;
   bool _loading = true;
-  bool _canEdit = false;
   int _total = 0;
   String _status = 'PENDING';
   DateTime? _dateFrom;
@@ -42,7 +41,6 @@ class _MeetingRoomApprovalPageState extends State<MeetingRoomApprovalPage> {
   void initState() {
     super.initState();
     _loadCaption();
-    _loadActions();
     _load();
   }
 
@@ -51,15 +49,6 @@ class _MeetingRoomApprovalPageState extends State<MeetingRoomApprovalPage> {
     _search.dispose();
     _repository.dispose();
     super.dispose();
-  }
-
-  Future<void> _loadActions() async {
-    try {
-      final actions = await _repository.actions();
-      if (mounted) {
-        setState(() => _canEdit = actions['approvalEdit'] == true);
-      }
-    } catch (_) {}
   }
 
   Future<void> _loadCaption() async {
@@ -675,7 +664,7 @@ class _MeetingRoomApprovalPageState extends State<MeetingRoomApprovalPage> {
                 icon: const Icon(Icons.history),
                 label: const Text('ประวัติ'),
               ),
-              if (status == 'PENDING' && _canEdit) ...[
+              if (status == 'PENDING' && item['canApprove'] == true) ...[
                 OutlinedButton(
                   onPressed: () => _decide(item, 'REJECTED'),
                   style: OutlinedButton.styleFrom(
@@ -697,7 +686,7 @@ class _MeetingRoomApprovalPageState extends State<MeetingRoomApprovalPage> {
                   ),
                   child: const Text('อนุมัติ'),
                 ),
-              ] else if (_canEdit)
+              ] else if (item['canRollback'] == true)
                 OutlinedButton.icon(
                   onPressed: () => _rollback(item),
                   style: OutlinedButton.styleFrom(

@@ -15,7 +15,13 @@ public sealed class MeetingInvitationController(IConfiguration configuration) : 
     public async Task<IActionResult> Actions(CancellationToken token)
     {
         await using var connection = await Open(token);
-        return Ok(new { view = await Allowed(connection, "VIEW", token), edit = await Allowed(connection, "EDIT", token) });
+        if (!Scope(out var company, out var user)) return Forbid();
+        var actionable = await HasOwnInvitation(connection, company, user, null, token);
+        return Ok(new
+        {
+            view = await Allowed(connection, "VIEW", token),
+            edit = actionable && await Allowed(connection, "EDIT", token),
+        });
     }
 
     [HttpGet]
@@ -27,7 +33,7 @@ public sealed class MeetingInvitationController(IConfiguration configuration) : 
         if (!await Allowed(connection, "VIEW", token)) return Forbid();
         var isAdmin = await IsCompanyAdmin(connection, company, user, token);
         var employee = await EmployeeId(connection, company, user, token);
-        if (!isAdmin && employee is null) return BadRequest(Error("ไม่พบข้อมูลพนักงานของผู้ใช้งาน", "กรุณาผูก User Login กับพนักงานก่อนเปิดคำเชิญของฉัน"));
+        if (!isAdmin && employee is null) return Ok(new { items = Array.Empty<object>(), total = 0, page, pageSize });
         const string filter = @"
 FROM dbo.TDADMeetingRoomBookingParticipant P
 INNER JOIN dbo.TDADMeetingRoomBooking B ON B.BookingID=P.BookingID AND B.CompanyID=P.CompanyID
@@ -51,7 +57,7 @@ SELECT P.BookingParticipantID,P.BookingID,B.BookingNo,B.Subject,R.RoomCode,R.Roo
        CASE WHEN P.EmployeeID=@employee THEN 1 ELSE 0 END,
        (SELECT COUNT_BIG(1) FROM dbo.TDADMeetingBookingFoodOption FO WHERE FO.BookingID=B.BookingID AND FO.CompanyID=B.CompanyID)
 {filter}
-GROUP BY P.BookingParticipantID,P.BookingID,B.BookingNo,B.Subject,R.RoomCode,R.RoomNameTH,
+GROUP BY P.BookingParticipantID,P.BookingID,B.BookingID,B.CompanyID,B.BookingNo,B.Subject,R.RoomCode,R.RoomNameTH,
          P.InvitationStatus,P.ResponseDate,P.Remark,PE.EmployeeCode,PE.FullName,RE.EmployeeCode,RE.FullName,FP.OrderCutoffDateTime,P.EmployeeID,B.CreateDate
 ORDER BY MIN(S.StartDateTime),B.CreateDate
 OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY;";
@@ -74,10 +80,13 @@ OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY;";
     {
         if (!Scope(out var company, out var user)) return Forbid();
         await using var connection = await Open(token);
-        if (!await Allowed(connection, "VIEW", token)) return Forbid();
+        if (!await Allowed(connection, "VIEW", token) ||
+            (!await IsCompanyAdmin(connection, company, user, token) &&
+            !await HasOwnInvitation(connection, company, user, participantId, token))) return Forbid();
         var isAdmin = await IsCompanyAdmin(connection, company, user, token);
         var employee = await EmployeeId(connection, company, user, token);
         if (!isAdmin && employee is null) return Forbid();
+        var canEdit = await Allowed(connection, "EDIT", token);
         const string headerSql = @"
 SELECT P.BookingParticipantID,P.BookingID,B.BookingNo,B.Subject,B.Description,R.RoomCode,R.RoomNameTH,
        MIN(S.StartDateTime),MAX(S.EndDateTime),P.InvitationStatus,P.Remark,RE.FullName,PE.FullName,FP.OrderCutoffDateTime,
@@ -101,7 +110,12 @@ GROUP BY P.BookingParticipantID,P.BookingID,B.BookingNo,B.Subject,B.Description,
         {
             participantId = reader.GetInt64(0), bookingId, bookingNo = Text(reader, 2), subject = reader.GetString(3), description = Text(reader, 4),
             roomCode = reader.GetString(5), roomName = reader.GetString(6), startDateTime = reader.GetDateTime(7), endDateTime = reader.GetDateTime(8),
-            invitationStatus = reader.GetString(9), remark = Text(reader, 10), organizerName = Text(reader, 11), participantName = Text(reader, 12), orderCutoffDateTime = Date(reader, 13), canRespond = reader.GetInt32(14) == 1, canOrder = reader.GetInt32(15) == 1,
+            invitationStatus = reader.GetString(9), remark = Text(reader, 10), organizerName = Text(reader, 11), participantName = Text(reader, 12), orderCutoffDateTime = Date(reader, 13),
+            canRespond = canEdit && reader.GetInt32(14) == 1,
+            responseUnavailableReason = reader.GetInt32(14) != 1
+                ? "ตอบรับได้เฉพาะคำเชิญของบัญชีที่เข้าสู่ระบบ"
+                : !canEdit ? "บัญชีนี้ไม่มีสิทธิ์แก้ไขการตอบรับ กรุณาติดต่อผู้ดูแลระบบ" : null,
+            canOrder = canEdit && reader.GetInt32(15) == 1,
         };
         await reader.CloseAsync();
         const string foodSql = @"
@@ -141,7 +155,8 @@ ORDER BY ISNULL(T.Seq,0),F.FoodCode;";
         if (status is not ("PENDING" or "ACCEPTED" or "DECLINED")) return BadRequest(Error("สถานะตอบรับไม่ถูกต้อง", "เลือกได้เฉพาะ รอตอบรับ เข้าร่วม หรือไม่เข้าร่วม"));
         if (!Scope(out var company, out var user)) return Forbid();
         await using var connection = await Open(token);
-        if (!await Allowed(connection, "EDIT", token)) return Forbid();
+        if (!await Allowed(connection, "EDIT", token) ||
+            !await HasOwnInvitation(connection, company, user, participantId, token)) return Forbid();
         var employee = await EmployeeId(connection, company, user, token);
         if (employee is null) return Forbid();
         const string sql = @"
@@ -159,7 +174,8 @@ WHERE P.BookingParticipantID=@participant AND P.CompanyID=@company AND P.Employe
     {
         if (!Scope(out var company, out var user)) return Forbid();
         await using var connection = await Open(token);
-        if (!await Allowed(connection, "EDIT", token)) return Forbid();
+        if (!await Allowed(connection, "EDIT", token) ||
+            !await HasOwnInvitation(connection, company, user, participantId, token)) return Forbid();
         var employee = await EmployeeId(connection, company, user, token);
         if (employee is null) return Forbid();
         var items = (request.Items ?? new List<FoodOrderItem>()).GroupBy(x => x.FoodId).Select(x => new FoodOrderItem(x.Key, x.Sum(y => y.Quantity))).ToList();
@@ -235,14 +251,62 @@ SELECT CASE WHEN EXISTS(
         await using var command = new SqlCommand("SELECT TOP 1 EmployeeID FROM dbo.TDADUserEmployee WHERE UserID=@user AND CompanyID=@company AND IsActive=1 ORDER BY UserEmployeeID", connection); Add(command, "@user", user); Add(command, "@company", company);
         var value = await command.ExecuteScalarAsync(token); return value is null ? null : Convert.ToInt64(value);
     }
+    private static async Task<bool> HasInvitationHistory(SqlConnection connection, long company, long user, CancellationToken token)
+    {
+        const string sql = """
+SELECT CASE WHEN EXISTS
+(
+    SELECT 1
+    FROM dbo.TDADUser U
+    INNER JOIN dbo.TDADUserEmployee UE
+        ON UE.UserID=U.UserID AND UE.CompanyID=U.CompanyID AND UE.IsActive=1
+    INNER JOIN dbo.TDADEmployee E
+        ON E.EmployeeID=UE.EmployeeID AND E.CompanyID=UE.CompanyID AND E.IsActive=1
+    INNER JOIN dbo.TDADMeetingRoomBookingParticipant P
+        ON P.EmployeeID=E.EmployeeID AND P.CompanyID=E.CompanyID
+    WHERE U.UserID=@user AND U.CompanyID=@company AND U.IsActive=1
+) THEN 1 ELSE 0 END;
+""";
+        await using var command = new SqlCommand(sql, connection);
+        Add(command, "@user", user);
+        Add(command, "@company", company);
+        return Convert.ToBoolean(await command.ExecuteScalarAsync(token));
+    }
+    private static async Task<bool> HasOwnInvitation(SqlConnection connection, long company, long user, long? participantId, CancellationToken token)
+    {
+        const string sql = """
+SELECT CASE WHEN EXISTS
+(
+    SELECT 1
+    FROM dbo.TDADUser U
+    INNER JOIN dbo.TDADUserEmployee UE
+        ON UE.UserID=U.UserID AND UE.CompanyID=U.CompanyID AND UE.IsActive=1
+    INNER JOIN dbo.TDADEmployee E
+        ON E.EmployeeID=UE.EmployeeID AND E.CompanyID=UE.CompanyID AND E.IsActive=1
+    INNER JOIN dbo.TDADMeetingRoomBookingParticipant P
+        ON P.EmployeeID=E.EmployeeID AND P.CompanyID=E.CompanyID
+    INNER JOIN dbo.TDADMeetingRoomBooking B
+        ON B.BookingID=P.BookingID AND B.CompanyID=P.CompanyID AND B.BookingStatus='APPROVED'
+    WHERE U.UserID=@user AND U.CompanyID=@company AND U.IsActive=1
+      AND (@participant IS NULL OR P.BookingParticipantID=@participant)
+      AND EXISTS
+      (
+          SELECT 1
+          FROM dbo.TDADMeetingRoomBookingSlot S
+          WHERE S.BookingID=B.BookingID AND S.CompanyID=B.CompanyID
+            AND S.EndDateTime>=GETDATE()
+      )
+) THEN 1 ELSE 0 END;
+""";
+        await using var command = new SqlCommand(sql, connection);
+        Add(command, "@user", user);
+        Add(command, "@company", company);
+        Add(command, "@participant", participantId);
+        return Convert.ToBoolean(await command.ExecuteScalarAsync(token));
+    }
     private void Bind(SqlCommand command, long company, long? employee, bool isAdmin, string? search, string? status) { Add(command, "@company", company); Add(command, "@employee", employee); Add(command, "@admin", isAdmin ? 1 : 0); Add(command, "@search", string.IsNullOrWhiteSpace(search) ? null : search.Trim()); Add(command, "@status", string.IsNullOrWhiteSpace(status) ? null : status.Trim().ToUpperInvariant()); }
     private static async Task<bool> IsCompanyAdmin(SqlConnection connection, long company, long user, CancellationToken token) { await using var command = new SqlCommand("SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADUser WHERE UserID=@user AND CompanyID=@company AND IsActive=1 AND IsCompanyAdmin=1) THEN 1 ELSE 0 END", connection); Add(command, "@user", user); Add(command, "@company", company); return Convert.ToBoolean(await command.ExecuteScalarAsync(token)); }
-    private async Task<bool> Allowed(SqlConnection connection, string action, CancellationToken token)
-    {
-        if (!Scope(out var company, out var user) || !long.TryParse(User.FindFirstValue("project_id"), out var project)) return false;
-        const string sql = "SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADUser WHERE UserID=@user AND CompanyID=@company AND IsActive=1 AND IsCompanyAdmin=1) OR EXISTS(SELECT 1 FROM dbo.TDADUserPermission UP INNER JOIN dbo.TDADPermission P ON P.PermissionID=UP.PermissionID AND P.ProjectID=UP.ProjectID WHERE UP.UserID=@user AND UP.ProjectID=@project AND UP.IsAllowed=1 AND UP.IsActive=1 AND P.IsActive=1 AND P.ScreenCode=@screen AND P.ActionCode=@action) THEN 1 ELSE 0 END";
-        await using var command = new SqlCommand(sql, connection); Add(command, "@user", user); Add(command, "@company", company); Add(command, "@project", project); Add(command, "@screen", ScreenCode); Add(command, "@action", action); return Convert.ToBoolean(await command.ExecuteScalarAsync(token));
-    }
+    private Task<bool> Allowed(SqlConnection connection, string action, CancellationToken token) => LaooMeetingApi.Security.MeetingFoodPlanAccess.Allowed(connection, User, action, token, ScreenCode);
     private bool Scope(out long company, out long user)
     {
         company = 0; user = 0;

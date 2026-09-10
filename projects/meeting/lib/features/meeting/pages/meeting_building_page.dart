@@ -10,7 +10,7 @@ import '../../../core/widgets/combo_box_text.dart';
 import '../../../core/widgets/auto_dismiss_message.dart';
 import '../../../core/api/api_exception.dart';
 import '../../../core/config/api_config.dart';
-import '../../support/branch/data/branch_repository.dart';
+import '../data/meeting_setup_lookup_repository.dart';
 import '../../support/presentation/widgets/support_workspace_shell.dart';
 import '../../../app/theme/laoo_design_tokens.dart';
 import '../../../app/theme/workspace_theme_presets.dart';
@@ -41,7 +41,6 @@ class MeetingBuildingPage extends StatefulWidget {
 
 class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
   final _repo = MeetingStructureRepository();
-  final _branchRepo = BranchRepository();
   List<Map<String, dynamic>> _items = [];
   List<Map<String, dynamic>> _branches = [];
   Map<String, bool> _actions = {};
@@ -103,13 +102,15 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
     try {
       final results = await Future.wait([
         _repo.get(branchId: _branchId),
-        _branchRepo.get(company: true),
+        MeetingSetupLookupRepository().get('23001'),
         _repo.actions(),
       ]);
       if (!mounted) return;
       setState(() {
         _items = List<Map<String, dynamic>>.from(results[0] as List);
-        _branches = List<Map<String, dynamic>>.from(results[1] as List);
+        _branches = List<Map<String, dynamic>>.from(
+          (results[1] as Map)['branches'] as List,
+        );
         _actions = Map<String, bool>.from(results[2] as Map);
       });
     } catch (error) {

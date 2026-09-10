@@ -5,9 +5,14 @@ class MeetingRoomBookingRepository {
 
   final ApiClient _api;
   static const _path = '/api/company/meeting-room-bookings';
+  Set<int> adminRoomIds = {};
 
   Future<Map<String, bool>> actions() async {
     final data = await _api.get('$_path/actions') as Map;
+    adminRoomIds = {
+      for (final id in data['adminRoomIds'] as List? ?? const [])
+        (id as num).toInt(),
+    };
     return Map<String, bool>.fromEntries(
       data.entries.map(
         (entry) => MapEntry('${entry.key}', entry.value == true),

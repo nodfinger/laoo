@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../widgets/meeting_popup.dart';
@@ -8,6 +10,7 @@ import '../../../app/theme/laoo_typography.dart';
 import '../../../app/theme/workspace_theme_presets.dart';
 import '../../../core/api/api_exception.dart';
 import '../../../core/config/api_config.dart';
+import '../../../core/company_setup/company_setup_controller.dart';
 import '../../../core/navigation/navigation_menu_repository.dart';
 import '../../../core/widgets/auto_dismiss_message.dart';
 import '../../support/presentation/widgets/support_workspace_shell.dart';
@@ -49,6 +52,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
   bool _roomBookingCalendarVisible = false;
   bool _myBookingsOnly = false;
   OverlayEntry? _notificationOverlay;
+  Timer? _notificationTimer;
   String? _subjectError;
   String? _attendeeError;
   String? _timeError;
@@ -88,6 +92,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
 
   @override
   void dispose() {
+    _notificationTimer?.cancel();
     _notificationOverlay?.remove();
     _repository.dispose();
     _subject.dispose();
@@ -550,16 +555,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
     });
     await _searchAvailableRooms(roomId: roomId);
     if (!mounted || room == null) return;
-    final availability = _selectedAvailability;
-    if (availability?['isAvailable'] == true) {
-      await _showBookingDialog();
-    } else {
-      _showMessage(
-        availability?['unavailableReason']?.toString() ??
-            'ห้องไม่ว่างในช่วงเวลาที่เลือก',
-        error: true,
-      );
-    }
+    await _showBookingDialog();
   }
 
   Future<void> _showBookingDialog({VoidCallback? onCancelled}) async {
@@ -690,7 +686,8 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
                       ),
                       const SizedBox(width: 8),
                       if ((_editingId == null && _actions['create'] == true) ||
-                          (_editingId != null && _actions['edit'] == true))
+                          (_editingId != null && _actions['edit'] == true) ||
+                          _repository.adminRoomIds.contains(_selectedRoomId))
                         FilledButton.icon(
                           style: FilledButton.styleFrom(
                             backgroundColor: preset.primary,
@@ -999,6 +996,78 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
     }
   }
 
+  Future<void> _decideApproval(
+    Map<String, dynamic> item,
+    String decision,
+  ) async {
+    final approvalId = _int(item['approvalId']);
+    if (approvalId == null) return;
+    final controller = TextEditingController();
+    final preset = workspaceThemeController.value;
+    final approved = decision == 'APPROVED';
+    final remark = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => MeetingPopup(
+        scrollable: true,
+        title: Row(
+          children: [
+            Icon(
+              approved ? Icons.check_circle_outline : Icons.cancel_outlined,
+              color: approved ? preset.primary : LaooColors.error,
+            ),
+            const SizedBox(width: 8),
+            Text(approved ? 'ยืนยันอนุมัติ' : 'ยืนยันไม่อนุมัติ'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('เลขที่จอง: ${item['bookingNo'] ?? '-'}'),
+            Text(
+              'ห้องประชุม: ${item['roomCode'] ?? '-'} | ${item['roomNameTh'] ?? '-'}',
+            ),
+            Text('ชื่อเรื่อง: ${item['subject'] ?? '-'}'),
+            Text('วันที่และเวลาประชุม: ${_bookingDateTime(item)}'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              maxLines: 3,
+              decoration: const InputDecoration(labelText: 'หมายเหตุ'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text('ยกเลิก', style: TextStyle(color: preset.primary)),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: approved ? preset.primary : LaooColors.error,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(LaooRadius.xs),
+              ),
+            ),
+            onPressed: () =>
+                Navigator.pop(dialogContext, controller.text.trim()),
+            child: Text(approved ? 'อนุมัติ' : 'ไม่อนุมัติ'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (remark == null || !mounted) return;
+    try {
+      await _repository.decideApproval(approvalId, decision, remark: remark);
+      _showMessage(approved ? 'อนุมัติการจองสำเร็จ' : 'ไม่อนุมัติการจองสำเร็จ');
+      await _loadBookings();
+    } catch (error) {
+      _showError(error, 'ดำเนินการอนุมัติไม่สำเร็จ');
+    }
+  }
+
   Future<void> _confirmRollback(Map<String, dynamic> item) async {
     final id = _int(item['bookingId']);
     if (id == null) return;
@@ -1097,6 +1166,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
 
   void _showMessage(String value, {bool error = false}) {
     if (!mounted) return;
+    _notificationTimer?.cancel();
     _notificationOverlay?.remove();
     final entry = OverlayEntry(
       builder: (_) => Positioned(
@@ -1111,9 +1181,15 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
     );
     _notificationOverlay = entry;
     Overlay.of(context, rootOverlay: true).insert(entry);
+    final seconds = companySetupController.current?.timeAlert ?? 30;
+    _notificationTimer = Timer(Duration(seconds: seconds), () {
+      if (_notificationOverlay == entry) _dismissNotification();
+    });
   }
 
   void _dismissNotification() {
+    _notificationTimer?.cancel();
+    _notificationTimer = null;
     _notificationOverlay?.remove();
     _notificationOverlay = null;
   }
@@ -1614,7 +1690,8 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                if (_actions['create'] == true)
+                if (_actions['create'] == true ||
+                    _repository.adminRoomIds.contains(_selectedRoomId))
                   FilledButton.icon(
                     style: FilledButton.styleFrom(
                       backgroundColor: preset.primary,
@@ -1943,7 +2020,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
                 ),
                 const SizedBox(width: 8),
                 OutlinedButton(
-                  onPressed: available ? () => _openBookingDialog(room) : null,
+                  onPressed: () => _openBookingDialog(room),
                   child: const Text('จอง'),
                 ),
               ],
@@ -2347,9 +2424,33 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
     WorkspaceThemePreset preset,
   ) {
     final status = item['status']?.toString();
+    final roomAdmin = _repository.adminRoomIds.contains(_int(item['roomId']));
+    final endDateTime = DateTime.tryParse('${item['endDateTime'] ?? ''}');
+    final hasEnded =
+        endDateTime != null && !endDateTime.isAfter(DateTime.now());
+    if (hasEnded) {
+      return Tooltip(
+        message: 'สิ้นสุดช่วงเวลาจองแล้ว',
+        child: Icon(Icons.lock_outline, color: Theme.of(context).disabledColor),
+      );
+    }
     final editable = status != 'CANCELLED' && status != 'REJECTED';
     return Wrap(
       children: [
+        if (status == 'PENDING' &&
+            (_actions['approvalEdit'] == true || roomAdmin) &&
+            item['approvalId'] != null) ...[
+          IconButton(
+            tooltip: 'ไม่อนุมัติการจอง',
+            onPressed: () => _decideApproval(item, 'REJECTED'),
+            icon: const Icon(Icons.cancel_outlined, color: Colors.red),
+          ),
+          IconButton(
+            tooltip: 'อนุมัติการจอง',
+            onPressed: () => _decideApproval(item, 'APPROVED'),
+            icon: Icon(Icons.check_circle_outline, color: preset.primary),
+          ),
+        ],
         if (item['canManageFoodPlan'] == true)
           IconButton(
             tooltip: 'กำหนดเมนูอาหาร',
@@ -2363,20 +2464,20 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
             onPressed: () => _showParticipantDialog(item),
             icon: Icon(Icons.group_add_outlined, color: preset.primary),
           ),
-        if (_actions['edit'] == true && editable)
+        if ((_actions['edit'] == true || roomAdmin) && editable)
           IconButton(
             tooltip: 'แก้ไข',
             onPressed: () => _editBooking(item),
             icon: Icon(Icons.edit_outlined, color: preset.primary),
           ),
-        if (_actions['delete'] == true && editable)
+        if ((_actions['delete'] == true || roomAdmin) && editable)
           IconButton(
             tooltip: 'ยกเลิกการจอง',
             onPressed: () => _confirmCancel(item),
             icon: const Icon(Icons.delete_outline, color: Colors.red),
           ),
         if ((status == 'APPROVED' || status == 'REJECTED') &&
-            _actions['admin'] == true)
+            (_actions['approvalEdit'] == true || roomAdmin))
           IconButton(
             tooltip: 'ถอยสถานะ',
             onPressed: () => _confirmRollback(item),
