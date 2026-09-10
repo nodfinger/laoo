@@ -12,6 +12,7 @@ class MeetingPaginationCard extends StatelessWidget {
     required this.primary,
     required this.onPrevious,
     required this.onNext,
+    this.showDivider = true,
   });
 
   final int total;
@@ -20,6 +21,7 @@ class MeetingPaginationCard extends StatelessWidget {
   final Color primary;
   final VoidCallback? onPrevious;
   final VoidCallback? onNext;
+  final bool showDivider;
 
   @override
   Widget build(BuildContext context) {
@@ -27,7 +29,6 @@ class MeetingPaginationCard extends StatelessWidget {
     final currentPage = pageCount == 0 ? 0 : pageIndex + 1;
     final start = total == 0 ? 0 : pageIndex * pageSize + 1;
     final end = ((pageIndex + 1) * pageSize).clamp(0, total);
-    final muted = Theme.of(context).colorScheme.surfaceContainerHighest;
     final mutedText = Theme.of(context).colorScheme.onSurfaceVariant;
     final onPrimary = Theme.of(context).colorScheme.onPrimary;
     final shape = RoundedRectangleBorder(
@@ -45,11 +46,13 @@ class MeetingPaginationCard extends StatelessWidget {
         child: OutlinedButton(
           style: OutlinedButton.styleFrom(
             padding: EdgeInsets.zero,
-            backgroundColor: muted,
-            disabledBackgroundColor: muted,
-            foregroundColor: mutedText,
-            disabledForegroundColor: mutedText.withValues(alpha: .55),
-            side: BorderSide.none,
+            backgroundColor: LaooColors.white,
+            disabledBackgroundColor: LaooColors.white,
+            foregroundColor: onPressed == null ? mutedText : primary,
+            disabledForegroundColor: mutedText,
+            side: BorderSide(
+              color: onPressed == null ? LaooColors.border : primary,
+            ),
             shape: shape,
           ),
           onPressed: onPressed,
@@ -73,7 +76,8 @@ class MeetingPaginationCard extends StatelessWidget {
         height: LaooLayout.paginationCardHeight,
         child: Column(
           children: [
-            const Divider(height: 1, thickness: 1, color: LaooColors.border),
+            if (showDivider)
+              const Divider(height: 1, thickness: 1, color: LaooColors.border),
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.symmetric(

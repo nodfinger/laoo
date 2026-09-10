@@ -8,6 +8,7 @@ import '../../support/presentation/widgets/support_workspace_shell.dart';
 import '../data/meeting_food_order_summary_repository.dart';
 import '../meeting_feature_host.dart';
 import '../meeting_route_contract.dart';
+import '../widgets/meeting_pagination_card.dart';
 
 class MeetingFoodOrderSummaryPage extends StatefulWidget {
   const MeetingFoodOrderSummaryPage({super.key});
@@ -23,7 +24,6 @@ class _State extends State<MeetingFoodOrderSummaryPage> {
   String caption = 'สรุปการสั่งอาหาร';
   String? message;
   List<Map<String, dynamic>> items = [];
-  Map<String, dynamic>? detail;
   bool loading = true, available = true;
   int page = 1, total = 0;
 
@@ -69,20 +69,6 @@ class _State extends State<MeetingFoodOrderSummaryPage> {
     } catch (error) {
       if (mounted) {
         setState(() => message = errorText(error, 'โหลดสรุปอาหารไม่สำเร็จ'));
-      }
-    } finally {
-      if (mounted) setState(() => loading = false);
-    }
-  }
-
-  Future<void> open(Map<String, dynamic> item) async {
-    setState(() => loading = true);
-    try {
-      final data = await repo.get((item['bookingId'] as num).toInt());
-      if (mounted) setState(() => detail = data);
-    } catch (error) {
-      if (mounted) {
-        setState(() => message = errorText(error, 'โหลดรายละเอียดไม่สำเร็จ'));
       }
     } finally {
       if (mounted) setState(() => loading = false);
@@ -194,13 +180,11 @@ class _State extends State<MeetingFoodOrderSummaryPage> {
       ),
     ),
   );
-  Widget itemCard(
-    Map<String, dynamic> item,
-    WorkspaceThemePreset preset,
-  ) => InkWell(
-    borderRadius: BorderRadius.circular(LaooRadius.xs),
-    onTap: () => open(item),
-    child: WorkspaceSectionCard(
+  Widget itemCard(Map<String, dynamic> item, WorkspaceThemePreset preset) {
+    final foods = List<Map<String, dynamic>>.from(
+      item['foods'] as List? ?? const [],
+    );
+    return WorkspaceSectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -228,93 +212,55 @@ class _State extends State<MeetingFoodOrderSummaryPage> {
             'ผู้สั่ง ${item['orderedParticipantCount'] ?? 0} คน | จำนวนรวม ${item['orderedQuantity'] ?? 0}',
             style: TextStyle(color: preset.textSecondary),
           ),
-        ],
-      ),
-    ),
-  );
-  Widget detailView(WorkspaceThemePreset preset) {
-    final header = Map<String, dynamic>.from(detail!['header'] as Map);
-    final rows = List<Map<String, dynamic>>.from(
-      detail!['items'] as List? ?? const [],
-    );
-    return Padding(
-      padding: const EdgeInsets.all(LaooLayout.cardMargin),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          WorkspaceSectionCard(
-            child: WorkspaceActionHeader(
-              title: '$caption > รายละเอียด',
-              favoriteKey: MeetingMenuCodes.foodOrderSummary,
-              actions: [
-                OutlinedButton.icon(
-                  onPressed: () => setState(() => detail = null),
-                  icon: const Icon(Icons.arrow_back),
-                  label: const Text('กลับ'),
-                ),
-              ],
-            ),
+          const SizedBox(height: 12),
+          const Text(
+            'สรุปรายการอาหารที่สั่ง',
+            style: TextStyle(fontWeight: FontWeight.w700),
           ),
-          const SizedBox(height: LaooLayout.cardSpacing),
-          WorkspaceSectionCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        '${header['roomCode']} | ${header['roomName']}',
-                        style: const TextStyle(fontWeight: FontWeight.w700),
+          const SizedBox(height: 6),
+          if (foods.isEmpty)
+            Text(
+              'ยังไม่มีรายการอาหาร',
+              style: TextStyle(color: preset.textSecondary),
+            )
+          else
+            ...foods.map(
+              (food) => Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: WorkspaceSectionCard(
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.restaurant_menu_outlined,
+                        color: preset.primary,
                       ),
-                    ),
-                    Text('${header['bookingNo'] ?? '-'}'),
-                    const SizedBox(width: 8),
-                    badge(header['status'] as String?, preset),
-                  ],
-                ),
-                const Divider(),
-                Text('${header['subject']}'),
-                Text(
-                  '${dateTime(header['startDateTime'])} - ${dateTime(header['endDateTime'])}',
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: LaooLayout.cardSpacing),
-          Expanded(
-            child: WorkspaceSectionCard(
-              child: SingleChildScrollView(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: DataTable(
-                    headingRowColor: WidgetStatePropertyAll(
-                      preset.primary.withValues(alpha: .1),
-                    ),
-                    columns: const [
-                      DataColumn(label: Text('ประเภทอาหาร')),
-                      DataColumn(label: Text('รายการอาหาร')),
-                      DataColumn(label: Text('ผู้สั่ง'), numeric: true),
-                      DataColumn(label: Text('จำนวนรวม'), numeric: true),
-                    ],
-                    rows: [
-                      for (final row in rows)
-                        DataRow(
-                          cells: [
-                            DataCell(Text('${row['foodTypeName'] ?? '-'}')),
-                            DataCell(Text('${row['code']} | ${row['nameTh']}')),
-                            DataCell(
-                              Text('${row['orderedParticipantCount'] ?? 0}'),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${food['code']} | ${food['nameTh']}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
-                            DataCell(Text('${row['orderedQuantity'] ?? 0}')),
+                            Text(
+                              '${food['foodTypeName'] ?? '-'}',
+                              style: TextStyle(color: preset.textSecondary),
+                            ),
                           ],
                         ),
+                      ),
+                      Text(
+                        'ผู้สั่ง ${food['orderedParticipantCount'] ?? 0}\nรวม ${food['orderedQuantity'] ?? 0}',
+                        textAlign: TextAlign.end,
+                      ),
                     ],
                   ),
                 ),
               ),
             ),
-          ),
         ],
       ),
     );
@@ -322,35 +268,23 @@ class _State extends State<MeetingFoodOrderSummaryPage> {
 
   Widget pager() {
     final pages = (total / 20).ceil();
-    return SizedBox(
-      height: LaooLayout.paginationCardHeight,
-      child: Row(
-        children: [
-          IconButton.filled(
-            onPressed: page > 1
-                ? () {
-                    setState(() => page--);
-                    load();
-                  }
-                : null,
-            icon: const Icon(Icons.chevron_left),
-          ),
-          const SizedBox(width: 8),
-          Text('${pages == 0 ? 0 : page} / $pages'),
-          const SizedBox(width: 8),
-          IconButton.filled(
-            onPressed: page < pages
-                ? () {
-                    setState(() => page++);
-                    load();
-                  }
-                : null,
-            icon: const Icon(Icons.chevron_right),
-          ),
-          const SizedBox(width: 8),
-          Text('ทั้งหมด $total รายการ'),
-        ],
-      ),
+    return MeetingPaginationCard(
+      total: total,
+      pageIndex: page - 1,
+      pageSize: 20,
+      primary: workspaceThemeController.value.primary,
+      onPrevious: page > 1
+          ? () {
+              setState(() => page--);
+              load();
+            }
+          : null,
+      onNext: page < pages
+          ? () {
+              setState(() => page++);
+              load();
+            }
+          : null,
     );
   }
 
@@ -362,61 +296,52 @@ class _State extends State<MeetingFoodOrderSummaryPage> {
       activeMenu: MeetingMenuCodes.foodOrderSummary,
       child: Stack(
         children: [
-          if (detail != null)
-            detailView(preset)
-          else
-            Padding(
-              padding: const EdgeInsets.all(LaooLayout.cardMargin),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  WorkspaceSectionCard(
-                    child: WorkspaceActionHeader(
-                      title: caption,
-                      favoriteKey: MeetingMenuCodes.foodOrderSummary,
-                      actions: [
-                        IconButton(
-                          tooltip: 'รีเฟรช',
-                          onPressed: load,
-                          icon: Icon(Icons.refresh, color: preset.primary),
-                        ),
-                      ],
-                    ),
+          Padding(
+            padding: const EdgeInsets.all(LaooLayout.cardMargin),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                WorkspaceSectionCard(
+                  child: WorkspaceActionHeader(
+                    title: caption,
+                    favoriteKey: MeetingMenuCodes.foodOrderSummary,
+                    actions: [
+                      IconButton(
+                        tooltip: 'รีเฟรช',
+                        onPressed: load,
+                        icon: Icon(Icons.refresh, color: preset.primary),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: LaooLayout.cardSpacing),
-                  filterCard(),
-                  const SizedBox(height: LaooLayout.cardSpacing),
-                  Expanded(
-                    child: loading
-                        ? const Center(child: CircularProgressIndicator())
-                        : !available
-                        ? const Center(
-                            child: Text(
-                              'ระบบสรุปอาหารยังไม่พร้อม กรุณาติดต่อผู้ดูแลระบบ',
-                            ),
-                          )
-                        : items.isEmpty
-                        ? const Center(
-                            child: Text(
-                              'ไม่พบรายการสั่งอาหารในช่วงวันที่เลือก',
-                            ),
-                          )
-                        : ListView.separated(
-                            itemCount: items.length,
-                            separatorBuilder: (_, _) =>
-                                const SizedBox(height: 6),
-                            itemBuilder: (_, index) =>
-                                itemCard(items[index], preset),
+                ),
+                const SizedBox(height: LaooLayout.cardSpacing),
+                filterCard(),
+                const SizedBox(height: LaooLayout.cardSpacing),
+                Expanded(
+                  child: loading
+                      ? const Center(child: CircularProgressIndicator())
+                      : !available
+                      ? const Center(
+                          child: Text(
+                            'ระบบสรุปอาหารยังไม่พร้อม กรุณาติดต่อผู้ดูแลระบบ',
                           ),
-                  ),
-                  const SizedBox(height: LaooLayout.cardSpacing),
-                  WorkspaceSectionCard(
-                    padding: EdgeInsets.zero,
-                    child: pager(),
-                  ),
-                ],
-              ),
+                        )
+                      : items.isEmpty
+                      ? const Center(
+                          child: Text('ไม่พบรายการสั่งอาหารในช่วงวันที่เลือก'),
+                        )
+                      : ListView.separated(
+                          itemCount: items.length,
+                          separatorBuilder: (_, _) => const SizedBox(height: 6),
+                          itemBuilder: (_, index) =>
+                              itemCard(items[index], preset),
+                        ),
+                ),
+                const SizedBox(height: LaooLayout.cardSpacing),
+                pager(),
+              ],
             ),
+          ),
           if (message != null)
             Positioned(
               top: 12,

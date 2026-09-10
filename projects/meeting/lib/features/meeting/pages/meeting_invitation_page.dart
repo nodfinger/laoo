@@ -11,6 +11,7 @@ import '../../support/presentation/widgets/support_workspace_shell.dart';
 import '../data/meeting_invitation_repository.dart';
 import '../meeting_feature_host.dart';
 import '../widgets/meeting_attendance_panel.dart';
+import '../widgets/meeting_pagination_card.dart';
 
 class MeetingInvitationPage extends StatefulWidget {
   const MeetingInvitationPage({super.key});
@@ -23,7 +24,6 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
   final _search = TextEditingController();
   final _remark = TextEditingController();
   List<Map<String, dynamic>> _items = [];
-  Map<String, bool> _actions = {};
   Map<int, int> _foodQuantities = {};
   Map<String, dynamic>? _detail;
   String? _filterStatus;
@@ -62,22 +62,17 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final values = await Future.wait([
-        _repository.list(
-          search: _search.text,
-          status: _filterStatus,
-          page: _page,
-        ),
-        _repository.actions(),
-      ]);
+      final result = await _repository.list(
+        search: _search.text,
+        status: _filterStatus,
+        page: _page,
+      );
       if (!mounted) return;
-      final result = values[0];
       setState(() {
         _items = List<Map<String, dynamic>>.from(
           result['items'] as List? ?? const [],
         );
         _total = (result['total'] as num?)?.toInt() ?? 0;
-        _actions = values[1] as Map<String, bool>;
       });
     } catch (error) {
       _notify(_error(error, 'โหลดคำเชิญไม่สำเร็จ'), true);
@@ -182,6 +177,9 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
     _ => 'รอตอบรับ',
   };
 
+  String _meetingPeriod(Map<String, dynamic> invitation) =>
+      '${_date(invitation['startDateTime'])} – ${_date(invitation['endDateTime'])}';
+
   Color _statusColor(String value, WorkspaceThemePreset preset) =>
       value == 'DECLINED' ? LaooColors.error : preset.primary;
 
@@ -216,13 +214,13 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
                       : () => setState(() => _detail = null),
                   child: const Text('ยกเลิก'),
                 ),
-                if (_actions['edit'] == true && canRespond)
+                if (canRespond)
                   FilledButton.icon(
                     onPressed: _saving ? null : _save,
                     icon: const Icon(Icons.save_outlined),
                     label: Text(_saving ? 'กำลังบันทึก...' : 'บันทึก'),
                   ),
-                if (_actions['edit'] == true && canOrder)
+                if (canOrder)
                   FilledButton.icon(
                     onPressed: _saving ? null : _saveFoodOrder,
                     icon: const Icon(Icons.restaurant_menu_outlined),
@@ -245,7 +243,7 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
                     child: Text(
                       '${invitation['bookingNo'] ?? '-'} | ${invitation['subject']}\n'
                       '${invitation['roomCode']} | ${invitation['roomName']}\n'
-                      '${_date(invitation['startDateTime'])} - ${_date(invitation['endDateTime'])}\n'
+                      '${_meetingPeriod(invitation)}\n'
                       'ผู้จัด: ${invitation['organizerName'] ?? '-'}',
                     ),
                   ),
@@ -265,30 +263,73 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
                         const [
                           ('PENDING', 'รอตอบรับ', Icons.schedule_outlined),
                           ('ACCEPTED', 'เข้าร่วม', Icons.check_circle_outline),
-                          ('DECLINED', 'ไม่เข้าร่วม', Icons.cancel_outlined),
+                          ('DECLINED', 'ปฏิเสธ', Icons.cancel_outlined),
                         ].map((option) {
                           final selected = _responseStatus == option.$1;
-                          return ChoiceChip(
-                            selected: selected,
-                            selectedColor: preset.primary.withValues(
-                              alpha: .15,
-                            ),
-                            avatar: Icon(
-                              option.$3,
-                              color: option.$1 == 'DECLINED'
-                                  ? LaooColors.error
-                                  : preset.primary,
-                            ),
-                            label: Text(option.$2),
-                            onSelected: _saving || !canRespond
-                                ? null
-                                : (_) => setState(
-                                    () => _responseStatus = option.$1,
+                          final isDeclined = option.$1 == 'DECLINED';
+                          final color = isDeclined
+                              ? LaooColors.error
+                              : preset.primary;
+                          return SizedBox(
+                            height: LaooTypography.buttonHeight,
+                            child: OutlinedButton.icon(
+                              onPressed: _saving || !canRespond || selected
+                                  ? null
+                                  : () => setState(
+                                      () => _responseStatus = option.$1,
+                                    ),
+                              icon: Icon(option.$3),
+                              label: Text(option.$2),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: selected
+                                    ? (isDeclined
+                                          ? Colors.white
+                                          : Theme.of(
+                                              context,
+                                            ).colorScheme.onPrimary)
+                                    : color,
+                                backgroundColor: selected
+                                    ? (isDeclined
+                                          ? LaooColors.error
+                                          : preset.primary)
+                                    : Colors.white,
+                                disabledForegroundColor: selected
+                                    ? (isDeclined
+                                          ? Colors.white
+                                          : Theme.of(
+                                              context,
+                                            ).colorScheme.onPrimary)
+                                    : color.withValues(alpha: .45),
+                                disabledBackgroundColor: selected
+                                    ? (isDeclined
+                                          ? LaooColors.error
+                                          : preset.primary)
+                                    : Colors.white,
+                                side: BorderSide(color: color),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(
+                                    LaooRadius.xs,
                                   ),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                ),
+                                textStyle: const TextStyle(
+                                  fontSize: LaooTypography.button,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
                           );
                         }).toList(),
                   ),
                   const SizedBox(height: 12),
+                  if (!canRespond) ...[
+                    Text(
+                      '${invitation['responseUnavailableReason'] ?? 'คำเชิญนี้ไม่สามารถเปลี่ยนการตอบรับได้ กรุณาโหลดข้อมูลใหม่หรือติดต่อผู้ดูแลระบบ'}',
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   TextField(
                     controller: _remark,
                     maxLines: 3,
@@ -411,13 +452,15 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
     final pageCount = (_total / 20).ceil();
     return Padding(
       padding: const EdgeInsets.all(LaooLayout.cardMargin),
-      child: WorkspaceSectionCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            WorkspacePageTitle(title: _caption, favoriteKey: '21003'),
-            const Divider(height: 17, color: LaooColors.border),
-            LayoutBuilder(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          WorkspaceSectionCard(
+            child: WorkspacePageTitle(title: _caption, favoriteKey: '21003'),
+          ),
+          const SizedBox(height: LaooLayout.captionFilterSpacing),
+          WorkspaceSectionCard(
+            child: LayoutBuilder(
               builder: (context, constraints) => Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -435,7 +478,6 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
                       decoration: const InputDecoration(
                         labelText: 'ค้นหาเลขที่จอง/หัวข้อ/ห้อง',
                         prefixIcon: Icon(Icons.search),
-                        suffixIcon: Icon(Icons.arrow_forward),
                       ),
                     ),
                   ),
@@ -491,103 +533,111 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
                 ],
               ),
             ),
-            const Divider(height: 17, color: LaooColors.border),
-            if (_loading) const LinearProgressIndicator(),
-            Expanded(
-              child: !_loading && _items.isEmpty
-                  ? const Center(
-                      child: Text('ยังไม่มีคำเชิญที่รอตอบรับหรือกำลังจะมาถึง'),
-                    )
-                  : ListView.separated(
-                      itemCount: _items.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 6),
-                      itemBuilder: (context, index) {
-                        final item = _items[index];
-                        final status = '${item['invitationStatus']}';
-                        final color = _statusColor(status, preset);
-                        return Card(
-                          margin: EdgeInsets.zero,
-                          child: ListTile(
-                            leading: Icon(
-                              Icons.mark_email_read_outlined,
-                              color: color,
-                            ),
-                            title: Text(
-                              '${item['bookingNo'] ?? '-'} | ${item['subject']}',
-                            ),
-                            subtitle: Text(
-                              '${item['roomCode']} | ${item['roomName']}\n'
-                              '${_date(item['startDateTime'])}\n'
-                              'ผู้จัด: ${item['organizerName'] ?? '-'}',
-                            ),
-                            trailing: Wrap(
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: color.withValues(alpha: .10),
-                                    borderRadius: BorderRadius.circular(
-                                      LaooRadius.xs,
-                                    ),
-                                  ),
-                                  child: Text(
-                                    _statusName(status),
-                                    style: TextStyle(color: color),
-                                  ),
-                                ),
-                                IconButton(
-                                  tooltip: 'เปิดคำเชิญ',
-                                  onPressed: () => _open(item),
-                                  icon: Icon(
-                                    Icons.chevron_right,
-                                    color: preset.primary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-            ),
-            const Divider(height: 17, color: LaooColors.border),
-            Wrap(
-              spacing: 8,
-              crossAxisAlignment: WrapCrossAlignment.center,
+          ),
+          const SizedBox(height: LaooLayout.cardSpacing),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                OutlinedButton(
-                  onPressed: _page > 1
-                      ? () {
-                          setState(() => _page--);
-                          _load();
-                        }
-                      : null,
-                  child: const Icon(Icons.chevron_left),
-                ),
-                FilledButton(
-                  onPressed: null,
-                  child: Text('${pageCount == 0 ? 0 : _page}'),
-                ),
-                OutlinedButton(
-                  onPressed: _page < pageCount
-                      ? () {
-                          setState(() => _page++);
-                          _load();
-                        }
-                      : null,
-                  child: const Icon(Icons.chevron_right),
-                ),
-                Text(
-                  '${_items.isEmpty ? 0 : (_page - 1) * 20 + 1}-${(_page - 1) * 20 + _items.length} จาก $_total',
+                if (_loading) const LinearProgressIndicator(),
+                Expanded(
+                  child: !_loading && _items.isEmpty
+                      ? const Center(
+                          child: Text(
+                            'ยังไม่มีคำเชิญที่รอตอบรับหรือกำลังจะมาถึง',
+                          ),
+                        )
+                      : ListView.separated(
+                          padding: EdgeInsets.zero,
+                          itemCount: _items.length,
+                          separatorBuilder: (_, _) => const SizedBox(height: 6),
+                          itemBuilder: (context, index) {
+                            final item = _items[index];
+                            final status = '${item['invitationStatus']}';
+                            final color = _statusColor(status, preset);
+                            return Card(
+                              margin: EdgeInsets.zero,
+                              color: LaooColors.white,
+                              surfaceTintColor: Colors.transparent,
+                              elevation: 0,
+                              clipBehavior: Clip.antiAlias,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(
+                                  LaooRadius.xs,
+                                ),
+                                side: BorderSide.none,
+                              ),
+                              child: ListTile(
+                                leading: Icon(
+                                  Icons.mark_email_read_outlined,
+                                  color: color,
+                                ),
+                                title: Text(
+                                  '${item['bookingNo'] ?? '-'} | ${item['subject']}',
+                                ),
+                                subtitle: Text(
+                                  '${item['roomCode']} | ${item['roomName']}\n'
+                                  '${_meetingPeriod(item)}\n'
+                                  'ผู้จัด: ${item['organizerName'] ?? '-'}',
+                                ),
+                                trailing: Wrap(
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: color.withValues(alpha: .10),
+                                        borderRadius: BorderRadius.circular(
+                                          LaooRadius.xs,
+                                        ),
+                                      ),
+                                      child: Text(
+                                        _statusName(status),
+                                        style: TextStyle(color: color),
+                                      ),
+                                    ),
+                                    IconButton(
+                                      tooltip: 'เปิดคำเชิญ',
+                                      onPressed: () => _open(item),
+                                      icon: Icon(
+                                        Icons.chevron_right,
+                                        color: preset.primary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+          const SizedBox(height: LaooLayout.cardSpacing),
+          MeetingPaginationCard(
+            showDivider: false,
+            total: _total,
+            pageIndex: _page - 1,
+            pageSize: 20,
+            primary: preset.primary,
+            onPrevious: _page > 1
+                ? () {
+                    setState(() => _page--);
+                    _load();
+                  }
+                : null,
+            onNext: _page < pageCount
+                ? () {
+                    setState(() => _page++);
+                    _load();
+                  }
+                : null,
+          ),
+        ],
       ),
     );
   }
