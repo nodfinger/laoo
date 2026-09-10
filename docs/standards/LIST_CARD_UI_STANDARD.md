@@ -10,6 +10,7 @@
 - ส่วน Caption, Filter, Table/List และ Pagination เป็น Card สีขาวเต็มความกว้างของ Content Area
 - Caption Card และ Filter Card ต้องแยกเป็นคนละ Card และเว้นระยะห่าง `6px` พอดี
 - Filter, Table/List และ Pagination ต้องแยกเป็น Card คนละ Section โดยใช้ `LaooLayout.cardSpacing` ระหว่าง Section และใช้เส้น `LaooColors.border` ภายในจุดที่มาตรฐานกำหนด ห้ามใช้กรอบสีสร้างขอบซ้ำ
+- Pagination Card ต้องวางใต้ Table/List และแสดงเสมอ แม้มีข้อมูลเพียงหน้าเดียวหรือไม่มีข้อมูล โดยใช้รายละเอียดตาม `PAGINATION_UI_STANDARD.md`
 - Margin ซ้าย บน ขวาของ Content ใช้ `LaooLayout.cardMargin`
 - Card ทุกตัวไม่มีเส้นกรอบสีและใช้มุมโค้ง `LaooRadius.xs`
 
@@ -19,7 +20,7 @@
 - Caption ใช้มาตรฐานกลาง `fontSize: 18`, `fontWeight: FontWeight.w700`, `color: Colors.black` ตาม `TYPOGRAPHY_STANDARD.md`
 - Icon ดาวอยู่ซ้ายสุด ชิดกับ Caption และใช้สี Primary ของ User Style
 - ปุ่ม `+ เพิ่ม` อยู่ขวา ใช้สี Primary มุมโค้ง `4px` และแสดงตาม Permission
-- มีเส้นสีเทาอ่อนยาวใต้ Caption โดยต้องอยู่ภายใน Card พอดี
+- ใต้ Caption Card ห้ามมีเส้นคั่นสีเทา; ใช้พื้นที่ว่างระหว่าง Caption Card กับ Filter Card `6px` เพื่อแยกส่วนแทน
 
 ## Filter Card
 

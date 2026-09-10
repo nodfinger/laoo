@@ -56,8 +56,10 @@ class ItemApi {
   Future<Map<String, dynamic>> get(int id) async => Map<String, dynamic>.from(
     await _client.get('/api/company/items/$id') as Map,
   );
-  Future<void> create(Map<String, dynamic> body) async =>
-      _client.post('/api/company/items', body: body);
+  Future<Map<String, dynamic>> create(Map<String, dynamic> body) async =>
+      Map<String, dynamic>.from(
+        await _client.post('/api/company/items', body: body) as Map,
+      );
   Future<void> update(int id, Map<String, dynamic> body) async =>
       _client.put('/api/company/items/$id', body: body);
   Future<void> updateVisibility(
@@ -69,6 +71,22 @@ class ItemApi {
     body: {'isActive': isActive, 'showShop': showShop},
   );
   Future<void> delete(int id) async => _client.delete('/api/company/items/$id');
+  Future<List<Map<String, dynamic>>> projectOptions() async =>
+      List<Map<String, dynamic>>.from(
+        await _client.get('/api/company/items/project-options') as List,
+      );
+  Future<Map<String, dynamic>> classificationDefaults(
+    String? group,
+    String? type,
+  ) async => Map<String, dynamic>.from(
+    await _client.get(
+          '/api/company/items/classification-defaults',
+          query: {'groupCode': ?group, 'typeCode': ?type},
+        )
+        as Map,
+  );
+  Future<void> saveClassificationDefaults(Map<String, dynamic> body) async =>
+      _client.put('/api/company/items/classification-defaults', body: body);
   Future<List<Map<String, dynamic>>> getPackUnits(int id) async =>
       List<Map<String, dynamic>>.from(
         await _client.get('/api/company/items/$id/pack-units') as List,

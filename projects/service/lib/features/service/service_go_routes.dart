@@ -8,7 +8,7 @@ import '../company/pre_order/pages/pre_order_page.dart';
 import '../company/quotation/pages/quotation_page.dart';
 import '../company/tax_invoice/pages/tax_invoice_page.dart';
 import '../company/temporary_receipt/pages/temporary_receipt_page.dart';
-import '../inventory/pages/inventory_pages.dart';
+import '../inventory/pages/inventory_pages.dart' hide StockReceiptPage;
 import '../inventory/pages/stock_receipt_page.dart';
 import '../support/presentation/widgets/support_workspace_shell.dart';
 import 'service_route_contract.dart';

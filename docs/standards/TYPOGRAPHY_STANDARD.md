@@ -17,5 +17,5 @@
 ## Prompt สำหรับส่งให้ AI
 
 ```text
-ตรวจ Typography ของหน้าจอนี้ตาม docs/standards/TYPOGRAPHY_STANDARD.md ใช้ NotoSansThai และค่า LaooTypography จากส่วนกลางเท่านั้น: Caption หลักของ List/Card/Action/Popup ต้อง fontSize 18, FontWeight.w700 และสีดำ; Section/Label 16px, TextBox/ComboBox/Table/Button 14px, Hint/Validation 12px และปุ่มสูง 48px ห้าม hardcode fontFamily/fontSize กระจายในหน้าจอ และต้องตรวจข้อความไทยกับ Overflow
+ตรวจ Typography ตามมาตรฐานกลาง ใช้ NotoSansThai และ LaooTypography: Caption 18px น้ำหนัก w700 สีดำ; Section/Label 16px; TextBox/ComboBox/Table 14px; Button 13px สูง 48px; Hint/Validation 12px ห้ามกระจายค่าฟอนต์แบบ hardcode และต้องตรวจข้อความไทยกับ Overflow
 ```

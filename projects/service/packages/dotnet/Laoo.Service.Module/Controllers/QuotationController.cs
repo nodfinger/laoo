@@ -1,3 +1,4 @@
+using LaooServiceModule.Infrastructure;
 using System.Data;
 using System.Security.Claims;
 using LaooServiceModule.Models;
@@ -8,7 +9,8 @@ using Microsoft.Data.SqlClient;
 namespace LaooServiceModule.Controllers;
 
 [ApiController, Authorize, LaooServiceModule.Security.RequireCompanyFeature("SALES")]
-[LaooServiceModule.Security.RequireCompanyProject("LAOO_SERVICE")]
+[LaooServiceModule.Security.RequireCompanyProject("LAOO")]
+[TypeFilter(typeof(ItemProjectExceptionFilter))]
 [Route("api/company/quotations")]
 public sealed class QuotationController(IConfiguration configuration, IWebHostEnvironment environment) : ControllerBase
 {
@@ -88,7 +90,7 @@ public sealed class QuotationController(IConfiguration configuration, IWebHostEn
         }
 
         var itemRows = new List<ItemLookupRow>();
-        await using (var cmd = new SqlCommand("""
+        await using (var cmd = new SqlCommand($"""
             SELECT I.ItemID,I.ItemCode,I.ItemName,
                    COALESCE(CONVERT(nvarchar(200), U.Name), CONVERT(nvarchar(200), I.UnitCode)) AS UnitCode,
                    I.UnitPrice,X.FilePath,X.ImageData
@@ -107,7 +109,7 @@ public sealed class QuotationController(IConfiguration configuration, IWebHostEn
              AND U.OwnerCompanyID=I.CompanyID
             WHERE I.CompanyID=@company AND I.IsActive=1
               AND EXISTS(SELECT 1 FROM dbo.TDIVItemUsage IU WHERE IU.CompanyID=I.CompanyID AND IU.ItemID=I.ItemID AND IU.UsageCode=N'SALE')
-            ORDER BY I.ItemCode
+            AND {ItemProjectAccess.ItemAliasPredicate} ORDER BY I.ItemCode
             """, c))
         {
             Add(cmd, "@company", SqlDbType.BigInt, CompanyId());
@@ -555,7 +557,7 @@ public sealed class QuotationController(IConfiguration configuration, IWebHostEn
     private async Task<(long Id, string Name)?> ReadEmployee(SqlConnection c, SqlTransaction tx, long? id, CancellationToken token)
     { if (id is null) return null; await using var cmd=new SqlCommand("SELECT EmployeeID,FullName FROM dbo.TDADEmployee WHERE EmployeeID=@id AND CompanyID=@company AND IsActive=1",c,tx); Add(cmd,"@id",SqlDbType.BigInt,id); Add(cmd,"@company",SqlDbType.BigInt,CompanyId()); await using var r=await cmd.ExecuteReaderAsync(token); return await r.ReadAsync(token)?(r.GetInt64(0),r.GetString(1)):null; }
     private async Task<(string Code, string Name, string? Unit)?> ReadItem(SqlConnection c, SqlTransaction tx, long id, CancellationToken token)
-    { await using var cmd=new SqlCommand("SELECT ItemCode,ItemName,UnitCode FROM dbo.TDIVItem I WHERE ItemID=@id AND CompanyID=@company AND IsActive=1 AND EXISTS(SELECT 1 FROM dbo.TDIVItemUsage U WHERE U.CompanyID=I.CompanyID AND U.ItemID=I.ItemID AND U.UsageCode=N'SALE')",c,tx); Add(cmd,"@id",SqlDbType.BigInt,id); Add(cmd,"@company",SqlDbType.BigInt,CompanyId()); await using var r=await cmd.ExecuteReaderAsync(token); return await r.ReadAsync(token)?(r.GetString(0),r.GetString(1),Text(r,2)):null; }
+    { await ItemProjectAccess.EnsureAsync(c,tx,CompanyId(),id,token); await using var cmd=new SqlCommand("SELECT ItemCode,ItemName,UnitCode FROM dbo.TDIVItem I WHERE ItemID=@id AND CompanyID=@company AND IsActive=1 AND EXISTS(SELECT 1 FROM dbo.TDIVItemUsage U WHERE U.CompanyID=I.CompanyID AND U.ItemID=I.ItemID AND U.UsageCode=N'SALE')",c,tx); Add(cmd,"@id",SqlDbType.BigInt,id); Add(cmd,"@company",SqlDbType.BigInt,CompanyId()); await using var r=await cmd.ExecuteReaderAsync(token); return await r.ReadAsync(token)?(r.GetString(0),r.GetString(1),Text(r,2)):null; }
     private async Task<string> NextCode(SqlConnection c, SqlTransaction tx, CancellationToken token)
     { await using var cmd=new SqlCommand("SELECT ISNULL(MAX(TRY_CONVERT(int,RIGHT(QuoteCode,6))),0)+1 FROM dbo.TDARQuotation WITH (UPDLOCK,HOLDLOCK) WHERE CompanyID=@company AND QuoteCode LIKE N'QT%';",c,tx); Add(cmd,"@company",SqlDbType.BigInt,CompanyId()); return $"QT{Convert.ToInt32(await cmd.ExecuteScalarAsync(token)):D6}"; }
     private Task<bool> Can(SqlConnection c,string action,CancellationToken token) =>

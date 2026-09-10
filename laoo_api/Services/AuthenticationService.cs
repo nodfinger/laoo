@@ -444,16 +444,17 @@ public sealed class AuthenticationService
                AND project.IsActive = 1
             OUTER APPLY
             (
-                SELECT TOP (1) userBranch.BranchID
-                FROM dbo.TDADUserBranch AS userBranch
-                INNER JOIN dbo.TDADBranch AS activeBranch
-                    ON activeBranch.BranchID = userBranch.BranchID
-                   AND activeBranch.CompanyID = userBranch.CompanyID
-                   AND activeBranch.IsActive = 1
-                WHERE userBranch.UserID = u.UserID
-                  AND userBranch.CompanyID = u.CompanyID
-                  AND userBranch.IsActive = 1
-                ORDER BY userBranch.IsDefault DESC, userBranch.UserBranchID
+                SELECT TOP (1) activeBranch.BranchID
+                FROM dbo.TDADBranch AS activeBranch
+                LEFT JOIN dbo.TDADUserBranch AS userBranch
+                    ON userBranch.BranchID = activeBranch.BranchID
+                   AND userBranch.CompanyID = activeBranch.CompanyID
+                   AND userBranch.UserID = u.UserID
+                   AND userBranch.IsActive = 1
+                WHERE activeBranch.CompanyID = u.CompanyID
+                  AND activeBranch.IsActive = 1
+                  AND (u.IsCompanyAdmin=1 OR activeBranch.AccessModeCode=N'ALL' OR userBranch.UserBranchID IS NOT NULL)
+                ORDER BY ISNULL(userBranch.IsDefault,0) DESC, activeBranch.BranchCode
             ) AS branch
             OUTER APPLY
             (

@@ -106,3 +106,56 @@ class BranchUpsertRequest {
     'isActive': isActive,
   };
 }
+
+class BranchAccessUser {
+  const BranchAccessUser({
+    required this.userId,
+    required this.username,
+    required this.displayName,
+    required this.isSelected,
+  });
+
+  factory BranchAccessUser.fromJson(Map<String, dynamic> json) =>
+      BranchAccessUser(
+        userId: (json['userId'] as num).toInt(),
+        username: '${json['username'] ?? ''}',
+        displayName: '${json['displayName'] ?? ''}',
+        isSelected: json['isSelected'] == true,
+      );
+
+  final int userId;
+  final String username;
+  final String displayName;
+  final bool isSelected;
+}
+
+class BranchAccessConfiguration {
+  const BranchAccessConfiguration({
+    required this.branchId,
+    required this.branchCode,
+    required this.branchName,
+    required this.accessModeCode,
+    required this.users,
+  });
+
+  factory BranchAccessConfiguration.fromJson(Map<String, dynamic> json) =>
+      BranchAccessConfiguration(
+        branchId: (json['branchId'] as num).toInt(),
+        branchCode: '${json['branchCode'] ?? ''}',
+        branchName: '${json['branchName'] ?? ''}',
+        accessModeCode: '${json['accessModeCode'] ?? 'RESTRICTED'}',
+        users: (json['users'] as List? ?? const [])
+            .whereType<Map>()
+            .map(
+              (item) =>
+                  BranchAccessUser.fromJson(Map<String, dynamic>.from(item)),
+            )
+            .toList(growable: false),
+      );
+
+  final int branchId;
+  final String branchCode;
+  final String branchName;
+  final String accessModeCode;
+  final List<BranchAccessUser> users;
+}

@@ -72,8 +72,6 @@ class _MasterDataPageState extends State<MasterDataPage> {
   bool _isAdding = false;
   String? _message;
   bool _messageError = false;
-  int _sortColumn = 4;
-  bool _sortAscending = true;
   int _currentPage = 0;
   String _appliedSearch = '';
 
@@ -183,18 +181,7 @@ class _MasterDataPageState extends State<MasterDataPage> {
 
   List<_MasterRow> get _filteredRows {
     final term = _appliedSearch;
-    final rows = [...(_rows[_selectedGroup] ?? const <_MasterRow>[])]
-      ..sort((a, b) {
-        final result = switch (_sortColumn) {
-          2 => a.code.compareTo(b.code),
-          3 => a.name.compareTo(b.name),
-          4 => a.seq.compareTo(b.seq),
-          5 => a.shortCode.compareTo(b.shortCode),
-          _ =>
-            a.seq != b.seq ? a.seq.compareTo(b.seq) : a.name.compareTo(b.name),
-        };
-        return _sortAscending ? result : -result;
-      });
+    final rows = [...(_rows[_selectedGroup] ?? const <_MasterRow>[])];
     final filtered = term.isEmpty
         ? rows
         : rows
@@ -236,12 +223,6 @@ class _MasterDataPageState extends State<MasterDataPage> {
         )
         .length;
   }
-
-  void _sort(int column, bool ascending) => setState(() {
-    _sortColumn = column;
-    _sortAscending = ascending;
-    _currentPage = 0;
-  });
 
   void _applySearch() {
     setState(() {
@@ -443,7 +424,8 @@ class _MasterDataPageState extends State<MasterDataPage> {
           seq: (_rows[_selectedGroup]?.length ?? 0) + 1,
         );
       } else {
-        _editing = null;
+        _editing = row;
+        _isAdding = false;
       }
       _message = 'บันทึกข้อมูลกลุ่ม${_group.name}สำเร็จ';
       _messageError = false;
@@ -493,13 +475,17 @@ class _MasterDataPageState extends State<MasterDataPage> {
     final editing = _editing;
     return SupportWorkspaceShell(
       menuScope: widget.menuScope,
-      pageTitle: editing == null
-          ? 'รหัสพื้นฐาน > ${_group.name}'
-          : 'รหัสพื้นฐาน > ${_isAdding ? 'เพิ่ม' : 'แก้ไข'}',
+      pageTitle: 'รหัสพื้นฐาน > ${_group.name}',
       activeMenu: 'masterData',
       child: Stack(
         children: [
-          editing == null ? _buildList(context) : _buildForm(context, editing),
+          _buildList(context),
+          if (editing != null) ...[
+            const Positioned.fill(
+              child: ModalBarrier(dismissible: false, color: Colors.black54),
+            ),
+            Positioned.fill(child: _buildForm(context, editing)),
+          ],
           if (_message != null)
             Positioned(
               top: 12,
@@ -721,8 +707,6 @@ class _MasterDataPageState extends State<MasterDataPage> {
                   columnSpacing: 16,
                   dataRowMinHeight: 48,
                   dataRowMaxHeight: 56,
-                  sortColumnIndex: _sortColumn,
-                  sortAscending: _sortAscending,
                   border: TableBorder(
                     top: BorderSide.none,
                     bottom: BorderSide.none,
@@ -753,13 +737,10 @@ class _MasterDataPageState extends State<MasterDataPage> {
                         child: Center(child: Text('Action')),
                       ),
                     ),
-                    DataColumn(label: const Text('รหัส'), onSort: _sort),
-                    DataColumn(label: const Text('ชื่อ'), onSort: _sort),
-                    DataColumn(
-                      label: const Text('เรียงลำดับแสดง'),
-                      onSort: _sort,
-                    ),
-                    DataColumn(label: const Text('รหัสย่อ'), onSort: _sort),
+                    const DataColumn(label: Text('รหัส')),
+                    const DataColumn(label: Text('ชื่อ')),
+                    const DataColumn(label: Text('เรียงลำดับแสดง')),
+                    const DataColumn(label: Text('รหัสย่อ')),
                   ],
                   rows: _filteredRows.asMap().entries.map((entry) {
                     final row = entry.value;
@@ -1158,107 +1139,131 @@ class _MasterDataFormState extends State<_MasterDataForm> {
 
   @override
   Widget build(BuildContext context) {
-    return ColoredBox(
-      color: const Color(0xFFF8F9FB),
-      child: Form(
-        child: ListView(
-          padding: const EdgeInsets.all(24),
-          children: [
-            Card(
-              color: Colors.white,
-              elevation: 0,
-              surfaceTintColor: Colors.transparent,
-              shadowColor: Colors.transparent,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(4),
-                side: BorderSide.none,
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 14,
-                ),
-                child: WorkspaceActionHeader(
-                  title:
-                      'รหัสพื้นฐาน > ${widget.groupName} > ${widget.isAdding ? 'เพิ่ม' : 'แก้ไข'}',
-                  favoriteKey: '05002',
-                  actions: [
-                    OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(
-                          100,
-                          LaooTypography.buttonHeight,
-                        ),
-                        alignment: Alignment.center,
-                      ),
-                      onPressed: _saving ? null : widget.onCancel,
-                      icon: const Icon(Icons.close),
-                      label: const Text('ยกเลิก'),
-                    ),
-                    if (widget.canSave)
-                      FilledButton.icon(
-                        style: FilledButton.styleFrom(
-                          minimumSize: const Size(
-                            100,
-                            LaooTypography.buttonHeight,
-                          ),
-                          alignment: Alignment.center,
-                        ),
-                        onPressed: _saving ? null : _sync,
-                        icon: const Icon(Icons.save_outlined),
-                        label: Text(_saving ? 'กำลังบันทึก...' : 'บันทึก'),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Card(
-              color: Colors.white,
-              elevation: 0,
-              surfaceTintColor: Colors.transparent,
-              shadowColor: Colors.transparent,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(4),
-                side: BorderSide.none,
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  children: [
-                    TextFormField(
-                      initialValue: widget.row.code,
-                      readOnly: true,
-                      decoration: const InputDecoration(
-                        labelText: 'รหัส (สร้างอัตโนมัติ)',
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _name,
-                      decoration: const InputDecoration(labelText: 'ชื่อ *'),
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _seq,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'ลำดับแสดงข้อมูล',
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _shortCode,
-                      inputFormatters: [_UpperCaseTextFormatter()],
-                      decoration: const InputDecoration(labelText: 'รหัสย่อ'),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
+    final primary = Theme.of(context).colorScheme.primary;
+    final actionStyle = ButtonStyle(
+      minimumSize: const WidgetStatePropertyAll(
+        Size(0, LaooTypography.buttonHeight),
+      ),
+      padding: const WidgetStatePropertyAll(
+        EdgeInsets.symmetric(horizontal: 16),
+      ),
+      shape: const WidgetStatePropertyAll(
+        RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(LaooRadius.xs)),
         ),
       ),
+    );
+    return Center(
+      child: Dialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(LaooLayout.cardMargin),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(LaooRadius.xs)),
+        ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 480),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(LaooLayout.cardPadding),
+            child: Form(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.edit_outlined, color: primary),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'รหัสพื้นฐาน > ${widget.groupName} > ${widget.isAdding ? 'เพิ่ม' : 'แก้ไข'}',
+                          style: const TextStyle(
+                            color: Colors.black,
+                            fontSize: LaooTypography.workspaceCaption,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  const Divider(height: 1, color: LaooColors.border),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    initialValue: widget.row.code,
+                    readOnly: true,
+                    style: const TextStyle(fontSize: LaooTypography.inputText),
+                    decoration: _inputDecoration(
+                      context,
+                      'รหัส (สร้างอัตโนมัติ)',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _name,
+                    style: const TextStyle(fontSize: LaooTypography.inputText),
+                    decoration: _inputDecoration(context, 'ชื่อ *'),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _seq,
+                    style: const TextStyle(fontSize: LaooTypography.inputText),
+                    keyboardType: TextInputType.number,
+                    decoration: _inputDecoration(context, 'ลำดับแสดงข้อมูล'),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _shortCode,
+                    style: const TextStyle(fontSize: LaooTypography.inputText),
+                    inputFormatters: [_UpperCaseTextFormatter()],
+                    decoration: _inputDecoration(context, 'รหัสย่อ'),
+                  ),
+                  const SizedBox(height: 12),
+                  const Divider(height: 1, color: LaooColors.border),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      OutlinedButton.icon(
+                        style: actionStyle,
+                        onPressed: _saving ? null : widget.onCancel,
+                        icon: const Icon(Icons.close),
+                        label: const Text('ยกเลิก'),
+                      ),
+                      const SizedBox(width: 8),
+                      if (widget.canSave)
+                        FilledButton.icon(
+                          style: actionStyle,
+                          onPressed: _saving ? null : _sync,
+                          icon: const Icon(Icons.save_outlined),
+                          label: Text(_saving ? 'กำลังบันทึก...' : 'บันทึก'),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  InputDecoration _inputDecoration(BuildContext context, String labelText) {
+    final primary = Theme.of(context).colorScheme.primary;
+    OutlineInputBorder border(Color color, {double width = 1}) =>
+        OutlineInputBorder(
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
+          borderSide: BorderSide(color: color, width: width),
+        );
+    return InputDecoration(
+      labelText: labelText,
+      isDense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      border: border(LaooColors.border),
+      enabledBorder: border(LaooColors.border),
+      focusedBorder: border(primary, width: 1.5),
+      errorBorder: border(LaooColors.error),
+      focusedErrorBorder: border(LaooColors.error, width: 1.5),
     );
   }
 }

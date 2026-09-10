@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../../app/theme/laoo_typography.dart';
+import '../../../../app/theme/laoo_design_tokens.dart';
 import '../../../../app/theme/workspace_theme_presets.dart';
 import '../../../../core/company_setup/company_setup_controller.dart';
 import '../../../../core/api/api_exception.dart';
@@ -1240,200 +1241,205 @@ class _ItemPageState extends State<ItemPage> {
 
   Widget _list() => ColoredBox(
     color: const Color(0xFFF8F9FB),
-    child: Stack(
-      children: [
-        Column(
-          children: [
-            Container(
-              margin: const EdgeInsets.fromLTRB(24, 16, 24, 0),
-              padding: const EdgeInsets.all(10),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.all(Radius.circular(4)),
-                border: Border(bottom: BorderSide(color: Color(0xFFE4EAE6))),
-              ),
-              child: Row(
-                children: [
-                  const Expanded(
-                    child: WorkspacePageTitle(
-                      title: 'ข้อมูลสินค้า',
-                      favoriteKey: '08001',
-                    ),
-                  ),
-                  if (MediaQuery.sizeOf(context).width >= 1200)
-                    DecoratedBox(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(4),
-                        color: workspaceThemeController.value.primary
-                            .withValues(alpha: .10),
+    child: Padding(
+      padding: const EdgeInsets.all(LaooLayout.cardMargin),
+      child: Stack(
+        children: [
+          Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(LaooLayout.cardPadding),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.all(Radius.circular(4)),
+                  border: Border(bottom: BorderSide(color: Color(0xFFE4EAE6))),
+                ),
+                child: Row(
+                  children: [
+                    const Expanded(
+                      child: WorkspacePageTitle(
+                        title: 'ข้อมูลสินค้า',
+                        favoriteKey: '08001',
                       ),
-                      child: IconButton(
-                        tooltip: _card ? 'แสดงแบบรายการ' : 'แสดงแบบการ์ด',
-                        onPressed: () => setState(() => _card = !_card),
-                        color: workspaceThemeController.value.primary,
-                        icon: Icon(
-                          _card
-                              ? Icons.view_list_outlined
-                              : Icons.grid_view_outlined,
+                    ),
+                    if (MediaQuery.sizeOf(context).width >= 1200)
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(4),
+                          color: workspaceThemeController.value.primary
+                              .withValues(alpha: .10),
                         ),
-                      ),
-                    ),
-                  if (_actions['create'] == true) const SizedBox(width: 8),
-                  if (_actions['create'] == true)
-                    MediaQuery.sizeOf(context).width < 600
-                        ? IconButton.filled(
-                            tooltip: 'เพิ่มสินค้า',
-                            onPressed: () => setState(() => _editing = {}),
-                            icon: const Icon(Icons.add),
-                          )
-                        : FilledButton.icon(
-                            onPressed: () => setState(() => _editing = {}),
-                            icon: const Icon(Icons.add),
-                            label: const Text('เพิ่ม'),
-                          ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 24),
-              padding: const EdgeInsets.all(10),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.all(Radius.circular(4)),
-              ),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final filterWidth = constraints.maxWidth < 700
-                      ? constraints.maxWidth < 220
-                            ? constraints.maxWidth
-                            : ((constraints.maxWidth - 32) / 2).clamp(
-                                96.0,
-                                240.0,
-                              )
-                      : ((constraints.maxWidth - 32) / 5).clamp(140.0, 240.0);
-                  return Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      SizedBox(
-                        width: filterWidth,
-                        child: _filter('กลุ่มสินค้า', _group, _groups, (v) {
-                          _group = v;
-                          _currentPage = 0;
-                          _load();
-                        }),
-                      ),
-                      SizedBox(
-                        width: filterWidth,
-                        child: _filter('ประเภทสินค้า', _type, _types, (v) {
-                          _type = v;
-                          _currentPage = 0;
-                          _load();
-                        }),
-                      ),
-                      SizedBox(
-                        width: filterWidth,
-                        child: TextField(
-                          controller: _search,
-                          onSubmitted: (_) => _load(),
-                          decoration: InputDecoration(
-                            labelText: 'ค้นหารหัส/ชื่อสินค้า',
-                            suffixIcon: IconButton(
-                              onPressed: _load,
-                              icon: const Icon(Icons.arrow_forward),
-                            ),
+                        child: IconButton(
+                          tooltip: _card ? 'แสดงแบบรายการ' : 'แสดงแบบการ์ด',
+                          onPressed: () => setState(() => _card = !_card),
+                          color: workspaceThemeController.value.primary,
+                          icon: Icon(
+                            _card
+                                ? Icons.view_list_outlined
+                                : Icons.grid_view_outlined,
                           ),
                         ),
                       ),
-                      SizedBox(
-                        width: filterWidth,
-                        child: DropdownButtonFormField<String>(
-                          initialValue: _statusFilter,
-                          decoration: const InputDecoration(labelText: 'สถานะ'),
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                fontSize: LaooTypography.tableBody,
-                                height: 1.35,
-                              ),
-                          items: const [
-                            DropdownMenuItem(
-                              value: 'all',
-                              child: Text('ทั้งหมด'),
+                    if (_actions['create'] == true) const SizedBox(width: 8),
+                    if (_actions['create'] == true)
+                      MediaQuery.sizeOf(context).width < 600
+                          ? IconButton.filled(
+                              tooltip: 'เพิ่มสินค้า',
+                              onPressed: () => setState(() => _editing = {}),
+                              icon: const Icon(Icons.add),
+                            )
+                          : FilledButton.icon(
+                              onPressed: () => setState(() => _editing = {}),
+                              icon: const Icon(Icons.add),
+                              label: const Text('เพิ่ม'),
                             ),
-                            DropdownMenuItem(
-                              value: 'active',
-                              child: Text('ใช้งาน'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'inactive',
-                              child: Text('ไม่ใช้งาน'),
-                            ),
-                          ],
-                          onChanged: (v) => setState(() {
-                            _statusFilter = v ?? 'all';
-                            _currentPage = 0;
-                          }),
-                        ),
-                      ),
-                      SizedBox(
-                        width: filterWidth,
-                        child: DropdownButtonFormField<String>(
-                          initialValue: _showFilter,
-                          decoration: const InputDecoration(labelText: 'แสดง'),
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                fontSize: LaooTypography.tableBody,
-                                height: 1.35,
-                              ),
-                          items: const [
-                            DropdownMenuItem(
-                              value: 'all',
-                              child: Text('ทั้งหมด'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'online',
-                              child: Text('Online'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'offline',
-                              child: Text('Offline'),
-                            ),
-                          ],
-                          onChanged: (v) => setState(() {
-                            _showFilter = v ?? 'all';
-                            _currentPage = 0;
-                          }),
-                        ),
-                      ),
-                    ],
-                  );
-                },
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Expanded(
-              child: _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : (_card || MediaQuery.sizeOf(context).width < 1200)
-                  ? _cardsV2()
-                  : _table(),
-            ),
-            const SizedBox(height: 8),
-            _paginationBar(),
-          ],
-        ),
-        if (_message != null)
-          Positioned(
-            top: 12,
-            right: 24,
-            child: _Alert(
-              text: _message!,
-              onClose: () => setState(() => _message = null),
-            ),
+              const SizedBox(height: LaooLayout.cardSpacing),
+              Container(
+                padding: const EdgeInsets.all(LaooLayout.cardPadding),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.all(Radius.circular(4)),
+                ),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final filterWidth = constraints.maxWidth < 700
+                        ? constraints.maxWidth < 220
+                              ? constraints.maxWidth
+                              : ((constraints.maxWidth - 32) / 2).clamp(
+                                  96.0,
+                                  240.0,
+                                )
+                        : ((constraints.maxWidth - 32) / 5).clamp(140.0, 240.0);
+                    return Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: filterWidth,
+                          child: _filter('กลุ่มสินค้า', _group, _groups, (v) {
+                            _group = v;
+                            _currentPage = 0;
+                            _load();
+                          }),
+                        ),
+                        SizedBox(
+                          width: filterWidth,
+                          child: _filter('ประเภทสินค้า', _type, _types, (v) {
+                            _type = v;
+                            _currentPage = 0;
+                            _load();
+                          }),
+                        ),
+                        SizedBox(
+                          width: filterWidth,
+                          child: TextField(
+                            controller: _search,
+                            onSubmitted: (_) => _load(),
+                            decoration: InputDecoration(
+                              labelText: 'ค้นหารหัส/ชื่อสินค้า',
+                              suffixIcon: IconButton(
+                                onPressed: _load,
+                                icon: const Icon(Icons.arrow_forward),
+                              ),
+                            ),
+                          ),
+                        ),
+                        SizedBox(
+                          width: filterWidth,
+                          child: DropdownButtonFormField<String>(
+                            initialValue: _statusFilter,
+                            decoration: const InputDecoration(
+                              labelText: 'สถานะ',
+                            ),
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  fontSize: LaooTypography.tableBody,
+                                  height: 1.35,
+                                ),
+                            items: const [
+                              DropdownMenuItem(
+                                value: 'all',
+                                child: Text('ทั้งหมด'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'active',
+                                child: Text('ใช้งาน'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'inactive',
+                                child: Text('ไม่ใช้งาน'),
+                              ),
+                            ],
+                            onChanged: (v) => setState(() {
+                              _statusFilter = v ?? 'all';
+                              _currentPage = 0;
+                            }),
+                          ),
+                        ),
+                        SizedBox(
+                          width: filterWidth,
+                          child: DropdownButtonFormField<String>(
+                            initialValue: _showFilter,
+                            decoration: const InputDecoration(
+                              labelText: 'แสดง',
+                            ),
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  fontSize: LaooTypography.tableBody,
+                                  height: 1.35,
+                                ),
+                            items: const [
+                              DropdownMenuItem(
+                                value: 'all',
+                                child: Text('ทั้งหมด'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'online',
+                                child: Text('Online'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'offline',
+                                child: Text('Offline'),
+                              ),
+                            ],
+                            onChanged: (v) => setState(() {
+                              _showFilter = v ?? 'all';
+                              _currentPage = 0;
+                            }),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: LaooLayout.cardSpacing),
+              Expanded(
+                child: _loading
+                    ? const Center(child: CircularProgressIndicator())
+                    : (_card || MediaQuery.sizeOf(context).width < 1200)
+                    ? _cardsV2()
+                    : _table(),
+              ),
+              const SizedBox(height: LaooLayout.cardSpacing),
+              _paginationBar(),
+            ],
           ),
-      ],
+          if (_message != null)
+            Positioned(
+              top: LaooLayout.cardPadding,
+              right: LaooLayout.cardPadding,
+              child: _Alert(
+                text: _message!,
+                onClose: () => setState(() => _message = null),
+              ),
+            ),
+        ],
+      ),
     ),
   );
 
@@ -1475,7 +1481,7 @@ class _ItemPageState extends State<ItemPage> {
             ? viewportConstraints.maxHeight - 24
             : 0.0;
         return SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
+          padding: EdgeInsets.zero,
           child: ConstrainedBox(
             constraints: BoxConstraints(minHeight: tableMinHeight),
             child: Card(
@@ -1906,8 +1912,7 @@ class _ItemPageState extends State<ItemPage> {
     final end = total == 0 ? 0 : (start + _pageSize - 1).clamp(0, total);
     final accent = workspaceThemeController.value.primary;
     return Container(
-      margin: const EdgeInsets.fromLTRB(24, 0, 24, 16),
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.all(LaooLayout.cardPadding),
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.all(Radius.circular(4)),
@@ -1991,9 +1996,9 @@ class _ItemPageState extends State<ItemPage> {
   }
 
   Widget _cards() => ListView.separated(
-    padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+    padding: EdgeInsets.zero,
     itemCount: _visibleRows.length,
-    separatorBuilder: (_, _) => const SizedBox(height: 10),
+    separatorBuilder: (_, _) => const SizedBox(height: 6),
     itemBuilder: (_, i) {
       final x = _visibleRows[i];
       final cover = x['coverImageBase64'];
@@ -2087,9 +2092,9 @@ class _ItemPageState extends State<ItemPage> {
   }
 
   Widget _cardsV2() => ListView.separated(
-    padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+    padding: EdgeInsets.zero,
     itemCount: _visibleRows.length,
-    separatorBuilder: (_, _) => const SizedBox(height: 10),
+    separatorBuilder: (_, _) => const SizedBox(height: 6),
     itemBuilder: (_, i) {
       final x = _visibleRows[i];
       final accent = workspaceThemeController.value.primary;
@@ -2105,7 +2110,7 @@ class _ItemPageState extends State<ItemPage> {
           side: const BorderSide(color: Color(0xFFF8F9FB)),
         ),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 12, 14),
+          padding: const EdgeInsets.all(LaooLayout.cardPadding),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

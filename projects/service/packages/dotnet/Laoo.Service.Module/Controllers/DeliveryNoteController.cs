@@ -9,7 +9,8 @@ using Microsoft.Data.SqlClient;
 namespace LaooServiceModule.Controllers;
 
 [ApiController, Authorize, LaooServiceModule.Security.RequireCompanyFeature("SALES")]
-[LaooServiceModule.Security.RequireCompanyProject("LAOO_SERVICE")]
+[LaooServiceModule.Security.RequireCompanyProject("LAOO")]
+[TypeFilter(typeof(ItemProjectExceptionFilter))]
 [Route("api/company/delivery-notes")]
 public sealed class DeliveryNoteController(IConfiguration configuration) : ControllerBase
 {
@@ -56,12 +57,12 @@ public sealed class DeliveryNoteController(IConfiguration configuration) : Contr
         return Ok(new
         {
             customers = await Rows(c, "SELECT CustomerID,CusCode,CusName,CusAddress,TaxID,ContName1,Phone1,Email1,ContName2,Phone2,Email2 FROM dbo.TDARCustomer WHERE CompanyID=@company AND IsActive=1 ORDER BY CusCode", token, r => new { customerId = r.GetInt64(0), customerCode = r.GetString(1), customerName = r.GetString(2), address = Text(r, 3), taxId = Text(r, 4), contactName1 = Text(r, 5), phone1 = Text(r, 6), email1 = Text(r, 7), contactName2 = Text(r, 8), phone2 = Text(r, 9), email2 = Text(r, 10) }),
-            items = await Rows(c, """
+            items = await Rows(c, $"""
               SELECT I.ItemID,I.ItemCode,I.ItemName,I.UnitCode,I.UnitPrice,I.StockBalance,COALESCE(M.Name,I.UnitCode)
               FROM dbo.TDIVItem I LEFT JOIN dbo.TDSTMaster M ON M.OwnerType=N'C' AND M.OwnerCompanyID=I.CompanyID AND M.MasterGroupCode=@unitGroup AND M.MasterCode=I.UnitCode AND M.IsActive=1
               WHERE I.CompanyID=@company AND I.IsActive=1 AND I.ItemKindCode=N'GOODS'
                 AND EXISTS(SELECT 1 FROM dbo.TDIVItemUsage U WHERE U.CompanyID=I.CompanyID AND U.ItemID=I.ItemID AND U.UsageCode=N'SALE')
-              ORDER BY I.ItemCode
+              AND {ItemProjectAccess.ItemAliasPredicate} ORDER BY I.ItemCode
             """, token, r => new { itemId = r.GetInt64(0), itemCode = r.GetString(1), itemName = r.GetString(2), unitCode = Text(r, 3), unitPrice = r.GetDecimal(4), stockBalance = r.GetDecimal(5), unitName = Text(r, 6) }, unitGroup: MasterConstCodes.cmsUnit),
             quotations = await Rows(c, "SELECT QuotationID,QuoteCode,QuoteDate,CustomerID,CusCode,CusName,COALESCE(NetAmount,0) FROM dbo.TDARQuotation WHERE CompanyID=@company AND IsActive=1 AND StatusCode<>N'CANCELLED' ORDER BY QuoteDate DESC", token, r => new { id = r.GetInt64(0), code = r.GetString(1), date = r.GetDateTime(2), customerId = r.GetInt64(3), customerCode = r.GetString(4), customerName = r.GetString(5), amount = r.GetDecimal(6) }),
             preOrders = await Rows(c, "SELECT PreOrderID,PreOrderCode,PreOrderDate,CustomerID,CusCode,CusName,TotalAmount FROM dbo.TDARPreOrder WHERE CompanyID=@company AND IsActive=1 AND StatusCode<>N'CANCELLED' ORDER BY PreOrderDate DESC", token, r => new { id = r.GetInt64(0), code = r.GetString(1), date = r.GetDateTime(2), customerId = r.GetInt64(3), customerCode = r.GetString(4), customerName = r.GetString(5), amount = r.GetDecimal(6) }),
@@ -109,13 +110,19 @@ public sealed class DeliveryNoteController(IConfiguration configuration) : Contr
         await using var tx = (SqlTransaction)await c.BeginTransactionAsync(IsolationLevel.Serializable, token);
         try
         {
+            if(request.WarehouseId.HasValue && !await WarehouseAccessService.CanAccessAsync(c,tx,CompanyId(),UserId(),request.WarehouseId.Value,token)){await tx.RollbackAsync(token);return StatusCode(403,new{message="ไม่มีสิทธิ์เข้าถึงคลัง",description="ผู้ใช้ไม่มีสิทธิ์เลือกคลังนี้ในใบส่งของ"});}
             await using var update = new SqlCommand("UPDATE D SET WarehouseID=@warehouse FROM dbo.TDARDeliveryNoteDetail D JOIN dbo.TDARDeliveryNote H ON H.DeliveryNoteID=D.DeliveryNoteID WHERE H.DeliveryNoteID=@id AND D.DeliveryNoteDetailID=@detail AND H.CompanyID=@company AND H.StatusCode=N'DRAFT'",c,tx);
             Add(update,"@warehouse",SqlDbType.BigInt,request.WarehouseId); Add(update,"@id",SqlDbType.BigInt,id); Add(update,"@detail",SqlDbType.BigInt,detailId); Add(update,"@company",SqlDbType.BigInt,CompanyId());
             if(await update.ExecuteNonQueryAsync(token)==0){await tx.RollbackAsync(token);return NotFound(new{message="ไม่พบรายการใบส่งของ",description="แก้คลังและ Serial ได้เฉพาะรายการในเอกสารสถานะร่างของ Company นี้"});}
+            await using var itemCommand = new SqlCommand("SELECT D.ItemID FROM dbo.TDARDeliveryNoteDetail D JOIN dbo.TDARDeliveryNote H ON H.DeliveryNoteID=D.DeliveryNoteID WHERE H.DeliveryNoteID=@id AND D.DeliveryNoteDetailID=@detail AND H.CompanyID=@company", c, tx);
+            Add(itemCommand,"@id",SqlDbType.BigInt,id); Add(itemCommand,"@detail",SqlDbType.BigInt,detailId); Add(itemCommand,"@company",SqlDbType.BigInt,CompanyId());
+            var itemId = await itemCommand.ExecuteScalarAsync(token);
+            if (itemId is null or DBNull) throw new ItemProjectDeniedException();
+            await ItemProjectAccess.EnsureAsync(c,tx,CompanyId(),Convert.ToInt64(itemId),token);
             await ReplaceSerials(c,tx,"DELIVERY_NOTE",detailId,request.SerialInstanceIds,token);
             await tx.CommitAsync(token); return Ok(new{message="บันทึกคลังและ Serial สำเร็จ"});
         }
-        catch(Exception ex){await tx.RollbackAsync(token);return BadRequest(new{message="บันทึกคลังและ Serial ไม่สำเร็จ",description=ex.Message});}
+        catch(Exception ex) when (ex is not ItemProjectDeniedException){await tx.RollbackAsync(token);return BadRequest(new{message="บันทึกคลังและ Serial ไม่สำเร็จ",description=ex.Message});}
     }
 
     [HttpDelete("{id:long}")]
@@ -152,7 +159,7 @@ public sealed class DeliveryNoteController(IConfiguration configuration) : Contr
             await using (var done = new SqlCommand("UPDATE dbo.TDARDeliveryNote SET StatusCode=N'CONFIRMED',ConfirmDate=SYSUTCDATETIME(),ConfirmedBy=@user,UpdateDate=SYSUTCDATETIME(),UpdatedBy=@user WHERE DeliveryNoteID=@id", c, tx)) { Add(done, "@user", SqlDbType.BigInt, UserId()); Add(done, "@id", SqlDbType.BigInt, id); await done.ExecuteNonQueryAsync(token); }
             await tx.CommitAsync(token); return Ok(new { message = "ยืนยันใบส่งของสำเร็จ" });
         }
-        catch (Exception ex) { await tx.RollbackAsync(token); return StatusCode(500, new { message = "ยืนยันใบส่งของไม่สำเร็จ", description = ex.Message }); }
+        catch (Exception ex) when (ex is not ItemProjectDeniedException) { await tx.RollbackAsync(token); return StatusCode(500, new { message = "ยืนยันใบส่งของไม่สำเร็จ", description = ex.Message }); }
     }
 
     [HttpPost("{id:long}/void")]
@@ -173,7 +180,7 @@ public sealed class DeliveryNoteController(IConfiguration configuration) : Contr
             await using (var done = new SqlCommand("UPDATE dbo.TDARDeliveryNote SET StatusCode=N'VOID',VoidDate=SYSUTCDATETIME(),VoidedBy=@user,UpdateDate=SYSUTCDATETIME(),UpdatedBy=@user WHERE DeliveryNoteID=@id", c, tx)) { Add(done, "@user", SqlDbType.BigInt, UserId()); Add(done, "@id", SqlDbType.BigInt, id); await done.ExecuteNonQueryAsync(token); }
             await tx.CommitAsync(token); return Ok(new { message = "ยกเลิกใบส่งของและคืนสต๊อกสำเร็จ" });
         }
-        catch (Exception ex) { await tx.RollbackAsync(token); return StatusCode(500, new { message = "ยกเลิกใบส่งของไม่สำเร็จ", description = ex.Message }); }
+        catch (Exception ex) when (ex is not ItemProjectDeniedException) { await tx.RollbackAsync(token); return StatusCode(500, new { message = "ยกเลิกใบส่งของไม่สำเร็จ", description = ex.Message }); }
     }
 
 #pragma warning restore CS0162
@@ -214,7 +221,7 @@ public sealed class DeliveryNoteController(IConfiguration configuration) : Contr
             { Add(done,"@user",SqlDbType.BigInt,UserId()); Add(done,"@id",SqlDbType.BigInt,id); Add(done,"@company",SqlDbType.BigInt,CompanyId()); await done.ExecuteNonQueryAsync(token); }
             await tx.CommitAsync(token); return Ok(new { message = "ยืนยันใบส่งของสำเร็จ" });
         }
-        catch (Exception ex) { await tx.RollbackAsync(token); return StatusCode(500, new { message = "ยืนยันใบส่งของไม่สำเร็จ", description = ex.Message }); }
+        catch (Exception ex) when (ex is not ItemProjectDeniedException) { await tx.RollbackAsync(token); return StatusCode(500, new { message = "ยืนยันใบส่งของไม่สำเร็จ", description = ex.Message }); }
     }
 
     private async Task<IActionResult> VoidInventory(long id, CancellationToken token)
@@ -232,7 +239,7 @@ public sealed class DeliveryNoteController(IConfiguration configuration) : Contr
             { Add(done,"@user",SqlDbType.BigInt,UserId()); Add(done,"@id",SqlDbType.BigInt,id); Add(done,"@company",SqlDbType.BigInt,CompanyId()); await done.ExecuteNonQueryAsync(token); }
             await tx.CommitAsync(token); return Ok(new { message = "ยกเลิกใบส่งของและคืนสต็อกสำเร็จ" });
         }
-        catch (Exception ex) { await tx.RollbackAsync(token); return StatusCode(500, new { message = "ยกเลิกใบส่งของไม่สำเร็จ", description = ex.Message }); }
+        catch (Exception ex) when (ex is not ItemProjectDeniedException) { await tx.RollbackAsync(token); return StatusCode(500, new { message = "ยกเลิกใบส่งของไม่สำเร็จ", description = ex.Message }); }
     }
 
     private async Task<List<long>> SelectedSerials(SqlConnection c, SqlTransaction tx, string type, long detail, CancellationToken token)
@@ -286,7 +293,7 @@ public sealed class DeliveryNoteController(IConfiguration configuration) : Contr
             if (type != "NONE" && request.ReferenceId.HasValue) { await using var link = new SqlCommand("INSERT dbo.TDARDocumentLink(CompanyID,FromDocumentType,FromDocumentID,ToDocumentType,ToDocumentID,LinkType,LinkDescription,CreatedBy) VALUES(@company,N'DELIVERY_NOTE',@id,@type,@target,N'REFERENCE',N'เอกสารอ้างอิงใบส่งของ',@user)", c, tx); Add(link, "@company", SqlDbType.BigInt, CompanyId()); Add(link, "@id", SqlDbType.BigInt, deliveryId); Add(link, "@type", SqlDbType.NVarChar, type, 30); Add(link, "@target", SqlDbType.BigInt, request.ReferenceId); Add(link, "@user", SqlDbType.BigInt, UserId()); await link.ExecuteNonQueryAsync(token); }
             await tx.CommitAsync(token); return Ok(new { deliveryNoteId = deliveryId, deliveryCode = code, statusCode = "DRAFT" });
         }
-        catch (Exception ex) { await tx.RollbackAsync(token); return StatusCode(500, new { message = "บันทึกใบส่งของไม่สำเร็จ", description = ex.Message }); }
+        catch (Exception ex) when (ex is not ItemProjectDeniedException) { await tx.RollbackAsync(token); return StatusCode(500, new { message = "บันทึกใบส่งของไม่สำเร็จ", description = ex.Message }); }
     }
 
     private void BindHeader(SqlCommand cmd, DeliveryNoteUpsertRequest request, string type, CustomerRow customer, long? id) { Add(cmd, "@company", SqlDbType.BigInt, CompanyId()); Add(cmd, "@date", SqlDbType.Date, request.DeliveryDate?.Date ?? DateTime.Today); Add(cmd, "@type", SqlDbType.NVarChar, type, 30); Add(cmd, "@quotation", SqlDbType.BigInt, type == "QUOTATION" ? request.ReferenceId : null); Add(cmd, "@preorder", SqlDbType.BigInt, type == "PREORDER" ? request.ReferenceId : null); Add(cmd, "@receipt", SqlDbType.BigInt, type == "TEMP_RECEIPT" ? request.ReferenceId : null); Add(cmd, "@parent", SqlDbType.BigInt, type == "DELIVERY_NOTE" ? request.ReferenceId : null); Add(cmd, "@customer", SqlDbType.BigInt, customer.Id); Add(cmd, "@cusCode", SqlDbType.NVarChar, customer.Code, 50); Add(cmd, "@cusName", SqlDbType.NVarChar, customer.Name, 200); Add(cmd, "@address", SqlDbType.NVarChar, customer.Address, 1000); Add(cmd, "@tax", SqlDbType.NVarChar, customer.TaxId, 30); Add(cmd, "@contact", SqlDbType.NVarChar, Filter(request.ContactName), 200); Add(cmd, "@phone", SqlDbType.NVarChar, Filter(request.ContactPhone), 100); Add(cmd, "@deliveryAddress", SqlDbType.NVarChar, Filter(request.DeliveryAddress) ?? customer.Address, 1000); Add(cmd, "@transport", SqlDbType.NVarChar, Filter(request.TransportBy), 200); Add(cmd, "@tracking", SqlDbType.NVarChar, Filter(request.TrackingNo), 100); Add(cmd, "@total", SqlDbType.Decimal, request.Items.Sum(x => Math.Round(x.DeliveryQty * x.UnitPrice, 4))); Add(cmd, "@remark", SqlDbType.NVarChar, Filter(request.Remark), 1000); Add(cmd, "@user", SqlDbType.BigInt, UserId()); if (id.HasValue) Add(cmd, "@id", SqlDbType.BigInt, id.Value); }
@@ -296,7 +303,7 @@ public sealed class DeliveryNoteController(IConfiguration configuration) : Contr
     private async Task<object?> ReadReceiptSource(SqlConnection c, long id, CancellationToken t) { long? pre = null, quote = null; await using (var cmd = new SqlCommand("SELECT PreOrderID,QuotationID FROM dbo.TDARTemporaryReceipt WHERE TemporaryReceiptID=@id AND CompanyID=@company AND IsActive=1", c)) { Add(cmd, "@id", SqlDbType.BigInt, id); Add(cmd, "@company", SqlDbType.BigInt, CompanyId()); await using var r = await cmd.ExecuteReaderAsync(t); if (!await r.ReadAsync(t)) return null; pre = Long(r, 0); quote = Long(r, 1); } var value = pre.HasValue ? await ReadPreOrderSource(c, pre.Value, t) : quote.HasValue ? await ReadQuotationSource(c, quote.Value, t) : null; return value is null ? new { referenceType = "TEMP_RECEIPT", referenceId = id, items = Array.Empty<object>() } : value; }
     private async Task<object?> ReadSource(SqlConnection c, string type, long id, string headerSql, string detailSql, long sourceId, CancellationToken token) { CustomerRow? customer = null; await using (var cmd = new SqlCommand(headerSql, c)) { Add(cmd, "@id", SqlDbType.BigInt, id); Add(cmd, "@company", SqlDbType.BigInt, CompanyId()); await using var r = await cmd.ExecuteReaderAsync(token); if (!await r.ReadAsync(token)) return null; customer = new(r.GetInt64(1), r.GetString(2), r.GetString(3), Text(r, 4), Text(r, 5), Text(r, 6), Text(r, 7)); } var items = await RowsById(c, detailSql, id, token, r => new { sourceDetailId = r.GetInt64(0), itemId = r.GetInt64(1), itemCode = r.GetString(2), itemName = r.GetString(3), unitCode = r.GetString(4), orderedQty = r.GetDecimal(5), previouslyDeliveredQty = r.GetDecimal(6), deliveryQty = Math.Max(0, r.GetDecimal(5) - r.GetDecimal(6)), unitPrice = r.GetDecimal(7) }); return new { referenceType = type, referenceId = sourceId, customer = new { customerId = customer.Id, customerCode = customer.Code, customerName = customer.Name, address = customer.Address, taxId = customer.TaxId, contactName = customer.Contact, contactPhone = customer.Phone }, items }; }
     private async Task<CustomerRow?> Customer(SqlConnection c, SqlTransaction tx, long id, CancellationToken t) { await using var cmd = new SqlCommand("SELECT CustomerID,CusCode,CusName,CusAddress,TaxID,ContName1,Phone1 FROM dbo.TDARCustomer WHERE CustomerID=@id AND CompanyID=@company AND IsActive=1", c, tx); Add(cmd, "@id", SqlDbType.BigInt, id); Add(cmd, "@company", SqlDbType.BigInt, CompanyId()); await using var r = await cmd.ExecuteReaderAsync(t); return await r.ReadAsync(t) ? new(r.GetInt64(0), r.GetString(1), r.GetString(2), Text(r, 3), Text(r, 4), Text(r, 5), Text(r, 6)) : null; }
-    private async Task<(string Code, string Name, string Unit)?> Item(SqlConnection c, SqlTransaction tx, long id, CancellationToken t) { await using var cmd = new SqlCommand("SELECT ItemCode,ItemName,UnitCode FROM dbo.TDIVItem I WHERE ItemID=@id AND CompanyID=@company AND IsActive=1 AND ItemKindCode=N'GOODS' AND EXISTS(SELECT 1 FROM dbo.TDIVItemUsage U WHERE U.CompanyID=I.CompanyID AND U.ItemID=I.ItemID AND U.UsageCode=N'SALE')", c, tx); Add(cmd, "@id", SqlDbType.BigInt, id); Add(cmd, "@company", SqlDbType.BigInt, CompanyId()); await using var r = await cmd.ExecuteReaderAsync(t); return await r.ReadAsync(t) ? (r.GetString(0), r.GetString(1), Text(r, 2) ?? "") : null; }
+    private async Task<(string Code, string Name, string Unit)?> Item(SqlConnection c, SqlTransaction tx, long id, CancellationToken t) { await ItemProjectAccess.EnsureAsync(c,tx,CompanyId(),id,t); await using var cmd = new SqlCommand("SELECT ItemCode,ItemName,UnitCode FROM dbo.TDIVItem I WHERE ItemID=@id AND CompanyID=@company AND IsActive=1 AND ItemKindCode=N'GOODS' AND EXISTS(SELECT 1 FROM dbo.TDIVItemUsage U WHERE U.CompanyID=I.CompanyID AND U.ItemID=I.ItemID AND U.UsageCode=N'SALE')", c, tx); Add(cmd, "@id", SqlDbType.BigInt, id); Add(cmd, "@company", SqlDbType.BigInt, CompanyId()); await using var r = await cmd.ExecuteReaderAsync(t); return await r.ReadAsync(t) ? (r.GetString(0), r.GetString(1), Text(r, 2) ?? "") : null; }
     private async Task<string> NextCode(SqlConnection c, SqlTransaction tx, CancellationToken t) { await using var cmd = new SqlCommand("SELECT ISNULL(MAX(TRY_CONVERT(int,RIGHT(DeliveryCode,6))),0)+1 FROM dbo.TDARDeliveryNote WITH(UPDLOCK,HOLDLOCK) WHERE CompanyID=@company AND DeliveryCode LIKE N'DN%'", c, tx); Add(cmd, "@company", SqlDbType.BigInt, CompanyId()); return $"DN{Convert.ToInt32(await cmd.ExecuteScalarAsync(t)):D6}"; }
     private async Task<string?> ValidateReference(SqlConnection c, SqlTransaction tx, string type, long? id, long customerId, CancellationToken token)
     {

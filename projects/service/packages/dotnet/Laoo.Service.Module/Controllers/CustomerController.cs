@@ -8,7 +8,7 @@ using Microsoft.Data.SqlClient;
 namespace LaooServiceModule.Controllers;
 
 [ApiController, Authorize, LaooServiceModule.Security.RequireCompanyFeature("SALES")]
-[LaooServiceModule.Security.RequireCompanyProject("LAOO_SERVICE")]
+[LaooServiceModule.Security.RequireCompanyProject("LAOO")]
 [Route("api/company/customers")]
 public sealed class CustomerController(IConfiguration configuration) : ControllerBase
 {

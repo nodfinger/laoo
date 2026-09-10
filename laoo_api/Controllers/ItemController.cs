@@ -9,9 +9,9 @@ using Microsoft.Data.SqlClient;
 namespace LaooApi.Controllers;
 
 [ApiController, Authorize]
-[LaooApi.Security.RequireCompanyProject("LAOO_SERVICE")]
+[LaooApi.Security.RequireItemCatalogProject]
 [Route("api/company/items")]
-public sealed class ItemController(IConfiguration configuration, IWebHostEnvironment environment) : ControllerBase
+public sealed partial class ItemController(IConfiguration configuration, IWebHostEnvironment environment) : ControllerBase
 {
     private const string ScreenCode = "08001";
     private readonly IConfiguration _configuration = configuration;
@@ -89,7 +89,8 @@ ORDER BY ISNULL(UpdateDate,CreateDate) DESC, PKValue DESC;
     public async Task<ActionResult<IReadOnlyList<ItemListRow>>> List(
         [FromQuery] string? groupCode, [FromQuery] string? typeCode,
         [FromQuery] string? itemKindCode, [FromQuery] string? stockTrackingCode,
-        [FromQuery] string? usageCode, [FromQuery] string? search, CancellationToken token)
+        [FromQuery] string? usageCode, [FromQuery] string? search, CancellationToken token,
+        [FromQuery] long? projectId = null)
     {
         await using var c = await OpenAsync(token);
         await EnsureImageStorageSchemaAsync(c, token);
@@ -114,6 +115,11 @@ WHERE I.CompanyID=@company
   AND (@kind='' OR I.ItemKindCode=@kind)
   AND (@tracking='' OR I.StockTrackingCode=@tracking)
   AND (@usage='' OR EXISTS(SELECT 1 FROM dbo.TDIVItemUsage IU WHERE IU.CompanyID=I.CompanyID AND IU.ItemID=I.ItemID AND IU.UsageCode=@usage))
+  AND (@forProject IS NULL OR (EXISTS(SELECT 1 FROM dbo.TDADCompanyProject CP JOIN dbo.TDADProject P ON P.ProjectID=CP.ProjectID AND P.IsActive=1
+      WHERE CP.CompanyID=I.CompanyID AND CP.ProjectID=@forProject AND CP.IsEnabled=1
+      AND (CP.StartDate IS NULL OR CP.StartDate<=CONVERT(date,SYSUTCDATETIME())) AND (CP.ExpireDate IS NULL OR CP.ExpireDate>=CONVERT(date,SYSUTCDATETIME())))
+      AND (NOT EXISTS(SELECT 1 FROM dbo.TDIVItemProjectPolicy IP WHERE IP.CompanyID=I.CompanyID AND IP.ItemID=I.ItemID AND IP.AccessModeCode='SELECTED')
+      OR EXISTS(SELECT 1 FROM dbo.TDIVItemProject IP WHERE IP.CompanyID=I.CompanyID AND IP.ItemID=I.ItemID AND IP.ProjectID=@forProject))))
   AND (@search='' OR I.ItemCode LIKE @like OR I.ItemName LIKE @like)
 ORDER BY I.ItemCode;
 """;
@@ -125,6 +131,7 @@ ORDER BY I.ItemCode;
         Add(cmd, "@kind", SqlDbType.NVarChar, itemKindCode?.Trim().ToUpperInvariant() ?? string.Empty, 20);
         Add(cmd, "@tracking", SqlDbType.NVarChar, stockTrackingCode?.Trim().ToUpperInvariant() ?? string.Empty, 20);
         Add(cmd, "@usage", SqlDbType.NVarChar, usageCode?.Trim().ToUpperInvariant() ?? string.Empty, 30);
+        Add(cmd, "@forProject", SqlDbType.BigInt, (object?)projectId ?? DBNull.Value);
         var q = search?.Trim() ?? string.Empty;
         Add(cmd, "@search", SqlDbType.NVarChar, q, 200);
         Add(cmd, "@like", SqlDbType.NVarChar, $"%{q}%", 210);
@@ -152,7 +159,7 @@ ORDER BY I.ItemCode;
         var values = new object?[] { r.GetInt64(0), r.GetString(1), r.GetString(2), TextValue(r, 3) ?? string.Empty, TextValue(r, 4) ?? string.Empty, r.GetString(5), r.GetString(6), ParseUsageCodes(TextValue(r, 7)), r.GetDecimal(8), TextValue(r, 9) ?? string.Empty, r.GetDecimal(10), r.GetDecimal(11), r.GetDecimal(12), r.GetDecimal(13), TextValue(r, 14), TextValue(r, 15), TextValue(r, 16), TextValue(r, 17), TextValue(r, 18), TextValue(r, 19), TextValue(r, 20), TextValue(r, 21), TextValue(r, 22), r.GetBoolean(23), r.GetBoolean(24) };
         await r.DisposeAsync();
         var detail = new ItemDetail((long)values[0]!, (string)values[1]!, (string)values[2]!, (string)values[3]!, (string)values[4]!, (string)values[5]!, (string)values[6]!, (IReadOnlyList<string>)values[7]!, (decimal)values[8]!, (string)values[9]!, (decimal)values[10]!, (decimal)values[11]!, (decimal)values[12]!, (decimal)values[13]!, (string?)values[14], (string?)values[15], (string?)values[16], (string?)values[17], (string?)values[18], (string?)values[19], (string?)values[20], (string?)values[21], (string?)values[22], (bool)values[23]!, (bool)values[24]!, await PackUnits(c, id, token), await Images(c, id, token));
-        return Ok(detail);
+        return Ok(detail with { ProjectAccess = await ReadProjectAccess(c, id, token) });
     }
 
     [HttpGet("{id:long}/pack-units")]
@@ -391,6 +398,11 @@ ORDER BY M.Seq,M.MasterCode;
         try
         {
             long itemId;
+            if (request.ProjectAccess is not null)
+            {
+                var accessError = await ValidateProjectAccess(c, tx, request.ProjectAccess, token);
+                if (accessError is not null) return BadRequest(new { message = "Project ของสินค้าไม่ถูกต้อง", description = accessError });
+            }
             if (id is null)
             {
                 code = await GenerateItemCodeAsync(c, tx, request, token);
@@ -418,6 +430,8 @@ ORDER BY M.Seq,M.MasterCode;
                 if (await cmd.ExecuteNonQueryAsync(token) == 0) return NotFound();
                 itemId = id.Value;
             }
+            if (request.ProjectAccess is not null)
+                await SaveProjectAccess(c, tx, itemId, request.ProjectAccess, token);
             await using (var clearUsage = new SqlCommand("DELETE FROM dbo.TDIVItemUsage WHERE CompanyID=@company AND ItemID=@id", c, tx))
             {
                 Add(clearUsage, "@company", SqlDbType.BigInt, CompanyID());
@@ -660,40 +674,8 @@ ORDER BY P.SortOrder,P.UnitCode;
         foreach (var path in paths) try { System.IO.File.Delete(Path.Combine(root, path.Replace('/', Path.DirectorySeparatorChar))); } catch { }
     }
 
-    private async Task<bool> CanAsync(SqlConnection c, string action, CancellationToken token)
-    {
-        var user = long.TryParse(User.FindFirstValue("user_id"), out var id) ? id : 0; if (user <= 0) return false;
-        const string sql = """
-SELECT CASE WHEN
-    EXISTS(SELECT 1 FROM dbo.TDADUser U
-           WHERE U.UserID=@user AND U.CompanyID=@company
-             AND U.IsActive=1 AND U.IsCompanyAdmin=1)
- OR EXISTS(SELECT 1 FROM dbo.TDADUserPermission UP
-           INNER JOIN dbo.TDADPermission P
-             ON P.PermissionID=UP.PermissionID AND P.ProjectID=UP.ProjectID
-           WHERE UP.UserID=@user AND UP.ProjectID=@project
-             AND UP.IsAllowed=1 AND UP.IsActive=1 AND P.IsActive=1
-             AND P.ActionCode=@action
-             AND P.ScreenCode IN (@screen,N'COMPANY_PRODUCTS'))
- OR EXISTS(SELECT 1 FROM dbo.TDADUser U
-           INNER JOIN dbo.TDADUserEmployee UE ON UE.UserID=U.UserID
-           INNER JOIN dbo.TDADEmployeeRoleGroup ERG ON ERG.EmployeeID=UE.EmployeeID
-           INNER JOIN dbo.TDADRoleGroup RG
-             ON RG.RoleGroupID=ERG.RoleGroupID
-            AND RG.ScopeType='C' AND RG.CompanyID=U.CompanyID
-            AND RG.ProjectID=@project
-           INNER JOIN dbo.TDADRoleGroupPermission RP
-             ON RP.RoleGroupID=RG.RoleGroupID AND RP.ProjectID=@project
-            AND RP.MenuCode IN (@screen,N'COMPANY_PRODUCTS')
-            AND RP.ActionCode=@action AND RP.IsAllowed=1
-           WHERE U.UserID=@user AND U.CompanyID=@company
-             AND U.IsActive=1 AND ERG.IsActive=1
-             AND ERG.EffectiveFrom<=CONVERT(date,SYSUTCDATETIME())
-             AND (ERG.EffectiveTo IS NULL OR ERG.EffectiveTo>=CONVERT(date,SYSUTCDATETIME())))
- THEN CAST(1 AS bit) ELSE CAST(0 AS bit) END
-""";
-        await using var cmd = new SqlCommand(sql, c); Add(cmd, "@user", SqlDbType.BigInt, user); Add(cmd, "@company", SqlDbType.BigInt, CompanyID()); Add(cmd, "@project", SqlDbType.BigInt, ProjectID()); Add(cmd, "@action", SqlDbType.NVarChar, action, 30); Add(cmd, "@screen", SqlDbType.NVarChar, ScreenCode, 20); return (bool)(await cmd.ExecuteScalarAsync(token) ?? false);
-    }
+    private Task<bool> CanAsync(SqlConnection c, string action, CancellationToken token) =>
+        LaooApi.Security.ItemCatalogAuthorization.IsAllowed(c, User, action, token);
 
     private long CompanyID() => long.TryParse(User.FindFirstValue("company_id"), out var id) ? id : 0;
     private long ProjectID() => long.TryParse(User.FindFirstValue("project_id"), out var id) ? id : 0;

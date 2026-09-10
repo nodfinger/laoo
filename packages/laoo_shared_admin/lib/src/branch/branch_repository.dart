@@ -47,4 +47,25 @@ class BranchRepository {
   Future<void> delete(int id) async {
     await _api.delete('${contract.apiPath}/$id');
   }
+
+  Future<BranchAccessConfiguration> access(int id) async =>
+      BranchAccessConfiguration.fromJson(
+        Map<String, dynamic>.from(
+          await _api.get('${contract.apiPath}/$id/access') as Map,
+        ),
+      );
+
+  Future<void> updateAccess(
+    int id, {
+    required String accessModeCode,
+    required Iterable<int> userIds,
+  }) async {
+    await _api.put(
+      '${contract.apiPath}/$id/access',
+      body: {
+        'accessModeCode': accessModeCode,
+        'userIds': userIds.toList(growable: false),
+      },
+    );
+  }
 }

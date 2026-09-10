@@ -36,7 +36,7 @@ public static class BranchScreenContracts
 }
 
 public sealed record BranchRequest(
-    long CompanyId,
+    long? CompanyId,
     string BranchCode,
     string BranchNameTh,
     string? BranchNameEn,
@@ -47,3 +47,7 @@ public sealed record BranchRequest(
     string? ContPhone,
     string? ContPositionName,
     bool IsActive = true);
+
+public sealed record BranchAccessRequest(
+    string AccessModeCode,
+    IReadOnlyCollection<long>? UserIds);

@@ -7,10 +7,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image/image.dart' as img;
 
+import '../../../../app/theme/laoo_design_tokens.dart';
 import '../../../../app/theme/laoo_typography.dart';
 import '../../../../app/theme/workspace_theme_presets.dart';
 import '../../../../core/widgets/timed_snack_bar.dart';
-import '../../../../features/support/presentation/widgets/support_workspace_shell.dart';
 import '../data/item_api.dart';
 
 class _UpperCaseTextFormatter extends TextInputFormatter {
@@ -48,6 +48,10 @@ class ItemFormLayout extends StatefulWidget {
     required this.maxItemImageSizeMB,
     required this.onCancel,
     required this.onSaved,
+    this.caption = 'ข้อมูลสินค้า',
+    this.canEditDefaults = false,
+    this.canEditItem = true,
+    this.apiFactory,
   });
 
   final Map<String, dynamic>? initial;
@@ -58,6 +62,10 @@ class ItemFormLayout extends StatefulWidget {
   final double maxItemImageSizeMB;
   final VoidCallback onCancel;
   final VoidCallback onSaved;
+  final String caption;
+  final bool canEditDefaults;
+  final bool canEditItem;
+  final ItemApi Function()? apiFactory;
 
   @override
   State<ItemFormLayout> createState() => _ItemFormLayoutState();
@@ -77,7 +85,17 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
   String? _group, _type, _unit;
   String _itemKind = 'GOODS', _stockTracking = 'QUANTITY';
   Set<String> _usageCodes = {'SALE'};
+  String _projectMode = 'ALL';
+  Set<int> _projectIds = {};
+  List<Map<String, dynamic>> _projectOptions = [];
+  bool _projectsLoading = true,
+      _classificationTouched = false,
+      _defaultsSaving = false;
+  String? _projectError;
+  int _defaultsSequence = 0;
   bool _active = true, _showShop = false, _saving = false;
+  bool _additionalExpanded = false;
+  int _additionalTab = 0;
   List<Map<String, dynamic>> _packs = [];
   List<Map<String, dynamic>> _images = [];
 
@@ -96,7 +114,7 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
       return;
     }
     final sequence = ++_previewSequence;
-    final api = ItemApi();
+    final api = widget.apiFactory?.call() ?? ItemApi();
     try {
       final code = await api.previewCode(groupCode: _group, typeCode: _type);
       if (mounted && sequence == _previewSequence) {
@@ -113,7 +131,12 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
   @override
   void initState() {
     super.initState();
-    _data = widget.initial ?? {};
+    _data = Map<String, dynamic>.from(widget.initial ?? {});
+    final access = _data['projectAccess'] as Map?;
+    _projectMode = '${access?['accessModeCode'] ?? 'ALL'}';
+    _projectIds = ((access?['projectIds'] as List?) ?? [])
+        .map((v) => (v as num).toInt())
+        .toSet();
     _code = TextEditingController(text: '${_data['itemCode'] ?? ''}');
     _name = TextEditingController(text: '${_data['itemName'] ?? ''}');
     _price = TextEditingController(text: '${_data['unitPrice'] ?? 0}');
@@ -152,7 +175,178 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
     _packs = List<Map<String, dynamic>>.from(_data['packUnits'] ?? []);
     _images = List<Map<String, dynamic>>.from(_data['images'] ?? []);
     WidgetsBinding.instance.addPostFrameCallback((_) => _previewCode());
+    _loadProjects();
+    _loadDefaults();
   }
+
+  Future<void> _loadProjects() async {
+    final api = widget.apiFactory?.call() ?? ItemApi();
+    try {
+      final options = await api.projectOptions();
+      if (mounted) {
+        setState(() {
+          _projectOptions = options;
+          _projectError = null;
+          _projectsLoading = false;
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _projectError = 'โหลด Project ไม่สำเร็จ: $error';
+          _projectsLoading = false;
+        });
+      }
+    } finally {
+      api.dispose();
+    }
+  }
+
+  Future<void> _loadDefaults() async {
+    if (_data['itemID'] != null || _classificationTouched) return;
+    final sequence = ++_defaultsSequence;
+    final api = widget.apiFactory?.call() ?? ItemApi();
+    try {
+      final value = await api.classificationDefaults(_group, _type);
+      if (!mounted ||
+          sequence != _defaultsSequence ||
+          _classificationTouched ||
+          _data['itemID'] != null) {
+        return;
+      }
+      setState(() {
+        _itemKind = '${value['itemKindCode'] ?? 'GOODS'}';
+        _stockTracking = '${value['stockTrackingCode'] ?? 'QUANTITY'}';
+        _usageCodes = Set<String>.from(value['usageCodes'] ?? ['SALE']);
+        if (!_usageCodes.contains('SALE')) _showShop = false;
+      });
+    } catch (error) {
+      if (mounted && sequence == _defaultsSequence) {
+        showTimedSnackBar(
+          context,
+          message: 'โหลดค่าเริ่มต้นไม่สำเร็จ: $error',
+          error: true,
+        );
+      }
+    } finally {
+      api.dispose();
+    }
+  }
+
+  Future<void> _saveDefaults(String scope) async {
+    final code = scope == 'GROUP' ? _group : _type;
+    if (code == null || _usageCodes.isEmpty || _defaultsSaving) return;
+    setState(() => _defaultsSaving = true);
+    final api = widget.apiFactory?.call() ?? ItemApi();
+    try {
+      await api.saveClassificationDefaults({
+        'scopeCode': scope,
+        'classificationCode': code,
+        'itemKindCode': _itemKind,
+        'stockTrackingCode': _stockTracking,
+        'usageCodes': _usageCodes.toList(),
+      });
+      if (mounted) {
+        showTimedSnackBar(
+          context,
+          message: 'บันทึกค่าเริ่มต้นแล้ว ไม่มีการเปลี่ยนสินค้าเดิม',
+        );
+      }
+    } catch (error) {
+      if (mounted) showTimedSnackBar(context, message: '$error', error: true);
+    } finally {
+      api.dispose();
+      if (mounted) setState(() => _defaultsSaving = false);
+    }
+  }
+
+  Widget _projectPanel() => ExpansionTile(
+    initiallyExpanded: true,
+    tilePadding: EdgeInsets.zero,
+    title: const Text('Project ที่ใช้งานสินค้า'),
+    children: [
+      if (_projectsLoading) const LinearProgressIndicator(),
+      if (_projectError != null) ...[
+        Text(_projectError!),
+        TextButton(
+          onPressed: _loadProjects,
+          child: const Text('โหลด Project ใหม่'),
+        ),
+      ],
+      DropdownButtonFormField<String>(
+        isExpanded: true,
+        style: Theme.of(
+          context,
+        ).textTheme.bodyMedium?.copyWith(fontSize: LaooTypography.comboBox),
+        initialValue: _projectMode,
+        decoration: const InputDecoration(labelText: 'ขอบเขตการใช้งาน'),
+        items: const [
+          DropdownMenuItem(
+            value: 'ALL',
+            child: Text('ทุก Project ที่บริษัทเปิดใช้'),
+          ),
+          DropdownMenuItem(
+            value: 'SELECTED',
+            child: Text('เฉพาะ Project ที่เลือก'),
+          ),
+        ],
+        onChanged: _saving ? null : (v) => setState(() => _projectMode = v!),
+      ),
+      if (_projectMode == 'SELECTED')
+        FormField<Set<int>>(
+          validator: (_) => _projectIds.isEmpty
+              ? 'กรุณาเลือก Project อย่างน้อยหนึ่งรายการ'
+              : null,
+          builder: (field) => Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ..._projectOptions.map((p) {
+                final id = (p['projectId'] as num).toInt();
+                return CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  title: Text('${p['projectName']}'),
+                  value: _projectIds.contains(id),
+                  onChanged: _saving
+                      ? null
+                      : (v) {
+                          setState(() {
+                            v == true
+                                ? _projectIds.add(id)
+                                : _projectIds.remove(id);
+                          });
+                          field.didChange(_projectIds);
+                        },
+                );
+              }),
+              ..._projectIds
+                  .where(
+                    (id) => !_projectOptions.any((p) => p['projectId'] == id),
+                  )
+                  .map(
+                    (id) => CheckboxListTile(
+                      title: Text(
+                        'Project $id ไม่ได้เปิดใช้งาน — ยกเลิกการเลือกเพื่อบันทึก',
+                      ),
+                      value: true,
+                      onChanged: _saving
+                          ? null
+                          : (_) => setState(() => _projectIds.remove(id)),
+                    ),
+                  ),
+              if (field.hasError)
+                Text(
+                  field.errorText!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+            ],
+          ),
+        ),
+      const Text('การเลือก Project ไม่ทดแทนสิทธิ์เมนู สาขา หรือคลังของผู้ใช้'),
+      const Text('งานขาย ใบส่งของ และสต๊อก ใช้ Project ข้อมูลส่วนกลาง'),
+      const SizedBox(height: 12),
+    ],
+  );
 
   @override
   void dispose() {
@@ -273,6 +467,8 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
   }
 
   Future<void> _save() async {
+    if (_data['itemID'] != null && !widget.canEditItem) return;
+    if (_saving || _projectsLoading || _projectError != null) return;
     if (!_form.currentState!.validate()) return;
     final normalizedCode = _code.text.trim().toUpperCase();
     _code.value = _code.value.copyWith(
@@ -288,6 +484,12 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
       'itemKindCode': _itemKind,
       'stockTrackingCode': _stockTracking,
       'usageCodes': _usageCodes.toList()..sort(),
+      'projectAccess': {
+        'accessModeCode': _projectMode,
+        'projectIds': _projectMode == 'ALL'
+            ? <int>[]
+            : (_projectIds.toList()..sort()),
+      },
       'unitPrice': double.tryParse(_price.text) ?? 0,
       'unitCode': _unit,
       'costPrice': double.tryParse(_cost.text) ?? 0,
@@ -308,268 +510,377 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
       'packUnits': _packs,
       'images': _images,
     };
-    final creating = _data['itemID'] == null;
+    final api = widget.apiFactory?.call() ?? ItemApi();
     try {
-      final api = ItemApi();
       if (_data['itemID'] == null) {
-        await api.create(body);
+        final saved = await api.create(body);
+        _data['itemID'] = saved['itemID'];
+        if (saved['itemCode'] != null) _code.text = '${saved['itemCode']}';
       } else {
         await api.update((_data['itemID'] as num).toInt(), body);
       }
-      api.dispose();
-      if (creating && mounted) {
-        setState(() {
-          _code.clear();
-          _name.clear();
-          _price.text = '0';
-          _cost.text = '0';
-          _min.text = '0';
-          _purchase.text = '0';
-          _orderCode.clear();
-          _orderLink1.clear();
-          _orderLink2.clear();
-          _remarkItem1.clear();
-          _note1.clear();
-          _note2.clear();
-          _note3.clear();
-          _note4.clear();
-          _note5.clear();
-          _group = _firstCode(widget.groups);
-          _type = _firstCode(widget.types);
-          _unit = _firstCode(widget.units);
-          _packs = [];
-          _images = [];
-          _active = true;
-          _showShop = false;
-          _itemKind = 'GOODS';
-          _stockTracking = 'QUANTITY';
-          _usageCodes = {'SALE'};
-          _saving = false;
-        });
-      }
       widget.onSaved();
+      if (mounted) setState(() => _saving = false);
     } catch (error) {
       if (!mounted) return;
       setState(() => _saving = false);
       showTimedSnackBar(context, message: error.toString(), error: true);
+    } finally {
+      api.dispose();
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final accent = workspaceThemeController.value.primary;
-    final title =
-        'ข้อมูลสินค้า > ${_data['itemID'] == null ? 'เพิ่ม' : 'แก้ไข'}';
-    return Form(
-      key: _form,
-      child: Container(
-        margin: EdgeInsets.zero,
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-        color: const Color(0xFFF8F9FB),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final wide = constraints.maxWidth >= 720;
-            final contentWidth = (constraints.maxWidth - 32)
-                .clamp(0.0, double.infinity)
-                .toDouble();
-            return ListView(
-              children: [
-                Card(
-                  margin: EdgeInsets.zero,
-                  color: Colors.white,
-                  elevation: 0,
-                  surfaceTintColor: Colors.transparent,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(4),
-                    side: BorderSide.none,
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 14,
-                    ),
-                    child: WorkspaceActionHeader(
-                      title: title,
-                      actions: [
-                        const Text('สถานะใช้งาน'),
-                        Switch(
-                          value: _active,
-                          onChanged: (v) => setState(() => _active = v),
-                        ),
-                        const Text('แสดงหน้า Online'),
-                        Switch(
-                          value: _showShop,
-                          onChanged: _usageCodes.contains('SALE')
-                              ? (v) => setState(() => _showShop = v)
-                              : null,
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: widget.onCancel,
-                          style: OutlinedButton.styleFrom(
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                          ),
-                          icon: const Icon(Icons.close),
-                          label: const Text('ยกเลิก'),
-                        ),
-                        FilledButton.icon(
-                          onPressed: _saving ? null : _save,
-                          icon: const Icon(Icons.save_outlined),
-                          label: const Text('บันทึก'),
-                        ),
-                      ],
+    final border = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(LaooRadius.xs),
+      borderSide: const BorderSide(color: LaooColors.border),
+    );
+    final buttonStyle = ButtonStyle(
+      minimumSize: const WidgetStatePropertyAll(
+        Size(0, LaooTypography.buttonHeight),
+      ),
+      textStyle: const WidgetStatePropertyAll(
+        TextStyle(fontSize: LaooTypography.button),
+      ),
+      shape: WidgetStatePropertyAll(
+        RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
+        ),
+      ),
+    );
+    return Theme(
+      data: Theme.of(context).copyWith(
+        inputDecorationTheme: Theme.of(context).inputDecorationTheme.copyWith(
+          border: border,
+          enabledBorder: border,
+          disabledBorder: border,
+          focusedBorder: border.copyWith(borderSide: BorderSide(color: accent)),
+          errorBorder: border.copyWith(
+            borderSide: BorderSide(color: Theme.of(context).colorScheme.error),
+          ),
+          focusedErrorBorder: border.copyWith(
+            borderSide: BorderSide(color: Theme.of(context).colorScheme.error),
+          ),
+        ),
+        textTheme: Theme.of(context).textTheme.copyWith(
+          titleMedium: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontSize: LaooTypography.inputText),
+        ),
+        outlinedButtonTheme: OutlinedButtonThemeData(style: buttonStyle),
+        filledButtonTheme: FilledButtonThemeData(style: buttonStyle),
+      ),
+      child: Form(
+        key: _form,
+        child: Padding(
+          padding: const EdgeInsets.all(LaooLayout.cardPadding),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.inventory_2_outlined, color: accent),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '${widget.caption} > ${_data['itemID'] == null ? 'เพิ่ม' : 'แก้ไข'}',
+                      style: LaooTypography.pageCaptionStyle,
                     ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Card(
-                  margin: EdgeInsets.zero,
-                  color: Colors.white,
-                  elevation: 0,
-                  shadowColor: Colors.transparent,
-                  surfaceTintColor: Colors.transparent,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(4),
-                    side: BorderSide.none,
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Wrap(
-                      textDirection: TextDirection.rtl,
-                      spacing: wide ? contentWidth * .02 : 0,
-                      runSpacing: 12,
+                ],
+              ),
+              const Divider(color: LaooColors.border),
+              Expanded(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final wide = constraints.maxWidth >= 720;
+                    return ListView(
                       children: [
-                        SizedBox(
-                          width: wide ? contentWidth * .75 : contentWidth,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                        Wrap(
+                          spacing: 12,
+                          runSpacing: 8,
+                          children: [
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Text('สถานะใช้งาน'),
+                                Switch(
+                                  value: _active,
+                                  onChanged: _saving
+                                      ? null
+                                      : (v) => setState(() => _active = v),
+                                ),
+                              ],
+                            ),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Text('แสดงหน้า Online'),
+                                Switch(
+                                  value: _showShop,
+                                  onChanged:
+                                      !_saving && _usageCodes.contains('SALE')
+                                      ? (v) => setState(() => _showShop = v)
+                                      : null,
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        _row(wide, [
+                          _drop('กลุ่มสินค้า', _group, widget.groups, (v) {
+                            setState(() => _group = v);
+                            _previewCode();
+                            _loadDefaults();
+                          }),
+                          _drop('ประเภทสินค้า', _type, widget.types, (v) {
+                            setState(() => _type = v);
+                            _previewCode();
+                            _loadDefaults();
+                          }),
+                        ]),
+                        const SizedBox(height: 12),
+                        _inventoryClassification(wide),
+                        if (widget.canEditDefaults)
+                          ExpansionTile(
+                            tilePadding: EdgeInsets.zero,
+                            title: const Text('ค่าเริ่มต้นสำหรับสินค้าใหม่'),
                             children: [
-                              _row(wide, [
-                                _drop('กลุ่มสินค้า', _group, widget.groups, (
-                                  v,
-                                ) {
-                                  setState(() => _group = v);
-                                  _previewCode();
-                                }),
-                                _drop('ประเภทสินค้า', _type, widget.types, (v) {
-                                  setState(() => _type = v);
-                                  _previewCode();
-                                }),
-                              ]),
-                              const SizedBox(height: 12),
-                              _inventoryClassification(wide),
-                              const SizedBox(height: 16),
-                              _compactFields(wide),
-                              const SizedBox(height: 16),
-                              _row(wide, [
-                                _text(_orderCode, 'อ้างอิงเลขที่เอกสารซื้อ'),
-                              ]),
-                              const SizedBox(height: 16),
-                              _row(wide, [
-                                _text(_orderLink1, 'อ้างอิง Link 1'),
-                              ]),
-                              const SizedBox(height: 16),
-                              _row(wide, [
-                                _text(_orderLink2, 'อ้างอิง Link 2'),
-                              ]),
-                              const SizedBox(height: 16),
-                              _detailsSection(accent, wide),
+                              const Text(
+                                'ใช้ค่าชนิด สต็อก และวัตถุประสงค์ด้านบน ประเภทมีลำดับก่อนกลุ่ม ไม่มีผลย้อนหลัง',
+                              ),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  OutlinedButton(
+                                    onPressed:
+                                        _defaultsSaving ||
+                                            _saving ||
+                                            _group == null
+                                        ? null
+                                        : () => _saveDefaults('GROUP'),
+                                    child: const Text(
+                                      'บันทึกค่าเริ่มต้นของกลุ่ม',
+                                    ),
+                                  ),
+                                  OutlinedButton(
+                                    onPressed:
+                                        _defaultsSaving ||
+                                            _saving ||
+                                            _type == null
+                                        ? null
+                                        : () => _saveDefaults('TYPE'),
+                                    child: const Text(
+                                      'บันทึกค่าเริ่มต้นของประเภท',
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ],
                           ),
+                        _projectPanel(),
+                        const SizedBox(height: 12),
+                        _compactFields(wide),
+                        const SizedBox(height: 12),
+                        ExpansionTile(
+                          tilePadding: EdgeInsets.zero,
+                          title: const Text('รูปสินค้า'),
+                          children: [_imageCard(accent)],
                         ),
-                        SizedBox(
-                          width: wide ? contentWidth * .23 : contentWidth,
-                          child: _imageCard(accent),
-                        ),
+                        const SizedBox(height: 12),
+                        _additionalPanel(accent, wide),
                       ],
-                    ),
-                  ),
+                    );
+                  },
                 ),
-              ],
-            );
-          },
+              ),
+              const Divider(color: LaooColors.border),
+              Wrap(
+                alignment: WrapAlignment.end,
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  OutlinedButton(
+                    onPressed: _saving ? null : widget.onCancel,
+                    child: const Text('ยกเลิก'),
+                  ),
+                  FilledButton.icon(
+                    onPressed:
+                        _saving ||
+                            _projectsLoading ||
+                            _projectError != null ||
+                            (_data['itemID'] != null && !widget.canEditItem)
+                        ? null
+                        : _save,
+                    icon: const Icon(Icons.save_outlined),
+                    label: Text(_saving ? 'กำลังบันทึก' : 'บันทึก'),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _detailsSection(Color accent, bool wide) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          children: [
-            const Expanded(child: Divider(color: Color(0xFFF5F6F7))),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Text(
-                'รายละเอียดสินค้า',
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  color: Colors.black,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-            const Expanded(child: Divider(color: Color(0xFFF5F6F7))),
-          ],
-        ),
-        const SizedBox(height: 12),
-        _row(wide, [_multiline(_remarkItem1, 'รายละเอียด 1')]),
-        const SizedBox(height: 12),
-        _text(_note1, 'อธิบายเพิ่มเติม 1'),
-        const SizedBox(height: 12),
-        _text(_note2, 'อธิบายเพิ่มเติม 2'),
-        const SizedBox(height: 12),
-        _text(_note3, 'อธิบายเพิ่มเติม 3'),
-        const SizedBox(height: 12),
-        _text(_note4, 'อธิบายเพิ่มเติม 4'),
-        const SizedBox(height: 12),
-        _text(_note5, 'อธิบายเพิ่มเติม 5'),
-      ],
-    );
-  }
+  bool get _hasAdditionalData => [
+    _orderCode,
+    _orderLink1,
+    _orderLink2,
+    _remarkItem1,
+    _note1,
+    _note2,
+    _note3,
+    _note4,
+    _note5,
+  ].any((controller) => controller.text.trim().isNotEmpty);
 
-  Widget _detailsCard(Color accent, bool wide) {
+  Widget _additionalPanel(Color accent, bool wide) {
+    final selectedColor = accent.withValues(alpha: .12);
     return Card(
       margin: EdgeInsets.zero,
       color: Colors.white,
       elevation: 0,
-      shadowColor: Colors.transparent,
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(4),
-        side: BorderSide.none,
+        borderRadius: BorderRadius.circular(LaooRadius.xs),
+        side: const BorderSide(color: LaooColors.border),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'รายละเอียดสินค้า',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: Colors.black,
-                fontWeight: FontWeight.w700,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(LaooRadius.xs),
+            onTap: () =>
+                setState(() => _additionalExpanded = !_additionalExpanded),
+            child: Padding(
+              padding: const EdgeInsets.all(LaooLayout.cardPadding),
+              child: Row(
+                children: [
+                  Icon(Icons.article_outlined, color: accent),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'ข้อมูลเพิ่มเติม',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        color: LaooColors.textPrimary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  if (_hasAdditionalData)
+                    Text(
+                      'มีข้อมูล',
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: accent),
+                    ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    _additionalExpanded
+                        ? Icons.expand_less_rounded
+                        : Icons.expand_more_rounded,
+                    color: accent,
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 12),
-            _row(wide, [_multiline(_remarkItem1, 'รายละเอียด 1')]),
-            const SizedBox(height: 12),
-            _text(_note1, 'อธิบายเพิ่มเติม 1'),
-            const SizedBox(height: 12),
-            _text(_note2, 'อธิบายเพิ่มเติม 2'),
-            const SizedBox(height: 12),
-            _text(_note3, 'อธิบายเพิ่มเติม 3'),
-            const SizedBox(height: 12),
-            _text(_note4, 'อธิบายเพิ่มเติม 4'),
-            const SizedBox(height: 12),
-            _text(_note5, 'อธิบายเพิ่มเติม 5'),
+          ),
+          if (_additionalExpanded) ...[
+            const Divider(height: 1, color: LaooColors.border),
+            Padding(
+              padding: const EdgeInsets.all(LaooLayout.cardPadding),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _additionalTabButton(
+                          label: 'เอกสารอ้างอิง',
+                          index: 0,
+                          accent: accent,
+                          selectedColor: selectedColor,
+                        ),
+                        const SizedBox(width: 8),
+                        _additionalTabButton(
+                          label: 'รายละเอียดเพิ่มเติม',
+                          index: 1,
+                          accent: accent,
+                          selectedColor: selectedColor,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  if (_additionalTab == 0)
+                    _referenceFields(wide)
+                  else
+                    _detailAndNotesFields(wide),
+                ],
+              ),
+            ),
           ],
-        ),
+        ],
       ),
     );
   }
+
+  Widget _additionalTabButton({
+    required String label,
+    required int index,
+    required Color accent,
+    required Color selectedColor,
+  }) {
+    final selected = _additionalTab == index;
+    return TextButton(
+      onPressed: () => setState(() => _additionalTab = index),
+      style: TextButton.styleFrom(
+        foregroundColor: accent,
+        backgroundColor: selected ? selectedColor : Colors.transparent,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        minimumSize: const Size(0, 40),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
+        ),
+      ),
+      child: Text(label),
+    );
+  }
+
+  Widget _referenceFields(bool wide) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      _row(wide, [_text(_orderCode, 'อ้างอิงเลขที่เอกสารซื้อ')]),
+      const SizedBox(height: 12),
+      _row(wide, [_text(_orderLink1, 'อ้างอิง Link 1')]),
+      const SizedBox(height: 12),
+      _row(wide, [_text(_orderLink2, 'อ้างอิง Link 2')]),
+    ],
+  );
+
+  Widget _detailAndNotesFields(bool wide) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      _row(wide, [_multiline(_remarkItem1, 'รายละเอียดสินค้า')]),
+      const SizedBox(height: 12),
+      _text(_note1, 'อธิบายเพิ่มเติม 1'),
+      const SizedBox(height: 12),
+      _text(_note2, 'อธิบายเพิ่มเติม 2'),
+      const SizedBox(height: 12),
+      _text(_note3, 'อธิบายเพิ่มเติม 3'),
+      const SizedBox(height: 12),
+      _text(_note4, 'อธิบายเพิ่มเติม 4'),
+      const SizedBox(height: 12),
+      _text(_note5, 'อธิบายเพิ่มเติม 5'),
+    ],
+  );
 
   Widget _packCard(Color accent) {
     return Card(
@@ -780,6 +1091,11 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
       'SPARE_PART': 'อะไหล่',
     };
     final kindField = DropdownButtonFormField<String>(
+      isExpanded: true,
+      style: Theme.of(
+        context,
+      ).textTheme.bodyMedium?.copyWith(fontSize: LaooTypography.comboBox),
+      key: ValueKey(_itemKind),
       initialValue: _itemKind,
       decoration: const InputDecoration(labelText: '* ชนิดพื้นฐาน'),
       items: kinds.entries
@@ -789,11 +1105,16 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
           )
           .toList(),
       onChanged: (value) => setState(() {
+        _classificationTouched = true;
         _itemKind = value ?? 'GOODS';
         if (_itemKind == 'SERVICE') _stockTracking = 'NONE';
       }),
     );
     final trackingField = DropdownButtonFormField<String>(
+      isExpanded: true,
+      style: Theme.of(
+        context,
+      ).textTheme.bodyMedium?.copyWith(fontSize: LaooTypography.comboBox),
       key: ValueKey('$_itemKind-$_stockTracking'),
       initialValue: _stockTracking,
       decoration: const InputDecoration(labelText: '* วิธีควบคุมสต็อก'),
@@ -806,7 +1127,10 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
           .toList(),
       onChanged: _itemKind == 'SERVICE'
           ? null
-          : (value) => setState(() => _stockTracking = value ?? 'NONE'),
+          : (value) => setState(() {
+              _classificationTouched = true;
+              _stockTracking = value ?? 'NONE';
+            }),
     );
     final usageField = FormField<Set<String>>(
       initialValue: _usageCodes,
@@ -827,6 +1151,7 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
               label: Text(entry.value),
               selected: selected,
               onSelected: (value) => setState(() {
+                _classificationTouched = true;
                 value
                     ? _usageCodes.add(entry.key)
                     : _usageCodes.remove(entry.key);
@@ -964,7 +1289,16 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
   }
 
   Widget _row(bool wide, List<Widget> fields) {
-    if (!wide) return Column(children: fields);
+    if (!wide) {
+      return Column(
+        children: [
+          for (var i = 0; i < fields.length; i++) ...[
+            if (i > 0) const SizedBox(height: 12),
+            fields[i],
+          ],
+        ],
+      );
+    }
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1019,6 +1353,7 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
       height: 1.35,
     );
     return DropdownButtonFormField<String>(
+      isExpanded: true,
       initialValue: value,
       decoration: InputDecoration(labelText: '* $label'),
       style: comboStyle,

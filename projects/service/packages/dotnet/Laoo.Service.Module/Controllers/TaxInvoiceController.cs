@@ -9,7 +9,8 @@ using Microsoft.Data.SqlClient;
 namespace LaooServiceModule.Controllers;
 
 [ApiController, Authorize, LaooServiceModule.Security.RequireCompanyFeature("SALES")]
-[LaooServiceModule.Security.RequireCompanyProject("LAOO_SERVICE")]
+[LaooServiceModule.Security.RequireCompanyProject("LAOO")]
+[TypeFilter(typeof(ItemProjectExceptionFilter))]
 [Route("api/company/tax-invoices")]
 public sealed class TaxInvoiceController(IConfiguration configuration) : ControllerBase
 {
@@ -88,13 +89,13 @@ public sealed class TaxInvoiceController(IConfiguration configuration) : Control
                 contactName1 = Text(r, 5), phone1 = Text(r, 6), email1 = Text(r, 7), contactName2 = Text(r, 8), phone2 = Text(r, 9), email2 = Text(r, 10),
                 paymentType = Text(r, 11), creditDays = r.IsDBNull(12) ? 0 : r.GetInt32(12)
             }),
-            items = await Rows(c, """
+            items = await Rows(c, $"""
               SELECT I.ItemID,I.ItemCode,I.ItemName,I.UnitCode,I.UnitPrice,I.StockBalance,COALESCE(M.Name,I.UnitCode)
               FROM dbo.TDIVItem I
               LEFT JOIN dbo.TDSTMaster M ON M.OwnerType=N'C' AND M.OwnerCompanyID=I.CompanyID AND M.MasterGroupCode=@unitGroup AND M.MasterCode=I.UnitCode AND M.IsActive=1
               WHERE I.CompanyID=@company AND I.IsActive=1
                 AND EXISTS(SELECT 1 FROM dbo.TDIVItemUsage U WHERE U.CompanyID=I.CompanyID AND U.ItemID=I.ItemID AND U.UsageCode=N'SALE')
-              ORDER BY I.ItemCode
+              AND {ItemProjectAccess.ItemAliasPredicate} ORDER BY I.ItemCode
             """, token, r => new
             {
                 itemId = r.GetInt64(0), itemCode = Text(r, 1), itemName = Text(r, 2), unitCode = Text(r, 3), unitPrice = r.GetDecimal(4), stockBalance = r.GetDecimal(5), unitName = Text(r, 6)
@@ -169,12 +170,18 @@ public sealed class TaxInvoiceController(IConfiguration configuration) : Control
         await using var c=await Open(token);if(!await Can(c,"EDIT",token))return Forbid();await using var tx=(SqlTransaction)await c.BeginTransactionAsync(IsolationLevel.Serializable,token);
         try
         {
+            if(request.WarehouseId.HasValue && !await WarehouseAccessService.CanAccessAsync(c,tx,CompanyId(),UserId(),request.WarehouseId.Value,token)){await tx.RollbackAsync(token);return StatusCode(403,new{message="ไม่มีสิทธิ์เข้าถึงคลัง",description="ผู้ใช้ไม่มีสิทธิ์เลือกคลังนี้ในใบกำกับภาษี"});}
             await using var update=new SqlCommand("UPDATE D SET WarehouseID=@warehouse FROM dbo.TDARTaxInvoiceDetail D JOIN dbo.TDARTaxInvoice H ON H.TaxInvoiceID=D.TaxInvoiceID WHERE H.TaxInvoiceID=@id AND D.TaxInvoiceDetailID=@detail AND H.CompanyID=@company AND H.StatusCode=N'DRAFT'",c,tx);
             Add(update,"@warehouse",SqlDbType.BigInt,request.WarehouseId);Add(update,"@id",SqlDbType.BigInt,id);Add(update,"@detail",SqlDbType.BigInt,detailId);Add(update,"@company",SqlDbType.BigInt,CompanyId());
             if(await update.ExecuteNonQueryAsync(token)==0){await tx.RollbackAsync(token);return NotFound(new{message="ไม่พบรายการใบกำกับภาษี",description="แก้คลังและ Serial ได้เฉพาะรายการในเอกสารสถานะร่างของ Company นี้"});}
+            await using var itemCommand = new SqlCommand("SELECT D.ItemID FROM dbo.TDARTaxInvoiceDetail D JOIN dbo.TDARTaxInvoice H ON H.TaxInvoiceID=D.TaxInvoiceID WHERE H.TaxInvoiceID=@id AND D.TaxInvoiceDetailID=@detail AND H.CompanyID=@company", c, tx);
+            Add(itemCommand,"@id",SqlDbType.BigInt,id); Add(itemCommand,"@detail",SqlDbType.BigInt,detailId); Add(itemCommand,"@company",SqlDbType.BigInt,CompanyId());
+            var itemId = await itemCommand.ExecuteScalarAsync(token);
+            if (itemId is null or DBNull) throw new ItemProjectDeniedException();
+            await ItemProjectAccess.EnsureAsync(c,tx,CompanyId(),Convert.ToInt64(itemId),token);
             await ReplaceSerials(c,tx,"TAX_INVOICE",detailId,request.SerialInstanceIds,token);await tx.CommitAsync(token);return Ok(new{message="บันทึกคลังและ Serial สำเร็จ"});
         }
-        catch(Exception ex){await tx.RollbackAsync(token);return BadRequest(new{message="บันทึกคลังและ Serial ไม่สำเร็จ",description=ex.Message});}
+        catch(Exception ex) when (ex is not ItemProjectDeniedException){await tx.RollbackAsync(token);return BadRequest(new{message="บันทึกคลังและ Serial ไม่สำเร็จ",description=ex.Message});}
     }
 
     [HttpDelete("{id:long}")]
@@ -232,7 +239,7 @@ public sealed class TaxInvoiceController(IConfiguration configuration) : Control
             await tx.CommitAsync(token);
             return Ok(new { taxInvoiceId = id, statusCode = "ISSUED" });
         }
-        catch (Exception ex) { await tx.RollbackAsync(token); return StatusCode(500, new { message = "ออกใบกำกับภาษีไม่สำเร็จ", description = ex.Message }); }
+        catch (Exception ex) when (ex is not ItemProjectDeniedException) { await tx.RollbackAsync(token); return StatusCode(500, new { message = "ออกใบกำกับภาษีไม่สำเร็จ", description = ex.Message }); }
     }
 
     [HttpPost("{id:long}/void")]
@@ -269,7 +276,7 @@ public sealed class TaxInvoiceController(IConfiguration configuration) : Control
             await tx.CommitAsync(token);
             return Ok(new { taxInvoiceId = id, statusCode = "VOID" });
         }
-        catch (Exception ex) { await tx.RollbackAsync(token); return StatusCode(500, new { message = "ยกเลิกใบกำกับภาษีไม่สำเร็จ", description = ex.Message }); }
+        catch (Exception ex) when (ex is not ItemProjectDeniedException) { await tx.RollbackAsync(token); return StatusCode(500, new { message = "ยกเลิกใบกำกับภาษีไม่สำเร็จ", description = ex.Message }); }
     }
 
 #pragma warning restore CS0162
@@ -308,7 +315,7 @@ public sealed class TaxInvoiceController(IConfiguration configuration) : Control
             { Add(done,"@id",SqlDbType.BigInt,id); Add(done,"@company",SqlDbType.BigInt,CompanyId()); Add(done,"@user",SqlDbType.BigInt,UserId()); await done.ExecuteNonQueryAsync(token); }
             await tx.CommitAsync(token); return Ok(new { taxInvoiceId=id,statusCode="ISSUED" });
         }
-        catch (Exception ex) { await tx.RollbackAsync(token); return StatusCode(500,new { message="ออกใบกำกับภาษีไม่สำเร็จ",description=ex.Message }); }
+        catch (Exception ex) when (ex is not ItemProjectDeniedException) { await tx.RollbackAsync(token); return StatusCode(500,new { message="ออกใบกำกับภาษีไม่สำเร็จ",description=ex.Message }); }
     }
 
     private async Task<IActionResult> VoidInventory(long id, CancellationToken token)
@@ -326,7 +333,7 @@ public sealed class TaxInvoiceController(IConfiguration configuration) : Control
             { Add(done,"@id",SqlDbType.BigInt,id); Add(done,"@company",SqlDbType.BigInt,CompanyId()); Add(done,"@user",SqlDbType.BigInt,UserId()); await done.ExecuteNonQueryAsync(token); }
             await tx.CommitAsync(token); return Ok(new { taxInvoiceId=id,statusCode="VOID" });
         }
-        catch (Exception ex) { await tx.RollbackAsync(token); return StatusCode(500,new { message="ยกเลิกใบกำกับภาษีไม่สำเร็จ",description=ex.Message }); }
+        catch (Exception ex) when (ex is not ItemProjectDeniedException) { await tx.RollbackAsync(token); return StatusCode(500,new { message="ยกเลิกใบกำกับภาษีไม่สำเร็จ",description=ex.Message }); }
     }
 
     private async Task<List<long>> SelectedSerials(SqlConnection c, SqlTransaction tx, string type, long detail, CancellationToken token)
@@ -437,7 +444,7 @@ public sealed class TaxInvoiceController(IConfiguration configuration) : Control
             await tx.CommitAsync(token);
             return Ok(new { taxInvoiceId = invoiceId, taxInvoiceCode = code, statusCode = "DRAFT", subtotal, discountAmount = headerDiscount, amountAfterDiscount = afterDiscount, taxAmount, netAmount = net });
         }
-        catch (Exception ex) { await tx.RollbackAsync(token); return StatusCode(500, new { message = "บันทึกใบกำกับภาษีไม่สำเร็จ", description = ex.Message }); }
+        catch (Exception ex) when (ex is not ItemProjectDeniedException) { await tx.RollbackAsync(token); return StatusCode(500, new { message = "บันทึกใบกำกับภาษีไม่สำเร็จ", description = ex.Message }); }
     }
 
     private void BindHeader(SqlCommand cmd, TaxInvoiceUpsertRequest request, string type, CustomerRow customer, decimal subtotal, decimal discount, decimal afterDiscount, decimal taxAmount, decimal net, long? id)
@@ -512,6 +519,7 @@ public sealed class TaxInvoiceController(IConfiguration configuration) : Control
 
     private async Task<(string Code, string Name, string Unit)?> Item(SqlConnection c, SqlTransaction tx, long id, CancellationToken token)
     {
+        await ItemProjectAccess.EnsureAsync(c,tx,CompanyId(),id,token);
         await using var cmd = new SqlCommand("SELECT ItemCode,ItemName,UnitCode FROM dbo.TDIVItem I WHERE ItemID=@id AND CompanyID=@company AND IsActive=1 AND EXISTS(SELECT 1 FROM dbo.TDIVItemUsage U WHERE U.CompanyID=I.CompanyID AND U.ItemID=I.ItemID AND U.UsageCode=N'SALE')", c, tx);
         Add(cmd, "@id", SqlDbType.BigInt, id); Add(cmd, "@company", SqlDbType.BigInt, CompanyId()); await using var r = await cmd.ExecuteReaderAsync(token);
         return await r.ReadAsync(token) ? (Text(r, 0) ?? "", Text(r, 1) ?? "", Text(r, 2) ?? "") : null;

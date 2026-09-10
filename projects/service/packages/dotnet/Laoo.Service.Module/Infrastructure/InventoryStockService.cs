@@ -27,6 +27,7 @@ internal static class InventoryStockService
         IReadOnlyCollection<long>? serialInstanceIds,
         CancellationToken token)
     {
+        await ItemProjectAccess.EnsureAsync(connection, transaction, companyId, itemId, token);
         const string itemSql = "SELECT ItemKindCode,StockTrackingCode FROM dbo.TDIVItem WITH(UPDLOCK,HOLDLOCK) WHERE CompanyID=@company AND ItemID=@item AND IsActive=1";
         await using var itemCommand = new SqlCommand(itemSql, connection, transaction);
         Add(itemCommand, "@company", SqlDbType.BigInt, companyId);
@@ -49,6 +50,8 @@ internal static class InventoryStockService
         if (!warehouse.HasValue) return InventoryIssueResult.Fail("This company has no active default warehouse.");
         if (!await WarehouseBelongsToCompany(connection, transaction, companyId, warehouse.Value, token))
             return InventoryIssueResult.Fail("The selected warehouse is not active in this company.");
+        if (!await WarehouseAccessService.CanAccessAsync(connection, transaction, companyId, userId, warehouse.Value, token))
+            return InventoryIssueResult.Fail("ไม่มีสิทธิ์เข้าถึงคลังที่เลือก");
 
         var sourceType = string.IsNullOrWhiteSpace(sourceDocumentType)
             ? documentType

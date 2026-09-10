@@ -354,24 +354,25 @@ public sealed class AuthContextController : ControllerBase
     {
         var sql = $$"""
             SELECT branch.BranchID, branch.CompanyID, branch.BranchCode,
-                   branch.BranchNameTH, branch.BranchNameEN, userBranch.IsDefault
+                   branch.BranchNameTH, branch.BranchNameEN, CONVERT(bit,ISNULL(userBranch.IsDefault,0)) IsDefault
             FROM dbo.TDADUser AS u
-            INNER JOIN dbo.TDADUserBranch AS userBranch
+            INNER JOIN dbo.TDADBranch AS branch
+                ON branch.CompanyID = u.CompanyID
+               AND branch.IsActive = 1
+            LEFT JOIN dbo.TDADUserBranch AS userBranch
                 ON userBranch.UserID = u.UserID
                AND userBranch.CompanyID = u.CompanyID
+               AND userBranch.BranchID = branch.BranchID
                AND userBranch.IsActive = 1
-            INNER JOIN dbo.TDADBranch AS branch
-                ON branch.BranchID = userBranch.BranchID
-               AND branch.CompanyID = userBranch.CompanyID
-               AND branch.IsActive = 1
             INNER JOIN dbo.TDADProject AS project
                 ON project.ProjectID = @ProjectID
                AND project.IsActive = 1
             WHERE u.UserID = @UserID
               AND u.CompanyID = @CompanyID
               AND u.IsActive = 1
+              AND (u.IsCompanyAdmin=1 OR branch.AccessModeCode=N'ALL' OR userBranch.UserBranchID IS NOT NULL)
               AND {{AuthenticationProjectAccess.CompanySql}}
-            ORDER BY userBranch.IsDefault DESC, branch.BranchCode;
+            ORDER BY ISNULL(userBranch.IsDefault,0) DESC, branch.BranchCode;
             """;
 
         await using var command = CreateIdentityCommand(sql, connection, userId, projectId);

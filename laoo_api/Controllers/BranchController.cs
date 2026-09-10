@@ -16,8 +16,9 @@ public sealed class BranchController(IConfiguration configuration) : ControllerB
         if (!IsRouteScopeAllowed()) return Forbid();
         await using var c = await Open(token);
         if (!await Allowed(c, "VIEW", token)) return Forbid();
-        const string sql = "SELECT B.BranchID,B.CompanyID,C.CustomerNameTH,B.BranchCode,B.BranchNameTH,B.BranchNameEN,B.Email,B.Telephone,B.AddressText,B.ContName,B.ContPhone,B.ContPositionName,B.IsActive FROM dbo.TDADBranch B INNER JOIN dbo.TDSTCompanySetUp C ON C.CompanyID=B.CompanyID WHERE (@q='' OR B.BranchCode LIKE @like OR B.BranchNameTH LIKE @like OR B.BranchNameEN LIKE @like) AND ((@isCompany=1 AND B.CompanyID=@currentCompanyId) OR (@isCompany=0 AND (@companyId IS NULL OR B.CompanyID=@companyId) AND (@partnerId IS NULL OR C.PartnerID=@partnerId))) ORDER BY B.BranchCode";
-        await using var cmd = new SqlCommand(sql, c); cmd.Parameters.AddWithValue("@q", search?.Trim() ?? string.Empty); cmd.Parameters.AddWithValue("@like", $"%{search?.Trim() ?? string.Empty}%"); cmd.Parameters.Add("@companyId", SqlDbType.BigInt).Value = companyId ?? (object)DBNull.Value; cmd.Parameters.Add("@currentCompanyId", SqlDbType.BigInt).Value = CompanyIdClaim() ?? (object)DBNull.Value; cmd.Parameters.Add("@isCompany", SqlDbType.Bit).Value = IsCompany(); cmd.Parameters.Add("@partnerId", SqlDbType.BigInt).Value = IsPartner() && long.TryParse(User.FindFirstValue("partner_id"), out var partnerId) ? partnerId : DBNull.Value;
+        var canManage = IsCompany() && await Allowed(c, "EDIT", token);
+        const string sql = "SELECT B.BranchID,B.CompanyID,C.CustomerNameTH,B.BranchCode,B.BranchNameTH,B.BranchNameEN,B.Email,B.Telephone,B.AddressText,B.ContName,B.ContPhone,B.ContPositionName,B.IsActive FROM dbo.TDADBranch B INNER JOIN dbo.TDSTCompanySetUp C ON C.CompanyID=B.CompanyID WHERE (@q='' OR B.BranchCode LIKE @like OR B.BranchNameTH LIKE @like OR B.BranchNameEN LIKE @like) AND ((@isCompany=1 AND B.CompanyID=@currentCompanyId AND (@canManage=1 OR B.AccessModeCode=N'ALL' OR EXISTS(SELECT 1 FROM dbo.TDADUserBranch UB WHERE UB.CompanyID=B.CompanyID AND UB.BranchID=B.BranchID AND UB.UserID=@currentUserId AND UB.IsActive=1))) OR (@isCompany=0 AND (@companyId IS NULL OR B.CompanyID=@companyId) AND (@partnerId IS NULL OR C.PartnerID=@partnerId))) ORDER BY B.BranchCode";
+        await using var cmd = new SqlCommand(sql, c); cmd.Parameters.AddWithValue("@q", search?.Trim() ?? string.Empty); cmd.Parameters.AddWithValue("@like", $"%{search?.Trim() ?? string.Empty}%"); cmd.Parameters.Add("@companyId", SqlDbType.BigInt).Value = companyId ?? (object)DBNull.Value; cmd.Parameters.Add("@currentCompanyId", SqlDbType.BigInt).Value = CompanyIdClaim() ?? (object)DBNull.Value; cmd.Parameters.Add("@currentUserId", SqlDbType.BigInt).Value = long.TryParse(User.FindFirstValue("user_id"), out var currentUserId) ? currentUserId : 0; cmd.Parameters.Add("@canManage", SqlDbType.Bit).Value = canManage; cmd.Parameters.Add("@isCompany", SqlDbType.Bit).Value = IsCompany(); cmd.Parameters.Add("@partnerId", SqlDbType.BigInt).Value = IsPartner() && long.TryParse(User.FindFirstValue("partner_id"), out var partnerId) ? partnerId : DBNull.Value;
         await using var r = await cmd.ExecuteReaderAsync(token); var result = new List<object>();
         while (await r.ReadAsync(token)) result.Add(new { branchId = r.GetInt64(0), companyId = r.GetInt64(1), companyName = r.GetString(2), branchCode = r.GetString(3), branchNameTh = r.GetString(4), branchNameEn = N(r, 5), email = N(r, 6), telephone = N(r, 7), addressText = N(r, 8), contName = N(r, 9), contPhone = N(r, 10), contPositionName = N(r, 11), isActive = r.GetBoolean(12) });
         return Ok(result);
@@ -35,6 +36,116 @@ public sealed class BranchController(IConfiguration configuration) : ControllerB
             edit = await Allowed(c, "EDIT", token),
             delete = await Allowed(c, "DELETE", token),
         });
+    }
+
+    [HttpGet("{id:long}/access")]
+    public async Task<IActionResult> GetAccess(long id, CancellationToken token)
+    {
+        if (!IsCompany()) return Forbid();
+        await using var c = await Open(token);
+        if (!await Allowed(c, "EDIT", token)) return Forbid();
+        var companyId = CompanyIdClaim() ?? 0;
+        const string branchSql = "SELECT BranchCode,BranchNameTH,AccessModeCode FROM dbo.TDADBranch WHERE BranchID=@id AND CompanyID=@company";
+        await using var branch = new SqlCommand(branchSql, c);
+        branch.Parameters.Add("@id", SqlDbType.BigInt).Value = id;
+        branch.Parameters.Add("@company", SqlDbType.BigInt).Value = companyId;
+        await using var branchReader = await branch.ExecuteReaderAsync(token);
+        if (!await branchReader.ReadAsync(token)) return NotFound(new { message = "ไม่พบสาขา", description = "สาขาไม่อยู่ใน Company ปัจจุบัน" });
+        var branchCode = branchReader.GetString(0);
+        var branchName = branchReader.GetString(1);
+        var accessModeCode = branchReader.GetString(2);
+        await branchReader.DisposeAsync();
+
+        const string userSql = """
+SELECT U.UserID,U.Username,COALESCE(NULLIF(P.FullName,N''),NULLIF(U.DisplayName,N''),U.Username) DisplayName,
+       CONVERT(bit,CASE WHEN UB.UserBranchID IS NULL THEN 0 ELSE 1 END) IsSelected
+FROM dbo.TDADUser U
+LEFT JOIN dbo.TDADPerson P ON P.PersonID=U.PersonID AND P.CompanyID=U.CompanyID
+LEFT JOIN dbo.TDADUserBranch UB ON UB.UserID=U.UserID AND UB.CompanyID=U.CompanyID AND UB.BranchID=@id AND UB.IsActive=1
+WHERE U.CompanyID=@company AND U.IsActive=1
+ORDER BY DisplayName,U.Username;
+""";
+        await using var usersCommand = new SqlCommand(userSql, c);
+        usersCommand.Parameters.Add("@id", SqlDbType.BigInt).Value = id;
+        usersCommand.Parameters.Add("@company", SqlDbType.BigInt).Value = companyId;
+        var users = new List<object>();
+        await using var reader = await usersCommand.ExecuteReaderAsync(token);
+        while (await reader.ReadAsync(token))
+            users.Add(new { userId = reader.GetInt64(0), username = reader.GetString(1), displayName = reader.GetString(2), isSelected = reader.GetBoolean(3) });
+        return Ok(new { branchId = id, branchCode, branchName, accessModeCode, users });
+    }
+
+    [HttpPut("{id:long}/access")]
+    public async Task<IActionResult> UpdateAccess(long id, BranchAccessRequest request, CancellationToken token)
+    {
+        if (!IsCompany()) return Forbid();
+        await using var c = await Open(token);
+        if (!await Allowed(c, "EDIT", token)) return Forbid();
+        var companyId = CompanyIdClaim() ?? 0;
+        var mode = request.AccessModeCode?.Trim().ToUpperInvariant();
+        if (mode is not ("ALL" or "RESTRICTED"))
+            return BadRequest(new { message = "รูปแบบสิทธิ์ไม่ถูกต้อง", description = "กรุณาเลือกทุกคนในบริษัทหรือเฉพาะผู้เลือก" });
+        var userIds = (request.UserIds ?? Array.Empty<long>()).Where(x => x > 0).Distinct().ToArray();
+        await using var tx = (SqlTransaction)await c.BeginTransactionAsync(token);
+        try
+        {
+            await using (var scope = new SqlCommand("SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADBranch WHERE BranchID=@id AND CompanyID=@company) THEN 1 ELSE 0 END", c, tx))
+            {
+                scope.Parameters.Add("@id", SqlDbType.BigInt).Value = id;
+                scope.Parameters.Add("@company", SqlDbType.BigInt).Value = companyId;
+                if (Convert.ToInt32(await scope.ExecuteScalarAsync(token)) != 1)
+                    return NotFound(new { message = "ไม่พบสาขา", description = "สาขาไม่อยู่ใน Company ปัจจุบัน" });
+            }
+            if (mode == "RESTRICTED" && userIds.Length > 0)
+            {
+                foreach (var userId in userIds)
+                {
+                    await using var validate = new SqlCommand("SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADUser WHERE UserID=@user AND CompanyID=@company AND IsActive=1) THEN 1 ELSE 0 END", c, tx);
+                    validate.Parameters.Add("@user", SqlDbType.BigInt).Value = userId;
+                    validate.Parameters.Add("@company", SqlDbType.BigInt).Value = companyId;
+                    if (Convert.ToInt32(await validate.ExecuteScalarAsync(token)) != 1)
+                        return BadRequest(new { message = "ผู้ใช้ไม่ถูกต้อง", description = "มีผู้ใช้ที่ปิดใช้งานหรืออยู่นอก Company ปัจจุบัน" });
+                }
+            }
+            await using (var updateMode = new SqlCommand("UPDATE dbo.TDADBranch SET AccessModeCode=@mode,UpdateDate=SYSUTCDATETIME() WHERE BranchID=@id AND CompanyID=@company", c, tx))
+            {
+                updateMode.Parameters.Add("@mode", SqlDbType.NVarChar, 20).Value = mode;
+                updateMode.Parameters.Add("@id", SqlDbType.BigInt).Value = id;
+                updateMode.Parameters.Add("@company", SqlDbType.BigInt).Value = companyId;
+                await updateMode.ExecuteNonQueryAsync(token);
+            }
+            if (mode == "RESTRICTED")
+            {
+                await using (var disable = new SqlCommand("UPDATE dbo.TDADUserBranch SET IsActive=0,UpdateDate=SYSUTCDATETIME() WHERE BranchID=@id AND CompanyID=@company", c, tx))
+                {
+                    disable.Parameters.Add("@id", SqlDbType.BigInt).Value = id;
+                    disable.Parameters.Add("@company", SqlDbType.BigInt).Value = companyId;
+                    await disable.ExecuteNonQueryAsync(token);
+                }
+                foreach (var userId in userIds)
+                {
+                    const string upsert = """
+UPDATE dbo.TDADUserBranch SET IsActive=1,UpdateDate=SYSUTCDATETIME()
+WHERE BranchID=@id AND CompanyID=@company AND UserID=@user;
+IF @@ROWCOUNT=0
+    INSERT dbo.TDADUserBranch(CompanyID,BranchID,UserID,IsDefault,IsActive,CreateDate)
+    VALUES(@company,@id,@user,0,1,SYSUTCDATETIME());
+""";
+                    await using var command = new SqlCommand(upsert, c, tx);
+                    command.Parameters.Add("@id", SqlDbType.BigInt).Value = id;
+                    command.Parameters.Add("@company", SqlDbType.BigInt).Value = companyId;
+                    command.Parameters.Add("@user", SqlDbType.BigInt).Value = userId;
+                    await command.ExecuteNonQueryAsync(token);
+                }
+            }
+            await tx.CommitAsync(token);
+            return Ok(new { branchId = id, accessModeCode = mode, userIds });
+        }
+        catch (SqlException ex)
+        {
+            try { await tx.RollbackAsync(token); } catch { }
+            return BadRequest(new { message = "บันทึกสิทธิ์สาขาไม่สำเร็จ", description = ex.Number is 2601 or 2627 ? "พบความสัมพันธ์ผู้ใช้กับสาขาซ้ำ" : ex.Message });
+        }
     }
 
     [HttpPost]
@@ -73,7 +184,7 @@ public sealed class BranchController(IConfiguration configuration) : ControllerB
         var targetCompanyId = IsCompany() ? CompanyIdClaim() : x.CompanyId;
         if (IsCompany() && targetCompanyId is long companyId) x = x with { CompanyId = companyId };
         if (targetCompanyId is null or <= 0) return BadRequest(new { message = "กรุณาระบุบริษัทของสาขา" });
-        if (x.CompanyId <= 0 || string.IsNullOrWhiteSpace(x.BranchCode) || string.IsNullOrWhiteSpace(x.BranchNameTh)) return BadRequest(new { message = "กรุณากรอกผู้ใช้บริการ รหัสสาขา และชื่อสาขา" });
+        if (x.CompanyId is null or <= 0 || string.IsNullOrWhiteSpace(x.BranchCode) || string.IsNullOrWhiteSpace(x.BranchNameTh)) return BadRequest(new { message = "กรุณากรอกผู้ใช้บริการ รหัสสาขา และชื่อสาขา" });
         await using var c = await Open(token);
         if (!await Allowed(c, id is null ? "CREATE" : "EDIT", token)) return Forbid();
         if (IsPartner())
@@ -122,15 +233,8 @@ public sealed class BranchController(IConfiguration configuration) : ControllerB
 
         if (IsCompany())
         {
-            var userId = long.TryParse(User.FindFirstValue("user_id"), out var parsedUser) ? parsedUser : 0;
-            if (userId == 0) return false;
-            const string companySql = "SELECT CASE WHEN EXISTS (SELECT 1 FROM dbo.TDADUser U WHERE U.UserID=@UserID AND U.IsActive=1 AND U.IsCompanyAdmin=1) OR EXISTS (SELECT 1 FROM dbo.TDADUserPermission UP INNER JOIN dbo.TDADPermission P ON P.PermissionID=UP.PermissionID AND P.ProjectID=UP.ProjectID INNER JOIN dbo.TDADUser U ON U.UserID=UP.UserID AND U.IsActive=1 WHERE UP.UserID=@UserID AND UP.ProjectID=@ProjectID AND UP.IsAllowed=1 AND UP.IsActive=1 AND P.IsActive=1 AND P.ScreenCode=@ScreenCode AND P.ActionCode=@Action) THEN 1 ELSE 0 END";
-            await using var companyCommand = new SqlCommand(companySql, connection);
-            companyCommand.Parameters.Add("@UserID", SqlDbType.BigInt).Value = userId;
-            companyCommand.Parameters.Add("@ProjectID", SqlDbType.BigInt).Value = projectId;
-            companyCommand.Parameters.Add("@ScreenCode", SqlDbType.NVarChar, 20).Value = screen.MenuCode;
-            companyCommand.Parameters.Add("@Action", SqlDbType.NVarChar, 50).Value = action;
-            return Convert.ToBoolean(await companyCommand.ExecuteScalarAsync(token));
+            return await Laoo.Shared.Contracts.CompanyMenuAccess.IsAllowedAsync(
+                connection, User, screen.MenuCode, action, token);
         }
 
         if (IsSupport())

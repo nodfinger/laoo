@@ -4,8 +4,8 @@
 
 ## Scope
 
-- ใช้ Popup เฉพาะงานสั้น เช่น Confirm Delete, Confirm Action, Lookup หรือจัดการ Master ขนาดเล็กที่ได้รับอนุมัติ
-- ห้ามใช้ Popup แทน Action Screen ที่มี Form หลาย Field เว้นแต่พ่ออนุมัติหน้าจอนั้นโดยตรง
+- ใช้ Popup สำหรับ Confirm Delete, Confirm Action, Lookup, จัดการ Master และ Action Form ของ CRUD (`ScreenType = 1`)
+- Action Form ของ `ScreenType = 1` ใช้ Popup เป็นมาตรฐาน แม้มีหลาย Field; ScreenType อื่นใช้ Popup ได้เมื่อ Feature Specification หรือพ่อกำหนด
 
 ## Popup Layout
 
@@ -13,12 +13,15 @@
 - กรอบ Popup ใช้มุมโค้ง `LaooRadius.xs` (`4px`) ทุกมุม
 - ระยะขอบ Popup ใช้ `LaooLayout.dialogInsetPadding`; Padding ภายในใช้ `LaooLayout.cardPadding`
 - Popup Action Form ใช้ความกว้างสูงสุด `480px` และต้องคำนวณให้ไม่เกินความกว้างหน้าจอหลังหัก `dialogInsetPadding` ทั้งสองด้าน; ห้ามปล่อยให้ Popup แคบตามความกว้างของ Field โดยไม่จำเป็น
-- Caption ใช้มาตรฐานกลาง `fontSize: 18`, `fontWeight: FontWeight.w700`, `color: Colors.black` ตาม `TYPOGRAPHY_STANDARD.md`; ต้องมี Icon อยู่ด้านหน้า Caption และ Icon ใช้สีดำ (`Colors.black`) ยกเว้น Delete Confirmation ซึ่งใช้ Icon สีแดงตาม Semantic Pattern ของการลบ
+- ข้อยกเว้นที่อนุมัติ: Popup ข้อมูลสินค้าใช้ความกว้างสูงสุด `1100px` ไม่เกินพื้นที่จอหลังหัก inset แบ่งข้อมูลเป็น Panel และเลื่อนเฉพาะเนื้อหา โดยปุ่มด้านล่างคงอยู่ใน Popup; ไม่เปลี่ยนขนาด Popup สั้นของหน้าอื่น
+- Caption ใช้มาตรฐานกลาง `fontSize: 18`, `fontWeight: FontWeight.w700`, `color: Colors.black` ตาม `TYPOGRAPHY_STANDARD.md`; ต้องมี Icon อยู่ด้านหน้า Caption และ Icon ใช้สี Primary ตาม User Style ยกเว้น Delete Confirmation ซึ่งใช้ Icon สีแดงตาม Semantic Pattern ของการลบ
 - ใช้เส้น `LaooColors.border` สีเทาอ่อนใต้ Caption และก่อนส่วนปุ่มด้านล่าง
 - Context Bar ที่แสดงรายการแม่/ห้อง/อาคารที่เลือก ใช้พื้น Primary แบบโปร่งแสงและข้อความขนาด `16px`
-- TextBox/ComboBox ใช้กรอบมาตรฐาน มุมโค้ง `4px`; Label และ Focus Border ใช้ Primary
+- TextBox/ComboBox ทุกช่องต้องใช้ `OutlineInputBorder` ครบทั้ง Normal, Focus, Error และ Disabled มุมโค้ง `4px`; Label และ Focus Border ใช้ Primary
+- ข้อความที่กรอกและข้อความที่เลือกใน TextBox/ComboBox ใช้ `LaooTypography.inputText` / `LaooTypography.comboBox` ขนาด `14px` เท่ากับหน้า List; ห้ามใช้ขนาดใหญ่กว่าเฉพาะใน Popup
 - ปุ่มด้านล่างใช้ Font `13px`, สูง `48px`, มุมโค้ง `LaooRadius.xs` (`4px`); ต้องกำหนด `RoundedRectangleBorder(borderRadius: BorderRadius.circular(LaooRadius.xs))` ใน Style ของปุ่มโดยตรง ห้ามปล่อยให้รับรูปทรง pill จาก Theme; ยกเลิกใช้ Text/Outlined Primary และบันทึกใช้ Filled Primary
 - เมื่อ Popup แคบต้องจัด Field ลงบรรทัดใหม่โดยไม่ Overflow
+- เมื่อบันทึกสำเร็จ ให้แสดง Success Notification แล้วคง Popup เปิดอยู่; ต้องเปลี่ยน Form เพิ่มเป็นโหมดแก้ไขหรือป้องกันการกดบันทึกซ้ำเพื่อไม่ให้สร้างข้อมูลซ้ำ
 
 ## Validation and Notification
 

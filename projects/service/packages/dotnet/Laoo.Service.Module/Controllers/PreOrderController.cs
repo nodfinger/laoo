@@ -1,3 +1,4 @@
+using LaooServiceModule.Infrastructure;
 using System.Data;
 using System.Security.Claims;
 using LaooServiceModule.Models;
@@ -8,7 +9,8 @@ using Microsoft.Data.SqlClient;
 namespace LaooServiceModule.Controllers;
 
 [ApiController, Authorize, LaooServiceModule.Security.RequireCompanyFeature("SALES")]
-[LaooServiceModule.Security.RequireCompanyProject("LAOO_SERVICE")]
+[LaooServiceModule.Security.RequireCompanyProject("LAOO")]
+[TypeFilter(typeof(ItemProjectExceptionFilter))]
 [Route("api/company/pre-orders")]
 public sealed class PreOrderController(IConfiguration configuration) : ControllerBase
 {
@@ -126,7 +128,7 @@ public sealed class PreOrderController(IConfiguration configuration) : Controlle
         }
 
         var items = new List<object>();
-        const string itemSql = """
+        var itemSql = $"""
             SELECT I.ItemID,I.ItemCode,I.ItemName,I.UnitCode,I.UnitPrice,
                    COALESCE(CONVERT(nvarchar(200),U.Name),CONVERT(nvarchar(200),I.UnitCode)) AS UnitName
             FROM dbo.TDIVItem I
@@ -137,7 +139,7 @@ public sealed class PreOrderController(IConfiguration configuration) : Controlle
              AND U.OwnerCompanyID=I.CompanyID
             WHERE I.CompanyID=@company AND I.IsActive=1 AND I.ItemKindCode=N'GOODS'
               AND EXISTS(SELECT 1 FROM dbo.TDIVItemUsage IU WHERE IU.CompanyID=I.CompanyID AND IU.ItemID=I.ItemID AND IU.UsageCode=N'SALE')
-            ORDER BY I.ItemCode;
+            AND {ItemProjectAccess.ItemAliasPredicate} ORDER BY I.ItemCode;
             """;
         await using (var command = new SqlCommand(itemSql, connection))
         {
@@ -456,7 +458,7 @@ public sealed class PreOrderController(IConfiguration configuration) : Controlle
                 description = $"ฐานข้อมูลไม่สามารถบันทึกเอกสารได้: {exception.Message}"
             });
         }
-        catch (Exception exception)
+        catch (Exception exception) when (exception is not ItemProjectDeniedException)
         {
             await transaction.RollbackAsync(token);
             return StatusCode(StatusCodes.Status500InternalServerError, new
@@ -517,6 +519,7 @@ public sealed class PreOrderController(IConfiguration configuration) : Controlle
         var status = string.IsNullOrWhiteSpace(line.StatusCode) ? "WAITING_STOCK" : line.StatusCode.Trim().ToUpperInvariant();
         if (!DetailStatuses.Contains(status)) return (null, null, $"ไม่รองรับสถานะรายการ {status}");
 
+        await ItemProjectAccess.EnsureAsync(connection,transaction,CompanyId(),line.ItemId,token);
         const string itemSql = "SELECT ItemCode,ItemName,UnitCode FROM dbo.TDIVItem I WHERE ItemID=@item AND CompanyID=@company AND IsActive=1 AND ItemKindCode=N'GOODS' AND EXISTS(SELECT 1 FROM dbo.TDIVItemUsage U WHERE U.CompanyID=I.CompanyID AND U.ItemID=I.ItemID AND U.UsageCode=N'SALE')";
         await using var itemCommand = new SqlCommand(itemSql, connection, transaction);
         Add(itemCommand, "@item", SqlDbType.BigInt, line.ItemId);

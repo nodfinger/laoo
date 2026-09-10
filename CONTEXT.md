@@ -66,6 +66,14 @@ _Avoid_: Item Group, Item Type
 สถานที่เก็บ Item ภายใต้ Branch ซึ่งเป็นขอบเขตของยอดคงเหลือและการเคลื่อนไหว
 _Avoid_: Branch, Room
 
+**Item Project Availability**:
+ขอบเขต Project ที่นำ Item ของ Company ไปใช้ได้ แยกจากวัตถุประสงค์และไม่ทดแทนสิทธิ์ของผู้ใช้
+_Avoid_: Item Usage, User Permission
+
+**Item Classification Default**:
+ค่าเริ่มต้นของชนิด วิธีควบคุมสต็อก และวัตถุประสงค์สำหรับสินค้าใหม่ในกลุ่มหรือประเภทนั้น ไม่ใช่คำสั่งเปลี่ยนสินค้าที่มีอยู่แล้ว
+_Avoid_: Item Project Availability
+
 **Item Instance**:
 หน่วยจริงหนึ่งชิ้นของ Item แบบ Serial ซึ่งมี Serial สถานะ และตำแหน่งปัจจุบันเฉพาะตัว
 _Avoid_: Item, Stock Balance

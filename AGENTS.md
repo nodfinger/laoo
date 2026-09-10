@@ -86,7 +86,7 @@ ScreenType: 1
 - ComboBox ที่อ่าน `TDSTMaster` ต้องอ้าง `MasterGroupCode` ผ่านตัวแปรกลาง Prefix `Ms` และเปิดการจัดการ Master ตาม Permission
 - หน้าจอแบ่งตาม `ScreenType`: `1 = CRUD`, `2 = UpdateOnly`, `3 = ShowOnly`, `4 = Document Header–Detail`
 - ทุก Action ต้องตรวจทั้ง `ScreenType` และ Permission ของผู้ใช้ และ Backend ต้องตรวจซ้ำ
-- Action Form หลาย Field ต้องเปิดเต็ม Content Area ภายใน Shared Workspace ห้ามสร้าง Shell ซ้อนหรือใช้ Popup แทน
+- Action Form ของ ScreenType = 1 ใช้ Popup แม้มีหลาย Field โดยแบ่ง Panel ตาม ACTION_UI_STANDARD.md และ POPUP_UI_STANDARD.md; ห้ามสร้าง Shell ซ้อน
 - ก่อนสร้าง Action Screen ต้องตรวจ ActionCode, Flow, Permission และปลายทางหลัง Save/Cancel จาก Feature Specification; หากไม่ระบุให้ถามพ่อก่อน
 
 

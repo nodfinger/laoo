@@ -142,13 +142,10 @@ class _EmployeeListWorkspaceState extends State<EmployeeListWorkspace> {
   @override
   Widget build(BuildContext context) {
     final t = widget.tokens;
-    return Material(
-      color: Theme.of(context).colorScheme.surface,
-      borderRadius: BorderRadius.circular(t.radius),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _standardCard(
           Padding(
             padding: t.cardPadding,
             child: Row(
@@ -165,26 +162,50 @@ class _EmployeeListWorkspaceState extends State<EmployeeListWorkspace> {
               ],
             ),
           ),
-          const Divider(height: 1),
-          Padding(padding: t.cardPadding, child: _filters()),
-          const Divider(height: 1),
-          if (controller.loading) const LinearProgressIndicator(minHeight: 2),
-          Expanded(
-            child: controller.error != null
-                ? _error()
-                : LayoutBuilder(
-                    builder: (_, constraints) =>
-                        constraints.maxWidth < t.compactBreakpoint
-                        ? _cards()
-                        : _table(),
-                  ),
+        ),
+        const SizedBox(height: 6),
+        _standardCard(Padding(padding: t.cardPadding, child: _filters())),
+        SizedBox(height: t.cardSpacing),
+        Expanded(
+          child: _standardCard(
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (controller.loading)
+                  const LinearProgressIndicator(minHeight: 2),
+                Expanded(
+                  child: controller.error != null
+                      ? _error()
+                      : LayoutBuilder(
+                          builder: (_, constraints) =>
+                              constraints.maxWidth < t.compactBreakpoint
+                              ? _cards()
+                              : _table(),
+                        ),
+                ),
+              ],
+            ),
           ),
-          const Divider(height: 1),
-          _pagination(),
-        ],
-      ),
+        ),
+        SizedBox(height: t.cardSpacing),
+        _paginationCard(),
+      ],
     );
   }
+
+  Widget _standardCard(Widget child) => Card(
+    margin: EdgeInsets.zero,
+    color: Colors.white,
+    elevation: 0,
+    surfaceTintColor: Colors.transparent,
+    shadowColor: Colors.transparent,
+    clipBehavior: Clip.antiAlias,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(widget.tokens.radius),
+      side: BorderSide.none,
+    ),
+    child: child,
+  );
 
   Widget _filters() => Wrap(
     spacing: widget.tokens.cardSpacing,
@@ -200,11 +221,6 @@ class _EmployeeListWorkspaceState extends State<EmployeeListWorkspace> {
           decoration: InputDecoration(
             labelText: 'ค้นหารหัส/ชื่อ/ชื่อเล่น/อีเมล',
             prefixIcon: const Icon(Icons.search),
-            suffixIcon: IconButton(
-              tooltip: 'ค้นหา',
-              onPressed: _applyFilters,
-              icon: const Icon(Icons.arrow_forward),
-            ),
           ),
         ),
       ),
@@ -257,13 +273,25 @@ class _EmployeeListWorkspaceState extends State<EmployeeListWorkspace> {
         onPressed: _applyFilters,
         icon: const Icon(Icons.search),
         label: const Text('ค้นหา'),
+        style: _filterButtonStyle,
       ),
       OutlinedButton.icon(
         onPressed: _clearFilters,
         icon: const Icon(Icons.filter_alt_off_outlined),
         label: const Text('ล้าง Filter'),
+        style: _filterButtonStyle,
       ),
     ],
+  );
+
+  ButtonStyle get _filterButtonStyle => ButtonStyle(
+    minimumSize: const WidgetStatePropertyAll(Size(0, 40)),
+    padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 14)),
+    shape: WidgetStatePropertyAll(
+      RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(widget.tokens.radius),
+      ),
+    ),
   );
 
   List<DropdownMenuItem<int?>> _organizationItems(
@@ -320,57 +348,76 @@ class _EmployeeListWorkspaceState extends State<EmployeeListWorkspace> {
       return const Center(child: Text('ไม่พบข้อมูลพนักงาน'));
     }
     final scheme = Theme.of(context).colorScheme;
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: SingleChildScrollView(
-        child: DataTable(
-          headingRowColor: WidgetStatePropertyAll(
-            scheme.primary.withValues(alpha: .10),
-          ),
-          headingTextStyle: TextStyle(
-            color: scheme.primary,
-            fontWeight: FontWeight.w700,
-          ),
-          sortColumnIndex: _sortColumn,
-          sortAscending: _sortAscending,
-          columns: [
-            _column('ID', 0),
-            const DataColumn(
-              label: SizedBox(width: 108, child: Center(child: Text('Action'))),
+    return LayoutBuilder(
+      builder: (_, constraints) => SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: SizedBox(
+          width: constraints.maxWidth < 900 ? 900 : constraints.maxWidth,
+          child: SingleChildScrollView(
+            child: DataTable(
+              horizontalMargin: widget.tokens.cardPadding.left,
+              columnSpacing: 16,
+              headingRowColor: WidgetStatePropertyAll(
+                scheme.primary.withValues(alpha: .10),
+              ),
+              headingTextStyle: TextStyle(
+                color: scheme.primary,
+                fontWeight: FontWeight.w700,
+              ),
+              sortColumnIndex: _sortColumn,
+              sortAscending: _sortAscending,
+              columns: [
+                DataColumn(
+                  label: const SizedBox(width: 32, child: Text('ID')),
+                  onSort: (_, ascending) => setState(() {
+                    _sortColumn = 0;
+                    _sortAscending = ascending;
+                  }),
+                ),
+                const DataColumn(
+                  label: SizedBox(
+                    width: 108,
+                    child: Center(child: Text('Action')),
+                  ),
+                ),
+                _column('แผนก', 2),
+                _column('รหัสพนักงาน', 3),
+                _column('ชื่อ-นามสกุล', 4),
+                _column('ชื่อเล่น', 5),
+                _column('โทรศัพท์', 6),
+                _column('รูปแบบแจ้งเตือน', 7),
+                _column('สถานะ', 8),
+              ],
+              rows: sortedItems.indexed
+                  .map((entry) {
+                    final item = entry.$2;
+                    return DataRow(
+                      cells: [
+                        DataCell(
+                          SizedBox(
+                            width: 32,
+                            child: Text(
+                              (((controller.page - 1) * controller.pageSize) +
+                                      entry.$1 +
+                                      1)
+                                  .toString(),
+                            ),
+                          ),
+                        ),
+                        DataCell(_actions(item)),
+                        DataCell(Text(_dash(item.departmentName))),
+                        DataCell(Text(item.employeeCode)),
+                        DataCell(Text(item.fullName)),
+                        DataCell(Text(_dash(item.nickName))),
+                        DataCell(Text(_dash(item.telephone))),
+                        DataCell(Text(_notifications(item))),
+                        DataCell(_status(item)),
+                      ],
+                    );
+                  })
+                  .toList(growable: false),
             ),
-            _column('แผนก', 2),
-            _column('รหัสพนักงาน', 3),
-            _column('ชื่อ-นามสกุล', 4),
-            _column('ชื่อเล่น', 5),
-            _column('โทรศัพท์', 6),
-            _column('รูปแบบแจ้งเตือน', 7),
-            _column('สถานะ', 8),
-          ],
-          rows: sortedItems.indexed
-              .map((entry) {
-                final item = entry.$2;
-                return DataRow(
-                  cells: [
-                    DataCell(
-                      Text(
-                        (((controller.page - 1) * controller.pageSize) +
-                                entry.$1 +
-                                1)
-                            .toString(),
-                      ),
-                    ),
-                    DataCell(_actions(item)),
-                    DataCell(Text(_dash(item.departmentName))),
-                    DataCell(Text(item.employeeCode)),
-                    DataCell(Text(item.fullName)),
-                    DataCell(Text(_dash(item.nickName))),
-                    DataCell(Text(_dash(item.telephone))),
-                    DataCell(Text(_notifications(item))),
-                    DataCell(_status(item)),
-                  ],
-                );
-              })
-              .toList(growable: false),
+          ),
         ),
       ),
     );
@@ -394,9 +441,16 @@ class _EmployeeListWorkspaceState extends State<EmployeeListWorkspace> {
       separatorBuilder: (_, _) => SizedBox(height: widget.tokens.itemSpacing),
       itemBuilder: (_, index) {
         final item = sortedItems[index];
-        return Material(
-          color: Theme.of(context).colorScheme.surfaceContainerLowest,
-          borderRadius: BorderRadius.circular(widget.tokens.radius),
+        return Card(
+          margin: EdgeInsets.zero,
+          color: Colors.white,
+          elevation: 0,
+          surfaceTintColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(widget.tokens.radius),
+            side: BorderSide.none,
+          ),
           child: Padding(
             padding: widget.tokens.cardPadding,
             child: Row(
@@ -490,51 +544,83 @@ class _EmployeeListWorkspaceState extends State<EmployeeListWorkspace> {
 
   String _dash(String value) => value.trim().isEmpty ? '-' : value;
 
-  Widget _pagination() => SizedBox(
-    height: widget.tokens.paginationHeight,
-    child: Padding(
-      padding: EdgeInsets.symmetric(horizontal: widget.tokens.cardPadding.left),
-      child: Row(
+  Widget _paginationCard() => _standardCard(
+    SizedBox(
+      height: widget.tokens.paginationHeight,
+      child: Column(
         children: [
-          IconButton(
-            tooltip: 'ก่อนหน้า',
-            onPressed: controller.page > 1 ? controller.previousPage : null,
-            icon: const Icon(Icons.chevron_left),
-          ),
-          Container(
-            width: 34,
-            height: 34,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primary,
-              borderRadius: BorderRadius.circular(widget.tokens.radius),
-            ),
-            child: Text(
-              controller.page.toString(),
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onPrimary,
-                fontWeight: FontWeight.w700,
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: widget.tokens.cardPadding.left,
               ),
-            ),
-          ),
-          IconButton(
-            tooltip: 'ถัดไป',
-            onPressed: controller.page < controller.totalPages
-                ? controller.nextPage
-                : null,
-            icon: const Icon(Icons.chevron_right),
-          ),
-          const Spacer(),
-          Flexible(
-            child: Text(
-              '${controller.firstRow}-${controller.lastRow} '
-              'จาก ${controller.totalCount}',
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.end,
+              child: Row(
+                children: [
+                  _paginationButton(
+                    tooltip: 'ก่อนหน้า',
+                    onPressed: controller.page > 1
+                        ? controller.previousPage
+                        : null,
+                    label: '<',
+                  ),
+                  const SizedBox(width: 6),
+                  Container(
+                    width: 34,
+                    height: 34,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primary,
+                      borderRadius: BorderRadius.circular(widget.tokens.radius),
+                    ),
+                    child: Text(
+                      controller.page.toString(),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onPrimary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  _paginationButton(
+                    tooltip: 'ถัดไป',
+                    onPressed: controller.page < controller.totalPages
+                        ? controller.nextPage
+                        : null,
+                    label: '>',
+                  ),
+                  const SizedBox(width: 12),
+                  Flexible(
+                    child: Text(
+                      '${controller.firstRow}-${controller.lastRow} '
+                      'จาก ${controller.totalCount}',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
       ),
+    ),
+  );
+
+  Widget _paginationButton({
+    required String tooltip,
+    required String label,
+    required VoidCallback? onPressed,
+  }) => SizedBox(
+    width: 36,
+    height: 36,
+    child: OutlinedButton(
+      onPressed: onPressed,
+      style: OutlinedButton.styleFrom(
+        padding: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(widget.tokens.radius),
+        ),
+      ),
+      child: Tooltip(message: tooltip, child: Text(label)),
     ),
   );
 }

@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image/image.dart' as img;
 
+import '../../../../app/theme/laoo_design_tokens.dart';
 import '../../../../app/theme/laoo_typography.dart';
 import '../../../../app/theme/workspace_theme_presets.dart';
 import '../../../../core/widgets/timed_snack_bar.dart';
@@ -78,6 +79,8 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
   String _itemKind = 'GOODS', _stockTracking = 'QUANTITY';
   Set<String> _usageCodes = {'SALE'};
   bool _active = true, _showShop = false, _saving = false;
+  bool _additionalExpanded = false;
+  int _additionalTab = 0;
   List<Map<String, dynamic>> _packs = [];
   List<Map<String, dynamic>> _images = [];
 
@@ -462,19 +465,7 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
                               const SizedBox(height: 16),
                               _compactFields(wide),
                               const SizedBox(height: 16),
-                              _row(wide, [
-                                _text(_orderCode, 'อ้างอิงเลขที่เอกสารซื้อ'),
-                              ]),
-                              const SizedBox(height: 16),
-                              _row(wide, [
-                                _text(_orderLink1, 'อ้างอิง Link 1'),
-                              ]),
-                              const SizedBox(height: 16),
-                              _row(wide, [
-                                _text(_orderLink2, 'อ้างอิง Link 2'),
-                              ]),
-                              const SizedBox(height: 16),
-                              _detailsSection(accent, wide),
+                              _additionalPanel(accent, wide),
                             ],
                           ),
                         ),
@@ -494,82 +485,159 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
     );
   }
 
-  Widget _detailsSection(Color accent, bool wide) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          children: [
-            const Expanded(child: Divider(color: Color(0xFFF5F6F7))),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Text(
-                'รายละเอียดสินค้า',
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  color: Colors.black,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-            const Expanded(child: Divider(color: Color(0xFFF5F6F7))),
-          ],
-        ),
-        const SizedBox(height: 12),
-        _row(wide, [_multiline(_remarkItem1, 'รายละเอียด 1')]),
-        const SizedBox(height: 12),
-        _text(_note1, 'อธิบายเพิ่มเติม 1'),
-        const SizedBox(height: 12),
-        _text(_note2, 'อธิบายเพิ่มเติม 2'),
-        const SizedBox(height: 12),
-        _text(_note3, 'อธิบายเพิ่มเติม 3'),
-        const SizedBox(height: 12),
-        _text(_note4, 'อธิบายเพิ่มเติม 4'),
-        const SizedBox(height: 12),
-        _text(_note5, 'อธิบายเพิ่มเติม 5'),
-      ],
-    );
-  }
+  bool get _hasAdditionalData => [
+    _orderCode,
+    _orderLink1,
+    _orderLink2,
+    _remarkItem1,
+    _note1,
+    _note2,
+    _note3,
+    _note4,
+    _note5,
+  ].any((controller) => controller.text.trim().isNotEmpty);
 
-  Widget _detailsCard(Color accent, bool wide) {
+  Widget _additionalPanel(Color accent, bool wide) {
+    final selectedColor = accent.withValues(alpha: .12);
     return Card(
       margin: EdgeInsets.zero,
       color: Colors.white,
       elevation: 0,
-      shadowColor: Colors.transparent,
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(4),
-        side: BorderSide.none,
+        borderRadius: BorderRadius.circular(LaooRadius.xs),
+        side: const BorderSide(color: LaooColors.border),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'รายละเอียดสินค้า',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: Colors.black,
-                fontWeight: FontWeight.w700,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(LaooRadius.xs),
+            onTap: () =>
+                setState(() => _additionalExpanded = !_additionalExpanded),
+            child: Padding(
+              padding: const EdgeInsets.all(LaooLayout.cardPadding),
+              child: Row(
+                children: [
+                  Icon(Icons.article_outlined, color: accent),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'ข้อมูลเพิ่มเติม',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        color: LaooColors.textPrimary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  if (_hasAdditionalData)
+                    Text(
+                      'มีข้อมูล',
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: accent),
+                    ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    _additionalExpanded
+                        ? Icons.expand_less_rounded
+                        : Icons.expand_more_rounded,
+                    color: accent,
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 12),
-            _row(wide, [_multiline(_remarkItem1, 'รายละเอียด 1')]),
-            const SizedBox(height: 12),
-            _text(_note1, 'อธิบายเพิ่มเติม 1'),
-            const SizedBox(height: 12),
-            _text(_note2, 'อธิบายเพิ่มเติม 2'),
-            const SizedBox(height: 12),
-            _text(_note3, 'อธิบายเพิ่มเติม 3'),
-            const SizedBox(height: 12),
-            _text(_note4, 'อธิบายเพิ่มเติม 4'),
-            const SizedBox(height: 12),
-            _text(_note5, 'อธิบายเพิ่มเติม 5'),
+          ),
+          if (_additionalExpanded) ...[
+            const Divider(height: 1, color: LaooColors.border),
+            Padding(
+              padding: const EdgeInsets.all(LaooLayout.cardPadding),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _additionalTabButton(
+                          label: 'เอกสารอ้างอิง',
+                          index: 0,
+                          accent: accent,
+                          selectedColor: selectedColor,
+                        ),
+                        const SizedBox(width: 8),
+                        _additionalTabButton(
+                          label: 'รายละเอียดเพิ่มเติม',
+                          index: 1,
+                          accent: accent,
+                          selectedColor: selectedColor,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  if (_additionalTab == 0)
+                    _referenceFields(wide)
+                  else
+                    _detailAndNotesFields(wide),
+                ],
+              ),
+            ),
           ],
-        ),
+        ],
       ),
     );
   }
+
+  Widget _additionalTabButton({
+    required String label,
+    required int index,
+    required Color accent,
+    required Color selectedColor,
+  }) {
+    final selected = _additionalTab == index;
+    return TextButton(
+      onPressed: () => setState(() => _additionalTab = index),
+      style: TextButton.styleFrom(
+        foregroundColor: accent,
+        backgroundColor: selected ? selectedColor : Colors.transparent,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        minimumSize: const Size(0, 40),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
+        ),
+      ),
+      child: Text(label),
+    );
+  }
+
+  Widget _referenceFields(bool wide) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      _row(wide, [_text(_orderCode, 'อ้างอิงเลขที่เอกสารซื้อ')]),
+      const SizedBox(height: 12),
+      _row(wide, [_text(_orderLink1, 'อ้างอิง Link 1')]),
+      const SizedBox(height: 12),
+      _row(wide, [_text(_orderLink2, 'อ้างอิง Link 2')]),
+    ],
+  );
+
+  Widget _detailAndNotesFields(bool wide) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      _row(wide, [_multiline(_remarkItem1, 'รายละเอียดสินค้า')]),
+      const SizedBox(height: 12),
+      _text(_note1, 'อธิบายเพิ่มเติม 1'),
+      const SizedBox(height: 12),
+      _text(_note2, 'อธิบายเพิ่มเติม 2'),
+      const SizedBox(height: 12),
+      _text(_note3, 'อธิบายเพิ่มเติม 3'),
+      const SizedBox(height: 12),
+      _text(_note4, 'อธิบายเพิ่มเติม 4'),
+      const SizedBox(height: 12),
+      _text(_note5, 'อธิบายเพิ่มเติม 5'),
+    ],
+  );
 
   Widget _packCard(Color accent) {
     return Card(

@@ -68,7 +68,10 @@ public sealed record ItemDetail(
     bool IsActive,
     bool ShowShop,
     IReadOnlyList<ItemPackUnitRow> PackUnits,
-    IReadOnlyList<ItemImageRow> Images);
+    IReadOnlyList<ItemImageRow> Images)
+{
+    public ItemProjectAccess? ProjectAccess { get; init; }
+}
 
 public sealed record ItemUpsertRequest(
     string ItemCode,
@@ -95,7 +98,15 @@ public sealed record ItemUpsertRequest(
     bool IsActive,
     bool ShowShop,
     IReadOnlyList<ItemPackUnitRow>? PackUnits,
-    IReadOnlyList<ItemImageUpload>? Images);
+    IReadOnlyList<ItemImageUpload>? Images)
+{
+    // Omission by older clients preserves the existing policy.
+    public ItemProjectAccess? ProjectAccess { get; init; }
+}
+
+public sealed record ItemProjectAccess(string AccessModeCode, IReadOnlyList<long> ProjectIds);
+public sealed record ItemClassificationDefault(string ScopeCode, string ClassificationCode,
+    string ItemKindCode, string StockTrackingCode, IReadOnlyList<string> UsageCodes);
 
 public sealed record ItemImageUpload(
     string ContentType,

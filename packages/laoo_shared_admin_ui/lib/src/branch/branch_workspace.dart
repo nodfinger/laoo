@@ -70,6 +70,7 @@ class _BranchWorkspaceState extends State<BranchWorkspace> {
   bool saving = false;
   bool formActive = true;
   bool showForm = false;
+  bool cardMode = false;
   bool canCreate = false;
   bool canEdit = false;
   bool canDelete = false;
@@ -211,10 +212,13 @@ class _BranchWorkspaceState extends State<BranchWorkspace> {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          Padding(
-            padding: t.contentMargin,
-            child: showForm ? buildForm() : buildList(),
-          ),
+          Padding(padding: t.contentMargin, child: buildList()),
+          if (showForm) ...[
+            const Positioned.fill(
+              child: ModalBarrier(dismissible: false, color: Colors.black54),
+            ),
+            Positioned.fill(child: buildForm()),
+          ],
           if (message != null)
             Positioned(
               top: t.contentMargin.top,
@@ -235,19 +239,26 @@ class _BranchWorkspaceState extends State<BranchWorkspace> {
     );
   }
 
-  Widget surface(Widget child, {BorderRadius? radius}) => Material(
-    color: Theme.of(context).colorScheme.surface,
-    borderRadius: radius ?? BorderRadius.circular(widget.tokens.radius),
+  Widget surface(Widget child, {BorderRadius? radius}) => Card(
+    margin: EdgeInsets.zero,
+    color: Colors.white,
+    elevation: 0,
+    surfaceTintColor: Colors.transparent,
+    shadowColor: Colors.transparent,
+    shape: RoundedRectangleBorder(
+      borderRadius: radius ?? BorderRadius.circular(widget.tokens.radius),
+      side: BorderSide.none,
+    ),
     clipBehavior: Clip.antiAlias,
     child: child,
   );
 
   Widget buildList() {
     final t = widget.tokens;
-    return surface(
-      Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        surface(
           Padding(
             padding: t.cardPadding,
             child: LayoutBuilder(
@@ -277,30 +288,57 @@ class _BranchWorkspaceState extends State<BranchWorkspace> {
                 return Row(
                   children: [
                     Expanded(child: title),
+                    if (constraints.maxWidth >= t.compactBreakpoint) ...[
+                      OutlinedButton(
+                        onPressed: () => setState(() => cardMode = !cardMode),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(44, 40),
+                          padding: EdgeInsets.zero,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(t.radius),
+                          ),
+                        ),
+                        child: Icon(
+                          cardMode
+                              ? Icons.view_list_outlined
+                              : Icons.grid_view_outlined,
+                        ),
+                      ),
+                      SizedBox(width: t.cardSpacing),
+                    ],
                     if (canCreate) add,
                   ],
                 );
               },
             ),
           ),
-          const Divider(height: 1),
-          Padding(padding: t.cardPadding, child: buildFilters()),
-          const Divider(height: 1),
-          if (loading) const LinearProgressIndicator(minHeight: 2),
-          Expanded(
-            child: loading
-                ? const Center(child: CircularProgressIndicator())
-                : LayoutBuilder(
-                    builder: (_, constraints) =>
-                        constraints.maxWidth < t.compactBreakpoint
-                        ? buildCards()
-                        : buildTable(),
-                  ),
+        ),
+        const SizedBox(height: 6),
+        surface(Padding(padding: t.cardPadding, child: buildFilters())),
+        SizedBox(height: t.cardSpacing),
+        Expanded(
+          child: surface(
+            Column(
+              children: [
+                if (loading) const LinearProgressIndicator(minHeight: 2),
+                Expanded(
+                  child: loading
+                      ? const Center(child: CircularProgressIndicator())
+                      : LayoutBuilder(
+                          builder: (_, constraints) =>
+                              constraints.maxWidth < t.compactBreakpoint ||
+                                  cardMode
+                              ? buildCards()
+                              : buildTable(),
+                        ),
+                ),
+              ],
+            ),
           ),
-          const Divider(height: 1),
-          buildPagination(),
-        ],
-      ),
+        ),
+        SizedBox(height: t.cardSpacing),
+        buildPagination(),
+      ],
     );
   }
 
@@ -318,11 +356,6 @@ class _BranchWorkspaceState extends State<BranchWorkspace> {
           decoration: InputDecoration(
             labelText: 'ค้นหาสาขา',
             prefixIcon: const Icon(Icons.search),
-            suffixIcon: IconButton(
-              tooltip: 'ค้นหา',
-              onPressed: load,
-              icon: const Icon(Icons.arrow_forward),
-            ),
           ),
         ),
       ),
@@ -371,13 +404,25 @@ class _BranchWorkspaceState extends State<BranchWorkspace> {
         onPressed: load,
         icon: const Icon(Icons.search),
         label: const Text('ค้นหา'),
+        style: filterButtonStyle,
       ),
       OutlinedButton.icon(
         onPressed: clearFilters,
         icon: const Icon(Icons.filter_alt_off_outlined),
         label: const Text('ล้าง Filter'),
+        style: filterButtonStyle,
       ),
     ],
+  );
+
+  ButtonStyle get filterButtonStyle => ButtonStyle(
+    minimumSize: const WidgetStatePropertyAll(Size(0, 40)),
+    padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 14)),
+    shape: WidgetStatePropertyAll(
+      RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(widget.tokens.radius),
+      ),
+    ),
   );
 
   void clearFilters() {
@@ -393,55 +438,82 @@ class _BranchWorkspaceState extends State<BranchWorkspace> {
   Widget buildTable() {
     if (visible.isEmpty) return const Center(child: Text('ไม่พบข้อมูลสาขา'));
     final scheme = Theme.of(context).colorScheme;
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: SingleChildScrollView(
-        child: DataTable(
-          headingRowColor: WidgetStatePropertyAll(
-            scheme.primary.withValues(alpha: .10),
-          ),
-          headingTextStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: scheme.primary,
-            fontWeight: FontWeight.w700,
-          ),
-          sortColumnIndex: sortColumn,
-          sortAscending: sortAscending,
-          horizontalMargin: 10,
-          columnSpacing: 18,
-          border: TableBorder(
-            horizontalInside: BorderSide(
-              color: Theme.of(context).dividerColor,
-              width: .5,
+    return LayoutBuilder(
+      builder: (_, constraints) => SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: SizedBox(
+          width: constraints.maxWidth < 900 ? 900 : constraints.maxWidth,
+          child: SingleChildScrollView(
+            child: DataTable(
+              headingRowColor: WidgetStatePropertyAll(
+                scheme.primary.withValues(alpha: .10),
+              ),
+              headingTextStyle: Theme.of(context).textTheme.bodyMedium
+                  ?.copyWith(
+                    color: scheme.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+              sortColumnIndex: sortColumn,
+              sortAscending: sortAscending,
+              horizontalMargin: 10,
+              columnSpacing: 18,
+              border: TableBorder(
+                horizontalInside: BorderSide(
+                  color: Theme.of(context).dividerColor,
+                  width: .5,
+                ),
+              ),
+              columns: [
+                const DataColumn(
+                  numeric: true,
+                  label: SizedBox(width: 32, child: Text('ID')),
+                ),
+                const DataColumn(
+                  label: SizedBox(
+                    width: 108,
+                    child: Center(child: Text('Action')),
+                  ),
+                ),
+                sortableColumn('ลูกค้า', 2, (x) => x.companyName.toLowerCase()),
+                sortableColumn(
+                  'รหัสสาขา',
+                  3,
+                  (x) => x.branchCode.toLowerCase(),
+                ),
+                sortableColumn(
+                  'ชื่อสาขา',
+                  4,
+                  (x) => x.branchNameTh.toLowerCase(),
+                ),
+                const DataColumn(label: Text('ผู้ติดต่อ')),
+                const DataColumn(label: Text('เบอร์โทร')),
+                sortableColumn('สถานะ', 7, (x) => x.isActive ? 1 : 0),
+              ],
+              rows: visible.indexed
+                  .map((entry) {
+                    final rowNumber = (page * widget.pageSize) + entry.$1 + 1;
+                    final item = entry.$2;
+                    return DataRow(
+                      cells: [
+                        DataCell(
+                          SizedBox(
+                            width: 32,
+                            child: Text(rowNumber.toString()),
+                          ),
+                        ),
+                        DataCell(rowActions(item)),
+                        DataCell(Text(item.companyName)),
+                        DataCell(Text(item.branchCode)),
+                        DataCell(Text(item.branchNameTh)),
+                        DataCell(Text(orDash(item.contName))),
+                        DataCell(Text(orDash(item.contPhone))),
+                        DataCell(statusText(item.isActive)),
+                      ],
+                    );
+                  })
+                  .toList(growable: false),
             ),
           ),
-          columns: [
-            const DataColumn(numeric: true, label: Text('ID')),
-            const DataColumn(label: Text('Action')),
-            sortableColumn('ลูกค้า', 2, (x) => x.companyName.toLowerCase()),
-            sortableColumn('รหัสสาขา', 3, (x) => x.branchCode.toLowerCase()),
-            sortableColumn('ชื่อสาขา', 4, (x) => x.branchNameTh.toLowerCase()),
-            const DataColumn(label: Text('ผู้ติดต่อ')),
-            const DataColumn(label: Text('เบอร์โทร')),
-            sortableColumn('สถานะ', 7, (x) => x.isActive ? 1 : 0),
-          ],
-          rows: visible.indexed
-              .map((entry) {
-                final rowNumber = (page * widget.pageSize) + entry.$1 + 1;
-                final item = entry.$2;
-                return DataRow(
-                  cells: [
-                    DataCell(Text(rowNumber.toString())),
-                    DataCell(rowActions(item)),
-                    DataCell(Text(item.companyName)),
-                    DataCell(Text(item.branchCode)),
-                    DataCell(Text(item.branchNameTh)),
-                    DataCell(Text(orDash(item.contName))),
-                    DataCell(Text(orDash(item.contPhone))),
-                    DataCell(statusText(item.isActive)),
-                  ],
-                );
-              })
-              .toList(growable: false),
         ),
       ),
     );
@@ -466,9 +538,16 @@ class _BranchWorkspaceState extends State<BranchWorkspace> {
       itemBuilder: (_, index) {
         final item = visible[index];
         final number = (page * widget.pageSize) + index + 1;
-        return Material(
-          color: Theme.of(context).colorScheme.surfaceContainerLowest,
-          borderRadius: BorderRadius.circular(t.radius),
+        return Card(
+          margin: EdgeInsets.zero,
+          color: Colors.white,
+          elevation: 0,
+          surfaceTintColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(t.radius),
+            side: BorderSide.none,
+          ),
           child: Padding(
             padding: t.cardPadding,
             child: Column(
@@ -508,29 +587,311 @@ class _BranchWorkspaceState extends State<BranchWorkspace> {
     );
   }
 
-  Widget rowActions(BranchRecord item) => Wrap(
-    spacing: 2,
-    alignment: WrapAlignment.center,
-    children: [
-      if (canEdit)
-        IconButton(
-          tooltip: 'แก้ไข',
-          visualDensity: VisualDensity.compact,
-          onPressed: () => openForm(item),
-          color: Theme.of(context).colorScheme.primary,
-          icon: const Icon(Icons.edit_outlined),
-        ),
-      if (canDelete)
-        IconButton(
-          tooltip: 'ลบ',
-          visualDensity: VisualDensity.compact,
-          onPressed: () => confirmDelete(item),
-          color: Theme.of(context).colorScheme.error,
-          icon: const Icon(Icons.delete_outline),
-        ),
-      if (!canEdit && !canDelete) const Text('-'),
-    ],
+  Widget rowActions(BranchRecord item) => SizedBox(
+    width: 108,
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        if (canEdit)
+          IconButton(
+            tooltip: 'แก้ไข',
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            onPressed: () => openForm(item),
+            color: Theme.of(context).colorScheme.primary,
+            icon: const Icon(Icons.edit_outlined),
+          ),
+        if (widget.companyScope && canEdit)
+          IconButton(
+            tooltip: 'กำหนดผู้มีสิทธิ์',
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            onPressed: () => openAccess(item),
+            color: Theme.of(context).colorScheme.primary,
+            icon: const Icon(Icons.manage_accounts_outlined),
+          ),
+        if (canDelete)
+          IconButton(
+            tooltip: 'ลบ',
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            onPressed: () => confirmDelete(item),
+            color: Theme.of(context).colorScheme.error,
+            icon: const Icon(Icons.delete_outline),
+          ),
+        if (!canEdit && !canDelete) const Text('-'),
+      ],
+    ),
   );
+
+  Future<void> openAccess(BranchRecord item) async {
+    BranchAccessConfiguration configuration;
+    try {
+      configuration = await widget.repository.access(item.branchId);
+    } catch (error) {
+      showMessage(widget.errorText(error), error: true);
+      return;
+    }
+    if (!mounted) return;
+    final searchController = TextEditingController();
+    var mode = configuration.accessModeCode;
+    var selected = configuration.users
+        .where((user) => user.isSelected)
+        .map((user) => user.userId)
+        .toSet();
+    var query = '';
+    var savingAccess = false;
+    String? popupMessage;
+    var popupHasError = false;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          final scheme = Theme.of(dialogContext).colorScheme;
+          final visibleUsers = configuration.users
+              .where((user) {
+                final term = query.toLowerCase();
+                return term.isEmpty ||
+                    user.displayName.toLowerCase().contains(term) ||
+                    user.username.toLowerCase().contains(term);
+              })
+              .toList(growable: false);
+          final border = OutlineInputBorder(
+            borderRadius: BorderRadius.circular(widget.tokens.radius),
+            borderSide: BorderSide(color: Theme.of(context).dividerColor),
+          );
+          final buttonStyle = ButtonStyle(
+            minimumSize: const WidgetStatePropertyAll(Size(0, 48)),
+            shape: WidgetStatePropertyAll(
+              RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(widget.tokens.radius),
+              ),
+            ),
+          );
+          return Dialog(
+            backgroundColor: Colors.white,
+            surfaceTintColor: Colors.transparent,
+            insetPadding: const EdgeInsets.all(10),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(widget.tokens.radius),
+            ),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 480),
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: widget.tokens.cardPadding,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.manage_accounts_outlined,
+                            color: scheme.primary,
+                          ),
+                          const SizedBox(width: 10),
+                          const Expanded(
+                            child: Text(
+                              'กำหนดสิทธิ์เข้าถึงสาขา',
+                              style: TextStyle(
+                                color: Colors.black,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Divider(height: 1, color: Theme.of(context).dividerColor),
+                      const SizedBox(height: 12),
+                      Text(
+                        '${configuration.branchCode} | ${configuration.branchName}',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        key: ValueKey(mode),
+                        initialValue: mode,
+                        isExpanded: true,
+                        style: const TextStyle(
+                          color: Colors.black,
+                          fontSize: 14,
+                        ),
+                        decoration: InputDecoration(
+                          labelText: 'การเข้าถึง *',
+                          border: border,
+                          enabledBorder: border,
+                          focusedBorder: border.copyWith(
+                            borderSide: BorderSide(
+                              color: scheme.primary,
+                              width: 1.5,
+                            ),
+                          ),
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'ALL',
+                            child: Text('ทุกคนในบริษัท'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'RESTRICTED',
+                            child: Text('เฉพาะผู้เลือก'),
+                          ),
+                        ],
+                        onChanged: savingAccess
+                            ? null
+                            : (value) => setDialogState(() {
+                                mode = value ?? 'RESTRICTED';
+                                popupMessage = null;
+                                popupHasError = false;
+                              }),
+                      ),
+                      if (mode == 'RESTRICTED') ...[
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: searchController,
+                          style: const TextStyle(fontSize: 14),
+                          decoration: InputDecoration(
+                            hintText: 'ค้นหาชื่อหรือ Username',
+                            prefixIcon: const Icon(Icons.search),
+                            border: border,
+                            enabledBorder: border,
+                            focusedBorder: border.copyWith(
+                              borderSide: BorderSide(
+                                color: scheme.primary,
+                                width: 1.5,
+                              ),
+                            ),
+                          ),
+                          onChanged: (value) =>
+                              setDialogState(() => query = value.trim()),
+                        ),
+                        const SizedBox(height: 8),
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxHeight: 280),
+                          child: visibleUsers.isEmpty
+                              ? const Center(
+                                  child: Padding(
+                                    padding: EdgeInsets.all(16),
+                                    child: Text('ไม่พบผู้ใช้งาน'),
+                                  ),
+                                )
+                              : ListView.builder(
+                                  shrinkWrap: true,
+                                  itemCount: visibleUsers.length,
+                                  itemBuilder: (_, index) {
+                                    final user = visibleUsers[index];
+                                    return CheckboxListTile(
+                                      dense: true,
+                                      contentPadding: EdgeInsets.zero,
+                                      controlAffinity:
+                                          ListTileControlAffinity.leading,
+                                      value: selected.contains(user.userId),
+                                      title: Text(
+                                        user.displayName,
+                                        style: const TextStyle(fontSize: 14),
+                                      ),
+                                      subtitle: Text(
+                                        user.username,
+                                        style: const TextStyle(fontSize: 12),
+                                      ),
+                                      onChanged: savingAccess
+                                          ? null
+                                          : (checked) => setDialogState(() {
+                                              checked == true
+                                                  ? selected.add(user.userId)
+                                                  : selected.remove(
+                                                      user.userId,
+                                                    );
+                                              popupMessage = null;
+                                              popupHasError = false;
+                                            }),
+                                    );
+                                  },
+                                ),
+                        ),
+                      ],
+                      if (popupMessage != null) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          popupMessage!,
+                          style: TextStyle(
+                            color: popupHasError
+                                ? scheme.error
+                                : scheme.primary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      Divider(height: 1, color: Theme.of(context).dividerColor),
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          OutlinedButton(
+                            style: buttonStyle,
+                            onPressed: savingAccess
+                                ? null
+                                : () => Navigator.pop(dialogContext),
+                            child: const Text('ยกเลิก'),
+                          ),
+                          const SizedBox(width: 8),
+                          FilledButton.icon(
+                            style: buttonStyle,
+                            onPressed: savingAccess
+                                ? null
+                                : () async {
+                                    setDialogState(() => savingAccess = true);
+                                    try {
+                                      await widget.repository.updateAccess(
+                                        item.branchId,
+                                        accessModeCode: mode,
+                                        userIds: mode == 'ALL'
+                                            ? const []
+                                            : selected,
+                                      );
+                                      if (!dialogContext.mounted) return;
+                                      setDialogState(() {
+                                        savingAccess = false;
+                                        popupMessage = 'บันทึกสิทธิ์สาขาแล้ว';
+                                        popupHasError = false;
+                                      });
+                                    } catch (error) {
+                                      if (!dialogContext.mounted) return;
+                                      setDialogState(() {
+                                        savingAccess = false;
+                                        popupMessage = widget.errorText(error);
+                                        popupHasError = true;
+                                      });
+                                    }
+                                  },
+                            icon: const Icon(Icons.save_outlined),
+                            label: const Text('บันทึก'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+    searchController.dispose();
+  }
 
   Widget statusText(bool value) {
     final color = value
@@ -549,48 +910,59 @@ class _BranchWorkspaceState extends State<BranchWorkspace> {
     final total = filtered.length;
     final first = total == 0 ? 0 : (page * widget.pageSize) + 1;
     final last = total == 0 ? 0 : (first + widget.pageSize - 1).clamp(0, total);
-    return SizedBox(
-      height: widget.tokens.paginationHeight,
-      child: Padding(
-        padding: EdgeInsets.symmetric(
-          horizontal: widget.tokens.cardPadding.left,
-        ),
-        child: Row(
+    return surface(
+      SizedBox(
+        height: widget.tokens.paginationHeight,
+        child: Column(
           children: [
-            IconButton(
-              tooltip: 'ก่อนหน้า',
-              onPressed: page > 0 ? () => setState(() => page--) : null,
-              icon: const Icon(Icons.chevron_left),
-            ),
-            Container(
-              width: 34,
-              height: 34,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primary,
-                borderRadius: BorderRadius.circular(widget.tokens.radius),
-              ),
-              child: Text(
-                (page + 1).toString(),
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onPrimary,
-                  fontWeight: FontWeight.w700,
+            Expanded(
+              child: Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: widget.tokens.cardPadding.left,
                 ),
-              ),
-            ),
-            IconButton(
-              tooltip: 'ถัดไป',
-              onPressed: page < pageCount - 1
-                  ? () => setState(() => page++)
-                  : null,
-              icon: const Icon(Icons.chevron_right),
-            ),
-            const Spacer(),
-            Flexible(
-              child: Text(
-                '$first-$last จาก $total',
-                textAlign: TextAlign.end,
-                overflow: TextOverflow.ellipsis,
+                child: Row(
+                  children: [
+                    paginationButton(
+                      tooltip: 'ก่อนหน้า',
+                      onPressed: page > 0 ? () => setState(() => page--) : null,
+                      label: '<',
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      width: 34,
+                      height: 34,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primary,
+                        borderRadius: BorderRadius.circular(
+                          widget.tokens.radius,
+                        ),
+                      ),
+                      child: Text(
+                        (page + 1).toString(),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onPrimary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    paginationButton(
+                      tooltip: 'ถัดไป',
+                      onPressed: page < pageCount - 1
+                          ? () => setState(() => page++)
+                          : null,
+                      label: '>',
+                    ),
+                    const SizedBox(width: 12),
+                    Flexible(
+                      child: Text(
+                        '$first-$last จาก $total',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -598,6 +970,25 @@ class _BranchWorkspaceState extends State<BranchWorkspace> {
       ),
     );
   }
+
+  Widget paginationButton({
+    required String tooltip,
+    required String label,
+    required VoidCallback? onPressed,
+  }) => SizedBox(
+    width: 36,
+    height: 36,
+    child: OutlinedButton(
+      onPressed: onPressed,
+      style: OutlinedButton.styleFrom(
+        padding: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(widget.tokens.radius),
+        ),
+      ),
+      child: Tooltip(message: tooltip, child: Text(label)),
+    ),
+  );
 
   void openForm([BranchRecord? item]) {
     editing = item;
@@ -623,65 +1014,61 @@ class _BranchWorkspaceState extends State<BranchWorkspace> {
   Widget buildForm() {
     final t = widget.tokens;
     final action = editing == null ? 'เพิ่ม' : 'แก้ไข';
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        surface(
-          Padding(
-            padding: t.cardPadding,
-            child: Column(
-              children: [
-                LayoutBuilder(
-                  builder: (_, constraints) {
-                    final title = widget.titleBuilder(
-                      context,
-                      '${widget.caption} > $action',
-                      false,
-                    );
-                    final buttons = formButtons();
-                    if (constraints.maxWidth < 600) {
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          title,
-                          SizedBox(height: t.cardSpacing),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: buttons,
-                          ),
-                        ],
-                      );
-                    }
-                    return Row(
-                      children: [
-                        Expanded(child: title),
-                        buttons,
-                      ],
-                    );
-                  },
-                ),
-                const Divider(),
-              ],
-            ),
+    final primary = Theme.of(context).colorScheme.primary;
+    return LayoutBuilder(
+      builder: (context, constraints) => Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: 480,
+            maxHeight: (constraints.maxHeight - t.contentMargin.vertical)
+                .clamp(0, double.infinity)
+                .toDouble(),
           ),
-          radius: BorderRadius.vertical(top: Radius.circular(t.radius)),
-        ),
-        Expanded(
-          child: surface(
-            SingleChildScrollView(
+          child: Material(
+            color: Colors.white,
+            surfaceTintColor: Colors.transparent,
+            clipBehavior: Clip.antiAlias,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(t.radius),
+              side: BorderSide.none,
+            ),
+            child: SingleChildScrollView(
               padding: t.cardPadding,
               child: Form(
                 key: formKey,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: formFields(),
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.edit_outlined, color: primary),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            '${widget.caption} > $action',
+                            style: widget.tokens.captionStyle,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    const Divider(height: 1),
+                    const SizedBox(height: 12),
+                    ...formFields(),
+                    const SizedBox(height: 12),
+                    const Divider(height: 1),
+                    const SizedBox(height: 12),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: formButtons(),
+                    ),
+                  ],
                 ),
               ),
             ),
-            radius: BorderRadius.vertical(bottom: Radius.circular(t.radius)),
           ),
         ),
-      ],
+      ),
     );
   }
 
@@ -722,20 +1109,22 @@ class _BranchWorkspaceState extends State<BranchWorkspace> {
       ),
     ],
     const SizedBox(height: 12),
-    field(code, 'รหัสสาขา *', validator: requiredValue),
-    const SizedBox(height: 12),
-    field(name, 'ชื่อสาขา *', validator: requiredValue),
+    twoFields(
+      field(code, 'รหัสสาขา *', validator: requiredValue),
+      field(name, 'ชื่อสาขา *', validator: requiredValue),
+    ),
     const SizedBox(height: 12),
     field(nameEn, 'ชื่อสาขา (ภาษาอังกฤษ)'),
     const SizedBox(height: 12),
-    field(
-      email,
-      'อีเมล',
-      keyboard: TextInputType.emailAddress,
-      validator: emailValue,
+    twoFields(
+      field(
+        email,
+        'อีเมล',
+        keyboard: TextInputType.emailAddress,
+        validator: emailValue,
+      ),
+      field(telephone, 'โทรศัพท์สาขา', keyboard: TextInputType.phone),
     ),
-    const SizedBox(height: 12),
-    field(telephone, 'โทรศัพท์สาขา', keyboard: TextInputType.phone),
     const SizedBox(height: 12),
     field(address, 'ที่อยู่', minLines: 2, maxLines: 3),
     const SizedBox(height: 12),
@@ -745,6 +1134,25 @@ class _BranchWorkspaceState extends State<BranchWorkspace> {
     const SizedBox(height: 12),
     field(position, 'ตำแหน่ง'),
   ];
+
+  Widget twoFields(Widget first, Widget second) => LayoutBuilder(
+    builder: (_, constraints) {
+      if (constraints.maxWidth < 400) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [first, const SizedBox(height: 12), second],
+        );
+      }
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(child: first),
+          const SizedBox(width: 12),
+          Expanded(child: second),
+        ],
+      );
+    },
+  );
 
   Widget field(
     TextEditingController controller,
@@ -826,25 +1234,18 @@ class _BranchWorkspaceState extends State<BranchWorkspace> {
       );
       if (current == null) {
         await widget.repository.create(request);
-        for (final controller in [
-          code,
-          name,
-          nameEn,
-          email,
-          telephone,
-          address,
-          contact,
-          contactPhone,
-          position,
-        ]) {
-          controller.clear();
-        }
         await load(clearMessage: false);
+        editing = _findSavedBranch(
+          (item) =>
+              item.branchCode == request.branchCode &&
+              (widget.companyScope || item.companyId == request.companyId),
+        );
+        if (editing != null) formCompanyId = editing!.companyId;
         showMessage('เพิ่มข้อมูลสาขาสำเร็จ');
       } else {
         await widget.repository.update(current.branchId, request);
-        closeForm();
         await load(clearMessage: false);
+        editing = _findSavedBranch((item) => item.branchId == current.branchId);
         showMessage('แก้ไขข้อมูลสาขาสำเร็จ');
       }
     } catch (error) {
@@ -857,6 +1258,13 @@ class _BranchWorkspaceState extends State<BranchWorkspace> {
   String? nullable(String value) {
     final text = value.trim();
     return text.isEmpty ? null : text;
+  }
+
+  BranchRecord? _findSavedBranch(bool Function(BranchRecord item) matches) {
+    for (final item in items) {
+      if (matches(item)) return item;
+    }
+    return null;
   }
 
   Future<void> confirmDelete(BranchRecord item) async {
