@@ -62,12 +62,33 @@ void main() {
     },
   );
 
-  test('Time preview settings are routable after activation', () {
-    expect(TimeRoutes.all, hasLength(2));
-    expect(TimeRoutes.implemented, hasLength(2));
-    for (final route in TimeRoutes.all) {
-      expect(route.projectCode, TimeProject.code);
-      expect(AppMenuRouteRegistry.byMenuCode(route.menuCode), isNotNull);
-    }
+  test('Time exposes only implemented routes to the Center host', () {
+    expect(TimeRoutes.all, hasLength(6));
+    expect(TimeRoutes.implemented, hasLength(6));
+    expect(buildTimeFeatureRoutes(), hasLength(6));
+    expect(
+      AppMenuRouteRegistry.byMenuCode(TimeMenuCodes.shiftTemplates),
+      isNotNull,
+    );
+    expect(
+      AppMenuRouteRegistry.byMenuCode(TimeMenuCodes.scheduleGroups),
+      isNotNull,
+    );
+    expect(
+      AppMenuRouteRegistry.byMenuCode(TimeMenuCodes.rotationPatterns),
+      isNotNull,
+    );
+    expect(
+      AppMenuRouteRegistry.byMenuCode(TimeMenuCodes.employeeSchedules),
+      isNotNull,
+    );
+    expect(
+      AppMenuRouteRegistry.byMenuCode(TimeMenuCodes.employeeSettings),
+      isNotNull,
+    );
+    expect(
+      AppMenuRouteRegistry.byMenuCode(TimeMenuCodes.systemSettings),
+      isNotNull,
+    );
   });
 }
