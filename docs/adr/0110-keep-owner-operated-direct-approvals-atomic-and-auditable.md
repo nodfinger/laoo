@@ -1,0 +1,3 @@
+# ทำ Direct Approval ของ OWNER_OPERATED ให้เป็น Atomic และตรวจสอบได้
+
+OWNER_OPERATED อนุญาตผู้มีสิทธิ์คนเดียวกันสร้างหรือทำแทน แก้ อนุมัติ และทำให้ผลมีผลใช้ได้ใน Transaction เดียว แต่ต้องบันทึก Request, Actor User, Subject Employee, Approval Decision และผลธุรกิจเป็นคนละหลักฐาน พร้อมตรวจ Action Permission, Employee Data Scope และ Business Invariant ทุกครั้ง Self-approval ต้องมี SELF_APPROVE และติดธง SelfApproved ส่วน Action ความเสี่ยงสูงใช้ Permission เหตุผลและหลักฐานเพิ่มโดยไม่บังคับคนที่สอง ทั้งนี้ห้ามแก้ Attendance Event ต้นฉบับ ทำยอดลาติดลบ นับเวลาซ้ำ หรือ Finalize Period ที่ยังมี Unresolved Result เพื่อให้ธุรกิจเจ้าของดำเนินการเองทำงานคล่องโดยไม่สูญเสีย Audit

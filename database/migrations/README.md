@@ -20,6 +20,7 @@ Store migrations in the owner directory:
 - Service: `projects/service/database/migrations`
 - Meeting: `projects/meeting/database/migrations`
 - Visitor: `projects/visitor/database/migrations`
+- Time: `projects/time/database/migrations`
 
 Run migrations only through `tools/scripts/run-migrations.ps1`. The runner
 uses `dbo.TDSTSchemaMigration`, verifies SHA-256 checksums, and takes the SQL

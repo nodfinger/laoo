@@ -127,13 +127,13 @@ ScreenType: 1
 - ก่อน Commit/Push ขึ้น GitHub ให้ถามพ่อเพียงครั้งเดียวต่อชุดงาน โดยสรุปขอบเขตให้ครบถ้วน
 - หากพ่อตอบ `ok` หรือ `approve` ให้ถือว่าอนุมัติการ Commit/Push ของชุดงานที่สรุปไว้แล้ว และห้ามถามซ้ำในชุดงานเดียวกัน
 - หากพ่อสั่งตรง ๆ ว่า `หม่อน ขึ้น github` ให้ถือว่าเป็นคำสั่งอนุมัติให้ Commit/Push ได้ทันที โดยไม่ต้องถามซ้ำ
-- ทุกเครื่องต้องอ่านบทบาทจาก `local.machine.json`: `center-service`, `meeting` หรือ `visitor`; ไฟล์นี้เป็น Local config และห้าม Commit
-- แต่ละเครื่องแก้และ Merge ได้เฉพาะ Project ตามบทบาทของตน; การแก้ Root/Shared จากเครื่อง Meeting หรือ Visitor ต้องแยก PR และตรวจ Center รวมก่อน Merge
+- ทุกเครื่องต้องอ่านบทบาทจาก `local.machine.json`: `center-service`, `meeting`, `visitor` หรือ `time`; ไฟล์นี้เป็น Local config และห้าม Commit
+- แต่ละเครื่องแก้และ Merge ได้เฉพาะ Project ตามบทบาทของตน; การแก้ Root/Shared จากเครื่อง Meeting, Visitor หรือ Time ต้องแยก PR และตรวจ Center รวมก่อน Merge
 - เมื่อพ่ออนุมัติ Commit/Push หรือสั่งให้ Commit/Push ให้ถือว่ารวมถึงการสร้าง Pull Request และ Merge เข้า `main` ต่อเนื่องได้ทันที โดยไม่ต้องถามอนุมัติซ้ำ
 - ก่อน Merge ต้องตรวจว่า Working Tree ถูกต้อง ไม่มี Secret หรือ Build Artifact, การทดสอบที่เกี่ยวข้องผ่าน และ Pull Request ไม่มี Conflict หรือ Check ที่ล้มเหลว; ห้ามข้าม Branch Protection หรือบังคับ Merge
 - หลัง Merge ให้สลับกลับ `main`, ดึง `origin/main` แบบ `--ff-only`, ตรวจว่า Working Tree สะอาด แล้วรายงาน Commit บน `main` ให้พ่อทราบ
 - ทุกเครื่องต้องรันผ่าน Center host ที่ `8080/5080`; พอร์ตแยกของ Service, Meeting และ Visitor เป็น Legacy และห้ามใช้หลังผ่าน parity
-- ก่อน Merge ให้รัน `tools/scripts/verify-center.ps1 -Module <service|meeting|visitor>` ตาม Project ที่แก้
+- ก่อน Merge ให้รัน `tools/scripts/verify-center.ps1 -Module <service|meeting|visitor|time>` ตาม Project ที่แก้
 
 ## Reporting Style
 

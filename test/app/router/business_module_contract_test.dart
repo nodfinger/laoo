@@ -4,6 +4,7 @@ import 'package:laoo/app/router/app_menu_route_registry.dart';
 import 'package:laoo/app/router/app_router.dart';
 import 'package:laoo_meeting/meeting_feature.dart';
 import 'package:laoo_service/service_feature.dart';
+import 'package:laoo_time/time_feature.dart';
 import 'package:laoo_visitor/visitor_feature.dart';
 
 void main() {
@@ -52,4 +53,18 @@ void main() {
       }
     },
   );
+
+  test('Time exposes 28001 and keeps 28002 reserved as preview', () {
+    expect(TimeRoutes.all, hasLength(2));
+    expect(TimeRoutes.implemented, [TimeRoutes.employeeSettings]);
+    expect(buildTimeFeatureRoutes(), hasLength(1));
+    expect(
+      AppMenuRouteRegistry.byMenuCode(TimeMenuCodes.employeeSettings),
+      isNotNull,
+    );
+    expect(
+      AppMenuRouteRegistry.byMenuCode(TimeMenuCodes.systemSettings),
+      isNull,
+    );
+  });
 }

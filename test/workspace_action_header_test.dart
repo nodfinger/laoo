@@ -87,12 +87,12 @@ void main() {
     expect(titleText.style?.color, Colors.black);
   });
 
-  test('uses 14px for shared controls and list data', () {
+  test('uses standard typography for shared controls and list data', () {
     expect(LaooTypography.body, 14);
     expect(LaooTypography.inputText, 14);
     expect(LaooTypography.inputHint, 14);
     expect(LaooTypography.comboBox, 14);
-    expect(LaooTypography.button, 14);
+    expect(LaooTypography.button, 13);
     expect(LaooTypography.tableHeader, 14);
     expect(LaooTypography.tableBody, 14);
   });
