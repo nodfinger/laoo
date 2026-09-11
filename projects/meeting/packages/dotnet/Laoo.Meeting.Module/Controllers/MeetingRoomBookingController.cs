@@ -36,6 +36,20 @@ public sealed class MeetingRoomBookingController(IConfiguration configuration) :
         return await Allowed(db, action, token, screen) || await BookingAdmin(db, bookingId, token);
     }
 
+    private async Task<bool> CanManageParticipants(SqlConnection db, long bookingId, long companyId, long userId, CancellationToken token)
+    {
+        if (await Allowed(db, "EDIT", token) || await BookingAdmin(db, bookingId, token)) return true;
+        await using var cmd = new SqlCommand("""
+SELECT CASE WHEN EXISTS
+(
+ SELECT 1 FROM dbo.TDADMeetingRoomBooking
+ WHERE BookingID=@booking AND CompanyID=@company AND RequesterUserID=@user
+) THEN 1 ELSE 0 END;
+""", db);
+        Add(cmd, "@booking", bookingId); Add(cmd, "@company", companyId); Add(cmd, "@user", userId);
+        return Convert.ToBoolean(await cmd.ExecuteScalarAsync(token));
+    }
+
     [HttpGet("actions")]
     public async Task<IActionResult> Actions(CancellationToken token)
     {
@@ -672,7 +686,7 @@ OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY;
     {
         if (!TryCompany(out var companyId) || !TryUser(out var userId)) return Forbid();
         await using var connection = await Open(token);
-        if (!await Allowed(connection, "EDIT", token)) return Forbid();
+        if (!await CanManageParticipants(connection, bookingId, companyId, userId, token)) return Forbid();
         const string headerSql = """
 SELECT B.BookingNo,B.BookingStatus,B.RequesterUserID,R.RoomCode,R.RoomNameTH,
        MIN(S.StartDateTime),MAX(S.EndDateTime),B.RequesterEmployeeID
@@ -701,7 +715,8 @@ GROUP BY B.BookingNo,B.BookingStatus,B.RequesterUserID,R.RoomCode,R.RoomNameTH,B
         const string employeeSql = """
 SELECT E.EmployeeID,E.EmployeeCode,E.FullName,E.NickName,
        CASE WHEN P.BookingParticipantID IS NULL THEN 0 ELSE 1 END AS IsSelected,
-       P.InvitationStatus,E.DepartmentOrgUnitID,D.NameTH
+       P.InvitationStatus,E.DepartmentOrgUnitID,D.NameTH,
+       P.IsLateResponse,P.LateResponseReason,P.LateResponseAtUtc
 FROM dbo.TDADEmployee E
 LEFT JOIN dbo.TDADMeetingRoomBookingParticipant P
     ON P.EmployeeID=E.EmployeeID AND P.CompanyID=E.CompanyID AND P.BookingID=@booking
@@ -721,6 +736,9 @@ ORDER BY E.EmployeeCode,E.FullName;
             employeeId = reader.GetInt64(0), employeeCode = reader.GetString(1), employeeName = reader.GetString(2),
             nickName = Text(reader, 3), selected = reader.GetInt32(4) == 1, invitationStatus = Text(reader, 5),
             departmentOrgUnitId = Long(reader, 6), departmentName = Text(reader, 7),
+            isLateResponse = !reader.IsDBNull(8) && reader.GetBoolean(8),
+            lateResponseReason = Text(reader, 9),
+            lateResponseAtUtc = reader.IsDBNull(10) ? (DateTime?)null : reader.GetDateTime(10),
         });
         return Ok(new { bookingId, bookingNo, status, roomCode, roomName, startDateTime, endDateTime, employees });
     }
@@ -732,7 +750,7 @@ ORDER BY E.EmployeeCode,E.FullName;
         var employeeIds = (request.EmployeeIds ?? []).Where(id => id > 0).Distinct().ToList();
         if (employeeIds.Count > 200) return BadRequest(Error("จำนวนผู้เข้าร่วมมากเกินไป", "เลือกผู้เข้าร่วมได้ไม่เกิน 200 คนต่อรายการ"));
         await using var connection = await Open(token);
-        if (!await Allowed(connection, "EDIT", token)) return Forbid();
+        if (!await CanManageParticipants(connection, bookingId, companyId, userId, token)) return Forbid();
         await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(IsolationLevel.Serializable, token);
         try
         {

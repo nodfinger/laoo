@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 import '../../../app/theme/laoo_design_tokens.dart';
@@ -23,8 +25,11 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
   final _repository = MeetingInvitationRepository();
   final _search = TextEditingController();
   final _remark = TextEditingController();
+  final _changeReason = TextEditingController();
   List<Map<String, dynamic>> _items = [];
   Map<int, int> _foodQuantities = {};
+  Map<int, String> _answerValues = {};
+  Map<int, Set<int>> _answerOptions = {};
   Map<String, dynamic>? _detail;
   String? _filterStatus;
   String _responseStatus = 'PENDING';
@@ -47,6 +52,7 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
   void dispose() {
     _search.dispose();
     _remark.dispose();
+    _changeReason.dispose();
     super.dispose();
   }
 
@@ -93,6 +99,7 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
         _detail = detail;
         _responseStatus = '${invitation['invitationStatus'] ?? 'PENDING'}';
         _remark.text = '${invitation['remark'] ?? ''}';
+        _changeReason.clear();
         _foodQuantities = {
           for (final food in List<Map<String, dynamic>>.from(
             detail['foods'] as List? ?? const [],
@@ -100,6 +107,26 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
             (food['foodId'] as num).toInt():
                 (food['orderQuantity'] as num?)?.toInt() ?? 0,
         };
+        _answerValues = {};
+        _answerOptions = {};
+        for (final question in List<Map<String, dynamic>>.from(
+          detail['questions'] as List? ?? const [],
+        )) {
+          final id = (question['questionId'] as num).toInt();
+          final value = '${question['answerValue'] ?? ''}';
+          final type = '${question['answerType']}';
+          if ((type == 'SINGLE' || type == 'MULTIPLE') && value.isNotEmpty) {
+            try {
+              _answerOptions[id] = (jsonDecode(value) as List)
+                  .map((item) => (item as num).toInt())
+                  .toSet();
+            } catch (_) {
+              _answerOptions[id] = {};
+            }
+          } else {
+            _answerValues[id] = value;
+          }
+        }
       });
     } catch (error) {
       _notify(_error(error, 'เปิดคำเชิญไม่สำเร็จ'), true);
@@ -112,39 +139,94 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
     final detail = _detail;
     if (detail == null) return;
     final invitation = Map<String, dynamic>.from(detail['invitation'] as Map);
+    final groups = List<Map<String, dynamic>>.from(
+      detail['groups'] as List? ?? const [],
+    );
+    final questions = List<Map<String, dynamic>>.from(
+      detail['questions'] as List? ?? const [],
+    );
+    final lateResponseMode = invitation['lateResponseMode'] == true;
+    final lateAcceptanceOnly = invitation['lateAcceptanceOnly'] == true;
+    if (lateAcceptanceOnly && _responseStatus != 'ACCEPTED') {
+      _notify('หลังเริ่มประชุมสามารถเลือกได้เฉพาะ เข้าร่วม', true);
+      return;
+    }
+    if (invitation['requiresChangeReason'] == true &&
+        _changeReason.text.trim().isEmpty) {
+      _notify('กรุณาระบุเหตุผลการตอบรับภายหลัง', true);
+      return;
+    }
+    if (_responseStatus == 'ACCEPTED' && !lateResponseMode) {
+      for (final group in groups) {
+        final type = '${group['foodTypeCode']}';
+        final foods = List<Map<String, dynamic>>.from(
+          detail['foods'] as List? ?? const [],
+        ).where((food) => '${food['foodTypeCode']}' == type);
+        final total = foods.fold<int>(
+          0,
+          (sum, food) =>
+              sum + (_foodQuantities[(food['foodId'] as num).toInt()] ?? 0),
+        );
+        final max = (group['maxQuantity'] as num).toInt();
+        if (total > max || (group['isRequired'] == true && total == 0)) {
+          _notify(
+            total > max
+                ? 'กลุ่ม ${group['foodTypeName']} เลือกได้รวมไม่เกิน $max'
+                : 'กรุณาเลือกอาหารในกลุ่ม ${group['foodTypeName']}',
+            true,
+          );
+          return;
+        }
+      }
+      for (final question in questions.where(
+        (question) => question['isRequired'] == true,
+      )) {
+        final id = (question['questionId'] as num).toInt();
+        final type = '${question['answerType']}';
+        final answered = type == 'SINGLE' || type == 'MULTIPLE'
+            ? (_answerOptions[id]?.isNotEmpty ?? false)
+            : (_answerValues[id]?.trim().isNotEmpty ?? false);
+        if (!answered) {
+          _notify('กรุณาตอบ: ${question['questionText']}', true);
+          return;
+        }
+      }
+    }
     setState(() => _saving = true);
     try {
       await _repository.respond(
         (invitation['participantId'] as num).toInt(),
         status: _responseStatus,
         remark: _remark.text.trim(),
+        changeReason: _changeReason.text.trim(),
+        quantities: _responseStatus == 'ACCEPTED' && !lateResponseMode
+            ? _foodQuantities
+            : const {},
+        answers: _responseStatus == 'ACCEPTED' && !lateResponseMode
+            ? questions.map((question) {
+                final id = (question['questionId'] as num).toInt();
+                final type = '${question['answerType']}';
+                return {
+                  'questionId': id,
+                  'value': type == 'SINGLE' || type == 'MULTIPLE'
+                      ? null
+                      : _answerValues[id],
+                  'optionIds': (_answerOptions[id] ?? {}).toList()..sort(),
+                };
+              }).toList()
+            : const [],
       );
       if (!mounted) return;
-      setState(() => _detail = null);
-      _notify('บันทึกการตอบรับสำเร็จ');
-      await _load();
+      if (lateResponseMode && _responseStatus == 'ACCEPTED') {
+        await _open({'participantId': invitation['participantId']});
+        _notify('บันทึกการตอบรับภายหลังสำเร็จ สามารถเช็กอินได้แล้ว');
+      } else {
+        setState(() => _detail = null);
+        _notify('บันทึกการตอบรับสำเร็จ');
+        await _load();
+      }
     } catch (error) {
       _notify(_error(error, 'บันทึกการตอบรับไม่สำเร็จ'), true);
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
-  }
-
-  Future<void> _saveFoodOrder() async {
-    final detail = _detail;
-    if (detail == null) return;
-    final invitation = Map<String, dynamic>.from(detail['invitation'] as Map);
-    setState(() => _saving = true);
-    try {
-      await _repository.saveFoodOrder(
-        (invitation['participantId'] as num).toInt(),
-        quantities: _foodQuantities,
-      );
-      if (!mounted) return;
-      _notify('บันทึกรายการอาหารสำเร็จ');
-      await _open({'participantId': invitation['participantId']});
-    } catch (error) {
-      _notify(_error(error, 'บันทึกรายการอาหารไม่สำเร็จ'), true);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -171,7 +253,8 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
     return '${two(date.day)}/${two(date.month)}/${date.year} ${two(date.hour)}:${two(date.minute)}';
   }
 
-  String _statusName(String value) => switch (value) {
+  String _statusName(String value, {bool late = false}) => switch (value) {
+    'ACCEPTED' when late => 'ตอบรับภายหลัง',
     'ACCEPTED' => 'เข้าร่วม',
     'DECLINED' => 'ไม่เข้าร่วม',
     _ => 'รอตอบรับ',
@@ -190,14 +273,262 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
         : Uri.parse(ApiConfig.baseUrl).resolve(value).toString();
   }
 
+  Widget _foodGroup(
+    Map<String, dynamic> group,
+    List<Map<String, dynamic>> foods,
+    bool enabled,
+    WorkspaceThemePreset preset,
+  ) {
+    final type = '${group['foodTypeCode']}';
+    final max = (group['maxQuantity'] as num).toInt();
+    final groupFoods = foods
+        .where((food) => '${food['foodTypeCode']}' == type)
+        .toList();
+    final total = groupFoods.fold<int>(
+      0,
+      (sum, food) =>
+          sum + (_foodQuantities[(food['foodId'] as num).toInt()] ?? 0),
+    );
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(LaooLayout.cardPadding),
+      decoration: BoxDecoration(
+        color: LaooColors.white,
+        borderRadius: BorderRadius.circular(LaooRadius.xs),
+        border: Border.all(color: LaooColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '${group['foodTypeName']}',
+                  style: const TextStyle(
+                    fontSize: LaooTypography.sectionTitle,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: preset.primary.withValues(alpha: .10),
+                  borderRadius: BorderRadius.circular(LaooRadius.xs),
+                ),
+                child: Text(
+                  'เลือกแล้ว $total / $max'
+                  '${group['isRequired'] == true ? ' · ต้องเลือก' : ''}',
+                  style: TextStyle(color: preset.primary),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ...groupFoods.map((food) {
+            final foodId = (food['foodId'] as num).toInt();
+            final quantity = _foodQuantities[foodId] ?? 0;
+            final image = '${food['imageUrl'] ?? ''}';
+            return Card(
+              margin: const EdgeInsets.only(bottom: 6),
+              color: LaooColors.white,
+              surfaceTintColor: Colors.transparent,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(LaooRadius.xs),
+                side: BorderSide(
+                  color: quantity > 0 ? preset.primary : LaooColors.border,
+                ),
+              ),
+              child: ListTile(
+                leading: image.isEmpty
+                    ? Icon(Icons.restaurant_outlined, color: preset.primary)
+                    : ClipRRect(
+                        borderRadius: BorderRadius.circular(LaooRadius.xs),
+                        child: Image.network(
+                          _imageUrl(image),
+                          width: 52,
+                          height: 52,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) =>
+                              const Icon(Icons.broken_image_outlined),
+                        ),
+                      ),
+                title: Text('${food['code']} | ${food['nameTh']}'),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      tooltip: 'ลดจำนวน',
+                      onPressed: !enabled || quantity == 0
+                          ? null
+                          : () => setState(
+                              () => _foodQuantities[foodId] = quantity - 1,
+                            ),
+                      icon: const Icon(Icons.remove_circle_outline),
+                    ),
+                    SizedBox(
+                      width: 28,
+                      child: Text(
+                        '$quantity',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'เพิ่มจำนวน',
+                      onPressed: !enabled || total >= max
+                          ? null
+                          : () => setState(
+                              () => _foodQuantities[foodId] = quantity + 1,
+                            ),
+                      icon: Icon(
+                        Icons.add_circle_outline,
+                        color: enabled && total < max ? preset.primary : null,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _requirementQuestion(
+    Map<String, dynamic> question,
+    bool enabled,
+    WorkspaceThemePreset preset,
+  ) {
+    final id = (question['questionId'] as num).toInt();
+    final type = '${question['answerType']}';
+    final options = List<Map<String, dynamic>>.from(
+      question['options'] as List? ?? const [],
+    );
+    Widget answer;
+    if (type == 'BOOLEAN') {
+      answer = Wrap(
+        spacing: 8,
+        children: [
+          for (final value in const [('true', 'ใช่'), ('false', 'ไม่ใช่')])
+            OutlinedButton.icon(
+              onPressed: !enabled
+                  ? null
+                  : () => setState(() => _answerValues[id] = value.$1),
+              icon: Icon(
+                _answerValues[id] == value.$1
+                    ? Icons.check_circle
+                    : Icons.circle_outlined,
+              ),
+              label: Text(value.$2),
+              style: OutlinedButton.styleFrom(
+                backgroundColor: _answerValues[id] == value.$1
+                    ? preset.primary.withValues(alpha: .10)
+                    : LaooColors.white,
+              ),
+            ),
+        ],
+      );
+    } else if (type == 'SINGLE') {
+      answer = Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: options.map((option) {
+          final optionId = (option['optionId'] as num).toInt();
+          final selected = _answerOptions[id]?.contains(optionId) ?? false;
+          return OutlinedButton.icon(
+            onPressed: !enabled
+                ? null
+                : () => setState(() => _answerOptions[id] = {optionId}),
+            icon: Icon(selected ? Icons.check_circle : Icons.circle_outlined),
+            label: Text('${option['optionText']}'),
+            style: OutlinedButton.styleFrom(
+              backgroundColor: selected
+                  ? preset.primary.withValues(alpha: .10)
+                  : LaooColors.white,
+            ),
+          );
+        }).toList(),
+      );
+    } else if (type == 'MULTIPLE') {
+      answer = Column(
+        children: options.map((option) {
+          final optionId = (option['optionId'] as num).toInt();
+          final selected = _answerOptions[id]?.contains(optionId) ?? false;
+          return CheckboxListTile(
+            value: selected,
+            title: Text('${option['optionText']}'),
+            activeColor: preset.primary,
+            onChanged: !enabled
+                ? null
+                : (value) => setState(() {
+                    final selectedOptions = _answerOptions.putIfAbsent(
+                      id,
+                      () => {},
+                    );
+                    value == true
+                        ? selectedOptions.add(optionId)
+                        : selectedOptions.remove(optionId);
+                  }),
+          );
+        }).toList(),
+      );
+    } else {
+      answer = TextFormField(
+        key: ValueKey('answer-$id-${_answerValues[id] ?? ''}'),
+        initialValue: _answerValues[id] ?? '',
+        enabled: enabled,
+        keyboardType: type == 'NUMBER'
+            ? TextInputType.number
+            : TextInputType.text,
+        maxLines: type == 'TEXT' ? 3 : 1,
+        decoration: InputDecoration(
+          labelText: type == 'NUMBER' ? 'จำนวน' : 'คำตอบ',
+        ),
+        onChanged: (value) => _answerValues[id] = value,
+      );
+    }
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(LaooLayout.cardPadding),
+      decoration: BoxDecoration(
+        color: LaooColors.white,
+        borderRadius: BorderRadius.circular(LaooRadius.xs),
+        border: Border.all(color: LaooColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            '${question['questionText']}'
+            '${question['isRequired'] == true ? ' *' : ''}',
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 8),
+          answer,
+        ],
+      ),
+    );
+  }
+
   Widget _action(WorkspaceThemePreset preset) {
     final detail = _detail!;
     final invitation = Map<String, dynamic>.from(detail['invitation'] as Map);
     final foods = List<Map<String, dynamic>>.from(
       detail['foods'] as List? ?? const [],
     );
+    final groups = List<Map<String, dynamic>>.from(
+      detail['groups'] as List? ?? const [],
+    );
+    final questions = List<Map<String, dynamic>>.from(
+      detail['questions'] as List? ?? const [],
+    );
     final canRespond = invitation['canRespond'] == true;
-    final canOrder = invitation['canOrder'] == true;
+    final canEditPreferences = invitation['canEditPreferences'] == true;
+    final lateAcceptanceOnly = invitation['lateAcceptanceOnly'] == true;
     return Padding(
       padding: const EdgeInsets.all(LaooLayout.cardMargin),
       child: Column(
@@ -220,16 +551,10 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
                     icon: const Icon(Icons.save_outlined),
                     label: Text(_saving ? 'กำลังบันทึก...' : 'บันทึก'),
                   ),
-                if (canOrder)
-                  FilledButton.icon(
-                    onPressed: _saving ? null : _saveFoodOrder,
-                    icon: const Icon(Icons.restaurant_menu_outlined),
-                    label: const Text('บันทึกรายการอาหาร'),
-                  ),
               ],
             ),
           ),
-          const Divider(height: 1, color: LaooColors.border),
+          const SizedBox(height: LaooLayout.cardSpacing),
           Expanded(
             child: WorkspaceSectionCard(
               child: ListView(
@@ -247,6 +572,20 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
                       'ผู้จัด: ${invitation['organizerName'] ?? '-'}',
                     ),
                   ),
+                  if (invitation['isLateResponse'] == true) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(LaooLayout.cardPadding),
+                      decoration: BoxDecoration(
+                        color: preset.primary.withValues(alpha: .10),
+                        borderRadius: BorderRadius.circular(LaooRadius.xs),
+                      ),
+                      child: Text(
+                        'สถานะ: ตอบรับภายหลัง\n'
+                        'เหตุผล: ${invitation['lateResponseReason'] ?? '-'}',
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 12),
                   const Text(
                     'การตอบรับ',
@@ -273,7 +612,12 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
                           return SizedBox(
                             height: LaooTypography.buttonHeight,
                             child: OutlinedButton.icon(
-                              onPressed: _saving || !canRespond || selected
+                              onPressed:
+                                  _saving ||
+                                      !canRespond ||
+                                      selected ||
+                                      (lateAcceptanceOnly &&
+                                          option.$1 != 'ACCEPTED')
                                   ? null
                                   : () => setState(
                                       () => _responseStatus = option.$1,
@@ -330,6 +674,19 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
                     ),
                     const SizedBox(height: 12),
                   ],
+                  if (lateAcceptanceOnly) ...[
+                    Container(
+                      padding: const EdgeInsets.all(LaooLayout.cardPadding),
+                      decoration: BoxDecoration(
+                        color: preset.primary.withValues(alpha: .10),
+                        borderRadius: BorderRadius.circular(LaooRadius.xs),
+                      ),
+                      child: const Text(
+                        'การประชุมเริ่มแล้ว สามารถตอบรับภายหลังได้เฉพาะ เข้าร่วม กรุณาระบุเหตุผลก่อนบันทึก อาหารและความต้องการปิดรับแล้ว',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   TextField(
                     controller: _remark,
                     maxLines: 3,
@@ -339,106 +696,101 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
                       labelText: 'หมายเหตุการตอบรับ',
                     ),
                   ),
-                  MeetingAttendancePanel(
-                    key: ValueKey((
-                      invitation['bookingId'],
-                      invitation['participantId'],
-                    )),
-                    bookingId: (invitation['bookingId'] as num).toInt(),
-                    participantId: (invitation['participantId'] as num).toInt(),
-                    onMessage: (message, error) => _notify(message, error),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.restaurant_menu_outlined,
-                        color: preset.primary,
+                  if (invitation['requiresChangeReason'] == true) ...[
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _changeReason,
+                      maxLines: 2,
+                      readOnly: !canRespond,
+                      decoration: const InputDecoration(
+                        labelText: 'เหตุผลการตอบรับ/แก้ไขภายหลัง *',
                       ),
-                      const SizedBox(width: 8),
-                      const Expanded(
-                        child: Text(
-                          'เมนูอาหารของการประชุม',
-                          style: TextStyle(
-                            fontSize: LaooTypography.sectionTitle,
-                            fontWeight: FontWeight.w700,
+                    ),
+                  ],
+                  if (_responseStatus == 'ACCEPTED') ...[
+                    const SizedBox(height: 16),
+                    MeetingAttendancePanel(
+                      key: ValueKey((
+                        invitation['bookingId'],
+                        invitation['participantId'],
+                      )),
+                      bookingId: (invitation['bookingId'] as num).toInt(),
+                      participantId: (invitation['participantId'] as num)
+                          .toInt(),
+                      onMessage: (message, error) => _notify(message, error),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.restaurant_menu_outlined,
+                          color: preset.primary,
+                        ),
+                        const SizedBox(width: 8),
+                        const Expanded(
+                          child: Text(
+                            'อาหารและเครื่องดื่ม',
+                            style: TextStyle(
+                              fontSize: LaooTypography.sectionTitle,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      groups.isEmpty
+                          ? 'ผู้จัดไม่ได้กำหนดอาหารสำหรับการประชุมนี้'
+                          : 'เลือกตามจำนวนของแต่ละกลุ่ม · ปิดรับ ${_date(invitation['orderCutoffDateTime'])}',
+                      style: TextStyle(color: preset.textSecondary),
+                    ),
+                    const SizedBox(height: 8),
+                    ...groups.map(
+                      (group) => _foodGroup(
+                        group,
+                        foods,
+                        canEditPreferences && !_saving,
+                        preset,
+                      ),
+                    ),
+                    if (questions.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.fact_check_outlined,
+                            color: preset.primary,
+                          ),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'ความต้องการเพิ่มเติม',
+                            style: TextStyle(
+                              fontSize: LaooTypography.sectionTitle,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      ...questions.map(
+                        (question) => _requirementQuestion(
+                          question,
+                          canEditPreferences && !_saving,
+                          preset,
                         ),
                       ),
                     ],
-                  ),
-                  Text(
-                    foods.isEmpty
-                        ? 'ผู้จัดยังไม่ได้เปิดเมนูอาหาร'
-                        : 'ปิดรับ ${_date(invitation['orderCutoffDateTime'])}',
-                    style: TextStyle(color: preset.textSecondary),
-                  ),
-                  const SizedBox(height: 8),
-                  ...foods.map((food) {
-                    final foodId = (food['foodId'] as num).toInt();
-                    final quantity = _foodQuantities[foodId] ?? 0;
-                    final image = '${food['imageUrl'] ?? ''}';
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 6),
-                      child: ListTile(
-                        leading: image.isEmpty
-                            ? Icon(
-                                Icons.restaurant_outlined,
-                                color: preset.primary,
-                              )
-                            : ClipRRect(
-                                borderRadius: BorderRadius.circular(
-                                  LaooRadius.xs,
-                                ),
-                                child: Image.network(
-                                  _imageUrl(image),
-                                  width: 52,
-                                  height: 52,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, _, _) =>
-                                      const Icon(Icons.broken_image_outlined),
-                                ),
-                              ),
-                        title: Text('${food['code']} | ${food['nameTh']}'),
-                        subtitle: Text('${food['foodTypeName'] ?? '-'}'),
-                        trailing: canOrder
-                            ? Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  IconButton(
-                                    tooltip: 'ลดจำนวน',
-                                    onPressed: _saving || quantity == 0
-                                        ? null
-                                        : () => setState(
-                                            () => _foodQuantities[foodId] =
-                                                quantity - 1,
-                                          ),
-                                    icon: const Icon(
-                                      Icons.remove_circle_outline,
-                                    ),
-                                  ),
-                                  Text('$quantity'),
-                                  IconButton(
-                                    tooltip: 'เพิ่มจำนวน',
-                                    onPressed: _saving || quantity >= 99
-                                        ? null
-                                        : () => setState(
-                                            () => _foodQuantities[foodId] =
-                                                quantity + 1,
-                                          ),
-                                    icon: Icon(
-                                      Icons.add_circle_outline,
-                                      color: preset.primary,
-                                    ),
-                                  ),
-                                ],
-                              )
-                            : quantity > 0
-                            ? Text('จำนวน $quantity')
-                            : null,
+                    Container(
+                      padding: const EdgeInsets.all(LaooLayout.cardPadding),
+                      decoration: BoxDecoration(
+                        color: preset.primary.withValues(alpha: .08),
+                        borderRadius: BorderRadius.circular(LaooRadius.xs),
                       ),
-                    );
-                  }),
+                      child: const Text(
+                        'ตรวจสอบสถานะ อาหาร และความต้องการให้ครบ แล้วกดบันทึกด้านบนเพียงครั้งเดียว',
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -517,6 +869,10 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
                           child: Text('เข้าร่วม'),
                         ),
                         DropdownMenuItem(
+                          value: 'LATE_ACCEPTED',
+                          child: Text('ตอบรับภายหลัง'),
+                        ),
+                        DropdownMenuItem(
                           value: 'DECLINED',
                           child: Text('ไม่เข้าร่วม'),
                         ),
@@ -554,6 +910,7 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
                           itemBuilder: (context, index) {
                             final item = _items[index];
                             final status = '${item['invitationStatus']}';
+                            final late = item['isLateResponse'] == true;
                             final color = _statusColor(status, preset);
                             return Card(
                               margin: EdgeInsets.zero,
@@ -572,16 +929,7 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
                                   Icons.mark_email_read_outlined,
                                   color: color,
                                 ),
-                                title: Text(
-                                  '${item['bookingNo'] ?? '-'} | ${item['subject']}',
-                                ),
-                                subtitle: Text(
-                                  '${item['roomCode']} | ${item['roomName']}\n'
-                                  '${_meetingPeriod(item)}\n'
-                                  'ผู้จัด: ${item['organizerName'] ?? '-'}',
-                                ),
-                                trailing: Wrap(
-                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                title: Row(
                                   children: [
                                     Container(
                                       padding: const EdgeInsets.symmetric(
@@ -595,19 +943,44 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
                                         ),
                                       ),
                                       child: Text(
-                                        _statusName(status),
+                                        _statusName(status, late: late),
                                         style: TextStyle(color: color),
                                       ),
                                     ),
-                                    IconButton(
-                                      tooltip: 'เปิดคำเชิญ',
-                                      onPressed: () => _open(item),
-                                      icon: Icon(
-                                        Icons.chevron_right,
-                                        color: preset.primary,
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        '${item['bookingNo'] ?? '-'} | ${item['subject']}',
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
                                   ],
+                                ),
+                                subtitle: Text(
+                                  '${item['roomCode']} | ${item['roomName']}\n'
+                                  '${_meetingPeriod(item)}',
+                                ),
+                                trailing: SizedBox(
+                                  width: 124,
+                                  height: 48,
+                                  child: FilledButton.icon(
+                                    onPressed: () => _open(item),
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: preset.primary,
+                                      foregroundColor: Theme.of(
+                                        context,
+                                      ).colorScheme.onPrimary,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(
+                                          LaooRadius.xs,
+                                        ),
+                                      ),
+                                    ),
+                                    icon: const Icon(
+                                      Icons.arrow_forward_rounded,
+                                    ),
+                                    label: const Text('ดำเนินการ'),
+                                  ),
                                 ),
                               ),
                             );

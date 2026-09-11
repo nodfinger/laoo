@@ -189,15 +189,12 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
   }) {
     final url = item['imageUrl']?.toString().trim() ?? '';
     if (url.isEmpty) {
-      return Container(
+      return SizedBox(
         width: size,
         height: size,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: preset.primary.withValues(alpha: .08),
-          borderRadius: BorderRadius.circular(LaooRadius.xs),
+        child: Center(
+          child: Icon(Icons.restaurant_menu_outlined, color: preset.primary),
         ),
-        child: Icon(Icons.restaurant_menu_outlined, color: preset.primary),
       );
     }
     final image = ClipRRect(
@@ -208,12 +205,12 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
         width: size,
         height: size,
         fit: BoxFit.cover,
-        errorBuilder: (_, _, _) => Container(
+        errorBuilder: (_, _, _) => SizedBox(
           width: size,
           height: size,
-          alignment: Alignment.center,
-          color: preset.primary.withValues(alpha: .08),
-          child: Icon(Icons.broken_image_outlined, color: preset.primary),
+          child: Center(
+            child: Icon(Icons.broken_image_outlined, color: preset.primary),
+          ),
         ),
       ),
     );
@@ -367,11 +364,8 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
                 columns: const [
                   DataColumn(
                     columnWidth: LaooDataTable.idColumnWidth,
-                    numeric: true,
-                    label: Align(
-                      alignment: Alignment.centerRight,
-                      child: Text('ID'),
-                    ),
+                    headingRowAlignment: MainAxisAlignment.center,
+                    label: Text('ID'),
                   ),
                   DataColumn(
                     headingRowAlignment: MainAxisAlignment.center,
@@ -386,8 +380,7 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
                   return DataRow(
                     cells: [
                       DataCell(
-                        Align(
-                          alignment: Alignment.centerRight,
+                        Center(
                           child: Text(
                             '${_currentPage * _pageSize + entry.key + 1}',
                           ),

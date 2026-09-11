@@ -397,6 +397,16 @@ class _MeetingAttendancePanelState extends State<MeetingAttendancePanel> {
                   Text(
                     '${meetingAttendanceDate(item.startDateTime)} - ${meetingAttendanceDate(item.endDateTime)}',
                   ),
+                  if (item.isLateResponse) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'ตอบรับภายหลัง · ${item.lateResponseReason ?? '-'}',
+                      style: TextStyle(
+                        color: preset.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
                   if (item.checkInDate != null)
                     Text(
                       'เช็กอินแล้ว ${meetingAttendanceDate(item.checkInDate)}\n'

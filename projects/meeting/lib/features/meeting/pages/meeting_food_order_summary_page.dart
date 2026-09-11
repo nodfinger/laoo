@@ -184,6 +184,21 @@ class _State extends State<MeetingFoodOrderSummaryPage> {
     final foods = List<Map<String, dynamic>>.from(
       item['foods'] as List? ?? const [],
     );
+    final foodGroups = <String, List<Map<String, dynamic>>>{};
+    for (final food in foods) {
+      foodGroups
+          .putIfAbsent('${food['foodTypeName'] ?? '-'}', () => [])
+          .add(food);
+    }
+    final requirements = List<Map<String, dynamic>>.from(
+      item['requirements'] as List? ?? const [],
+    );
+    final requirementGroups = <int, List<Map<String, dynamic>>>{};
+    for (final answer in requirements) {
+      requirementGroups
+          .putIfAbsent((answer['questionId'] as num).toInt(), () => [])
+          .add(answer);
+    }
     return WorkspaceSectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -203,7 +218,7 @@ class _State extends State<MeetingFoodOrderSummaryPage> {
               badge(item['status'] as String?, preset),
             ],
           ),
-          const Divider(),
+          const SizedBox(height: 8),
           Text('${item['subject'] ?? '-'}'),
           Text(
             '${dateTime(item['startDateTime'])} - ${dateTime(item['endDateTime'])}',
@@ -224,43 +239,85 @@ class _State extends State<MeetingFoodOrderSummaryPage> {
               style: TextStyle(color: preset.textSecondary),
             )
           else
-            ...foods.map(
-              (food) => Padding(
-                padding: const EdgeInsets.only(bottom: 6),
+            ...foodGroups.entries.map(
+              (group) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
                 child: WorkspaceSectionCard(
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Icon(
-                        Icons.restaurant_menu_outlined,
-                        color: preset.primary,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '${food['code']} | ${food['nameTh']}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            Text(
-                              '${food['foodTypeName'] ?? '-'}',
-                              style: TextStyle(color: preset.textSecondary),
-                            ),
-                          ],
+                      Text(
+                        group.key,
+                        style: TextStyle(
+                          color: preset.primary,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
-                      Text(
-                        'ผู้สั่ง ${food['orderedParticipantCount'] ?? 0}\nรวม ${food['orderedQuantity'] ?? 0}',
-                        textAlign: TextAlign.end,
+                      const SizedBox(height: 4),
+                      ...group.value.map(
+                        (food) => Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.restaurant_menu_outlined,
+                                color: preset.primary,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  '${food['code']} | ${food['nameTh']}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                'ผู้สั่ง ${food['orderedParticipantCount'] ?? 0} | รวม ${food['orderedQuantity'] ?? 0}',
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ],
                   ),
                 ),
               ),
             ),
+          if (requirementGroups.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            const Text(
+              'ความต้องการเพิ่มเติม',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 6),
+            ...requirementGroups.values.map((answers) {
+              final first = answers.first;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: WorkspaceSectionCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        '${first['questionText']}',
+                        style: TextStyle(
+                          color: preset.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      ...answers.map(
+                        (answer) => Text(
+                          '${answer['participantName']} : ${answer['answerValue'] ?? '-'}',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+          ],
         ],
       ),
     );
