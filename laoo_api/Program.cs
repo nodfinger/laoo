@@ -34,7 +34,8 @@ builder.Services
     .AddControllers()
     .AddApplicationPart(typeof(LaooServiceModule.ServiceModuleMarker).Assembly)
     .AddApplicationPart(typeof(LaooMeetingApi.Controllers.MeetingRoomBookingController).Assembly)
-    .AddApplicationPart(typeof(LaooVisitorModule.Controllers.VisitorStatusController).Assembly);
+    .AddApplicationPart(typeof(LaooVisitorModule.Controllers.VisitorStatusController).Assembly)
+    .AddApplicationPart(typeof(LaooTimeModule.TimeModuleMarker).Assembly);
 builder.Services.AddProblemDetails(options =>
 {
     options.CustomizeProblemDetails = context =>
