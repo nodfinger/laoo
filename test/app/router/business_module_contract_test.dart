@@ -54,12 +54,17 @@ void main() {
     },
   );
 
-  test('Time catalog is reserved but not routable before implementation', () {
+  test('Time exposes 28001 and keeps 28002 reserved as preview', () {
     expect(TimeRoutes.all, hasLength(2));
-    expect(TimeRoutes.implemented, isEmpty);
-    for (final route in TimeRoutes.all) {
-      expect(route.projectCode, TimeProject.code);
-      expect(AppMenuRouteRegistry.byMenuCode(route.menuCode), isNull);
-    }
+    expect(TimeRoutes.implemented, [TimeRoutes.employeeSettings]);
+    expect(buildTimeFeatureRoutes(), hasLength(1));
+    expect(
+      AppMenuRouteRegistry.byMenuCode(TimeMenuCodes.employeeSettings),
+      isNotNull,
+    );
+    expect(
+      AppMenuRouteRegistry.byMenuCode(TimeMenuCodes.systemSettings),
+      isNull,
+    );
   });
 }

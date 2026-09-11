@@ -4,14 +4,15 @@
 
 ## Current-state findings
 
-- Git branch ปัจจุบันคือ `machine/time` แต่ Repository ยังไม่มี `projects/time` และ `local.machine.json`; Runbook, Center Flutter host, Center API host, migration runner และ `verify-center.ps1` รู้จักเฉพาะ Service, Meeting และ Visitor
-- Core มี Person, Employee, User, User–Employee link, Role Group, Menu Permission และ Company Project Entitlement ให้ใช้งานต่อได้
-- `EmployeeController` และ `CompanyPersonService` บังคับ Username, Password และ Role Group เมื่อสร้าง Company Employee และสร้าง Active Login ใน Transaction เดียว จึงยังรองรับ Employee ที่ไม่มี Login ตาม PROXY_ONLY ไม่ได้
-- Core Employee มี `StartWorkDate` และ `IsActive` แต่ยังไม่มี Employment Period ที่ระบุสถานะการจ้างตามช่วงวันที่ครบถ้วน
-- `TDADPermission` และ `TDADRoleGroupPermission` เก็บ ActionCode เพิ่มเติมได้ แต่หน้าจอ Permission ปัจจุบันจำกัด Flow หลักเป็น VIEW, CREATE, EDIT และ DELETE จึงยังจัดการ Action ของ Time ไม่ครบ
-- Permission ปัจจุบันตรวจ Company และ Project ได้ แต่ยังไม่มีตัวประเมิน Employee Data Scope กลางสำหรับ SELF, ALL, Branch, Division, Department และ Supervisor ตามช่วงวันที่
-- ยังไม่พบ Table, API หรือ Module ของ Attendance, Leave, OT, Approval Profile, Request Policy, Snapshot, Administrative Override และ Partner Delegation ใน Source ปัจจุบัน
-- ตรวจ DBTDLaoo ผ่าน `laoo_api/local.json` แล้ว ไม่พบ Project `LAOO_TIME`, Module Code `TM`, Table Prefix `TDTM` หรือ Menu/Menu Group ช่วง `25–30` จึงใช้ Namespace ชุดนี้ได้โดยไม่ชนข้อมูลปัจจุบัน
+- ณ วันที่ 2026-09-11 Repository มี `projects/time`, role `time`, Center Flutter/API composition, migration runner และ `verify-center.ps1 -Module time` แล้ว
+- ฐานข้อมูลเป้าหมายของระบบคือ `DBTDLaooService`; ห้ามใช้ `DBTDLaoo` สำหรับ Migration หรือข้อมูลของ Time
+- Foundation Migration ของ `LAOO_TIME` มีโครงสร้าง Configuration, Scope, Request, Snapshot, Decision, Audit, Delegation และ Notification แล้ว แต่การรัน Migration จริงต้องทำหลัง Core Merge และ Pull `main` ล่าสุดเท่านั้น
+- หน้าจอ `28001` และ API เป็น Vertical Slice แรกที่พัฒนาใช้งานจริง โดยอ่าน PersonID, Employee และ Organization จาก Core แบบ Read-only และเขียนเฉพาะตาราง `TDTM`
+- `GET /api/time/employee-settings/{employeeId}` ส่งรายละเอียด เวอร์ชัน Attendance Requirement เวอร์ชันรหัสที่เครื่อง และ Immutable Audit History
+- การแก้ไข `28001` ใช้แผงแก้ไขในหน้าเดียวกัน บังคับ RowVersion เมื่อมีข้อมูลเดิม และสร้าง Version ใหม่แม้วันที่เริ่มใช้ตรงกับ Version เดิม
+- Business Date/Time ของ `28001` ใช้เวลาไทย `UTC+07:00` ตาม ADR 0062; Audit timestamp เก็บเป็น UTC
+- `28002` ยังคงเป็น Preview และไม่มี Route/API ใช้งานจริงในชุด Merge ของ `28001`
+- งาน `27001`–`27004` ถูกแยกออกจากชุด Merge ของ `28001` และเก็บใน Branch งานกะ/ตารางทำงานสำหรับตรวจเป็นชุดถัดไป
 
 ## Ownership boundary
 
@@ -74,7 +75,7 @@ projects/time/
 | `28001` | พนักงาน–ลงเวลาทำงาน | `2` | `timeEmployeeSettings` | `TIME_EMPLOYEE_SETTINGS` |
 | `28002` | กำหนดค่าระบบเวลา | `2` | `timeSystemSettings` | `TIME_SYSTEM_SETTINGS` |
 
-รหัส `28001`, `28002` และ ScreenType `2` ได้รับอนุมัติแล้ว การ Bootstrap ต้อง Seed เป็นสถานะไม่ Active จนกว่า Route, API, Permission และ Center integration จะพร้อม
+รหัส `28001`, `28002` และ ScreenType `2` ได้รับอนุมัติแล้ว โดยชุด Merge ปัจจุบันเปิด Route เฉพาะ `28001`; `28002` คงสถานะ Preview และเมนูในฐานข้อมูลยังไม่ Active จนกว่า Core จะตรวจ Merge, Migration และ Permission ครบ
 
 ## Foundation data model
 

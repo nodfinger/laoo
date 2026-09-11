@@ -1,5 +1,12 @@
 import 'package:go_router/go_router.dart';
 
-// Time menus remain disabled until their page and API are implemented.
-// The Center host will consume this function after the bootstrap integration.
-List<GoRoute> buildTimeFeatureRoutes() => <GoRoute>[];
+import '../employee_settings/employee_time_settings_page.dart';
+import 'time_route_contract.dart';
+
+List<GoRoute> buildTimeFeatureRoutes() => <GoRoute>[
+  GoRoute(
+    name: TimeRouteNames.employeeSettings,
+    path: TimeRoutePaths.employeeSettings,
+    builder: (context, state) => const EmployeeTimeSettingsPage(),
+  ),
+];
