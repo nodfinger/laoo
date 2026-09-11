@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:laoo_meeting/meeting_feature.dart';
 import 'package:laoo_service/service_feature.dart';
+import 'package:laoo_time/time_feature.dart';
 import 'package:laoo_visitor/visitor_feature.dart';
 
 import 'app/laoo_app.dart';
@@ -9,6 +10,7 @@ import 'features/support/presentation/widgets/support_workspace_shell.dart';
 void main() {
   configureMeetingFeatureHost(_buildMeetingWorkspaceShell);
   configureServiceWorkspaceShell(_buildMeetingWorkspaceShell);
+  configureTimeFeatureHost(_buildMeetingWorkspaceShell);
   configureVisitorFeatureHost(_buildMeetingWorkspaceShell);
   runApp(const LaooApp());
 }

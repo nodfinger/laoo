@@ -4,6 +4,7 @@ import 'package:laoo/app/router/app_menu_route_registry.dart';
 import 'package:laoo/app/router/app_router.dart';
 import 'package:laoo_meeting/meeting_feature.dart';
 import 'package:laoo_service/service_feature.dart';
+import 'package:laoo_time/time_feature.dart';
 import 'package:laoo_visitor/visitor_feature.dart';
 
 void main() {
@@ -52,4 +53,13 @@ void main() {
       }
     },
   );
+
+  test('Time catalog is reserved but not routable before implementation', () {
+    expect(TimeRoutes.all, hasLength(2));
+    expect(TimeRoutes.implemented, isEmpty);
+    for (final route in TimeRoutes.all) {
+      expect(route.projectCode, TimeProject.code);
+      expect(AppMenuRouteRegistry.byMenuCode(route.menuCode), isNull);
+    }
+  });
 }

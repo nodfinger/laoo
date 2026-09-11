@@ -7,11 +7,23 @@
 | `center-service` | Root Core, `laoo_api`, shared packages, `projects/service` |
 | `meeting` | `projects/meeting` |
 | `visitor` | `projects/visitor` |
+| `time` | `projects/time` |
 
 Every machine clones `nodfinger/laoo` to `C:\laooplatform\laoo`. Never
 share a live working tree, `.git`, `.dart_tool`, `build`, `bin`, or `obj`.
 Copy `local.machine.example.json` to ignored `local.machine.json` and set the
 role for that machine.
+
+Time machine example:
+
+```json
+{
+  "role": "time",
+  "allowedProjects": ["LAOO_TIME"],
+  "webPort": 8080,
+  "apiPort": 5080
+}
+```
 
 ## One runtime on every machine
 
@@ -84,6 +96,9 @@ and runs them only after explicit approval and after pulling current `main`:
 .\tools\scripts\run-migrations.ps1 -Module meeting -DryRun
 .\tools\scripts\run-migrations.ps1 -Module meeting
 ```
+
+For the Time role, use `-Module time`; its owned migrations are under
+`projects/time/database/migrations`.
 
 The runner validates names and checksums, writes
 `dbo.TDSTSchemaMigration`, and serializes execution with the SQL application
