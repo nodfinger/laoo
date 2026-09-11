@@ -574,6 +574,14 @@ _Avoid_: สำเนา Project ภายนอก, Shared Folder
 แอป Flutter ของ Business Project ที่อยู่ใต้ `projects/<project>` ภายใน Canonical Workspace
 _Avoid_: Repository แยก, สำเนา Core
 
+**Project Bootstrap**:
+รอบเตรียมโครงสร้างของ Business Project โดยเครื่อง Center กำหนด Project, Menu, Ownership, Route/API composition และ Migration namespace ก่อนส่งให้เครื่อง Project พัฒนา Workflow ของตน
+_Avoid_: การพัฒนา Business Feature ทั้งหมดบนเครื่อง Core, Project ที่แยกตัวโดยไม่มี Center integration
+
+**Core Impact**:
+การเปลี่ยน Root, Core API, Authentication, Permission, Shared Package หรือ Shared Schema ที่อาจกระทบมากกว่าหนึ่ง Project และต้องแยกจาก Project PR
+_Avoid_: Business Project change, การแก้ Core แฝงใน Project PR
+
 **Legacy Project Copy**:
 โฟลเดอร์หรือ repository เดิมที่เก็บไว้เพื่อกู้คืนหรือเทียบประวัติเท่านั้น และห้ามใช้พัฒนา Feature ใหม่
 _Avoid_: Active Project, Source of Truth
@@ -611,6 +619,14 @@ _Avoid_: Item Project Availability
 **Item Instance**:
 หน่วยจริงหนึ่งชิ้นของ Item แบบ Serial ซึ่งมี Serial สถานะ และตำแหน่งปัจจุบันเฉพาะตัว
 _Avoid_: Item, Stock Balance
+
+**Warranty Policy**:
+ค่าเริ่มต้นความคุ้มครองของ Item แยกประกันผู้ขายและประกันลูกค้า โดยกำหนดว่าไม่มีประกัน ตลอดอายุ หรือจำนวนเดือน
+_Avoid_: วันหมดอายุของ Serial, ประกันเอกสาร
+
+**Serial Warranty Coverage**:
+Snapshot ความคุ้มครองของ Item Instance หนึ่งชิ้น ซึ่งเก็บวันเริ่ม วันหมดอายุ เหตุการณ์ และเอกสารที่เริ่มประกันจริง
+_Avoid_: Warranty Policy, Item Warranty
 
 **Inventory Fulfillment**:
 หลักฐานว่ารายการต้นทางถูกตัดสต็อกโดยเอกสารใดแล้ว เพื่อป้องกันการตัดจำนวนหรือ Serial ซ้ำ

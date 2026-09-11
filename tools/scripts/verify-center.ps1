@@ -16,6 +16,8 @@ function Invoke-Checked {
 
 Push-Location $repoRoot
 try {
+    Write-Host '[Machine ownership boundary]'
+    & (Join-Path $PSScriptRoot 'check-machine-boundaries.ps1') -Module $Module
     Invoke-Checked 'Git diff check' { git diff --check }
     Invoke-Checked 'Center-only host guard' {
         $legacyHosts = @(

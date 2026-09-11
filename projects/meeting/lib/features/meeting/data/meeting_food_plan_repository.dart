@@ -34,6 +34,8 @@ class MeetingFoodPlanRepository {
     required Set<int> foodIds,
     required bool isActive,
     Map<int, int>? foodQuantities,
+    List<Map<String, dynamic>>? groups,
+    List<Map<String, dynamic>>? questions,
   }) => _api.put(
     '$_path/$bookingId',
     body: {
@@ -43,6 +45,8 @@ class MeetingFoodPlanRepository {
         'foodQuantities': {
           for (final id in foodIds) '$id': foodQuantities[id] ?? 1,
         },
+      'groups': ?groups,
+      'questions': ?questions,
       'isActive': isActive,
     },
   );

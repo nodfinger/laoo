@@ -24,3 +24,15 @@
 A screen becomes a Core screen when it owns platform-wide master data or is
 used by more than one Business Project. A screen remains inside a Business
 Project when its workflow or data is specific to that Project.
+
+## Project integration ownership
+
+- Center owns Root host composition, Authentication, Person, Employee, User,
+  Organization, Navigation, Permission, and shared packages.
+- Business Projects own their Workflow, Transaction, Configuration, and Audit
+  data under `projects/<project>`.
+- Business Projects reference Core identities and master data by scoped IDs;
+  they do not create duplicate Person, Employee, User, Branch, Organization,
+  Item, or Permission sources.
+- Reusable UI or contracts move to shared packages only through a separate
+  Center-owned Core Impact PR.

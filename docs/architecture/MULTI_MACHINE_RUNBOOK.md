@@ -1,4 +1,4 @@
-# LAOO Three-Machine Center-Host Runbook
+# LAOO Multi-Machine Center-Host Runbook
 
 ## Ownership
 
@@ -24,6 +24,40 @@ Time machine example:
   "apiPort": 5080
 }
 ```
+
+Run `tools/scripts/check-machine-boundaries.ps1 -Module <module>` before full
+verification. On Meeting, Visitor, and Time machines it rejects changed files
+outside the owned Project directory. The Center machine may change Root, Core,
+shared packages, and Service, and is responsible for integration verification.
+
+## New Project bootstrap
+
+Before assigning a new machine, the Center machine must merge a Bootstrap PR
+that defines:
+
+- ProjectCode, approved MenuCode and ScreenType, and the data ownership table;
+- an inactive menu/feature entitlement until the route and API are ready;
+- Flutter route contract and Center API module composition;
+- a Project-owned migration directory and unique ProjectCode filename prefix;
+- Core read contracts and Project-owned write contracts.
+
+After Bootstrap reaches `main`, every machine pulls with `--ff-only`. The new
+machine then works only under `projects/<project>` and runs through the Center
+host. Do not build the complete Business Project in Root and move it later.
+
+## Core Impact protocol
+
+Classify every change before coding:
+
+| Level | Meaning | Required action |
+| --- | --- | --- |
+| Green | Only `projects/<project>`; no public contract change | Continue in the Project PR |
+| Yellow | Adds API/field/shared component | Notify Center; merge a separate compatible Core PR first |
+| Red | Authentication, Permission, Person, Employee, shared schema or migration | Stop dependent work until Core PR is merged and every machine syncs |
+
+A Core Impact description records the requested change, consuming Projects,
+API/contract/schema impact, backward compatibility, migration, and merge order.
+Never hide Root/Core/Shared edits inside a Project PR.
 
 ## One runtime on every machine
 
@@ -86,6 +120,10 @@ Resolve conflicts and run Center verification before Commit/Push/Merge:
 Each machine may create and squash-merge its own PR after verification. Never
 push directly to `main`, force-push, reset shared work, or copy whole projects
 over another clone. After Merge, switch to `main` and pull with `--ff-only`.
+
+Core and Project dependency order is always: compatible Core PR, machine sync,
+then dependent Project PR. A single Login remains company-wide; Project access
+and Role Groups remain independently assigned per Project.
 
 ## Shared database
 

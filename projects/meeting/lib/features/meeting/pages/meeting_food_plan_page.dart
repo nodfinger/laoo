@@ -12,6 +12,7 @@ import '../../../core/widgets/auto_dismiss_message.dart';
 import '../../support/presentation/widgets/support_workspace_shell.dart';
 import '../data/meeting_food_plan_repository.dart';
 import '../meeting_feature_host.dart';
+import '../widgets/meeting_pagination_card.dart';
 
 class MeetingFoodPlanPage extends StatefulWidget {
   const MeetingFoodPlanPage({
@@ -35,9 +36,10 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
   List<Map<String, dynamic>> _items = [];
   Map<String, dynamic>? _detail;
   Set<int> _selectedFoodIds = {};
-  final Map<int, TextEditingController> _foodQuantities = {};
-  final Set<int> _quantityErrors = {};
-  String _foodTypeFilter = '';
+  final Map<String, Map<String, dynamic>> _groupRules = {};
+  final Set<String> _expandedFoodTypes = {};
+  List<Map<String, dynamic>> _questions = [];
+  int _nextQuestionKey = 1;
   DateTime? _cutoff;
   bool _planActive = true;
   bool _loading = true;
@@ -65,9 +67,6 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
   @override
   void dispose() {
     _search.dispose();
-    for (final controller in _foodQuantities.values) {
-      controller.dispose();
-    }
     super.dispose();
   }
 
@@ -123,13 +122,40 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
             .where((food) => food['selected'] == true)
             .map((food) => (food['foodId'] as num).toInt())
             .toSet();
-        _foodTypeFilter = '';
-        _quantityErrors.clear();
-        for (final food in foods) {
-          final id = (food['foodId'] as num).toInt();
-          _foodQuantities.putIfAbsent(id, () => TextEditingController()).text =
-              '${(food['quantity'] as num?)?.toInt() ?? 1}';
+        _groupRules.clear();
+        for (final group in List<Map<String, dynamic>>.from(
+          detail['groups'] as List? ?? const [],
+        )) {
+          _groupRules['${group['foodTypeCode']}'] = {
+            'maxQuantity': (group['maxQuantity'] as num?)?.toInt() ?? 1,
+            'isRequired': group['isRequired'] == true,
+          };
         }
+        for (final food in foods.where((food) => food['selected'] == true)) {
+          final type = '${food['foodTypeCode']}';
+          _groupRules.putIfAbsent(
+            type,
+            () => {
+              'maxQuantity': (food['quantity'] as num?)?.toInt() ?? 1,
+              'isRequired': false,
+            },
+          );
+        }
+        _expandedFoodTypes
+          ..clear()
+          ..addAll(foods.map((food) => '${food['foodTypeCode']}'));
+        _questions =
+            List<Map<String, dynamic>>.from(
+              detail['questions'] as List? ?? const [],
+            ).map((question) {
+              final copy = Map<String, dynamic>.from(question);
+              copy['_key'] =
+                  'saved-${question['questionId'] ?? _nextQuestionKey++}';
+              copy['optionsText'] = List<Map<String, dynamic>>.from(
+                question['options'] as Iterable? ?? const [],
+              ).map((option) => '${option['optionText']}').join(', ');
+              return copy;
+            }).toList();
         _cutoff = savedCutoff?.toLocal() ?? defaultCutoff;
         _planActive = detail['isActive'] == true || savedCutoff == null;
       });
@@ -302,19 +328,37 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
     final detail = _detail;
     if (detail == null || !_canEdit) return;
     final start = DateTime.parse('${detail['startDateTime']}').toLocal();
-    final quantities = <int, int>{};
-    _quantityErrors.clear();
-    for (final id in _selectedFoodIds) {
-      final value = int.tryParse(_foodQuantities[id]?.text.trim() ?? '');
-      if (value == null || value <= 0 || value > 2147483647) {
-        _quantityErrors.add(id);
-      } else {
-        quantities[id] = value;
-      }
-    }
+    final foods = List<Map<String, dynamic>>.from(
+      detail['foods'] as List? ?? const [],
+    );
+    final selectedTypes = foods
+        .where(
+          (food) => _selectedFoodIds.contains((food['foodId'] as num).toInt()),
+        )
+        .map((food) => '${food['foodTypeCode']}')
+        .toSet();
+    final invalidGroup = selectedTypes.any((type) {
+      final max = (_groupRules[type]?['maxQuantity'] as num?)?.toInt();
+      return max == null || max < 1 || max > 99;
+    });
+    final invalidQuestion = _questions.any((question) {
+      final text = '${question['questionText'] ?? ''}'.trim();
+      final type = '${question['answerType'] ?? 'TEXT'}';
+      final options = '${question['optionsText'] ?? ''}'
+          .split(',')
+          .where((value) => value.trim().isNotEmpty)
+          .length;
+      return text.isEmpty ||
+          text.length > 300 ||
+          ((type == 'SINGLE' || type == 'MULTIPLE') && options < 2);
+    });
     setState(() {
       _foodError = _planActive && _selectedFoodIds.isEmpty
           ? 'กรุณาเลือกอาหารอย่างน้อย 1 รายการ'
+          : invalidGroup
+          ? 'กรุณากำหนดจำนวนรวมของแต่ละกลุ่มระหว่าง 1 ถึง 99'
+          : invalidQuestion
+          ? 'กรุณาตรวจคำถามและตัวเลือกที่กำหนด'
           : null;
       _cutoffError =
           _cutoff == null ||
@@ -323,16 +367,7 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
           ? 'เวลาปิดรับต้องมากกว่าเวลาปัจจุบันและก่อนเริ่มประชุม'
           : null;
     });
-    if (_quantityErrors.isNotEmpty) {
-      setState(() {
-        _foodTypeFilter = '';
-        _foodError =
-            'กรุณาระบุจำนวนเต็มมากกว่า 0 และไม่เกิน 2147483647 ในรายการอาหารที่เลือก';
-      });
-    }
-    if (_foodError != null ||
-        _cutoffError != null ||
-        _quantityErrors.isNotEmpty) {
+    if (_foodError != null || _cutoffError != null) {
       return;
     }
     setState(() => _saving = true);
@@ -341,7 +376,38 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
         (detail['bookingId'] as num).toInt(),
         cutoff: _cutoff!,
         foodIds: _selectedFoodIds,
-        foodQuantities: quantities,
+        groups: selectedTypes.map((type) {
+          final rule = _groupRules[type]!;
+          return {
+            'foodTypeCode': type,
+            'maxQuantity': (rule['maxQuantity'] as num).toInt(),
+            'isRequired': rule['isRequired'] == true,
+            'foodIds': foods
+                .where(
+                  (food) =>
+                      '${food['foodTypeCode']}' == type &&
+                      _selectedFoodIds.contains(
+                        (food['foodId'] as num).toInt(),
+                      ),
+                )
+                .map((food) => (food['foodId'] as num).toInt())
+                .toList(),
+          };
+        }).toList(),
+        questions: _questions.asMap().entries.map((entry) {
+          final question = entry.value;
+          return {
+            'questionText': '${question['questionText']}'.trim(),
+            'answerType': '${question['answerType'] ?? 'TEXT'}',
+            'isRequired': question['isRequired'] == true,
+            'sortOrder': entry.key + 1,
+            'options': '${question['optionsText'] ?? ''}'
+                .split(',')
+                .map((value) => value.trim())
+                .where((value) => value.isNotEmpty)
+                .toList(),
+          };
+        }).toList(),
         isActive: _planActive,
       );
       if (!mounted) return;
@@ -404,6 +470,7 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
 
   Widget _foodCard(Map<String, dynamic> food, WorkspaceThemePreset preset) {
     final id = (food['foodId'] as num).toInt();
+    final type = '${food['foodTypeCode']}';
     final selected = _selectedFoodIds.contains(id);
     final image = food['imageUrl']?.toString() ?? '';
     return InkWell(
@@ -411,7 +478,15 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
       onTap: _saving || !_canEdit
           ? null
           : () => setState(() {
-              selected ? _selectedFoodIds.remove(id) : _selectedFoodIds.add(id);
+              if (selected) {
+                _selectedFoodIds.remove(id);
+              } else {
+                _selectedFoodIds.add(id);
+                _groupRules.putIfAbsent(
+                  type,
+                  () => {'maxQuantity': 1, 'isRequired': false},
+                );
+              }
             }),
       child: Container(
         padding: const EdgeInsets.all(10),
@@ -463,42 +538,260 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
                 ],
               ),
             ),
-            const SizedBox(width: 10),
-            SizedBox(
-              width: 110,
-              child: TextField(
-                controller: _foodQuantities[id],
-                enabled: selected && _canEdit && !_saving,
-                keyboardType: TextInputType.number,
-                style: const TextStyle(
-                  color: LaooColors.textPrimary,
-                  fontSize: LaooTypography.inputText,
-                ),
-                decoration: InputDecoration(
-                  labelText: 'จำนวน',
-                  errorText: selected && _quantityErrors.contains(id)
-                      ? 'ระบุจำนวนเต็ม > 0'
-                      : null,
-                  errorMaxLines: 2,
-                ),
-                onChanged: (_) => setState(() {
-                  _quantityErrors.remove(id);
-                }),
-              ),
-            ),
             Checkbox(
               value: selected,
               activeColor: preset.primary,
               onChanged: _saving || !_canEdit
                   ? null
-                  : (_) => setState(
-                      () => selected
-                          ? _selectedFoodIds.remove(id)
-                          : _selectedFoodIds.add(id),
-                    ),
+                  : (_) => setState(() {
+                      if (selected) {
+                        _selectedFoodIds.remove(id);
+                      } else {
+                        _selectedFoodIds.add(id);
+                        _groupRules.putIfAbsent(
+                          type,
+                          () => {'maxQuantity': 1, 'isRequired': false},
+                        );
+                      }
+                    }),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _foodGroupCard(
+    String type,
+    String name,
+    List<Map<String, dynamic>> foods,
+    WorkspaceThemePreset preset,
+  ) {
+    final expanded = _expandedFoodTypes.contains(type);
+    final allSelected = foods.every(
+      (food) => _selectedFoodIds.contains((food['foodId'] as num).toInt()),
+    );
+    final rule = _groupRules.putIfAbsent(
+      type,
+      () => {'maxQuantity': 1, 'isRequired': false},
+    );
+    return WorkspaceSectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(LaooLayout.cardPadding),
+            decoration: BoxDecoration(
+              color: preset.primary.withValues(alpha: .10),
+              borderRadius: BorderRadius.circular(LaooRadius.xs),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Wrap(
+                    spacing: 12,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text(
+                        name,
+                        style: const TextStyle(
+                          fontSize: LaooTypography.sectionTitle,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      SizedBox(
+                        width: 150,
+                        child: TextFormField(
+                          key: ValueKey('group-$type-${rule['maxQuantity']}'),
+                          initialValue: '${rule['maxQuantity']}',
+                          enabled: _canEdit && !_saving,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: 'จำนวนรวมต่อคน',
+                          ),
+                          onChanged: (value) =>
+                              rule['maxQuantity'] = int.tryParse(value),
+                        ),
+                      ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text('บังคับเลือก'),
+                          Switch.adaptive(
+                            value: rule['isRequired'] == true,
+                            activeTrackColor: preset.primary,
+                            onChanged: !_canEdit || _saving
+                                ? null
+                                : (value) => setState(
+                                    () => rule['isRequired'] = value,
+                                  ),
+                          ),
+                        ],
+                      ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Checkbox(
+                            value: allSelected,
+                            activeColor: preset.primary,
+                            onChanged: !_canEdit || _saving
+                                ? null
+                                : (value) => setState(() {
+                                    final ids = foods
+                                        .map(
+                                          (food) =>
+                                              (food['foodId'] as num).toInt(),
+                                        )
+                                        .toSet();
+                                    if (value == true) {
+                                      _selectedFoodIds.addAll(ids);
+                                      _groupRules.putIfAbsent(
+                                        type,
+                                        () => {
+                                          'maxQuantity': 1,
+                                          'isRequired': false,
+                                        },
+                                      );
+                                    } else {
+                                      _selectedFoodIds.removeAll(ids);
+                                    }
+                                  }),
+                          ),
+                          const Text('เลือกทั้งหมด'),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: expanded ? 'ย่อรายการอาหาร' : 'แสดงรายการอาหาร',
+                  onPressed: () => setState(() {
+                    if (expanded) {
+                      _expandedFoodTypes.remove(type);
+                    } else {
+                      _expandedFoodTypes.add(type);
+                    }
+                  }),
+                  icon: Icon(
+                    expanded
+                        ? Icons.keyboard_arrow_up_outlined
+                        : Icons.keyboard_arrow_down_outlined,
+                    color: preset.primary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (expanded) ...[
+            const SizedBox(height: LaooLayout.cardSpacing),
+            ...foods.map(
+              (food) => Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: _foodCard(food, preset),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _questionCard(
+    int index,
+    Map<String, dynamic> question,
+    WorkspaceThemePreset preset,
+  ) {
+    final type = '${question['answerType'] ?? 'TEXT'}';
+    final needsOptions = type == 'SINGLE' || type == 'MULTIPLE';
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(LaooLayout.cardPadding),
+      decoration: BoxDecoration(
+        color: LaooColors.white,
+        borderRadius: BorderRadius.circular(LaooRadius.xs),
+        border: Border.all(color: LaooColors.border),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  key: ValueKey('question-${question['_key']}'),
+                  initialValue: '${question['questionText'] ?? ''}',
+                  enabled: _canEdit && !_saving,
+                  decoration: InputDecoration(
+                    labelText: 'คำถามที่ ${index + 1}',
+                  ),
+                  onChanged: (value) => question['questionText'] = value,
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                tooltip: 'ลบคำถาม',
+                onPressed: !_canEdit || _saving
+                    ? null
+                    : () => setState(() => _questions.removeAt(index)),
+                icon: const Icon(Icons.delete_outline, color: LaooColors.error),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  initialValue: type,
+                  decoration: const InputDecoration(labelText: 'ประเภทคำตอบ'),
+                  items: const [
+                    DropdownMenuItem(value: 'TEXT', child: Text('ข้อความ')),
+                    DropdownMenuItem(
+                      value: 'BOOLEAN',
+                      child: Text('ใช่ / ไม่ใช่'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'SINGLE',
+                      child: Text('เลือกหนึ่ง'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'MULTIPLE',
+                      child: Text('เลือกหลาย'),
+                    ),
+                    DropdownMenuItem(value: 'NUMBER', child: Text('จำนวน')),
+                  ],
+                  onChanged: !_canEdit || _saving
+                      ? null
+                      : (value) => setState(
+                          () => question['answerType'] = value ?? 'TEXT',
+                        ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Text('บังคับตอบ'),
+              Switch.adaptive(
+                value: question['isRequired'] == true,
+                activeTrackColor: preset.primary,
+                onChanged: !_canEdit || _saving
+                    ? null
+                    : (value) => setState(() => question['isRequired'] = value),
+              ),
+            ],
+          ),
+          if (needsOptions) ...[
+            const SizedBox(height: 12),
+            TextFormField(
+              key: ValueKey('options-${question['_key']}'),
+              initialValue: '${question['optionsText'] ?? ''}',
+              enabled: _canEdit && !_saving,
+              decoration: const InputDecoration(
+                labelText: 'ตัวเลือก',
+                hintText: 'คั่นแต่ละตัวเลือกด้วยเครื่องหมายจุลภาค',
+              ),
+              onChanged: (value) => question['optionsText'] = value,
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -508,21 +801,10 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
     final foods = List<Map<String, dynamic>>.from(
       detail['foods'] as List? ?? const [],
     );
-    final foodTypes =
-        foods
-            .map((food) => '${food['foodTypeName'] ?? ''}'.trim())
-            .where((type) => type.isNotEmpty)
-            .toSet()
-            .toList()
-          ..sort();
-    final filteredFoods = _foodTypeFilter.isEmpty
-        ? foods
-        : foods
-              .where(
-                (food) =>
-                    '${food['foodTypeName'] ?? ''}'.trim() == _foodTypeFilter,
-              )
-              .toList();
+    final foodTypes = <String, List<Map<String, dynamic>>>{};
+    for (final food in foods) {
+      foodTypes.putIfAbsent('${food['foodTypeCode']}', () => []).add(food);
+    }
     return Padding(
       padding: const EdgeInsets.all(LaooLayout.cardMargin),
       child: Column(
@@ -563,7 +845,7 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
               ],
             ),
           ),
-          const Divider(height: 1, color: LaooColors.border),
+          const SizedBox(height: LaooLayout.cardSpacing),
           Expanded(
             child: WorkspaceSectionCard(
               child: ListView(
@@ -608,44 +890,43 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
                       ),
                     ),
                   const SizedBox(height: 12),
-                  SizedBox(
-                    width: 280,
-                    child: DropdownButtonFormField<String>(
-                      key: ValueKey(_foodTypeFilter),
-                      initialValue: _foodTypeFilter,
-                      isExpanded: true,
-                      decoration: const InputDecoration(
-                        labelText: 'ประเภทอาหาร',
-                      ),
-                      items: [
-                        const DropdownMenuItem<String>(
-                          value: '',
-                          child: Text('ทั้งหมด'),
-                        ),
-                        ...foodTypes.map(
-                          (type) => DropdownMenuItem<String>(
-                            value: type,
-                            child: Text(type),
-                          ),
-                        ),
-                      ],
-                      onChanged: (value) =>
-                          setState(() => _foodTypeFilter = value ?? ''),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
                   const Text(
-                    'รายการอาหารที่เปิดให้เลือก',
+                    'กลุ่มและรายการอาหารที่เปิดให้เลือก',
                     style: TextStyle(
                       fontSize: LaooTypography.sectionTitle,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: 8),
-                  ...filteredFoods.map(
-                    (food) => Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
-                      child: _foodCard(food, preset),
+                  Container(
+                    padding: const EdgeInsets.all(LaooLayout.cardPadding),
+                    decoration: BoxDecoration(
+                      color: LaooColors.background,
+                      borderRadius: BorderRadius.circular(LaooRadius.xs),
+                    ),
+                    child: Column(
+                      children: [
+                        for (
+                          var index = 0;
+                          index < foodTypes.entries.length;
+                          index++
+                        ) ...[
+                          Builder(
+                            builder: (context) {
+                              final entry = foodTypes.entries.elementAt(index);
+                              final first = entry.value.first;
+                              return _foodGroupCard(
+                                entry.key,
+                                '${first['foodTypeName'] ?? entry.key}',
+                                entry.value,
+                                preset,
+                              );
+                            },
+                          ),
+                          if (index < foodTypes.entries.length - 1)
+                            const SizedBox(height: LaooLayout.cardSpacing),
+                        ],
+                      ],
                     ),
                   ),
                   if (_foodError != null)
@@ -656,6 +937,44 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
                         fontSize: LaooTypography.inputHint,
                       ),
                     ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'ความต้องการของผู้เข้าร่วม',
+                          style: TextStyle(
+                            fontSize: LaooTypography.sectionTitle,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: !_canEdit || _saving
+                            ? null
+                            : () => setState(
+                                () => _questions.add({
+                                  '_key': 'new-${_nextQuestionKey++}',
+                                  'questionText': '',
+                                  'answerType': 'TEXT',
+                                  'isRequired': false,
+                                  'optionsText': '',
+                                }),
+                              ),
+                        icon: const Icon(Icons.add),
+                        label: const Text('เพิ่มคำถาม'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  if (_questions.isEmpty)
+                    Text(
+                      'ยังไม่ได้กำหนดคำถามเพิ่มเติม',
+                      style: TextStyle(color: preset.textSecondary),
+                    ),
+                  ..._questions.asMap().entries.map(
+                    (entry) => _questionCard(entry.key, entry.value, preset),
+                  ),
                 ],
               ),
             ),
@@ -674,7 +993,7 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             WorkspacePageTitle(title: _caption, favoriteKey: '21005'),
-            const Divider(height: 17, color: LaooColors.border),
+            const SizedBox(height: LaooLayout.cardSpacing),
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -713,7 +1032,7 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
                 ),
               ],
             ),
-            const Divider(height: 17, color: LaooColors.border),
+            const SizedBox(height: LaooLayout.cardSpacing),
             if (_loading) const LinearProgressIndicator(),
             Expanded(
               child: !_loading && _items.isEmpty
@@ -767,37 +1086,25 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
                       },
                     ),
             ),
-            const Divider(height: 17, color: LaooColors.border),
-            Wrap(
-              spacing: 8,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                OutlinedButton(
-                  onPressed: _page > 1
-                      ? () {
-                          setState(() => _page--);
-                          _load();
-                        }
-                      : null,
-                  child: const Icon(Icons.chevron_left),
-                ),
-                FilledButton(
-                  onPressed: null,
-                  child: Text('${pageCount == 0 ? 0 : _page}'),
-                ),
-                OutlinedButton(
-                  onPressed: _page < pageCount
-                      ? () {
-                          setState(() => _page++);
-                          _load();
-                        }
-                      : null,
-                  child: const Icon(Icons.chevron_right),
-                ),
-                Text(
-                  '${_items.isEmpty ? 0 : (_page - 1) * 20 + 1}-${((_page - 1) * 20 + _items.length)} จาก $_total',
-                ),
-              ],
+            const SizedBox(height: LaooLayout.cardSpacing),
+            MeetingPaginationCard(
+              showDivider: false,
+              total: _total,
+              pageIndex: _page - 1,
+              pageSize: 20,
+              primary: preset.primary,
+              onPrevious: _page > 1
+                  ? () {
+                      setState(() => _page--);
+                      _load();
+                    }
+                  : null,
+              onNext: _page < pageCount
+                  ? () {
+                      setState(() => _page++);
+                      _load();
+                    }
+                  : null,
             ),
           ],
         ),

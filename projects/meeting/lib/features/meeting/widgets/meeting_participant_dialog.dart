@@ -158,7 +158,17 @@ Future<bool> showMeetingParticipantDialog(
                           itemBuilder: (_, index) {
                             final employee = filtered[index];
                             final employeeId = _int(employee['employeeId']);
+                            final invitationStatus =
+                                '${employee['invitationStatus'] ?? ''}';
                             final details = <String>[
+                              if (employee['selected'] == true &&
+                                  invitationStatus.isNotEmpty)
+                                'สถานะ: ${_invitationStatusName(employee)}',
+                              if (employee['isLateResponse'] == true &&
+                                  '${employee['lateResponseReason'] ?? ''}'
+                                      .trim()
+                                      .isNotEmpty)
+                                'เหตุผล: ${employee['lateResponseReason']}',
                               if ('${employee['nickName'] ?? ''}'.isNotEmpty)
                                 'ชื่อเล่น: ${employee['nickName']}',
                               if ('${employee['departmentName'] ?? ''}'
@@ -250,3 +260,12 @@ String _bookingDateTime(Map<String, dynamic> item) {
 }
 
 String _two(int value) => value.toString().padLeft(2, '0');
+
+String _invitationStatusName(Map<String, dynamic> employee) {
+  if (employee['isLateResponse'] == true) return 'ตอบรับภายหลัง';
+  return switch ('${employee['invitationStatus'] ?? ''}') {
+    'ACCEPTED' => 'เข้าร่วม',
+    'DECLINED' => 'ไม่เข้าร่วม',
+    _ => 'รอตอบรับ',
+  };
+}

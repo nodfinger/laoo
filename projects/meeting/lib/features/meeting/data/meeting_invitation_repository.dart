@@ -4,6 +4,7 @@ class MeetingInvitationRepository {
   MeetingInvitationRepository({ApiClient? api}) : _api = api ?? ApiClient();
   final ApiClient _api;
   static const _path = '/api/company/my-meeting-invitations';
+  static const _responsePath = '/api/company/meeting-participant-responses';
 
   Future<Map<String, dynamic>> list({
     String? search,
@@ -24,7 +25,9 @@ class MeetingInvitationRepository {
   );
 
   Future<Map<String, dynamic>> get(int participantId) async =>
-      Map<String, dynamic>.from(await _api.get('$_path/$participantId') as Map);
+      Map<String, dynamic>.from(
+        await _api.get('$_responsePath/$participantId') as Map,
+      );
 
   Future<Map<String, bool>> actions() async => Map<String, bool>.fromEntries(
     (await _api.get('$_path/actions') as Map).entries.map(
@@ -36,21 +39,20 @@ class MeetingInvitationRepository {
     int participantId, {
     required String status,
     String? remark,
+    String? changeReason,
+    Map<int, int> quantities = const {},
+    List<Map<String, dynamic>> answers = const [],
   }) => _api.put(
-    '$_path/$participantId/response',
-    body: {'status': status, 'remark': remark},
-  );
-
-  Future<void> saveFoodOrder(
-    int participantId, {
-    required Map<int, int> quantities,
-  }) => _api.put(
-    '$_path/$participantId/food-order',
+    '$_responsePath/$participantId',
     body: {
+      'status': status,
+      'remark': remark,
+      'changeReason': changeReason,
       'items': quantities.entries
           .where((entry) => entry.value > 0)
           .map((entry) => {'foodId': entry.key, 'quantity': entry.value})
           .toList(),
+      'answers': answers,
     },
   );
 }

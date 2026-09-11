@@ -134,6 +134,10 @@ ScreenType: 1
 - หลัง Merge ให้สลับกลับ `main`, ดึง `origin/main` แบบ `--ff-only`, ตรวจว่า Working Tree สะอาด แล้วรายงาน Commit บน `main` ให้พ่อทราบ
 - ทุกเครื่องต้องรันผ่าน Center host ที่ `8080/5080`; พอร์ตแยกของ Service, Meeting และ Visitor เป็น Legacy และห้ามใช้หลังผ่าน parity
 - ก่อน Merge ให้รัน `tools/scripts/verify-center.ps1 -Module <service|meeting|visitor|time>` ตาม Project ที่แก้
+- Project ใหม่ต้องเริ่มจาก Bootstrap PR ของเครื่อง `center-service` เพื่อกำหนด ProjectCode, Menu/ScreenType, Data Ownership, Center route/API composition และ Migration namespace ก่อนแยกเครื่องพัฒนา Business Feature
+- เครื่อง Project ต้องจัดระดับ Core Impact ก่อน Coding: `Green` แก้เฉพาะ Project ได้, `Yellow` มี API/Field/Shared contract ให้แจ้ง Center และแยก Core PR, `Red` กระทบ Authentication/Permission/Person/Employee/Shared Schema ให้หยุดงานที่พึ่งพาจน Core PR Merge และทุกเครื่อง Sync
+- Core PR ต้อง Merge แบบ backward-compatible ก่อน Project PR ที่เรียกใช้ และห้ามซ่อนการแก้ Root/Core/Shared ไว้ใน Project PR
+- ก่อนตรวจ Center ให้รัน `tools/scripts/check-machine-boundaries.ps1 -Module <service|meeting|visitor|time>`; เครื่อง Meeting, Visitor และ Time ต้องไม่มีไฟล์เปลี่ยนแปลงนอก `projects/<project>`
 
 ## Reporting Style
 

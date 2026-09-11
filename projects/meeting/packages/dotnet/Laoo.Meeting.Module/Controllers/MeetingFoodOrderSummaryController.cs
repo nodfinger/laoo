@@ -23,10 +23,12 @@ public sealed class MeetingFoodOrderSummaryController(IConfiguration configurati
         if(to<from || to.DayNumber-from.DayNumber>366) return BadRequest(Error("ช่วงวันที่ไม่ถูกต้อง","วันที่สิ้นสุดต้องไม่น้อยกว่าวันที่เริ่ม และเลือกได้ไม่เกิน 366 วัน"));
         search=string.IsNullOrWhiteSpace(search)?null:search.Trim();
         await using var db=await Open(token);
-        if(!await MeetingFoodPlanAccess.Allowed(db,User,"VIEW",token,ScreenCode)) return Forbid();
+        var roleAccess=await RoleManage(db,null,company,user,token);
+        if(!roleAccess&&!await MeetingFoodPlanAccess.Allowed(db,User,"VIEW",token,ScreenCode)) return Forbid();
         if(!await Ready(db,token)) return Ok(new {available=false,total=0,page,pageSize,items=Array.Empty<object>()});
         var where=$"""
 WHERE B.CompanyID=@company
+ AND {MeetingFoodPlanAccess.OwnershipSql}
  AND EXISTS(SELECT 1 FROM dbo.TDADMeetingRoomBookingSlot SX WHERE SX.CompanyID=B.CompanyID AND SX.BookingID=B.BookingID
    AND SX.StartDateTime<DATEADD(day,1,CAST(@to AS datetime2)) AND SX.EndDateTime>=CAST(@from AS datetime2))
  AND (B.BookingStatus='APPROVED' OR (B.BookingStatus='CANCELLED' AND EXISTS(
@@ -56,7 +58,7 @@ OUTER APPLY(
  FROM dbo.TDADMeetingBookingFoodOrder H
  JOIN dbo.TDADMeetingBookingFoodOrderDetail D ON D.BookingFoodOrderID=H.BookingFoodOrderID
  JOIN dbo.TDADMeetingRoomBookingParticipant P ON P.CompanyID=H.CompanyID AND P.BookingParticipantID=H.BookingParticipantID
- WHERE H.CompanyID=B.CompanyID AND H.BookingID=B.BookingID AND P.InvitationStatus IN ('PENDING','ACCEPTED')
+ WHERE H.CompanyID=B.CompanyID AND H.BookingID=B.BookingID AND H.IsCancelled=0 AND P.InvitationStatus='ACCEPTED'
 ) A
 {where}
 ORDER BY 7,B.BookingID OFFSET @offset ROWS FETCH NEXT @take ROWS ONLY;
@@ -73,7 +75,13 @@ ORDER BY 7,B.BookingID OFFSET @offset ROWS FETCH NEXT @take ROWS ONLY;
         }
         await reader.CloseAsync();
         var foods=await FoodSummaries(db,company,bookingIds,token);
-        foreach(var item in items) item["foods"]=foods.TryGetValue((long)item["bookingId"]!,out var rows)?rows:Array.Empty<object>();
+        var requirements=await RequirementSummaries(db,company,bookingIds,token);
+        foreach(var item in items)
+        {
+            var id=(long)item["bookingId"]!;
+            item["foods"]=foods.TryGetValue(id,out var rows)?rows:Array.Empty<object>();
+            item["requirements"]=requirements.TryGetValue(id,out var answers)?answers:Array.Empty<object>();
+        }
         return Ok(new {available=true,total,page,pageSize,items});
     }
 
@@ -82,7 +90,8 @@ ORDER BY 7,B.BookingID OFFSET @offset ROWS FETCH NEXT @take ROWS ONLY;
     {
         if(!Scope(out var company,out var user)) return Forbid();
         await using var db=await Open(token);
-        if(!await MeetingFoodPlanAccess.Allowed(db,User,"VIEW",token,ScreenCode)) return Forbid();
+        var roleAccess=await RoleManage(db,bookingId,company,user,token);
+        if(!roleAccess&&!await MeetingFoodPlanAccess.Allowed(db,User,"VIEW",token,ScreenCode)) return Forbid();
         if(!await Ready(db,token)) return StatusCode(503,Error("ระบบสรุปอาหารยังไม่พร้อม","ยังไม่ได้ติดตั้งโครงสร้างคำสั่งอาหาร กรุณาติดต่อผู้ดูแลระบบ"));
         await using var headerCommand=new SqlCommand($"""
 SELECT B.BookingID,B.BookingNo,B.Subject,B.BookingStatus,R.RoomCode,R.RoomNameTH,MIN(S.StartDateTime),MAX(S.EndDateTime)
@@ -90,6 +99,7 @@ FROM dbo.TDADMeetingRoomBooking B
 JOIN dbo.TDADMeetingRoom R ON R.CompanyID=B.CompanyID AND R.RoomID=B.RoomID
 JOIN dbo.TDADMeetingRoomBookingSlot S ON S.CompanyID=B.CompanyID AND S.BookingID=B.BookingID
 WHERE B.CompanyID=@company AND B.BookingID=@booking
+ AND {MeetingFoodPlanAccess.OwnershipSql}
  AND (B.BookingStatus='APPROVED' OR (B.BookingStatus='CANCELLED' AND EXISTS(
    SELECT 1 FROM dbo.TDADMeetingBookingFoodOrder HX JOIN dbo.TDADMeetingBookingFoodOrderDetail DX ON DX.BookingFoodOrderID=HX.BookingFoodOrderID
    WHERE HX.CompanyID=B.CompanyID AND HX.BookingID=B.BookingID)))
@@ -112,7 +122,7 @@ OUTER APPLY(
  FROM dbo.TDADMeetingBookingFoodOrder H
  JOIN dbo.TDADMeetingBookingFoodOrderDetail D ON D.BookingFoodOrderID=H.BookingFoodOrderID AND D.FoodID=F.FoodID
  JOIN dbo.TDADMeetingRoomBookingParticipant P ON P.CompanyID=H.CompanyID AND P.BookingParticipantID=H.BookingParticipantID
- WHERE H.CompanyID=O.CompanyID AND H.BookingID=O.BookingID AND P.InvitationStatus IN ('PENDING','ACCEPTED')
+ WHERE H.CompanyID=O.CompanyID AND H.BookingID=O.BookingID AND H.IsCancelled=0 AND P.InvitationStatus='ACCEPTED'
 ) A
 WHERE O.CompanyID=@company AND O.BookingID=@booking
 ORDER BY ISNULL(T.Seq,0),F.FoodNameTH,F.FoodCode;
@@ -121,7 +131,8 @@ ORDER BY ISNULL(T.Seq,0),F.FoodNameTH,F.FoodCode;
         await using var reader=await cmd.ExecuteReaderAsync(token);var items=new List<object>();
         while(await reader.ReadAsync(token)) items.Add(new {foodId=reader.GetInt64(0),code=reader.GetString(1),nameTh=reader.GetString(2),
             foodTypeCode=reader.GetString(3),foodTypeName=Text(reader,4),orderedParticipantCount=reader.GetInt32(5),orderedQuantity=reader.GetInt32(6)});
-        return Ok(new {header,items});
+        var requirements=await RequirementSummaries(db,company,[bookingId],token);
+        return Ok(new {header,items,requirements=requirements.GetValueOrDefault(bookingId)??[]});
     }
 
     private bool Scope(out long company,out long user)
@@ -136,7 +147,10 @@ ORDER BY ISNULL(T.Seq,0),F.FoodNameTH,F.FoodCode;
     {
         await using var cmd=new SqlCommand("""
 SELECT CASE WHEN OBJECT_ID(N'dbo.TDADMeetingBookingFoodOrder',N'U') IS NOT NULL
- AND OBJECT_ID(N'dbo.TDADMeetingBookingFoodOrderDetail',N'U') IS NOT NULL THEN 1 ELSE 0 END
+ AND OBJECT_ID(N'dbo.TDADMeetingBookingFoodOrderDetail',N'U') IS NOT NULL
+ AND OBJECT_ID(N'dbo.TDADMeetingBookingRequirementQuestion',N'U') IS NOT NULL
+ AND OBJECT_ID(N'dbo.TDADMeetingParticipantRequirementAnswer',N'U') IS NOT NULL
+ AND COL_LENGTH(N'dbo.TDADMeetingBookingFoodOrder',N'IsCancelled') IS NOT NULL THEN 1 ELSE 0 END
 """,db);
         return Convert.ToBoolean(await cmd.ExecuteScalarAsync(token));
     }
@@ -156,7 +170,7 @@ OUTER APPLY(
  FROM dbo.TDADMeetingBookingFoodOrder H
  JOIN dbo.TDADMeetingBookingFoodOrderDetail D ON D.BookingFoodOrderID=H.BookingFoodOrderID AND D.FoodID=F.FoodID
  JOIN dbo.TDADMeetingRoomBookingParticipant P ON P.CompanyID=H.CompanyID AND P.BookingParticipantID=H.BookingParticipantID
- WHERE H.CompanyID=O.CompanyID AND H.BookingID=O.BookingID AND P.InvitationStatus IN ('PENDING','ACCEPTED')
+ WHERE H.CompanyID=O.CompanyID AND H.BookingID=O.BookingID AND H.IsCancelled=0 AND P.InvitationStatus='ACCEPTED'
 ) A
 WHERE O.CompanyID=@company AND O.BookingID IN ({ids})
 ORDER BY O.BookingID,ISNULL(T.Seq,0),F.FoodNameTH,F.FoodCode;
@@ -171,6 +185,46 @@ ORDER BY O.BookingID,ISNULL(T.Seq,0),F.FoodNameTH,F.FoodCode;
             rows.Add(new {foodId=reader.GetInt64(1),code=reader.GetString(2),nameTh=reader.GetString(3),foodTypeName=Text(reader,4),orderedParticipantCount=reader.GetInt32(5),orderedQuantity=reader.GetInt32(6)});
         }
         return result;
+    }
+    private static async Task<Dictionary<long,List<object>>> RequirementSummaries(SqlConnection db,long company,IReadOnlyList<long> bookingIds,CancellationToken token)
+    {
+        var result=new Dictionary<long,List<object>>();if(bookingIds.Count==0)return result;
+        var ids=string.Join(',',bookingIds.Select((_,index)=>$"@requirementBooking{index}"));
+        await using var cmd=new SqlCommand($"""
+SELECT Q.BookingID,Q.RequirementQuestionID,Q.QuestionText,Q.AnswerType,E.FullName,
+ CASE WHEN Q.AnswerType='BOOLEAN' THEN CASE A.AnswerValue WHEN 'true' THEN N'ใช่' WHEN 'false' THEN N'ไม่ใช่' ELSE A.AnswerValue END
+      WHEN Q.AnswerType IN('SINGLE','MULTIPLE') THEN
+       (SELECT STRING_AGG(O.OptionText,N', ') FROM OPENJSON(A.AnswerValue) J
+        JOIN dbo.TDADMeetingBookingRequirementOption O ON O.RequirementOptionID=TRY_CONVERT(bigint,J.[value])
+         AND O.RequirementQuestionID=Q.RequirementQuestionID)
+      ELSE A.AnswerValue END
+FROM dbo.TDADMeetingBookingRequirementQuestion Q
+JOIN dbo.TDADMeetingParticipantRequirementAnswer A ON A.CompanyID=Q.CompanyID AND A.RequirementQuestionID=Q.RequirementQuestionID
+JOIN dbo.TDADMeetingRoomBookingParticipant P ON P.CompanyID=A.CompanyID AND P.BookingParticipantID=A.BookingParticipantID
+ AND P.BookingID=Q.BookingID AND P.InvitationStatus='ACCEPTED'
+JOIN dbo.TDADEmployee E ON E.CompanyID=P.CompanyID AND E.EmployeeID=P.EmployeeID
+WHERE Q.CompanyID=@company AND Q.BookingID IN ({ids}) AND Q.IsActive=1
+ORDER BY Q.BookingID,Q.SortOrder,Q.RequirementQuestionID,E.FullName;
+""",db);
+        cmd.Parameters.AddWithValue("@company",company);
+        for(var index=0;index<bookingIds.Count;index++)cmd.Parameters.AddWithValue($"@requirementBooking{index}",bookingIds[index]);
+        await using var reader=await cmd.ExecuteReaderAsync(token);
+        while(await reader.ReadAsync(token))
+        {
+            var booking=reader.GetInt64(0);if(!result.TryGetValue(booking,out var rows))result[booking]=rows=[];
+            rows.Add(new{questionId=reader.GetInt64(1),questionText=reader.GetString(2),answerType=reader.GetString(3),
+                participantName=reader.GetString(4),answerValue=Text(reader,5)});
+        }
+        return result;
+    }
+    private static async Task<bool> RoleManage(SqlConnection db,long? booking,long company,long user,CancellationToken token)
+    {
+        await using var cmd=new SqlCommand($"""
+SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADMeetingRoomBooking B WHERE B.CompanyID=@company
+ AND (@booking IS NULL OR B.BookingID=@booking) AND {MeetingFoodPlanAccess.OwnershipSql}) THEN 1 ELSE 0 END;
+""",db);
+        cmd.Parameters.AddWithValue("@booking",(object?)booking??DBNull.Value);cmd.Parameters.AddWithValue("@company",company);cmd.Parameters.AddWithValue("@user",user);
+        return Convert.ToBoolean(await cmd.ExecuteScalarAsync(token));
     }
     private static void Bind(SqlCommand cmd,long company,long user,string? search,DateOnly from,DateOnly to)
     {
