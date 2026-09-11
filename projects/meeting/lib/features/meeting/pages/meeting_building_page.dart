@@ -4,7 +4,6 @@ import '../widgets/meeting_popup.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image/image.dart' as img;
-import 'dart:typed_data';
 
 import '../../../core/widgets/combo_box_text.dart';
 import '../../../core/widgets/auto_dismiss_message.dart';
@@ -64,7 +63,7 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
             child: Image.network(
               _buildingImageUrl(url),
               fit: BoxFit.contain,
-              errorBuilder: (_, __, ___) => const Padding(
+              errorBuilder: (_, _, _) => const Padding(
                 padding: EdgeInsets.all(24),
                 child: Text('ไม่สามารถโหลดรูปอาคารได้'),
               ),
@@ -323,7 +322,7 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
                                         child: Image.memory(
                                           Uint8List.fromList(bytes),
                                           fit: BoxFit.contain,
-                                          errorBuilder: (_, __, ___) =>
+                                          errorBuilder: (_, _, _) =>
                                               const Padding(
                                                 padding: EdgeInsets.all(24),
                                                 child: Text(
@@ -344,7 +343,7 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
                                     width: 72,
                                     height: 72,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => Container(
+                                    errorBuilder: (_, _, _) => Container(
                                       width: 72,
                                       height: 72,
                                       alignment: Alignment.center,
@@ -370,7 +369,7 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
                                   width: 72,
                                   height: 72,
                                   fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => const SizedBox(
+                                  errorBuilder: (_, _, _) => const SizedBox(
                                     width: 72,
                                     height: 72,
                                     child: Icon(Icons.broken_image_outlined),
@@ -551,10 +550,11 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
         await _load();
       }
     } catch (error) {
-      if (mounted)
+      if (mounted) {
         setState(
           () => _message = _errorText(error, 'บันทึกข้อมูลอาคารไม่สำเร็จ'),
         );
+      }
     }
   }
 
@@ -743,12 +743,15 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
                         ).colorScheme.onPrimary,
                       ),
                       onPressed: () {
-                        if (code.text.trim().isEmpty)
+                        if (code.text.trim().isEmpty) {
                           codeError = 'กรุณากรอกรหัสชั้น';
-                        if (name.text.trim().isEmpty)
+                        }
+                        if (name.text.trim().isEmpty) {
                           nameError = 'กรุณากรอกชื่อชั้น';
-                        if (number.text.trim().isEmpty)
+                        }
+                        if (number.text.trim().isEmpty) {
                           numberError = 'กรุณากรอกเลขชั้น';
+                        }
                         final parsedNumber = int.tryParse(number.text.trim());
                         if (number.text.trim().isNotEmpty &&
                             parsedNumber == null) {
@@ -790,10 +793,11 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
         _load();
       }
     } catch (error) {
-      if (mounted)
+      if (mounted) {
         setState(
           () => _message = _errorText(error, 'บันทึกข้อมูลชั้นไม่สำเร็จ'),
         );
+      }
     }
   }
 
@@ -808,8 +812,9 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
       await _repo.deleteFloor(floor['floorId'] as int);
       await _load();
     } catch (error) {
-      if (mounted)
+      if (mounted) {
         setState(() => _message = _errorText(error, 'ลบข้อมูลชั้นไม่สำเร็จ'));
+      }
     }
   }
 
@@ -891,7 +896,7 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
                   Expanded(
                     child: ListView.separated(
                       itemCount: _items.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 6),
+                      separatorBuilder: (_, _) => const SizedBox(height: 6),
                       itemBuilder: (context, index) {
                         final building = _items[index];
                         final floors = List<Map<String, dynamic>>.from(
@@ -928,7 +933,7 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
                                         width: 56,
                                         height: 56,
                                         fit: BoxFit.cover,
-                                        errorBuilder: (_, __, ___) =>
+                                        errorBuilder: (_, _, _) =>
                                             const Icon(
                                               Icons.broken_image_outlined,
                                             ),
