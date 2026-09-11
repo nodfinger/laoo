@@ -21,7 +21,13 @@
 - ข้อความที่กรอกและข้อความที่เลือกใน TextBox/ComboBox ใช้ `LaooTypography.inputText` / `LaooTypography.comboBox` ขนาด `14px` เท่ากับหน้า List; ห้ามใช้ขนาดใหญ่กว่าเฉพาะใน Popup
 - ปุ่มด้านล่างใช้ Font `13px`, สูง `48px`, มุมโค้ง `LaooRadius.xs` (`4px`); ต้องกำหนด `RoundedRectangleBorder(borderRadius: BorderRadius.circular(LaooRadius.xs))` ใน Style ของปุ่มโดยตรง ห้ามปล่อยให้รับรูปทรง pill จาก Theme; ยกเลิกใช้ Text/Outlined Primary และบันทึกใช้ Filled Primary
 - เมื่อ Popup แคบต้องจัด Field ลงบรรทัดใหม่โดยไม่ Overflow
-- เมื่อบันทึกสำเร็จ ให้แสดง Success Notification แล้วคง Popup เปิดอยู่; ต้องเปลี่ยน Form เพิ่มเป็นโหมดแก้ไขหรือป้องกันการกดบันทึกซ้ำเพื่อไม่ให้สร้างข้อมูลซ้ำ
+- หลังบันทึกสำเร็จให้แสดง Success Notification ตาม `TimeAlert` และกำหนด Flow ตาม Action เสมอ: Action `เพิ่ม` ให้ล้างค่ากรอกทั้งหมด กลับสู่ค่าเริ่มต้นของ Form และคง Popup เปิดไว้เพื่อเพิ่มรายการถัดไป; Action อื่น เช่น `แก้ไข` หรือ Custom Action ให้ปิด Popup ทันทีหลังบันทึกสำเร็จ ห้ามเปลี่ยน Form เพิ่มเป็นโหมดแก้ไข
+
+### Date Picker
+
+- Date Picker ถือเป็น Popup และต้องใช้พื้นขาวทั้ง Header และ Calendar, ไม่มี Surface Tint หรือกรอบนอก, มุม `LaooRadius.xs` (`4px`)
+- สีวันที่เลือก, วันนี้, ไอคอนเปลี่ยนเดือน และปุ่มยกเลิก/ตกลง ต้องอ้าง Primary ของ User Style; ข้อความใช้สีมาตรฐานของระบบ ห้ามคงพื้น Header สีเทาหรือสีจาก Material Theme เดิม
+- Typography ของ Header, วันในปฏิทิน และปุ่มต้องอ้าง TextTheme/LaooTypography กลาง ห้ามกำหนดขนาด Font เฉพาะ Date Picker
 
 ## Validation and Notification
 
@@ -45,5 +51,5 @@
 ## Prompt สำหรับส่งให้ AI
 
 ```text
-ปรับ Popup/Dialog/Alert นี้ตาม docs/standards/UX_UI_STANDARD.md, POPUP_UI_STANDARD.md และ TYPOGRAPHY_STANDARD.md เอาเส้นกรอบรอบนอกออก Caption สีดำ 18px Icon ใช้สี Primary มีเส้นเทาอ่อนใต้ Caption และก่อนปุ่ม TextBox/ComboBox มุมโค้ง 4px Validation สีแดงใต้ Field ปุ่มด้านล่างสูง 48px มุมโค้ง 4px และใช้สี User Style ส่วน Delete Confirm ใช้ Pattern สีแดงกลางของระบบ Notification ต้องลอยมุมขวาบนและหายตาม TimeAlert ห้ามแก้ API, SQL, Repository หรือ Business Logic ตรวจ Responsive, Overflow, dart format และ dart analyze
+ปรับ Popup/Dialog/Alert นี้ตาม docs/standards/UX_UI_STANDARD.md, POPUP_UI_STANDARD.md และ TYPOGRAPHY_STANDARD.md เอาเส้นกรอบรอบนอกออก Caption สีดำ 18px Icon ใช้สี Primary มีเส้นเทาอ่อนใต้ Caption และก่อนปุ่ม TextBox/ComboBox มุมโค้ง 4px Validation สีแดงใต้ Field ปุ่มด้านล่างสูง 48px มุมโค้ง 4px และใช้สี User Style หลังบันทึก Action เพิ่มให้ล้าง Form และคง Popup ไว้; Action อื่นให้ปิด Popup ทันที ส่วน Delete Confirm ใช้ Pattern สีแดงกลางของระบบ Notification ต้องลอยมุมขวาบนและหายตาม TimeAlert ห้ามแก้ API, SQL, Repository หรือ Business Logic ตรวจ Responsive, Overflow, dart format และ dart analyze
 ```

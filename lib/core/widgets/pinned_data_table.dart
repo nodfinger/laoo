@@ -2,6 +2,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../app/theme/laoo_design_tokens.dart';
+
 /// Shared column definitions for operational list tables.
 abstract final class LaooTableColumns {
   static const double idWidth = 56;
@@ -42,8 +44,8 @@ class PinnedDataTable extends StatefulWidget {
     this.horizontalMargin = 14,
     this.columnSpacing = 20,
     this.showCheckboxColumn = true,
-    this.showBottomBorder = false,
-    this.dividerThickness,
+    this.showBottomBorder = true,
+    this.dividerThickness = 1,
     this.checkboxHorizontalMargin,
     this.border,
     this.clipBehavior = Clip.hardEdge,
@@ -67,7 +69,7 @@ class PinnedDataTable extends StatefulWidget {
   final double? columnSpacing;
   final bool showCheckboxColumn;
   final bool showBottomBorder;
-  final double? dividerThickness;
+  final double dividerThickness;
   final double? checkboxHorizontalMargin;
   final TableBorder? border;
   final Clip clipBehavior;
@@ -159,32 +161,35 @@ class _PinnedDataTableState extends State<PinnedDataTable> {
     );
   }
 
-  DataTable _table({
+  Widget _table({
     double? headingRowHeight,
     required double dataRowMinHeight,
     required double dataRowMaxHeight,
-  }) => DataTable(
-    columns: _resolvedColumns,
-    sortColumnIndex: widget.sortColumnIndex,
-    sortAscending: widget.sortAscending,
-    onSelectAll: widget.onSelectAll,
-    decoration: widget.decoration,
-    dataRowColor: widget.dataRowColor,
-    dataRowMinHeight: dataRowMinHeight,
-    dataRowMaxHeight: dataRowMaxHeight,
-    dataTextStyle: widget.dataTextStyle,
-    headingRowColor: widget.headingRowColor,
-    headingRowHeight: headingRowHeight ?? widget.headingRowHeight,
-    headingTextStyle: widget.headingTextStyle,
-    horizontalMargin: widget.horizontalMargin,
-    columnSpacing: widget.columnSpacing,
-    showCheckboxColumn: widget.showCheckboxColumn,
-    showBottomBorder: widget.showBottomBorder,
-    dividerThickness: widget.dividerThickness,
-    rows: widget.rows,
-    checkboxHorizontalMargin: widget.checkboxHorizontalMargin,
-    border: widget.border,
-    clipBehavior: widget.clipBehavior,
+  }) => Theme(
+    data: Theme.of(context).copyWith(dividerColor: LaooColors.border),
+    child: DataTable(
+      columns: _resolvedColumns,
+      sortColumnIndex: widget.sortColumnIndex,
+      sortAscending: widget.sortAscending,
+      onSelectAll: widget.onSelectAll,
+      decoration: widget.decoration,
+      dataRowColor: widget.dataRowColor,
+      dataRowMinHeight: dataRowMinHeight,
+      dataRowMaxHeight: dataRowMaxHeight,
+      dataTextStyle: widget.dataTextStyle,
+      headingRowColor: widget.headingRowColor,
+      headingRowHeight: headingRowHeight ?? widget.headingRowHeight,
+      headingTextStyle: widget.headingTextStyle,
+      horizontalMargin: widget.horizontalMargin,
+      columnSpacing: widget.columnSpacing,
+      showCheckboxColumn: widget.showCheckboxColumn,
+      showBottomBorder: widget.showBottomBorder,
+      dividerThickness: widget.dividerThickness,
+      rows: widget.rows,
+      checkboxHorizontalMargin: widget.checkboxHorizontalMargin,
+      border: widget.border,
+      clipBehavior: widget.clipBehavior,
+    ),
   );
 
   List<DataColumn> get _resolvedColumns {

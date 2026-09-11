@@ -8,6 +8,7 @@
 
 - ใช้พื้นหลังและ Design Token จากส่วนกลางเท่านั้น
 - ส่วน Caption, Filter, Table/List และ Pagination เป็น Card สีขาวเต็มความกว้างของ Content Area
+- Card เชิงโครงสร้างของหน้า List ได้แก่ Caption, Filter, Table/List, Pagination, Empty และ Error ต้องกว้างเท่ากันเสมอ โดย Stretch เต็ม Content Area เดียวกันและขอบซ้าย/ขวาต้องตรงกัน; ห้ามใช้ `Center`, `IntrinsicWidth`, `SizedBox(width: ...)` หรือ `maxWidth` กับตัว Card จน Filter Card หดตามจำนวน Control (กำหนดความกว้างได้เฉพาะ TextBox, ComboBox และปุ่มภายใน Card)
 - Caption Card และ Filter Card ต้องแยกเป็นคนละ Card และเว้นระยะห่าง `6px` พอดี
 - Filter, Table/List และ Pagination ต้องแยกเป็น Card คนละ Section โดยใช้ `LaooLayout.cardSpacing` ระหว่าง Section และใช้เส้น `LaooColors.border` ภายในจุดที่มาตรฐานกำหนด ห้ามใช้กรอบสีสร้างขอบซ้ำ
 - Pagination Card ต้องวางใต้ Table/List และแสดงเสมอ แม้มีข้อมูลเพียงหน้าเดียวหรือไม่มีข้อมูล โดยใช้รายละเอียดตาม `PAGINATION_UI_STANDARD.md`
@@ -39,6 +40,7 @@
 - ไม่มีกรอบสีรอบนอก
 - หัวตารางใช้พื้น Primary ความทึบประมาณ `10%`; ข้อความหัวตารางใช้ Primary ขนาด `13px` น้ำหนัก `700`
 - ข้อความข้อมูลใช้ `13px`; เส้นคั่นแต่ละแถวใช้ `LaooColors.border` แบบบางและอ่อน
+- Table/List ต้องมีเส้นคั่นแนวนอนระหว่างหัวตารางและข้อมูล และใต้ข้อมูลทุกแถวรวมแถวสุดท้ายเสมอ โดยใช้ `LaooColors.border` ขนาด `1px` ซึ่งเป็นสีเทาจางมาก; ห้ามใช้เส้นเข้ม, เส้นสี Primary หรือเส้นแนวตั้งเพื่อแบ่งคอลัมน์ และห้ามสร้างกรอบรอบนอกของตาราง
 - คอลัมน์แรกเป็น `ID` เรียงตามลำดับรายการ และคอลัมน์ที่สองเป็น `Action`
 - Action และ Icon จัดกึ่งกลาง; Edit ใช้ Primary, Delete ใช้สีแดง และแสดงตาม Permission
 - รองรับ Sort เฉพาะคอลัมน์ที่ระบบกำหนดไว้เดิม
@@ -55,5 +57,5 @@
 ## Prompt สำหรับส่งให้ AI
 
 ```text
-ปรับหน้า List/Card นี้ตาม docs/standards/UX_UI_STANDARD.md, LIST_CARD_UI_STANDARD.md, PAGINATION_UI_STANDARD.md และ TYPOGRAPHY_STANDARD.md ใช้ Caption จาก MenuName, Caption Card กับ Filter Card ห่างกัน 6px, Card สีขาวไม่มีกรอบสี, TextBox และ ComboBox ใน Filter ใช้ OutlineInputBorder สี LaooColors.border มุมโค้ง 4px และ Focus สี Primary, ชุดค้นหา/ค้นหา/ล้าง Filter ห้ามแยกคนละบรรทัด, Filter/Table/Pagination เต็มความกว้าง, Action ตาม Permission และ User Style เมื่อหน้าจอแคบกว่า 900px ให้เป็น Card Mode อัตโนมัติ โดย Card รายการแต่ละใบห่างกัน 6px พอดี ห้ามพึ่ง Card default margin ห้ามแก้ API, SQL, Repository หรือ Business Logic และต้องตรวจ Responsive, Overflow, dart format และ dart analyze
+ปรับหน้า List/Card นี้ตาม docs/standards/UX_UI_STANDARD.md, LIST_CARD_UI_STANDARD.md, PAGINATION_UI_STANDARD.md และ TYPOGRAPHY_STANDARD.md ใช้ Caption จาก MenuName, Caption Card กับ Filter Card ห่างกัน 6px, Card สีขาวไม่มีกรอบสี, Caption/Filter/Table/Pagination/Empty/Error ต้อง Stretch เต็ม Content Area เดียวกันและขอบซ้าย-ขวาตรงกัน ห้ามให้ Filter Card หดหรืออยู่กึ่งกลางตามจำนวน Control, Table/List ต้องมีเส้นคั่นแนวนอนสี LaooColors.border ขนาด 1px ระหว่างหัวตารางและทุกแถว โดยไม่มีเส้นแนวตั้งหรือกรอบรอบนอก, TextBox และ ComboBox ใน Filter ใช้ OutlineInputBorder สี LaooColors.border มุมโค้ง 4px และ Focus สี Primary, ชุดค้นหา/ค้นหา/ล้าง Filter ห้ามแยกคนละบรรทัด, Filter/Table/Pagination เต็มความกว้าง, Action ตาม Permission และ User Style เมื่อหน้าจอแคบกว่า 900px ให้เป็น Card Mode อัตโนมัติ โดย Card รายการแต่ละใบห่างกัน 6px พอดี ห้ามพึ่ง Card default margin ห้ามแก้ API, SQL, Repository หรือ Business Logic และต้องตรวจ Responsive, Overflow, dart format และ dart analyze
 ```

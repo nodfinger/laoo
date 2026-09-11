@@ -75,6 +75,10 @@ class ItemApi {
       List<Map<String, dynamic>>.from(
         await _client.get('/api/company/items/project-options') as List,
       );
+  Future<List<Map<String, dynamic>>> responsibleDepartments() async =>
+      List<Map<String, dynamic>>.from(
+        await _client.get('/api/company/items/responsible-departments') as List,
+      );
   Future<Map<String, dynamic>> classificationDefaults(
     String? group,
     String? type,

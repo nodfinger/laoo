@@ -2,6 +2,12 @@
 
 มาตรฐานนี้ใช้กับหน้า Add, Edit และ View ที่เป็น Action Screen ลูกของหน้า CRUD (`ScreenType = 1`) โดยต้องออกแบบตาม Action Style นี้เสมอ
 
+## Date display
+
+- วันที่ใน Action Form ต้องแสดงเป็น `dd/MM/yyyy` ผ่าน `CompanyDateFormatter` โดยอ่าน `yearFormat` จาก `CompanySetupController`: ตั้งค่า `BE` แสดง พ.ศ. และค่าอื่นแสดง ค.ศ.
+- ค่าที่ส่งหรือรับกับ API/Database ยังคงเป็น ISO `yyyy-MM-dd`; ห้ามส่งข้อความวันที่ที่แสดงบนหน้าจอไปแทนค่า Date จริง
+- Date Picker ต้องใช้ Locale ให้สอดคล้องกับ `yearFormat` ของ Company Setup
+
 ## ScreenType 1: Required Popup Action Style
 
 - หน้า Add/Edit/View ของ CRUD (`ScreenType = 1`) ต้องเปิดเป็น Popup Action Form เหนือหน้า List; ห้ามเปลี่ยนไปเป็นหน้าเต็ม Content Area เว้นแต่พ่ออนุมัติหน้าจอนั้นโดยตรง

@@ -71,6 +71,8 @@ public sealed record ItemDetail(
     IReadOnlyList<ItemImageRow> Images)
 {
     public ItemProjectAccess? ProjectAccess { get; init; }
+    public IReadOnlyList<ItemWarrantyPolicyInput> WarrantyPolicies { get; init; } = [];
+    public long? ResponsibleDepartmentOrgUnitID { get; init; }
 }
 
 public sealed record ItemUpsertRequest(
@@ -102,7 +104,11 @@ public sealed record ItemUpsertRequest(
 {
     // Omission by older clients preserves the existing policy.
     public ItemProjectAccess? ProjectAccess { get; init; }
+    public IReadOnlyList<ItemWarrantyPolicyInput>? WarrantyPolicies { get; init; }
+    public long? ResponsibleDepartmentOrgUnitID { get; init; }
 }
+
+public sealed record ItemWarrantyPolicyInput(string CoverageTypeCode, string WarrantyModeCode, int? DurationMonths);
 
 public sealed record ItemProjectAccess(string AccessModeCode, IReadOnlyList<long> ProjectIds);
 public sealed record ItemClassificationDefault(string ScopeCode, string ClassificationCode,

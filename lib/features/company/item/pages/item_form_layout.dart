@@ -44,12 +44,12 @@ class ItemFormLayout extends StatefulWidget {
     required this.groups,
     required this.types,
     required this.units,
+    required this.responsibleDepartments,
     required this.codeSettings,
     required this.maxItemImageSizeMB,
     required this.onCancel,
     required this.onSaved,
     this.caption = 'ข้อมูลสินค้า',
-    this.canEditDefaults = false,
     this.canEditItem = true,
     this.apiFactory,
   });
@@ -58,12 +58,12 @@ class ItemFormLayout extends StatefulWidget {
   final List<Map<String, dynamic>> groups;
   final List<Map<String, dynamic>> types;
   final List<Map<String, dynamic>> units;
+  final List<Map<String, dynamic>> responsibleDepartments;
   final Map<String, dynamic> codeSettings;
   final double maxItemImageSizeMB;
   final VoidCallback onCancel;
   final VoidCallback onSaved;
   final String caption;
-  final bool canEditDefaults;
   final bool canEditItem;
   final ItemApi Function()? apiFactory;
 
@@ -82,19 +82,19 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
       _note3,
       _note4,
       _note5;
-  String? _group, _type, _unit;
+  late final TextEditingController _supplierWarrantyMonths,
+      _customerWarrantyMonths;
+  String? _group, _type, _unit, _responsibleDepartment;
   String _itemKind = 'GOODS', _stockTracking = 'QUANTITY';
   Set<String> _usageCodes = {'SALE'};
   String _projectMode = 'ALL';
   Set<int> _projectIds = {};
   List<Map<String, dynamic>> _projectOptions = [];
-  bool _projectsLoading = true,
-      _classificationTouched = false,
-      _defaultsSaving = false;
+  bool _projectsLoading = true;
   String? _projectError;
-  int _defaultsSequence = 0;
   bool _active = true, _showShop = false, _saving = false;
-  bool _additionalExpanded = false;
+  String _supplierWarrantyMode = 'NONE', _customerWarrantyMode = 'NONE';
+  bool _additionalExpanded = true;
   int _additionalTab = 0;
   List<Map<String, dynamic>> _packs = [];
   List<Map<String, dynamic>> _images = [];
@@ -154,9 +154,29 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
     _note3 = TextEditingController(text: '${_data['note3'] ?? ''}');
     _note4 = TextEditingController(text: '${_data['note4'] ?? ''}');
     _note5 = TextEditingController(text: '${_data['note5'] ?? ''}');
+    final policies = List<Map<String, dynamic>>.from(
+      _data['warrantyPolicies'] as List? ?? const [],
+    );
+    Map policy(String coverage) => policies.firstWhere(
+      (value) => '${value['coverageTypeCode']}'.toUpperCase() == coverage,
+      orElse: () => const <String, dynamic>{},
+    );
+    final supplierPolicy = policy('SUPPLIER');
+    final customerPolicy = policy('CUSTOMER');
+    _supplierWarrantyMode = '${supplierPolicy['warrantyModeCode'] ?? 'NONE'}'
+        .toUpperCase();
+    _customerWarrantyMode = '${customerPolicy['warrantyModeCode'] ?? 'NONE'}'
+        .toUpperCase();
+    _supplierWarrantyMonths = TextEditingController(
+      text: '${supplierPolicy['durationMonths'] ?? ''}',
+    );
+    _customerWarrantyMonths = TextEditingController(
+      text: '${customerPolicy['durationMonths'] ?? ''}',
+    );
     _group = _data['itemGroupCode'];
     _type = _data['itemTypeCode'];
     _unit = _data['unitCode'];
+    _responsibleDepartment = _data['responsibleDepartmentOrgUnitID']?.toString();
     _itemKind = '${_data['itemKindCode'] ?? 'GOODS'}'.toUpperCase();
     _stockTracking = '${_data['stockTrackingCode'] ?? 'QUANTITY'}'
         .toUpperCase();
@@ -176,7 +196,26 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
     _images = List<Map<String, dynamic>>.from(_data['images'] ?? []);
     WidgetsBinding.instance.addPostFrameCallback((_) => _previewCode());
     _loadProjects();
-    _loadDefaults();
+    if (_data['itemID'] == null) _loadClassificationDefaults();
+  }
+
+  Future<void> _loadClassificationDefaults() async {
+    final api = widget.apiFactory?.call() ?? ItemApi();
+    try {
+      final defaults = await api.classificationDefaults(_group, _type);
+      if (!mounted || defaults['found'] != true) return;
+      setState(() {
+        _itemKind = '${defaults['itemKindCode'] ?? _itemKind}'.toUpperCase();
+        _stockTracking = '${defaults['stockTrackingCode'] ?? _stockTracking}'
+            .toUpperCase();
+        final usage = defaults['usageCodes'];
+        if (usage is List && usage.isNotEmpty) {
+          _usageCodes = usage.map((value) => '$value'.toUpperCase()).toSet();
+        }
+      });
+    } finally {
+      api.dispose();
+    }
   }
 
   Future<void> _loadProjects() async {
@@ -202,150 +241,142 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
     }
   }
 
-  Future<void> _loadDefaults() async {
-    if (_data['itemID'] != null || _classificationTouched) return;
-    final sequence = ++_defaultsSequence;
-    final api = widget.apiFactory?.call() ?? ItemApi();
-    try {
-      final value = await api.classificationDefaults(_group, _type);
-      if (!mounted ||
-          sequence != _defaultsSequence ||
-          _classificationTouched ||
-          _data['itemID'] != null) {
-        return;
-      }
-      setState(() {
-        _itemKind = '${value['itemKindCode'] ?? 'GOODS'}';
-        _stockTracking = '${value['stockTrackingCode'] ?? 'QUANTITY'}';
-        _usageCodes = Set<String>.from(value['usageCodes'] ?? ['SALE']);
-        if (!_usageCodes.contains('SALE')) _showShop = false;
-      });
-    } catch (error) {
-      if (mounted && sequence == _defaultsSequence) {
-        showTimedSnackBar(
-          context,
-          message: 'โหลดค่าเริ่มต้นไม่สำเร็จ: $error',
-          error: true,
-        );
-      }
-    } finally {
-      api.dispose();
-    }
-  }
-
-  Future<void> _saveDefaults(String scope) async {
-    final code = scope == 'GROUP' ? _group : _type;
-    if (code == null || _usageCodes.isEmpty || _defaultsSaving) return;
-    setState(() => _defaultsSaving = true);
-    final api = widget.apiFactory?.call() ?? ItemApi();
-    try {
-      await api.saveClassificationDefaults({
-        'scopeCode': scope,
-        'classificationCode': code,
-        'itemKindCode': _itemKind,
-        'stockTrackingCode': _stockTracking,
-        'usageCodes': _usageCodes.toList(),
-      });
-      if (mounted) {
-        showTimedSnackBar(
-          context,
-          message: 'บันทึกค่าเริ่มต้นแล้ว ไม่มีการเปลี่ยนสินค้าเดิม',
-        );
-      }
-    } catch (error) {
-      if (mounted) showTimedSnackBar(context, message: '$error', error: true);
-    } finally {
-      api.dispose();
-      if (mounted) setState(() => _defaultsSaving = false);
-    }
-  }
-
-  Widget _projectPanel() => ExpansionTile(
-    initiallyExpanded: true,
-    tilePadding: EdgeInsets.zero,
-    title: const Text('Project ที่ใช้งานสินค้า'),
-    children: [
-      if (_projectsLoading) const LinearProgressIndicator(),
-      if (_projectError != null) ...[
-        Text(_projectError!),
-        TextButton(
-          onPressed: _loadProjects,
-          child: const Text('โหลด Project ใหม่'),
-        ),
-      ],
-      DropdownButtonFormField<String>(
-        isExpanded: true,
-        style: Theme.of(
-          context,
-        ).textTheme.bodyMedium?.copyWith(fontSize: LaooTypography.comboBox),
-        initialValue: _projectMode,
-        decoration: const InputDecoration(labelText: 'ขอบเขตการใช้งาน'),
-        items: const [
-          DropdownMenuItem(
-            value: 'ALL',
-            child: Text('ทุก Project ที่บริษัทเปิดใช้'),
-          ),
-          DropdownMenuItem(
-            value: 'SELECTED',
-            child: Text('เฉพาะ Project ที่เลือก'),
-          ),
-        ],
-        onChanged: _saving ? null : (v) => setState(() => _projectMode = v!),
-      ),
-      if (_projectMode == 'SELECTED')
-        FormField<Set<int>>(
-          validator: (_) => _projectIds.isEmpty
-              ? 'กรุณาเลือก Project อย่างน้อยหนึ่งรายการ'
-              : null,
-          builder: (field) => Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+  Widget _projectPanel(Color accent) => Card(
+    margin: EdgeInsets.zero,
+    color: Colors.white,
+    elevation: 0,
+    surfaceTintColor: Colors.transparent,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(LaooRadius.xs),
+      side: const BorderSide(color: LaooColors.border),
+    ),
+    child: Padding(
+      padding: const EdgeInsets.all(LaooLayout.cardPadding),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
             children: [
-              ..._projectOptions.map((p) {
-                final id = (p['projectId'] as num).toInt();
-                return CheckboxListTile(
-                  contentPadding: EdgeInsets.zero,
-                  controlAffinity: ListTileControlAffinity.leading,
-                  title: Text('${p['projectName']}'),
-                  value: _projectIds.contains(id),
-                  onChanged: _saving
-                      ? null
-                      : (v) {
-                          setState(() {
-                            v == true
-                                ? _projectIds.add(id)
-                                : _projectIds.remove(id);
-                          });
-                          field.didChange(_projectIds);
-                        },
-                );
-              }),
-              ..._projectIds
-                  .where(
-                    (id) => !_projectOptions.any((p) => p['projectId'] == id),
-                  )
-                  .map(
-                    (id) => CheckboxListTile(
-                      title: Text(
-                        'Project $id ไม่ได้เปิดใช้งาน — ยกเลิกการเลือกเพื่อบันทึก',
-                      ),
-                      value: true,
-                      onChanged: _saving
-                          ? null
-                          : (_) => setState(() => _projectIds.remove(id)),
-                    ),
+              Icon(Icons.apps_outlined, color: accent),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Project ที่ใช้งานสินค้า',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: LaooColors.textPrimary,
+                    fontWeight: FontWeight.w700,
                   ),
-              if (field.hasError)
-                Text(
-                  field.errorText!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
                 ),
+              ),
             ],
           ),
-        ),
-      const Text('การเลือก Project ไม่ทดแทนสิทธิ์เมนู สาขา หรือคลังของผู้ใช้'),
-      const Text('งานขาย ใบส่งของ และสต๊อก ใช้ Project ข้อมูลส่วนกลาง'),
-      const SizedBox(height: 12),
-    ],
+          const SizedBox(height: 12),
+          if (_projectsLoading) const LinearProgressIndicator(),
+          if (_projectError != null) ...[
+            Text(_projectError!),
+            TextButton(
+              onPressed: _loadProjects,
+              child: const Text('โหลด Project ใหม่'),
+            ),
+          ],
+          DropdownButtonFormField<String>(
+            isExpanded: true,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(fontSize: LaooTypography.comboBox),
+            initialValue: _projectMode,
+            decoration: const InputDecoration(labelText: 'ขอบเขตการใช้งาน'),
+            items: const [
+              DropdownMenuItem(
+                value: 'ALL',
+                child: Text('ทุก Project ที่บริษัทเปิดใช้'),
+              ),
+              DropdownMenuItem(
+                value: 'SELECTED',
+                child: Text('เฉพาะ Project ที่เลือก'),
+              ),
+            ],
+            onChanged: _saving
+                ? null
+                : (v) => setState(() => _projectMode = v!),
+          ),
+          FormField<Set<int>>(
+            validator: (_) => _projectMode == 'SELECTED' && _projectIds.isEmpty
+                ? 'กรุณาเลือก Project อย่างน้อยหนึ่งรายการ'
+                : null,
+            builder: (field) => Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SizedBox(height: 6),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 320),
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: [
+                      ..._projectOptions.map((project) {
+                        final id = (project['projectId'] as num).toInt();
+                        final allProjects = _projectMode == 'ALL';
+                        return CheckboxListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          controlAffinity: ListTileControlAffinity.leading,
+                          title: Text('${project['projectName']}'),
+                          value: allProjects || _projectIds.contains(id),
+                          onChanged: _saving || allProjects
+                              ? null
+                              : (selected) {
+                                  setState(() {
+                                    selected == true
+                                        ? _projectIds.add(id)
+                                        : _projectIds.remove(id);
+                                  });
+                                  field.didChange(_projectIds);
+                                },
+                        );
+                      }),
+                      ..._projectIds
+                          .where(
+                            (id) => !_projectOptions.any(
+                              (project) => project['projectId'] == id,
+                            ),
+                          )
+                          .map(
+                            (id) => CheckboxListTile(
+                              dense: true,
+                              contentPadding: EdgeInsets.zero,
+                              controlAffinity: ListTileControlAffinity.leading,
+                              title: Text(
+                                'Project $id ไม่ได้เปิดใช้งาน — ยกเลิกการเลือกเพื่อบันทึก',
+                              ),
+                              value: true,
+                              onChanged: _saving
+                                  ? null
+                                  : (_) =>
+                                        setState(() => _projectIds.remove(id)),
+                            ),
+                          ),
+                    ],
+                  ),
+                ),
+                if (field.hasError)
+                  Text(
+                    field.errorText!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const Text(
+            'การเลือก Project ไม่ทดแทนสิทธิ์เมนู สาขา หรือคลังของผู้ใช้',
+          ),
+          const Text('งานขาย ใบส่งของ และสต๊อก ใช้ Project ข้อมูลส่วนกลาง'),
+        ],
+      ),
+    ),
   );
 
   @override
@@ -366,6 +397,8 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
       _note3,
       _note4,
       _note5,
+      _supplierWarrantyMonths,
+      _customerWarrantyMonths,
     ]) {
       controller.dispose();
     }
@@ -481,9 +514,26 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
       'itemName': _name.text.trim(),
       'itemGroupCode': _group,
       'itemTypeCode': _type,
+      'responsibleDepartmentOrgUnitID': int.tryParse(_responsibleDepartment ?? ''),
       'itemKindCode': _itemKind,
       'stockTrackingCode': _stockTracking,
       'usageCodes': _usageCodes.toList()..sort(),
+      'warrantyPolicies': [
+        {
+          'coverageTypeCode': 'SUPPLIER',
+          'warrantyModeCode': _supplierWarrantyMode,
+          'durationMonths': _supplierWarrantyMode == 'MONTHS'
+              ? int.tryParse(_supplierWarrantyMonths.text)
+              : null,
+        },
+        {
+          'coverageTypeCode': 'CUSTOMER',
+          'warrantyModeCode': _customerWarrantyMode,
+          'durationMonths': _customerWarrantyMode == 'MONTHS'
+              ? int.tryParse(_customerWarrantyMonths.text)
+              : null,
+        },
+      ],
       'projectAccess': {
         'accessModeCode': _projectMode,
         'projectIds': _projectMode == 'ALL'
@@ -542,7 +592,7 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
         Size(0, LaooTypography.buttonHeight),
       ),
       textStyle: const WidgetStatePropertyAll(
-        TextStyle(fontSize: LaooTypography.button),
+        TextStyle(fontSize: LaooTypography.button, fontWeight: FontWeight.w600),
       ),
       shape: WidgetStatePropertyAll(
         RoundedRectangleBorder(
@@ -571,6 +621,16 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
         ),
         outlinedButtonTheme: OutlinedButtonThemeData(style: buttonStyle),
         filledButtonTheme: FilledButtonThemeData(style: buttonStyle),
+        textButtonTheme: const TextButtonThemeData(
+          style: ButtonStyle(
+            textStyle: WidgetStatePropertyAll(
+              TextStyle(
+                fontSize: LaooTypography.button,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
       ),
       child: Form(
         key: _form,
@@ -595,105 +655,28 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
               Expanded(
                 child: LayoutBuilder(
                   builder: (context, constraints) {
-                    final wide = constraints.maxWidth >= 720;
-                    return ListView(
-                      children: [
-                        Wrap(
-                          spacing: 12,
-                          runSpacing: 8,
-                          children: [
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
+                    final wide = constraints.maxWidth >= 980;
+                    return SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: wide
+                          ? Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text('สถานะใช้งาน'),
-                                Switch(
-                                  value: _active,
-                                  onChanged: _saving
-                                      ? null
-                                      : (v) => setState(() => _active = v),
-                                ),
+                                Expanded(flex: 7, child: _leftContent(true)),
+                                const SizedBox(width: 12),
+                                Expanded(flex: 3, child: _rightContent(accent)),
+                              ],
+                            )
+                          : Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                _imagePanel(accent),
+                                const SizedBox(height: 12),
+                                _leftContent(false),
+                                const SizedBox(height: 12),
+                                _projectPanel(accent),
                               ],
                             ),
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Text('แสดงหน้า Online'),
-                                Switch(
-                                  value: _showShop,
-                                  onChanged:
-                                      !_saving && _usageCodes.contains('SALE')
-                                      ? (v) => setState(() => _showShop = v)
-                                      : null,
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        _row(wide, [
-                          _drop('กลุ่มสินค้า', _group, widget.groups, (v) {
-                            setState(() => _group = v);
-                            _previewCode();
-                            _loadDefaults();
-                          }),
-                          _drop('ประเภทสินค้า', _type, widget.types, (v) {
-                            setState(() => _type = v);
-                            _previewCode();
-                            _loadDefaults();
-                          }),
-                        ]),
-                        const SizedBox(height: 12),
-                        _inventoryClassification(wide),
-                        if (widget.canEditDefaults)
-                          ExpansionTile(
-                            tilePadding: EdgeInsets.zero,
-                            title: const Text('ค่าเริ่มต้นสำหรับสินค้าใหม่'),
-                            children: [
-                              const Text(
-                                'ใช้ค่าชนิด สต็อก และวัตถุประสงค์ด้านบน ประเภทมีลำดับก่อนกลุ่ม ไม่มีผลย้อนหลัง',
-                              ),
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                children: [
-                                  OutlinedButton(
-                                    onPressed:
-                                        _defaultsSaving ||
-                                            _saving ||
-                                            _group == null
-                                        ? null
-                                        : () => _saveDefaults('GROUP'),
-                                    child: const Text(
-                                      'บันทึกค่าเริ่มต้นของกลุ่ม',
-                                    ),
-                                  ),
-                                  OutlinedButton(
-                                    onPressed:
-                                        _defaultsSaving ||
-                                            _saving ||
-                                            _type == null
-                                        ? null
-                                        : () => _saveDefaults('TYPE'),
-                                    child: const Text(
-                                      'บันทึกค่าเริ่มต้นของประเภท',
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        _projectPanel(),
-                        const SizedBox(height: 12),
-                        _compactFields(wide),
-                        const SizedBox(height: 12),
-                        ExpansionTile(
-                          tilePadding: EdgeInsets.zero,
-                          title: const Text('รูปสินค้า'),
-                          children: [_imageCard(accent)],
-                        ),
-                        const SizedBox(height: 12),
-                        _additionalPanel(accent, wide),
-                      ],
                     );
                   },
                 ),
@@ -727,6 +710,91 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
       ),
     );
   }
+
+  Widget _leftContent(bool wide) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Wrap(
+        spacing: 12,
+        runSpacing: 8,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('สถานะใช้งาน'),
+              Switch(
+                value: _active,
+                onChanged: _saving
+                    ? null
+                    : (value) => setState(() => _active = value),
+              ),
+            ],
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('แสดงหน้า Online'),
+              Switch(
+                value: _showShop,
+                onChanged: !_saving && _usageCodes.contains('SALE')
+                    ? (value) => setState(() => _showShop = value)
+                    : null,
+              ),
+            ],
+          ),
+        ],
+      ),
+      const SizedBox(height: 12),
+      _row(wide, [
+        _drop('กลุ่มสินค้า', _group, widget.groups, (value) {
+          setState(() => _group = value);
+          _previewCode();
+        }),
+        _drop('ประเภทสินค้า', _type, widget.types, (value) {
+          setState(() => _type = value);
+          _previewCode();
+        }),
+        _dropOptional(
+          'แผนกที่รับผิดชอบ',
+          _responsibleDepartment,
+          widget.responsibleDepartments,
+          (value) => setState(() => _responsibleDepartment = value),
+        ),
+      ]),
+      const SizedBox(height: 12),
+      _inventoryClassification(wide),
+      const SizedBox(height: 12),
+      _compactFields(wide),
+      const SizedBox(height: 12),
+      _warrantyPanel(wide),
+      const SizedBox(height: 12),
+      _additionalPanel(workspaceThemeController.value.primary, wide),
+    ],
+  );
+
+  Widget _rightContent(Color accent) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      _imagePanel(accent),
+      const SizedBox(height: 12),
+      _projectPanel(accent),
+    ],
+  );
+
+  Widget _imagePanel(Color accent) => Card(
+    margin: EdgeInsets.zero,
+    color: Colors.white,
+    elevation: 0,
+    surfaceTintColor: Colors.transparent,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(LaooRadius.xs),
+      side: const BorderSide(color: LaooColors.border),
+    ),
+    child: Padding(
+      padding: const EdgeInsets.all(LaooLayout.cardPadding),
+      child: _imageCard(accent),
+    ),
+  );
 
   bool get _hasAdditionalData => [
     _orderCode,
@@ -1105,7 +1173,6 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
           )
           .toList(),
       onChanged: (value) => setState(() {
-        _classificationTouched = true;
         _itemKind = value ?? 'GOODS';
         if (_itemKind == 'SERVICE') _stockTracking = 'NONE';
       }),
@@ -1128,7 +1195,6 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
       onChanged: _itemKind == 'SERVICE'
           ? null
           : (value) => setState(() {
-              _classificationTouched = true;
               _stockTracking = value ?? 'NONE';
             }),
     );
@@ -1141,17 +1207,22 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
         decoration: InputDecoration(
           labelText: '* วัตถุประสงค์',
           errorText: field.errorText,
+          contentPadding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
         ),
         child: Wrap(
-          spacing: 6,
-          runSpacing: 6,
+          spacing: 8,
+          runSpacing: 10,
           children: usages.entries.map((entry) {
             final selected = _usageCodes.contains(entry.key);
             return FilterChip(
               label: Text(entry.value),
               selected: selected,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              labelPadding: EdgeInsets.zero,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(LaooRadius.xs),
+              ),
               onSelected: (value) => setState(() {
-                _classificationTouched = true;
                 value
                     ? _usageCodes.add(entry.key)
                     : _usageCodes.remove(entry.key);
@@ -1183,6 +1254,103 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
         const SizedBox(width: 12),
         Expanded(flex: 2, child: usageField),
       ],
+    );
+  }
+
+  Widget _warrantyPanel(bool wide) {
+    Widget policy({
+      required String label,
+      required String value,
+      required ValueChanged<String?> onChanged,
+      required TextEditingController months,
+      required bool fieldsInRow,
+    }) {
+      final mode = DropdownButtonFormField<String>(
+        initialValue: value,
+        decoration: InputDecoration(labelText: label),
+        items: const [
+          DropdownMenuItem(value: 'NONE', child: Text('ไม่มีประกัน')),
+          DropdownMenuItem(value: 'LIFETIME', child: Text('ตลอดอายุ')),
+          DropdownMenuItem(value: 'MONTHS', child: Text('กำหนดจำนวนเดือน')),
+        ],
+        onChanged: _saving ? null : onChanged,
+      );
+      final duration = _text(
+        months,
+        'จำนวนเดือน',
+        number: true,
+        required: value == 'MONTHS',
+        readOnly: value != 'MONTHS',
+      );
+      return fieldsInRow
+          ? Row(
+              children: [
+                Expanded(flex: 3, child: mode),
+                const SizedBox(width: 12),
+                Expanded(child: duration),
+              ],
+            )
+          : Column(children: [mode, const SizedBox(height: 12), duration]);
+    }
+
+    return Card(
+      margin: EdgeInsets.zero,
+      color: Colors.white,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(LaooRadius.xs),
+        side: const BorderSide(color: LaooColors.border),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(LaooLayout.cardPadding),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final sideBySide = wide && constraints.maxWidth >= 680;
+            Widget supplier({required bool compact}) => policy(
+              label: 'ประกันผู้ขาย (เริ่มเมื่อรับเข้า)',
+              value: _supplierWarrantyMode,
+              months: _supplierWarrantyMonths,
+              fieldsInRow: !compact && wide,
+              onChanged: (next) =>
+                  setState(() => _supplierWarrantyMode = next ?? 'NONE'),
+            );
+            Widget customer({required bool compact}) => policy(
+              label: 'ประกันลูกค้า (เลือกเริ่มตอนส่งของ/ติดตั้ง)',
+              value: _customerWarrantyMode,
+              months: _customerWarrantyMonths,
+              fieldsInRow: !compact && wide,
+              onChanged: (next) =>
+                  setState(() => _customerWarrantyMode = next ?? 'NONE'),
+            );
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'ค่าเริ่มต้นประกัน',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 12),
+                if (sideBySide)
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: supplier(compact: true)),
+                      const SizedBox(width: 12),
+                      Expanded(child: customer(compact: true)),
+                    ],
+                  )
+                else ...[
+                  supplier(compact: false),
+                  const SizedBox(height: 12),
+                  customer(compact: false),
+                ],
+              ],
+            );
+          },
+        ),
+      ),
     );
   }
 
@@ -1367,6 +1535,34 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
           )
           .toList(),
       onChanged: onChanged,
+    );
+  }
+
+  Widget _dropOptional(
+    String label,
+    String? value,
+    List<Map<String, dynamic>> values,
+    ValueChanged<String?> onChanged,
+  ) {
+    final comboStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
+      fontSize: LaooTypography.tableBody,
+      height: 1.35,
+    );
+    return DropdownButtonFormField<String>(
+      isExpanded: true,
+      initialValue: value,
+      decoration: InputDecoration(labelText: label),
+      style: comboStyle,
+      items: [
+        DropdownMenuItem<String>(value: null, child: Text('ไม่ระบุ', style: comboStyle)),
+        ...values.map(
+          (item) => DropdownMenuItem(
+            value: '${item['code']}',
+            child: Text('${item['name']}', style: comboStyle),
+          ),
+        ),
+      ],
+      onChanged: _saving ? null : onChanged,
     );
   }
 

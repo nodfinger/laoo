@@ -119,7 +119,7 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     api.dispose();
   });
-  testWidgets('Create then save updates same vendor and stays open', (
+  testWidgets('Create then save clears the form and keeps the popup open', (
     tester,
   ) async {
     final api = FakeVendorApi();
@@ -134,14 +134,37 @@ void main() {
     await tester.tap(find.text('บันทึก'));
     await tester.pumpAndSettle();
     expect(api.creates, 1);
-    expect(find.text('ผู้ขาย > แก้ไข'), findsOneWidget);
-    await tester.tap(find.text('บันทึก'));
-    await tester.pumpAndSettle();
-    expect(api.creates, 1);
-    expect(api.updates, 1);
+    expect(find.text('ผู้ขาย > เพิ่ม'), findsOneWidget);
+    expect(
+      tester.widget<TextFormField>(fields.at(0)).controller!.text,
+      isEmpty,
+    );
+    expect(
+      tester.widget<TextFormField>(fields.at(1)).controller!.text,
+      isEmpty,
+    );
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(seconds: 31));
+    api.dispose();
+  });
+
+  testWidgets('Edit then save closes the popup', (tester) async {
+    final api = FakeVendorApi();
+    await render(
+      tester,
+      const Size(1100, 820),
+      VendorWorkspace(caption: 'ผู้ขาย', api: api),
+    );
+    await tester.tap(find.byTooltip('แก้ไข').hitTestable());
+    await tester.pumpAndSettle();
+    expect(find.text('ผู้ขาย > แก้ไข'), findsOneWidget);
+    await tester.tap(find.text('บันทึก'));
+    await tester.pumpAndSettle();
+    expect(api.updates, 1);
+    expect(find.text('ผู้ขาย > แก้ไข'), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
     api.dispose();
   });
 }

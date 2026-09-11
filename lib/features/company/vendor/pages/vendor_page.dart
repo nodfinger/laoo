@@ -307,7 +307,10 @@ class _VendorWorkspaceState extends State<VendorWorkspace> {
   Widget _box(
     Widget child, {
     EdgeInsets padding = const EdgeInsets.all(LaooLayout.cardPadding),
-  }) => WorkspaceSectionCard(padding: padding, child: child);
+  }) => SizedBox(
+    width: double.infinity,
+    child: WorkspaceSectionCard(padding: padding, child: child),
+  );
   @override
   Widget build(
     BuildContext context,
@@ -560,6 +563,7 @@ class _VendorWorkspaceState extends State<VendorWorkspace> {
                                 DataColumn(
                                   label: Center(child: Text('Action')),
                                   columnWidth: FixedColumnWidth(128),
+                                  headingRowAlignment: MainAxisAlignment.center,
                                 ),
                                 DataColumn(label: Text('รหัสผู้ขาย')),
                                 DataColumn(
@@ -750,7 +754,6 @@ class _VendorFormState extends State<VendorForm> {
       widget.initial?['entityTypeCode'] as String? ?? 'ORGANIZATION';
   late bool _active = widget.initial?['isActive'] as bool? ?? true;
   bool _saving = false;
-  bool _showValidation = false;
   bool get _editable => _id == null || widget.canEdit;
   Color get _primary => workspaceThemeController.value.primary;
   @override
@@ -764,9 +767,9 @@ class _VendorFormState extends State<VendorForm> {
   Future<void> _save() async {
     if (_saving || !_editable) return;
     if (!_form.currentState!.validate()) {
-      setState(() => _showValidation = true);
       return;
     }
+    final creating = _id == null;
     setState(() => _saving = true);
     try {
       final data = <String, dynamic>{
@@ -779,13 +782,14 @@ class _VendorFormState extends State<VendorForm> {
       };
       final saved = await widget.api.save(data, id: _id);
       if (!mounted) return;
-      setState(() {
-        _id = (saved['vendorID'] as num).toInt();
-        _version = saved['rowVersion'] as String;
-      });
       widget.onSaved();
       widget.onResult?.call(saved);
       showTimedSnackBar(context, message: 'บันทึกผู้ขายสำเร็จ');
+      if (creating) {
+        _resetForCreate();
+      } else {
+        Navigator.of(context).pop(saved);
+      }
     } catch (e) {
       if (mounted) {
         showTimedSnackBar(context, message: vendorError(e), error: true);
@@ -793,6 +797,20 @@ class _VendorFormState extends State<VendorForm> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  void _resetForCreate() {
+    for (final controller in _fields.values) {
+      controller.clear();
+    }
+    _fields['creditDays']!.text = '0';
+    _form.currentState?.reset();
+    setState(() {
+      _id = null;
+      _version = null;
+      _type = 'ORGANIZATION';
+      _active = true;
+    });
   }
 
   Widget _field(
@@ -832,6 +850,75 @@ class _VendorFormState extends State<VendorForm> {
       },
     ),
   );
+
+  Widget _twoColumns(
+    Widget first,
+    Widget second, {
+    int firstFlex = 1,
+    int secondFlex = 1,
+  }) => LayoutBuilder(
+    builder: (context, constraints) {
+      if (constraints.maxWidth < 360) {
+        return Column(children: [first, second]);
+      }
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(flex: firstFlex, child: first),
+          const SizedBox(width: 12),
+          Expanded(flex: secondFlex, child: second),
+        ],
+      );
+    },
+  );
+
+  Widget _vendorTypeField(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 12),
+    child: DropdownButtonFormField<String>(
+      key: ValueKey('vendor-type-$_id-$_type'),
+      initialValue: _type,
+      isExpanded: true,
+      decoration: vendorInput('ประเภทผู้ขาย *', _primary),
+      style: TextStyle(
+        fontSize: LaooTypography.comboBox,
+        color: Theme.of(context).colorScheme.onSurface,
+      ),
+      items: const [
+        DropdownMenuItem(value: 'PERSON', child: Text('บุคคล')),
+        DropdownMenuItem(value: 'ORGANIZATION', child: Text('นิติบุคคล')),
+      ],
+      onChanged: _editable && !_saving
+          ? (v) => setState(() => _type = v!)
+          : null,
+    ),
+  );
+
+  Widget _vendorInfoRow(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final type = _vendorTypeField(context);
+      final taxId = _field('taxID', 'เลขผู้เสียภาษี', max: 50);
+      final credit = _field(
+        'creditDays',
+        'เครดิต (วัน)',
+        max: 4,
+        required: true,
+      );
+      if (constraints.maxWidth < 400) {
+        return Column(children: [type, taxId, credit]);
+      }
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(flex: 12, child: type),
+          const SizedBox(width: 8),
+          Expanded(flex: 14, child: taxId),
+          const SizedBox(width: 8),
+          Expanded(flex: 8, child: credit),
+        ],
+      );
+    },
+  );
+
   @override
   Widget build(
     BuildContext context,
@@ -893,86 +980,39 @@ class _VendorFormState extends State<VendorForm> {
                               ),
                             ],
                           ),
-                          _field(
-                            'vendorCode',
-                            'รหัสผู้ขาย',
-                            max: 50,
-                            required: true,
+                          const SizedBox(height: 12),
+                          _twoColumns(
+                            _field(
+                              'vendorCode',
+                              'รหัสผู้ขาย',
+                              max: 50,
+                              required: true,
+                            ),
+                            _field('vendorName', 'ชื่อผู้ขาย', required: true),
+                            firstFlex: 3,
+                            secondFlex: 5,
                           ),
-                          _field('vendorName', 'ชื่อผู้ขาย', required: true),
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: DropdownButtonFormField<String>(
-                              initialValue: _type,
-                              isExpanded: true,
-                              decoration: vendorInput(
-                                'ประเภทผู้ขาย *',
-                                _primary,
-                              ),
-                              style: TextStyle(
-                                fontSize: LaooTypography.comboBox,
-                                color: Theme.of(context).colorScheme.onSurface,
-                              ),
-                              items: const [
-                                DropdownMenuItem(
-                                  value: 'PERSON',
-                                  child: Text('บุคคล'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'ORGANIZATION',
-                                  child: Text('นิติบุคคล'),
-                                ),
-                              ],
-                              onChanged: _editable && !_saving
-                                  ? (v) => setState(() => _type = v!)
-                                  : null,
+                          _vendorInfoRow(context),
+                          _twoColumns(
+                            _field('telephone', 'โทรศัพท์', max: 50),
+                            _field('email', 'อีเมล', max: 320, email: true),
+                          ),
+                          _field('address', 'ที่อยู่', max: 1000, lines: 2),
+                          _field('contactName', 'ชื่อผู้ติดต่อ'),
+                          _twoColumns(
+                            _field(
+                              'contactTelephone',
+                              'โทรศัพท์ผู้ติดต่อ',
+                              max: 50,
+                            ),
+                            _field(
+                              'contactEmail',
+                              'อีเมลผู้ติดต่อ',
+                              max: 320,
+                              email: true,
                             ),
                           ),
-                          _field('taxID', 'เลขประจำตัวผู้เสียภาษี', max: 50),
-                          _field('telephone', 'โทรศัพท์', max: 50),
-                          _field('email', 'อีเมล', max: 320, email: true),
-                          ExpansionTile(
-                            key: ValueKey('address-$_showValidation'),
-                            maintainState: true,
-                            initiallyExpanded: _showValidation,
-                            tilePadding: EdgeInsets.zero,
-                            shape: const Border(),
-                            collapsedShape: const Border(),
-                            title: const Text('ที่อยู่และเงื่อนไขการซื้อ'),
-                            children: [
-                              _field('address', 'ที่อยู่', max: 1000, lines: 3),
-                              _field(
-                                'creditDays',
-                                'เครดิต (วัน)',
-                                max: 4,
-                                required: true,
-                              ),
-                            ],
-                          ),
-                          ExpansionTile(
-                            key: ValueKey('contact-$_showValidation'),
-                            maintainState: true,
-                            initiallyExpanded: _showValidation,
-                            tilePadding: EdgeInsets.zero,
-                            shape: const Border(),
-                            collapsedShape: const Border(),
-                            title: const Text('ผู้ติดต่อและหมายเหตุ'),
-                            children: [
-                              _field('contactName', 'ชื่อผู้ติดต่อ'),
-                              _field(
-                                'contactTelephone',
-                                'โทรศัพท์ผู้ติดต่อ',
-                                max: 50,
-                              ),
-                              _field(
-                                'contactEmail',
-                                'อีเมลผู้ติดต่อ',
-                                max: 320,
-                                email: true,
-                              ),
-                              _field('remark', 'หมายเหตุ', max: 1000, lines: 3),
-                            ],
-                          ),
+                          _field('remark', 'หมายเหตุ', max: 1000, lines: 3),
                         ],
                       ),
                     ),

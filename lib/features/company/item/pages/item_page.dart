@@ -42,7 +42,8 @@ class _ItemPageState extends State<ItemPage> {
   List<Map<String, dynamic>> _rows = const [];
   List<Map<String, dynamic>> _groups = const [],
       _types = const [],
-      _units = const [];
+      _units = const [],
+      _responsibleDepartments = const [];
   Map<String, bool> _actions = const {};
   Set<String> _permissionPoints = const {};
   Map<String, dynamic> _codeSettings = const {};
@@ -53,6 +54,7 @@ class _ItemPageState extends State<ItemPage> {
   int _currentPage = 0;
   String _caption = '';
   bool _formOpen = false;
+  Map<String, dynamic>? _formDetail;
   String? _message;
   Timer? _timer;
 
@@ -111,61 +113,21 @@ class _ItemPageState extends State<ItemPage> {
     }
   }
 
-  Future<void> _openForm([Map<String, dynamic>? detail]) async {
+  void _openForm([Map<String, dynamic>? detail]) {
     if (_formOpen ||
         (detail == null ? _actions['create'] : _actions['edit']) != true) {
       return;
     }
-    _formOpen = true;
-    try {
-      await showDialog<void>(
-        context: context,
-        barrierDismissible: false,
-        builder: (dialogContext) {
-          final size = MediaQuery.sizeOf(dialogContext);
-          return Dialog(
-            backgroundColor: Colors.white,
-            surfaceTintColor: Colors.transparent,
-            insetPadding: const EdgeInsets.all(LaooLayout.dialogInsetPadding),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(LaooRadius.xs),
-            ),
-            child: SizedBox(
-              width: (size.width - LaooLayout.dialogInsetPadding * 2).clamp(
-                0.0,
-                1100.0,
-              ),
-              height: (size.height - LaooLayout.dialogInsetPadding * 2).clamp(
-                0.0,
-                900.0,
-              ),
-              child: _ItemForm(
-                initial: detail,
-                caption: _caption,
-                canEditDefaults: _actions['edit'] == true,
-                canEditItem: _actions['edit'] == true,
-                groups: _groups,
-                types: _types,
-                units: _units,
-                codeSettings: _codeSettings,
-                maxItemImageSizeMB: _maxItemImageSizeMB,
-                onCancel: () => Navigator.of(dialogContext).pop(),
-                onSaved: () {
-                  showTimedSnackBar(
-                    context,
-                    message: 'บันทึกข้อมูลสินค้าสำเร็จ',
-                  );
-                  _load();
-                },
-              ),
-            ),
-          );
-        },
-      );
-    } finally {
-      _formOpen = false;
-    }
+    setState(() {
+      _formDetail = detail;
+      _formOpen = true;
+    });
   }
+
+  void _closeForm() => setState(() {
+    _formOpen = false;
+    _formDetail = null;
+  });
 
   Future<void> _loadDefaultViewMode() async {
     try {
@@ -206,6 +168,7 @@ class _ItemPageState extends State<ItemPage> {
         _withLoadDescription(_master.list('006'), 'กลุ่มสินค้า'),
         _withLoadDescription(_master.list('007'), 'ประเภทสินค้า'),
         _withLoadDescription(_master.list('002'), 'หน่วยนับ'),
+        _withLoadDescription(_api.responsibleDepartments(), 'แผนกที่รับผิดชอบ'),
         permissionPoints,
       ]);
       if (!mounted) return;
@@ -218,7 +181,8 @@ class _ItemPageState extends State<ItemPage> {
         _groups = result[4] as List<Map<String, dynamic>>;
         _types = result[5] as List<Map<String, dynamic>>;
         _units = result[6] as List<Map<String, dynamic>>;
-        _permissionPoints = result[7] as Set<String>;
+        _responsibleDepartments = result[7] as List<Map<String, dynamic>>;
+        _permissionPoints = result[8] as Set<String>;
         _currentPage = _currentPage.clamp(0, _totalPages - 1);
         _loading = false;
       });
@@ -1172,7 +1136,7 @@ class _ItemPageState extends State<ItemPage> {
     }
     try {
       final detail = await _api.get((row['itemID'] as num).toInt());
-      if (mounted) await _openForm(detail);
+      if (mounted) _openForm(detail);
     } catch (e) {
       if (mounted) {
         _show('ไม่สามารถเปิดหน้าแก้ไขสินค้าได้:\n${_readableError(e)}');
@@ -1308,8 +1272,41 @@ class _ItemPageState extends State<ItemPage> {
     pageTitle: _caption,
     activeMenu: widget.activeMenu,
     menuScope: WorkspaceMenuScope.company,
-    child: _list(),
+    child: _formOpen ? _actionForm() : _list(),
   );
+
+  Widget _actionForm() {
+    final returnToListAfterSave = _formDetail?['itemID'] != null;
+    return ColoredBox(
+      color: LaooColors.background,
+      child: Padding(
+        padding: const EdgeInsets.all(LaooLayout.cardMargin),
+        child: DecoratedBox(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.all(Radius.circular(LaooRadius.xs)),
+          ),
+          child: _ItemForm(
+            initial: _formDetail,
+            caption: _caption,
+            canEditItem: _actions['edit'] == true,
+            groups: _groups,
+            types: _types,
+            units: _units,
+            responsibleDepartments: _responsibleDepartments,
+            codeSettings: _codeSettings,
+            maxItemImageSizeMB: _maxItemImageSizeMB,
+            onCancel: _closeForm,
+            onSaved: () {
+              showTimedSnackBar(context, message: 'บันทึกข้อมูลสินค้าสำเร็จ');
+              if (returnToListAfterSave) _closeForm();
+              _load();
+            },
+          ),
+        ),
+      ),
+    );
+  }
 
   Widget _list() => ColoredBox(
     color: const Color(0xFFF8F9FB),
@@ -2075,6 +2072,7 @@ class _ItemPageState extends State<ItemPage> {
       final x = _visibleRows[i];
       final cover = x['coverImageBase64'];
       return Card(
+        margin: EdgeInsets.zero,
         child: ListTile(
           leading: cover is String && cover.isNotEmpty
               ? Image.memory(
@@ -2174,8 +2172,8 @@ class _ItemPageState extends State<ItemPage> {
       return Card(
         margin: EdgeInsets.zero,
         color: Colors.white,
-        elevation: 2,
-        shadowColor: accent.withValues(alpha: .18),
+        elevation: 0,
+        shadowColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(4),

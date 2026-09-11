@@ -8,6 +8,7 @@ abstract final class RouteNames {
   static const String authenticatedHome = 'authenticated-home';
   static const String companyProducts = 'company-products';
   static const String companyCustomers = 'company-customers';
+  static const String companyPersons = 'company-persons';
   static const String companyQuotations = 'company-quotations';
   static const String companyPreOrders = 'company-pre-orders';
   static const String companyTemporaryReceipts = 'company-temporary-receipts';
@@ -16,6 +17,7 @@ abstract final class RouteNames {
   static const String assetLocations = 'asset-locations';
   static const String assetItems = 'asset-items';
   static const String assetCustomers = 'asset-customers';
+  static const String assetResidents = 'asset-residents';
   static const String cmTickets = 'cm-tickets';
   static const String cmQrPortal = 'cm-qr-portal';
   static const String pmPlans = 'pm-plans';

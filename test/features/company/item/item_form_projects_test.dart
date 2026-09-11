@@ -74,6 +74,7 @@ void main() {
                     'accessModeCode': 'SELECTED',
                     'projectIds': [2],
                   },
+                if (existing) 'responsibleDepartmentOrgUnitID': 11,
               },
               groups: const [
                 {'code': 'G', 'name': 'กลุ่ม'},
@@ -83,6 +84,9 @@ void main() {
               ],
               units: const [
                 {'code': 'U', 'name': 'เครื่อง'},
+              ],
+              responsibleDepartments: const [
+                {'code': '11', 'name': 'IT | เทคโนโลยีสารสนเทศ'},
               ],
               codeSettings: const {'runItem': '0'},
               maxItemImageSizeMB: 1,
@@ -162,6 +166,8 @@ void main() {
       'accessModeCode': 'SELECTED',
       'projectIds': [2],
     });
+    expect(api.saved?['responsibleDepartmentOrgUnitID'], 11);
+    expect(find.text('แผนกที่รับผิดชอบ'), findsOneWidget);
     expect(find.text('ค่าเริ่มต้นสำหรับสินค้าใหม่'), findsNothing);
   });
 }
