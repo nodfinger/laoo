@@ -7,14 +7,14 @@ using Microsoft.Extensions.Configuration;
 
 var jsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
 var request = JsonSerializer.Deserialize<FoodPlanRequest>(
-    """{"orderCutoffDateTime":"2030-01-01T10:00:00","foodIds":[11,12],"isActive":true,"foodQuantities":{"11":3,"12":1}}""",
+    """{"orderCutoffDateTime":"2030-01-01T10:00:00","isActive":true,"groups":[{"foodTypeCode":"RICE","maxQuantity":1,"isRequired":true,"foodIds":[11,12]},{"foodTypeCode":"DRINK","maxQuantity":2,"isRequired":false,"foodIds":[21,22]}],"questions":[{"questionText":"แพ้อาหารหรือไม่","answerType":"BOOLEAN","isRequired":true,"sortOrder":1,"options":[]}]}""",
     jsonOptions)!;
-Check(request.FoodQuantities![11] == 3 && request.FoodQuantities[12] == 1,
-    "JSON quantity keys and values deserialize");
+Check(request.Groups is { Count:2 } && request.Groups[1].MaxQuantity==2 && request.Groups[0].IsRequired,
+    "JSON group limits and required flag deserialize");
 var legacy = JsonSerializer.Deserialize<FoodPlanRequest>(
     """{"orderCutoffDateTime":"2030-01-01T10:00:00","foodIds":[11],"isActive":true}""",
     jsonOptions)!;
-Check(legacy.FoodQuantities is null, "Legacy clients may omit quantities (default 1)");
+Check(legacy.Groups is null, "Legacy payload is identifiable before database access");
 
 var controller = new MeetingFoodPlanController(new ConfigurationBuilder().Build())
 {
@@ -31,29 +31,29 @@ var controller = new MeetingFoodPlanController(new ConfigurationBuilder().Build(
         },
     },
 };
-foreach (var (label, quantities) in new[]
+Check(await controller.Save(1,legacy,default) is BadRequestObjectResult,
+    "API rejects legacy per-item quantity contract before database access");
+foreach (var (label, groups) in new[]
 {
-    ("zero", new Dictionary<long, int> { [11] = 0, [12] = 1 }),
-    ("negative", new Dictionary<long, int> { [11] = -1, [12] = 1 }),
-    ("missing food", new Dictionary<long, int> { [11] = 1 }),
-    ("unselected food", new Dictionary<long, int> { [11] = 1, [12] = 1, [13] = 1 }),
+    ("zero quota", new List<FoodGroupRequest>{new("RICE",0,true,[11])}),
+    ("quota over 99", new List<FoodGroupRequest>{new("RICE",100,true,[11])}),
+    ("empty group", new List<FoodGroupRequest>{new("RICE",1,true,[])}),
+    ("duplicate group", new List<FoodGroupRequest>{new("RICE",1,true,[11]),new("RICE",2,false,[12])}),
+    ("food in two groups", new List<FoodGroupRequest>{new("RICE",1,true,[11]),new("DRINK",2,false,[11])}),
 })
 {
-    var result = await controller.Save(1, request with { FoodQuantities = quantities }, default);
+    var result = await controller.Save(1, request with { Groups = groups }, default);
     Check(result is BadRequestObjectResult, $"API rejects {label} before writing");
 }
-foreach (var invalid in new[] { "1.5", "2147483648", "null" })
-{
-    var rejected = false;
-    try
-    {
-        JsonSerializer.Deserialize<FoodPlanRequest>(
-            """{"orderCutoffDateTime":"2030-01-01T10:00:00","foodIds":[11],"foodQuantities":{"11":"""
-            + invalid + "}}", jsonOptions);
-    }
-    catch (JsonException) { rejected = true; }
-    Check(rejected, $"JSON rejects non-integer/out-of-range quantity {invalid}");
-}
+Check(await controller.Save(1,request with {Questions=[new("", "TEXT",true,1,[])]},default)
+    is BadRequestObjectResult,"API rejects blank requirement question");
+Check(await controller.Save(1,request with {Questions=[new("เลือกอาหาร", "SINGLE",true,1,["หนึ่ง"])]},default)
+    is BadRequestObjectResult,"API requires at least two options for choice question");
+
+var responseController=new MeetingParticipantResponseController(new ConfigurationBuilder().Build())
+{ControllerContext=controller.ControllerContext};
+Check(await responseController.Save(1,new("UNKNOWN",null,null,[],[]),default)
+    is BadRequestObjectResult,"Unified participant response rejects invalid status before database access");
 
 var attendanceProtection = new Microsoft.AspNetCore.DataProtection.EphemeralDataProtectionProvider();
 var attendance = new MeetingAttendanceController(new ConfigurationBuilder().Build(), attendanceProtection)

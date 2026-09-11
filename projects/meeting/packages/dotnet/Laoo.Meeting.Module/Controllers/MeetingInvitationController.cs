@@ -17,10 +17,11 @@ public sealed class MeetingInvitationController(IConfiguration configuration) : 
         await using var connection = await Open(token);
         if (!Scope(out var company, out var user)) return Forbid();
         var actionable = await HasOwnInvitation(connection, company, user, null, token);
+        var hasHistory = await HasInvitationHistory(connection, company, user, token);
         return Ok(new
         {
-            view = await Allowed(connection, "VIEW", token),
-            edit = actionable && await Allowed(connection, "EDIT", token),
+            view = hasHistory || await Allowed(connection, "VIEW", token),
+            edit = actionable,
         });
     }
 
@@ -30,8 +31,9 @@ public sealed class MeetingInvitationController(IConfiguration configuration) : 
         if (!Scope(out var company, out var user)) return Forbid();
         page = Math.Max(1, page); pageSize = Math.Clamp(pageSize, 1, 100);
         await using var connection = await Open(token);
-        if (!await Allowed(connection, "VIEW", token)) return Forbid();
         var isAdmin = await IsCompanyAdmin(connection, company, user, token);
+        if (!isAdmin && !await Allowed(connection, "VIEW", token)
+            && !await HasInvitationHistory(connection, company, user, token)) return Forbid();
         var employee = await EmployeeId(connection, company, user, token);
         if (!isAdmin && employee is null) return Ok(new { items = Array.Empty<object>(), total = 0, page, pageSize });
         const string filter = @"
@@ -45,7 +47,9 @@ INNER JOIN dbo.TDADEmployee PE ON PE.EmployeeID=P.EmployeeID AND PE.CompanyID=P.
 LEFT JOIN dbo.TDADMeetingBookingFoodPlan FP ON FP.BookingID=B.BookingID AND FP.CompanyID=B.CompanyID AND FP.IsActive=1
 WHERE P.CompanyID=@company AND (@admin=1 OR P.EmployeeID=@employee) AND B.BookingStatus='APPROVED'
   AND S.EndDateTime>=GETDATE()
-  AND (@status IS NULL OR @status='' OR P.InvitationStatus=@status)
+  AND (@status IS NULL OR @status=''
+       OR (@status='LATE_ACCEPTED' AND P.InvitationStatus='ACCEPTED' AND P.IsLateResponse=1)
+       OR (@status<>'LATE_ACCEPTED' AND P.InvitationStatus=@status))
   AND (@search IS NULL OR B.BookingNo LIKE N'%'+@search+N'%' OR B.Subject LIKE N'%'+@search+N'%' OR R.RoomCode LIKE N'%'+@search+N'%' OR R.RoomNameTH LIKE N'%'+@search+N'%' OR PE.EmployeeCode LIKE N'%'+@search+N'%' OR PE.FullName LIKE N'%'+@search+N'%')";
         var countSql = $"SELECT COUNT_BIG(DISTINCT P.BookingParticipantID) {filter};";
         await using var count = new SqlCommand(countSql, connection); Bind(count, company, employee, isAdmin, search, status);
@@ -55,10 +59,12 @@ SELECT P.BookingParticipantID,P.BookingID,B.BookingNo,B.Subject,R.RoomCode,R.Roo
        MIN(S.StartDateTime),MAX(S.EndDateTime),P.InvitationStatus,P.ResponseDate,P.Remark,
        PE.EmployeeCode,PE.FullName,RE.EmployeeCode,RE.FullName,FP.OrderCutoffDateTime,
        CASE WHEN P.EmployeeID=@employee THEN 1 ELSE 0 END,
-       (SELECT COUNT_BIG(1) FROM dbo.TDADMeetingBookingFoodOption FO WHERE FO.BookingID=B.BookingID AND FO.CompanyID=B.CompanyID)
+       (SELECT COUNT_BIG(1) FROM dbo.TDADMeetingBookingFoodOption FO WHERE FO.BookingID=B.BookingID AND FO.CompanyID=B.CompanyID),
+       P.IsLateResponse,P.LateResponseReason,P.LateResponseAtUtc
 {filter}
 GROUP BY P.BookingParticipantID,P.BookingID,B.BookingID,B.CompanyID,B.BookingNo,B.Subject,R.RoomCode,R.RoomNameTH,
-         P.InvitationStatus,P.ResponseDate,P.Remark,PE.EmployeeCode,PE.FullName,RE.EmployeeCode,RE.FullName,FP.OrderCutoffDateTime,P.EmployeeID,B.CreateDate
+         P.InvitationStatus,P.ResponseDate,P.Remark,PE.EmployeeCode,PE.FullName,RE.EmployeeCode,RE.FullName,FP.OrderCutoffDateTime,P.EmployeeID,B.CreateDate,
+         P.IsLateResponse,P.LateResponseReason,P.LateResponseAtUtc
 ORDER BY MIN(S.StartDateTime),B.CreateDate
 OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY;";
         await using var command = new SqlCommand(sql, connection); Bind(command, company, employee, isAdmin, search, status); Add(command, "@skip", (page - 1) * pageSize); Add(command, "@take", pageSize);
@@ -71,6 +77,7 @@ OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY;";
             invitationStatus = reader.GetString(8), responseDate = Date(reader, 9), remark = Text(reader, 10), participantCode = Text(reader, 11),
             participantName = Text(reader, 12), organizerCode = Text(reader, 13), organizerName = Text(reader, 14),
             orderCutoffDateTime = Date(reader, 15), foodCount = Convert.ToInt32(reader.GetInt64(17)), canRespond = reader.GetInt32(16) == 1,
+            isLateResponse = reader.GetBoolean(18), lateResponseReason = Text(reader, 19), lateResponseAtUtc = Date(reader, 20),
         });
         return Ok(new { items, total, page, pageSize });
     }
@@ -148,7 +155,7 @@ ORDER BY ISNULL(T.Seq,0),F.FoodCode;";
         return Ok(new { invitation = result, foods });
     }
 
-    [HttpPut("{participantId:long}/response")]
+    [NonAction]
     public async Task<IActionResult> Respond(long participantId, InvitationResponseRequest request, CancellationToken token)
     {
         var status = request.Status?.Trim().ToUpperInvariant();
@@ -169,7 +176,7 @@ WHERE P.BookingParticipantID=@participant AND P.CompanyID=@company AND P.Employe
         return await command.ExecuteNonQueryAsync(token) == 0 ? NotFound(Error("ไม่พบคำเชิญที่แก้ไขได้", "คำเชิญอาจสิ้นสุดหรือไม่อยู่ในบัญชีผู้ใช้นี้")) : Ok(new { participantId, status });
     }
 
-    [HttpPut("{participantId:long}/food-order")]
+    [NonAction]
     public async Task<IActionResult> SaveFoodOrder(long participantId, FoodOrderRequest request, CancellationToken token)
     {
         if (!Scope(out var company, out var user)) return Forbid();

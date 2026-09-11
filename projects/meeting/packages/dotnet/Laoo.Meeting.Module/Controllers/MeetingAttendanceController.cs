@@ -124,8 +124,8 @@ JOIN dbo.TDADMeetingRoom R ON R.CompanyID=B.CompanyID AND R.RoomID=B.RoomID
         var total=Convert.ToInt64(await count.ExecuteScalarAsync(token));
         await using var cmd=new SqlCommand($"""
 SELECT B.BookingID,B.BookingNo,B.Subject,B.BookingStatus,R.RoomCode,R.RoomNameTH,S.BookingSlotID,S.StartDateTime,S.EndDateTime,
- COUNT(DISTINCT CASE WHEN P.InvitationStatus IN ('PENDING','ACCEPTED') THEN P.BookingParticipantID END) ParticipantCount,
- COUNT(DISTINCT CASE WHEN P.InvitationStatus IN ('PENDING','ACCEPTED') AND CI.ParticipantCheckInID IS NOT NULL THEN P.BookingParticipantID END) CheckedInCount
+ COUNT(DISTINCT CASE WHEN P.InvitationStatus='ACCEPTED' THEN P.BookingParticipantID END) ParticipantCount,
+ COUNT(DISTINCT CASE WHEN P.InvitationStatus='ACCEPTED' AND CI.ParticipantCheckInID IS NOT NULL THEN P.BookingParticipantID END) CheckedInCount
 FROM dbo.TDADMeetingRoomBooking B
 JOIN dbo.TDADMeetingRoomBookingSlot S ON S.CompanyID=B.CompanyID AND S.BookingID=B.BookingID
 JOIN dbo.TDADMeetingRoom R ON R.CompanyID=B.CompanyID AND R.RoomID=B.RoomID
@@ -161,19 +161,20 @@ ORDER BY S.StartDateTime,B.BookingID,S.BookingSlotID OFFSET @offset ROWS FETCH N
         var qrReady=await ReceiptReady(db,token);
         var sql=$"""
 SELECT P.BookingParticipantID,E.FullName,S.BookingSlotID,S.StartDateTime,S.EndDateTime,C.CheckInDate,C.CheckInByUserID,C.CheckInMethod,
- CASE WHEN B.BookingStatus='APPROVED' AND P.InvitationStatus IN ('PENDING','ACCEPTED')
+ CASE WHEN B.BookingStatus='APPROVED' AND P.InvitationStatus='ACCEPTED'
  AND S.StartDateTime<=GETDATE() AND S.EndDateTime>GETDATE() AND C.ParticipantCheckInID IS NULL
  AND ((@selfEdit=1 AND {SelfSql}) OR (@managerEdit=1 AND {ManagerSql})) THEN 1 ELSE 0 END,
  CASE WHEN @qrReady=1 AND B.BookingStatus='APPROVED' AND S.EndDateTime>GETDATE()
  AND @managerEdit=1 AND {ManagerSql} THEN 1 ELSE 0 END,
  CASE WHEN @qrReady=1 AND B.BookingStatus='APPROVED' AND S.EndDateTime>GETDATE()
- AND P.InvitationStatus IN ('PENDING','ACCEPTED')
+ AND P.InvitationStatus='ACCEPTED'
  AND ((@selfView=1 AND {SelfSql}) OR (@managerEdit=1 AND {ManagerSql})) THEN 1 ELSE 0 END,
  CASE WHEN @qrReady=1 AND B.BookingStatus='APPROVED' AND S.StartDateTime<=GETDATE() AND S.EndDateTime>GETDATE()
- AND P.InvitationStatus IN ('PENDING','ACCEPTED') AND @managerEdit=1 AND {ManagerSql} THEN 1 ELSE 0 END,
+ AND P.InvitationStatus='ACCEPTED' AND @managerEdit=1 AND {ManagerSql} THEN 1 ELSE 0 END,
  CASE WHEN @qrReady=1 AND B.BookingStatus='APPROVED' AND S.StartDateTime<=GETDATE() AND S.EndDateTime>GETDATE()
- AND P.InvitationStatus IN ('PENDING','ACCEPTED') AND C.ParticipantCheckInID IS NULL
- AND @selfEdit=1 AND {SelfSql} THEN 1 ELSE 0 END
+ AND P.InvitationStatus='ACCEPTED' AND C.ParticipantCheckInID IS NULL
+ AND @selfEdit=1 AND {SelfSql} THEN 1 ELSE 0 END,
+ P.IsLateResponse,P.LateResponseReason,P.LateResponseAtUtc
 {SourceSql}
 LEFT JOIN dbo.TDADMeetingParticipantCheckIn C ON C.CompanyID=P.CompanyID AND C.BookingParticipantID=P.BookingParticipantID AND C.BookingSlotID=S.BookingSlotID
 WHERE B.CompanyID=@company AND B.BookingID=@booking AND (@slot IS NULL OR S.BookingSlotID=@slot)
@@ -194,7 +195,9 @@ ORDER BY S.StartDateTime,E.FullName,P.BookingParticipantID;
             checkInByUserId=reader.IsDBNull(6)?(long?)null:reader.GetInt64(6),
             method=reader.IsDBNull(7)?null:reader.GetString(7),canCheckIn=reader.GetInt32(8)==1,
             canIssueRoomQr=reader.GetInt32(9)==1,canIssuePersonalQr=reader.GetInt32(10)==1,
-            canManualCheckIn=reader.GetInt32(8)==1,canScanRoomQr=reader.GetInt32(12)==1,canScanPersonalQr=reader.GetInt32(11)==1 });
+            canManualCheckIn=reader.GetInt32(8)==1,canScanRoomQr=reader.GetInt32(12)==1,canScanPersonalQr=reader.GetInt32(11)==1,
+            isLateResponse=reader.GetBoolean(13),lateResponseReason=reader.IsDBNull(14)?null:reader.GetString(14),
+            lateResponseAtUtc=reader.IsDBNull(15)?(DateTime?)null:DateTime.SpecifyKind(reader.GetDateTime(15),DateTimeKind.Utc) });
         return Ok(new {available=true,items});
     }
 
@@ -235,7 +238,7 @@ ORDER BY S.StartDateTime,E.FullName,P.BookingParticipantID;
         var source=request is null?SourceSql:SourceSql.Replace("BookingParticipant P","BookingParticipant P WITH (UPDLOCK,HOLDLOCK)");
         await using var access=new SqlCommand($"""
 SELECT C.ParticipantCheckInID,C.CheckInDate,
- CASE WHEN B.BookingStatus='APPROVED' AND P.InvitationStatus IN ('PENDING','ACCEPTED')
+ CASE WHEN B.BookingStatus='APPROVED' AND P.InvitationStatus='ACCEPTED'
  AND S.StartDateTime<=GETDATE() AND S.EndDateTime>GETDATE() AND C.ParticipantCheckInID IS NOT NULL
  AND ((@selfEdit=1 AND {SelfSql}) OR (@managerEdit=1 AND {ManagerSql})) THEN 1 ELSE 0 END,
  CASE WHEN @selfEdit=1 AND {SelfSql} THEN 'SELF' ELSE 'DELEGATE' END
@@ -258,7 +261,7 @@ WHERE B.CompanyID=@company AND B.BookingID=@booking AND P.BookingParticipantID=@
         if(request is not null && !canReceive) return Conflict(new {message="ยังรับอาหารรอบนี้ไม่ได้",description="ต้องเช็กอินก่อน และอยู่ในช่วงเวลาของรอบประชุมที่อนุมัติแล้ว พร้อมสิทธิ์รับอาหารของตนเองหรือรับแทน"});
 
         // Lock the order header before details, matching SaveFoodOrder. The quantity cap is booking-wide.
-        await using var order=new SqlCommand("SELECT BookingFoodOrderID FROM dbo.TDADMeetingBookingFoodOrder WITH (UPDLOCK,HOLDLOCK) WHERE CompanyID=@company AND BookingID=@booking AND BookingParticipantID=@participant",db,tx);
+        await using var order=new SqlCommand("SELECT BookingFoodOrderID FROM dbo.TDADMeetingBookingFoodOrder WITH (UPDLOCK,HOLDLOCK) WHERE CompanyID=@company AND BookingID=@booking AND BookingParticipantID=@participant AND IsCancelled=0",db,tx);
         Bind(order,company,user,bookingId);order.Parameters.AddWithValue("@participant",participantId);
         var orderId=await order.ExecuteScalarAsync(token);
         var items=orderId is null?new List<FoodReceiptData>():await ReadReceipts(db,tx,company,Convert.ToInt64(orderId),token);
@@ -308,7 +311,7 @@ JOIN dbo.TDADMeetingBookingFoodOrder H ON H.BookingFoodOrderID=D.BookingFoodOrde
 JOIN dbo.TDADMeetingFood F ON F.FoodID=D.FoodID AND F.CompanyID=H.CompanyID
 LEFT JOIN dbo.TDADMeetingFoodReceipt R WITH (UPDLOCK,HOLDLOCK) ON R.CompanyID=H.CompanyID AND R.BookingFoodOrderDetailID=D.BookingFoodOrderDetailID
 LEFT JOIN dbo.TDADMeetingParticipantCheckIn C ON C.ParticipantCheckInID=R.ParticipantCheckInID AND C.CompanyID=R.CompanyID
-WHERE H.BookingFoodOrderID=@order ORDER BY D.BookingFoodOrderDetailID;
+WHERE H.BookingFoodOrderID=@order AND H.IsCancelled=0 ORDER BY D.BookingFoodOrderDetailID;
 """,db,tx);
         cmd.Parameters.AddWithValue("@company",company);cmd.Parameters.AddWithValue("@order",orderId);
         await using var reader=await cmd.ExecuteReaderAsync(token);
@@ -329,6 +332,7 @@ SELECT CASE WHEN OBJECT_ID(N'dbo.TDADMeetingFoodReceipt',N'U') IS NOT NULL
  AND OBJECT_ID(N'dbo.TDADMeetingBookingFoodOrderDetail',N'U') IS NOT NULL
  AND COL_LENGTH(N'dbo.TDADMeetingFoodReceipt',N'ReceivedAtUtc') IS NOT NULL
  AND COL_LENGTH(N'dbo.TDADMeetingFoodReceiptHistory',N'PreviousQuantity') IS NOT NULL
+ AND COL_LENGTH(N'dbo.TDADMeetingBookingFoodOrder',N'IsCancelled') IS NOT NULL
  AND EXISTS(SELECT 1 FROM sys.triggers WHERE object_id=OBJECT_ID(N'dbo.TR_MeetingFoodReceipt_Validate') AND is_disabled=0)
  AND EXISTS(SELECT 1 FROM sys.triggers WHERE object_id=OBJECT_ID(N'dbo.TR_MeetingFoodOrderDetail_ProtectReceipt') AND is_disabled=0)
  AND EXISTS(SELECT 1 FROM sys.check_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.TDADMeetingParticipantCheckIn')
@@ -364,7 +368,7 @@ LEFT JOIN dbo.TDADMeetingRoomBookingParticipant P ON P.CompanyID=B.CompanyID AND
 WHERE B.CompanyID=@company AND B.BookingID=@booking AND S.BookingSlotID=@slot
  AND B.BookingStatus='APPROVED' AND S.EndDateTime>GETDATE()
  AND ((@kind='ROOM' AND @managerEdit=1 AND {ManagerSql})
- OR (@kind='PERSONAL' AND P.InvitationStatus IN ('PENDING','ACCEPTED')
+ OR (@kind='PERSONAL' AND P.InvitationStatus='ACCEPTED'
  AND EXISTS(SELECT 1 FROM dbo.TDADEmployee E WHERE E.CompanyID=@company AND E.EmployeeID=P.EmployeeID AND E.IsActive=1)
  AND ((@selfView=1 AND {SelfSql}) OR (@managerEdit=1 AND {ManagerSql}))));
 """;
@@ -427,7 +431,7 @@ SELECT P.BookingParticipantID,CASE WHEN @selfEdit=1 AND {SelfSql} THEN 1 ELSE 0 
 WHERE B.CompanyID=@company AND B.BookingID=@booking AND (@participant=0 OR P.BookingParticipantID=@participant) AND S.BookingSlotID=@slot
 AND (@room=0 OR B.RoomID=@room) AND (@employee=0 OR P.EmployeeID=@employee)
 AND ((@selfEdit=1 AND {SelfSql}) OR (@managerEdit=1 AND {ManagerSql}))
-AND B.BookingStatus='APPROVED' AND P.InvitationStatus IN ('PENDING','ACCEPTED')
+AND B.BookingStatus='APPROVED' AND P.InvitationStatus='ACCEPTED'
 AND S.StartDateTime<=GETDATE() AND S.EndDateTime>GETDATE();
 """;
         await using var eligible=new SqlCommand(sql,db,tx);Bind(eligible,company,user,bookingId);
