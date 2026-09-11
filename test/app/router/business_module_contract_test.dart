@@ -42,6 +42,14 @@ void main() {
     }
   });
 
+  test('Serial registry is owned by the Core project', () {
+    final route = ServiceRoutes.byMenuCode('08006');
+
+    expect(route, isNotNull);
+    expect(route.projectCode, 'LAOO');
+    expect(route.screenType, 1);
+  });
+
   test(
     'Visitor catalog is reserved but not routable before implementation',
     () {
@@ -54,12 +62,12 @@ void main() {
     },
   );
 
-  test('Time catalog is reserved but not routable before implementation', () {
+  test('Time preview settings are routable after activation', () {
     expect(TimeRoutes.all, hasLength(2));
-    expect(TimeRoutes.implemented, isEmpty);
+    expect(TimeRoutes.implemented, hasLength(2));
     for (final route in TimeRoutes.all) {
       expect(route.projectCode, TimeProject.code);
-      expect(AppMenuRouteRegistry.byMenuCode(route.menuCode), isNull);
+      expect(AppMenuRouteRegistry.byMenuCode(route.menuCode), isNotNull);
     }
   });
 }

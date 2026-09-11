@@ -13,8 +13,8 @@ void main() {
     expect(TimeRoutes.employeeSettings.screenType, 2);
     expect(TimeRoutes.systemSettings.menuCode, '28002');
     expect(TimeRoutes.systemSettings.screenType, 2);
-    expect(TimeRoutes.implemented, isEmpty);
-    expect(buildTimeFeatureRoutes(), isEmpty);
+    expect(TimeRoutes.implemented, hasLength(2));
+    expect(buildTimeFeatureRoutes(), hasLength(2));
   });
 
   testWidgets('Time delegates workspace composition to the Center host', (

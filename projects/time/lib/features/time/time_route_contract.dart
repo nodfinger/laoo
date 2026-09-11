@@ -35,7 +35,7 @@ abstract final class TimeRoutes {
     screenType: 2,
     routeName: TimeRouteNames.employeeSettings,
     routePath: TimeRoutePaths.employeeSettings,
-    isImplemented: false,
+    isImplemented: true,
   );
 
   static const systemSettings = FeatureRouteContract(
@@ -44,7 +44,7 @@ abstract final class TimeRoutes {
     screenType: 2,
     routeName: TimeRouteNames.systemSettings,
     routePath: TimeRoutePaths.systemSettings,
-    isImplemented: false,
+    isImplemented: true,
   );
 
   static const all = <FeatureRouteContract>[employeeSettings, systemSettings];
