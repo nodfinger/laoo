@@ -154,7 +154,7 @@ abstract final class ServiceRoutes {
       routePath: '/inventory/stock-receipts',
     ),
     FeatureRouteContract(
-      projectCode: ServiceProject.code,
+      projectCode: 'LAOO',
       menuCode: '08006',
       screenType: 1,
       routeName: 'itemInstances',

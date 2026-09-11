@@ -1277,7 +1277,9 @@ class SerialRegistryPage extends StatefulWidget {
 
 class _SerialRegistryPageState extends State<SerialRegistryPage> {
   final _api = InventoryApi(), _search = TextEditingController();
-  List<Map<String, dynamic>> _rows = const [], _history = const [];
+  List<Map<String, dynamic>> _rows = const [],
+      _history = const [],
+      _warranties = const [];
   bool _loading = true;
   Map<String, dynamic>? _selected;
   @override
@@ -1316,13 +1318,16 @@ class _SerialRegistryPageState extends State<SerialRegistryPage> {
 
   Future<void> _select(Map<String, dynamic> row) async {
     try {
-      final history = await _api.instanceHistory(
-        (row['itemInstanceID'] as num).toInt(),
-      );
+      final id = (row['itemInstanceID'] as num).toInt();
+      final values = await Future.wait([
+        _api.instanceHistory(id),
+        _api.instanceWarranties(id),
+      ]);
       if (mounted) {
         setState(() {
           _selected = row;
-          _history = history;
+          _history = values[0];
+          _warranties = values[1];
         });
       }
     } catch (e) {
@@ -1342,100 +1347,442 @@ class _SerialRegistryPageState extends State<SerialRegistryPage> {
     activeMenu: 'itemInstances',
     menuScope: WorkspaceMenuScope.company,
     child: Padding(
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.all(LaooLayout.cardMargin),
       child: Column(
         children: [
-          const _Header(title: 'ทะเบียน Serial/อุปกรณ์'),
-          const SizedBox(height: 6),
-          _Filter(controller: _search, onSearch: _load),
-          const SizedBox(height: 6),
+          _SerialRegistryToolbar(
+            controller: _search,
+            count: _rows.length,
+            onSearch: _load,
+          ),
+          const SizedBox(height: LaooLayout.cardSpacing),
           Expanded(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  flex: 3,
-                  child: Card(
-                    margin: EdgeInsets.zero,
-                    color: Colors.white,
-                    child: _loading
-                        ? const Center(child: CircularProgressIndicator())
-                        : SingleChildScrollView(
-                            child: DataTable(
-                              columns: const [
-                                DataColumn(label: Text('Serial')),
-                                DataColumn(label: Text('Item')),
-                                DataColumn(label: Text('สถานะ')),
-                                DataColumn(label: Text('คลัง')),
-                              ],
-                              rows: _rows
-                                  .map(
-                                    (x) => DataRow(
-                                      selected: identical(x, _selected),
-                                      onSelectChanged: (_) => _select(x),
-                                      cells: [
-                                        DataCell(Text('${x['serialNo']}')),
-                                        DataCell(
-                                          Text(
-                                            '${x['itemCode']} | ${x['itemName']}',
-                                          ),
+            child: LayoutBuilder(
+              builder: (context, constraints) => SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: SizedBox(
+                  width: math.max(900, constraints.maxWidth),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                        flex: 3,
+                        child: Card(
+                          margin: EdgeInsets.zero,
+                          color: LaooColors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(LaooRadius.xs),
+                          ),
+                          child: _loading
+                              ? const Center(child: CircularProgressIndicator())
+                              : LayoutBuilder(
+                                  builder: (context, constraints) => SingleChildScrollView(
+                                    scrollDirection: Axis.horizontal,
+                                    child: SizedBox(
+                                      width: math.max(
+                                        720,
+                                        constraints.maxWidth,
+                                      ),
+                                      child: DataTable(
+                                        headingRowColor: WidgetStatePropertyAll(
+                                          Theme.of(context).colorScheme.primary
+                                              .withValues(alpha: .10),
                                         ),
-                                        DataCell(Text('${x['statusCode']}')),
-                                        DataCell(
-                                          Text('${x['warehouseCode'] ?? '-'}'),
+                                        headingTextStyle: TextStyle(
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.primary,
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: LaooTypography.inputText,
+                                        ),
+                                        dataTextStyle: const TextStyle(
+                                          color: LaooColors.textPrimary,
+                                          fontSize: LaooTypography.inputText,
+                                        ),
+                                        dividerThickness: .5,
+                                        dataRowMinHeight: 56,
+                                        dataRowMaxHeight: 64,
+                                        columns: const [
+                                          DataColumn(label: Text('Serial')),
+                                          DataColumn(label: Text('Item')),
+                                          DataColumn(label: Text('สถานะ')),
+                                          DataColumn(label: Text('คลัง')),
+                                        ],
+                                        rows: _rows
+                                            .map(
+                                              (x) => DataRow(
+                                                selected: identical(
+                                                  x,
+                                                  _selected,
+                                                ),
+                                                onSelectChanged: (_) =>
+                                                    _select(x),
+                                                cells: [
+                                                  DataCell(
+                                                    Text('${x['serialNo']}'),
+                                                  ),
+                                                  DataCell(
+                                                    Text(
+                                                      '${x['itemCode']} | ${x['itemName']}',
+                                                    ),
+                                                  ),
+                                                  DataCell(
+                                                    _SerialRegistryStatus(
+                                                      code:
+                                                          '${x['statusCode']}',
+                                                    ),
+                                                  ),
+                                                  DataCell(
+                                                    Text(
+                                                      '${x['warehouseCode'] ?? '-'}',
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            )
+                                            .toList(),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                        ),
+                      ),
+                      const SizedBox(width: LaooLayout.cardSpacing),
+                      Expanded(
+                        flex: 2,
+                        child: Card(
+                          margin: EdgeInsets.zero,
+                          color: LaooColors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(LaooRadius.xs),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(
+                              LaooLayout.cardPadding,
+                            ),
+                            child: _selected == null
+                                ? Center(
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.touch_app_outlined,
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.primary,
+                                          size: 32,
+                                        ),
+                                        const SizedBox(height: 12),
+                                        const Text(
+                                          'เลือกรายการ Serial เพื่อดูรายละเอียด',
                                         ),
                                       ],
                                     ),
                                   )
-                                  .toList(),
-                            ),
-                          ),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  flex: 2,
-                  child: Card(
-                    margin: EdgeInsets.zero,
-                    color: Colors.white,
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: _selected == null
-                          ? const Center(
-                              child: Text('เลือกรายการเพื่อดูประวัติ'),
-                            )
-                          : ListView(
-                              children: [
-                                Text(
-                                  '${_selected!['serialNo']}',
-                                  style: Theme.of(
-                                    context,
-                                  ).textTheme.titleMedium,
-                                ),
-                                const SizedBox(height: 12),
-                                ..._history.map(
-                                  (x) => ListTile(
-                                    contentPadding: EdgeInsets.zero,
-                                    title: Text(
-                                      '${x['fromStatusCode'] ?? '-'} → ${x['toStatusCode']}',
-                                    ),
-                                    subtitle: Text(
-                                      '${x['documentType']} | ${x['eventDate']}\n${x['remark'] ?? ''}',
-                                    ),
+                                : ListView(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(12),
+                                        decoration: BoxDecoration(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .primary
+                                              .withValues(alpha: .10),
+                                          borderRadius: BorderRadius.circular(
+                                            LaooRadius.xs,
+                                          ),
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              '${_selected!['serialNo']}',
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .titleMedium
+                                                  ?.copyWith(
+                                                    color: Theme.of(
+                                                      context,
+                                                    ).colorScheme.primary,
+                                                    fontWeight: FontWeight.w700,
+                                                  ),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              '${_selected!['itemCode']} | ${_selected!['itemName']}',
+                                            ),
+                                            const SizedBox(height: 8),
+                                            _SerialRegistryStatus(
+                                              code:
+                                                  '${_selected!['statusCode']}',
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(height: 16),
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            Icons.verified_outlined,
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.primary,
+                                            size: 20,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            'ประกัน',
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .titleSmall
+                                                ?.copyWith(
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      if (_warranties.isEmpty)
+                                        const Text('ยังไม่มีข้อมูลประกัน')
+                                      else
+                                        ..._warranties.map(
+                                          (x) => Container(
+                                            margin: const EdgeInsets.only(
+                                              bottom: 8,
+                                            ),
+                                            padding: const EdgeInsets.all(12),
+                                            decoration: BoxDecoration(
+                                              border: Border.all(
+                                                color: LaooColors.border,
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(
+                                                    LaooRadius.xs,
+                                                  ),
+                                            ),
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  '${x['coverageTypeCode'] == 'SUPPLIER' ? 'ประกันผู้ขาย' : 'ประกันลูกค้า'} · ${x['warrantyModeCode'] == 'LIFETIME'
+                                                      ? 'ตลอดอายุ'
+                                                      : x['warrantyModeCode'] == 'NONE'
+                                                      ? 'ไม่มีประกัน'
+                                                      : '${x['durationMonths']} เดือน'}',
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.w700,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 4),
+                                                Text(
+                                                  'เริ่ม ${_serialRegistryDate(x['startDate'])}${x['expireDate'] == null ? ' · ตลอดอายุ' : ' · หมด ${_serialRegistryDate(x['expireDate'])}'}',
+                                                ),
+                                                Text(
+                                                  'จาก ${x['startEventCode'] ?? '-'}',
+                                                  style: const TextStyle(
+                                                    color: LaooColors
+                                                        .textSecondary,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            Icons.history_outlined,
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.primary,
+                                            size: 20,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            'ประวัติ Serial',
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .titleSmall
+                                                ?.copyWith(
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      ..._history.map(
+                                        (x) => Container(
+                                          padding: const EdgeInsets.only(
+                                            bottom: 10,
+                                          ),
+                                          margin: const EdgeInsets.only(
+                                            bottom: 10,
+                                          ),
+                                          decoration: const BoxDecoration(
+                                            border: Border(
+                                              bottom: BorderSide(
+                                                color: LaooColors.border,
+                                                width: .5,
+                                              ),
+                                            ),
+                                          ),
+                                          child: Text(
+                                            '${x['fromStatusCode'] ?? '-'} → ${x['toStatusCode']}\n${x['documentType']} · ${_serialRegistryDate(x['eventDate'])}${'${x['remark'] ?? ''}'.trim().isEmpty ? '' : '\n${x['remark']}'}',
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                ),
-                              ],
-                            ),
-                    ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
+              ),
             ),
           ),
         ],
       ),
     ),
   );
+}
+
+String _serialRegistryDate(Object? value) {
+  final text = '${value ?? ''}';
+  if (text.length < 10) return text.isEmpty ? '-' : text;
+  final parts = text.substring(0, 10).split('-');
+  return parts.length == 3 ? '${parts[2]}/${parts[1]}/${parts[0]}' : text;
+}
+
+class _SerialRegistryToolbar extends StatelessWidget {
+  const _SerialRegistryToolbar({
+    required this.controller,
+    required this.count,
+    required this.onSearch,
+  });
+
+  final TextEditingController controller;
+  final int count;
+  final VoidCallback onSearch;
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
+    return Card(
+      margin: EdgeInsets.zero,
+      color: LaooColors.white,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(LaooRadius.xs),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(LaooLayout.cardPadding),
+        child: LayoutBuilder(
+          builder: (context, constraints) => Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.qr_code_2_outlined, color: primary),
+                  const SizedBox(width: 8),
+                  Text(
+                    'ทะเบียน SN/อุปกรณ์',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: Colors.black,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(
+                width: constraints.maxWidth > 620 ? 320 : constraints.maxWidth,
+                child: TextField(
+                  controller: controller,
+                  onSubmitted: (_) => onSearch(),
+                  decoration: const InputDecoration(
+                    prefixIcon: Icon(Icons.search),
+                    labelText: 'ค้นหา Serial, รหัส หรือชื่อสินค้า',
+                  ),
+                ),
+              ),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(LaooRadius.xs),
+                  ),
+                ),
+                onPressed: onSearch,
+                icon: const Icon(Icons.search),
+                label: const Text('ค้นหา'),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 7,
+                ),
+                decoration: BoxDecoration(
+                  color: primary.withValues(alpha: .10),
+                  borderRadius: BorderRadius.circular(LaooRadius.xs),
+                ),
+                child: Text(
+                  '$count รายการ',
+                  style: TextStyle(
+                    color: primary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: LaooTypography.inputText,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SerialRegistryStatus extends StatelessWidget {
+  const _SerialRegistryStatus({required this.code});
+  final String code;
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
+    const labels = {
+      'IN_STOCK': 'อยู่ในคลัง',
+      'RESERVED': 'จอง',
+      'ISSUED': 'เบิกใช้',
+      'SOLD': 'ขายแล้ว',
+      'INSTALLED': 'ติดตั้งแล้ว',
+      'REPAIR': 'ซ่อม',
+      'RETIRED': 'เลิกใช้',
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: primary.withValues(alpha: .10),
+        borderRadius: BorderRadius.circular(LaooRadius.xs),
+      ),
+      child: Text(
+        labels[code] ?? code,
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          color: primary,
+          fontWeight: FontWeight.w700,
+          fontSize: LaooTypography.inputText,
+        ),
+      ),
+    );
+  }
 }
 
 class InventoryItemCatalogPage extends StatefulWidget {
@@ -1865,40 +2212,6 @@ class _Header extends StatelessWidget {
               icon: const Icon(Icons.save_outlined),
               label: const Text('บันทึก'),
             ),
-        ],
-      ),
-    ),
-  );
-}
-
-class _Filter extends StatelessWidget {
-  const _Filter({required this.controller, required this.onSearch});
-  final TextEditingController controller;
-  final VoidCallback onSearch;
-  @override
-  Widget build(BuildContext context) => Card(
-    margin: EdgeInsets.zero,
-    color: Colors.white,
-    child: Padding(
-      padding: const EdgeInsets.all(10),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: controller,
-              onSubmitted: (_) => onSearch(),
-              decoration: const InputDecoration(
-                prefixIcon: Icon(Icons.search),
-                labelText: 'ค้นหารหัสหรือชื่อ',
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          FilledButton.icon(
-            onPressed: onSearch,
-            icon: const Icon(Icons.search),
-            label: const Text('ค้นหา'),
-          ),
         ],
       ),
     ),

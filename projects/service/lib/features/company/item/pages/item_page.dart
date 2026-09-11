@@ -2003,6 +2003,7 @@ class _ItemPageState extends State<ItemPage> {
       final x = _visibleRows[i];
       final cover = x['coverImageBase64'];
       return Card(
+        margin: EdgeInsets.zero,
         child: ListTile(
           leading: cover is String && cover.isNotEmpty
               ? Image.memory(
@@ -2102,8 +2103,8 @@ class _ItemPageState extends State<ItemPage> {
       return Card(
         margin: EdgeInsets.zero,
         color: Colors.white,
-        elevation: 2,
-        shadowColor: accent.withValues(alpha: .18),
+        elevation: 0,
+        shadowColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(4),

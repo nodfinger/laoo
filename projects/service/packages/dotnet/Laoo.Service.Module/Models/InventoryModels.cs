@@ -19,7 +19,8 @@ public sealed record StockReceiptLineRequest(
     decimal UnitCost,
     string? Remark,
     IReadOnlyList<StockReceiptSerialInput>? Serials,
-    string SerialSourceCode = "FACTORY");
+    string SerialSourceCode = "FACTORY",
+    string? UnitCode = null);
 
 public sealed record StockReceiptUpsertRequest(
     long WarehouseID,
@@ -38,7 +39,15 @@ public sealed record ItemInstanceLocationRequest(
     long? BuildingID,
     long? FloorID,
     long? RoomID,
-    string? Remark);
+    string? Remark,
+    bool StartCustomerWarranty = false,
+    DateOnly? InstallationDate = null);
+
+public sealed record ItemInstanceWarrantyOverrideRequest(
+    string WarrantyModeCode,
+    int? DurationMonths,
+    DateOnly StartDate,
+    string Remark);
 
 public sealed record InventoryIssueSerialInput(long ItemInstanceID);
 
@@ -56,4 +65,5 @@ public sealed record InventoryIssueRequest(
 
 public sealed record InventoryAllocationRequest(
     long? WarehouseId,
-    IReadOnlyList<long>? SerialInstanceIds);
+    IReadOnlyList<long>? SerialInstanceIds,
+    IReadOnlyList<long>? StartCustomerWarrantySerialInstanceIds = null);

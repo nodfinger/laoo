@@ -67,7 +67,7 @@ IF @result<0 THROW 52711,'Receipt is busy. Retry the operation.',1;
                 vendorCode = vr.GetString(0); vendorName = vr.GetString(1);
             }
 
-            var prepared = new List<(StockReceiptLineRequest Line, string Source, string[] Serials)>();
+            var prepared = new List<(StockReceiptLineRequest Line, string Source, string[] Serials, string ReceiptUnit, string BaseUnit, decimal Factor, decimal BaseQuantity)>();
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var totalSerials = 0;
             foreach (var line in request.Items)
@@ -79,15 +79,22 @@ IF @result<0 THROW 52711,'Receipt is busy. Retry the operation.',1;
                     return InvalidReceipt($"รายการที่ {prepared.Count + 1}: จำนวนต้องมากกว่า 0 ต้นทุนไม่ติดลบ และทศนิยมไม่เกิน 4 ตำแหน่ง");
                 var tracking = await ItemTracking(c, tx, line.ItemID, token);
                 if (string.IsNullOrEmpty(tracking)) return InvalidReceipt("กรุณาเลือกสินค้าที่ควบคุมสต๊อกและเปิดใช้งาน");
+                var unit = await ResolveReceiptUnit(c, tx, line.ItemID, line.UnitCode, token);
+                if (unit is null)
+                    return InvalidReceipt($"รายการที่ {prepared.Count + 1}: หน่วยรับสินค้าไม่อยู่ในอัตราส่วนหน่วยนับของสินค้านี้");
+                var exactBaseQuantity = line.Quantity * unit.Value.Factor;
+                var baseQuantity = decimal.Round(exactBaseQuantity, 4, MidpointRounding.AwayFromZero);
+                if (baseQuantity <= 0 || baseQuantity > 99999999999999m || baseQuantity != exactBaseQuantity)
+                    return InvalidReceipt($"รายการที่ {prepared.Count + 1}: ผลแปลงเป็นหน่วยฐานต้องมากกว่า 0 และมีทศนิยมไม่เกิน 4 ตำแหน่ง");
                 var source = line.SerialSourceCode?.Trim().ToUpperInvariant() ?? "FACTORY";
                 if (source is not ("FACTORY" or "INTERNAL")) return InvalidReceipt("รูปแบบ Serial ต้องเป็นโรงงานหรือสร้างเลขภายใน");
                 var serials = (line.Serials ?? []).Select(x => x?.SerialNo?.Trim() ?? "").ToArray();
                 if (tracking == "SERIAL")
                 {
-                    if (line.Quantity != decimal.Truncate(line.Quantity) || line.Quantity > 2000 || (totalSerials += (int)line.Quantity) > 2000)
+                    if (baseQuantity != decimal.Truncate(baseQuantity) || baseQuantity > 2000 || (totalSerials += (int)baseQuantity) > 2000)
                         return InvalidReceipt("สินค้าควบคุม Serial ต้องเป็นจำนวนเต็ม รวมไม่เกิน 2,000 ชิ้นต่อเอกสาร");
                     if (source == "INTERNAL" && serials.Length == 0)
-                        serials = Enumerable.Range(0, (int)line.Quantity).Select(_ => "IS" + Guid.NewGuid().ToString("N").ToUpperInvariant()).ToArray();
+                        serials = Enumerable.Range(0, (int)baseQuantity).Select(_ => "IS" + Guid.NewGuid().ToString("N").ToUpperInvariant()).ToArray();
                     else if (source == "INTERNAL")
                     {
                         // Re-saving must preserve only numbers previously issued by this document.
@@ -108,8 +115,8 @@ WHERE R.CompanyID=@company AND R.StockReceiptID=@id AND D.ItemID=@item
                                 return InvalidReceipt("เลข Serial ภายในต้องให้ระบบสร้าง หรือใช้เลขเดิมจากเอกสารนี้");
                         }
                     }
-                    if (serials.Length != (int)line.Quantity || serials.Any(x => x.Length is < 1 or > 200))
-                        return InvalidReceipt($"รายการที่ {prepared.Count + 1}: ระบุ Serial ให้ครบ {line.Quantity:0} ชิ้น ความยาว 1–200 ตัวอักษร");
+                    if (serials.Length != (int)baseQuantity || serials.Any(x => x.Length is < 1 or > 200))
+                        return InvalidReceipt($"รายการที่ {prepared.Count + 1}: ระบุ Serial ให้ครบ {baseQuantity:0} ชิ้น ความยาว 1–200 ตัวอักษร");
                 }
                 else if (serials.Length > 0 || source == "INTERNAL")
                     return InvalidReceipt("สินค้าที่ไม่ควบคุม Serial ไม่สามารถระบุหรือสร้าง Serial ได้");
@@ -131,7 +138,7 @@ SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.TDIVItemInstance WITH(UPDLOCK,HOLDLOCK
                     if (Convert.ToInt32(await duplicate.ExecuteScalarAsync(token)) != 0)
                         return InvalidReceipt($"Serial {serial} มีแล้วหรือถูกจองในใบรับอื่นของบริษัท");
                 }
-                prepared.Add((line, source, serials));
+                prepared.Add((line, source, serials, unit.Value.ReceiptUnit, unit.Value.BaseUnit, unit.Value.Factor, baseQuantity));
             }
 
             var code = id.HasValue ? null : await NextCode(c, tx, token);
@@ -170,13 +177,17 @@ VALUES(@company,@warehouse,@code,@date,@type,N'DRAFT',@reference,@remark,@vendor
             foreach (var p in prepared)
             {
                 await using var detail = new SqlCommand("""
-INSERT dbo.TDIVStockReceiptDetail(StockReceiptID,[LineNo],ItemID,Quantity,UnitCost,Remark,SerialSourceCode)
-OUTPUT INSERTED.StockReceiptDetailID VALUES(@receipt,@line,@item,@qty,@cost,@remark,@source)
+INSERT dbo.TDIVStockReceiptDetail(StockReceiptID,[LineNo],ItemID,Quantity,ReceiptUnitCode,ReceiptQuantity,BaseUnitCode,UnitConversionFactor,UnitCost,Remark,SerialSourceCode)
+OUTPUT INSERTED.StockReceiptDetailID VALUES(@receipt,@line,@item,@baseQty,@receiptUnit,@receiptQty,@baseUnit,@factor,@cost,@remark,@source)
 """, c, tx);
                 Add(detail, "@receipt", SqlDbType.BigInt, receiptId);
                 Add(detail, "@line", SqlDbType.Int, ++lineNo);
                 Add(detail, "@item", SqlDbType.BigInt, p.Line.ItemID);
-                Add(detail, "@qty", SqlDbType.Decimal, p.Line.Quantity);
+                Add(detail, "@baseQty", SqlDbType.Decimal, p.BaseQuantity);
+                Add(detail, "@receiptUnit", SqlDbType.NVarChar, p.ReceiptUnit, 50);
+                Add(detail, "@receiptQty", SqlDbType.Decimal, p.Line.Quantity);
+                Add(detail, "@baseUnit", SqlDbType.NVarChar, p.BaseUnit, 50);
+                Add(detail, "@factor", SqlDbType.Decimal, p.Factor);
                 Add(detail, "@cost", SqlDbType.Decimal, p.Line.UnitCost);
                 Add(detail, "@remark", SqlDbType.NVarChar, p.Line.Remark?.Trim(), 500);
                 Add(detail, "@source", SqlDbType.VarChar, p.Source, 20);
@@ -188,7 +199,7 @@ OUTPUT INSERTED.StockReceiptDetailID VALUES(@receipt,@line,@item,@qty,@cost,@rem
                     Add(insert, "@serial", SqlDbType.NVarChar, serial, 200);
                     await insert.ExecuteNonQueryAsync(token);
                 }
-                saved.Add(new { lineNo, itemID = p.Line.ItemID, serialSourceCode = p.Source, serials = p.Serials });
+                saved.Add(new { lineNo, itemID = p.Line.ItemID, quantity = p.Line.Quantity, unitCode = p.ReceiptUnit, baseQuantity = p.BaseQuantity, baseUnitCode = p.BaseUnit, conversionFactor = p.Factor, serialSourceCode = p.Source, serials = p.Serials });
             }
             await tx.CommitAsync(token);
             return Ok(new { stockReceiptID = receiptId, receiptCode = code, statusCode = "DRAFT", items = saved });
@@ -201,5 +212,31 @@ OUTPUT INSERTED.StockReceiptDetailID VALUES(@receipt,@line,@item,@qty,@cost,@rem
                 ? "เลขเอกสารหรือ Serial ซ้ำ กรุณาตรวจข้อมูลและลองใหม่"
                 : "ไม่สามารถบันทึกข้อมูลได้ กรุณาลองใหม่ หากยังไม่สำเร็จให้ติดต่อผู้ดูแลระบบ");
         }
+    }
+
+    private async Task<(string ReceiptUnit,string BaseUnit,decimal Factor)?> ResolveReceiptUnit(SqlConnection c,SqlTransaction tx,long itemId,string? requestedUnit,CancellationToken token)
+    {
+        await using var itemCommand=new SqlCommand("SELECT UnitCode FROM dbo.TDIVItem WITH(HOLDLOCK) WHERE ItemID=@item AND CompanyID=@company AND IsActive=1 AND ItemKindCode=N'GOODS' AND StockTrackingCode<>N'NONE'",c,tx);
+        Add(itemCommand,"@item",SqlDbType.BigInt,itemId);Add(itemCommand,"@company",SqlDbType.BigInt,CompanyId());
+        var baseUnit=Convert.ToString(await itemCommand.ExecuteScalarAsync(token));
+        if(string.IsNullOrWhiteSpace(baseUnit))return null;
+        var target=string.IsNullOrWhiteSpace(requestedUnit)?baseUnit:requestedUnit.Trim();
+        if(string.Equals(target,baseUnit,StringComparison.OrdinalIgnoreCase))return(baseUnit,baseUnit,1m);
+
+        var current=baseUnit;var factor=1m;var visited=new HashSet<string>(StringComparer.OrdinalIgnoreCase){baseUnit};
+        for(var depth=0;depth<20;depth++)
+        {
+            await using var packCommand=new SqlCommand("SELECT TOP 1 ParentUnitCode,ConversionQuantity,BaseQuantity FROM dbo.TDIVItemPackUnit WITH(HOLDLOCK) WHERE ItemID=@item AND UnitCode=@unit ORDER BY SortOrder,ItemPackUnitID",c,tx);
+            Add(packCommand,"@item",SqlDbType.BigInt,itemId);Add(packCommand,"@unit",SqlDbType.NVarChar,current,50);
+            await using var reader=await packCommand.ExecuteReaderAsync(token);
+            if(!await reader.ReadAsync(token))return null;
+            var parent=reader.IsDBNull(0)?null:reader.GetString(0);var conversion=reader.GetDecimal(1);var baseQuantity=reader.GetDecimal(2);
+            if(conversion<=0||baseQuantity<=0||string.IsNullOrWhiteSpace(parent)||!visited.Add(parent))return null;
+            factor*=conversion/baseQuantity;
+            if(factor<=0)return null;
+            if(string.Equals(target,parent,StringComparison.OrdinalIgnoreCase))return(parent,baseUnit,factor);
+            current=parent;
+        }
+        return null;
     }
 }

@@ -1,6 +1,11 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import '../../../app/theme/laoo_design_tokens.dart';
 import '../../../app/theme/laoo_typography.dart';
+import '../../../core/company_setup/company_date_formatter.dart';
+import '../../../core/company_setup/company_setup_controller.dart';
 import '../../../core/navigation/navigation_menu_repository.dart';
 import '../../../core/widgets/timed_snack_bar.dart';
 import '../../support/presentation/widgets/support_workspace_shell.dart';
@@ -87,12 +92,34 @@ class _StockReceiptWorkspaceState extends State<StockReceiptWorkspace> {
       _busy = false,
       _createVendor = false,
       _card = false;
-  int? _id, _warehouse, _vendor;
+  int? _id, _warehouse, _vendor, _listVendor, _listWarehouse;
   int _page = 0;
   static const _pageSize = 10;
   String _type = 'RECEIPT', _code = '', _status = 'DRAFT';
   DateTime _date = DateTime.now();
   Color get _primary => Theme.of(context).colorScheme.primary;
+  String get _yearFormat => companySetupController.current?.yearFormat ?? 'C';
+  String _displayDate(DateTime value) =>
+      CompanyDateFormatter.formatDateByYearFormat(value, _yearFormat);
+  String _listDate(Object? value) {
+    final text = value?.toString() ?? '';
+    final date = DateTime.tryParse(text);
+    return date == null ? text : _displayDate(date);
+  }
+
+  bool get _usesBuddhistYear {
+    switch (_yearFormat.trim().toUpperCase()) {
+      case 'B':
+      case 'BE':
+      case 'T':
+      case 'TH':
+      case 'THAI':
+        return true;
+      default:
+        return false;
+    }
+  }
+
   bool get _editable =>
       _status == 'DRAFT' &&
       (_id == null ? _actions['create'] : _actions['edit']) == true;
@@ -122,7 +149,11 @@ class _StockReceiptWorkspaceState extends State<StockReceiptWorkspace> {
   Future<void> _load() async {
     try {
       final result = await Future.wait([
-        _api.receipts(search: _search.text),
+        _api.receipts(
+          search: _search.text,
+          vendorId: _listVendor,
+          warehouseId: _listWarehouse,
+        ),
         _api.receiptLookup(),
         _api.actions('stock-receipts'),
       ]);
@@ -146,6 +177,19 @@ class _StockReceiptWorkspaceState extends State<StockReceiptWorkspace> {
         _error(e);
       }
     }
+  }
+
+  Future<void> _findListVendor() async {
+    if (_busy) return;
+    final id = await showDialog<int>(
+      context: context,
+      builder: (_) => ReceiptLookupDialog(
+        label: 'ผู้ขาย',
+        rows: _vendors,
+        prefix: 'vendor',
+      ),
+    );
+    if (id != null && mounted) setState(() => _listVendor = id);
   }
 
   void _new() {
@@ -196,11 +240,22 @@ class _StockReceiptWorkspaceState extends State<StockReceiptWorkspace> {
         _lines.clear();
         for (final raw in data['items'] as List) {
           final item = Map<String, dynamic>.from(raw);
-          final l = ReceiptDraftLine(item)
-            ..quantity.text = '${item['quantity']}'
-            ..cost.text = '${item['unitCost']}'
-            ..source = item['serialSourceCode'] ?? 'FACTORY'
-            ..remark = item['remark'];
+          final matches = _items.where((x) => x['itemID'] == item['itemID']);
+          final l =
+              ReceiptDraftLine(
+                  matches.isEmpty
+                      ? item
+                      : Map<String, dynamic>.from(matches.first),
+                )
+                ..quantity.text = '${item['quantity']}'
+                ..cost.text = '${item['unitCost']}'
+                ..source = item['serialSourceCode'] ?? 'FACTORY'
+                ..remark = item['remark'];
+          l.selectUnit(
+            '${item['unitCode'] ?? l.baseUnit}',
+            snapshotFactor: (item['conversionFactor'] as num?)?.toDouble(),
+            snapshotBaseUnit: '${item['baseUnitCode'] ?? l.baseUnit}',
+          );
           l.setSerials(
             serials
                 .where(
@@ -209,6 +264,7 @@ class _StockReceiptWorkspaceState extends State<StockReceiptWorkspace> {
                 )
                 .map((s) => '${s['serialNo']}')
                 .toList(),
+            confirmed: true,
           );
           _lines.add(l);
         }
@@ -248,7 +304,7 @@ class _StockReceiptWorkspaceState extends State<StockReceiptWorkspace> {
       _error('กรุณาเพิ่มรายการสินค้าอย่างน้อย 1 รายการ');
       return;
     }
-    if (_lines.where((l) => l.serial).fold<double>(0, (n, l) => n + l.qty) >
+    if (_lines.where((l) => l.serial).fold<double>(0, (n, l) => n + l.baseQty) >
         2000) {
       _error('Serial รวมต้องไม่เกิน 2,000 ชิ้นต่อเอกสาร');
       return;
@@ -257,6 +313,10 @@ class _StockReceiptWorkspaceState extends State<StockReceiptWorkspace> {
     if (serialLines.isNotEmpty) {
       for (final l in serialLines) {
         l.resizeSerials();
+      }
+      if (_serialLinesAreConfirmedAndValid(serialLines)) {
+        await _persist();
+        return;
       }
       await showDialog<void>(
         context: context,
@@ -268,6 +328,21 @@ class _StockReceiptWorkspaceState extends State<StockReceiptWorkspace> {
     } else {
       await _persist();
     }
+  }
+
+  bool _serialLinesAreConfirmedAndValid(List<ReceiptDraftLine> lines) {
+    final seen = <String>{};
+    for (final line in lines) {
+      if (!line.serialConfirmed) return false;
+      if (line.source == 'INTERNAL' && line.serialValues.isEmpty) continue;
+      if (line.serialValues.length != line.baseQty.toInt()) return false;
+      for (final serial in line.serialValues) {
+        final value = serial.trim();
+        if (value.isEmpty || value.length > 200) return false;
+        if (!seen.add(value.toUpperCase())) return false;
+      }
+    }
+    return true;
   }
 
   Future<bool> _persist() async {
@@ -291,7 +366,7 @@ class _StockReceiptWorkspaceState extends State<StockReceiptWorkspace> {
         _status = 'DRAFT';
         for (final raw in saved['items'] as List) {
           final line = _lines[(raw['lineNo'] as num).toInt() - 1];
-          line.setSerials(List<String>.from(raw['serials']));
+          line.setSerials(List<String>.from(raw['serials']), confirmed: true);
         }
       });
       showTimedSnackBar(
@@ -385,7 +460,8 @@ class _StockReceiptWorkspaceState extends State<StockReceiptWorkspace> {
         ? _editor()
         : _list(),
   );
-  Widget _surface(Widget child) => Container(
+  Widget _surface(Widget child, {Key? key}) => Container(
+    key: key,
     padding: const EdgeInsets.all(LaooLayout.cardPadding),
     decoration: BoxDecoration(
       color: Colors.white,
@@ -393,39 +469,42 @@ class _StockReceiptWorkspaceState extends State<StockReceiptWorkspace> {
     ),
     child: child,
   );
-  Widget _title(List<Widget> buttons, {String suffix = ''}) => _surface(
-    Wrap(
-      alignment: WrapAlignment.spaceBetween,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      spacing: 12,
-      runSpacing: 8,
-      children: [
-        Row(
-          mainAxisSize: MainAxisSize.min,
+  Widget _title(List<Widget> buttons, {String suffix = '', Key? surfaceKey}) =>
+      _surface(
+        Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 12,
+          runSpacing: 8,
           children: [
-            Icon(Icons.star_border, color: _primary),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                '${widget.caption}$suffix',
-                style: const TextStyle(
-                  fontSize: LaooTypography.workspaceCaption,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.black,
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.star_border, color: _primary),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    '${widget.caption}$suffix',
+                    style: const TextStyle(
+                      fontSize: LaooTypography.workspaceCaption,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black,
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
+            Wrap(spacing: 8, runSpacing: 6, children: buttons),
           ],
         ),
-        Wrap(spacing: 8, runSpacing: 6, children: buttons),
-      ],
-    ),
-  );
+        key: surfaceKey,
+      );
   Widget _list() => LayoutBuilder(
     builder: (context, box) {
       final card = box.maxWidth < 900 || _card;
       final visible = _rows.skip(_page * _pageSize).take(_pageSize).toList();
       return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _title([
             if (box.maxWidth >= 900)
@@ -444,7 +523,7 @@ class _StockReceiptWorkspaceState extends State<StockReceiptWorkspace> {
                 icon: const Icon(Icons.add),
                 label: const Text('เพิ่ม'),
               ),
-          ]),
+          ], surfaceKey: const ValueKey('stock-receipt-caption-card')),
           const SizedBox(height: 6),
           _surface(
             LayoutBuilder(
@@ -457,15 +536,88 @@ class _StockReceiptWorkspaceState extends State<StockReceiptWorkspace> {
                         ? constraints.maxWidth
                         : 260,
                     child: TextField(
+                      key: const ValueKey('stock-receipt-search-filter'),
                       controller: _search,
                       style: const TextStyle(
                         fontSize: LaooTypography.inputText,
                       ),
                       decoration: receiptInput(
-                        'ค้นหาเลขที่ / อ้างอิง',
+                        'ค้นหาเลขที่ / อ้างอิง / หมายเหตุ / ผู้ส่งมอบ',
                         _primary,
                       ),
                       onSubmitted: (_) => _load(),
+                    ),
+                  ),
+                  SizedBox(
+                    width: constraints.maxWidth < 280
+                        ? constraints.maxWidth
+                        : 280,
+                    child: DropdownButtonFormField<int>(
+                      key: ValueKey('stock-receipt-vendor-filter-$_listVendor'),
+                      initialValue: _listVendor,
+                      isExpanded: true,
+                      style: const TextStyle(
+                        fontSize: LaooTypography.comboBox,
+                        color: LaooColors.textPrimary,
+                      ),
+                      decoration: receiptInput('ผู้ขาย', _primary).copyWith(
+                        prefixIcon: IconButton(
+                          tooltip: 'ค้นหาผู้ขาย',
+                          onPressed: _busy ? null : _findListVendor,
+                          icon: Icon(Icons.search, color: _primary),
+                        ),
+                      ),
+                      items: [
+                        const DropdownMenuItem<int>(
+                          value: null,
+                          child: Text('ทั้งหมด'),
+                        ),
+                        for (final vendor in _vendors)
+                          DropdownMenuItem<int>(
+                            value: (vendor['vendorID'] as num).toInt(),
+                            child: Text(
+                              '${vendor['vendorCode']} | ${vendor['vendorName']}',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                      ],
+                      onChanged: _busy
+                          ? null
+                          : (value) => setState(() => _listVendor = value),
+                    ),
+                  ),
+                  SizedBox(
+                    width: constraints.maxWidth < 280
+                        ? constraints.maxWidth
+                        : 280,
+                    child: DropdownButtonFormField<int>(
+                      key: ValueKey(
+                        'stock-receipt-warehouse-filter-$_listWarehouse',
+                      ),
+                      initialValue: _listWarehouse,
+                      isExpanded: true,
+                      style: const TextStyle(
+                        fontSize: LaooTypography.comboBox,
+                        color: LaooColors.textPrimary,
+                      ),
+                      decoration: receiptInput('คลัง', _primary),
+                      items: [
+                        const DropdownMenuItem<int>(
+                          value: null,
+                          child: Text('ทั้งหมด'),
+                        ),
+                        for (final warehouse in _warehouses)
+                          DropdownMenuItem<int>(
+                            value: (warehouse['warehouseID'] as num).toInt(),
+                            child: Text(
+                              '${warehouse['warehouseCode']} | ${warehouse['warehouseName']}',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                      ],
+                      onChanged: _busy
+                          ? null
+                          : (value) => setState(() => _listWarehouse = value),
                     ),
                   ),
                   FilledButton(
@@ -479,6 +631,8 @@ class _StockReceiptWorkspaceState extends State<StockReceiptWorkspace> {
                         ? null
                         : () {
                             _search.clear();
+                            _listVendor = null;
+                            _listWarehouse = null;
                             _load();
                           },
                     child: const Text('ล้าง Filter'),
@@ -486,11 +640,15 @@ class _StockReceiptWorkspaceState extends State<StockReceiptWorkspace> {
                 ],
               ),
             ),
+            key: const ValueKey('stock-receipt-filter-card'),
           ),
           const SizedBox(height: LaooLayout.cardSpacing),
           Expanded(
             child: _rows.isEmpty
-                ? _surface(const Center(child: Text('ไม่พบรายการ')))
+                ? _surface(
+                    const Center(child: Text('ไม่พบรายการ')),
+                    key: const ValueKey('stock-receipt-empty-card'),
+                  )
                 : card
                 ? ListView.separated(
                     itemCount: visible.length,
@@ -507,7 +665,8 @@ class _StockReceiptWorkspaceState extends State<StockReceiptWorkspace> {
                             Text(
                               '${r['warehouseCode']} | ${r['warehouseName']}',
                             ),
-                            Text('${r['receiptDate']}'.split('T').first),
+                            Text(_listDate(r['receiptDate'])),
+                            Text('${r['vendorName'] ?? '-'}'),
                             Text('${r['statusCode']}'),
                             _rowActions(r),
                           ],
@@ -516,63 +675,78 @@ class _StockReceiptWorkspaceState extends State<StockReceiptWorkspace> {
                     },
                   )
                 : _surface(
-                    SingleChildScrollView(
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: DataTable(
-                          headingTextStyle: TextStyle(
-                            fontSize: LaooTypography.tableHeader,
-                            color: _primary,
-                            fontWeight: FontWeight.w700,
-                          ),
-                          dataTextStyle: const TextStyle(
-                            fontSize: LaooTypography.tableBody,
-                            color: Colors.black,
-                          ),
-                          headingRowColor: WidgetStatePropertyAll(
-                            _primary.withValues(alpha: .1),
-                          ),
-                          columns: const [
-                            DataColumn(label: Text('ID')),
-                            DataColumn(label: Text('Action')),
-                            DataColumn(label: Text('เลขที่')),
-                            DataColumn(label: Text('วันที่')),
-                            DataColumn(label: Text('คลัง')),
-                            DataColumn(label: Text('ประเภท')),
-                            DataColumn(label: Text('จำนวน')),
-                            DataColumn(label: Text('สถานะ')),
-                          ],
-                          rows: [
-                            for (var i = 0; i < visible.length; i++)
-                              DataRow(
-                                cells: [
-                                  DataCell(
-                                    Text('${_page * _pageSize + i + 1}'),
-                                  ),
-                                  DataCell(_rowActions(visible[i])),
-                                  for (final key in [
-                                    'receiptCode',
-                                    'receiptDate',
-                                    'warehouseName',
-                                    'receiptType',
-                                    'totalQuantity',
-                                    'statusCode',
-                                  ])
-                                    DataCell(
-                                      Text(
-                                        key == 'receiptDate'
-                                            ? '${visible[i][key]}'
-                                                  .split('T')
-                                                  .first
-                                            : '${visible[i][key]}',
-                                      ),
+                    LayoutBuilder(
+                      builder: (_, constraints) => SingleChildScrollView(
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              minWidth: constraints.maxWidth,
+                            ),
+                            child: Theme(
+                              data: Theme.of(
+                                context,
+                              ).copyWith(dividerColor: LaooColors.border),
+                              child: DataTable(
+                                dividerThickness: 1,
+                                showBottomBorder: true,
+                                headingTextStyle: TextStyle(
+                                  fontSize: LaooTypography.tableHeader,
+                                  color: _primary,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                                dataTextStyle: const TextStyle(
+                                  fontSize: LaooTypography.tableBody,
+                                  color: Colors.black,
+                                ),
+                                headingRowColor: WidgetStatePropertyAll(
+                                  _primary.withValues(alpha: .1),
+                                ),
+                                columns: const [
+                                  DataColumn(label: Text('ID')),
+                                  DataColumn(label: Text('Action')),
+                                  DataColumn(label: Text('เลขที่')),
+                                  DataColumn(label: Text('วันที่')),
+                                  DataColumn(label: Text('ผู้ขาย')),
+                                  DataColumn(label: Text('คลัง')),
+                                  DataColumn(label: Text('ประเภท')),
+                                  DataColumn(label: Text('จำนวน')),
+                                  DataColumn(label: Text('สถานะ')),
+                                ],
+                                rows: [
+                                  for (var i = 0; i < visible.length; i++)
+                                    DataRow(
+                                      cells: [
+                                        DataCell(
+                                          Text('${_page * _pageSize + i + 1}'),
+                                        ),
+                                        DataCell(_rowActions(visible[i])),
+                                        for (final key in [
+                                          'receiptCode',
+                                          'receiptDate',
+                                          'vendorName',
+                                          'warehouseName',
+                                          'receiptType',
+                                          'totalQuantity',
+                                          'statusCode',
+                                        ])
+                                          DataCell(
+                                            Text(
+                                              key == 'receiptDate'
+                                                  ? _listDate(visible[i][key])
+                                                  : '${visible[i][key] ?? '-'}',
+                                            ),
+                                          ),
+                                      ],
                                     ),
                                 ],
                               ),
-                          ],
+                            ),
+                          ),
                         ),
                       ),
                     ),
+                    key: const ValueKey('stock-receipt-table-card'),
                   ),
           ),
           const SizedBox(height: LaooLayout.cardSpacing),
@@ -602,6 +776,7 @@ class _StockReceiptWorkspaceState extends State<StockReceiptWorkspace> {
                   ),
                 ],
               ),
+              key: const ValueKey('stock-receipt-pagination-card'),
             ),
           ),
         ],
@@ -646,6 +821,67 @@ class _StockReceiptWorkspaceState extends State<StockReceiptWorkspace> {
       child: child,
     ),
   );
+
+  Future<void> _pickReceiptDate() async {
+    final theme = Theme.of(context);
+    final primary = _primary;
+    final selected = await showDatePicker(
+      context: context,
+      initialDate: _date,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+      locale: _usesBuddhistYear
+          ? const Locale('th', 'TH')
+          : const Locale('en', 'US'),
+      builder: (context, child) => Theme(
+        data: theme.copyWith(
+          colorScheme: theme.colorScheme.copyWith(
+            primary: primary,
+            onPrimary: Colors.white,
+            surface: Colors.white,
+            onSurface: LaooColors.textPrimary,
+          ),
+          dialogTheme: DialogThemeData(
+            backgroundColor: Colors.white,
+            surfaceTintColor: Colors.transparent,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(LaooRadius.xs),
+            ),
+          ),
+          datePickerTheme: DatePickerThemeData(
+            backgroundColor: Colors.white,
+            surfaceTintColor: Colors.transparent,
+            headerBackgroundColor: Colors.white,
+            headerForegroundColor: LaooColors.textPrimary,
+            headerHeadlineStyle: theme.textTheme.headlineMedium?.copyWith(
+              color: LaooColors.textPrimary,
+            ),
+            headerHelpStyle: theme.textTheme.labelLarge?.copyWith(
+              color: LaooColors.textSecondary,
+            ),
+            weekdayStyle: theme.textTheme.bodySmall?.copyWith(
+              color: LaooColors.textPrimary,
+            ),
+            dayStyle: theme.textTheme.bodyMedium?.copyWith(
+              color: LaooColors.textPrimary,
+            ),
+            dayForegroundColor: WidgetStatePropertyAll(LaooColors.textPrimary),
+            dayOverlayColor: WidgetStatePropertyAll(
+              primary.withValues(alpha: 0.12),
+            ),
+            todayForegroundColor: WidgetStatePropertyAll(primary),
+            todayBorder: BorderSide(color: primary),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(LaooRadius.xs),
+            ),
+          ),
+        ),
+        child: child!,
+      ),
+    );
+    if (selected != null && mounted) setState(() => _date = selected);
+  }
+
   Widget _editor() => Form(
     key: _form,
     child: ListView(
@@ -683,37 +919,7 @@ class _StockReceiptWorkspaceState extends State<StockReceiptWorkspace> {
             children: [
               Text('สถานะ: $_status'),
               const SizedBox(height: 12),
-              _pair(
-                TextFormField(
-                  key: ValueKey(_code),
-                  initialValue: _code.isEmpty ? 'สร้างอัตโนมัติ' : _code,
-                  readOnly: true,
-                  decoration: receiptInput('เลขที่เอกสาร', _primary),
-                ),
-                TextFormField(
-                  key: ValueKey(_date),
-                  initialValue: _date.toIso8601String().substring(0, 10),
-                  readOnly: true,
-                  decoration: receiptInput('วันที่รับ *', _primary).copyWith(
-                    suffixIcon: const Icon(Icons.calendar_today_outlined),
-                  ),
-                  onTap: !_editable || _busy
-                      ? null
-                      : () async {
-                          final date = await showDatePicker(
-                            context: context,
-                            initialDate: _date,
-                            firstDate: DateTime(2000),
-                            lastDate: DateTime(2100),
-                          );
-                          if (date != null && mounted) {
-                            setState(() => _date = date);
-                          }
-                        },
-                ),
-              ),
-              const SizedBox(height: 12),
-              _pair(
+              _three(
                 DropdownButtonFormField<String>(
                   initialValue: _type,
                   isExpanded: true,
@@ -729,13 +935,20 @@ class _StockReceiptWorkspaceState extends State<StockReceiptWorkspace> {
                       ? null
                       : (v) => setState(() => _type = v!),
                 ),
-                _combo(
-                  'คลัง *',
-                  _warehouse,
-                  _warehouses,
-                  'warehouse',
-                  (v) => setState(() => _warehouse = v),
-                  required: true,
+                TextFormField(
+                  key: ValueKey(_code),
+                  initialValue: _code.isEmpty ? 'สร้างอัตโนมัติ' : _code,
+                  readOnly: true,
+                  decoration: receiptInput('เลขที่เอกสาร', _primary),
+                ),
+                TextFormField(
+                  key: ValueKey(_date),
+                  initialValue: _displayDate(_date),
+                  readOnly: true,
+                  decoration: receiptInput('วันที่รับ *', _primary).copyWith(
+                    suffixIcon: const Icon(Icons.calendar_today_outlined),
+                  ),
+                  onTap: !_editable || _busy ? null : _pickReceiptDate,
                 ),
               ),
               const SizedBox(height: 12),
@@ -763,7 +976,15 @@ class _StockReceiptWorkspaceState extends State<StockReceiptWorkspace> {
                 ],
               ),
               const SizedBox(height: 12),
-              _pair(
+              _three(
+                _combo(
+                  'คลัง *',
+                  _warehouse,
+                  _warehouses,
+                  'warehouse',
+                  (v) => setState(() => _warehouse = v),
+                  required: true,
+                ),
                 _text(_reference, 'อ้างอิงเอกสารผู้ขาย', 100),
                 _text(_delivered, 'ผู้ส่งมอบ', 200),
               ),
@@ -773,42 +994,139 @@ class _StockReceiptWorkspaceState extends State<StockReceiptWorkspace> {
           ),
         ),
         const SizedBox(height: LaooLayout.cardSpacing),
-        _surface(
-          Column(
+        _detailSection(),
+      ],
+    ),
+  );
+
+  Widget _detailSection() => _surface(
+    Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          key: const ValueKey('stock-receipt-detail-section-header'),
+          padding: const EdgeInsets.all(LaooLayout.cardPadding),
+          decoration: BoxDecoration(
+            color: _primary.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(LaooRadius.xs),
+          ),
+          child: Row(
             children: [
-              Row(
-                children: [
-                  const Expanded(child: Text('รายการสินค้า')),
-                  if (_editable)
-                    OutlinedButton.icon(
-                      style: receiptButton(_primary),
-                      onPressed: _busy || _items.isEmpty
-                          ? null
-                          : () => setState(
-                              () => _lines.add(ReceiptDraftLine(_items.first)),
-                            ),
-                      icon: const Icon(Icons.add),
-                      label: const Text('เพิ่มรายการ'),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              LayoutBuilder(
-                builder: (context, box) => Column(
-                  children: [
-                    if (box.maxWidth >= 900) _detailHeader(),
-                    for (var i = 0; i < _lines.length; i++)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: _detail(i, _lines[i], box.maxWidth < 900),
-                      ),
-                  ],
+              Icon(Icons.inventory_2_outlined, color: _primary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'รายการสินค้า (${_lines.length})',
+                  style: const TextStyle(
+                    fontSize: LaooTypography.sectionTitle,
+                    fontWeight: LaooTypography.emphasizedWeight,
+                    color: LaooColors.textPrimary,
+                  ),
                 ),
               ),
-              Align(
-                alignment: Alignment.centerRight,
-                child: Text(
-                  'มูลค่ารวม ${_lines.fold<double>(0, (sum, l) => sum + l.amount).toStringAsFixed(2)} บาท',
+              if (_editable)
+                OutlinedButton.icon(
+                  style: receiptButton(_primary),
+                  onPressed: _busy || _items.isEmpty
+                      ? null
+                      : () => setState(
+                          () => _lines.add(ReceiptDraftLine(_items.first)),
+                        ),
+                  icon: const Icon(Icons.add),
+                  label: const Text('เพิ่มรายการ'),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 6),
+        LayoutBuilder(
+          builder: (context, box) {
+            final narrow = box.maxWidth < 900;
+            return Column(
+              children: [
+                if (!narrow) _detailHeader(),
+                if (_lines.isEmpty)
+                  Container(
+                    key: const ValueKey('stock-receipt-detail-empty'),
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    alignment: Alignment.center,
+                    child: const Text(
+                      'ยังไม่มีรายการสินค้า',
+                      style: TextStyle(
+                        fontSize: LaooTypography.body,
+                        color: LaooColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                for (var i = 0; i < _lines.length; i++)
+                  Container(
+                    key: ValueKey('stock-receipt-detail-row-$i'),
+                    width: double.infinity,
+                    margin: EdgeInsets.only(bottom: narrow ? 6 : 0),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: narrow ? LaooLayout.cardPadding : 8,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: narrow
+                          ? _primary.withValues(alpha: 0.035)
+                          : Colors.white,
+                      borderRadius: narrow
+                          ? BorderRadius.circular(LaooRadius.xs)
+                          : null,
+                      border: narrow
+                          ? null
+                          : const Border(
+                              bottom: BorderSide(color: LaooColors.border),
+                            ),
+                    ),
+                    child: _detail(i, _lines[i], narrow),
+                  ),
+              ],
+            );
+          },
+        ),
+        const SizedBox(height: 6),
+        Container(
+          key: const ValueKey('stock-receipt-detail-footer'),
+          padding: const EdgeInsets.all(LaooLayout.cardPadding),
+          decoration: BoxDecoration(
+            color: _primary.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(LaooRadius.xs),
+          ),
+          child: Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 16,
+            runSpacing: 6,
+            children: [
+              Text(
+                'รวม ${_lines.length} รายการ',
+                style: const TextStyle(
+                  fontSize: LaooTypography.body,
+                  color: LaooColors.textSecondary,
+                ),
+              ),
+              Text.rich(
+                TextSpan(
+                  children: [
+                    const TextSpan(text: 'มูลค่ารวม  '),
+                    TextSpan(
+                      text:
+                          '${_lines.fold<double>(0, (sum, l) => sum + l.amount).toStringAsFixed(2)} บาท',
+                      style: TextStyle(
+                        color: _primary,
+                        fontSize: LaooTypography.sectionTitle,
+                        fontWeight: LaooTypography.emphasizedWeight,
+                      ),
+                    ),
+                  ],
+                ),
+                style: const TextStyle(
+                  fontSize: LaooTypography.body,
+                  fontWeight: LaooTypography.emphasizedWeight,
+                  color: LaooColors.textPrimary,
                 ),
               ),
             ],
@@ -829,6 +1147,28 @@ class _StockReceiptWorkspaceState extends State<StockReceiptWorkspace> {
             ],
           ),
   );
+  Widget _three(Widget first, Widget second, Widget third) => LayoutBuilder(
+    builder: (_, box) => box.maxWidth < 850
+        ? Column(
+            children: [
+              first,
+              const SizedBox(height: 12),
+              second,
+              const SizedBox(height: 12),
+              third,
+            ],
+          )
+        : Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: first),
+              const SizedBox(width: 12),
+              Expanded(child: second),
+              const SizedBox(width: 12),
+              Expanded(child: third),
+            ],
+          ),
+  );
   Widget _text(TextEditingController c, String label, int max) => TextFormField(
     controller: c,
     enabled: _editable && !_busy,
@@ -845,6 +1185,7 @@ class _StockReceiptWorkspaceState extends State<StockReceiptWorkspace> {
     String prefix,
     ValueChanged<int?> changed, {
     bool required = false,
+    bool tableInput = false,
   }) {
     final rows = [...values];
     if (selected != null && !rows.any((r) => r['${prefix}ID'] == selected)) {
@@ -862,25 +1203,29 @@ class _StockReceiptWorkspaceState extends State<StockReceiptWorkspace> {
         fontSize: LaooTypography.comboBox,
         color: Colors.black,
       ),
-      decoration: receiptInput(label, _primary).copyWith(
-        prefixIcon: _editable && !_busy
-            ? IconButton(
-                tooltip: 'ค้นหา$label',
-                onPressed: () async {
-                  final id = await showDialog<int>(
-                    context: context,
-                    builder: (_) => ReceiptLookupDialog(
-                      label: label,
-                      rows: values,
-                      prefix: prefix,
-                    ),
-                  );
-                  if (id != null && mounted) changed(id);
-                },
-                icon: Icon(Icons.search, color: _primary),
-              )
-            : null,
-      ),
+      decoration:
+          (tableInput
+                  ? receiptTableInput(_primary)
+                  : receiptInput(label, _primary))
+              .copyWith(
+                prefixIcon: _editable && !_busy
+                    ? IconButton(
+                        tooltip: 'ค้นหา$label',
+                        onPressed: () async {
+                          final id = await showDialog<int>(
+                            context: context,
+                            builder: (_) => ReceiptLookupDialog(
+                              label: label,
+                              rows: values,
+                              prefix: prefix,
+                            ),
+                          );
+                          if (id != null && mounted) changed(id);
+                        },
+                        icon: Icon(Icons.search, color: _primary),
+                      )
+                    : null,
+              ),
       items: [
         if (!required)
           const DropdownMenuItem<int>(value: null, child: Text('ไม่ระบุ')),
@@ -898,15 +1243,20 @@ class _StockReceiptWorkspaceState extends State<StockReceiptWorkspace> {
     );
   }
 
-  Widget _detailHeader() => Padding(
-    padding: const EdgeInsets.only(bottom: 8),
+  Widget _detailHeader() => Container(
+    key: const ValueKey('stock-receipt-detail-table-header'),
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+    decoration: BoxDecoration(
+      color: _primary.withValues(alpha: 0.1),
+      borderRadius: BorderRadius.circular(LaooRadius.xs),
+    ),
     child: Row(
       children: [
-        const SizedBox(width: 36, child: Text('ID')),
-        const SizedBox(width: 48, child: Text('Action')),
+        const SizedBox(width: 36, child: Center(child: Text('ID'))),
+        const SizedBox(width: 48, child: Center(child: Text('Action'))),
         for (final pair in [
           ('สินค้า', 4),
-          ('หน่วย', 1),
+          ('หน่วย', 2),
           ('จำนวน', 2),
           ('ต้นทุน/หน่วย', 2),
           ('รวม', 2),
@@ -916,16 +1266,75 @@ class _StockReceiptWorkspaceState extends State<StockReceiptWorkspace> {
             flex: pair.$2,
             child: Text(
               pair.$1,
-              style: TextStyle(color: _primary, fontWeight: FontWeight.w700),
+              style: TextStyle(
+                color: _primary,
+                fontSize: LaooTypography.tableHeader,
+                fontWeight: LaooTypography.emphasizedWeight,
+              ),
             ),
           ),
       ],
     ),
   );
   Widget _detail(int index, ReceiptDraftLine l, bool narrow) {
-    final item = _combo('สินค้า *', l.itemId, _items, 'item', (v) {
-      setState(() => l.setItem(_items.firstWhere((x) => x['itemID'] == v)));
-    }, required: true);
+    final item = _combo(
+      'สินค้า *',
+      l.itemId,
+      _items,
+      'item',
+      (v) {
+        setState(() => l.setItem(_items.firstWhere((x) => x['itemID'] == v)));
+      },
+      required: true,
+      tableInput: !narrow,
+    );
+    final unit = DropdownButtonFormField<String>(
+      key: ValueKey('receipt-unit-${l.itemId}-${l.unit}'),
+      initialValue: l.unit,
+      isExpanded: true,
+      decoration: narrow
+          ? receiptInput('หน่วยรับ *', _primary)
+          : receiptTableInput(_primary),
+      style: const TextStyle(
+        fontSize: LaooTypography.inputText,
+        color: Colors.black87,
+      ),
+      items: l.units
+          .map(
+            (u) => DropdownMenuItem<String>(
+              value: '${u['unitCode']}',
+              child: Text(
+                '${u['unitName'] ?? u['unitCode']}',
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          )
+          .toList(),
+      onChanged: !_editable || _busy
+          ? null
+          : (value) => setState(() {
+              if (value == null || value == l.unit) return;
+              l.selectUnit(value);
+              l.setSerials([]);
+            }),
+    );
+    final unitField = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        unit,
+        if (l.conversionFactor != 1)
+          Padding(
+            padding: const EdgeInsets.only(top: 4, left: 4),
+            child: Text(
+              'เข้าสต๊อก ${l.baseQtyText} ${l.baseUnitName}',
+              style: TextStyle(
+                color: _primary,
+                fontSize: LaooTypography.bodySmall,
+              ),
+            ),
+          ),
+      ],
+    );
     Widget number(
       TextEditingController c,
       String label, {
@@ -935,12 +1344,15 @@ class _StockReceiptWorkspaceState extends State<StockReceiptWorkspace> {
       enabled: _editable && !_busy,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
       style: const TextStyle(fontSize: LaooTypography.inputText),
-      decoration: receiptInput(label, _primary),
+      decoration: narrow
+          ? receiptInput(label, _primary)
+          : receiptTableInput(_primary),
       onChanged: (_) => setState(() {
+        if (quantity) l.serialConfirmed = false;
         if (quantity &&
             l.source == 'INTERNAL' &&
             l.numbers.isNotEmpty &&
-            l.numbers.length != l.qty) {
+            l.numbers.length != l.baseQty) {
           l.setSerials([]);
         }
       }),
@@ -949,7 +1361,11 @@ class _StockReceiptWorkspaceState extends State<StockReceiptWorkspace> {
         if (n == null || !n.isFinite || n < 0 || (quantity && n <= 0)) {
           return 'ระบุตัวเลข${quantity ? 'มากกว่า 0' : ''}';
         }
-        if (quantity && l.serial && (n != n.truncateToDouble() || n > 2000)) {
+        final baseQuantity = n * l.conversionFactor;
+        if (quantity &&
+            l.serial &&
+            (baseQuantity != baseQuantity.truncateToDouble() ||
+                baseQuantity > 2000)) {
           return 'จำนวนเต็ม 1–2000';
         }
         return null;
@@ -966,23 +1382,32 @@ class _StockReceiptWorkspaceState extends State<StockReceiptWorkspace> {
       icon: const Icon(Icons.delete_outline, color: Colors.red),
     );
     final progress = l.serial
-        ? '${l.source == 'INTERNAL' && l.serialValues.isEmpty ? 'สร้าง' : l.serialValues.where((x) => x.trim().isNotEmpty).length}/${l.qty.toInt()}'
+        ? '${l.source == 'INTERNAL' && l.serialValues.isEmpty ? 'สร้าง' : l.serialValues.where((x) => x.trim().isNotEmpty).length}/${l.baseQty.toInt()}'
         : '—';
     final serial = TextButton(
       onPressed: !l.serial || _busy
           ? null
           : () async {
-              if (l.qty <= 0 ||
-                  l.qty > 2000 ||
-                  l.qty != l.qty.truncateToDouble()) {
+              if (l.baseQty <= 0 ||
+                  l.baseQty > 2000 ||
+                  l.baseQty != l.baseQty.truncateToDouble()) {
                 return;
               }
+              final previousSource = l.source;
+              final previousSerials = List<String>.from(l.serialValues);
+              final wasConfirmed = l.serialConfirmed;
               l.resizeSerials();
-              await showDialog<void>(
+              final confirmed = await showDialog<bool>(
                 context: context,
                 builder: (_) =>
                     ReceiptSerialDialog(lines: [l], readOnly: !_editable),
               );
+              if (confirmed == true) {
+                l.serialConfirmed = true;
+              } else {
+                l.source = previousSource;
+                l.setSerials(previousSerials, confirmed: wasConfirmed);
+              }
               if (mounted) setState(() {});
             },
       child: Text(progress),
@@ -999,6 +1424,8 @@ class _StockReceiptWorkspaceState extends State<StockReceiptWorkspace> {
           ),
           item,
           const SizedBox(height: 12),
+          unitField,
+          const SizedBox(height: 12),
           _pair(
             number(l.quantity, 'จำนวน *', quantity: true),
             number(l.cost, 'ต้นทุน/หน่วย'),
@@ -1006,11 +1433,7 @@ class _StockReceiptWorkspaceState extends State<StockReceiptWorkspace> {
           Wrap(
             spacing: 16,
             crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              Text('หน่วย: ${l.unit}'),
-              Text('รวม: ${l.amount.toStringAsFixed(2)}'),
-              serial,
-            ],
+            children: [Text('รวม: ${l.amount.toStringAsFixed(2)}'), serial],
           ),
         ],
       );
@@ -1018,10 +1441,16 @@ class _StockReceiptWorkspaceState extends State<StockReceiptWorkspace> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(width: 36, child: Text('${index + 1}')),
-        SizedBox(width: 48, child: delete),
+        SizedBox(
+          width: 36,
+          child: Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Center(child: Text('${index + 1}')),
+          ),
+        ),
+        SizedBox(width: 48, child: Center(child: delete)),
         Expanded(flex: 4, child: item),
-        Expanded(child: Text(l.unit)),
+        Expanded(flex: 2, child: unitField),
         Expanded(
           flex: 2,
           child: Padding(
@@ -1036,8 +1465,22 @@ class _StockReceiptWorkspaceState extends State<StockReceiptWorkspace> {
             child: number(l.cost, 'ต้นทุน'),
           ),
         ),
-        Expanded(flex: 2, child: Text(l.amount.toStringAsFixed(2))),
-        Expanded(flex: 2, child: serial),
+        Expanded(
+          flex: 2,
+          child: Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Text(
+              l.amount.toStringAsFixed(2),
+              style: const TextStyle(
+                fontWeight: LaooTypography.emphasizedWeight,
+              ),
+            ),
+          ),
+        ),
+        Expanded(
+          flex: 2,
+          child: Align(alignment: Alignment.centerLeft, child: serial),
+        ),
       ],
     );
   }
@@ -1060,6 +1503,11 @@ InputDecoration receiptInput(String label, Color primary) {
     focusedErrorBorder: border(Colors.red),
   );
 }
+
+InputDecoration receiptTableInput(Color primary) => receiptInput(
+  '',
+  primary,
+).copyWith(labelText: null, floatingLabelBehavior: FloatingLabelBehavior.never);
 
 ButtonStyle receiptButton(Color primary, {bool compact = false}) => ButtonStyle(
   minimumSize: WidgetStatePropertyAll(
@@ -1089,6 +1537,7 @@ class ReceiptLookupDialog extends StatefulWidget {
 class _ReceiptLookupDialogState extends State<ReceiptLookupDialog> {
   final _search = TextEditingController();
   String _query = '';
+  String? _itemTypeCode;
   @override
   void dispose() {
     _search.dispose();
@@ -1098,10 +1547,28 @@ class _ReceiptLookupDialogState extends State<ReceiptLookupDialog> {
   @override
   Widget build(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
+    final isItemLookup = widget.prefix == 'item';
     String name(Map<String, dynamic> r) =>
         '${r['${widget.prefix}Code']} | ${r['${widget.prefix}Name']}';
+    String typeName(Map<String, dynamic> r) {
+      final code = r['itemTypeCode']?.toString().trim() ?? '';
+      final label = r['itemTypeName']?.toString().trim() ?? '';
+      return label.isEmpty ? code : '$code | $label';
+    }
+
+    final types = <String, String>{
+      for (final row in widget.rows)
+        if ((row['itemTypeCode']?.toString().trim() ?? '').isNotEmpty)
+          row['itemTypeCode'].toString(): typeName(row),
+    };
     final rows = widget.rows
-        .where((r) => name(r).toLowerCase().contains(_query))
+        .where(
+          (r) =>
+              name(r).toLowerCase().contains(_query) &&
+              (!isItemLookup ||
+                  _itemTypeCode == null ||
+                  r['itemTypeCode']?.toString() == _itemTypeCode),
+        )
         .toList();
     return Dialog(
       backgroundColor: Colors.white,
@@ -1110,7 +1577,7 @@ class _ReceiptLookupDialogState extends State<ReceiptLookupDialog> {
         borderRadius: BorderRadius.circular(LaooRadius.xs),
       ),
       child: SizedBox(
-        width: 480,
+        width: isItemLookup ? 820 : 480,
         height: MediaQuery.sizeOf(context).height * .65,
         child: Padding(
           padding: const EdgeInsets.all(LaooLayout.cardPadding),
@@ -1133,26 +1600,76 @@ class _ReceiptLookupDialogState extends State<ReceiptLookupDialog> {
                 ],
               ),
               const Divider(color: LaooColors.border),
-              TextField(
-                controller: _search,
-                autofocus: true,
-                style: const TextStyle(fontSize: LaooTypography.inputText),
-                decoration: receiptInput('รหัส / ชื่อ', primary).copyWith(
-                  suffixIcon: IconButton(
-                    tooltip: 'ค้นหา',
-                    onPressed: () => setState(
+              LayoutBuilder(
+                builder: (_, box) {
+                  final search = TextField(
+                    controller: _search,
+                    autofocus: true,
+                    style: const TextStyle(fontSize: LaooTypography.inputText),
+                    decoration: receiptInput('รหัส / ชื่อ', primary).copyWith(
+                      suffixIcon: IconButton(
+                        tooltip: 'ค้นหา',
+                        onPressed: () => setState(
+                          () => _query = _search.text.trim().toLowerCase(),
+                        ),
+                        icon: Icon(Icons.search, color: primary),
+                      ),
+                    ),
+                    onSubmitted: (_) => setState(
                       () => _query = _search.text.trim().toLowerCase(),
                     ),
-                    icon: Icon(Icons.search, color: primary),
-                  ),
-                ),
-                onSubmitted: (_) =>
-                    setState(() => _query = _search.text.trim().toLowerCase()),
+                  );
+                  if (!isItemLookup) return search;
+                  final typeFilter = DropdownButtonFormField<String>(
+                    key: const ValueKey('item-lookup-type-filter'),
+                    initialValue: _itemTypeCode,
+                    isExpanded: true,
+                    style: const TextStyle(
+                      fontSize: LaooTypography.comboBox,
+                      color: LaooColors.textPrimary,
+                    ),
+                    decoration: receiptInput('ประเภทสินค้า', primary),
+                    items: [
+                      const DropdownMenuItem<String>(
+                        value: null,
+                        child: Text('ทั้งหมด'),
+                      ),
+                      for (final entry in types.entries)
+                        DropdownMenuItem(
+                          value: entry.key,
+                          child: Text(
+                            entry.value,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                    ],
+                    onChanged: (value) => setState(() => _itemTypeCode = value),
+                  );
+                  if (box.maxWidth < 600) {
+                    return Column(
+                      children: [
+                        search,
+                        const SizedBox(height: 12),
+                        typeFilter,
+                      ],
+                    );
+                  }
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(flex: 3, child: search),
+                      const SizedBox(width: 12),
+                      Expanded(flex: 2, child: typeFilter),
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 12),
               Expanded(
                 child: rows.isEmpty
                     ? const Center(child: Text('ไม่พบรายการ'))
+                    : isItemLookup
+                    ? _itemResults(rows, name, typeName, primary)
                     : ListView.builder(
                         itemCount: rows.length,
                         itemBuilder: (_, i) => ListTile(
@@ -1162,10 +1679,7 @@ class _ReceiptLookupDialogState extends State<ReceiptLookupDialog> {
                               fontSize: LaooTypography.comboBox,
                             ),
                           ),
-                          onTap: () => Navigator.pop(
-                            context,
-                            (rows[i]['${widget.prefix}ID'] as num).toInt(),
-                          ),
+                          onTap: () => _select(rows[i]),
                         ),
                       ),
               ),
@@ -1184,6 +1698,199 @@ class _ReceiptLookupDialogState extends State<ReceiptLookupDialog> {
       ),
     );
   }
+
+  Widget _itemResults(
+    List<Map<String, dynamic>> rows,
+    String Function(Map<String, dynamic>) name,
+    String Function(Map<String, dynamic>) typeName,
+    Color primary,
+  ) => LayoutBuilder(
+    builder: (_, box) {
+      final narrow = box.maxWidth < 600;
+      return Column(
+        children: [
+          if (!narrow)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+              decoration: BoxDecoration(
+                color: primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(LaooRadius.xs),
+              ),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 72,
+                    child: Text('รูปภาพ', style: _headerStyle(primary)),
+                  ),
+                  Expanded(child: Text('สินค้า', style: _headerStyle(primary))),
+                  SizedBox(
+                    width: 180,
+                    child: Text('ประเภทสินค้า', style: _headerStyle(primary)),
+                  ),
+                  SizedBox(
+                    width: 80,
+                    child: Text('หน่วย', style: _headerStyle(primary)),
+                  ),
+                ],
+              ),
+            ),
+          Expanded(
+            child: ListView.separated(
+              itemCount: rows.length,
+              separatorBuilder: (_, _) =>
+                  const Divider(height: 1, color: LaooColors.border),
+              itemBuilder: (_, i) => narrow
+                  ? ListTile(
+                      leading: _imageThumbnail(rows[i], primary),
+                      title: Text(name(rows[i])),
+                      subtitle: Text(
+                        '${typeName(rows[i])} • ${rows[i]['unitCode'] ?? '-'}',
+                      ),
+                      onTap: () => _select(rows[i]),
+                    )
+                  : InkWell(
+                      onTap: () => _select(rows[i]),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 8,
+                        ),
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: 72,
+                              child: _imageThumbnail(rows[i], primary),
+                            ),
+                            Expanded(
+                              child: Text(
+                                name(rows[i]),
+                                style: const TextStyle(
+                                  fontSize: LaooTypography.comboBox,
+                                ),
+                              ),
+                            ),
+                            SizedBox(
+                              width: 180,
+                              child: Text(typeName(rows[i])),
+                            ),
+                            SizedBox(
+                              width: 80,
+                              child: Text('${rows[i]['unitCode'] ?? '-'}'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+            ),
+          ),
+        ],
+      );
+    },
+  );
+
+  TextStyle _headerStyle(Color primary) => TextStyle(
+    color: primary,
+    fontSize: LaooTypography.tableHeader,
+    fontWeight: LaooTypography.emphasizedWeight,
+  );
+
+  Widget _imageThumbnail(Map<String, dynamic> row, Color primary) {
+    final bytes = _imageBytes(row['coverImageBase64']);
+    if (bytes == null) {
+      return Container(
+        width: 56,
+        height: 56,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: primary.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
+        ),
+        child: Icon(Icons.image_not_supported_outlined, color: primary),
+      );
+    }
+    return Tooltip(
+      message: 'ดูรูปภาพ',
+      child: InkWell(
+        onTap: () => _previewImage(
+          name: '${row['itemCode']} | ${row['itemName']}',
+          bytes: bytes,
+        ),
+        borderRadius: BorderRadius.circular(LaooRadius.xs),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
+          child: Image.memory(bytes, width: 56, height: 56, fit: BoxFit.cover),
+        ),
+      ),
+    );
+  }
+
+  Uint8List? _imageBytes(Object? value) {
+    final text = value?.toString().trim() ?? '';
+    if (text.isEmpty) return null;
+    try {
+      return base64Decode(text);
+    } on FormatException {
+      return null;
+    }
+  }
+
+  Future<void> _previewImage({
+    required String name,
+    required Uint8List bytes,
+  }) => showDialog<void>(
+    context: context,
+    builder: (context) => Dialog(
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(LaooRadius.xs),
+      ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 640, maxHeight: 640),
+        child: Padding(
+          padding: const EdgeInsets.all(LaooLayout.cardPadding),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.image_outlined,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      name,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: LaooTypography.workspaceCaption,
+                        fontWeight: LaooTypography.emphasizedWeight,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const Divider(color: LaooColors.border),
+              Flexible(child: Image.memory(bytes, fit: BoxFit.contain)),
+              const Divider(color: LaooColors.border),
+              Align(
+                alignment: Alignment.centerRight,
+                child: OutlinedButton(
+                  style: receiptButton(Theme.of(context).colorScheme.primary),
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('ปิด'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+
+  void _select(Map<String, dynamic> row) =>
+      Navigator.pop(context, (row['${widget.prefix}ID'] as num).toInt());
 }
 
 class ReceiptDraftLine {
@@ -1191,9 +1898,12 @@ class ReceiptDraftLine {
     setItem(item);
   }
   late int itemId;
-  String name = '', unit = '', source = 'FACTORY';
+  String name = '', unit = '', baseUnit = '', baseUnitName = '';
+  String source = 'FACTORY';
+  double conversionFactor = 1;
+  List<Map<String, dynamic>> units = [];
   String? remark;
-  bool serial = false;
+  bool serial = false, serialConfirmed = false;
   final quantity = TextEditingController(text: '1'),
       cost = TextEditingController(text: '0');
   final List<TextEditingController> numbers = [];
@@ -1207,27 +1917,78 @@ class ReceiptDraftLine {
     return n != null && n.isFinite ? qty * n : 0;
   }
 
+  double get baseQty => qty * conversionFactor;
+  String get baseQtyText => baseQty == baseQty.truncateToDouble()
+      ? baseQty.toInt().toString()
+      : baseQty.toStringAsFixed(4).replaceFirst(RegExp(r'0+$'), '');
+
   List<String> get serialValues => numbers.map((c) => c.text.trim()).toList();
   void setItem(Map<String, dynamic> item) {
     itemId = (item['itemID'] as num).toInt();
     name = '${item['itemCode']} | ${item['itemName']}';
-    unit = '${item['unitCode'] ?? ''}';
+    baseUnit = '${item['unitCode'] ?? ''}';
+    baseUnitName = '${item['unitName'] ?? baseUnit}';
+    units = (item['receiptUnits'] as List? ?? const [])
+        .map((u) => Map<String, dynamic>.from(u as Map))
+        .toList();
+    if (units.isEmpty) {
+      units = [
+        {
+          'unitCode': baseUnit,
+          'unitName': baseUnitName,
+          'conversionFactor': 1,
+          'isBaseUnit': true,
+        },
+      ];
+    }
+    unit = baseUnit;
+    conversionFactor = 1;
     serial = item['stockTrackingCode'] == 'SERIAL';
     source = 'FACTORY';
     setSerials([]);
   }
 
-  void setSerials(List<String> values) {
+  void selectUnit(
+    String code, {
+    double? snapshotFactor,
+    String? snapshotBaseUnit,
+  }) {
+    final matches = units.where((u) => '${u['unitCode']}' == code);
+    Map<String, dynamic> selected;
+    if (matches.isEmpty) {
+      selected = {
+        'unitCode': code,
+        'unitName': code,
+        'conversionFactor': snapshotFactor ?? 1,
+        'isBaseUnit': false,
+      };
+      units.add(selected);
+    } else {
+      selected = matches.first;
+    }
+    unit = code;
+    conversionFactor =
+        snapshotFactor ??
+        (selected['conversionFactor'] as num?)?.toDouble() ??
+        1;
+    if (snapshotBaseUnit != null && snapshotBaseUnit.isNotEmpty) {
+      baseUnit = snapshotBaseUnit;
+    }
+  }
+
+  void setSerials(List<String> values, {bool confirmed = false}) {
     for (final c in numbers) {
       c.dispose();
     }
     numbers.clear();
     numbers.addAll(values.map((v) => TextEditingController(text: v)));
+    serialConfirmed = serial && confirmed;
   }
 
   void resizeSerials() {
     if (source == 'INTERNAL' && numbers.isEmpty) return;
-    final size = qty.toInt().clamp(0, 2000);
+    final size = baseQty.toInt().clamp(0, 2000);
+    if (numbers.length != size) serialConfirmed = false;
     while (numbers.length > size) {
       numbers.removeLast().dispose();
     }
@@ -1239,6 +2000,7 @@ class ReceiptDraftLine {
   Map<String, dynamic> get body => {
     'itemID': itemId,
     'quantity': qty,
+    'unitCode': unit,
     'unitCost': double.tryParse(cost.text) ?? 0,
     'remark': remark,
     'serialSourceCode': source,
@@ -1270,9 +2032,24 @@ class ReceiptSerialDialog extends StatefulWidget {
 class _ReceiptSerialDialogState extends State<ReceiptSerialDialog> {
   final _form = GlobalKey<FormState>();
   bool _saving = false, _saved = false;
+
+  Set<String> get _duplicateSerials {
+    final seen = <String>{};
+    final duplicates = <String>{};
+    for (final line in widget.lines) {
+      for (final serial in line.serialValues) {
+        final normalized = serial.trim().toUpperCase();
+        if (normalized.isEmpty) continue;
+        if (!seen.add(normalized)) duplicates.add(normalized);
+      }
+    }
+    return duplicates;
+  }
+
   @override
   Widget build(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
+    final duplicateSerials = _duplicateSerials;
     return PopScope(
       canPop: !_saving,
       child: Dialog(
@@ -1316,10 +2093,41 @@ class _ReceiptSerialDialogState extends State<ReceiptSerialDialog> {
                         child: Column(
                           children: [
                             for (final l in widget.lines) ...[
-                              Align(
-                                alignment: Alignment.centerLeft,
-                                child: Text(
-                                  '${l.name} • ${l.qty.toInt()} ชิ้น',
+                              Container(
+                                key: ValueKey(
+                                  'receipt-serial-item-header-${widget.lines.indexOf(l)}',
+                                ),
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 10,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: primary.withValues(alpha: 0.10),
+                                  borderRadius: BorderRadius.circular(
+                                    LaooRadius.xs,
+                                  ),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      l.name,
+                                      style: TextStyle(
+                                        fontSize: LaooTypography.sectionTitle,
+                                        fontWeight:
+                                            LaooTypography.emphasizedWeight,
+                                        color: primary,
+                                      ),
+                                    ),
+                                    Text(
+                                      'จำนวน ${l.baseQty.toInt()} ${l.baseUnitName}',
+                                      style: TextStyle(
+                                        fontSize: LaooTypography.body,
+                                        color: primary,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                               const SizedBox(height: 12),
@@ -1351,12 +2159,15 @@ class _ReceiptSerialDialogState extends State<ReceiptSerialDialog> {
                               const SizedBox(height: 12),
                               if (l.source == 'INTERNAL' && l.numbers.isEmpty)
                                 Text(
-                                  'ระบบจะสร้าง Serial ${l.qty.toInt()} หมายเลขเมื่อบันทึกเอกสาร',
+                                  'ระบบจะสร้าง Serial ${l.baseQty.toInt()} หมายเลขเมื่อบันทึกเอกสาร',
                                 ),
                               for (var i = 0; i < l.numbers.length; i++)
                                 Padding(
                                   padding: const EdgeInsets.only(bottom: 12),
                                   child: TextFormField(
+                                    key: ValueKey(
+                                      'receipt-serial-${widget.lines.indexOf(l)}-$i',
+                                    ),
                                     controller: l.numbers[i],
                                     readOnly:
                                         l.source == 'INTERNAL' ||
@@ -1366,10 +2177,22 @@ class _ReceiptSerialDialogState extends State<ReceiptSerialDialog> {
                                     style: const TextStyle(
                                       fontSize: LaooTypography.inputText,
                                     ),
-                                    decoration: receiptInput(
-                                      'Serial ${i + 1} *',
-                                      primary,
-                                    ),
+                                    autovalidateMode:
+                                        AutovalidateMode.onUserInteraction,
+                                    decoration:
+                                        receiptInput(
+                                          'Serial ${i + 1} *',
+                                          primary,
+                                        ).copyWith(
+                                          errorText:
+                                              duplicateSerials.contains(
+                                                l.numbers[i].text
+                                                    .trim()
+                                                    .toUpperCase(),
+                                              )
+                                              ? 'Serial ซ้ำในเอกสาร'
+                                              : null,
+                                        ),
                                     textInputAction: TextInputAction.next,
                                     onFieldSubmitted: (_) =>
                                         FocusScope.of(context).nextFocus(),
@@ -1379,22 +2202,16 @@ class _ReceiptSerialDialogState extends State<ReceiptSerialDialog> {
                                       if (value.isEmpty || value.length > 200) {
                                         return 'ระบุ Serial 1–200 ตัวอักษร';
                                       }
-                                      final count = widget.lines
-                                          .expand((l) => l.serialValues)
-                                          .where(
-                                            (s) =>
-                                                s.toUpperCase() ==
-                                                value.toUpperCase(),
+                                      return duplicateSerials.contains(
+                                            value.toUpperCase(),
                                           )
-                                          .length;
-                                      return count > 1
                                           ? 'Serial ซ้ำในเอกสาร'
                                           : null;
                                     },
                                   ),
                                 ),
                               Text(
-                                'ระบุ ${l.serialValues.where((v) => v.isNotEmpty).length}/${l.qty.toInt()}',
+                                'ระบุ ${l.serialValues.where((v) => v.isNotEmpty).length}/${l.baseQty.toInt()}',
                               ),
                               const SizedBox(height: 12),
                             ],
@@ -1411,24 +2228,25 @@ class _ReceiptSerialDialogState extends State<ReceiptSerialDialog> {
                     spacing: 8,
                     runSpacing: 8,
                     children: [
-                      OutlinedButton(
-                        style: receiptButton(primary),
-                        onPressed: _saving
-                            ? null
-                            : () => Navigator.pop(context),
-                        child: Text(
-                          _saved || widget.readOnly
-                              ? 'กลับเอกสาร'
-                              : 'กลับไปแก้ไข',
-                        ),
-                      ),
                       if (widget.onSave != null && !_saved && !widget.readOnly)
+                        OutlinedButton(
+                          style: receiptButton(primary),
+                          onPressed: _saving
+                              ? null
+                              : () => Navigator.pop(context),
+                          child: const Text('กลับไปแก้ไข'),
+                        ),
+                      if (!_saved && !widget.readOnly)
                         FilledButton(
                           style: receiptButton(primary),
                           onPressed: _saving
                               ? null
                               : () async {
                                   if (!_form.currentState!.validate()) return;
+                                  if (widget.onSave == null) {
+                                    Navigator.pop(context, true);
+                                    return;
+                                  }
                                   setState(() => _saving = true);
                                   final success = await widget.onSave!();
                                   if (mounted) {
@@ -1438,7 +2256,23 @@ class _ReceiptSerialDialogState extends State<ReceiptSerialDialog> {
                                     });
                                   }
                                 },
-                          child: Text(_saving ? 'กำลังบันทึก' : 'บันทึกเอกสาร'),
+                          child: Text(_saving ? 'กำลังบันทึก' : 'ยืนยัน'),
+                        ),
+                      if (widget.onSave == null && !widget.readOnly)
+                        OutlinedButton(
+                          style: receiptButton(primary),
+                          onPressed: _saving
+                              ? null
+                              : () => Navigator.pop(context, false),
+                          child: const Text('ปิด'),
+                        ),
+                      if (_saved || widget.readOnly)
+                        OutlinedButton(
+                          style: receiptButton(primary),
+                          onPressed: _saving
+                              ? null
+                              : () => Navigator.pop(context),
+                          child: const Text('ปิด'),
                         ),
                     ],
                   ),

@@ -119,7 +119,7 @@ public sealed class DeliveryNoteController(IConfiguration configuration) : Contr
             var itemId = await itemCommand.ExecuteScalarAsync(token);
             if (itemId is null or DBNull) throw new ItemProjectDeniedException();
             await ItemProjectAccess.EnsureAsync(c,tx,CompanyId(),Convert.ToInt64(itemId),token);
-            await ReplaceSerials(c,tx,"DELIVERY_NOTE",detailId,request.SerialInstanceIds,token);
+            await ReplaceSerials(c,tx,"DELIVERY_NOTE",detailId,request.SerialInstanceIds,request.StartCustomerWarrantySerialInstanceIds,token);
             await tx.CommitAsync(token); return Ok(new{message="บันทึกคลังและ Serial สำเร็จ"});
         }
         catch(Exception ex) when (ex is not ItemProjectDeniedException){await tx.RollbackAsync(token);return BadRequest(new{message="บันทึกคลังและ Serial ไม่สำเร็จ",description=ex.Message});}
@@ -210,6 +210,9 @@ public sealed class DeliveryNoteController(IConfiguration configuration) : Contr
                 var sourceDetail = line.Pre ?? line.Quote ?? line.Parent ?? line.Detail;
                 var issued = await InventoryStockService.IssueSaleAsync(c, tx, CompanyId(), UserId(), "DELIVERY_NOTE", id, line.Detail, line.Item, line.Qty, line.Warehouse, sourceType, sourceDetail, serials, token);
                 if (!issued.Success) { await tx.RollbackAsync(token); return Conflict(new { message = "ตัดสต็อกไม่สำเร็จ", description = issued.Error }); }
+                var warrantySerials = await SelectedWarrantySerials(c,tx,line.Detail,token);
+                var deliveryDate = await DeliveryDate(c,tx,id,token);
+                foreach(var instanceId in warrantySerials) await ItemWarrantyService.CreateSnapshotAsync(c,tx,CompanyId(),UserId(),line.Item,instanceId,"CUSTOMER","DELIVERY",deliveryDate,"DELIVERY_NOTE",id,line.Detail,token);
                 if (!issued.AlreadyFulfilled && line.Pre.HasValue)
                 {
                     await using var pre = new SqlCommand("UPDATE dbo.TDARPreOrderDetail SET DeliveredQty=DeliveredQty+@qty WHERE PreOrderDetailID=@pre AND DeliveredQty+@qty<=AllocatedQty", c, tx);
@@ -235,6 +238,7 @@ public sealed class DeliveryNoteController(IConfiguration configuration) : Contr
             if (status != "CONFIRMED") { await tx.RollbackAsync(token); return Conflict(new { message = "ยกเลิกใบส่งของไม่ได้", description = "ยกเลิกได้เฉพาะเอกสารที่ยืนยันแล้ว" }); }
             await using (var pre = new SqlCommand("UPDATE P SET DeliveredQty=CASE WHEN P.DeliveredQty>=F.Quantity THEN P.DeliveredQty-F.Quantity ELSE 0 END FROM dbo.TDARPreOrderDetail P JOIN dbo.TDARDeliveryNoteDetail D ON D.PreOrderDetailID=P.PreOrderDetailID JOIN dbo.TDIVInventoryFulfillment F ON F.FulfilledByDocumentDetailID=D.DeliveryNoteDetailID AND F.FulfilledByDocumentType=N'DELIVERY_NOTE' AND F.FulfilledByDocumentID=@id AND F.ReversedDate IS NULL WHERE D.DeliveryNoteID=@id", c, tx)) { Add(pre,"@id",SqlDbType.BigInt,id); await pre.ExecuteNonQueryAsync(token); }
             await InventoryStockService.ReverseDocumentAsync(c, tx, CompanyId(), UserId(), "DELIVERY_NOTE", id, token);
+            await ItemWarrantyService.VoidBySourceAsync(c,tx,CompanyId(),UserId(),"DELIVERY_NOTE",id,"ยกเลิกใบส่งของ",token);
             await using (var done = new SqlCommand("UPDATE dbo.TDARDeliveryNote SET StatusCode=N'VOID',VoidDate=SYSUTCDATETIME(),VoidedBy=@user,UpdateDate=SYSUTCDATETIME(),UpdatedBy=@user WHERE DeliveryNoteID=@id AND CompanyID=@company", c, tx))
             { Add(done,"@user",SqlDbType.BigInt,UserId()); Add(done,"@id",SqlDbType.BigInt,id); Add(done,"@company",SqlDbType.BigInt,CompanyId()); await done.ExecuteNonQueryAsync(token); }
             await tx.CommitAsync(token); return Ok(new { message = "ยกเลิกใบส่งของและคืนสต็อกสำเร็จ" });
@@ -249,13 +253,25 @@ public sealed class DeliveryNoteController(IConfiguration configuration) : Contr
         var result = new List<long>(); await using var reader = await cmd.ExecuteReaderAsync(token); while (await reader.ReadAsync(token)) result.Add(reader.GetInt64(0)); return result;
     }
 
-    private async Task ReplaceSerials(SqlConnection c, SqlTransaction tx, string type, long detail, IReadOnlyList<long>? serials, CancellationToken token)
+    private async Task<List<long>> SelectedWarrantySerials(SqlConnection c, SqlTransaction tx, long detail, CancellationToken token)
+    {
+        await using var cmd = new SqlCommand("SELECT ItemInstanceID FROM dbo.TDIVDocumentSerialSelection WHERE CompanyID=@company AND DocumentType=N'DELIVERY_NOTE' AND DocumentDetailID=@detail AND StartCustomerWarranty=1", c, tx);
+        Add(cmd,"@company",SqlDbType.BigInt,CompanyId()); Add(cmd,"@detail",SqlDbType.BigInt,detail);
+        var result = new List<long>(); await using var reader = await cmd.ExecuteReaderAsync(token); while(await reader.ReadAsync(token)) result.Add(reader.GetInt64(0)); return result;
+    }
+
+    private async Task<DateOnly> DeliveryDate(SqlConnection c, SqlTransaction tx, long id, CancellationToken token)
+    {
+        await using var cmd = new SqlCommand("SELECT DeliveryDate FROM dbo.TDARDeliveryNote WHERE DeliveryNoteID=@id AND CompanyID=@company",c,tx); Add(cmd,"@id",SqlDbType.BigInt,id); Add(cmd,"@company",SqlDbType.BigInt,CompanyId()); return DateOnly.FromDateTime(Convert.ToDateTime(await cmd.ExecuteScalarAsync(token)));
+    }
+
+    private async Task ReplaceSerials(SqlConnection c, SqlTransaction tx, string type, long detail, IReadOnlyList<long>? serials, IReadOnlyList<long>? startWarrantySerials, CancellationToken token)
     {
         await using(var clear=new SqlCommand("DELETE dbo.TDIVDocumentSerialSelection WHERE CompanyID=@company AND DocumentType=@type AND DocumentDetailID=@detail",c,tx)){Add(clear,"@company",SqlDbType.BigInt,CompanyId());Add(clear,"@type",SqlDbType.NVarChar,type,30);Add(clear,"@detail",SqlDbType.BigInt,detail);await clear.ExecuteNonQueryAsync(token);}
         foreach(var serial in (serials??Array.Empty<long>()).Distinct())
         {
-            await using var add=new SqlCommand("INSERT dbo.TDIVDocumentSerialSelection(CompanyID,DocumentType,DocumentDetailID,ItemInstanceID,CreatedBy) SELECT @company,@type,@detail,I.ItemInstanceID,@user FROM dbo.TDIVItemInstance I JOIN dbo.TDARDeliveryNoteDetail D ON D.DeliveryNoteDetailID=@detail WHERE I.ItemInstanceID=@serial AND I.CompanyID=@company AND I.ItemID=D.ItemID AND I.StatusCode=N'IN_STOCK'; IF @@ROWCOUNT=0 THROW 52321,N'Invalid serial selection',1",c,tx);
-            Add(add,"@company",SqlDbType.BigInt,CompanyId());Add(add,"@type",SqlDbType.NVarChar,type,30);Add(add,"@detail",SqlDbType.BigInt,detail);Add(add,"@serial",SqlDbType.BigInt,serial);Add(add,"@user",SqlDbType.BigInt,UserId());await add.ExecuteNonQueryAsync(token);
+            await using var add=new SqlCommand("INSERT dbo.TDIVDocumentSerialSelection(CompanyID,DocumentType,DocumentDetailID,ItemInstanceID,StartCustomerWarranty,CreatedBy) SELECT @company,@type,@detail,I.ItemInstanceID,@startWarranty,@user FROM dbo.TDIVItemInstance I JOIN dbo.TDARDeliveryNoteDetail D ON D.DeliveryNoteDetailID=@detail WHERE I.ItemInstanceID=@serial AND I.CompanyID=@company AND I.ItemID=D.ItemID AND I.StatusCode=N'IN_STOCK'; IF @@ROWCOUNT=0 THROW 52321,N'Invalid serial selection',1",c,tx);
+            Add(add,"@company",SqlDbType.BigInt,CompanyId());Add(add,"@type",SqlDbType.NVarChar,type,30);Add(add,"@detail",SqlDbType.BigInt,detail);Add(add,"@serial",SqlDbType.BigInt,serial);Add(add,"@startWarranty",SqlDbType.Bit,startWarrantySerials?.Contains(serial)==true);Add(add,"@user",SqlDbType.BigInt,UserId());await add.ExecuteNonQueryAsync(token);
         }
     }
 

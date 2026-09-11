@@ -50,16 +50,21 @@ class InventoryApi {
       Map<String, dynamic>.from(
         await _client.get('/api/company/stock-receipts/lookup') as Map,
       );
-  Future<List<Map<String, dynamic>>> receipts({String? search}) async =>
-      List<Map<String, dynamic>>.from(
-        await _client.get(
-              '/api/company/stock-receipts',
-              query: {
-                if (search?.trim().isNotEmpty == true) 'search': search!.trim(),
-              },
-            )
-            as List,
-      );
+  Future<List<Map<String, dynamic>>> receipts({
+    String? search,
+    int? vendorId,
+    int? warehouseId,
+  }) async => List<Map<String, dynamic>>.from(
+    await _client.get(
+          '/api/company/stock-receipts',
+          query: {
+            if (search?.trim().isNotEmpty == true) 'search': search!.trim(),
+            if (vendorId != null) 'vendorId': '$vendorId',
+            if (warehouseId != null) 'warehouseId': '$warehouseId',
+          },
+        )
+        as List,
+  );
   Future<Map<String, dynamic>> receipt(int id) async =>
       Map<String, dynamic>.from(
         await _client.get('/api/company/stock-receipts/$id') as Map,
@@ -91,6 +96,10 @@ class InventoryApi {
   Future<List<Map<String, dynamic>>> instanceHistory(int id) async =>
       List<Map<String, dynamic>>.from(
         await _client.get('/api/company/item-instances/$id/history') as List,
+      );
+  Future<List<Map<String, dynamic>>> instanceWarranties(int id) async =>
+      List<Map<String, dynamic>>.from(
+        await _client.get('/api/company/item-instances/$id/warranties') as List,
       );
   Future<void> updateInstanceLocation(int id, Map<String, dynamic> body) =>
       _client.put('/api/company/item-instances/$id/location', body: body);
