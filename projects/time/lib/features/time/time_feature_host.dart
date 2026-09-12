@@ -234,6 +234,7 @@ class _TimeCaptionCardState extends State<TimeCaptionCard> {
           ),
         ),
       );
+}
 
 TimeUiTokens get timeUiTokens {
   final tokens = _uiTokens;
