@@ -7,6 +7,8 @@ import '../schedule_groups/schedule_group_page.dart';
 import '../rotation_patterns/rotation_pattern_page.dart';
 import '../employee_schedules/employee_schedule_page.dart';
 import 'time_route_contract.dart';
+import '../time_corrections/time_correction_page.dart';
+import '../time_reasons/time_reason_page.dart';
 
 List<GoRoute> buildTimeFeatureRoutes() => <GoRoute>[
   GoRoute(
@@ -38,5 +40,45 @@ List<GoRoute> buildTimeFeatureRoutes() => <GoRoute>[
     name: TimeRouteNames.systemSettings,
     path: TimeRoutePaths.systemSettings,
     builder: (context, state) => const TimeSystemSettingsPage(),
+  ),
+  GoRoute(
+    name: TimeRouteNames.timeCorrectionProxy,
+    path: TimeRoutePaths.timeCorrectionProxy,
+    builder: (context, state) => const TimeCorrectionPage(
+      menuCode: TimeMenuCodes.timeCorrectionProxy,
+      mode: 'proxy',
+    ),
+  ),
+  GoRoute(
+    name: TimeRouteNames.timeApprovalInbox,
+    path: TimeRoutePaths.timeApprovalInbox,
+    builder: (context, state) => const TimeCorrectionPage(
+      menuCode: TimeMenuCodes.timeApprovalInbox,
+      mode: 'approval',
+    ),
+  ),
+  GoRoute(
+    name: TimeRouteNames.onBehalfReasons,
+    path: TimeRoutePaths.onBehalfReasons,
+    builder: (context, state) => const TimeReasonPage(
+      menuCode: TimeMenuCodes.onBehalfReasons,
+      apiPath: '/api/time/on-behalf-reasons',
+    ),
+  ),
+  GoRoute(
+    name: TimeRouteNames.adjustmentReasons,
+    path: TimeRoutePaths.adjustmentReasons,
+    builder: (context, state) => const TimeReasonPage(
+      menuCode: TimeMenuCodes.adjustmentReasons,
+      apiPath: '/api/time/adjustment-reasons',
+    ),
+  ),
+  GoRoute(
+    name: TimeRouteNames.myTimeCorrections,
+    path: TimeRoutePaths.myTimeCorrections,
+    builder: (context, state) => const TimeCorrectionPage(
+      menuCode: TimeMenuCodes.myTimeCorrections,
+      mode: 'self',
+    ),
   ),
 ];

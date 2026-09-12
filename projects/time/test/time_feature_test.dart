@@ -9,7 +9,7 @@ void main() {
     expect(AppConfig.projectCode, 'LAOO_TIME');
     expect(AppConfig.apiBaseUrl, 'http://localhost:5080');
     expect(TimeMenuGroups.setup, '28');
-    expect(TimeRoutes.all, hasLength(6));
+    expect(TimeRoutes.all, hasLength(11));
     expect(TimeRoutes.shiftTemplates.menuCode, '27001');
     expect(TimeRoutes.scheduleGroups.menuCode, '27002');
     expect(TimeRoutes.rotationPatterns.menuCode, '27003');
@@ -18,8 +18,18 @@ void main() {
     expect(TimeRoutes.employeeSettings.screenType, 2);
     expect(TimeRoutes.systemSettings.menuCode, '28002');
     expect(TimeRoutes.systemSettings.screenType, 2);
-    expect(TimeRoutes.implemented, hasLength(6));
-    expect(buildTimeFeatureRoutes(), hasLength(6));
+    expect(TimeRoutes.timeCorrectionProxy.menuCode, '26001');
+    expect(TimeRoutes.timeCorrectionProxy.screenType, 4);
+    expect(TimeRoutes.timeApprovalInbox.menuCode, '26002');
+    expect(TimeRoutes.timeApprovalInbox.screenType, 3);
+    expect(TimeRoutes.onBehalfReasons.menuCode, '28003');
+    expect(TimeRoutes.onBehalfReasons.screenType, 1);
+    expect(TimeRoutes.adjustmentReasons.menuCode, '28004');
+    expect(TimeRoutes.adjustmentReasons.screenType, 1);
+    expect(TimeRoutes.myTimeCorrections.menuCode, '30001');
+    expect(TimeRoutes.myTimeCorrections.screenType, 4);
+    expect(TimeRoutes.implemented, hasLength(11));
+    expect(buildTimeFeatureRoutes(), hasLength(11));
   });
 
   testWidgets('Time delegates workspace composition to the Center host', (
