@@ -18,12 +18,29 @@ typedef TimeMessageBuilder =
       required VoidCallback onClose,
     });
 
+class TimeListLayout {
+  const TimeListLayout({
+    required this.contentMargin,
+    required this.cardPadding,
+    required this.cardSpacing,
+    required this.paginationHeight,
+    required this.captionStyle,
+  });
+
+  final EdgeInsets contentMargin;
+  final EdgeInsets cardPadding;
+  final double cardSpacing;
+  final double paginationHeight;
+  final TextStyle captionStyle;
+}
+
 TimeWorkspaceShellBuilder? _workspaceShellBuilder;
 TimeApiClientFactory? _apiClientFactory;
 TimeApiClientDisposer? _apiClientDisposer;
 TimeErrorText? _errorText;
 TimeMessageBuilder? _messageBuilder;
 int Function()? _pageSizeProvider;
+TimeListLayout? _listLayout;
 
 void configureTimeFeatureHost(
   TimeWorkspaceShellBuilder builder, {
@@ -32,6 +49,7 @@ void configureTimeFeatureHost(
   TimeErrorText? errorText,
   TimeMessageBuilder? messageBuilder,
   int Function()? pageSizeProvider,
+  TimeListLayout? listLayout,
 }) {
   _workspaceShellBuilder = builder;
   _apiClientFactory = apiClientFactory;
@@ -39,6 +57,7 @@ void configureTimeFeatureHost(
   _errorText = errorText;
   _messageBuilder = messageBuilder;
   _pageSizeProvider = pageSizeProvider;
+  _listLayout = listLayout;
 }
 
 Widget buildTimeWorkspaceShell({
@@ -79,3 +98,13 @@ int get timePageSize {
   final value = _pageSizeProvider?.call() ?? 30;
   return value > 0 ? value : 30;
 }
+
+TimeListLayout get timeListLayout =>
+    _listLayout ??
+    const TimeListLayout(
+      contentMargin: EdgeInsets.all(10),
+      cardPadding: EdgeInsets.all(10),
+      cardSpacing: 10,
+      paginationHeight: 56,
+      captionStyle: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+    );

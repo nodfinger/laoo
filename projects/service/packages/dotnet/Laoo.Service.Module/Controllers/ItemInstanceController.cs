@@ -23,7 +23,11 @@ public sealed class ItemInstanceController(IConfiguration configuration) : Contr
         await using var c=await Open(token);if(!await Can(c,"VIEW",token))return Forbid();
         var sql=$"""
 SELECT X.ItemInstanceID,X.ItemID,I.ItemCode,I.ItemName,X.SerialNo,X.StatusCode,X.WarehouseID,W.WarehouseCode,W.WarehouseName,
-       X.CustomerID,X.BranchID,X.BuildingID,X.FloorID,X.RoomID,X.UpdateDate,X.CreateDate
+       X.CustomerID,X.BranchID,X.BuildingID,X.FloorID,X.RoomID,X.UpdateDate,X.CreateDate,
+       COALESCE((SELECT STRING_AGG(U.UsageCode,N',') FROM dbo.TDIVItemUsage U WHERE U.CompanyID=I.CompanyID AND U.ItemID=I.ItemID),N''),
+       CASE WHEN EXISTS(SELECT 1 FROM dbo.TDIVItemProjectPolicy IP WHERE IP.CompanyID=I.CompanyID AND IP.ItemID=I.ItemID AND IP.AccessModeCode=N'SELECTED')
+            THEN COALESCE((SELECT STRING_AGG(P.ProjectCode,N',') FROM dbo.TDIVItemProject IX JOIN dbo.TDADProject P ON P.ProjectID=IX.ProjectID WHERE IX.CompanyID=I.CompanyID AND IX.ItemID=I.ItemID AND P.IsActive=1),N'')
+            ELSE N'ALL' END
 FROM dbo.TDIVItemInstance X
 JOIN dbo.TDIVItem I ON I.ItemID=X.ItemID AND I.CompanyID=X.CompanyID
 LEFT JOIN dbo.TDIVWarehouse W ON W.WarehouseID=X.WarehouseID AND W.CompanyID=X.CompanyID
@@ -37,7 +41,7 @@ WHERE X.CompanyID=@company
 ORDER BY X.UpdateDate DESC,X.ItemInstanceID DESC;
 """;
         await using var command=new SqlCommand(sql,c);var q=search?.Trim()??"";Add(command,"@company",SqlDbType.BigInt,CompanyId());Add(command,"@user",SqlDbType.BigInt,UserId());Add(command,"@search",SqlDbType.NVarChar,q,200);Add(command,"@like",SqlDbType.NVarChar,$"%{q}%",210);Add(command,"@status",SqlDbType.NVarChar,statusCode?.Trim().ToUpperInvariant()??"",20);Add(command,"@warehouse",SqlDbType.BigInt,warehouseID);Add(command,"@item",SqlDbType.BigInt,itemID);
-        var rows=new List<object>();await using var reader=await command.ExecuteReaderAsync(token);while(await reader.ReadAsync(token))rows.Add(new{itemInstanceID=reader.GetInt64(0),itemID=reader.GetInt64(1),itemCode=reader.GetString(2),itemName=reader.GetString(3),serialNo=reader.GetString(4),statusCode=reader.GetString(5),warehouseID=Long(reader,6),warehouseCode=Text(reader,7),warehouseName=Text(reader,8),customerID=Long(reader,9),branchID=Long(reader,10),buildingID=Long(reader,11),floorID=Long(reader,12),roomID=Long(reader,13),updateDate=reader.IsDBNull(14)?null:(DateTime?)reader.GetDateTime(14),createDate=reader.GetDateTime(15)});return Ok(rows);
+        var rows=new List<object>();await using var reader=await command.ExecuteReaderAsync(token);while(await reader.ReadAsync(token))rows.Add(new{itemInstanceID=reader.GetInt64(0),itemID=reader.GetInt64(1),itemCode=reader.GetString(2),itemName=reader.GetString(3),serialNo=reader.GetString(4),statusCode=reader.GetString(5),warehouseID=Long(reader,6),warehouseCode=Text(reader,7),warehouseName=Text(reader,8),customerID=Long(reader,9),branchID=Long(reader,10),buildingID=Long(reader,11),floorID=Long(reader,12),roomID=Long(reader,13),updateDate=reader.IsDBNull(14)?null:(DateTime?)reader.GetDateTime(14),createDate=reader.GetDateTime(15),usageCodes=reader.GetString(16),projectCodes=reader.GetString(17)});return Ok(rows);
     }
 
     [HttpGet("{id:long}/history")]

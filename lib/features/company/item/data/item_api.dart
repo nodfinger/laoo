@@ -37,6 +37,8 @@ class ItemApi {
     String? itemKindCode,
     String? stockTrackingCode,
     String? usageCode,
+    int? projectId,
+    int? responsibleDepartmentId,
     String? search,
   }) async => List<Map<String, dynamic>>.from(
     await _client.get(
@@ -48,6 +50,9 @@ class ItemApi {
             if (stockTrackingCode?.isNotEmpty == true)
               'stockTrackingCode': stockTrackingCode!,
             if (usageCode?.isNotEmpty == true) 'usageCode': usageCode!,
+            if (projectId != null) 'projectId': '$projectId',
+            if (responsibleDepartmentId != null)
+              'responsibleDepartmentOrgUnitId': '$responsibleDepartmentId',
             if (search?.trim().isNotEmpty == true) 'search': search!.trim(),
           },
         )

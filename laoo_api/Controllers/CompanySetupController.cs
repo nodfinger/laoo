@@ -134,6 +134,8 @@ SET
     RowSTD = @RowSTD,
     RowCardSTD = @RowCardSTD,
     TimeAlert = @TimeAlert,
+    ReceiveStockImmediately = @ReceiveStockImmediately,
+    ReceiveStockPriceModeCode = @ReceiveStockPriceModeCode,
     OrgStructureType = @OrgStructureType,
     {{businessTypeSet}}
     PasswordPolicyCode = @PasswordPolicyCode,
@@ -174,6 +176,8 @@ WHERE OwnerType = @OwnerType
         Add(command, "@RowSTD", SqlDbType.Int, request.RowSTD);
         Add(command, "@RowCardSTD", SqlDbType.Int, request.RowCardSTD);
         Add(command, "@TimeAlert", SqlDbType.Int, request.TimeAlert);
+        Add(command, "@ReceiveStockImmediately", SqlDbType.Bit, request.ReceiveStockImmediately);
+        Add(command, "@ReceiveStockPriceModeCode", SqlDbType.NVarChar, request.ReceiveStockPriceModeCode.Trim().ToUpperInvariant(), 20);
         Add(command, "@OrgStructureType", SqlDbType.Int, request.OrgStructureType);
         Add(command, "@BusinessTypeCode", SqlDbType.NVarChar, requestedBusinessType, 20);
         Add(command, "@PasswordPolicyCode", SqlDbType.TinyInt, PasswordService.NormalizePolicyCode(request.PasswordPolicyCode));
@@ -282,7 +286,7 @@ ELSE
         await using var connection = CreateConnection();
         await connection.OpenAsync(cancellationToken);
         if (!await AllowedAsync(connection, "VIEW", cancellationToken)) return Forbid();
-        const string sql = "SELECT Code,Name FROM dbo.TDSTMasterCont WHERE GroupCode=@GroupCode ORDER BY Seq,Code";
+        const string sql = "SELECT Code,MAX(Name) AS Name FROM dbo.TDSTMasterCont WHERE GroupCode=@GroupCode GROUP BY Code ORDER BY MIN(Seq),Code";
         await using var command = new SqlCommand(sql, connection);
         Add(command, "@GroupCode", SqlDbType.NVarChar,
             string.IsNullOrWhiteSpace(groupCode)
@@ -459,6 +463,8 @@ SELECT
     S.RowSTD,
     S.RowCardSTD,
     S.TimeAlert,
+    S.ReceiveStockImmediately,
+    COALESCE(S.ReceiveStockPriceModeCode,N'CUSTOM') AS ReceiveStockPriceModeCode,
     S.OrgStructureType,
     {{businessTypeProjection}} AS BusinessTypeCode,
     CAST(COALESCE(S.PasswordPolicyCode, 3) AS tinyint) AS PasswordPolicyCode,
@@ -563,6 +569,8 @@ WHERE S.OwnerType = @OwnerType
             reader.GetInt32(reader.GetOrdinal("RowSTD")),
             reader.GetInt32(reader.GetOrdinal("RowCardSTD")),
             reader.GetInt32(reader.GetOrdinal("TimeAlert")),
+            reader.GetBoolean(reader.GetOrdinal("ReceiveStockImmediately")),
+            reader.GetString(reader.GetOrdinal("ReceiveStockPriceModeCode")),
             reader.GetInt32(reader.GetOrdinal("OrgStructureType")),
             businessTypeCode,
             CompanyBusinessType.RequesterMode(businessTypeCode),

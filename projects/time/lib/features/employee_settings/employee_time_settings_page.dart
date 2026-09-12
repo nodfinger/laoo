@@ -135,20 +135,31 @@ class _EmployeeTimeSettingsPageState extends State<EmployeeTimeSettingsPage> {
 
   Widget _content(String caption) {
     final pages = _data.total == 0 ? 1 : (_data.total / _data.pageSize).ceil();
+    final layout = timeListLayout;
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: layout.contentMargin,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            caption,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+          _standardCard(
+            Padding(
+              padding: layout.cardPadding,
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.star_border_rounded,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(child: Text(caption, style: layout.captionStyle)),
+                ],
+              ),
+            ),
           ),
-          const SizedBox(height: 12),
-          Card(
-            margin: EdgeInsets.zero,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
+          const SizedBox(height: 6),
+          _standardCard(
+            Padding(
+              padding: layout.cardPadding,
               child: Wrap(
                 spacing: 12,
                 runSpacing: 12,
@@ -196,11 +207,10 @@ class _EmployeeTimeSettingsPageState extends State<EmployeeTimeSettingsPage> {
               ),
             ),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: layout.cardSpacing),
           Expanded(
-            child: Card(
-              margin: EdgeInsets.zero,
-              child: _loading
+            child: _standardCard(
+              _loading
                   ? const Center(child: CircularProgressIndicator())
                   : _data.items.isEmpty
                   ? const Center(child: Text('ไม่พบข้อมูล'))
@@ -267,12 +277,11 @@ class _EmployeeTimeSettingsPageState extends State<EmployeeTimeSettingsPage> {
                     ),
             ),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: layout.cardSpacing),
           SizedBox(
-            height: 56,
-            child: Card(
-              margin: EdgeInsets.zero,
-              child: Row(
+            height: layout.paginationHeight,
+            child: _standardCard(
+              Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   Text('ทั้งหมด ${_data.total} รายการ'),
@@ -301,6 +310,19 @@ class _EmployeeTimeSettingsPageState extends State<EmployeeTimeSettingsPage> {
       ),
     );
   }
+
+  Widget _standardCard(Widget child) => Card(
+    margin: EdgeInsets.zero,
+    color: Theme.of(context).colorScheme.surface,
+    elevation: 0,
+    shadowColor: Colors.transparent,
+    surfaceTintColor: Colors.transparent,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.all(Radius.circular(4)),
+      side: BorderSide.none,
+    ),
+    child: child,
+  );
 
   Widget _mobileList() {
     return ListView.separated(

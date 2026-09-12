@@ -70,6 +70,7 @@ public sealed record ItemDetail(
     IReadOnlyList<ItemPackUnitRow> PackUnits,
     IReadOnlyList<ItemImageRow> Images)
 {
+    public string ReceiveStockPriceModeCode { get; init; } = "CUSTOM";
     public ItemProjectAccess? ProjectAccess { get; init; }
     public IReadOnlyList<ItemWarrantyPolicyInput> WarrantyPolicies { get; init; } = [];
     public long? ResponsibleDepartmentOrgUnitID { get; init; }
@@ -106,6 +107,7 @@ public sealed record ItemUpsertRequest(
     public ItemProjectAccess? ProjectAccess { get; init; }
     public IReadOnlyList<ItemWarrantyPolicyInput>? WarrantyPolicies { get; init; }
     public long? ResponsibleDepartmentOrgUnitID { get; init; }
+    public string? ReceiveStockPriceModeCode { get; init; }
 }
 
 public sealed record ItemWarrantyPolicyInput(string CoverageTypeCode, string WarrantyModeCode, int? DurationMonths);

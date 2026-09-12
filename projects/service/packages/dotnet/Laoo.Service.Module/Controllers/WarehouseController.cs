@@ -35,7 +35,7 @@ FROM dbo.TDIVWarehouse W
 LEFT JOIN dbo.TDADBranch B ON B.BranchID=W.BranchID AND B.CompanyID=W.CompanyID
 WHERE W.CompanyID=@company AND (@search=N'' OR W.WarehouseCode LIKE @like OR W.WarehouseName LIKE @like)
   AND (@manage=1 OR {WarehouseAccessService.WarehouseAliasPredicate})
-ORDER BY W.IsDefault DESC,W.WarehouseCode;
+ORDER BY B.BranchCode,W.WarehouseCode,W.WarehouseName;
 """;
         await using var command = new SqlCommand(sql,connection);
         var value=search?.Trim()??string.Empty; var companyId=CompanyId(); var userId=UserId();

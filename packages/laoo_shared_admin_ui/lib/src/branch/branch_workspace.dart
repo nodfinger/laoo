@@ -867,6 +867,8 @@ class _BranchWorkspaceState extends State<BranchWorkspace> {
                                         popupMessage = 'บันทึกสิทธิ์สาขาแล้ว';
                                         popupHasError = false;
                                       });
+                                      Navigator.pop(dialogContext);
+                                      showMessage('บันทึกสิทธิ์สาขาแล้ว');
                                     } catch (error) {
                                       if (!dialogContext.mounted) return;
                                       setDialogState(() {

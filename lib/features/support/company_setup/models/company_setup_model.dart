@@ -20,6 +20,8 @@ class CompanySetupModel {
     required this.rowStd,
     required this.rowCardStd,
     required this.timeAlert,
+    this.receiveStockImmediately = true,
+    this.receiveStockPriceModeCode = 'CUSTOM',
     required this.orgStructureType,
     required this.businessTypeCode,
     required this.requesterMode,
@@ -78,6 +80,8 @@ class CompanySetupModel {
   final int rowStd;
   final int rowCardStd;
   final int timeAlert;
+  final bool receiveStockImmediately;
+  final String receiveStockPriceModeCode;
   final int orgStructureType;
   final String businessTypeCode;
   final String requesterMode;
@@ -136,6 +140,10 @@ class CompanySetupModel {
       rowStd: asInt(json['rowSTD']) ?? asInt(json['rowStd']) ?? 30,
       rowCardStd: asInt(json['rowCardSTD']) ?? asInt(json['rowCardStd']) ?? 30,
       timeAlert: asInt(json['timeAlert']) ?? 30,
+      receiveStockImmediately: asBool(json['receiveStockImmediately']),
+      receiveStockPriceModeCode:
+          json['receiveStockPriceModeCode']?.toString().toUpperCase() ??
+          'CUSTOM',
       orgStructureType: asInt(json['orgStructureType']) ?? 1,
       businessTypeCode: json['businessTypeCode']?.toString() ?? 'COMPANY',
       requesterMode: json['requesterMode']?.toString() ?? 'EMPLOYEE',
@@ -181,6 +189,8 @@ class CompanySetupUpdateInput {
     required this.rowStd,
     required this.rowCardStd,
     required this.timeAlert,
+    this.receiveStockImmediately = true,
+    this.receiveStockPriceModeCode = 'CUSTOM',
     required this.orgStructureType,
     this.businessTypeCode,
     this.passwordPolicyCode = 3,
@@ -214,6 +224,8 @@ class CompanySetupUpdateInput {
   final int rowStd;
   final int rowCardStd;
   final int timeAlert;
+  final bool receiveStockImmediately;
+  final String receiveStockPriceModeCode;
   final int orgStructureType;
   final String? businessTypeCode;
   final int passwordPolicyCode;
@@ -247,6 +259,8 @@ class CompanySetupUpdateInput {
     'rowSTD': rowStd,
     'rowCardSTD': rowCardStd,
     'timeAlert': timeAlert,
+    'receiveStockImmediately': receiveStockImmediately,
+    'receiveStockPriceModeCode': receiveStockPriceModeCode,
     'orgStructureType': orgStructureType,
     'businessTypeCode': businessTypeCode,
     'passwordPolicyCode': passwordPolicyCode,

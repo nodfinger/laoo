@@ -5,6 +5,8 @@ class CompanySetupContext {
     required this.rowStd,
     required this.rowCardStd,
     required this.timeAlert,
+    required this.receiveStockPriceModeCode,
+    required this.receiveStockImmediately,
     required this.orgStructureType,
     required this.yearFormat,
     required this.versionId,
@@ -23,6 +25,8 @@ class CompanySetupContext {
   final int rowStd;
   final int rowCardStd;
   final int timeAlert;
+  final String receiveStockPriceModeCode;
+  final bool receiveStockImmediately;
   final int orgStructureType;
   final String yearFormat;
   final String versionId;
@@ -42,6 +46,11 @@ class CompanySetupContext {
       rowStd: _positiveInt(json['rowSTD'] ?? json['rowStd'], 50),
       rowCardStd: _positiveInt(json['rowCardSTD'] ?? json['rowCardStd'], 12),
       timeAlert: _positiveInt(json['timeAlert'], 30),
+      receiveStockPriceModeCode: _text(
+        json['receiveStockPriceModeCode'],
+        'CUSTOM',
+      ).toUpperCase(),
+      receiveStockImmediately: json['receiveStockImmediately'] != false,
       orgStructureType:
           (json['orgStructureType'] as num?)?.toInt() ??
           int.tryParse('${json['orgStructureType']}') ??

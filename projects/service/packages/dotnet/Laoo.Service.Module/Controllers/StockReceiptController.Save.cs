@@ -43,6 +43,7 @@ IF @result<0 THROW 52711,'Receipt is busy. Retry the operation.',1;
         try
         {
             await LockReceiptSerials(c, tx, token);
+            var receiveStockImmediately = await ReceiveStockImmediately(c, tx, token);
             if (!await WarehouseAccessService.CanAccessAsync(c, tx, CompanyId(), UserId(), request.WarehouseID, token))
                 return StatusCode(403, new { message = "ไม่มีสิทธิ์เข้าถึงคลัง", description = "กรุณาเลือกคลังที่ได้รับสิทธิ์และเปิดใช้งาน" });
             // Check the old warehouse too; an inaccessible document cannot be moved into an accessible one.
@@ -199,10 +200,24 @@ OUTPUT INSERTED.StockReceiptDetailID VALUES(@receipt,@line,@item,@baseQty,@recei
                     Add(insert, "@serial", SqlDbType.NVarChar, serial, 200);
                     await insert.ExecuteNonQueryAsync(token);
                 }
+                if (receiveStockImmediately)
+                {
+                    await IncreaseBalance(c, tx, request.WarehouseID, p.Line.ItemID, p.BaseQuantity, receiptId, detailId, "RECEIPT", token);
+                    foreach (var serial in p.Serials)
+                        await CreateInstance(c, tx, request.WarehouseID, p.Line.ItemID, serial, receiptId, detailId, request.ReceiptDate, token);
+                }
                 saved.Add(new { lineNo, itemID = p.Line.ItemID, quantity = p.Line.Quantity, unitCode = p.ReceiptUnit, baseQuantity = p.BaseQuantity, baseUnitCode = p.BaseUnit, conversionFactor = p.Factor, serialSourceCode = p.Source, serials = p.Serials });
             }
+            if (receiveStockImmediately)
+            {
+                await using var confirm = new SqlCommand("UPDATE dbo.TDIVStockReceipt SET StatusCode=N'CONFIRMED',ConfirmDate=SYSUTCDATETIME(),ConfirmedBy=@user,UpdateDate=SYSUTCDATETIME(),UpdatedBy=@user WHERE StockReceiptID=@id AND CompanyID=@company", c, tx);
+                Add(confirm, "@user", SqlDbType.BigInt, UserId());
+                Add(confirm, "@id", SqlDbType.BigInt, receiptId);
+                Add(confirm, "@company", SqlDbType.BigInt, CompanyId());
+                await confirm.ExecuteNonQueryAsync(token);
+            }
             await tx.CommitAsync(token);
-            return Ok(new { stockReceiptID = receiptId, receiptCode = code, statusCode = "DRAFT", items = saved });
+            return Ok(new { stockReceiptID = receiptId, receiptCode = code, statusCode = receiveStockImmediately ? "CONFIRMED" : "DRAFT", items = saved });
         }
         catch (SqlException ex)
         {
@@ -212,6 +227,15 @@ OUTPUT INSERTED.StockReceiptDetailID VALUES(@receipt,@line,@item,@baseQty,@recei
                 ? "เลขเอกสารหรือ Serial ซ้ำ กรุณาตรวจข้อมูลและลองใหม่"
                 : "ไม่สามารถบันทึกข้อมูลได้ กรุณาลองใหม่ หากยังไม่สำเร็จให้ติดต่อผู้ดูแลระบบ");
         }
+    }
+
+    private async Task<bool> ReceiveStockImmediately(SqlConnection c, SqlTransaction? tx, CancellationToken token)
+    {
+        const string sql = "SELECT TOP(1) COALESCE(ReceiveStockImmediately,1) FROM dbo.TDSTCompanySetUp WHERE CompanyID=@company AND OwnerType=N'C' AND IsActive=1 ORDER BY ISNULL(UpdateDate,CreateDate) DESC,PKValue DESC";
+        await using var command = new SqlCommand(sql, c, tx);
+        Add(command, "@company", SqlDbType.BigInt, CompanyId());
+        var value = await command.ExecuteScalarAsync(token);
+        return value is null or DBNull || Convert.ToBoolean(value);
     }
 
     private async Task<(string ReceiptUnit,string BaseUnit,decimal Factor)?> ResolveReceiptUnit(SqlConnection c,SqlTransaction tx,long itemId,string? requestedUnit,CancellationToken token)

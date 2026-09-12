@@ -5,6 +5,8 @@ import 'package:laoo_time/time_feature.dart';
 import 'package:laoo_visitor/visitor_feature.dart';
 
 import 'app/laoo_app.dart';
+import 'app/theme/laoo_design_tokens.dart';
+import 'app/theme/laoo_typography.dart';
 import 'core/api/api_client.dart';
 import 'core/api/api_exception.dart';
 import 'core/company_setup/company_setup_controller.dart';
@@ -23,6 +25,13 @@ void main() {
     messageBuilder: ({required message, required error, required onClose}) =>
         AutoDismissMessage(message: message, error: error, onClose: onClose),
     pageSizeProvider: () => companySetupController.pageSize,
+    listLayout: const TimeListLayout(
+      contentMargin: EdgeInsets.all(LaooLayout.cardMargin),
+      cardPadding: EdgeInsets.all(LaooLayout.cardPadding),
+      cardSpacing: LaooLayout.cardSpacing,
+      paginationHeight: LaooLayout.paginationCardHeight,
+      captionStyle: LaooTypography.screenCaptionStyle,
+    ),
   );
   configureVisitorFeatureHost(_buildMeetingWorkspaceShell);
   runApp(const LaooApp());

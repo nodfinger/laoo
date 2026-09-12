@@ -47,6 +47,7 @@ class ItemFormLayout extends StatefulWidget {
     required this.responsibleDepartments,
     required this.codeSettings,
     required this.maxItemImageSizeMB,
+    this.defaultReceiveStockPriceModeCode = 'CUSTOM',
     required this.onCancel,
     required this.onSaved,
     this.caption = 'ข้อมูลสินค้า',
@@ -61,6 +62,7 @@ class ItemFormLayout extends StatefulWidget {
   final List<Map<String, dynamic>> responsibleDepartments;
   final Map<String, dynamic> codeSettings;
   final double maxItemImageSizeMB;
+  final String defaultReceiveStockPriceModeCode;
   final VoidCallback onCancel;
   final VoidCallback onSaved;
   final String caption;
@@ -85,6 +87,12 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
   late final TextEditingController _supplierWarrantyMonths,
       _customerWarrantyMonths;
   String? _group, _type, _unit, _responsibleDepartment;
+  String _receiveStockPriceModeCode = 'CUSTOM';
+  static const _receiveStockPriceModes = [
+    {'code': 'CUSTOM', 'name': 'กำหนดเอง'},
+    {'code': 'LAST_RECEIPT', 'name': 'ราคารับเข้าล่าสุด'},
+    {'code': 'AVERAGE', 'name': 'ราคาเฉลี่ย'},
+  ];
   String _itemKind = 'GOODS', _stockTracking = 'QUANTITY';
   Set<String> _usageCodes = {'SALE'};
   String _projectMode = 'ALL';
@@ -176,7 +184,16 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
     _group = _data['itemGroupCode'];
     _type = _data['itemTypeCode'];
     _unit = _data['unitCode'];
-    _responsibleDepartment = _data['responsibleDepartmentOrgUnitID']?.toString();
+    _responsibleDepartment = _data['responsibleDepartmentOrgUnitID']
+        ?.toString();
+    _receiveStockPriceModeCode =
+        '${_data['receiveStockPriceModeCode'] ?? widget.defaultReceiveStockPriceModeCode}'
+            .toUpperCase();
+    if (!_receiveStockPriceModes.any(
+      (x) => x['code'] == _receiveStockPriceModeCode,
+    )) {
+      _receiveStockPriceModeCode = widget.defaultReceiveStockPriceModeCode;
+    }
     _itemKind = '${_data['itemKindCode'] ?? 'GOODS'}'.toUpperCase();
     _stockTracking = '${_data['stockTrackingCode'] ?? 'QUANTITY'}'
         .toUpperCase();
@@ -514,7 +531,10 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
       'itemName': _name.text.trim(),
       'itemGroupCode': _group,
       'itemTypeCode': _type,
-      'responsibleDepartmentOrgUnitID': int.tryParse(_responsibleDepartment ?? ''),
+      'responsibleDepartmentOrgUnitID': int.tryParse(
+        _responsibleDepartment ?? '',
+      ),
+      'receiveStockPriceModeCode': _receiveStockPriceModeCode,
       'itemKindCode': _itemKind,
       'stockTrackingCode': _stockTracking,
       'usageCodes': _usageCodes.toList()..sort(),
@@ -759,6 +779,13 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
           _responsibleDepartment,
           widget.responsibleDepartments,
           (value) => setState(() => _responsibleDepartment = value),
+        ),
+        _drop(
+          'ราคาเริ่มต้นรับเข้าสต๊อก',
+          _receiveStockPriceModeCode,
+          _receiveStockPriceModes,
+          (value) =>
+              setState(() => _receiveStockPriceModeCode = value ?? 'CUSTOM'),
         ),
       ]),
       const SizedBox(height: 12),
@@ -1554,7 +1581,10 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
       decoration: InputDecoration(labelText: label),
       style: comboStyle,
       items: [
-        DropdownMenuItem<String>(value: null, child: Text('ไม่ระบุ', style: comboStyle)),
+        DropdownMenuItem<String>(
+          value: null,
+          child: Text('ไม่ระบุ', style: comboStyle),
+        ),
         ...values.map(
           (item) => DropdownMenuItem(
             value: '${item['code']}',

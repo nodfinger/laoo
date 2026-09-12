@@ -18,6 +18,7 @@ class _SubPermissionPageState extends State<SubPermissionPage> {
   String _caption = '';
   List<Map<String, dynamic>> _rows = const [];
   bool _loading = true;
+  final Set<String> _expandedMenus = <String>{};
 
   @override
   void initState() {
@@ -50,9 +51,9 @@ class _SubPermissionPageState extends State<SubPermissionPage> {
   @override
   Widget build(BuildContext context) {
     final accent = workspaceThemeController.value.primary;
-    final groups = <String, List<Map<String, dynamic>>>{};
+    final menus = <String, List<Map<String, dynamic>>>{};
     for (final row in _rows) {
-      groups.putIfAbsent('${row['menuGroupName']}', () => []).add(row);
+      menus.putIfAbsent('${row['menuCode']}', () => []).add(row);
     }
     return SupportWorkspaceShell(
       pageTitle: _caption,
@@ -83,36 +84,34 @@ class _SubPermissionPageState extends State<SubPermissionPage> {
                           bottom: BorderSide(color: Color(0xFFE1E5E8)),
                         ),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                      child: Row(
                         children: [
-                          Text(
-                            _caption,
-                            style: const TextStyle(
-                              color: Colors.black,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
+                          Icon(Icons.tune_outlined, color: accent, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _caption,
+                              style: const TextStyle(
+                                color: Colors.black,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ),
                         ],
                       ),
                     ),
                   ),
-                  const SizedBox(height: 0),
-                  ...groups.entries.map(
-                    (group) => _groupCard(group.value, accent),
-                  ),
+                  const SizedBox(height: 6),
+                  ...menus.entries.map((menu) => _menuCard(menu.value, accent)),
                 ],
               ),
       ),
     );
   }
 
-  Widget _groupCard(List<Map<String, dynamic>> rows, Color accent) {
-    final menus = <String, List<Map<String, dynamic>>>{};
-    for (final row in rows) {
-      menus.putIfAbsent('${row['menuCode']}', () => []).add(row);
-    }
+  Widget _menuCard(List<Map<String, dynamic>> rows, Color accent) {
+    final menuCode = '${rows.first['menuCode']}';
     return Card(
       color: Colors.white,
       margin: const EdgeInsets.only(bottom: 8),
@@ -123,37 +122,35 @@ class _SubPermissionPageState extends State<SubPermissionPage> {
         borderRadius: BorderRadius.circular(4),
         side: BorderSide.none,
       ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ...menus.values.expand(
-              (points) => [
-                Text(
-                  '${points.first['menuName']}',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                ...points.asMap().entries.expand(
-                  (entry) => [
-                    _pointRow(entry.value, accent),
-                    if (entry.key < points.length - 1)
-                      const Divider(
-                        color: Color(0xFFF5F6F7),
-                        height: 1,
-                        thickness: 1,
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 0),
-              ],
-            ),
-          ],
+      child: ExpansionTile(
+        initiallyExpanded: _expandedMenus.contains(menuCode),
+        onExpansionChanged: (value) {
+          setState(() {
+            value
+                ? _expandedMenus.add(menuCode)
+                : _expandedMenus.remove(menuCode);
+          });
+        },
+        tilePadding: const EdgeInsets.symmetric(horizontal: 12),
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+        leading: Icon(Icons.account_tree_outlined, color: accent, size: 21),
+        title: Text(
+          '${rows.first['menuName']}',
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
         ),
+        children: [
+          ...rows.asMap().entries.expand(
+            (entry) => [
+              _pointRow(entry.value, accent),
+              if (entry.key < rows.length - 1)
+                const Divider(
+                  color: Color(0xFFF5F6F7),
+                  height: 1,
+                  thickness: 1,
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }

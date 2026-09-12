@@ -19,7 +19,20 @@ public sealed partial class StockReceiptController(IConfiguration configuration,
     private sealed record ReceiptPackRow(long ItemID, string UnitCode, string? ParentUnitCode, decimal ConversionQuantity, decimal BaseQuantity, string? ParentUnitName);
 
     [HttpGet("actions")]
-    public async Task<IActionResult> Actions(CancellationToken token){await using var c=await Open(token);return Ok(new{view=await Can(c,"VIEW",token),create=await Can(c,"CREATE",token),edit=await Can(c,"EDIT",token),delete=await Can(c,"DELETE",token)});}
+    public async Task<IActionResult> Actions(CancellationToken token)
+    {
+        await using var c=await Open(token);
+        var receiveStockImmediately=await ReceiveStockImmediately(c,null,token);
+        return Ok(new
+        {
+            view=await Can(c,"VIEW",token),
+            create=await Can(c,"CREATE",token),
+            edit=await Can(c,"EDIT",token),
+            delete=await Can(c,"DELETE",token),
+            receiveStockImmediately,
+            confirmStock=!receiveStockImmediately&&await Can(c,"EDIT",token,"CONFIRM_STOCK")
+        });
+    }
 
     [HttpGet("lookup")]
     public async Task<IActionResult> Lookup(CancellationToken token)
@@ -113,7 +126,7 @@ public sealed partial class StockReceiptController(IConfiguration configuration,
     [HttpPost("{id:long}/confirm")]
     public async Task<IActionResult> Confirm(long id,CancellationToken token)
     {
-        await using var c=await Open(token);if(!await Can(c,"EDIT",token))return Forbid();await using var tx=(SqlTransaction)await c.BeginTransactionAsync(token);
+        await using var c=await Open(token);if(!await Can(c,"EDIT",token,"CONFIRM_STOCK"))return Forbid();await using var tx=(SqlTransaction)await c.BeginTransactionAsync(token);
         try
         {
             await LockReceiptSerials(c,tx,token);
@@ -180,5 +193,5 @@ public sealed partial class StockReceiptController(IConfiguration configuration,
     private void BindHeader(SqlCommand c,StockReceiptUpsertRequest r,string type){Add(c,"@company",SqlDbType.BigInt,CompanyId());Add(c,"@warehouse",SqlDbType.BigInt,r.WarehouseID);Add(c,"@date",SqlDbType.Date,r.ReceiptDate.ToDateTime(TimeOnly.MinValue));Add(c,"@type",SqlDbType.NVarChar,type,20);Add(c,"@reference",SqlDbType.NVarChar,r.ReferenceNo?.Trim(),100);Add(c,"@remark",SqlDbType.NVarChar,r.Remark?.Trim(),1000);Add(c,"@user",SqlDbType.BigInt,UserId());}
     private async Task<List<object>> Rows<T>(SqlConnection c,string sql,CancellationToken token,Func<SqlDataReader,T> map) where T:class{await using var command=new SqlCommand(sql,c);Add(command,"@company",SqlDbType.BigInt,CompanyId());Add(command,"@user",SqlDbType.BigInt,UserId());var rows=new List<object>();await using var reader=await command.ExecuteReaderAsync(token);while(await reader.ReadAsync(token))rows.Add(map(reader));return rows;}
     private static async Task<List<object>> RowsById<T>(SqlConnection c,string sql,long id,CancellationToken token,Func<SqlDataReader,T> map) where T:class{await using var command=new SqlCommand(sql,c);Add(command,"@id",SqlDbType.BigInt,id);var rows=new List<object>();await using var reader=await command.ExecuteReaderAsync(token);while(await reader.ReadAsync(token))rows.Add(map(reader));return rows;}
-    private Task<bool> Can(SqlConnection c,string action,CancellationToken t)=>InventoryControllerSupport.CanAsync(c,User,ScreenCode,action,t);private Task<SqlConnection> Open(CancellationToken t)=>InventoryControllerSupport.OpenAsync(configuration,t);private long CompanyId()=>InventoryControllerSupport.ClaimId(User,"company_id");private long UserId()=>InventoryControllerSupport.ClaimId(User,"user_id");private static void Add(SqlCommand c,string n,SqlDbType t,object? v,int s=0)=>InventoryControllerSupport.Add(c,n,t,v,s);private static string? Text(SqlDataReader r,int i)=>r.IsDBNull(i)?null:r.GetString(i);
+    private Task<bool> Can(SqlConnection c,string action,CancellationToken t,string? point=null)=>point is null?InventoryControllerSupport.CanAsync(c,User,ScreenCode,action,t):InventoryControllerSupport.CanAsync(c,User,ScreenCode,action,point,t);private Task<SqlConnection> Open(CancellationToken t)=>InventoryControllerSupport.OpenAsync(configuration,t);private long CompanyId()=>InventoryControllerSupport.ClaimId(User,"company_id");private long UserId()=>InventoryControllerSupport.ClaimId(User,"user_id");private static void Add(SqlCommand c,string n,SqlDbType t,object? v,int s=0)=>InventoryControllerSupport.Add(c,n,t,v,s);private static string? Text(SqlDataReader r,int i)=>r.IsDBNull(i)?null:r.GetString(i);
 }

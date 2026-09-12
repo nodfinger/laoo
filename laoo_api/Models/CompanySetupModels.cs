@@ -28,6 +28,8 @@ public sealed record CompanySetupResponse(
     int RowSTD,
     int RowCardSTD,
     int TimeAlert,
+    bool ReceiveStockImmediately,
+    string ReceiveStockPriceModeCode,
     int OrgStructureType,
     string BusinessTypeCode,
     string RequesterMode,
@@ -71,6 +73,8 @@ public sealed class CompanySetupUpdateRequest
     public int RowSTD { get; init; }
     public int RowCardSTD { get; init; }
     public int TimeAlert { get; init; }
+    public bool ReceiveStockImmediately { get; init; } = true;
+    public string ReceiveStockPriceModeCode { get; init; } = "CUSTOM";
     public int OrgStructureType { get; init; } = 1;
     public string? BusinessTypeCode { get; init; }
     public int PasswordPolicyCode { get; init; } = 3;

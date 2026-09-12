@@ -143,7 +143,10 @@ class _WarehousePageState extends State<WarehousePage> {
     _openWarehouseDialog();
   }
 
-  Future<void> _save(StateSetter setDialogState) async {
+  Future<void> _save(
+    BuildContext dialogContext,
+    StateSetter setDialogState,
+  ) async {
     if (_saving) return;
     setDialogState(() {
       _branchError = _branchId == null ? 'กรุณาเลือกสาขา' : null;
@@ -167,6 +170,10 @@ class _WarehousePageState extends State<WarehousePage> {
       showTimedSnackBar(context, message: 'บันทึกคลังแล้ว');
       await _load();
       if (!mounted) return;
+      if (!wasNew) {
+        if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+        return;
+      }
       setDialogState(() {
         if (wasNew) {
           for (final row in _rows) {
@@ -1222,7 +1229,9 @@ class _WarehousePageState extends State<WarehousePage> {
             ),
             const SizedBox(width: 8),
             FilledButton.icon(
-              onPressed: _saving ? null : () => _save(setDialogState),
+              onPressed: _saving
+                  ? null
+                  : () => _save(dialogContext, setDialogState),
               style: actionButtonStyle,
               icon: const Icon(Icons.save_outlined),
               label: const Text('บันทึก'),
@@ -1281,7 +1290,36 @@ class _SerialRegistryPageState extends State<SerialRegistryPage> {
       _history = const [],
       _warranties = const [];
   bool _loading = true;
+  String? _usageFilter, _projectFilter;
   Map<String, dynamic>? _selected;
+
+  List<Map<String, dynamic>> get _visibleRows => _rows
+      .where((row) {
+        final usages = '${row['usageCodes'] ?? ''}'.split(',');
+        final projects = '${row['projectCodes'] ?? ''}'.split(',');
+        return (_usageFilter == null || usages.contains(_usageFilter)) &&
+            (_projectFilter == null || projects.contains(_projectFilter));
+      })
+      .toList(growable: false);
+
+  List<Map<String, String>> _codeOptions(String field) {
+    final values = <String>{};
+    for (final row in _rows) {
+      values.addAll(
+        '${row[field] ?? ''}'.split(',').where((value) => value.isNotEmpty),
+      );
+    }
+    return values
+        .map(
+          (value) => {
+            'value': value,
+            'label': value == 'ALL' ? 'ทุก Project' : value,
+          },
+        )
+        .toList()
+      ..sort((a, b) => a['label']!.compareTo(b['label']!));
+  }
+
   @override
   void initState() {
     super.initState();
@@ -1349,10 +1387,20 @@ class _SerialRegistryPageState extends State<SerialRegistryPage> {
     child: Padding(
       padding: const EdgeInsets.all(LaooLayout.cardMargin),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _SerialRegistryToolbar(
             controller: _search,
-            count: _rows.length,
+            count: _visibleRows.length,
+            usageFilter: _usageFilter,
+            projectFilter: _projectFilter,
+            usageOptions: _codeOptions('usageCodes'),
+            projectOptions: _codeOptions('projectCodes'),
+            onFilterChanged: (usage, project) => setState(() {
+              _usageFilter = usage;
+              _projectFilter = project;
+              _selected = null;
+            }),
             onSearch: _load,
           ),
           const SizedBox(height: LaooLayout.cardSpacing),
@@ -1409,7 +1457,7 @@ class _SerialRegistryPageState extends State<SerialRegistryPage> {
                                           DataColumn(label: Text('สถานะ')),
                                           DataColumn(label: Text('คลัง')),
                                         ],
-                                        rows: _rows
+                                        rows: _visibleRows
                                             .map(
                                               (x) => DataRow(
                                                 selected: identical(
@@ -1664,88 +1712,131 @@ class _SerialRegistryToolbar extends StatelessWidget {
   const _SerialRegistryToolbar({
     required this.controller,
     required this.count,
+    required this.usageFilter,
+    required this.projectFilter,
+    required this.usageOptions,
+    required this.projectOptions,
+    required this.onFilterChanged,
     required this.onSearch,
   });
 
   final TextEditingController controller;
   final int count;
+  final String? usageFilter, projectFilter;
+  final List<Map<String, String>> usageOptions, projectOptions;
+  final void Function(String?, String?) onFilterChanged;
   final VoidCallback onSearch;
 
   @override
   Widget build(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
-    return Card(
+    final cardShape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(LaooRadius.xs),
+    );
+    Widget card(Widget child) => Card(
       margin: EdgeInsets.zero,
       color: LaooColors.white,
       elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(LaooRadius.xs),
-      ),
+      surfaceTintColor: Colors.transparent,
+      shape: cardShape,
       child: Padding(
         padding: const EdgeInsets.all(LaooLayout.cardPadding),
-        child: LayoutBuilder(
-          builder: (context, constraints) => Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            crossAxisAlignment: WrapCrossAlignment.center,
+        child: child,
+      ),
+    );
+
+    Widget filter(
+      String label,
+      String? value,
+      List<Map<String, String>> options,
+      void Function(String?) onChanged,
+    ) => SizedBox(
+      width: 220,
+      child: DropdownButtonFormField<String>(
+        initialValue: value ?? '',
+        isExpanded: true,
+        decoration: InputDecoration(labelText: label),
+        items: [
+          const DropdownMenuItem(value: '', child: Text('ทั้งหมด')),
+          ...options.map(
+            (option) => DropdownMenuItem(
+              value: option['value'],
+              child: Text(option['label']!),
+            ),
+          ),
+        ],
+        onChanged: (next) => onChanged(next?.isEmpty == true ? null : next),
+      ),
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        card(
+          Row(
             children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.qr_code_2_outlined, color: primary),
-                  const SizedBox(width: 8),
-                  Text(
-                    'ทะเบียน SN/อุปกรณ์',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: Colors.black,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(
-                width: constraints.maxWidth > 620 ? 320 : constraints.maxWidth,
-                child: TextField(
-                  controller: controller,
-                  onSubmitted: (_) => onSearch(),
-                  decoration: const InputDecoration(
-                    prefixIcon: Icon(Icons.search),
-                    labelText: 'ค้นหา Serial, รหัส หรือชื่อสินค้า',
-                  ),
-                ),
-              ),
-              FilledButton.icon(
-                style: FilledButton.styleFrom(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(LaooRadius.xs),
-                  ),
-                ),
-                onPressed: onSearch,
-                icon: const Icon(Icons.search),
-                label: const Text('ค้นหา'),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 7,
-                ),
-                decoration: BoxDecoration(
-                  color: primary.withValues(alpha: .10),
-                  borderRadius: BorderRadius.circular(LaooRadius.xs),
-                ),
+              Icon(Icons.qr_code_2_outlined, color: primary),
+              const SizedBox(width: 8),
+              Expanded(
                 child: Text(
-                  '$count รายการ',
-                  style: TextStyle(
-                    color: primary,
+                  'ทะเบียน SN/อุปกรณ์',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: Colors.black,
                     fontWeight: FontWeight.w700,
-                    fontSize: LaooTypography.inputText,
                   ),
                 ),
               ),
             ],
           ),
         ),
-      ),
+        const SizedBox(height: 6),
+        card(
+          LayoutBuilder(
+            builder: (context, constraints) => Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                SizedBox(
+                  width: constraints.maxWidth > 620
+                      ? 320
+                      : constraints.maxWidth,
+                  child: TextField(
+                    controller: controller,
+                    onSubmitted: (_) => onSearch(),
+                    decoration: const InputDecoration(
+                      prefixIcon: Icon(Icons.search),
+                      labelText: 'ค้นหา Serial, รหัส หรือชื่อสินค้า',
+                    ),
+                  ),
+                ),
+                FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(LaooRadius.xs),
+                    ),
+                  ),
+                  onPressed: onSearch,
+                  icon: const Icon(Icons.search),
+                  label: const Text('ค้นหา'),
+                ),
+                filter(
+                  'วัตถุประสงค์',
+                  usageFilter,
+                  usageOptions,
+                  (value) => onFilterChanged(value, projectFilter),
+                ),
+                filter(
+                  'Project ที่นำไปใช้',
+                  projectFilter,
+                  projectOptions,
+                  (value) => onFilterChanged(usageFilter, value),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

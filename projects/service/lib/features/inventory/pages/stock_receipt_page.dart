@@ -363,16 +363,23 @@ class _StockReceiptWorkspaceState extends State<StockReceiptWorkspace> {
       setState(() {
         _id = (saved['stockReceiptID'] as num).toInt();
         _code = saved['receiptCode'];
-        _status = 'DRAFT';
+        _status = '${saved['statusCode'] ?? 'DRAFT'}';
+        _editing = _status == 'DRAFT';
         for (final raw in saved['items'] as List) {
           final line = _lines[(raw['lineNo'] as num).toInt() - 1];
           line.setSerials(List<String>.from(raw['serials']), confirmed: true);
         }
       });
-      showTimedSnackBar(
-        context,
-        message: 'บันทึกเอกสารร่างแล้ว ยังไม่เพิ่มยอดสต๊อก',
-      );
+      if (_status != 'CONFIRMED') {
+        showTimedSnackBar(
+          context,
+          message: 'บันทึกเอกสารร่างแล้ว ยังไม่เพิ่มยอดสต๊อก',
+        );
+      }
+      if (_status == 'CONFIRMED') {
+        showTimedSnackBar(context, message: 'รับสินค้าเข้าสต๊อกแล้ว');
+        await _load();
+      }
       return true;
     } catch (e) {
       if (mounted) _error(e);
@@ -383,7 +390,7 @@ class _StockReceiptWorkspaceState extends State<StockReceiptWorkspace> {
   }
 
   Future<void> _confirm(Map<String, dynamic> row) async {
-    if (_busy || _actions['edit'] != true) return;
+    if (_busy || _actions['confirmStock'] != true) return;
     final yes = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -417,8 +424,20 @@ class _StockReceiptWorkspaceState extends State<StockReceiptWorkspace> {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Divider(color: LaooColors.border),
-            Text(
-              'เอกสาร ${row['receiptCode']}\nเมื่อยืนยันจะเพิ่มยอดคงเหลือและทะเบียน Serial',
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('เอกสาร ${row['receiptCode']}'),
+                  const SizedBox(height: 8),
+                  Text('วันที่รับ: ${_listDate(row['receiptDate'])}'),
+                  const SizedBox(height: 8),
+                  Text('ผู้ขาย: ${row['vendorName'] ?? '-'}'),
+                  const SizedBox(height: 8),
+                  const Text('เมื่อยืนยันจะเพิ่มยอดคงเหลือและทะเบียน Serial'),
+                ],
+              ),
             ),
             const Divider(color: LaooColors.border),
           ],
@@ -791,7 +810,7 @@ class _StockReceiptWorkspaceState extends State<StockReceiptWorkspace> {
         onPressed: _busy ? null : () => _open(row),
         icon: Icon(Icons.open_in_new, color: _primary),
       ),
-      if (_actions['edit'] == true && row['statusCode'] == 'DRAFT')
+      if (_actions['confirmStock'] == true && row['statusCode'] == 'DRAFT')
         IconButton(
           tooltip: 'ยืนยันเข้าสต๊อก',
           onPressed: _busy ? null : () => _confirm(row),

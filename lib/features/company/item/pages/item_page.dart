@@ -33,6 +33,20 @@ class _ItemPageState extends State<ItemPage> {
   static const _menuCode = '08001';
   static const _pricePermissionCode = '01';
   static const _packPermissionCode = '02';
+  static const _itemKinds = [
+    {'code': 'GOODS', 'name': 'สินค้า'},
+    {'code': 'SERVICE', 'name': 'บริการ'},
+  ];
+  static const _stockTrackingModes = [
+    {'code': 'NONE', 'name': 'ไม่คุมสต๊อก'},
+    {'code': 'QUANTITY', 'name': 'คุมด้วยจำนวน'},
+    {'code': 'SERIAL', 'name': 'คุมด้วย Serial'},
+  ];
+  static const _usageModes = [
+    {'code': 'SALE', 'name': 'ขาย'},
+    {'code': 'MATERIAL', 'name': 'วัสดุ'},
+    {'code': 'SPARE_PART', 'name': 'อะไหล่'},
+  ];
   final _api = ItemApi();
   final _subPermission = SubPermissionApi();
   final _master = MasterDataApi();
@@ -43,14 +57,19 @@ class _ItemPageState extends State<ItemPage> {
   List<Map<String, dynamic>> _groups = const [],
       _types = const [],
       _units = const [],
-      _responsibleDepartments = const [];
+      _responsibleDepartments = const [],
+      _projects = const [];
   Map<String, bool> _actions = const {};
   Set<String> _permissionPoints = const {};
   Map<String, dynamic> _codeSettings = const {};
   double _maxItemImageSizeMB = 1;
-  String? _group, _type;
+  String? _group, _type, _itemKind, _stockTracking, _usageCode;
+  int? _projectId, _responsibleDepartmentId;
   String _statusFilter = 'all', _showFilter = 'all';
-  bool _card = false, _loading = true, _showImages = true;
+  bool _card = false,
+      _loading = true,
+      _showImages = true,
+      _filterExpanded = false;
   int _currentPage = 0;
   String _caption = '';
   bool _formOpen = false;
@@ -156,19 +175,34 @@ class _ItemPageState extends State<ItemPage> {
 
   Future<void> _load() async {
     try {
+      try {
+        await companySetupController.load();
+      } catch (_) {
+        // Item list can still load when setup is temporarily unavailable.
+      }
       final permissionPoints = _loadPermissionPoints();
       final result = await Future.wait([
         _withLoadDescription(_api.actions(), 'สิทธิ์หน้าสินค้า'),
         _withLoadDescription(_api.codeSettings(), 'ค่าการสร้างรหัสสินค้า'),
         _withLoadDescription(_api.imageSettings(), 'ข้อกำหนดรูปภาพสินค้า'),
         _withLoadDescription(
-          _api.list(groupCode: _group, typeCode: _type, search: _search.text),
+          _api.list(
+            groupCode: _group,
+            typeCode: _type,
+            itemKindCode: _itemKind,
+            stockTrackingCode: _stockTracking,
+            usageCode: _usageCode,
+            projectId: _projectId,
+            responsibleDepartmentId: _responsibleDepartmentId,
+            search: _search.text,
+          ),
           'รายการสินค้า',
         ),
         _withLoadDescription(_master.list('006'), 'กลุ่มสินค้า'),
         _withLoadDescription(_master.list('007'), 'ประเภทสินค้า'),
         _withLoadDescription(_master.list('002'), 'หน่วยนับ'),
         _withLoadDescription(_api.responsibleDepartments(), 'แผนกที่รับผิดชอบ'),
+        _withLoadDescription(_api.projectOptions(), 'Project สินค้า'),
         permissionPoints,
       ]);
       if (!mounted) return;
@@ -182,7 +216,8 @@ class _ItemPageState extends State<ItemPage> {
         _types = result[5] as List<Map<String, dynamic>>;
         _units = result[6] as List<Map<String, dynamic>>;
         _responsibleDepartments = result[7] as List<Map<String, dynamic>>;
-        _permissionPoints = result[8] as Set<String>;
+        _projects = result[8] as List<Map<String, dynamic>>;
+        _permissionPoints = result[9] as Set<String>;
         _currentPage = _currentPage.clamp(0, _totalPages - 1);
         _loading = false;
       });
@@ -1296,6 +1331,9 @@ class _ItemPageState extends State<ItemPage> {
             responsibleDepartments: _responsibleDepartments,
             codeSettings: _codeSettings,
             maxItemImageSizeMB: _maxItemImageSizeMB,
+            defaultReceiveStockPriceModeCode:
+                '${_codeSettings['receiveStockPriceModeCode'] ?? companySetupController.current?.receiveStockPriceModeCode ?? 'CUSTOM'}'
+                    .toUpperCase(),
             onCancel: _closeForm,
             onSaved: () {
               showTimedSnackBar(context, message: 'บันทึกข้อมูลสินค้าสำเร็จ');
@@ -1321,7 +1359,6 @@ class _ItemPageState extends State<ItemPage> {
                 decoration: const BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.all(Radius.circular(4)),
-                  border: Border(bottom: BorderSide(color: Color(0xFFE4EAE6))),
                 ),
                 child: Row(
                   children: [
@@ -1365,125 +1402,229 @@ class _ItemPageState extends State<ItemPage> {
                   ],
                 ),
               ),
-              const SizedBox(height: LaooLayout.cardSpacing),
+              const SizedBox(height: 6),
               Container(
                 padding: const EdgeInsets.all(LaooLayout.cardPadding),
                 decoration: const BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.all(Radius.circular(4)),
                 ),
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final filterWidth = constraints.maxWidth < 700
-                        ? constraints.maxWidth < 220
-                              ? constraints.maxWidth
-                              : ((constraints.maxWidth - 32) / 2).clamp(
-                                  96.0,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    InkWell(
+                      onTap: () =>
+                          setState(() => _filterExpanded = !_filterExpanded),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.tune_outlined,
+                            color: workspaceThemeController.value.primary,
+                          ),
+                          const SizedBox(width: 8),
+                          const Expanded(
+                            child: Text(
+                              'ตัวกรองค้นหา',
+                              style: TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                          Text('${_filteredRows.length} รายการ'),
+                          const SizedBox(width: 8),
+                          Icon(
+                            _filterExpanded
+                                ? Icons.expand_less
+                                : Icons.expand_more,
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (_filterExpanded) ...[
+                      const SizedBox(height: 10),
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final filterWidth = constraints.maxWidth < 700
+                              ? constraints.maxWidth < 220
+                                    ? constraints.maxWidth
+                                    : ((constraints.maxWidth - 32) / 2).clamp(
+                                        96.0,
+                                        240.0,
+                                      )
+                              : ((constraints.maxWidth - 32) / 5).clamp(
+                                  140.0,
                                   240.0,
-                                )
-                        : ((constraints.maxWidth - 32) / 5).clamp(140.0, 240.0);
-                    return Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        SizedBox(
-                          width: filterWidth,
-                          child: _filter('กลุ่มสินค้า', _group, _groups, (v) {
-                            _group = v;
-                            _currentPage = 0;
-                            _load();
-                          }),
-                        ),
-                        SizedBox(
-                          width: filterWidth,
-                          child: _filter('ประเภทสินค้า', _type, _types, (v) {
-                            _type = v;
-                            _currentPage = 0;
-                            _load();
-                          }),
-                        ),
-                        SizedBox(
-                          width: filterWidth,
-                          child: TextField(
-                            controller: _search,
-                            onSubmitted: (_) => _load(),
-                            decoration: InputDecoration(
-                              labelText: 'ค้นหารหัส/ชื่อสินค้า',
-                              suffixIcon: IconButton(
-                                onPressed: _load,
-                                icon: const Icon(Icons.arrow_forward),
-                              ),
-                            ),
-                          ),
-                        ),
-                        SizedBox(
-                          width: filterWidth,
-                          child: DropdownButtonFormField<String>(
-                            initialValue: _statusFilter,
-                            decoration: const InputDecoration(
-                              labelText: 'สถานะ',
-                            ),
-                            style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(
-                                  fontSize: LaooTypography.tableBody,
-                                  height: 1.35,
+                                );
+                          return Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              SizedBox(
+                                width: filterWidth,
+                                child: _filter(
+                                  'ชนิดพื้นฐาน',
+                                  _itemKind,
+                                  _itemKinds,
+                                  (v) {
+                                    _itemKind = v;
+                                    _currentPage = 0;
+                                    _load();
+                                  },
                                 ),
-                            items: const [
-                              DropdownMenuItem(
-                                value: 'all',
-                                child: Text('ทั้งหมด'),
                               ),
-                              DropdownMenuItem(
-                                value: 'active',
-                                child: Text('ใช้งาน'),
+                              SizedBox(
+                                width: filterWidth,
+                                child: _filter(
+                                  'วิธีคุมสต๊อก',
+                                  _stockTracking,
+                                  _stockTrackingModes,
+                                  (v) {
+                                    _stockTracking = v;
+                                    _currentPage = 0;
+                                    _load();
+                                  },
+                                ),
                               ),
-                              DropdownMenuItem(
-                                value: 'inactive',
-                                child: Text('ไม่ใช้งาน'),
+                              SizedBox(
+                                width: filterWidth,
+                                child: _filter(
+                                  'วัตถุประสงค์',
+                                  _usageCode,
+                                  _usageModes,
+                                  (v) {
+                                    _usageCode = v;
+                                    _currentPage = 0;
+                                    _load();
+                                  },
+                                ),
+                              ),
+                              SizedBox(
+                                width: filterWidth,
+                                child: _projectFilter(),
+                              ),
+                              SizedBox(
+                                width: filterWidth,
+                                child: _filter(
+                                  'แผนกที่รับผิดชอบ',
+                                  _responsibleDepartmentId?.toString() ?? '',
+                                  [
+                                    {'code': '', 'name': 'ทั้งหมด'},
+                                    ..._responsibleDepartments,
+                                  ],
+                                  (v) {
+                                    _responsibleDepartmentId = int.tryParse(
+                                      v ?? '',
+                                    );
+                                    _currentPage = 0;
+                                    _load();
+                                  },
+                                ),
+                              ),
+                              SizedBox(
+                                width: filterWidth,
+                                child: _filter('กลุ่มสินค้า', _group, _groups, (
+                                  v,
+                                ) {
+                                  _group = v;
+                                  _currentPage = 0;
+                                  _load();
+                                }),
+                              ),
+                              SizedBox(
+                                width: filterWidth,
+                                child: _filter('ประเภทสินค้า', _type, _types, (
+                                  v,
+                                ) {
+                                  _type = v;
+                                  _currentPage = 0;
+                                  _load();
+                                }),
+                              ),
+                              SizedBox(
+                                width: filterWidth,
+                                child: TextField(
+                                  controller: _search,
+                                  onSubmitted: (_) => _load(),
+                                  decoration: InputDecoration(
+                                    labelText: 'ค้นหารหัส/ชื่อสินค้า',
+                                    suffixIcon: IconButton(
+                                      onPressed: _load,
+                                      icon: const Icon(Icons.arrow_forward),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              SizedBox(
+                                width: filterWidth,
+                                child: DropdownButtonFormField<String>(
+                                  isExpanded: true,
+                                  initialValue: _statusFilter,
+                                  decoration: const InputDecoration(
+                                    labelText: 'สถานะ',
+                                  ),
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(
+                                        fontSize: LaooTypography.tableBody,
+                                        height: 1.35,
+                                      ),
+                                  items: const [
+                                    DropdownMenuItem(
+                                      value: 'all',
+                                      child: Text('ทั้งหมด'),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: 'active',
+                                      child: Text('ใช้งาน'),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: 'inactive',
+                                      child: Text('ไม่ใช้งาน'),
+                                    ),
+                                  ],
+                                  onChanged: (v) => setState(() {
+                                    _statusFilter = v ?? 'all';
+                                    _currentPage = 0;
+                                  }),
+                                ),
+                              ),
+                              SizedBox(
+                                width: filterWidth,
+                                child: DropdownButtonFormField<String>(
+                                  isExpanded: true,
+                                  initialValue: _showFilter,
+                                  decoration: const InputDecoration(
+                                    labelText: 'แสดง',
+                                  ),
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(
+                                        fontSize: LaooTypography.tableBody,
+                                        height: 1.35,
+                                      ),
+                                  items: const [
+                                    DropdownMenuItem(
+                                      value: 'all',
+                                      child: Text('ทั้งหมด'),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: 'online',
+                                      child: Text('Online'),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: 'offline',
+                                      child: Text('Offline'),
+                                    ),
+                                  ],
+                                  onChanged: (v) => setState(() {
+                                    _showFilter = v ?? 'all';
+                                    _currentPage = 0;
+                                  }),
+                                ),
                               ),
                             ],
-                            onChanged: (v) => setState(() {
-                              _statusFilter = v ?? 'all';
-                              _currentPage = 0;
-                            }),
-                          ),
-                        ),
-                        SizedBox(
-                          width: filterWidth,
-                          child: DropdownButtonFormField<String>(
-                            initialValue: _showFilter,
-                            decoration: const InputDecoration(
-                              labelText: 'แสดง',
-                            ),
-                            style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(
-                                  fontSize: LaooTypography.tableBody,
-                                  height: 1.35,
-                                ),
-                            items: const [
-                              DropdownMenuItem(
-                                value: 'all',
-                                child: Text('ทั้งหมด'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'online',
-                                child: Text('Online'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'offline',
-                                child: Text('Offline'),
-                              ),
-                            ],
-                            onChanged: (v) => setState(() {
-                              _showFilter = v ?? 'all';
-                              _currentPage = 0;
-                            }),
-                          ),
-                        ),
-                      ],
-                    );
-                  },
+                          );
+                        },
+                      ),
+                    ],
+                  ],
                 ),
               ),
               const SizedBox(height: LaooLayout.cardSpacing),
@@ -1518,6 +1659,7 @@ class _ItemPageState extends State<ItemPage> {
     List<Map<String, dynamic>> values,
     ValueChanged<String?> onChanged,
   ) => DropdownButtonFormField<String>(
+    isExpanded: true,
     initialValue: value,
     decoration: InputDecoration(labelText: label),
     style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -1539,6 +1681,26 @@ class _ItemPageState extends State<ItemPage> {
         )
         .toList(),
     onChanged: onChanged,
+  );
+
+  Widget _projectFilter() => DropdownButtonFormField<int>(
+    isExpanded: true,
+    initialValue: _projectId,
+    decoration: const InputDecoration(labelText: 'Project ที่นำไปใช้'),
+    items: [
+      const DropdownMenuItem<int>(value: null, child: Text('ทั้งหมด')),
+      ..._projects.map(
+        (x) => DropdownMenuItem<int>(
+          value: (x['projectId'] as num).toInt(),
+          child: Text('${x['projectCode']} | ${x['projectName']}'),
+        ),
+      ),
+    ],
+    onChanged: (v) {
+      _projectId = v;
+      _currentPage = 0;
+      _load();
+    },
   );
 
   Widget _table() {

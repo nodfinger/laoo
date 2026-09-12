@@ -65,6 +65,13 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
   List<Map<String, dynamic>> _runCusOptions = const [];
   final _customerDigit = TextEditingController(text: '5');
   final _markCus = TextEditingController();
+  bool _receiveStockImmediately = true;
+  String _receiveStockPriceModeCode = 'CUSTOM';
+  static const _receiveStockPriceModes = [
+    {'code': 'CUSTOM', 'name': 'กำหนดเอง'},
+    {'code': 'LAST_RECEIPT', 'name': 'ราคารับเข้าล่าสุด'},
+    {'code': 'AVERAGE', 'name': 'ราคาเฉลี่ย'},
+  ];
 
   bool _saving = false;
   bool _canEdit = false;
@@ -121,6 +128,8 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
       _rowStd.text = setup.rowStd.toString();
       _rowCardStd.text = setup.rowCardStd.toString();
       _timeAlert.text = setup.timeAlert.toString();
+      _receiveStockImmediately = setup.receiveStockImmediately;
+      _receiveStockPriceModeCode = setup.receiveStockPriceModeCode;
       _itemDigit.text = setup.itemDigit.toString();
       _markItem.text = setup.markItem ?? '';
       _customerDigit.text = setup.customerDigit.toString();
@@ -200,9 +209,29 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
     super.dispose();
   }
 
-  String _apiMessage(ApiException error) => error.statusCode == null
-      ? error.message
-      : '${error.message} (HTTP ${error.statusCode})';
+  String _apiMessage(ApiException error) {
+    final rawMessage = error.message.trim();
+    const marker = 'รายละเอียดเพิ่มเติม:';
+    final markerIndex = rawMessage.indexOf(marker);
+    final message =
+        (markerIndex >= 0 ? rawMessage.substring(0, markerIndex) : rawMessage)
+            .trim();
+    final embeddedDescription = markerIndex >= 0
+        ? rawMessage.substring(markerIndex + marker.length).trim()
+        : null;
+    final description = (error.description?.trim().isNotEmpty ?? false)
+        ? error.description!.trim()
+        : (embeddedDescription?.isNotEmpty ?? false)
+        ? embeddedDescription!
+        : 'กรุณาตรวจสอบการเชื่อมต่อและข้อมูลกำหนดค่าระบบ แล้วลองใหม่อีกครั้ง';
+    final parts = <String>[];
+    if (message.isNotEmpty) parts.add(message);
+    parts.add('$marker $description');
+    if (error.statusCode != null) {
+      parts.add('รหัส HTTP: ${error.statusCode}');
+    }
+    return parts.join('\n');
+  }
 
   Future<void> _save() async {
     if (_saving) return;
@@ -236,6 +265,8 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
             rowStd: int.tryParse(_rowStd.text) ?? 30,
             rowCardStd: int.tryParse(_rowCardStd.text) ?? 30,
             timeAlert: int.tryParse(_timeAlert.text) ?? 30,
+            receiveStockImmediately: _receiveStockImmediately,
+            receiveStockPriceModeCode: _receiveStockPriceModeCode,
             itemDigit: int.tryParse(_itemDigit.text) ?? 3,
             runCus: _runCus,
             markCus: _markCus.text,
@@ -319,6 +350,60 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
                 ),
               ),
               const SizedBox(height: 12),
+            ],
+            if (widget.additionalOnly) ...[
+              Text(
+                'ข้อมูลส่วนกลาง',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: accent,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 8),
+              SwitchListTile.adaptive(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('รับสินค้าเข้าคลัง–ตัดสต๊อกทันที'),
+                subtitle: const Text(
+                  'เมื่อยืนยันรับสินค้า ระบบบันทึกยอดคงคลังทันที',
+                ),
+                value: _receiveStockImmediately,
+                onChanged: _canEdit
+                    ? (value) =>
+                          setState(() => _receiveStockImmediately = value)
+                    : null,
+              ),
+              const Divider(height: 20),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 420),
+                  child: DropdownButtonFormField<String>(
+                    initialValue:
+                        _receiveStockPriceModes.any(
+                          (x) => x['code'] == _receiveStockPriceModeCode,
+                        )
+                        ? _receiveStockPriceModeCode
+                        : 'CUSTOM',
+                    decoration: const InputDecoration(
+                      labelText: 'ราคาเริ่มต้นรับเข้าสต๊อก',
+                    ),
+                    items: _receiveStockPriceModes
+                        .map(
+                          (x) => DropdownMenuItem<String>(
+                            value: '${x['code']}',
+                            child: Text('${x['name']}'),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: _canEdit
+                        ? (value) => setState(
+                            () =>
+                                _receiveStockPriceModeCode = value ?? 'CUSTOM',
+                          )
+                        : null,
+                  ),
+                ),
+              ),
             ],
             Align(
               alignment: Alignment.centerLeft,
