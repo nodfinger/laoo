@@ -153,7 +153,7 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
     }
     if (invitation['requiresChangeReason'] == true &&
         _changeReason.text.trim().isEmpty) {
-      _notify('กรุณาระบุเหตุผลการตอบรับภายหลัง', true);
+      _notify('กรุณาระบุเหตุผลการตอบรับ', true);
       return;
     }
     if (_responseStatus == 'ACCEPTED' && !lateResponseMode) {
@@ -251,6 +251,11 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
     if (date == null) return '-';
     String two(int number) => number.toString().padLeft(2, '0');
     return '${two(date.day)}/${two(date.month)}/${date.year} ${two(date.hour)}:${two(date.minute)}';
+  }
+
+  bool _hasPassed(Object? value) {
+    final date = DateTime.tryParse('$value')?.toLocal();
+    return date != null && !DateTime.now().isBefore(date);
   }
 
   String _statusName(String value, {bool late = false}) => switch (value) {
@@ -355,7 +360,7 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
                               const Icon(Icons.broken_image_outlined),
                         ),
                       ),
-                title: Text('${food['code']} | ${food['nameTh']}'),
+                title: Text('${food['nameTh']}'),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -528,7 +533,68 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
     );
     final canRespond = invitation['canRespond'] == true;
     final canEditPreferences = invitation['canEditPreferences'] == true;
+    final hasFoodPlan = groups.isNotEmpty;
+    final foodCutoffPassed = _hasPassed(invitation['orderCutoffDateTime']);
+    final foodOrderingClosed = hasFoodPlan && foodCutoffPassed;
     final lateAcceptanceOnly = invitation['lateAcceptanceOnly'] == true;
+    final participantNickName = '${invitation['participantNickName'] ?? ''}'
+        .trim();
+    final requiresChangeReason = invitation['requiresChangeReason'] == true;
+    final responseChoices = Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children:
+          const [
+            ('PENDING', 'รอตอบรับ', Icons.schedule_outlined),
+            ('ACCEPTED', 'เข้าร่วม', Icons.check_circle_outline),
+            ('DECLINED', 'ปฏิเสธ', Icons.cancel_outlined),
+          ].map((option) {
+            final selected = _responseStatus == option.$1;
+            final isDeclined = option.$1 == 'DECLINED';
+            final color = isDeclined ? LaooColors.error : preset.primary;
+            return SizedBox(
+              height: LaooTypography.buttonHeight,
+              child: OutlinedButton.icon(
+                onPressed:
+                    _saving ||
+                        !canRespond ||
+                        selected ||
+                        (lateAcceptanceOnly && option.$1 != 'ACCEPTED')
+                    ? null
+                    : () => setState(() => _responseStatus = option.$1),
+                icon: Icon(option.$3),
+                label: Text(option.$2),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: selected
+                      ? (isDeclined
+                            ? Colors.white
+                            : Theme.of(context).colorScheme.onPrimary)
+                      : color,
+                  backgroundColor: selected
+                      ? (isDeclined ? LaooColors.error : preset.primary)
+                      : Colors.white,
+                  disabledForegroundColor: selected
+                      ? (isDeclined
+                            ? Colors.white
+                            : Theme.of(context).colorScheme.onPrimary)
+                      : color.withValues(alpha: .45),
+                  disabledBackgroundColor: selected
+                      ? (isDeclined ? LaooColors.error : preset.primary)
+                      : Colors.white,
+                  side: BorderSide(color: color),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(LaooRadius.xs),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  textStyle: const TextStyle(
+                    fontSize: LaooTypography.button,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+    );
     return Padding(
       padding: const EdgeInsets.all(LaooLayout.cardMargin),
       child: Column(
@@ -569,6 +635,7 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
                       '${invitation['bookingNo'] ?? '-'} | ${invitation['subject']}\n'
                       '${invitation['roomCode']} | ${invitation['roomName']}\n'
                       '${_meetingPeriod(invitation)}\n'
+                      'ผู้ถูกเชิญ: ${invitation['participantName'] ?? '-'}${participantNickName.isEmpty ? '' : ' ($participantNickName)'}\n'
                       'ผู้จัด: ${invitation['organizerName'] ?? '-'}',
                     ),
                   ),
@@ -587,92 +654,65 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
                     ),
                   ],
                   const SizedBox(height: 12),
-                  const Text(
-                    'การตอบรับ',
-                    style: TextStyle(
-                      fontSize: LaooTypography.sectionTitle,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children:
-                        const [
-                          ('PENDING', 'รอตอบรับ', Icons.schedule_outlined),
-                          ('ACCEPTED', 'เข้าร่วม', Icons.check_circle_outline),
-                          ('DECLINED', 'ปฏิเสธ', Icons.cancel_outlined),
-                        ].map((option) {
-                          final selected = _responseStatus == option.$1;
-                          final isDeclined = option.$1 == 'DECLINED';
-                          final color = isDeclined
-                              ? LaooColors.error
-                              : preset.primary;
-                          return SizedBox(
-                            height: LaooTypography.buttonHeight,
-                            child: OutlinedButton.icon(
-                              onPressed:
-                                  _saving ||
-                                      !canRespond ||
-                                      selected ||
-                                      (lateAcceptanceOnly &&
-                                          option.$1 != 'ACCEPTED')
-                                  ? null
-                                  : () => setState(
-                                      () => _responseStatus = option.$1,
-                                    ),
-                              icon: Icon(option.$3),
-                              label: Text(option.$2),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: selected
-                                    ? (isDeclined
-                                          ? Colors.white
-                                          : Theme.of(
-                                              context,
-                                            ).colorScheme.onPrimary)
-                                    : color,
-                                backgroundColor: selected
-                                    ? (isDeclined
-                                          ? LaooColors.error
-                                          : preset.primary)
-                                    : Colors.white,
-                                disabledForegroundColor: selected
-                                    ? (isDeclined
-                                          ? Colors.white
-                                          : Theme.of(
-                                              context,
-                                            ).colorScheme.onPrimary)
-                                    : color.withValues(alpha: .45),
-                                disabledBackgroundColor: selected
-                                    ? (isDeclined
-                                          ? LaooColors.error
-                                          : preset.primary)
-                                    : Colors.white,
-                                side: BorderSide(color: color),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(
-                                    LaooRadius.xs,
-                                  ),
-                                ),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                ),
-                                textStyle: const TextStyle(
-                                  fontSize: LaooTypography.button,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final compact = constraints.maxWidth < 880;
+                      final remark = SizedBox(
+                        width: double.infinity,
+                        height: LaooTypography.buttonHeight,
+                        child: TextField(
+                          controller: _remark,
+                          maxLines: 1,
+                          readOnly: !canRespond,
+                          style: const TextStyle(
+                            fontSize: LaooTypography.inputText,
+                          ),
+                          decoration: const InputDecoration(
+                            labelText: 'หมายเหตุการตอบรับ',
+                          ),
+                        ),
+                      );
+                      if (compact) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const Text(
+                              'การตอบรับ',
+                              style: TextStyle(
+                                fontSize: LaooTypography.sectionTitle,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
-                          );
-                        }).toList(),
+                            const SizedBox(height: 8),
+                            responseChoices,
+                            const SizedBox(height: 8),
+                            remark,
+                          ],
+                        );
+                      }
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'การตอบรับ',
+                            style: TextStyle(
+                              fontSize: LaooTypography.sectionTitle,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          responseChoices,
+                          const SizedBox(height: 8),
+                          remark,
+                        ],
+                      );
+                    },
                   ),
-                  const SizedBox(height: 12),
                   if (!canRespond) ...[
                     Text(
                       '${invitation['responseUnavailableReason'] ?? 'คำเชิญนี้ไม่สามารถเปลี่ยนการตอบรับได้ กรุณาโหลดข้อมูลใหม่หรือติดต่อผู้ดูแลระบบ'}',
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: LaooLayout.cardSpacing),
                   ],
                   if (lateAcceptanceOnly) ...[
                     Container(
@@ -685,30 +725,24 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
                         'การประชุมเริ่มแล้ว สามารถตอบรับภายหลังได้เฉพาะ เข้าร่วม กรุณาระบุเหตุผลก่อนบันทึก อาหารและความต้องการปิดรับแล้ว',
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: LaooLayout.cardSpacing),
                   ],
-                  TextField(
-                    controller: _remark,
-                    maxLines: 3,
-                    readOnly: !canRespond,
-                    style: const TextStyle(fontSize: LaooTypography.inputText),
-                    decoration: const InputDecoration(
-                      labelText: 'หมายเหตุการตอบรับ',
-                    ),
-                  ),
-                  if (invitation['requiresChangeReason'] == true) ...[
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _changeReason,
-                      maxLines: 2,
-                      readOnly: !canRespond,
-                      decoration: const InputDecoration(
-                        labelText: 'เหตุผลการตอบรับ/แก้ไขภายหลัง *',
+                  if (requiresChangeReason) ...[
+                    SizedBox(
+                      height: LaooTypography.buttonHeight,
+                      child: TextField(
+                        controller: _changeReason,
+                        maxLines: 1,
+                        readOnly: !canRespond,
+                        decoration: const InputDecoration(
+                          labelText: 'เหตุผลการตอบรับ (กรณีพบปัญหา)',
+                        ),
                       ),
                     ),
+                    const SizedBox(height: LaooLayout.cardSpacing),
                   ],
-                  if (_responseStatus == 'ACCEPTED') ...[
-                    const SizedBox(height: 16),
+                  if (_responseStatus == 'ACCEPTED' && foodOrderingClosed) ...[
+                    const SizedBox(height: LaooLayout.cardSpacing),
                     MeetingAttendancePanel(
                       key: ValueKey((
                         invitation['bookingId'],
@@ -719,7 +753,43 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
                           .toInt(),
                       onMessage: (message, error) => _notify(message, error),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: LaooLayout.cardSpacing),
+                    Container(
+                      padding: const EdgeInsets.all(LaooLayout.cardPadding),
+                      decoration: BoxDecoration(
+                        color: LaooColors.error.withValues(alpha: .10),
+                        borderRadius: BorderRadius.circular(LaooRadius.xs),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.warning_amber_rounded,
+                            color: LaooColors.error,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'เกินเวลาปิดรับสั่งอาหาร\nปิดรับเมื่อ ${_date(invitation['orderCutoffDateTime'])}',
+                              style: const TextStyle(color: LaooColors.error),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  if (_responseStatus == 'ACCEPTED' && !foodOrderingClosed) ...[
+                    const SizedBox(height: LaooLayout.cardSpacing),
+                    MeetingAttendancePanel(
+                      key: ValueKey((
+                        invitation['bookingId'],
+                        invitation['participantId'],
+                      )),
+                      bookingId: (invitation['bookingId'] as num).toInt(),
+                      participantId: (invitation['participantId'] as num)
+                          .toInt(),
+                      onMessage: (message, error) => _notify(message, error),
+                    ),
+                    const SizedBox(height: LaooLayout.cardSpacing),
                     Row(
                       children: [
                         Icon(
@@ -911,6 +981,8 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
                             final item = _items[index];
                             final status = '${item['invitationStatus']}';
                             final late = item['isLateResponse'] == true;
+                            final participantNickName =
+                                '${item['participantNickName'] ?? ''}'.trim();
                             final color = _statusColor(status, preset);
                             return Card(
                               margin: EdgeInsets.zero,
@@ -958,12 +1030,13 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
                                 ),
                                 subtitle: Text(
                                   '${item['roomCode']} | ${item['roomName']}\n'
-                                  '${_meetingPeriod(item)}',
+                                  '${_meetingPeriod(item)}\n'
+                                  'ผู้ถูกเชิญ: ${item['participantName'] ?? '-'}${participantNickName.isEmpty ? '' : ' ($participantNickName)'}',
                                 ),
                                 trailing: SizedBox(
                                   width: 124,
                                   height: 48,
-                                  child: FilledButton.icon(
+                                  child: FilledButton(
                                     onPressed: () => _open(item),
                                     style: FilledButton.styleFrom(
                                       backgroundColor: preset.primary,
@@ -976,10 +1049,7 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
                                         ),
                                       ),
                                     ),
-                                    icon: const Icon(
-                                      Icons.arrow_forward_rounded,
-                                    ),
-                                    label: const Text('ดำเนินการ'),
+                                    child: const Text('ดำเนินการ'),
                                   ),
                                 ),
                               ),

@@ -57,13 +57,13 @@ WHERE P.CompanyID=@company AND (@admin=1 OR P.EmployeeID=@employee) AND B.Bookin
         var sql = $@"
 SELECT P.BookingParticipantID,P.BookingID,B.BookingNo,B.Subject,R.RoomCode,R.RoomNameTH,
        MIN(S.StartDateTime),MAX(S.EndDateTime),P.InvitationStatus,P.ResponseDate,P.Remark,
-       PE.EmployeeCode,PE.FullName,RE.EmployeeCode,RE.FullName,FP.OrderCutoffDateTime,
+       PE.EmployeeCode,PE.FullName,PE.NickName,RE.EmployeeCode,RE.FullName,FP.OrderCutoffDateTime,
        CASE WHEN P.EmployeeID=@employee THEN 1 ELSE 0 END,
        (SELECT COUNT_BIG(1) FROM dbo.TDADMeetingBookingFoodOption FO WHERE FO.BookingID=B.BookingID AND FO.CompanyID=B.CompanyID),
        P.IsLateResponse,P.LateResponseReason,P.LateResponseAtUtc
 {filter}
 GROUP BY P.BookingParticipantID,P.BookingID,B.BookingID,B.CompanyID,B.BookingNo,B.Subject,R.RoomCode,R.RoomNameTH,
-         P.InvitationStatus,P.ResponseDate,P.Remark,PE.EmployeeCode,PE.FullName,RE.EmployeeCode,RE.FullName,FP.OrderCutoffDateTime,P.EmployeeID,B.CreateDate,
+         P.InvitationStatus,P.ResponseDate,P.Remark,PE.EmployeeCode,PE.FullName,PE.NickName,RE.EmployeeCode,RE.FullName,FP.OrderCutoffDateTime,P.EmployeeID,B.CreateDate,
          P.IsLateResponse,P.LateResponseReason,P.LateResponseAtUtc
 ORDER BY MIN(S.StartDateTime),B.CreateDate
 OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY;";
@@ -75,9 +75,9 @@ OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY;";
             participantId = reader.GetInt64(0), bookingId = reader.GetInt64(1), bookingNo = Text(reader, 2), subject = reader.GetString(3),
             roomCode = reader.GetString(4), roomName = reader.GetString(5), startDateTime = reader.GetDateTime(6), endDateTime = reader.GetDateTime(7),
             invitationStatus = reader.GetString(8), responseDate = Date(reader, 9), remark = Text(reader, 10), participantCode = Text(reader, 11),
-            participantName = Text(reader, 12), organizerCode = Text(reader, 13), organizerName = Text(reader, 14),
-            orderCutoffDateTime = Date(reader, 15), foodCount = Convert.ToInt32(reader.GetInt64(17)), canRespond = reader.GetInt32(16) == 1,
-            isLateResponse = reader.GetBoolean(18), lateResponseReason = Text(reader, 19), lateResponseAtUtc = Date(reader, 20),
+            participantName = Text(reader, 12), participantNickName = Text(reader, 13), organizerCode = Text(reader, 14), organizerName = Text(reader, 15),
+            orderCutoffDateTime = Date(reader, 16), foodCount = Convert.ToInt32(reader.GetInt64(18)), canRespond = reader.GetInt32(17) == 1,
+            isLateResponse = reader.GetBoolean(19), lateResponseReason = Text(reader, 20), lateResponseAtUtc = Date(reader, 21),
         });
         return Ok(new { items, total, page, pageSize });
     }

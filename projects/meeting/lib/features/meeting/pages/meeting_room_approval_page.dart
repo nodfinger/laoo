@@ -541,6 +541,11 @@ class _MeetingRoomApprovalPageState extends State<MeetingRoomApprovalPage> {
   Widget _itemCard(Map<String, dynamic> item, WorkspaceThemePreset preset) {
     final start = _dateTime(item['startDateTime']);
     final end = _dateTime(item['endDateTime']);
+    final startValue = DateTime.tryParse(
+      item['startDateTime']?.toString() ?? '',
+    )?.toLocal();
+    final hasStarted =
+        startValue != null && !startValue.isAfter(DateTime.now());
     final status = '${item['status'] ?? 'PENDING'}';
     return WorkspaceSectionCard(
       child: Column(
@@ -626,6 +631,14 @@ class _MeetingRoomApprovalPageState extends State<MeetingRoomApprovalPage> {
             spacing: 6,
             runSpacing: 6,
             children: [
+              if ((status == "APPROVED" || status == "REJECTED") && hasStarted)
+                Tooltip(
+                  message: "ถึงเวลาเริ่มประชุมแล้ว ไม่สามารถย้อนสถานะได้",
+                  child: Icon(
+                    Icons.lock_outline,
+                    color: Theme.of(context).disabledColor,
+                  ),
+                ),
               if (status == 'APPROVED' && item['canManageParticipants'] == true)
                 OutlinedButton.icon(
                   onPressed: () => _manageParticipants(item),

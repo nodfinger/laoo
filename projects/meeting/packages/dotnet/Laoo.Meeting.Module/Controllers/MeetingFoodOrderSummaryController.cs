@@ -75,11 +75,13 @@ ORDER BY 7,B.BookingID OFFSET @offset ROWS FETCH NEXT @take ROWS ONLY;
         }
         await reader.CloseAsync();
         var foods=await FoodSummaries(db,company,bookingIds,token);
+        var participantFoods=await ParticipantFoodSummaries(db,company,bookingIds,token);
         var requirements=await RequirementSummaries(db,company,bookingIds,token);
         foreach(var item in items)
         {
             var id=(long)item["bookingId"]!;
             item["foods"]=foods.TryGetValue(id,out var rows)?rows:Array.Empty<object>();
+            item["participantFoods"]=participantFoods.TryGetValue(id,out var participantRows)?participantRows:Array.Empty<object>();
             item["requirements"]=requirements.TryGetValue(id,out var answers)?answers:Array.Empty<object>();
         }
         return Ok(new {available=true,total,page,pageSize,items});
@@ -186,12 +188,49 @@ ORDER BY O.BookingID,ISNULL(T.Seq,0),F.FoodNameTH,F.FoodCode;
         }
         return result;
     }
+    private static async Task<Dictionary<long,List<object>>> ParticipantFoodSummaries(SqlConnection db,long company,IReadOnlyList<long> bookingIds,CancellationToken token)
+    {
+        var result=new Dictionary<long,List<object>>();if(bookingIds.Count==0)return result;
+        var ids=string.Join(',',bookingIds.Select((_,index)=>$"@participantBooking{index}"));
+        await using var cmd=new SqlCommand($"""
+SELECT H.BookingID,P.BookingParticipantID,E.EmployeeCode,E.FullName,E.NickName,
+       DIV.NameTH,DEP.NameTH,F.FoodID,F.FoodNameTH,F.FoodTypeCode,T.Name,D.Quantity
+FROM dbo.TDADMeetingBookingFoodOrder H
+JOIN dbo.TDADMeetingBookingFoodOrderDetail D ON D.BookingFoodOrderID=H.BookingFoodOrderID
+JOIN dbo.TDADMeetingRoomBookingParticipant P ON P.CompanyID=H.CompanyID AND P.BookingParticipantID=H.BookingParticipantID
+JOIN dbo.TDADEmployee E ON E.CompanyID=P.CompanyID AND E.EmployeeID=P.EmployeeID
+LEFT JOIN dbo.TDADOrganizationUnit DEP ON DEP.CompanyID=E.CompanyID
+  AND DEP.OrgUnitID=E.DepartmentOrgUnitID AND DEP.UnitType='DEP'
+LEFT JOIN dbo.TDADOrganizationUnit DIV ON DIV.CompanyID=DEP.CompanyID
+  AND DIV.OrgUnitID=DEP.ParentOrgUnitID AND DIV.UnitType='DIV'
+JOIN dbo.TDADMeetingFood F ON F.CompanyID=H.CompanyID AND F.FoodID=D.FoodID
+OUTER APPLY(SELECT TOP(1) M.Name,M.Seq FROM dbo.TDSTMaster M
+ WHERE M.MasterGroupCode='011' AND M.MasterCode=F.FoodTypeCode AND M.IsActive=1
+   AND M.OwnerType='C' AND M.OwnerCompanyID=@company) T
+WHERE H.CompanyID=@company AND H.BookingID IN ({ids}) AND H.IsCancelled=0
+  AND P.InvitationStatus='ACCEPTED'
+ORDER BY H.BookingID,E.FullName,E.NickName,ISNULL(T.Seq,0),F.FoodNameTH,F.FoodCode;
+""",db);
+        cmd.Parameters.AddWithValue("@company",company);
+        for(var index=0;index<bookingIds.Count;index++)cmd.Parameters.AddWithValue($"@participantBooking{index}",bookingIds[index]);
+        await using var reader=await cmd.ExecuteReaderAsync(token);
+        while(await reader.ReadAsync(token))
+        {
+            var booking=reader.GetInt64(0);if(!result.TryGetValue(booking,out var rows))result[booking]=rows=[];
+            rows.Add(new {participantId=reader.GetInt64(1),employeeCode=Text(reader,2),participantName=reader.GetString(3),
+                participantNickname=Text(reader,4),divisionName=Text(reader,5),departmentName=Text(reader,6),
+                foodId=reader.GetInt64(7),foodName=reader.GetString(8),foodTypeCode=reader.GetString(9),
+                foodTypeName=Text(reader,10),quantity=reader.GetInt32(11)});
+        }
+        return result;
+    }
+
     private static async Task<Dictionary<long,List<object>>> RequirementSummaries(SqlConnection db,long company,IReadOnlyList<long> bookingIds,CancellationToken token)
     {
         var result=new Dictionary<long,List<object>>();if(bookingIds.Count==0)return result;
         var ids=string.Join(',',bookingIds.Select((_,index)=>$"@requirementBooking{index}"));
         await using var cmd=new SqlCommand($"""
-SELECT Q.BookingID,Q.RequirementQuestionID,Q.QuestionText,Q.AnswerType,E.FullName,
+SELECT Q.BookingID,P.BookingParticipantID,Q.RequirementQuestionID,Q.QuestionText,Q.AnswerType,E.FullName,E.NickName,
  CASE WHEN Q.AnswerType='BOOLEAN' THEN CASE A.AnswerValue WHEN 'true' THEN N'ใช่' WHEN 'false' THEN N'ไม่ใช่' ELSE A.AnswerValue END
       WHEN Q.AnswerType IN('SINGLE','MULTIPLE') THEN
        (SELECT STRING_AGG(O.OptionText,N', ') FROM OPENJSON(A.AnswerValue) J
@@ -204,7 +243,7 @@ JOIN dbo.TDADMeetingRoomBookingParticipant P ON P.CompanyID=A.CompanyID AND P.Bo
  AND P.BookingID=Q.BookingID AND P.InvitationStatus='ACCEPTED'
 JOIN dbo.TDADEmployee E ON E.CompanyID=P.CompanyID AND E.EmployeeID=P.EmployeeID
 WHERE Q.CompanyID=@company AND Q.BookingID IN ({ids}) AND Q.IsActive=1
-ORDER BY Q.BookingID,Q.SortOrder,Q.RequirementQuestionID,E.FullName;
+ORDER BY Q.BookingID,E.FullName,E.NickName,Q.SortOrder,Q.RequirementQuestionID;
 """,db);
         cmd.Parameters.AddWithValue("@company",company);
         for(var index=0;index<bookingIds.Count;index++)cmd.Parameters.AddWithValue($"@requirementBooking{index}",bookingIds[index]);
@@ -212,8 +251,9 @@ ORDER BY Q.BookingID,Q.SortOrder,Q.RequirementQuestionID,E.FullName;
         while(await reader.ReadAsync(token))
         {
             var booking=reader.GetInt64(0);if(!result.TryGetValue(booking,out var rows))result[booking]=rows=[];
-            rows.Add(new{questionId=reader.GetInt64(1),questionText=reader.GetString(2),answerType=reader.GetString(3),
-                participantName=reader.GetString(4),answerValue=Text(reader,5)});
+            rows.Add(new{participantId=reader.GetInt64(1),questionId=reader.GetInt64(2),questionText=reader.GetString(3),
+                answerType=reader.GetString(4),participantName=reader.GetString(5),participantNickname=Text(reader,6),
+                answerValue=Text(reader,7)});
         }
         return result;
     }

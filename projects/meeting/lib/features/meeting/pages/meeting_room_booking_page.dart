@@ -91,6 +91,12 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
   }
 
   @override
+  void reassemble() {
+    super.reassemble();
+    if (!_loading && !widget.initialCalendar) unawaited(_load());
+  }
+
+  @override
   void dispose() {
     _notificationTimer?.cancel();
     _notificationOverlay?.remove();
@@ -167,7 +173,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
     );
     if (!mounted) return;
     setState(() {
-      _bookings = _maps(result['items']);
+      _bookings = _sortBookings(_maps(result['items']));
       _total = _int(result['total']) ?? 0;
     });
   }
@@ -208,7 +214,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
         page++;
       } while (items.length < total);
       if (!mounted) return;
-      setState(() => _roomScheduleBookings = items);
+      setState(() => _roomScheduleBookings = _sortBookings(items));
     } catch (error) {
       _showError(error, 'โหลดตารางการจองตามห้องประชุมไม่สำเร็จ');
     } finally {
@@ -1062,7 +1068,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
     try {
       await _repository.decideApproval(approvalId, decision, remark: remark);
       _showMessage(approved ? 'อนุมัติการจองสำเร็จ' : 'ไม่อนุมัติการจองสำเร็จ');
-      await _loadBookings();
+      await Future.wait([_loadBookings(), _searchAvailableRooms()]);
     } catch (error) {
       _showError(error, 'ดำเนินการอนุมัติไม่สำเร็จ');
     }
@@ -1691,7 +1697,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
                 ),
                 const SizedBox(width: 8),
                 if (_actions['create'] == true ||
-                    _repository.adminRoomIds.contains(_selectedRoomId))
+                    _repository.adminRoomIds.contains(roomId))
                   FilledButton.icon(
                     style: FilledButton.styleFrom(
                       backgroundColor: preset.primary,
@@ -1729,40 +1735,78 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
     decoration: const BoxDecoration(
       border: Border(top: BorderSide(color: LaooColors.border, width: .5)),
     ),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Icon(Icons.schedule_outlined, size: 18, color: preset.primary),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '${_bookingDateTime(booking)} | ${booking['subject'] ?? '-'}',
-                style: const TextStyle(fontSize: LaooTypography.inputText),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.schedule_outlined, size: 18, color: preset.primary),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${_bookingDateTime(booking)} | ${booking['subject'] ?? '-'}',
+                    style: const TextStyle(fontSize: LaooTypography.inputText),
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'ผู้จอง: ${booking['requesterName'] ?? '-'} | เลขที่ ${booking['bookingNo'] ?? '-'}',
+                          style: const TextStyle(
+                            color: LaooColors.textSecondary,
+                            fontSize: LaooTypography.inputHint,
+                          ),
+                        ),
+                      ),
+                      _bookingActions(booking, preset),
+                    ],
+                  ),
+                ],
               ),
-              const SizedBox(height: 2),
-              Text(
-                'ผู้จอง: ${booking['requesterName'] ?? '-'} | เลขที่ ${booking['bookingNo'] ?? '-'}',
-                style: const TextStyle(
-                  color: LaooColors.textSecondary,
-                  fontSize: LaooTypography.inputHint,
-                ),
-              ),
-            ],
-          ),
+            ),
+            const SizedBox(width: 8),
+            _status(booking['status']?.toString(), preset),
+          ],
         ),
-        const SizedBox(width: 8),
-        _status(booking['status']?.toString(), preset),
       ],
     ),
   );
 
   List<Map<String, dynamic>> _roomBookingsForSchedule(int? roomId) =>
-      _roomScheduleBookings
-          .where((booking) => _int(booking['roomId']) == roomId)
-          .toList();
+      _sortBookings(
+        _roomScheduleBookings
+            .where((booking) => _int(booking['roomId']) == roomId)
+            .toList(),
+      );
+
+  List<Map<String, dynamic>> _sortBookings(List<Map<String, dynamic>> source) {
+    final result = List<Map<String, dynamic>>.of(source);
+    final now = DateTime.now();
+    int rank(Map<String, dynamic> item) {
+      if (item['status']?.toString() == 'CANCELLED') return 2;
+      final start = DateTime.tryParse('${item['startDateTime'] ?? ''}');
+      if (start != null && !start.isAfter(now)) return 1;
+      return 0;
+    }
+
+    result.sort((left, right) {
+      final rankCompare = rank(left).compareTo(rank(right));
+      if (rankCompare != 0) return rankCompare;
+      final leftStart = DateTime.tryParse('${left['startDateTime'] ?? ''}');
+      final rightStart = DateTime.tryParse('${right['startDateTime'] ?? ''}');
+      if (leftStart == null && rightStart == null) return 0;
+      if (leftStart == null) return 1;
+      if (rightStart == null) return -1;
+      return leftStart.compareTo(rightStart);
+    });
+    return result;
+  }
 
   Widget _styledCalendar(
     WorkspaceThemePreset preset, {
@@ -1929,6 +1973,11 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
               ),
             ),
           ),
+          IconButton(
+            tooltip: 'รีเฟรชรายการจองและสิทธิ์',
+            onPressed: _searching || _loading ? null : _load,
+            icon: Icon(Icons.refresh, color: preset.primary),
+          ),
         ],
       ),
       const Divider(color: LaooColors.border),
@@ -1960,7 +2009,9 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
     final selected = id == _selectedRoomId;
     final available = !availability || room['isAvailable'] == true;
     final imageUrl = room['roomImageUrl']?.toString();
-    final bookingsForSelectedDate = _maps(room['bookingsForSelectedDate']);
+    final bookingsForSelectedDate = _sortBookings(
+      _maps(room['bookingsForSelectedDate']),
+    );
     return Card(
       margin: EdgeInsets.zero,
       color: LaooColors.white,
@@ -2019,10 +2070,12 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                OutlinedButton(
-                  onPressed: () => _openBookingDialog(room),
-                  child: const Text('จอง'),
-                ),
+                if (_actions['create'] == true ||
+                    _repository.adminRoomIds.contains(id))
+                  OutlinedButton(
+                    onPressed: () => _openBookingDialog(room),
+                    child: const Text('จอง'),
+                  ),
               ],
             ),
             if (availability) ...[
@@ -2100,12 +2153,24 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
                               fontSize: LaooTypography.inputText,
                             ),
                           ),
-                          Text(
-                            'ผู้จอง: ${conflict['requesterName'] ?? '-'}',
-                            style: const TextStyle(
-                              color: LaooColors.textSecondary,
-                              fontSize: LaooTypography.inputHint,
-                            ),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  'ผู้จอง: ${conflict['requesterName'] ?? '-'}',
+                                  style: const TextStyle(
+                                    color: LaooColors.textSecondary,
+                                    fontSize: LaooTypography.inputHint,
+                                  ),
+                                ),
+                              ),
+                              _bookingActions(
+                                conflict,
+                                preset,
+                                includeApproval: true,
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -2421,24 +2486,27 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
 
   Widget _bookingActions(
     Map<String, dynamic> item,
-    WorkspaceThemePreset preset,
-  ) {
+    WorkspaceThemePreset preset, {
+    bool includeApproval = true,
+  }) {
     final status = item['status']?.toString();
-    final roomAdmin = _repository.adminRoomIds.contains(_int(item['roomId']));
-    final endDateTime = DateTime.tryParse('${item['endDateTime'] ?? ''}');
-    final hasEnded =
-        endDateTime != null && !endDateTime.isAfter(DateTime.now());
-    if (hasEnded) {
+    final startDateTime = DateTime.tryParse('${item['startDateTime'] ?? ''}');
+    final hasStarted =
+        startDateTime != null && !startDateTime.isAfter(DateTime.now());
+    if (hasStarted) {
       return Tooltip(
-        message: 'สิ้นสุดช่วงเวลาจองแล้ว',
+        message: 'ถึงเวลาเริ่มประชุมแล้ว ไม่สามารถทำรายการได้',
         child: Icon(Icons.lock_outline, color: Theme.of(context).disabledColor),
       );
     }
     final editable = status != 'CANCELLED' && status != 'REJECTED';
+    final canEditBooking = item['canEditBooking'] == true && editable;
+    final canCancelBooking = item['canCancelBooking'] == true && editable;
     return Wrap(
       children: [
-        if (status == 'PENDING' &&
-            (_actions['approvalEdit'] == true || roomAdmin) &&
+        if (includeApproval &&
+            status == 'PENDING' &&
+            item['canApprove'] == true &&
             item['approvalId'] != null) ...[
           IconButton(
             tooltip: 'ไม่อนุมัติการจอง',
@@ -2464,26 +2532,28 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
             onPressed: () => _showParticipantDialog(item),
             icon: Icon(Icons.group_add_outlined, color: preset.primary),
           ),
-        if ((_actions['edit'] == true || roomAdmin) && editable)
+        if (canEditBooking)
           IconButton(
             tooltip: 'แก้ไข',
             onPressed: () => _editBooking(item),
             icon: Icon(Icons.edit_outlined, color: preset.primary),
           ),
-        if ((_actions['delete'] == true || roomAdmin) && editable)
+        if (canCancelBooking)
           IconButton(
             tooltip: 'ยกเลิกการจอง',
             onPressed: () => _confirmCancel(item),
             icon: const Icon(Icons.delete_outline, color: Colors.red),
           ),
-        if ((status == 'APPROVED' || status == 'REJECTED') &&
-            (_actions['approvalEdit'] == true || roomAdmin))
+        if (includeApproval &&
+            (status == 'APPROVED' || status == 'REJECTED') &&
+            item['canRollback'] == true)
           IconButton(
             tooltip: 'ถอยสถานะ',
             onPressed: () => _confirmRollback(item),
             icon: Icon(Icons.undo, color: preset.primary),
           )
-        else if (status == 'APPROVED' || status == 'REJECTED')
+        else if (includeApproval &&
+            (status == 'APPROVED' || status == 'REJECTED'))
           IconButton(
             tooltip: 'เฉพาะ Admin เท่านั้น',
             onPressed: null,

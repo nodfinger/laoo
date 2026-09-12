@@ -2346,6 +2346,17 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                if (_message != null) ...[
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: AutoDismissMessage(
+                      message: _message!,
+                      error: _messageError,
+                      onClose: () => setState(() => _message = null),
+                    ),
+                  ),
+                  const SizedBox(height: LaooLayout.cardSpacing),
+                ],
                 WorkspaceSectionCard(
                   child: Row(
                     children: [
@@ -2600,16 +2611,6 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
               ],
             ),
           ),
-          if (_message != null)
-            Positioned(
-              top: 12,
-              right: 12,
-              child: AutoDismissMessage(
-                message: _message!,
-                error: _messageError,
-                onClose: () => setState(() => _message = null),
-              ),
-            ),
         ],
       ),
     );

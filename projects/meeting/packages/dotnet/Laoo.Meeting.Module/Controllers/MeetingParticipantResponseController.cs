@@ -86,7 +86,7 @@ ORDER BY Q.SortOrder,Q.RequirementQuestionID,O.SortOrder,O.RequirementOptionID;
 
         return Ok(new { invitation=new {participantId,access.BookingId,access.BookingNo,access.Subject,access.RoomCode,access.RoomName,
             startDateTime=access.Start,endDateTime=access.End,invitationStatus=access.Status,remark=access.Remark,
-            access.ParticipantName,access.OrganizerName,orderCutoffDateTime=access.Cutoff,canRespond,
+            access.ParticipantName,access.ParticipantNickName,access.OrganizerName,orderCutoffDateTime=access.Cutoff,canRespond,
             canEditPreferences,lateResponseMode,lateAcceptanceOnly,access.IsLateResponse,access.LateResponseReason,access.LateResponseAtUtc,
             requiresChangeReason=lateResponseMode||((duringMeeting||afterCutoff)&&access.Manager),responseUnavailableReason=canRespond?null:
                 afterCutoff?"พ้นเวลาปิดรับแล้ว กรุณาติดต่อผู้จัดประชุมหรือผู้ดูแลห้อง":"การประชุมสิ้นสุดแล้วจึงไม่สามารถเปลี่ยนคำตอบได้"},
@@ -284,7 +284,7 @@ SELECT CASE WHEN OBJECT_ID(N'dbo.TDADMeetingFoodReceipt',N'U') IS NOT NULL AND E
         var hint=lockRow?"WITH(UPDLOCK,HOLDLOCK)":"";
         var sql=$"""
 SELECT P.BookingID,P.EmployeeID,B.BookingNo,B.Subject,R.RoomCode,R.RoomNameTH,MIN(S.StartDateTime),MAX(S.EndDateTime),
- P.InvitationStatus,P.Remark,PE.FullName,RE.FullName,FP.OrderCutoffDateTime,
+ P.InvitationStatus,P.Remark,PE.FullName,PE.NickName,RE.FullName,FP.OrderCutoffDateTime,
  CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADUserEmployee UE WHERE UE.UserID=@user AND UE.CompanyID=@company AND UE.EmployeeID=P.EmployeeID AND UE.IsActive=1) THEN 1 ELSE 0 END,
  CASE WHEN B.RequesterUserID=@user
   OR EXISTS(SELECT 1 FROM dbo.TDADUser U WHERE U.UserID=@user AND U.CompanyID=@company AND U.IsActive=1 AND U.IsCompanyAdmin=1)
@@ -300,14 +300,14 @@ LEFT JOIN dbo.TDADUserEmployee RUE ON RUE.UserID=B.RequesterUserID AND RUE.Compa
 LEFT JOIN dbo.TDADEmployee RE ON RE.EmployeeID=COALESCE(B.RequesterEmployeeID,RUE.EmployeeID) AND RE.CompanyID=B.CompanyID
 LEFT JOIN dbo.TDADMeetingBookingFoodPlan FP ON FP.BookingID=B.BookingID AND FP.CompanyID=B.CompanyID AND FP.IsActive=1
 WHERE P.BookingParticipantID=@participant AND P.CompanyID=@company
-GROUP BY P.BookingID,P.EmployeeID,B.BookingNo,B.Subject,R.RoomCode,R.RoomNameTH,P.InvitationStatus,P.Remark,PE.FullName,RE.FullName,
+GROUP BY P.BookingID,P.EmployeeID,B.BookingNo,B.Subject,R.RoomCode,R.RoomNameTH,P.InvitationStatus,P.Remark,PE.FullName,PE.NickName,RE.FullName,
  FP.OrderCutoffDateTime,B.RequesterUserID,B.RoomID,P.IsLateResponse,P.LateResponseReason,P.LateResponseAtUtc;
 """;
         await using var cmd=new SqlCommand(sql,db,tx);Add(cmd,"@participant",participant);Add(cmd,"@company",company);Add(cmd,"@user",user);
         await using var r=await cmd.ExecuteReaderAsync(token);if(!await r.ReadAsync(token))return null;
         return new(r.GetInt64(0),r.GetInt64(1),Text(r,2),r.GetString(3),r.GetString(4),r.GetString(5),r.GetDateTime(6),r.GetDateTime(7),
-            r.GetString(8),Text(r,9),Text(r,10),Text(r,11),Date(r,12),r.GetInt32(13)==1,r.GetInt32(14)==1,
-            r.GetBoolean(15),Text(r,16),Date(r,17));
+            r.GetString(8),Text(r,9),Text(r,10),Text(r,11),Text(r,12),Date(r,13),r.GetInt32(14)==1,r.GetInt32(15)==1,
+            r.GetBoolean(16),Text(r,17),Date(r,18));
     }
 
     private bool Scope(out long company,out long user)
@@ -343,6 +343,6 @@ public sealed record ParticipantResponseRequest(string? Status,string? Remark,st
 public sealed record ParticipantFoodItem(long FoodId,int Quantity);
 public sealed record ParticipantRequirementAnswerRequest(long QuestionId,string? Value,List<long>? OptionIds);
 internal sealed record AccessData(long BookingId,long EmployeeId,string? BookingNo,string Subject,string RoomCode,string RoomName,
- DateTime Start,DateTime End,string Status,string? Remark,string? ParticipantName,string? OrganizerName,DateTime? Cutoff,bool Own,bool Manager,
+ DateTime Start,DateTime End,string Status,string? Remark,string? ParticipantName,string? ParticipantNickName,string? OrganizerName,DateTime? Cutoff,bool Own,bool Manager,
  bool IsLateResponse,string? LateResponseReason,DateTime? LateResponseAtUtc);
 internal sealed record QuestionRow(long Id,string Text,string Type,bool Required,int Sort,string? Answer,long? OptionId,string? OptionText,int? OptionSort);

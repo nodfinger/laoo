@@ -305,11 +305,6 @@ class _MeetingAttendancePanelState extends State<MeetingAttendancePanel> {
                 ),
               ),
             ),
-            IconButton(
-              tooltip: 'รีเฟรชเช็กอิน',
-              onPressed: _busy ? null : _load,
-              icon: Icon(Icons.refresh, color: preset.primary),
-            ),
           ],
         ),
         const Text(
