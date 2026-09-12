@@ -63,32 +63,12 @@ void main() {
   );
 
   test('Time exposes only implemented routes to the Center host', () {
-    expect(TimeRoutes.all, hasLength(6));
-    expect(TimeRoutes.implemented, hasLength(6));
-    expect(buildTimeFeatureRoutes(), hasLength(6));
-    expect(
-      AppMenuRouteRegistry.byMenuCode(TimeMenuCodes.shiftTemplates),
-      isNotNull,
-    );
-    expect(
-      AppMenuRouteRegistry.byMenuCode(TimeMenuCodes.scheduleGroups),
-      isNotNull,
-    );
-    expect(
-      AppMenuRouteRegistry.byMenuCode(TimeMenuCodes.rotationPatterns),
-      isNotNull,
-    );
-    expect(
-      AppMenuRouteRegistry.byMenuCode(TimeMenuCodes.employeeSchedules),
-      isNotNull,
-    );
-    expect(
-      AppMenuRouteRegistry.byMenuCode(TimeMenuCodes.employeeSettings),
-      isNotNull,
-    );
-    expect(
-      AppMenuRouteRegistry.byMenuCode(TimeMenuCodes.systemSettings),
-      isNotNull,
-    );
+    final implemented = TimeRoutes.implemented.toList();
+
+    expect(implemented, hasLength(TimeRoutes.all.length));
+    expect(buildTimeFeatureRoutes(), hasLength(implemented.length));
+    for (final route in implemented) {
+      expect(AppMenuRouteRegistry.byMenuCode(route.menuCode), isNotNull);
+    }
   });
 }

@@ -17,6 +17,8 @@ class EmployeeTimeSettingsRepository {
     String? search,
     bool? isActive,
     bool? requiresAttendance,
+    int? divisionOrgUnitId,
+    int? departmentOrgUnitId,
     int page = 1,
     int pageSize = 30,
   }) async {
@@ -27,9 +29,19 @@ class EmployeeTimeSettingsRepository {
       if (isActive != null) 'isActive': '$isActive',
       if (requiresAttendance != null)
         'requirementCode': requiresAttendance ? 'REQUIRED' : 'EXEMPT',
+      if (divisionOrgUnitId != null) 'divisionOrgUnitId': '$divisionOrgUnitId',
+      if (departmentOrgUnitId != null)
+        'departmentOrgUnitId': '$departmentOrgUnitId',
     };
     final json = await api.get(path, query: query);
     return EmployeeTimeSettingsResult.fromJson(
+      Map<String, dynamic>.from(json as Map),
+    );
+  }
+
+  Future<EmployeeOrganizationFilterOptions> organizationFilters() async {
+    final json = await api.get('$path/organization-filters');
+    return EmployeeOrganizationFilterOptions.fromJson(
       Map<String, dynamic>.from(json as Map),
     );
   }

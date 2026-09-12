@@ -20,6 +20,11 @@ abstract final class TimeMenuCodes {
   static const employeeSchedules = '27004';
   static const employeeSettings = '28001';
   static const systemSettings = '28002';
+  static const timeCorrectionProxy = '26001';
+  static const timeApprovalInbox = '26002';
+  static const onBehalfReasons = '28003';
+  static const adjustmentReasons = '28004';
+  static const myTimeCorrections = '30001';
 }
 
 abstract final class TimeRouteNames {
@@ -29,6 +34,11 @@ abstract final class TimeRouteNames {
   static const employeeSchedules = 'timeEmployeeSchedules';
   static const employeeSettings = 'timeEmployeeSettings';
   static const systemSettings = 'timeSystemSettings';
+  static const timeCorrectionProxy = 'timeCorrectionProxy';
+  static const timeApprovalInbox = 'timeApprovalInbox';
+  static const onBehalfReasons = 'timeOnBehalfReasons';
+  static const adjustmentReasons = 'timeAdjustmentReasons';
+  static const myTimeCorrections = 'myTimeCorrections';
 }
 
 abstract final class TimeRoutePaths {
@@ -38,6 +48,11 @@ abstract final class TimeRoutePaths {
   static const employeeSchedules = '/company/time-employee-schedules';
   static const employeeSettings = '/company/time-employee-settings';
   static const systemSettings = '/company/time-system-settings';
+  static const timeCorrectionProxy = '/company/time-corrections';
+  static const timeApprovalInbox = '/company/time-approval-inbox';
+  static const onBehalfReasons = '/company/time-on-behalf-reasons';
+  static const adjustmentReasons = '/company/time-adjustment-reasons';
+  static const myTimeCorrections = '/company/my-time-corrections';
 }
 
 abstract final class TimeRoutes {
@@ -94,6 +109,47 @@ abstract final class TimeRoutes {
     isImplemented: true,
   );
 
+  static const timeCorrectionProxy = FeatureRouteContract(
+    projectCode: TimeProject.code,
+    menuCode: TimeMenuCodes.timeCorrectionProxy,
+    screenType: 4,
+    routeName: TimeRouteNames.timeCorrectionProxy,
+    routePath: TimeRoutePaths.timeCorrectionProxy,
+    isImplemented: true,
+  );
+  static const timeApprovalInbox = FeatureRouteContract(
+    projectCode: TimeProject.code,
+    menuCode: TimeMenuCodes.timeApprovalInbox,
+    screenType: 3,
+    routeName: TimeRouteNames.timeApprovalInbox,
+    routePath: TimeRoutePaths.timeApprovalInbox,
+    isImplemented: true,
+  );
+  static const onBehalfReasons = FeatureRouteContract(
+    projectCode: TimeProject.code,
+    menuCode: TimeMenuCodes.onBehalfReasons,
+    screenType: 1,
+    routeName: TimeRouteNames.onBehalfReasons,
+    routePath: TimeRoutePaths.onBehalfReasons,
+    isImplemented: true,
+  );
+  static const adjustmentReasons = FeatureRouteContract(
+    projectCode: TimeProject.code,
+    menuCode: TimeMenuCodes.adjustmentReasons,
+    screenType: 1,
+    routeName: TimeRouteNames.adjustmentReasons,
+    routePath: TimeRoutePaths.adjustmentReasons,
+    isImplemented: true,
+  );
+  static const myTimeCorrections = FeatureRouteContract(
+    projectCode: TimeProject.code,
+    menuCode: TimeMenuCodes.myTimeCorrections,
+    screenType: 4,
+    routeName: TimeRouteNames.myTimeCorrections,
+    routePath: TimeRoutePaths.myTimeCorrections,
+    isImplemented: true,
+  );
+
   static const all = <FeatureRouteContract>[
     shiftTemplates,
     scheduleGroups,
@@ -101,6 +157,11 @@ abstract final class TimeRoutes {
     employeeSchedules,
     employeeSettings,
     systemSettings,
+    timeCorrectionProxy,
+    timeApprovalInbox,
+    onBehalfReasons,
+    adjustmentReasons,
+    myTimeCorrections,
   ];
 
   static Iterable<FeatureRouteContract> get implemented =>

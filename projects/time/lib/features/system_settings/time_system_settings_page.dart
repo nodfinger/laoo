@@ -6,12 +6,18 @@ import '../time/time_route_contract.dart';
 import 'time_system_settings_models.dart';
 import 'time_system_settings_repository.dart';
 
+List<DropdownMenuItem<T>> _uniqueDropdownItems<T>(
+  Iterable<DropdownMenuItem<T>> items,
+) {
+  final seen = <T?>{};
+  return items.where((item) => seen.add(item.value)).toList(growable: false);
+}
+
 class TimeSystemSettingsPage extends StatefulWidget {
   const TimeSystemSettingsPage({super.key});
 
   @override
-  State<TimeSystemSettingsPage> createState() =>
-      _TimeSystemSettingsPageState();
+  State<TimeSystemSettingsPage> createState() => _TimeSystemSettingsPageState();
 }
 
 class _TimeSystemSettingsPageState extends State<TimeSystemSettingsPage> {
@@ -53,12 +59,14 @@ class _TimeSystemSettingsPageState extends State<TimeSystemSettingsPage> {
   Map<String, String> _selectedPolicies = {};
   bool _loading = true;
   bool _saving = false;
+  bool _favoriteSaving = false;
+  bool _isFavorite = false;
   String? _message;
+  String? _loadError;
   bool _messageError = false;
 
   bool get _canEdit =>
-      _actions?.canEdit == true &&
-      _actions?.canManageApprovalProfile == true;
+      _actions?.canEdit == true && _actions?.canManageApprovalProfile == true;
 
   @override
   void initState() {
@@ -82,16 +90,58 @@ class _TimeSystemSettingsPageState extends State<TimeSystemSettingsPage> {
       if (!actions.canView) throw StateError('ไม่มีสิทธิ์ดูข้อมูลหน้าจอนี้');
       if (!mounted) return;
       setState(() => _actions = actions);
+      await _loadFavorite();
       await _load();
     } catch (error) {
       if (!mounted) return;
-      _show(timeErrorText(error), error: true);
-      setState(() => _loading = false);
+      setState(() {
+        _loadError = timeErrorText(error);
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _loadFavorite() async {
+    try {
+      final data = await _api.get('/api/user-favorites') as List<dynamic>;
+      final isFavorite = data.any((item) {
+        final map = item as Map<String, dynamic>;
+        return map['menuCode']?.toString() == TimeMenuCodes.systemSettings;
+      });
+      if (mounted) setState(() => _isFavorite = isFavorite);
+    } catch (_) {
+      // Shortcut state must not prevent the page from loading.
+    }
+  }
+
+  Future<void> _toggleFavorite() async {
+    if (_favoriteSaving) return;
+    setState(() => _favoriteSaving = true);
+    try {
+      if (_isFavorite) {
+        await _api.delete(
+          '/api/user-favorites/${TimeMenuCodes.systemSettings}',
+        );
+      } else {
+        await _api.post(
+          '/api/user-favorites',
+          body: {'menuCode': TimeMenuCodes.systemSettings, 'sortOrder': 0},
+        );
+      }
+      if (mounted) setState(() => _isFavorite = !_isFavorite);
+    } catch (error) {
+      if (mounted) _show(timeErrorText(error), error: true);
+    } finally {
+      if (mounted) setState(() => _favoriteSaving = false);
     }
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _loadError = null;
+      _source = null;
+    });
     try {
       final data = await _repository.get(effectiveDate: _effectiveFrom);
       if (!mounted) return;
@@ -109,7 +159,7 @@ class _TimeSystemSettingsPageState extends State<TimeSystemSettingsPage> {
         _reason.clear();
       });
     } catch (error) {
-      if (mounted) _show(timeErrorText(error), error: true);
+      if (mounted) setState(() => _loadError = timeErrorText(error));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -129,6 +179,31 @@ class _TimeSystemSettingsPageState extends State<TimeSystemSettingsPage> {
       initialDate: _effectiveFrom,
       firstDate: _today(),
       lastDate: DateTime(_today().year + 5, 12, 31),
+      builder: (context, child) {
+        final theme = Theme.of(context);
+        final primary = timeUiTokens.primaryColor;
+        final colorScheme = theme.colorScheme.copyWith(
+          primary: primary,
+          surface: Colors.white,
+        );
+        return Theme(
+          data: theme.copyWith(
+            colorScheme: colorScheme,
+            datePickerTheme: DatePickerThemeData(
+              backgroundColor: Colors.white,
+              surfaceTintColor: Colors.transparent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(4),
+              ),
+              headerBackgroundColor: Colors.white,
+              headerForegroundColor: colorScheme.onSurface,
+              todayForegroundColor: WidgetStatePropertyAll(primary),
+              todayBorder: BorderSide(color: primary),
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
     if (value == null || value == _effectiveFrom) return;
     setState(() => _effectiveFrom = value);
@@ -166,7 +241,9 @@ class _TimeSystemSettingsPageState extends State<TimeSystemSettingsPage> {
         ),
       );
       await _load();
-      if (mounted) _show('บันทึกการตั้งค่าสำเร็จ', error: false);
+      if (mounted && _loadError == null) {
+        _show('บันทึกการตั้งค่าสำเร็จ', error: false);
+      }
     } catch (error) {
       if (mounted) _show(timeErrorText(error), error: true);
     } finally {
@@ -201,21 +278,114 @@ class _TimeSystemSettingsPageState extends State<TimeSystemSettingsPage> {
   Widget _content(String caption) {
     if (_loading) return const Center(child: CircularProgressIndicator());
     final source = _source;
-    if (source == null) return const Center(child: Text('ไม่พบข้อมูล'));
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Text(
-          caption,
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+    if (source == null) {
+      final error = _loadError;
+      if (error == null) return const Center(child: Text('ไม่พบข้อมูล'));
+      const separator = '\nรายละเอียดเพิ่มเติม:';
+      final detailIndex = error.indexOf(separator);
+      final rawMessage = detailIndex < 0
+          ? error
+          : error.substring(0, detailIndex);
+      final message =
+          rawMessage.contains('\n') || rawMessage.contains('Exception:')
+          ? 'ไม่สามารถโหลดการตั้งค่าระบบเวลาได้'
+          : rawMessage;
+      final description = detailIndex < 0
+          ? 'ตรวจสอบการเชื่อมต่อและสิทธิ์ของผู้ใช้ แล้วลองใหม่อีกครั้ง'
+          : error.substring(detailIndex + separator.length).trim();
+      return Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 520),
+          child: Card(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(message, style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 8),
+                  Text('รายละเอียดเพิ่มเติม: $description'),
+                  const SizedBox(height: 12),
+                  TextButton.icon(
+                    onPressed: _actions == null ? _initialize : _load,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('ลองใหม่'),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
-        const SizedBox(height: 12),
-        _readiness(source),
-        const SizedBox(height: 12),
+      );
+    }
+    final tokens = timeUiTokens;
+    final colorScheme = Theme.of(context).colorScheme;
+    return ListView(
+      padding: tokens.contentMargin,
+      children: [
+        Card(
+          margin: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+            child: Row(
+              children: [
+                IconButton(
+                  tooltip: _isFavorite
+                      ? 'นำออกจากเมนูลัดของฉัน'
+                      : 'เพิ่มหน้านี้เป็นเมนูลัดของฉัน',
+                  onPressed: _favoriteSaving ? null : _toggleFavorite,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 40,
+                    minHeight: 40,
+                  ),
+                  icon: Icon(
+                    _isFavorite
+                        ? Icons.star_rounded
+                        : Icons.star_border_rounded,
+                    color: tokens.primaryColor,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(child: Text(caption, style: tokens.captionStyle)),
+                const SizedBox(width: 12),
+                FilledButton.icon(
+                  onPressed: _canEdit && !_saving ? _save : null,
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(0, 40),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    backgroundColor: colorScheme.primary,
+                    foregroundColor: colorScheme.onPrimary,
+                    textStyle: tokens.buttonStyle,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  icon: _saving
+                      ? const SizedBox.square(
+                          dimension: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.save_outlined),
+                  label: const Text('บันทึก'),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 6),
+        if (source.employeeWithoutLoginCount > 0) ...[
+          _employeeLoginWarning(source.employeeWithoutLoginCount),
+          const SizedBox(height: 6),
+        ],
         _section(
           title: 'รูปแบบการอนุมัติ',
-          description:
-              'ค่าหลักของบริษัทและค่าที่เลือกใช้แยกตามกระบวนการ',
+          description: 'ค่าหลักของบริษัทและค่าที่เลือกใช้แยกตามกระบวนการ',
           children: [
             _dropdown(
               label: 'ค่าหลักของบริษัท',
@@ -228,34 +398,32 @@ class _TimeSystemSettingsPageState extends State<TimeSystemSettingsPage> {
                 label: entry.value,
                 value: _selectedProfiles[entry.key] ?? 'DEFAULT',
                 options: _processProfiles,
-                onChanged: (value) => setState(
-                  () => _selectedProfiles[entry.key] = value,
-                ),
+                onChanged: (value) =>
+                    setState(() => _selectedProfiles[entry.key] = value),
               ),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 6),
         _section(
           title: 'ผู้เริ่มคำขอ',
-          description:
-              'กำหนดว่าพนักงานทำเอง ผู้ดูแลทำแทน หรือรองรับทั้งสองแบบ',
+          description: 'กำหนดว่าพนักงานทำเอง ผู้ดูแลทำแทน หรือรองรับทั้งสองแบบ',
           children: [
             for (final entry in _requestProcesses.entries)
               _dropdown(
                 label: entry.value,
-                value:
-                    _selectedPolicies[entry.key] ?? 'SELF_SERVICE_AND_PROXY',
+                value: _selectedPolicies[entry.key] ?? 'SELF_SERVICE_AND_PROXY',
                 options: _requestPolicies,
-                onChanged: (value) => setState(
-                  () => _selectedPolicies[entry.key] = value,
-                ),
+                onChanged: (value) =>
+                    setState(() => _selectedPolicies[entry.key] = value),
               ),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 6),
         _section(
           title: 'การเริ่มใช้งานและ Audit',
-          description: 'ทุกการแก้ไขต้องระบุวันที่เริ่มใช้และเหตุผลเพื่อเก็บ Log',
+          description:
+              'ทุกการแก้ไขต้องระบุวันที่เริ่มใช้และเหตุผลเพื่อเก็บ Log',
+          fullWidth: true,
           children: [
             InkWell(
               onTap: _canEdit ? _pickDate : null,
@@ -271,10 +439,16 @@ class _TimeSystemSettingsPageState extends State<TimeSystemSettingsPage> {
               controller: _reason,
               enabled: _canEdit,
               maxLength: 1000,
-              maxLines: 3,
+              buildCounter:
+                  (
+                    context, {
+                    required int currentLength,
+                    int? maxLength,
+                    required bool isFocused,
+                  }) => null,
+              maxLines: 1,
               decoration: const InputDecoration(
                 labelText: 'เหตุผลในการแก้ไข *',
-                alignLabelWithHint: true,
               ),
             ),
           ],
@@ -297,33 +471,14 @@ class _TimeSystemSettingsPageState extends State<TimeSystemSettingsPage> {
     );
   }
 
-  Widget _readiness(TimeSystemSettings source) {
-    final ready = source.selfServiceReady;
-    return Card(
-      margin: EdgeInsets.zero,
-      color: ready ? Colors.green.shade50 : Colors.orange.shade50,
-      child: ListTile(
-        leading: Icon(
-          ready ? Icons.check_circle_outline : Icons.warning_amber_rounded,
-          color: ready ? Colors.green.shade700 : Colors.orange.shade800,
-        ),
-        title: Text(
-          ready
-              ? 'พร้อมเปิดใช้งาน Self-service'
-              : 'ยังมีพนักงานไม่มี Active Login '
-                    '${source.employeeWithoutLoginCount} คน',
-        ),
-        subtitle: Text('พนักงานที่ใช้งานอยู่ ${source.activeEmployeeCount} คน'),
-      ),
-    );
-  }
-
   Widget _section({
     required String title,
     required String description,
     required List<Widget> children,
+    bool fullWidth = false,
   }) => Card(
     margin: EdgeInsets.zero,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
     child: Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -340,7 +495,7 @@ class _TimeSystemSettingsPageState extends State<TimeSystemSettingsPage> {
               children: children
                   .map(
                     (child) => SizedBox(
-                      width: constraints.maxWidth < 650
+                      width: fullWidth || constraints.maxWidth < 650
                           ? constraints.maxWidth
                           : 340,
                       child: child,
@@ -354,23 +509,48 @@ class _TimeSystemSettingsPageState extends State<TimeSystemSettingsPage> {
     ),
   );
 
+  Widget _employeeLoginWarning(int count) => Card(
+    margin: EdgeInsets.zero,
+    color: const Color(0xFFFFF8E1),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(4),
+      side: BorderSide(color: Colors.amber.shade700),
+    ),
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.warning_amber_rounded, color: Colors.amber.shade800),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'ยังมีพนักงานไม่มี Active Login $count คน',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+
   Widget _dropdown({
     required String label,
     required String value,
     required Map<String, String> options,
     required ValueChanged<String> onChanged,
   }) => DropdownButtonFormField<String>(
-    initialValue: value,
+    initialValue: options.containsKey(value) ? value : null,
     isExpanded: true,
     decoration: InputDecoration(labelText: label),
-    items: options.entries
-        .map(
-          (entry) => DropdownMenuItem(
-            value: entry.key,
-            child: Text(entry.value, overflow: TextOverflow.ellipsis),
-          ),
-        )
-        .toList(growable: false),
+    items: _uniqueDropdownItems(
+      options.entries.map(
+        (entry) => DropdownMenuItem<String>(
+          value: entry.key,
+          child: Text(entry.value, overflow: TextOverflow.ellipsis),
+        ),
+      ),
+    ),
     onChanged: _canEdit
         ? (value) {
             if (value != null) onChanged(value);
@@ -380,7 +560,7 @@ class _TimeSystemSettingsPageState extends State<TimeSystemSettingsPage> {
 }
 
 DateTime _today() {
-  final now = DateTime.now();
+  final now = timeUiTokens.businessDate;
   return DateTime(now.year, now.month, now.day);
 }
 

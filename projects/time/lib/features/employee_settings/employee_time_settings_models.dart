@@ -29,6 +29,10 @@ class EmployeeTimeSettingRecord {
     required this.employeeCode,
     required this.fullName,
     required this.nickName,
+    required this.divisionOrgUnitId,
+    required this.divisionName,
+    required this.departmentOrgUnitId,
+    required this.departmentName,
     required this.isActive,
     required this.requiresAttendance,
     required this.requirementEffectiveFrom,
@@ -45,6 +49,10 @@ class EmployeeTimeSettingRecord {
   final String employeeCode;
   final String fullName;
   final String? nickName;
+  final int? divisionOrgUnitId;
+  final String? divisionName;
+  final int? departmentOrgUnitId;
+  final String? departmentName;
   final bool isActive;
   final bool requiresAttendance;
   final DateTime? requirementEffectiveFrom;
@@ -62,6 +70,10 @@ class EmployeeTimeSettingRecord {
         employeeCode: json['employeeCode']?.toString() ?? '',
         fullName: json['fullName']?.toString() ?? '',
         nickName: _text(json['nickName']),
+        divisionOrgUnitId: _number(json['divisionOrgUnitId']),
+        divisionName: _text(json['divisionName']),
+        departmentOrgUnitId: _number(json['departmentOrgUnitId']),
+        departmentName: _text(json['departmentName']),
         isActive: json['isActive'] == true,
         requiresAttendance: json['requiresAttendance'] != false,
         requirementEffectiveFrom: _date(json['requirementEffectiveFrom']),
@@ -72,6 +84,35 @@ class EmployeeTimeSettingRecord {
         deviceCodeEffectiveFrom: _date(json['deviceCodeEffectiveFrom']),
         deviceCodeRowVersion: _text(json['deviceCodeRowVersion']),
         hasActiveLogin: json['hasActiveLogin'] == true,
+      );
+}
+
+class EmployeeOrganizationFilterOptions {
+  const EmployeeOrganizationFilterOptions({
+    required this.divisions,
+    required this.departments,
+  });
+
+  final List<EmployeeOrganizationOption> divisions;
+  final List<EmployeeOrganizationOption> departments;
+
+  factory EmployeeOrganizationFilterOptions.fromJson(Map<String, dynamic> json) =>
+      EmployeeOrganizationFilterOptions(
+        divisions: _organizationOptions(json['divisions']),
+        departments: _organizationOptions(json['departments']),
+      );
+}
+
+class EmployeeOrganizationOption {
+  const EmployeeOrganizationOption({required this.id, required this.name});
+
+  final int id;
+  final String name;
+
+  factory EmployeeOrganizationOption.fromJson(Map<String, dynamic> json) =>
+      EmployeeOrganizationOption(
+        id: (json['id'] as num).toInt(),
+        name: json['name']?.toString() ?? '',
       );
 }
 
@@ -149,3 +190,16 @@ String? _text(dynamic value) {
   final text = value?.toString().trim();
   return text == null || text.isEmpty ? null : text;
 }
+
+int? _number(dynamic value) => (value as num?)?.toInt();
+
+List<EmployeeOrganizationOption> _organizationOptions(dynamic value) => value is List
+    ? value
+          .whereType<Map>()
+          .map(
+            (item) => EmployeeOrganizationOption.fromJson(
+              Map<String, dynamic>.from(item),
+            ),
+          )
+          .toList(growable: false)
+    : const [];
