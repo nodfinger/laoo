@@ -124,6 +124,156 @@ class LaooTableCard extends StatelessWidget {
       LaooSurfaceCard(tokens: tokens, padding: EdgeInsets.zero, child: child);
 }
 
+abstract final class LaooWorkspaceTableColumns {
+  static const double idWidth = 56;
+
+  static const DataColumn id = DataColumn(
+    label: Text('ID'),
+    columnWidth: FixedColumnWidth(idWidth),
+  );
+}
+
+/// A full-width operational table with the row dividers and dimensions used by
+/// the Center registries. It keeps wide tables horizontally scrollable while
+/// preserving the available workspace width for normal desktop lists.
+class LaooWorkspaceDataTable extends StatelessWidget {
+  const LaooWorkspaceDataTable({
+    required this.tokens,
+    required this.columns,
+    required this.rows,
+    this.headingRowColor,
+    this.headingTextStyle,
+    this.dataTextStyle,
+    super.key,
+  });
+
+  final LaooWorkspaceUiTokens tokens;
+  final List<DataColumn> columns;
+  final List<DataRow> rows;
+  final WidgetStateProperty<Color?>? headingRowColor;
+  final TextStyle? headingTextStyle;
+  final TextStyle? dataTextStyle;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) => Theme(
+      data: Theme.of(context).copyWith(dividerColor: tokens.borderColor),
+      child: Scrollbar(
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minWidth: constraints.maxWidth),
+            child: SizedBox(
+              height: constraints.maxHeight,
+              child: SingleChildScrollView(
+                child: DataTable(
+                  headingRowHeight: 52,
+                  dataRowMinHeight: 48,
+                  dataRowMaxHeight: 56,
+                  horizontalMargin: 14,
+                  columnSpacing: 20,
+                  dividerThickness: 1,
+                  border: TableBorder(
+                    horizontalInside: BorderSide(color: tokens.borderColor),
+                    bottom: BorderSide(color: tokens.borderColor),
+                  ),
+                  headingRowColor: headingRowColor,
+                  headingTextStyle:
+                      headingTextStyle ??
+                      tokens.tableStyle.copyWith(
+                        color: tokens.primaryColor,
+                        fontWeight: FontWeight.w700,
+                      ),
+                  dataTextStyle: dataTextStyle ?? tokens.tableStyle,
+                  columns: columns,
+                  rows: rows,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+class LaooListCardToggle extends StatelessWidget {
+  const LaooListCardToggle({
+    required this.tokens,
+    required this.cards,
+    required this.onChanged,
+    super.key,
+  });
+
+  final LaooWorkspaceUiTokens tokens;
+  final bool cards;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) => IconButton(
+    tooltip: 'สลับ Card/List',
+    color: tokens.primaryColor,
+    onPressed: () => onChanged(!cards),
+    icon: Icon(cards ? Icons.view_list : Icons.grid_view),
+  );
+}
+
+class LaooActionDialog extends StatelessWidget {
+  const LaooActionDialog({
+    required this.tokens,
+    required this.icon,
+    required this.title,
+    required this.content,
+    required this.actions,
+    this.width = 560,
+    super.key,
+  });
+
+  final LaooWorkspaceUiTokens tokens;
+  final IconData icon;
+  final String title;
+  final Widget content;
+  final List<Widget> actions;
+  final double width;
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    backgroundColor: Colors.white,
+    surfaceTintColor: Colors.transparent,
+    insetPadding: const EdgeInsets.all(16),
+    contentPadding: EdgeInsets.zero,
+    titlePadding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+    actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(tokens.radius),
+    ),
+    title: Row(
+      children: [
+        Icon(icon, color: tokens.primaryColor),
+        const SizedBox(width: 10),
+        Expanded(child: Text(title, style: tokens.captionStyle)),
+      ],
+    ),
+    content: SizedBox(
+      width: width,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Divider(height: 1, color: tokens.borderColor),
+            const SizedBox(height: 12),
+            content,
+            const SizedBox(height: 12),
+            Divider(height: 1, color: tokens.borderColor),
+          ],
+        ),
+      ),
+    ),
+    actions: actions,
+  );
+}
+
 class LaooPaginationCard extends StatelessWidget {
   const LaooPaginationCard({
     required this.tokens,
@@ -189,8 +339,9 @@ class LaooPaginationCard extends StatelessWidget {
     LaooWorkspaceUiTokens tokens, {
     bool current = false,
   }) => OutlinedButton.styleFrom(
-    minimumSize: const Size(40, 36),
-    padding: const EdgeInsets.symmetric(horizontal: 10),
+    minimumSize: Size(tokens.buttonHeight, tokens.buttonHeight),
+    maximumSize: Size(tokens.buttonHeight, tokens.buttonHeight),
+    padding: EdgeInsets.zero,
     textStyle: tokens.buttonStyle,
     foregroundColor: current ? Colors.white : tokens.primaryColor,
     backgroundColor: current ? tokens.primaryColor : tokens.surfaceColor,

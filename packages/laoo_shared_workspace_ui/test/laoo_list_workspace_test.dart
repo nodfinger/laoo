@@ -56,6 +56,10 @@ void main() {
       expect(find.text('ตารางข้อมูล'), findsOneWidget);
       expect(find.text('21-40 จาก 45'), findsOneWidget);
       expect(find.byType(LaooSurfaceCard), findsNWidgets(4));
+      expect(
+        tester.getSize(find.widgetWithText(OutlinedButton, '<')),
+        const Size(48, 48),
+      );
     },
   );
 }

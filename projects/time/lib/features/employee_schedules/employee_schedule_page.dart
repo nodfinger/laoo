@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:laoo_shared_core/laoo_shared_core.dart';
+import 'package:laoo_shared_workspace_ui/laoo_shared_workspace_ui.dart';
 import '../time/time_feature_host.dart';
 import '../time/time_route_contract.dart';
 import 'employee_schedule_models.dart';
@@ -24,6 +25,7 @@ class _State extends State<EmployeeSchedulePage> {
     items: [],
   );
   bool loading = true;
+  bool cards = false;
   String? message;
   bool error = false;
   @override
@@ -261,6 +263,42 @@ class _State extends State<EmployeeSchedulePage> {
     validator: (v) => v == null ? 'กรุณาเลือกข้อมูล' : null,
     onChanged: change,
   );
+  Widget _table() => LaooWorkspaceDataTable(
+    tokens: timeUiTokens.workspace,
+    headingRowColor: WidgetStatePropertyAll(
+      timeUiTokens.primaryColor.withValues(alpha: .10),
+    ),
+    columns: const [
+      LaooWorkspaceTableColumns.id,
+      DataColumn(label: Text('จัดการ'), columnWidth: FixedColumnWidth(76)),
+      DataColumn(label: Text('รหัสพนักงาน')),
+      DataColumn(label: Text('ชื่อพนักงาน'), columnWidth: FlexColumnWidth()),
+      DataColumn(label: Text('รหัสกลุ่ม')),
+      DataColumn(label: Text('กลุ่มตาราง')),
+    ],
+    rows: [
+      for (var index = 0; index < data.items.length; index++)
+        DataRow(
+          cells: [
+            DataCell(Text('${(data.page - 1) * data.pageSize + index + 1}')),
+            DataCell(
+              IconButton(
+                tooltip: 'จัดเข้ากลุ่ม',
+                onPressed: actions?.edit == true
+                    ? () => form('assign', row: data.items[index])
+                    : null,
+                icon: const Icon(Icons.edit_outlined),
+              ),
+            ),
+            DataCell(Text(data.items[index].employeeCode)),
+            DataCell(Text(data.items[index].fullName)),
+            DataCell(Text(data.items[index].groupCode ?? '-')),
+            DataCell(Text(data.items[index].groupName ?? '-')),
+          ],
+        ),
+    ],
+  );
+
   @override
   Widget build(BuildContext context) {
     final caption = actions?.caption ?? 'จัดตารางพนักงาน';
@@ -271,66 +309,78 @@ class _State extends State<EmployeeSchedulePage> {
         children: [
           Positioned.fill(
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: timeUiTokens.contentMargin,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
-                    caption,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
+                  TimeCaptionCard(
+                    api: api,
+                    menuCode: TimeMenuCodes.employeeSchedules,
+                    caption: caption,
+                    trailing: LaooListCardToggle(
+                      tokens: timeUiTokens.workspace,
+                      cards: cards,
+                      onChanged: (value) => setState(() => cards = value),
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      FilledButton.icon(
-                        onPressed: actions?.edit == true
-                            ? () => form('assign')
-                            : null,
-                        icon: const Icon(Icons.group_add_outlined),
-                        label: const Text('จัดเข้ากลุ่ม'),
-                      ),
-                      OutlinedButton.icon(
-                        onPressed: actions?.edit == true
-                            ? () => form('rotate')
-                            : null,
-                        icon: const Icon(Icons.autorenew),
-                        label: const Text('กำหนด Rotation'),
-                      ),
-                      OutlinedButton.icon(
-                        onPressed: actions?.edit == true
-                            ? () => form('override')
-                            : null,
-                        icon: const Icon(Icons.edit_calendar_outlined),
-                        label: const Text('ปรับตารางเฉพาะวัน'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: search,
-                    onSubmitted: (_) => load(),
-                    decoration: InputDecoration(
-                      labelText: 'ค้นหาพนักงานหรือกลุ่ม',
-                      prefixIcon: const Icon(Icons.search),
-                      suffixIcon: IconButton(
-                        onPressed: () => load(),
-                        icon: const Icon(Icons.search),
-                      ),
+                  const SizedBox(height: 6),
+                  LaooFilterCard(
+                    tokens: timeUiTokens.workspace,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Wrap(
+                          spacing: timeUiTokens.itemSpacing,
+                          runSpacing: timeUiTokens.itemSpacing,
+                          children: [
+                            FilledButton.icon(
+                              onPressed: actions?.edit == true
+                                  ? () => form('assign')
+                                  : null,
+                              icon: const Icon(Icons.group_add_outlined),
+                              label: const Text('จัดเข้ากลุ่ม'),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: actions?.edit == true
+                                  ? () => form('rotate')
+                                  : null,
+                              icon: const Icon(Icons.autorenew),
+                              label: const Text('กำหนด Rotation'),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: actions?.edit == true
+                                  ? () => form('override')
+                                  : null,
+                              icon: const Icon(Icons.edit_calendar_outlined),
+                              label: const Text('ปรับตารางเฉพาะวัน'),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: timeUiTokens.cardSpacing),
+                        TextField(
+                          controller: search,
+                          onSubmitted: (_) => load(),
+                          decoration: InputDecoration(
+                            labelText: 'ค้นหาพนักงานหรือกลุ่ม',
+                            prefixIcon: const Icon(Icons.search),
+                            suffixIcon: IconButton(
+                              onPressed: () => load(),
+                              icon: const Icon(Icons.search),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: timeUiTokens.cardSpacing),
                   Expanded(
                     child: Card(
                       child: loading
                           ? const Center(child: CircularProgressIndicator())
                           : data.items.isEmpty
                           ? const Center(child: Text('ไม่พบข้อมูล'))
-                          : ListView.separated(
+                          : cards
+                          ? ListView.separated(
                               itemCount: data.items.length,
                               separatorBuilder: (_, _) =>
                                   const Divider(height: 1),
@@ -359,26 +409,25 @@ class _State extends State<EmployeeSchedulePage> {
                                   ),
                                 );
                               },
-                            ),
+                            )
+                          : _table(),
                     ),
                   ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      IconButton(
-                        onPressed: data.page > 1
-                            ? () => load(page: data.page - 1)
-                            : null,
-                        icon: const Icon(Icons.chevron_left),
-                      ),
-                      Text('หน้า ${data.page}'),
-                      IconButton(
-                        onPressed: data.page * data.pageSize < data.total
-                            ? () => load(page: data.page + 1)
-                            : null,
-                        icon: const Icon(Icons.chevron_right),
-                      ),
-                    ],
+                  SizedBox(height: timeUiTokens.cardSpacing),
+                  LaooPaginationCard(
+                    tokens: timeUiTokens.workspace,
+                    page: data.page,
+                    pageCount: data.total == 0
+                        ? 1
+                        : (data.total / data.pageSize).ceil(),
+                    pageSize: data.pageSize,
+                    total: data.total,
+                    onPrevious: data.page > 1
+                        ? () => load(page: data.page - 1)
+                        : null,
+                    onNext: data.page * data.pageSize < data.total
+                        ? () => load(page: data.page + 1)
+                        : null,
                   ),
                 ],
               ),

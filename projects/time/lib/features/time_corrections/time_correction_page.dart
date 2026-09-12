@@ -25,6 +25,7 @@ class _TimeCorrectionPageState extends State<TimeCorrectionPage> {
   int total = 0;
   int page = 1;
   String? status;
+  bool cards = false;
   bool loading = true;
   String? message;
   bool messageError = false;
@@ -153,6 +154,34 @@ class _TimeCorrectionPageState extends State<TimeCorrectionPage> {
     }
   }
 
+  Widget _buildCards() => ListView.separated(
+    padding: timeUiTokens.cardPadding,
+    itemCount: items.length,
+    separatorBuilder: (_, _) => SizedBox(height: timeUiTokens.itemSpacing),
+    itemBuilder: (context, index) {
+      final row = items[index];
+      return Card(
+        child: ListTile(
+          leading: CircleAvatar(
+            backgroundColor: timeUiTokens.primaryColor.withValues(alpha: .1),
+            foregroundColor: timeUiTokens.primaryColor,
+            child: Text('${(page - 1) * timePageSize + index + 1}'),
+          ),
+          title: Text('${row['employeeCode']} — ${row['employeeName']}'),
+          subtitle: Text(
+            '${displayDate('${row['workDate']}')} · ${row['reasonName']}\n'
+            '${statusText('${row['statusCode']}')}',
+          ),
+          trailing: IconButton(
+            tooltip: 'ดูรายละเอียด',
+            onPressed: () => open(row),
+            icon: const Icon(Icons.visibility_outlined),
+          ),
+        ),
+      );
+    },
+  );
+
   @override
   Widget build(BuildContext context) {
     final caption = actions?['caption'] as String? ?? '';
@@ -168,13 +197,22 @@ class _TimeCorrectionPageState extends State<TimeCorrectionPage> {
               api: api,
               menuCode: widget.menuCode,
               caption: caption,
-              trailing: !approval && actions?['create'] == true
-                  ? FilledButton.icon(
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  LaooListCardToggle(
+                    tokens: timeUiTokens.workspace,
+                    cards: cards,
+                    onChanged: (value) => setState(() => cards = value),
+                  ),
+                  if (!approval && actions?['create'] == true)
+                    FilledButton.icon(
                       onPressed: create,
                       icon: const Icon(Icons.add),
                       label: const Text('สร้างคำขอ'),
-                    )
-                  : null,
+                    ),
+                ],
+              ),
             ),
             filter: Wrap(
               spacing: timeUiTokens.itemSpacing,
@@ -221,59 +259,82 @@ class _TimeCorrectionPageState extends State<TimeCorrectionPage> {
             ),
             table: loading
                 ? const Center(child: CircularProgressIndicator())
-                : SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: DataTable(
-                      headingTextStyle: timeUiTokens.tableStyle.copyWith(
-                        color: timeUiTokens.primaryColor,
-                        fontWeight: FontWeight.w700,
-                      ),
-                      dataTextStyle: timeUiTokens.tableStyle,
-                      dividerThickness: 1,
-                      headingRowColor: WidgetStatePropertyAll(
-                        timeUiTokens.primaryColor.withValues(alpha: 0.10),
-                      ),
-                      columns: const [
-                        DataColumn(label: Text('ดู')),
-                        DataColumn(label: Text('วันที่ทำงาน')),
-                        DataColumn(label: Text('พนักงาน')),
-                        DataColumn(label: Text('เหตุผล')),
-                        DataColumn(label: Text('ผู้เริ่มคำขอ')),
-                        DataColumn(label: Text('สถานะ')),
-                      ],
-                      rows: items
-                          .map(
-                            (row) => DataRow(
-                              cells: [
-                                DataCell(
-                                  IconButton(
-                                    onPressed: () => open(row),
-                                    icon: const Icon(Icons.visibility_outlined),
-                                  ),
-                                ),
-                                DataCell(
-                                  Text(displayDate('${row['workDate']}')),
-                                ),
-                                DataCell(
-                                  Text(
-                                    '${row['employeeCode']} — ${row['employeeName']}',
-                                  ),
-                                ),
-                                DataCell(Text('${row['reasonName']}')),
-                                DataCell(
-                                  Text(
-                                    row['initiationModeCode'] == 'SELF'
-                                        ? 'พนักงาน'
-                                        : 'ผู้ดูแลทำแทน',
-                                  ),
-                                ),
-                                DataCell(
-                                  Text(statusText('${row['statusCode']}')),
-                                ),
-                              ],
+                : cards
+                ? _buildCards()
+                : LayoutBuilder(
+                    builder: (context, constraints) => SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minWidth: constraints.maxWidth,
+                        ),
+                        child: DataTable(
+                          headingTextStyle: timeUiTokens.tableStyle.copyWith(
+                            color: timeUiTokens.primaryColor,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          dataTextStyle: timeUiTokens.tableStyle,
+                          dividerThickness: 1,
+                          border: TableBorder(
+                            horizontalInside: BorderSide(
+                              color: timeUiTokens.borderColor,
                             ),
-                          )
-                          .toList(),
+                            bottom: BorderSide(color: timeUiTokens.borderColor),
+                          ),
+                          headingRowColor: WidgetStatePropertyAll(
+                            timeUiTokens.primaryColor.withValues(alpha: 0.10),
+                          ),
+                          columns: const [
+                            LaooWorkspaceTableColumns.id,
+                            DataColumn(label: Text('ดู')),
+                            DataColumn(label: Text('วันที่ทำงาน')),
+                            DataColumn(label: Text('พนักงาน')),
+                            DataColumn(label: Text('เหตุผล')),
+                            DataColumn(label: Text('ผู้เริ่มคำขอ')),
+                            DataColumn(label: Text('สถานะ')),
+                          ],
+                          rows: items
+                              .map(
+                                (row) => DataRow(
+                                  cells: [
+                                    DataCell(
+                                      Text(
+                                        '${(page - 1) * timePageSize + items.indexOf(row) + 1}',
+                                      ),
+                                    ),
+                                    DataCell(
+                                      IconButton(
+                                        onPressed: () => open(row),
+                                        icon: const Icon(
+                                          Icons.visibility_outlined,
+                                        ),
+                                      ),
+                                    ),
+                                    DataCell(
+                                      Text(displayDate('${row['workDate']}')),
+                                    ),
+                                    DataCell(
+                                      Text(
+                                        '${row['employeeCode']} — ${row['employeeName']}',
+                                      ),
+                                    ),
+                                    DataCell(Text('${row['reasonName']}')),
+                                    DataCell(
+                                      Text(
+                                        row['initiationModeCode'] == 'SELF'
+                                            ? 'พนักงาน'
+                                            : 'ผู้ดูแลทำแทน',
+                                      ),
+                                    ),
+                                    DataCell(
+                                      Text(statusText('${row['statusCode']}')),
+                                    ),
+                                  ],
+                                ),
+                              )
+                              .toList(),
+                        ),
+                      ),
                     ),
                   ),
             pagination: LaooPaginationCard(

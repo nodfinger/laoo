@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:laoo_shared_core/laoo_shared_core.dart';
 import 'package:laoo_shared_workspace_ui/laoo_shared_workspace_ui.dart';
 import '../time/time_feature_host.dart';
+import '../time/time_route_contract.dart';
 import 'time_reason_repository.dart';
 
 class TimeReasonPage extends StatefulWidget {
@@ -27,6 +28,7 @@ class _TimeReasonPageState extends State<TimeReasonPage> {
   int total = 0;
   int page = 1;
   bool? active = true;
+  bool cards = false;
   bool loading = true;
   String? message;
   bool messageError = false;
@@ -93,7 +95,13 @@ class _TimeReasonPageState extends State<TimeReasonPage> {
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => _ReasonDialog(value: row),
+      builder: (_) => _ReasonDialog(
+        caption: actions?['caption'] as String? ?? '',
+        icon: widget.menuCode == TimeMenuCodes.onBehalfReasons
+            ? Icons.person_add_alt_outlined
+            : Icons.rule_outlined,
+        value: row,
+      ),
     );
     if (result == null) return;
     try {
@@ -148,6 +156,45 @@ class _TimeReasonPageState extends State<TimeReasonPage> {
     }
   }
 
+  Widget _buildCards() => ListView.separated(
+    padding: timeUiTokens.cardPadding,
+    itemCount: items.length,
+    separatorBuilder: (_, _) => SizedBox(height: timeUiTokens.itemSpacing),
+    itemBuilder: (context, index) {
+      final row = items[index];
+      return Card(
+        child: ListTile(
+          leading: CircleAvatar(
+            backgroundColor: timeUiTokens.primaryColor.withValues(alpha: .1),
+            foregroundColor: timeUiTokens.primaryColor,
+            child: Text('${(page - 1) * timePageSize + index + 1}'),
+          ),
+          title: Text('${row['reasonCode']} — ${row['reasonName']}'),
+          subtitle: Text(
+            '${row['requireRemark'] == true ? 'ต้องระบุหมายเหตุ' : 'ไม่บังคับหมายเหตุ'} · '
+            '${row['requireEvidence'] == true ? 'ต้องแนบหลักฐาน' : 'ไม่บังคับหลักฐาน'}',
+          ),
+          trailing: Wrap(
+            children: [
+              if (actions?['edit'] == true)
+                IconButton(
+                  tooltip: 'แก้ไข',
+                  onPressed: () => edit(row),
+                  icon: const Icon(Icons.edit_outlined),
+                ),
+              if (actions?['delete'] == true)
+                IconButton(
+                  tooltip: 'ลบ',
+                  onPressed: () => remove(row),
+                  icon: const Icon(Icons.delete_outline, color: Colors.red),
+                ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+
   @override
   Widget build(BuildContext context) {
     final caption = actions?['caption'] as String? ?? '';
@@ -163,13 +210,22 @@ class _TimeReasonPageState extends State<TimeReasonPage> {
               api: api,
               menuCode: widget.menuCode,
               caption: caption,
-              trailing: actions?['create'] == true
-                  ? FilledButton.icon(
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  LaooListCardToggle(
+                    tokens: timeUiTokens.workspace,
+                    cards: cards,
+                    onChanged: (value) => setState(() => cards = value),
+                  ),
+                  if (actions?['create'] == true)
+                    FilledButton.icon(
                       onPressed: () => edit(),
                       icon: const Icon(Icons.add),
                       label: const Text('เพิ่ม'),
-                    )
-                  : null,
+                    ),
+                ],
+              ),
             ),
             filter: Wrap(
               spacing: timeUiTokens.itemSpacing,
@@ -209,77 +265,100 @@ class _TimeReasonPageState extends State<TimeReasonPage> {
             ),
             table: loading
                 ? const Center(child: CircularProgressIndicator())
-                : SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: DataTable(
-                      headingTextStyle: timeUiTokens.tableStyle.copyWith(
-                        color: timeUiTokens.primaryColor,
-                        fontWeight: FontWeight.w700,
-                      ),
-                      dataTextStyle: timeUiTokens.tableStyle,
-                      dividerThickness: 1,
-                      headingRowColor: WidgetStatePropertyAll(
-                        timeUiTokens.primaryColor.withValues(alpha: 0.10),
-                      ),
-                      columns: const [
-                        DataColumn(label: Text('จัดการ')),
-                        DataColumn(label: Text('รหัส')),
-                        DataColumn(label: Text('ชื่อเหตุผล')),
-                        DataColumn(label: Text('หมายเหตุ')),
-                        DataColumn(label: Text('หลักฐาน')),
-                        DataColumn(label: Text('สถานะ')),
-                      ],
-                      rows: items
-                          .map(
-                            (row) => DataRow(
-                              cells: [
-                                DataCell(
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      if (actions?['edit'] == true)
-                                        IconButton(
-                                          onPressed: () => edit(row),
-                                          icon: const Icon(Icons.edit_outlined),
-                                        ),
-                                      if (actions?['delete'] == true)
-                                        IconButton(
-                                          onPressed: () => remove(row),
-                                          icon: const Icon(
-                                            Icons.delete_outline,
-                                            color: Colors.red,
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                                DataCell(Text('${row['reasonCode']}')),
-                                DataCell(Text('${row['reasonName']}')),
-                                DataCell(
-                                  Icon(
-                                    row['requireRemark'] == true
-                                        ? Icons.check
-                                        : Icons.remove,
-                                  ),
-                                ),
-                                DataCell(
-                                  Icon(
-                                    row['requireEvidence'] == true
-                                        ? Icons.check
-                                        : Icons.remove,
-                                  ),
-                                ),
-                                DataCell(
-                                  Text(
-                                    row['isActive'] == true
-                                        ? 'ใช้งาน'
-                                        : 'ไม่ใช้งาน',
-                                  ),
-                                ),
-                              ],
+                : cards
+                ? _buildCards()
+                : LayoutBuilder(
+                    builder: (context, constraints) => SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minWidth: constraints.maxWidth,
+                        ),
+                        child: DataTable(
+                          headingTextStyle: timeUiTokens.tableStyle.copyWith(
+                            color: timeUiTokens.primaryColor,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          dataTextStyle: timeUiTokens.tableStyle,
+                          dividerThickness: 1,
+                          border: TableBorder(
+                            horizontalInside: BorderSide(
+                              color: timeUiTokens.borderColor,
                             ),
-                          )
-                          .toList(),
+                            bottom: BorderSide(color: timeUiTokens.borderColor),
+                          ),
+                          headingRowColor: WidgetStatePropertyAll(
+                            timeUiTokens.primaryColor.withValues(alpha: 0.10),
+                          ),
+                          columns: const [
+                            LaooWorkspaceTableColumns.id,
+                            DataColumn(label: Text('จัดการ')),
+                            DataColumn(label: Text('รหัส')),
+                            DataColumn(label: Text('ชื่อเหตุผล')),
+                            DataColumn(label: Text('หมายเหตุ')),
+                            DataColumn(label: Text('หลักฐาน')),
+                            DataColumn(label: Text('สถานะ')),
+                          ],
+                          rows: items
+                              .map(
+                                (row) => DataRow(
+                                  cells: [
+                                    DataCell(
+                                      Text(
+                                        '${(page - 1) * timePageSize + items.indexOf(row) + 1}',
+                                      ),
+                                    ),
+                                    DataCell(
+                                      Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          if (actions?['edit'] == true)
+                                            IconButton(
+                                              onPressed: () => edit(row),
+                                              icon: const Icon(
+                                                Icons.edit_outlined,
+                                              ),
+                                            ),
+                                          if (actions?['delete'] == true)
+                                            IconButton(
+                                              onPressed: () => remove(row),
+                                              icon: const Icon(
+                                                Icons.delete_outline,
+                                                color: Colors.red,
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                    DataCell(Text('${row['reasonCode']}')),
+                                    DataCell(Text('${row['reasonName']}')),
+                                    DataCell(
+                                      Icon(
+                                        row['requireRemark'] == true
+                                            ? Icons.check
+                                            : Icons.remove,
+                                      ),
+                                    ),
+                                    DataCell(
+                                      Icon(
+                                        row['requireEvidence'] == true
+                                            ? Icons.check
+                                            : Icons.remove,
+                                      ),
+                                    ),
+                                    DataCell(
+                                      Text(
+                                        row['isActive'] == true
+                                            ? 'ใช้งาน'
+                                            : 'ไม่ใช้งาน',
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                              .toList(),
+                        ),
+                      ),
                     ),
                   ),
             pagination: LaooPaginationCard(
@@ -311,7 +390,9 @@ class _TimeReasonPageState extends State<TimeReasonPage> {
 }
 
 class _ReasonDialog extends StatefulWidget {
-  const _ReasonDialog({this.value});
+  const _ReasonDialog({required this.caption, required this.icon, this.value});
+  final String caption;
+  final IconData icon;
   final Map<String, dynamic>? value;
   @override
   State<_ReasonDialog> createState() => _ReasonDialogState();
@@ -343,57 +424,56 @@ class _ReasonDialogState extends State<_ReasonDialog> {
   }
 
   @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: Text(widget.value == null ? 'เพิ่มเหตุผล' : 'แก้ไขเหตุผล'),
-    content: SizedBox(
-      width: 520,
-      child: Form(
-        key: key,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              children: [
-                const Text('สถานะ'),
-                const SizedBox(width: 8),
-                Switch(
-                  value: active,
-                  onChanged: (value) => setState(() => active = value),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: code,
-              decoration: const InputDecoration(labelText: 'รหัส *'),
-              validator: requiredText,
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: name,
-              decoration: const InputDecoration(labelText: 'ชื่อเหตุผล *'),
-              validator: requiredText,
-            ),
-            CheckboxListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('บังคับระบุหมายเหตุ'),
-              value: requireRemark,
-              onChanged: (value) =>
-                  setState(() => requireRemark = value ?? false),
-            ),
-            CheckboxListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('บังคับแนบหลักฐาน'),
-              value: requireEvidence,
-              onChanged: (value) =>
-                  setState(() => requireEvidence = value ?? false),
-            ),
-          ],
-        ),
+  Widget build(BuildContext context) => LaooActionDialog(
+    tokens: timeUiTokens.workspace,
+    icon: widget.icon,
+    title: '${widget.caption} > ${widget.value == null ? 'เพิ่ม' : 'แก้ไข'}',
+    content: Form(
+      key: key,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              const Text('สถานะ'),
+              const SizedBox(width: 8),
+              Switch(
+                value: active,
+                onChanged: (value) => setState(() => active = value),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: code,
+            decoration: const InputDecoration(labelText: 'รหัส *'),
+            validator: requiredText,
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: name,
+            decoration: const InputDecoration(labelText: 'ชื่อเหตุผล *'),
+            validator: requiredText,
+          ),
+          CheckboxListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('บังคับระบุหมายเหตุ'),
+            value: requireRemark,
+            onChanged: (value) =>
+                setState(() => requireRemark = value ?? false),
+          ),
+          CheckboxListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('บังคับแนบหลักฐาน'),
+            value: requireEvidence,
+            onChanged: (value) =>
+                setState(() => requireEvidence = value ?? false),
+          ),
+        ],
       ),
     ),
     actions: [
-      TextButton(
+      OutlinedButton(
         onPressed: () => Navigator.pop(context),
         child: const Text('ยกเลิก'),
       ),

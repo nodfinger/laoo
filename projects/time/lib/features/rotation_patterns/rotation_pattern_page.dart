@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:laoo_shared_core/laoo_shared_core.dart';
+import 'package:laoo_shared_workspace_ui/laoo_shared_workspace_ui.dart';
 import '../time/time_feature_host.dart';
 import '../time/time_route_contract.dart';
 import 'rotation_pattern_models.dart';
@@ -23,6 +24,7 @@ class _State extends State<RotationPatternPage> {
     items: [],
   );
   bool loading = true;
+  bool cards = false;
   String? message;
   bool error = false;
   @override
@@ -145,6 +147,54 @@ class _State extends State<RotationPatternPage> {
     }
   }
 
+  Widget _table() => LaooWorkspaceDataTable(
+    tokens: timeUiTokens.workspace,
+    headingRowColor: WidgetStatePropertyAll(
+      timeUiTokens.primaryColor.withValues(alpha: .10),
+    ),
+    columns: const [
+      LaooWorkspaceTableColumns.id,
+      DataColumn(label: Text('จัดการ'), columnWidth: FixedColumnWidth(112)),
+      DataColumn(label: Text('รหัส')),
+      DataColumn(label: Text('ชื่อรูปแบบ'), columnWidth: FlexColumnWidth()),
+      DataColumn(label: Text('รอบ (วัน)')),
+      DataColumn(label: Text('สถานะ')),
+    ],
+    rows: [
+      for (var index = 0; index < data.items.length; index++)
+        DataRow(
+          cells: [
+            DataCell(Text('${(data.page - 1) * data.pageSize + index + 1}')),
+            DataCell(
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    tooltip: 'แก้ไข',
+                    onPressed: actions?.edit == true
+                        ? () => edit(data.items[index])
+                        : null,
+                    icon: const Icon(Icons.edit_outlined),
+                  ),
+                  IconButton(
+                    tooltip: 'ลบ',
+                    onPressed: actions?.delete == true
+                        ? () => remove(data.items[index])
+                        : null,
+                    icon: const Icon(Icons.delete_outline, color: Colors.red),
+                  ),
+                ],
+              ),
+            ),
+            DataCell(Text(data.items[index].code)),
+            DataCell(Text(data.items[index].name)),
+            DataCell(Text('${data.items[index].cycleDays}')),
+            DataCell(Text(data.items[index].active ? 'ใช้งาน' : 'ไม่ใช้งาน')),
+          ],
+        ),
+    ],
+  );
+
   @override
   Widget build(BuildContext context) {
     final caption = actions?.caption ?? 'รูปแบบหมุนกะ';
@@ -155,37 +205,40 @@ class _State extends State<RotationPatternPage> {
         children: [
           Positioned.fill(
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: timeUiTokens.contentMargin,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          caption,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
+                  TimeCaptionCard(
+                    api: api,
+                    menuCode: TimeMenuCodes.rotationPatterns,
+                    caption: caption,
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        LaooListCardToggle(
+                          tokens: timeUiTokens.workspace,
+                          cards: cards,
+                          onChanged: (value) => setState(() => cards = value),
+                        ),
+                        if (actions?.create == true)
+                          FilledButton.icon(
+                            onPressed: () => edit(),
+                            icon: const Icon(Icons.add),
+                            label: const Text('เพิ่ม'),
                           ),
-                        ),
-                      ),
-                      if (actions?.create == true)
-                        FilledButton.icon(
-                          onPressed: () => edit(),
-                          icon: const Icon(Icons.add),
-                          label: const Text('เพิ่ม'),
-                        ),
-                    ],
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: timeUiTokens.cardSpacing),
                   Expanded(
                     child: Card(
                       child: loading
                           ? const Center(child: CircularProgressIndicator())
                           : data.items.isEmpty
                           ? const Center(child: Text('ไม่พบข้อมูล'))
-                          : ListView.separated(
+                          : cards
+                          ? ListView.separated(
                               itemCount: data.items.length,
                               separatorBuilder: (_, _) =>
                                   const Divider(height: 1),
@@ -222,26 +275,25 @@ class _State extends State<RotationPatternPage> {
                                   ),
                                 );
                               },
-                            ),
+                            )
+                          : _table(),
                     ),
                   ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      IconButton(
-                        onPressed: data.page > 1
-                            ? () => load(page: data.page - 1)
-                            : null,
-                        icon: const Icon(Icons.chevron_left),
-                      ),
-                      Text('หน้า ${data.page}'),
-                      IconButton(
-                        onPressed: data.page * data.pageSize < data.total
-                            ? () => load(page: data.page + 1)
-                            : null,
-                        icon: const Icon(Icons.chevron_right),
-                      ),
-                    ],
+                  SizedBox(height: timeUiTokens.cardSpacing),
+                  LaooPaginationCard(
+                    tokens: timeUiTokens.workspace,
+                    page: data.page,
+                    pageCount: data.total == 0
+                        ? 1
+                        : (data.total / data.pageSize).ceil(),
+                    pageSize: data.pageSize,
+                    total: data.total,
+                    onPrevious: data.page > 1
+                        ? () => load(page: data.page - 1)
+                        : null,
+                    onNext: data.page * data.pageSize < data.total
+                        ? () => load(page: data.page + 1)
+                        : null,
                   ),
                 ],
               ),

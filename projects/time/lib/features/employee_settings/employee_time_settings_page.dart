@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:laoo_shared_core/laoo_shared_core.dart';
+import 'package:laoo_shared_workspace_ui/laoo_shared_workspace_ui.dart';
 
 import '../time/time_feature_host.dart';
 import '../time/time_route_contract.dart';
@@ -36,6 +37,7 @@ class _EmployeeTimeSettingsPageState extends State<EmployeeTimeSettingsPage> {
       const EmployeeOrganizationFilterOptions(divisions: [], departments: []);
   EmployeeTimeSettingRecord? _selected;
   bool _loading = true;
+  bool _cards = false;
   bool? _isActive = true;
   bool? _requiresAttendance;
   int? _divisionOrgUnitId;
@@ -165,17 +167,22 @@ class _EmployeeTimeSettingsPageState extends State<EmployeeTimeSettingsPage> {
                 Icon(Icons.star_border, color: tokens.primaryColor),
                 const SizedBox(width: 6),
                 Expanded(child: Text(caption, style: tokens.captionStyle)),
+                LaooListCardToggle(
+                  tokens: tokens.workspace,
+                  cards: _cards,
+                  onChanged: (value) => setState(() => _cards = value),
+                ),
               ],
             ),
           ),
-          SizedBox(height: tokens.cardSpacing),
+          SizedBox(height: tokens.workspace.captionFilterSpacing),
           _filterCard(),
           SizedBox(height: tokens.cardSpacing),
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final list = _listCard(
-                  constraints.maxWidth < tokens.compactBreakpoint,
+                  constraints.maxWidth < tokens.compactBreakpoint || _cards,
                 );
                 final selected = _selected;
                 if (selected == null || constraints.maxWidth < 1100) {
@@ -295,96 +302,93 @@ class _EmployeeTimeSettingsPageState extends State<EmployeeTimeSettingsPage> {
 
   Widget _listCard(bool compact) {
     final tokens = timeUiTokens;
-    if (_loading)
+    if (_loading) {
       return _card(const Center(child: CircularProgressIndicator()));
-    if (_data.items.isEmpty)
+    }
+    if (_data.items.isEmpty) {
       return _card(const Center(child: Text('ไม่พบข้อมูล')));
+    }
     return _card(
       compact
           ? _mobileList()
-          : SingleChildScrollView(
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: DataTable(
-                  dividerThickness: 1,
-                  headingRowColor: WidgetStatePropertyAll(
-                    tokens.primaryColor.withValues(alpha: 0.10),
-                  ),
-                  headingTextStyle: tokens.tableStyle.copyWith(
-                    color: tokens.primaryColor,
-                    fontWeight: FontWeight.w700,
-                  ),
-                  dataTextStyle: tokens.tableStyle,
-                  columns: const [
-                    DataColumn(label: Text('ลำดับ')),
-                    DataColumn(label: Text('จัดการ')),
-                    DataColumn(label: Text('รหัสพนักงาน')),
-                    DataColumn(label: Text('ชื่อพนักงาน')),
-                    DataColumn(label: Text('ลงเวลา')),
-                    DataColumn(label: Text('รหัสที่เครื่อง')),
-                    DataColumn(label: Text('Login')),
-                  ],
-                  rows: _data.items
-                      .asMap()
-                      .entries
-                      .map((entry) {
-                        final employee = entry.value;
-                        final number =
-                            ((_page - 1) * _data.pageSize) + entry.key + 1;
-                        return DataRow(
-                          cells: [
-                            DataCell(Text('$number')),
-                            DataCell(
-                              IconButton(
-                                tooltip: 'แก้ไข',
-                                onPressed: _actions?.canEdit == true
-                                    ? () => _select(employee)
-                                    : null,
-                                color: tokens.primaryColor,
-                                icon: const Icon(Icons.edit_outlined),
-                              ),
-                            ),
-                            DataCell(Text(employee.employeeCode)),
-                            DataCell(
-                              Column(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(employee.fullName),
-                                  Text(
-                                    '${employee.divisionName ?? '-'} / '
-                                    '${employee.departmentName ?? '-'}',
-                                    style: tokens.tableStyle.copyWith(
-                                      color: tokens.primaryColor,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            DataCell(
-                              Text(
-                                employee.requiresAttendance
-                                    ? 'ต้องลงเวลา'
-                                    : 'ยกเว้น',
-                              ),
-                            ),
-                            DataCell(Text(employee.deviceCode ?? '-')),
-                            DataCell(
-                              Icon(
-                                employee.hasActiveLogin
-                                    ? Icons.check_circle
-                                    : Icons.warning_amber,
-                                color: employee.hasActiveLogin
-                                    ? tokens.primaryColor
-                                    : Colors.red,
-                              ),
-                            ),
-                          ],
-                        );
-                      })
-                      .toList(growable: false),
-                ),
+          : LaooWorkspaceDataTable(
+              tokens: tokens.workspace,
+              headingRowColor: WidgetStatePropertyAll(
+                tokens.primaryColor.withValues(alpha: 0.10),
               ),
+              headingTextStyle: tokens.tableStyle.copyWith(
+                color: tokens.primaryColor,
+                fontWeight: FontWeight.w700,
+              ),
+              dataTextStyle: tokens.tableStyle,
+              columns: const [
+                LaooWorkspaceTableColumns.id,
+                DataColumn(label: Text('จัดการ')),
+                DataColumn(label: Text('รหัสพนักงาน')),
+                DataColumn(label: Text('ชื่อพนักงาน')),
+                DataColumn(label: Text('ลงเวลา')),
+                DataColumn(label: Text('รหัสที่เครื่อง')),
+                DataColumn(label: Text('Login')),
+              ],
+              rows: _data.items
+                  .asMap()
+                  .entries
+                  .map((entry) {
+                    final employee = entry.value;
+                    final number =
+                        ((_page - 1) * _data.pageSize) + entry.key + 1;
+                    return DataRow(
+                      cells: [
+                        DataCell(Text('$number')),
+                        DataCell(
+                          IconButton(
+                            tooltip: 'แก้ไข',
+                            onPressed: _actions?.canEdit == true
+                                ? () => _select(employee)
+                                : null,
+                            color: tokens.primaryColor,
+                            icon: const Icon(Icons.edit_outlined),
+                          ),
+                        ),
+                        DataCell(Text(employee.employeeCode)),
+                        DataCell(
+                          Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(employee.fullName),
+                              Text(
+                                '${employee.divisionName ?? '-'} / '
+                                '${employee.departmentName ?? '-'}',
+                                style: tokens.tableStyle.copyWith(
+                                  color: tokens.primaryColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        DataCell(
+                          Text(
+                            employee.requiresAttendance
+                                ? 'ต้องลงเวลา'
+                                : 'ยกเว้น',
+                          ),
+                        ),
+                        DataCell(Text(employee.deviceCode ?? '-')),
+                        DataCell(
+                          Icon(
+                            employee.hasActiveLogin
+                                ? Icons.check_circle
+                                : Icons.warning_amber,
+                            color: employee.hasActiveLogin
+                                ? tokens.primaryColor
+                                : Colors.red,
+                          ),
+                        ),
+                      ],
+                    );
+                  })
+                  .toList(growable: false),
             ),
     );
   }
@@ -447,72 +451,14 @@ class _EmployeeTimeSettingsPageState extends State<EmployeeTimeSettingsPage> {
 
   Widget _pagination(int pages) {
     final tokens = timeUiTokens;
-    final start = _data.total == 0 ? 0 : ((_page - 1) * _data.pageSize) + 1;
-    final end = _data.total == 0
-        ? 0
-        : ((_page * _data.pageSize) > _data.total
-              ? _data.total
-              : _page * _data.pageSize);
-    return SizedBox(
-      height: tokens.paginationHeight,
-      child: _card(
-        Wrap(
-          spacing: tokens.itemSpacing,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            _pageButton(
-              icon: Icons.chevron_left,
-              enabled: _page > 1 && !_loading,
-              onPressed: () => _load(page: _page - 1),
-            ),
-            _pageButton(
-              label: '$_page',
-              enabled: true,
-              active: true,
-              onPressed: null,
-            ),
-            _pageButton(
-              icon: Icons.chevron_right,
-              enabled: _page < pages && !_loading,
-              onPressed: () => _load(page: _page + 1),
-            ),
-            Text('$start-$end จาก ${_data.total} รายการ'),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _pageButton({
-    IconData? icon,
-    String? label,
-    required bool enabled,
-    bool active = false,
-    VoidCallback? onPressed,
-  }) {
-    final tokens = timeUiTokens;
-    return SizedBox(
-      height: 36,
-      width: 40,
-      child: OutlinedButton(
-        onPressed: active
-            ? () {}
-            : enabled
-            ? onPressed
-            : null,
-        style: OutlinedButton.styleFrom(
-          padding: EdgeInsets.zero,
-          foregroundColor: active ? Colors.white : tokens.primaryColor,
-          backgroundColor: active ? tokens.primaryColor : Colors.white,
-          side: BorderSide(
-            color: enabled ? tokens.primaryColor : tokens.borderColor,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(tokens.radius),
-          ),
-        ),
-        child: icon == null ? Text(label!) : Icon(icon),
-      ),
+    return LaooPaginationCard(
+      tokens: tokens.workspace,
+      page: _page,
+      pageCount: pages,
+      pageSize: _data.pageSize,
+      total: _data.total,
+      onPrevious: _page > 1 && !_loading ? () => _load(page: _page - 1) : null,
+      onNext: _page < pages && !_loading ? () => _load(page: _page + 1) : null,
     );
   }
 
@@ -664,7 +610,9 @@ class _EmployeeTimeSettingsEditorState
     _deviceCode = TextEditingController(text: widget.employee.deviceCode);
     _reason = TextEditingController();
     _effectiveFrom = DateUtils.dateOnly(timeUiTokens.businessDate);
-    _effectiveFromText = TextEditingController(text: _formatDate(_effectiveFrom));
+    _effectiveFromText = TextEditingController(
+      text: _formatDate(_effectiveFrom),
+    );
   }
 
   @override
@@ -750,12 +698,13 @@ class _EmployeeTimeSettingsEditorState
                           controller: _deviceCode,
                           style: tokens.inputStyle,
                           maxLength: 100,
-                          buildCounter: (
-                            context, {
-                            required int currentLength,
-                            int? maxLength,
-                            required bool isFocused,
-                          }) => null,
+                          buildCounter:
+                              (
+                                context, {
+                                required int currentLength,
+                                int? maxLength,
+                                required bool isFocused,
+                              }) => null,
                           decoration: _decoration(
                             label: 'รหัสที่เครื่อง',
                             hint: 'รหัสในเครื่อง',
@@ -771,7 +720,9 @@ class _EmployeeTimeSettingsEditorState
                           style: tokens.inputStyle,
                           decoration: _decoration(
                             label: 'วันที่เริ่มใช้',
-                            suffixIcon: const Icon(Icons.calendar_month_outlined),
+                            suffixIcon: const Icon(
+                              Icons.calendar_month_outlined,
+                            ),
                           ),
                           onTap: _pickEffectiveFrom,
                         ),
@@ -783,12 +734,13 @@ class _EmployeeTimeSettingsEditorState
                     controller: _reason,
                     style: tokens.inputStyle,
                     maxLength: 1000,
-                    buildCounter: (
-                      context, {
-                      required int currentLength,
-                      int? maxLength,
-                      required bool isFocused,
-                    }) => null,
+                    buildCounter:
+                        (
+                          context, {
+                          required int currentLength,
+                          int? maxLength,
+                          required bool isFocused,
+                        }) => null,
                     maxLines: 1,
                     decoration: _decoration(label: 'เหตุผลในการแก้ไข'),
                   ),
