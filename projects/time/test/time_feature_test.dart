@@ -187,6 +187,10 @@ void main() {
     expect(find.text('รูปแบบการอนุมัติ'), findsOneWidget);
     expect(find.text('ผู้เริ่มคำขอ'), findsOneWidget);
     expect(find.textContaining('ไม่มี Active Login'), findsOneWidget);
+    expect(
+      find.text('ยังมีพนักงานไม่มี Active Login 2 คน'),
+      findsOneWidget,
+    );
     await tester.scrollUntilVisible(
       find.text('บันทึก'),
       500,

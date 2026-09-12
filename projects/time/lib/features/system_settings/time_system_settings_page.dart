@@ -379,6 +379,10 @@ class _TimeSystemSettingsPageState extends State<TimeSystemSettingsPage> {
           ),
         ),
         const SizedBox(height: 6),
+        if (source.employeeWithoutLoginCount > 0) ...[
+          _employeeLoginWarning(source.employeeWithoutLoginCount),
+          const SizedBox(height: 6),
+        ],
         _section(
           title: 'รูปแบบการอนุมัติ',
           description: 'ค่าหลักของบริษัทและค่าที่เลือกใช้แยกตามกระบวนการ',
@@ -498,6 +502,31 @@ class _TimeSystemSettingsPageState extends State<TimeSystemSettingsPage> {
                     ),
                   )
                   .toList(growable: false),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+
+  Widget _employeeLoginWarning(int count) => Card(
+    margin: EdgeInsets.zero,
+    color: const Color(0xFFFFF8E1),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(4),
+      side: BorderSide(color: Colors.amber.shade700),
+    ),
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.warning_amber_rounded, color: Colors.amber.shade800),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'ยังมีพนักงานไม่มี Active Login $count คน',
+              style: const TextStyle(fontWeight: FontWeight.w600),
             ),
           ),
         ],
