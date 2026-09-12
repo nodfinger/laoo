@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../app/theme/laoo_design_tokens.dart';
+import '../../../app/theme/laoo_typography.dart';
 import '../../../app/theme/workspace_theme_presets.dart';
 import '../../../core/api/api_exception.dart';
 import '../../../core/navigation/navigation_menu_repository.dart';
@@ -8,6 +9,7 @@ import '../../support/presentation/widgets/support_workspace_shell.dart';
 import '../data/meeting_food_order_summary_repository.dart';
 import '../meeting_feature_host.dart';
 import '../meeting_route_contract.dart';
+import '../utils/meeting_food_summary_export.dart';
 import '../widgets/meeting_pagination_card.dart';
 
 class MeetingFoodOrderSummaryPage extends StatefulWidget {
@@ -26,6 +28,8 @@ class _State extends State<MeetingFoodOrderSummaryPage> {
   List<Map<String, dynamic>> items = [];
   bool loading = true, available = true;
   int page = 1, total = 0;
+  String groupBy = 'room';
+  int? foodFilterId;
 
   @override
   void initState() {
@@ -88,11 +92,104 @@ class _State extends State<MeetingFoodOrderSummaryPage> {
   }
 
   Future<void> pick(bool isFrom) async {
+    final preset = workspaceThemeController.value;
+    final baseTheme = Theme.of(context);
     final value = await showDatePicker(
       context: context,
       initialDate: isFrom ? from : to,
       firstDate: DateTime(2000),
       lastDate: DateTime(2100),
+      builder: (context, child) {
+        final scheme = baseTheme.colorScheme.copyWith(
+          primary: preset.primary,
+          surface: LaooColors.white,
+          onSurface: preset.textPrimary,
+        );
+        return Theme(
+          data: baseTheme.copyWith(
+            colorScheme: scheme,
+            datePickerTheme: DatePickerThemeData(
+              backgroundColor: LaooColors.white,
+              surfaceTintColor: Colors.transparent,
+              headerHelpStyle: LaooTypography.popupTitleStyle,
+              dividerColor: LaooColors.border,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(LaooRadius.xs),
+                side: BorderSide.none,
+              ),
+              cancelButtonStyle: TextButton.styleFrom(
+                foregroundColor: preset.primary,
+                minimumSize: const Size(64, LaooTypography.buttonHeight),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(LaooRadius.xs),
+                ),
+              ),
+              confirmButtonStyle: TextButton.styleFrom(
+                foregroundColor: scheme.onPrimary,
+                backgroundColor: preset.primary,
+                minimumSize: const Size(64, LaooTypography.buttonHeight),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(LaooRadius.xs),
+                ),
+              ),
+              headerBackgroundColor: LaooColors.white,
+              headerForegroundColor: preset.textPrimary,
+              weekdayStyle: TextStyle(
+                color: preset.primary,
+                fontSize: LaooTypography.inputText,
+                fontWeight: FontWeight.w700,
+              ),
+              dayStyle: const TextStyle(
+                fontSize: LaooTypography.inputText,
+                fontWeight: FontWeight.w500,
+              ),
+              dayForegroundColor: WidgetStateProperty.resolveWith((states) {
+                if (states.contains(WidgetState.disabled)) {
+                  return preset.textSecondary.withValues(alpha: .45);
+                }
+                if (states.contains(WidgetState.selected)) {
+                  return scheme.onPrimary;
+                }
+                return preset.textPrimary;
+              }),
+              dayBackgroundColor: WidgetStateProperty.resolveWith(
+                (states) => states.contains(WidgetState.selected)
+                    ? preset.primary
+                    : Colors.transparent,
+              ),
+              dayOverlayColor: WidgetStatePropertyAll(
+                preset.primary.withValues(alpha: .10),
+              ),
+              dayShape: WidgetStateProperty.resolveWith(
+                (states) => RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(LaooRadius.xs),
+                  side: states.contains(WidgetState.selected)
+                      ? BorderSide(color: preset.primary, width: 1.25)
+                      : BorderSide.none,
+                ),
+              ),
+              todayForegroundColor: WidgetStatePropertyAll(preset.primary),
+              todayBackgroundColor: WidgetStateProperty.resolveWith(
+                (states) => states.contains(WidgetState.selected)
+                    ? preset.primary.withValues(alpha: .14)
+                    : Colors.transparent,
+              ),
+              todayBorder: BorderSide(color: preset.primary, width: 1.25),
+            ),
+            dialogTheme: DialogThemeData(
+              backgroundColor: LaooColors.white,
+              surfaceTintColor: Colors.transparent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(LaooRadius.xs),
+              ),
+            ),
+            iconButtonTheme: IconButtonThemeData(
+              style: IconButton.styleFrom(foregroundColor: preset.primary),
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
     if (value == null || !mounted) return;
     setState(() {
@@ -124,6 +221,55 @@ class _State extends State<MeetingFoodOrderSummaryPage> {
     );
   }
 
+  Widget quantityBadge(String text, WorkspaceThemePreset preset) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    decoration: BoxDecoration(
+      color: preset.primary.withValues(alpha: .10),
+      borderRadius: BorderRadius.circular(LaooRadius.xs),
+    ),
+    child: Text(
+      text,
+      style: TextStyle(color: preset.primary, fontWeight: FontWeight.w700),
+    ),
+  );
+
+  String csvCell(Object? value) {
+    final text = '${value ?? ''}'.replaceAll('"', '""');
+    return '"$text"';
+  }
+
+  void exportSummary() {
+    final rows = <List<Object?>>[
+      [
+        'ห้องประชุม',
+        'หัวข้อ',
+        'วันและเวลาประชุม',
+        'ประเภทอาหาร',
+        'รายการอาหาร',
+        'ผู้สั่ง',
+        'รวมจำนวน',
+      ],
+    ];
+    for (final booking in visibleItems) {
+      for (final food in orderedFoods(booking)) {
+        rows.add([
+          '${booking['roomCode']} | ${booking['roomName']}',
+          booking['subject'],
+          '${dateTime(booking['startDateTime'])} - ${dateTime(booking['endDateTime'])}',
+          food['foodTypeName'],
+          food['nameTh'],
+          food['orderedParticipantCount'],
+          food['orderedQuantity'],
+        ]);
+      }
+    }
+    downloadFoodSummary(
+      'สรุปการสั่งอาหาร_${date(from).replaceAll('/', '-')}_ ${date(to).replaceAll('/', '-')}.csv'
+          .replaceAll('_ ', '_'),
+      rows.map((row) => row.map(csvCell).join(',')).join('\r\n'),
+    );
+  }
+
   Widget filterCard() => WorkspaceSectionCard(
     child: LayoutBuilder(
       builder: (_, box) => Wrap(
@@ -143,6 +289,50 @@ class _State extends State<MeetingFoodOrderSummaryPage> {
                 labelText: 'ค้นหาเลขที่จอง/หัวข้อ/ห้อง',
                 prefixIcon: Icon(Icons.search),
               ),
+            ),
+          ),
+          SizedBox(
+            width: box.maxWidth < 650 ? box.maxWidth : 190,
+            child: DropdownButtonFormField<String>(
+              initialValue: groupBy,
+              decoration: const InputDecoration(labelText: 'จัดกลุ่มข้อมูล'),
+              items: const [
+                DropdownMenuItem(value: 'room', child: Text('ตามห้องประชุม')),
+                DropdownMenuItem(value: 'food', child: Text('ตามอาหาร')),
+                DropdownMenuItem(value: 'subject', child: Text('ตามเรื่อง')),
+                DropdownMenuItem(
+                  value: 'participant',
+                  child: Text('ตามผู้เข้าประชุม'),
+                ),
+              ],
+              onChanged: (value) {
+                if (value != null) setState(() => groupBy = value);
+              },
+            ),
+          ),
+          SizedBox(
+            width: box.maxWidth < 650 ? box.maxWidth : 220,
+            child: DropdownButtonFormField<int?>(
+              initialValue:
+                  foodFilterOptions.any(
+                    (food) => (food['foodId'] as num?)?.toInt() == foodFilterId,
+                  )
+                  ? foodFilterId
+                  : null,
+              decoration: const InputDecoration(labelText: 'รายการอาหาร'),
+              items: [
+                const DropdownMenuItem<int?>(
+                  value: null,
+                  child: Text('รายการอาหารทั้งหมด'),
+                ),
+                ...foodFilterOptions.map(
+                  (food) => DropdownMenuItem<int?>(
+                    value: (food['foodId'] as num).toInt(),
+                    child: Text('${food['nameTh']}'),
+                  ),
+                ),
+              ],
+              onChanged: (value) => setState(() => foodFilterId = value),
             ),
           ),
           OutlinedButton.icon(
@@ -169,6 +359,7 @@ class _State extends State<MeetingFoodOrderSummaryPage> {
                 search.clear();
                 from = today;
                 to = today.add(const Duration(days: 30));
+                foodFilterId = null;
                 page = 1;
               });
               load();
@@ -180,10 +371,405 @@ class _State extends State<MeetingFoodOrderSummaryPage> {
       ),
     ),
   );
-  Widget itemCard(Map<String, dynamic> item, WorkspaceThemePreset preset) {
-    final foods = List<Map<String, dynamic>>.from(
-      item['foods'] as List? ?? const [],
+
+  List<Map<String, dynamic>> orderedFoods(Map<String, dynamic> item) =>
+      List<Map<String, dynamic>>.from(
+        item['foods'] as List? ?? const [],
+      ).where((food) {
+        if (foodFilterId != null && food['foodId'] != foodFilterId) {
+          return false;
+        }
+        final people = (food['orderedParticipantCount'] as num?)?.toInt() ?? 0;
+        final quantity = (food['orderedQuantity'] as num?)?.toInt() ?? 0;
+        return people > 0 && quantity > 0;
+      }).toList();
+
+  List<Map<String, dynamic>> get visibleItems => items
+      .where((item) => foodFilterId == null || orderedFoods(item).isNotEmpty)
+      .toList();
+
+  List<Map<String, dynamic>> get foodFilterOptions {
+    final options = <int, Map<String, dynamic>>{};
+    for (final item in items) {
+      for (final food in List<Map<String, dynamic>>.from(
+        item['foods'] as List? ?? const [],
+      )) {
+        final id = (food['foodId'] as num?)?.toInt();
+        final people = (food['orderedParticipantCount'] as num?)?.toInt() ?? 0;
+        final quantity = (food['orderedQuantity'] as num?)?.toInt() ?? 0;
+        if (id != null && people > 0 && quantity > 0) options[id] = food;
+      }
+    }
+    final result = options.values.toList();
+    result.sort(
+      (left, right) => '${left['nameTh']}'.compareTo('${right['nameTh']}'),
     );
+    return result;
+  }
+
+  int quantityOf(Iterable<Map<String, dynamic>> rows) => rows.fold(
+    0,
+    (total, row) =>
+        total + ((row['food']['orderedQuantity'] as num?)?.toInt() ?? 0),
+  );
+
+  Widget foodMeetingRow(Map<String, dynamic> row, WorkspaceThemePreset preset) {
+    final booking = Map<String, dynamic>.from(row['booking'] as Map);
+    final food = Map<String, dynamic>.from(row['food'] as Map);
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Row(
+        children: [
+          Icon(Icons.meeting_room_outlined, size: 18, color: preset.primary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${booking['roomCode']} | ${booking['roomName']}\n'
+                  '${dateTime(booking['startDateTime'])} - ${dateTime(booking['endDateTime'])}',
+                ),
+                const SizedBox(height: 4),
+                quantityBadge(
+                  'รวมจำนวน ${food['orderedQuantity'] ?? 0}',
+                  preset,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget foodGroupedList(WorkspaceThemePreset preset) {
+    final typeRows = <String, List<Map<String, dynamic>>>{};
+    for (final booking in visibleItems) {
+      for (final food in orderedFoods(booking)) {
+        typeRows.putIfAbsent('${food['foodTypeName'] ?? '-'}', () => []).add({
+          'booking': booking,
+          'food': food,
+        });
+      }
+    }
+    return ListView.separated(
+      itemCount: typeRows.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 6),
+      itemBuilder: (_, index) {
+        final type = typeRows.entries.elementAt(index);
+        final foodRows = <String, List<Map<String, dynamic>>>{};
+        for (final row in type.value) {
+          final food = Map<String, dynamic>.from(row['food'] as Map);
+          foodRows.putIfAbsent('${food['foodId']}', () => []).add(row);
+        }
+        return WorkspaceSectionCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                type.key,
+                style: TextStyle(
+                  color: preset.primary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 8),
+              ...foodRows.values.map((rows) {
+                final food = Map<String, dynamic>.from(
+                  rows.first['food'] as Map,
+                );
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.restaurant_menu_outlined),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  '${food['nameTh']}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          quantityBadge('รวมจำนวน ${quantityOf(rows)}', preset),
+                        ],
+                      ),
+                      ...rows.map((row) => foodMeetingRow(row, preset)),
+                    ],
+                  ),
+                );
+              }),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget subjectGroupedList(WorkspaceThemePreset preset) {
+    final subjectRows = <String, List<Map<String, dynamic>>>{};
+    for (final item in visibleItems) {
+      subjectRows.putIfAbsent('${item['subject'] ?? '-'}', () => []).add(item);
+    }
+    return ListView.separated(
+      itemCount: subjectRows.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 6),
+      itemBuilder: (_, index) {
+        final subject = subjectRows.entries.elementAt(index);
+        return WorkspaceSectionCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                subject.key,
+                style: TextStyle(
+                  color: preset.primary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 8),
+              ...subject.value.map(
+                (item) => Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.meeting_room_outlined,
+                        size: 18,
+                        color: preset.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${item['roomCode']} | ${item['roomName']}\n'
+                              '${dateTime(item['startDateTime'])} - ${dateTime(item['endDateTime'])}',
+                            ),
+                            const SizedBox(height: 4),
+                            ...orderedFoods(item).map(
+                              (food) => Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.restaurant_menu_outlined,
+                                      size: 16,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text('${food['nameTh']}'),
+                                          const SizedBox(height: 4),
+                                          quantityBadge(
+                                            'รวมจำนวน ${food['orderedQuantity'] ?? 0}',
+                                            preset,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget participantGroupedList(WorkspaceThemePreset preset) {
+    final groups = <String, Map<String, dynamic>>{};
+    for (final booking in visibleItems) {
+      final rows =
+          List<Map<String, dynamic>>.from(
+                booking['participantFoods'] as List? ?? const [],
+              )
+              .where(
+                (row) => foodFilterId == null || row['foodId'] == foodFilterId,
+              )
+              .toList();
+      for (final row in rows) {
+        final key = '${booking['bookingId']}:${row['participantId']}';
+        final group = groups.putIfAbsent(
+          key,
+          () => {
+            'booking': booking,
+            'participantId': row['participantId'],
+            'participantName': row['participantName'],
+            'participantNickname': row['participantNickname'],
+            'divisionName': row['divisionName'],
+            'departmentName': row['departmentName'],
+            'foods': <Map<String, dynamic>>[],
+          },
+        );
+        (group['foods'] as List<Map<String, dynamic>>).add(row);
+      }
+    }
+    final orderedGroups = groups.values.toList()
+      ..sort((left, right) {
+        final nameCompare = '${left['participantName']}'.compareTo(
+          '${right['participantName']}',
+        );
+        if (nameCompare != 0) return nameCompare;
+        return '${left['participantNickname'] ?? ''}'.compareTo(
+          '${right['participantNickname'] ?? ''}',
+        );
+      });
+    return ListView.separated(
+      itemCount: orderedGroups.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 6),
+      itemBuilder: (_, index) {
+        final group = orderedGroups[index];
+        final booking = Map<String, dynamic>.from(group['booking'] as Map);
+        final foods = List<Map<String, dynamic>>.from(group['foods'] as List);
+        final foodGroups = <String, List<Map<String, dynamic>>>{};
+        for (final food in foods) {
+          foodGroups
+              .putIfAbsent('${food['foodTypeName'] ?? '-'}', () => [])
+              .add(food);
+        }
+        final participantId = group['participantId'];
+        final answers = List<Map<String, dynamic>>.from(
+          (booking['requirements'] as List? ?? const []).where(
+            (answer) => '${answer['participantId']}' == '$participantId',
+          ),
+        );
+        return WorkspaceSectionCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.person_outline, color: preset.primary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '${group['participantName'] ?? '-'}'
+                      '${group['participantNickname'] == null ? '' : ' (${group['participantNickname']})'}'
+                      '${group['divisionName'] == null ? '' : ' | ฝ่าย ${group['divisionName']}'}'
+                      '${group['departmentName'] == null ? '' : ' | แผนก ${group['departmentName']}'}',
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '${booking['subject'] ?? '-'} | ${booking['roomCode']} ${booking['roomName']}',
+                style: TextStyle(color: preset.textSecondary),
+              ),
+              Text(
+                '${dateTime(booking['startDateTime'])} - ${dateTime(booking['endDateTime'])}',
+                style: TextStyle(color: preset.textSecondary),
+              ),
+              const SizedBox(height: 10),
+              ...foodGroups.entries.map(
+                (type) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        type.key,
+                        style: TextStyle(
+                          color: preset.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      ...type.value.map(
+                        (food) => Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.restaurant_menu_outlined,
+                                size: 17,
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Wrap(
+                                  spacing: 6,
+                                  runSpacing: 4,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  children: [
+                                    Text('${food['foodName']}'),
+                                    quantityBadge(
+                                      'จำนวน ${food['quantity'] ?? 0}',
+                                      preset,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (answers.isNotEmpty) ...[
+                const Divider(),
+                Text(
+                  'ข้อความ/ตัวเลือก',
+                  style: TextStyle(
+                    color: preset.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                ...answers.map(
+                  (answer) => Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      '${answer['questionText']}: ${answer['answerValue'] ?? '-'}',
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget resultList(WorkspaceThemePreset preset) => switch (groupBy) {
+    'food' => foodGroupedList(preset),
+    'subject' => subjectGroupedList(preset),
+    'participant' => participantGroupedList(preset),
+    _ => ListView.separated(
+      itemCount: visibleItems.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 6),
+      itemBuilder: (_, index) => itemCard(visibleItems[index], preset),
+    ),
+  };
+
+  Widget itemCard(Map<String, dynamic> item, WorkspaceThemePreset preset) {
+    final foods = orderedFoods(item);
     final foodGroups = <String, List<Map<String, dynamic>>>{};
     for (final food in foods) {
       foodGroups
@@ -223,9 +809,17 @@ class _State extends State<MeetingFoodOrderSummaryPage> {
           Text(
             '${dateTime(item['startDateTime'])} - ${dateTime(item['endDateTime'])}',
           ),
-          Text(
-            'ผู้สั่ง ${item['orderedParticipantCount'] ?? 0} คน | จำนวนรวม ${item['orderedQuantity'] ?? 0}',
-            style: TextStyle(color: preset.textSecondary),
+          const SizedBox(height: 4),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              quantityBadge(
+                'ผู้สั่ง ${item['orderedParticipantCount'] ?? 0} คน',
+                preset,
+              ),
+              quantityBadge('รวมจำนวน ${item['orderedQuantity'] ?? 0}', preset),
+            ],
           ),
           const SizedBox(height: 12),
           const Text(
@@ -258,6 +852,7 @@ class _State extends State<MeetingFoodOrderSummaryPage> {
                         (food) => Padding(
                           padding: const EdgeInsets.symmetric(vertical: 4),
                           child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Icon(
                                 Icons.restaurant_menu_outlined,
@@ -265,15 +860,32 @@ class _State extends State<MeetingFoodOrderSummaryPage> {
                               ),
                               const SizedBox(width: 8),
                               Expanded(
-                                child: Text(
-                                  '${food['code']} | ${food['nameTh']}',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '${food['nameTh']}',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Wrap(
+                                      spacing: 6,
+                                      runSpacing: 6,
+                                      children: [
+                                        quantityBadge(
+                                          'ผู้สั่ง ${food['orderedParticipantCount'] ?? 0} คน',
+                                          preset,
+                                        ),
+                                        quantityBadge(
+                                          'รวมจำนวน ${food['orderedQuantity'] ?? 0}',
+                                          preset,
+                                        ),
+                                      ],
+                                    ),
+                                  ],
                                 ),
-                              ),
-                              Text(
-                                'ผู้สั่ง ${food['orderedParticipantCount'] ?? 0} | รวม ${food['orderedQuantity'] ?? 0}',
                               ),
                             ],
                           ),
@@ -326,6 +938,7 @@ class _State extends State<MeetingFoodOrderSummaryPage> {
   Widget pager() {
     final pages = (total / 20).ceil();
     return MeetingPaginationCard(
+      showDivider: false,
       total: total,
       pageIndex: page - 1,
       pageSize: 20,
@@ -363,10 +976,10 @@ class _State extends State<MeetingFoodOrderSummaryPage> {
                     title: caption,
                     favoriteKey: MeetingMenuCodes.foodOrderSummary,
                     actions: [
-                      IconButton(
-                        tooltip: 'รีเฟรช',
-                        onPressed: load,
-                        icon: Icon(Icons.refresh, color: preset.primary),
+                      OutlinedButton.icon(
+                        onPressed: items.isEmpty ? null : exportSummary,
+                        icon: const Icon(Icons.file_download_outlined),
+                        label: const Text('Export ข้อมูล'),
                       ),
                     ],
                   ),
@@ -387,12 +1000,7 @@ class _State extends State<MeetingFoodOrderSummaryPage> {
                       ? const Center(
                           child: Text('ไม่พบรายการสั่งอาหารในช่วงวันที่เลือก'),
                         )
-                      : ListView.separated(
-                          itemCount: items.length,
-                          separatorBuilder: (_, _) => const SizedBox(height: 6),
-                          itemBuilder: (_, index) =>
-                              itemCard(items[index], preset),
-                        ),
+                      : resultList(preset),
                 ),
                 const SizedBox(height: LaooLayout.cardSpacing),
                 pager(),
