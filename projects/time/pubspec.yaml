@@ -18,6 +18,8 @@ dependencies:
     path: ../../packages/laoo_shared_admin_ui
   laoo_shared_core:
     path: ../../packages/laoo_shared_core
+  laoo_shared_workspace_ui:
+    path: ../../packages/laoo_shared_workspace_ui
   go_router: ^17.4.0
 
 dev_dependencies:

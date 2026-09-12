@@ -7,6 +7,7 @@ import 'package:laoo_visitor/visitor_feature.dart';
 import 'app/laoo_app.dart';
 import 'app/theme/laoo_design_tokens.dart';
 import 'app/theme/laoo_typography.dart';
+import 'app/theme/workspace_theme_presets.dart';
 import 'core/api/api_client.dart';
 import 'core/api/api_exception.dart';
 import 'core/company_setup/company_setup_controller.dart';
@@ -32,49 +33,52 @@ void main() {
       paginationHeight: LaooLayout.paginationCardHeight,
       captionStyle: LaooTypography.screenCaptionStyle,
     ),
-    uiTokens: TimeUiTokens(
-      contentMargin: const EdgeInsets.all(LaooLayout.cardMargin),
-      cardPadding: const EdgeInsets.all(LaooLayout.cardPadding),
-      cardSpacing: LaooLayout.cardSpacing,
-      itemSpacing: 6,
-      radius: LaooRadius.xs,
-      compactBreakpoint: 900,
-      paginationHeight: LaooLayout.paginationCardHeight,
-      captionStyle: LaooTypography.screenCaptionStyle,
-      sectionStyle: const TextStyle(
-        fontFamily: LaooTypography.fontFamily,
-        fontFamilyFallback: LaooTypography.fontFallback,
-        fontSize: LaooTypography.sectionTitle,
-        height: LaooTypography.titleLineHeight,
-        fontWeight: LaooTypography.emphasizedWeight,
-        color: LaooColors.textPrimary,
-      ),
-      inputStyle: const TextStyle(
-        fontFamily: LaooTypography.fontFamily,
-        fontFamilyFallback: LaooTypography.fontFallback,
-        fontSize: LaooTypography.inputText,
-        height: LaooTypography.inputLineHeight,
-        color: LaooColors.textPrimary,
-      ),
-      tableStyle: const TextStyle(
-        fontFamily: LaooTypography.fontFamily,
-        fontFamilyFallback: LaooTypography.fontFallback,
-        fontSize: LaooTypography.tableBody,
-        height: LaooTypography.bodyLineHeight,
-        color: LaooColors.textPrimary,
-      ),
-      buttonStyle: const TextStyle(
-        fontFamily: LaooTypography.fontFamily,
-        fontFamilyFallback: LaooTypography.fontFallback,
-        fontSize: LaooTypography.button,
-        fontWeight: LaooTypography.emphasizedWeight,
-      ),
-      buttonHeight: LaooTypography.buttonHeight,
-      primaryColor: LaooColors.green,
-      borderColor: LaooColors.border,
-      backgroundColor: LaooColors.background,
-      businessDate: DateTime.now(),
-    ),
+    uiTokensProvider: () {
+      final theme = workspaceThemeController.value;
+      return TimeUiTokens(
+        contentMargin: const EdgeInsets.all(LaooLayout.cardMargin),
+        cardPadding: const EdgeInsets.all(LaooLayout.cardPadding),
+        cardSpacing: LaooLayout.cardSpacing,
+        itemSpacing: 6,
+        radius: LaooRadius.xs,
+        compactBreakpoint: 900,
+        paginationHeight: LaooLayout.paginationCardHeight,
+        captionStyle: LaooTypography.screenCaptionStyle,
+        sectionStyle: const TextStyle(
+          fontFamily: LaooTypography.fontFamily,
+          fontFamilyFallback: LaooTypography.fontFallback,
+          fontSize: LaooTypography.sectionTitle,
+          height: LaooTypography.titleLineHeight,
+          fontWeight: LaooTypography.emphasizedWeight,
+          color: LaooColors.textPrimary,
+        ),
+        inputStyle: const TextStyle(
+          fontFamily: LaooTypography.fontFamily,
+          fontFamilyFallback: LaooTypography.fontFallback,
+          fontSize: LaooTypography.inputText,
+          height: LaooTypography.inputLineHeight,
+          color: LaooColors.textPrimary,
+        ),
+        tableStyle: const TextStyle(
+          fontFamily: LaooTypography.fontFamily,
+          fontFamilyFallback: LaooTypography.fontFallback,
+          fontSize: LaooTypography.tableBody,
+          height: LaooTypography.bodyLineHeight,
+          color: LaooColors.textPrimary,
+        ),
+        buttonStyle: const TextStyle(
+          fontFamily: LaooTypography.fontFamily,
+          fontFamilyFallback: LaooTypography.fontFallback,
+          fontSize: LaooTypography.button,
+          fontWeight: LaooTypography.emphasizedWeight,
+        ),
+        buttonHeight: LaooTypography.buttonHeight,
+        primaryColor: theme.primary,
+        borderColor: theme.border,
+        backgroundColor: LaooColors.background,
+        businessDate: DateTime.now(),
+      );
+    },
   );
   configureVisitorFeatureHost(_buildMeetingWorkspaceShell);
   runApp(const LaooApp());

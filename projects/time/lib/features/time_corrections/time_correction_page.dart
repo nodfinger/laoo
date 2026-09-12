@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:laoo_shared_core/laoo_shared_core.dart';
+import 'package:laoo_shared_workspace_ui/laoo_shared_workspace_ui.dart';
 import '../time/time_feature_host.dart';
 import 'time_correction_repository.dart';
 
@@ -161,161 +162,130 @@ class _TimeCorrectionPageState extends State<TimeCorrectionPage> {
       activeMenu: widget.menuCode,
       child: Stack(
         children: [
-          Padding(
-            padding: timeUiTokens.contentMargin,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+          LaooListWorkspace(
+            tokens: timeUiTokens.workspace,
+            caption: TimeCaptionCard(
+              api: api,
+              menuCode: widget.menuCode,
+              caption: caption,
+              trailing: !approval && actions?['create'] == true
+                  ? FilledButton.icon(
+                      onPressed: create,
+                      icon: const Icon(Icons.add),
+                      label: const Text('สร้างคำขอ'),
+                    )
+                  : null,
+            ),
+            filter: Wrap(
+              spacing: timeUiTokens.itemSpacing,
+              runSpacing: timeUiTokens.itemSpacing,
+              crossAxisAlignment: WrapCrossAlignment.end,
               children: [
-                TimeCaptionCard(
-                  api: api,
-                  menuCode: widget.menuCode,
-                  caption: caption,
-                  trailing: !approval && actions?['create'] == true
-                      ? FilledButton.icon(
-                          onPressed: create,
-                          icon: const Icon(Icons.add),
-                          label: const Text('สร้างคำขอ'),
-                        )
-                      : null,
-                ),
-                SizedBox(height: timeUiTokens.cardSpacing),
-                Card(
-                  margin: EdgeInsets.zero,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(timeUiTokens.radius),
-                  ),
-                  child: Padding(
-                    padding: timeUiTokens.cardPadding,
-                    child: Row(
-                      children: [
-                        SizedBox(
-                          width: 220,
-                          child: DropdownButtonFormField<String?>(
-                            initialValue: status,
-                            decoration: const InputDecoration(
-                              labelText: 'สถานะคำขอ',
-                            ),
-                            items: [
-                              if (!approval)
-                                const DropdownMenuItem(
-                                  value: null,
-                                  child: Text('ทั้งหมด'),
-                                ),
-                              const DropdownMenuItem(
-                                value: 'PENDING',
-                                child: Text('รออนุมัติ'),
-                              ),
-                              const DropdownMenuItem(
-                                value: 'APPROVED',
-                                child: Text('อนุมัติแล้ว'),
-                              ),
-                              const DropdownMenuItem(
-                                value: 'REJECTED',
-                                child: Text('ไม่อนุมัติ'),
-                              ),
-                              const DropdownMenuItem(
-                                value: 'CANCELLED',
-                                child: Text('ยกเลิก'),
-                              ),
-                            ],
-                            onChanged: (value) =>
-                                setState(() => status = value),
-                          ),
-                        ),
-                        SizedBox(width: timeUiTokens.itemSpacing),
-                        FilledButton.icon(
-                          onPressed: loading ? null : () => load(),
-                          icon: const Icon(Icons.search),
-                          label: const Text('ค้นหา'),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                SizedBox(height: timeUiTokens.cardSpacing),
-                Expanded(
-                  child: Card(
-                    margin: EdgeInsets.zero,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(timeUiTokens.radius),
-                    ),
-                    child: loading
-                        ? const Center(child: CircularProgressIndicator())
-                        : SingleChildScrollView(
-                            child: DataTable(
-                              columns: const [
-                                DataColumn(label: Text('ดู')),
-                                DataColumn(label: Text('วันที่ทำงาน')),
-                                DataColumn(label: Text('พนักงาน')),
-                                DataColumn(label: Text('เหตุผล')),
-                                DataColumn(label: Text('ผู้เริ่มคำขอ')),
-                                DataColumn(label: Text('สถานะ')),
-                              ],
-                              rows: items
-                                  .map(
-                                    (row) => DataRow(
-                                      cells: [
-                                        DataCell(
-                                          IconButton(
-                                            onPressed: () => open(row),
-                                            icon: const Icon(
-                                              Icons.visibility_outlined,
-                                            ),
-                                          ),
-                                        ),
-                                        DataCell(
-                                          Text(
-                                            displayDate('${row['workDate']}'),
-                                          ),
-                                        ),
-                                        DataCell(
-                                          Text(
-                                            '${row['employeeCode']} — ${row['employeeName']}',
-                                          ),
-                                        ),
-                                        DataCell(Text('${row['reasonName']}')),
-                                        DataCell(
-                                          Text(
-                                            row['initiationModeCode'] == 'SELF'
-                                                ? 'พนักงาน'
-                                                : 'ผู้ดูแลทำแทน',
-                                          ),
-                                        ),
-                                        DataCell(
-                                          Text(
-                                            statusText('${row['statusCode']}'),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  )
-                                  .toList(),
-                            ),
-                          ),
-                  ),
-                ),
                 SizedBox(
-                  height: timeUiTokens.paginationHeight,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      IconButton(
-                        onPressed: page > 1
-                            ? () => load(targetPage: page - 1)
-                            : null,
-                        icon: const Icon(Icons.chevron_left),
+                  width: 220,
+                  child: DropdownButtonFormField<String?>(
+                    initialValue: status,
+                    decoration: const InputDecoration(labelText: 'สถานะคำขอ'),
+                    items: [
+                      if (!approval)
+                        const DropdownMenuItem(
+                          value: null,
+                          child: Text('ทั้งหมด'),
+                        ),
+                      const DropdownMenuItem(
+                        value: 'PENDING',
+                        child: Text('รออนุมัติ'),
                       ),
-                      Text('หน้า $page จาก $pageCount'),
-                      IconButton(
-                        onPressed: page < pageCount
-                            ? () => load(targetPage: page + 1)
-                            : null,
-                        icon: const Icon(Icons.chevron_right),
+                      const DropdownMenuItem(
+                        value: 'APPROVED',
+                        child: Text('อนุมัติแล้ว'),
+                      ),
+                      const DropdownMenuItem(
+                        value: 'REJECTED',
+                        child: Text('ไม่อนุมัติ'),
+                      ),
+                      const DropdownMenuItem(
+                        value: 'CANCELLED',
+                        child: Text('ยกเลิก'),
                       ),
                     ],
+                    onChanged: (value) => setState(() => status = value),
                   ),
                 ),
+                FilledButton.icon(
+                  onPressed: loading ? null : () => load(),
+                  icon: const Icon(Icons.search),
+                  label: const Text('ค้นหา'),
+                ),
               ],
+            ),
+            table: loading
+                ? const Center(child: CircularProgressIndicator())
+                : SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: DataTable(
+                      headingTextStyle: timeUiTokens.tableStyle.copyWith(
+                        color: timeUiTokens.primaryColor,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      dataTextStyle: timeUiTokens.tableStyle,
+                      dividerThickness: 1,
+                      headingRowColor: WidgetStatePropertyAll(
+                        timeUiTokens.primaryColor.withValues(alpha: 0.10),
+                      ),
+                      columns: const [
+                        DataColumn(label: Text('ดู')),
+                        DataColumn(label: Text('วันที่ทำงาน')),
+                        DataColumn(label: Text('พนักงาน')),
+                        DataColumn(label: Text('เหตุผล')),
+                        DataColumn(label: Text('ผู้เริ่มคำขอ')),
+                        DataColumn(label: Text('สถานะ')),
+                      ],
+                      rows: items
+                          .map(
+                            (row) => DataRow(
+                              cells: [
+                                DataCell(
+                                  IconButton(
+                                    onPressed: () => open(row),
+                                    icon: const Icon(Icons.visibility_outlined),
+                                  ),
+                                ),
+                                DataCell(
+                                  Text(displayDate('${row['workDate']}')),
+                                ),
+                                DataCell(
+                                  Text(
+                                    '${row['employeeCode']} — ${row['employeeName']}',
+                                  ),
+                                ),
+                                DataCell(Text('${row['reasonName']}')),
+                                DataCell(
+                                  Text(
+                                    row['initiationModeCode'] == 'SELF'
+                                        ? 'พนักงาน'
+                                        : 'ผู้ดูแลทำแทน',
+                                  ),
+                                ),
+                                DataCell(
+                                  Text(statusText('${row['statusCode']}')),
+                                ),
+                              ],
+                            ),
+                          )
+                          .toList(),
+                    ),
+                  ),
+            pagination: LaooPaginationCard(
+              tokens: timeUiTokens.workspace,
+              page: page,
+              pageCount: pageCount,
+              pageSize: timePageSize,
+              total: total,
+              onPrevious: page > 1 ? () => load(targetPage: page - 1) : null,
+              onNext: page < pageCount
+                  ? () => load(targetPage: page + 1)
+                  : null,
             ),
           ),
           if (message != null)

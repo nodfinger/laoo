@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:laoo_shared_core/laoo_shared_core.dart';
+import 'package:laoo_shared_workspace_ui/laoo_shared_workspace_ui.dart';
 import '../time/time_feature_host.dart';
 import 'time_reason_repository.dart';
 
@@ -156,179 +157,141 @@ class _TimeReasonPageState extends State<TimeReasonPage> {
       activeMenu: widget.menuCode,
       child: Stack(
         children: [
-          Padding(
-            padding: timeUiTokens.contentMargin,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+          LaooListWorkspace(
+            tokens: timeUiTokens.workspace,
+            caption: TimeCaptionCard(
+              api: api,
+              menuCode: widget.menuCode,
+              caption: caption,
+              trailing: actions?['create'] == true
+                  ? FilledButton.icon(
+                      onPressed: () => edit(),
+                      icon: const Icon(Icons.add),
+                      label: const Text('เพิ่ม'),
+                    )
+                  : null,
+            ),
+            filter: Wrap(
+              spacing: timeUiTokens.itemSpacing,
+              runSpacing: timeUiTokens.itemSpacing,
+              crossAxisAlignment: WrapCrossAlignment.end,
               children: [
-                TimeCaptionCard(
-                  api: api,
-                  menuCode: widget.menuCode,
-                  caption: caption,
-                  trailing: actions?['create'] == true
-                      ? FilledButton.icon(
-                          onPressed: () => edit(),
-                          icon: const Icon(Icons.add),
-                          label: const Text('เพิ่ม'),
-                        )
-                      : null,
-                ),
-                SizedBox(height: timeUiTokens.cardSpacing),
-                Card(
-                  margin: EdgeInsets.zero,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(timeUiTokens.radius),
-                  ),
-                  child: Padding(
-                    padding: timeUiTokens.cardPadding,
-                    child: Wrap(
-                      spacing: timeUiTokens.itemSpacing,
-                      runSpacing: timeUiTokens.itemSpacing,
-                      crossAxisAlignment: WrapCrossAlignment.end,
-                      children: [
-                        SizedBox(
-                          width: 300,
-                          child: TextField(
-                            controller: search,
-                            onSubmitted: (_) => load(),
-                            decoration: const InputDecoration(
-                              labelText: 'ค้นหา',
-                              prefixIcon: Icon(Icons.search),
-                            ),
-                          ),
-                        ),
-                        SizedBox(
-                          width: 180,
-                          child: DropdownButtonFormField<bool?>(
-                            initialValue: active,
-                            decoration: const InputDecoration(
-                              labelText: 'สถานะ',
-                            ),
-                            items: const [
-                              DropdownMenuItem(
-                                value: true,
-                                child: Text('ใช้งาน'),
-                              ),
-                              DropdownMenuItem(
-                                value: false,
-                                child: Text('ไม่ใช้งาน'),
-                              ),
-                              DropdownMenuItem(
-                                value: null,
-                                child: Text('ทั้งหมด'),
-                              ),
-                            ],
-                            onChanged: (value) =>
-                                setState(() => active = value),
-                          ),
-                        ),
-                        FilledButton.icon(
-                          onPressed: loading ? null : () => load(),
-                          icon: const Icon(Icons.search),
-                          label: const Text('ค้นหา'),
-                        ),
-                      ],
+                SizedBox(
+                  width: 300,
+                  child: TextField(
+                    controller: search,
+                    onSubmitted: (_) => load(),
+                    decoration: const InputDecoration(
+                      labelText: 'ค้นหา',
+                      prefixIcon: Icon(Icons.search),
                     ),
-                  ),
-                ),
-                SizedBox(height: timeUiTokens.cardSpacing),
-                Expanded(
-                  child: Card(
-                    margin: EdgeInsets.zero,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(timeUiTokens.radius),
-                    ),
-                    child: loading
-                        ? const Center(child: CircularProgressIndicator())
-                        : SingleChildScrollView(
-                            child: DataTable(
-                              columns: const [
-                                DataColumn(label: Text('จัดการ')),
-                                DataColumn(label: Text('รหัส')),
-                                DataColumn(label: Text('ชื่อเหตุผล')),
-                                DataColumn(label: Text('หมายเหตุ')),
-                                DataColumn(label: Text('หลักฐาน')),
-                                DataColumn(label: Text('สถานะ')),
-                              ],
-                              rows: items
-                                  .map(
-                                    (row) => DataRow(
-                                      cells: [
-                                        DataCell(
-                                          Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              if (actions?['edit'] == true)
-                                                IconButton(
-                                                  onPressed: () => edit(row),
-                                                  icon: const Icon(
-                                                    Icons.edit_outlined,
-                                                  ),
-                                                ),
-                                              if (actions?['delete'] == true)
-                                                IconButton(
-                                                  onPressed: () => remove(row),
-                                                  icon: const Icon(
-                                                    Icons.delete_outline,
-                                                    color: Colors.red,
-                                                  ),
-                                                ),
-                                            ],
-                                          ),
-                                        ),
-                                        DataCell(Text('${row['reasonCode']}')),
-                                        DataCell(Text('${row['reasonName']}')),
-                                        DataCell(
-                                          Icon(
-                                            row['requireRemark'] == true
-                                                ? Icons.check
-                                                : Icons.remove,
-                                          ),
-                                        ),
-                                        DataCell(
-                                          Icon(
-                                            row['requireEvidence'] == true
-                                                ? Icons.check
-                                                : Icons.remove,
-                                          ),
-                                        ),
-                                        DataCell(
-                                          Text(
-                                            row['isActive'] == true
-                                                ? 'ใช้งาน'
-                                                : 'ไม่ใช้งาน',
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  )
-                                  .toList(),
-                            ),
-                          ),
                   ),
                 ),
                 SizedBox(
-                  height: timeUiTokens.paginationHeight,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      IconButton(
-                        onPressed: page > 1
-                            ? () => load(targetPage: page - 1)
-                            : null,
-                        icon: const Icon(Icons.chevron_left),
-                      ),
-                      Text('หน้า $page จาก $pageCount'),
-                      IconButton(
-                        onPressed: page < pageCount
-                            ? () => load(targetPage: page + 1)
-                            : null,
-                        icon: const Icon(Icons.chevron_right),
-                      ),
+                  width: 180,
+                  child: DropdownButtonFormField<bool?>(
+                    initialValue: active,
+                    decoration: const InputDecoration(labelText: 'สถานะ'),
+                    items: const [
+                      DropdownMenuItem(value: true, child: Text('ใช้งาน')),
+                      DropdownMenuItem(value: false, child: Text('ไม่ใช้งาน')),
+                      DropdownMenuItem(value: null, child: Text('ทั้งหมด')),
                     ],
+                    onChanged: (value) => setState(() => active = value),
                   ),
                 ),
+                FilledButton.icon(
+                  onPressed: loading ? null : () => load(),
+                  icon: const Icon(Icons.search),
+                  label: const Text('ค้นหา'),
+                ),
               ],
+            ),
+            table: loading
+                ? const Center(child: CircularProgressIndicator())
+                : SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: DataTable(
+                      headingTextStyle: timeUiTokens.tableStyle.copyWith(
+                        color: timeUiTokens.primaryColor,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      dataTextStyle: timeUiTokens.tableStyle,
+                      dividerThickness: 1,
+                      headingRowColor: WidgetStatePropertyAll(
+                        timeUiTokens.primaryColor.withValues(alpha: 0.10),
+                      ),
+                      columns: const [
+                        DataColumn(label: Text('จัดการ')),
+                        DataColumn(label: Text('รหัส')),
+                        DataColumn(label: Text('ชื่อเหตุผล')),
+                        DataColumn(label: Text('หมายเหตุ')),
+                        DataColumn(label: Text('หลักฐาน')),
+                        DataColumn(label: Text('สถานะ')),
+                      ],
+                      rows: items
+                          .map(
+                            (row) => DataRow(
+                              cells: [
+                                DataCell(
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      if (actions?['edit'] == true)
+                                        IconButton(
+                                          onPressed: () => edit(row),
+                                          icon: const Icon(Icons.edit_outlined),
+                                        ),
+                                      if (actions?['delete'] == true)
+                                        IconButton(
+                                          onPressed: () => remove(row),
+                                          icon: const Icon(
+                                            Icons.delete_outline,
+                                            color: Colors.red,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                                DataCell(Text('${row['reasonCode']}')),
+                                DataCell(Text('${row['reasonName']}')),
+                                DataCell(
+                                  Icon(
+                                    row['requireRemark'] == true
+                                        ? Icons.check
+                                        : Icons.remove,
+                                  ),
+                                ),
+                                DataCell(
+                                  Icon(
+                                    row['requireEvidence'] == true
+                                        ? Icons.check
+                                        : Icons.remove,
+                                  ),
+                                ),
+                                DataCell(
+                                  Text(
+                                    row['isActive'] == true
+                                        ? 'ใช้งาน'
+                                        : 'ไม่ใช้งาน',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                          .toList(),
+                    ),
+                  ),
+            pagination: LaooPaginationCard(
+              tokens: timeUiTokens.workspace,
+              page: page,
+              pageCount: pageCount,
+              pageSize: timePageSize,
+              total: total,
+              onPrevious: page > 1 ? () => load(targetPage: page - 1) : null,
+              onNext: page < pageCount
+                  ? () => load(targetPage: page + 1)
+                  : null,
             ),
           ),
           if (message != null)

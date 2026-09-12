@@ -1,0 +1,16 @@
+name: laoo_shared_workspace_ui
+description: Shared workspace layout primitives for LAOO business projects.
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
