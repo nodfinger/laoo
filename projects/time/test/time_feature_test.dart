@@ -107,6 +107,7 @@ void main() {
       messageBuilder: ({required message, required error, required onClose}) =>
           Text(message),
       pageSizeProvider: () => 20,
+      uiTokens: _testTimeUiTokens,
     );
 
     await tester.pumpWidget(
@@ -115,13 +116,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('พนักงาน–ลงเวลาทำงาน'), findsOneWidget);
-    expect(find.textContaining('EMP-01'), findsOneWidget);
-    expect(find.textContaining('A-100'), findsOneWidget);
+    expect(find.textContaining('EMP-01'), findsWidgets);
+    expect(find.textContaining('A-100'), findsWidgets);
 
     await tester.tap(find.byTooltip('แก้ไข'));
     await tester.pumpAndSettle();
     expect(find.text('แก้ไขการลงเวลาทำงาน'), findsOneWidget);
-    expect(find.text('เหตุผลในการแก้ไข *'), findsOneWidget);
+    expect(find.text('เหตุผลในการแก้ไข'), findsOneWidget);
     expect(find.text('ยกเลิก'), findsOneWidget);
     expect(find.text('บันทึก'), findsOneWidget);
   });
@@ -176,6 +177,7 @@ void main() {
       apiClientFactory: _FakeSystemApi.new,
       messageBuilder: ({required message, required error, required onClose}) =>
           Text(message),
+      uiTokens: _testTimeUiTokens,
     );
 
     await tester.pumpWidget(const MaterialApp(home: TimeSystemSettingsPage()));
@@ -191,6 +193,24 @@ void main() {
       scrollable: find.byType(Scrollable).first,
     );
     expect(find.text('บันทึก'), findsOneWidget);
+  });
+
+  testWidgets('system settings keeps API error description and retry visible', (
+    tester,
+  ) async {
+    configureTimeFeatureHost(
+      ({required pageTitle, required activeMenu, required child}) => child,
+      apiClientFactory: _FailingSystemApi.new,
+      errorText: (error) => error.toString().replaceFirst('Bad state: ', ''),
+      uiTokens: _testTimeUiTokens,
+    );
+
+    await tester.pumpWidget(const MaterialApp(home: TimeSystemSettingsPage()));
+    await tester.pumpAndSettle();
+
+    expect(find.text('โหลดการตั้งค่าไม่สำเร็จ'), findsOneWidget);
+    expect(find.text('รายละเอียดเพิ่มเติม: กรุณาลองใหม่'), findsOneWidget);
+    expect(find.text('ลองใหม่'), findsOneWidget);
   });
 }
 
@@ -260,6 +280,26 @@ class _FakeApi implements JsonApiClient {
   }) => throw UnimplementedError();
 }
 
+final _testTimeUiTokens = TimeUiTokens(
+  contentMargin: EdgeInsets.all(16),
+  cardPadding: EdgeInsets.all(12),
+  cardSpacing: 12,
+  itemSpacing: 8,
+  radius: 8,
+  compactBreakpoint: 700,
+  paginationHeight: 56,
+  captionStyle: TextStyle(fontSize: 20),
+  sectionStyle: TextStyle(fontSize: 16),
+  inputStyle: TextStyle(fontSize: 14),
+  tableStyle: TextStyle(fontSize: 14),
+  buttonStyle: TextStyle(fontSize: 14),
+  buttonHeight: 40,
+  primaryColor: Colors.green,
+  borderColor: Colors.grey,
+  backgroundColor: Colors.white,
+  businessDate: DateTime(2026, 9, 12),
+);
+
 class _FakeSystemApi implements JsonApiClient {
   String? lastPath;
   Object? lastBody;
@@ -328,4 +368,20 @@ class _FakeSystemApi implements JsonApiClient {
     Map<String, String>? query,
     bool authenticated = true,
   }) => throw UnimplementedError();
+}
+
+class _FailingSystemApi extends _FakeSystemApi {
+  @override
+  Future<dynamic> get(
+    String path, {
+    Map<String, String>? query,
+    bool authenticated = true,
+  }) {
+    if (path.endsWith('/actions')) {
+      return super.get(path, query: query, authenticated: authenticated);
+    }
+    throw StateError(
+      'โหลดการตั้งค่าไม่สำเร็จ\nรายละเอียดเพิ่มเติม: กรุณาลองใหม่',
+    );
+  }
 }

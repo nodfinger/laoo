@@ -18,6 +18,7 @@ public sealed class TimeSystemSettingsController(IConfiguration configuration)
     : ControllerBase
 {
     private const string MenuCode = "28002";
+    private static readonly TimeSpan ThailandOffset = TimeSpan.FromHours(7);
     private static readonly string[] ApprovalProcesses =
         ["LEAVE", "TIME", "OT", "ENTITLEMENT", "PERIOD"];
     private static readonly string[] RequestProcesses =
@@ -65,7 +66,7 @@ public sealed class TimeSystemSettingsController(IConfiguration configuration)
         if (!TryScope(out var companyId, out _)) return Forbid();
         await using var connection = await Open(token);
         if (!await Can(connection, "VIEW", token)) return Forbid();
-        var date = effectiveDate ?? DateOnly.FromDateTime(DateTime.Today);
+        var date = effectiveDate ?? ThailandBusinessDate();
         var state = await LoadState(connection, null, companyId, date, token);
         return Ok(new
         {
@@ -88,7 +89,7 @@ public sealed class TimeSystemSettingsController(IConfiguration configuration)
         if (!TryScope(out var companyId, out var userId)) return Forbid();
         var reason = Clean(request.Reason);
         var defaultProfile = Normalize(request.DefaultProfileCode);
-        if (request.EffectiveFrom < DateOnly.FromDateTime(DateTime.Today))
+        if (request.EffectiveFrom < ThailandBusinessDate())
             return BadRequest(new { message = "วันที่เริ่มใช้ต้องไม่ย้อนหลัง" });
         if (reason is null || reason.Length > 1000)
             return BadRequest(new { message = "กรุณาระบุเหตุผลไม่เกิน 1,000 ตัวอักษร" });
@@ -152,10 +153,10 @@ public sealed class TimeSystemSettingsController(IConfiguration configuration)
             await using var audit = new SqlCommand("""
 INSERT dbo.TDTMAdministrativeOverride
     (CompanyID,OverrideTypeCode,TargetTypeCode,BeforeJson,AfterJson,Reason,
-     ActorUserID,CorrelationID)
+     ActorUserID,CorrelationID,OccurredDate)
 VALUES
     (@CompanyID,'APPROVAL_PROFILE_CHANGE','TIME_SYSTEM_SETTINGS',
-     @BeforeJson,@AfterJson,@Reason,@UserID,NEWID());
+     @BeforeJson,@AfterJson,@Reason,@UserID,NEWID(),SYSUTCDATETIME());
 """, connection, transaction);
             Add(audit, "@CompanyID", SqlDbType.BigInt, companyId);
             Add(audit, "@BeforeJson", SqlDbType.NVarChar,
@@ -265,13 +266,15 @@ WHERE CompanyID=@CompanyID AND IsActive=1 AND EffectiveFrom<=@Date
         var activeEmployees = 0;
         var withoutLogin = 0;
         await using (var command = new SqlCommand("""
-SELECT COUNT_BIG(1),SUM(CASE WHEN EXISTS
+SELECT COUNT_BIG(1),COALESCE(SUM(CASE WHEN LoginUser.EmployeeID IS NULL THEN 1 ELSE 0 END),0)
+FROM dbo.TDADEmployee E
+OUTER APPLY
 (
-    SELECT 1 FROM dbo.TDADUserEmployee UE
+    SELECT TOP (1) UE.EmployeeID
+    FROM dbo.TDADUserEmployee UE
     JOIN dbo.TDADUser U ON U.UserID=UE.UserID AND U.CompanyID=UE.CompanyID AND U.IsActive=1
     WHERE UE.CompanyID=E.CompanyID AND UE.EmployeeID=E.EmployeeID AND UE.IsActive=1
-) THEN 0 ELSE 1 END)
-FROM dbo.TDADEmployee E
+) LoginUser
 WHERE E.CompanyID=@CompanyID AND E.IsActive=1;
 """, connection, transaction))
         {
@@ -332,7 +335,7 @@ WHERE E.CompanyID=@CompanyID AND E.IsActive=1;
         {
             await using var update = new SqlCommand($"""
 UPDATE dbo.{table}
-SET {valueColumn}=@Value,UpdateDate=SYSDATETIME(),UpdateBy=@UserID
+SET {valueColumn}=@Value,UpdateDate=SYSUTCDATETIME(),UpdateBy=@UserID
 WHERE {idColumn}=@ID AND CompanyID=@CompanyID;
 """, connection, transaction);
             BindVersion(update, companyId, process, effectiveFrom, userId);
@@ -379,7 +382,7 @@ VALUES
             await using var deactivate = new SqlCommand($"""
 UPDATE dbo.{table}
 SET EffectiveTo=@EffectiveFrom,IsActive=0,
-    UpdateDate=SYSDATETIME(),UpdateBy=@UserID
+    UpdateDate=SYSUTCDATETIME(),UpdateBy=@UserID
 WHERE {idColumn}=@ID AND CompanyID=@CompanyID;
 """, connection, transaction);
             BindVersion(deactivate, companyId, null, effectiveFrom, userId);
@@ -399,7 +402,7 @@ WHERE {idColumn}=@ID AND CompanyID=@CompanyID;
         await using var command = new SqlCommand($"""
 UPDATE dbo.{table}
 SET EffectiveTo=DATEADD(day,-1,@EffectiveFrom),
-    UpdateDate=SYSDATETIME(),UpdateBy=@UserID
+    UpdateDate=SYSUTCDATETIME(),UpdateBy=@UserID
 WHERE {idColumn}=@ID AND CompanyID=@CompanyID;
 """, connection, transaction);
         BindVersion(command, companyId, null, effectiveFrom, userId);
@@ -462,6 +465,9 @@ ORDER BY EffectiveFrom DESC,{idColumn} DESC;
             entry => Normalize(entry.Key), entry => Normalize(entry.Value));
 
     private static string Normalize(string value) => value.Trim().ToUpperInvariant();
+
+    private static DateOnly ThailandBusinessDate() =>
+        DateOnly.FromDateTime(DateTime.UtcNow.Add(ThailandOffset));
 
     private static string? Clean(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();

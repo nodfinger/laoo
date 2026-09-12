@@ -21,7 +21,7 @@ public sealed class EmployeeTimeSettingsController(IConfiguration configuration)
         bool RequiresAttendance,
         string? DeviceCode,
         DateOnly EffectiveFrom,
-        string Reason,
+        string? Reason,
         string? RequirementRowVersion,
         string? DeviceCodeRowVersion);
 
@@ -49,6 +49,8 @@ public sealed class EmployeeTimeSettingsController(IConfiguration configuration)
         [FromQuery] string? search,
         [FromQuery] bool? isActive,
         [FromQuery] string? requirementCode,
+        [FromQuery] long? divisionOrgUnitId,
+        [FromQuery] long? departmentOrgUnitId,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 30,
         CancellationToken token = default)
@@ -69,6 +71,10 @@ public sealed class EmployeeTimeSettingsController(IConfiguration configuration)
         search = Clean(search);
         const string fromSql = """
 FROM dbo.TDADEmployee E
+LEFT JOIN dbo.TDADOrganizationUnit DV
+  ON DV.OrgUnitID=E.DivisionOrgUnitID AND DV.CompanyID=E.CompanyID
+LEFT JOIN dbo.TDADOrganizationUnit DP
+  ON DP.OrgUnitID=E.DepartmentOrgUnitID AND DP.CompanyID=E.CompanyID
 OUTER APPLY
 (
     SELECT TOP (1) R.AttendanceRequirementID,R.RequirementCode,
@@ -76,8 +82,8 @@ OUTER APPLY
            CONVERT(varchar(32),R.RowVersion,2) RowVersion
     FROM dbo.TDTMAttendanceRequirement R
     WHERE R.CompanyID=E.CompanyID AND R.EmployeeID=E.EmployeeID
-      AND R.EffectiveFrom<=CONVERT(date,GETDATE())
-      AND (R.EffectiveTo IS NULL OR R.EffectiveTo>=CONVERT(date,GETDATE()))
+      AND R.EffectiveFrom<=@BusinessDate
+      AND (R.EffectiveTo IS NULL OR R.EffectiveTo>=@BusinessDate)
     ORDER BY R.EffectiveFrom DESC,R.AttendanceRequirementID DESC
 ) AR
 OUTER APPLY
@@ -87,16 +93,20 @@ OUTER APPLY
            CONVERT(varchar(32),D.RowVersion,2) RowVersion
     FROM dbo.TDTMAttendanceDeviceCodeAssignment D
     WHERE D.CompanyID=E.CompanyID AND D.EmployeeID=E.EmployeeID
-      AND D.EffectiveFromDateTime<=GETDATE()
-      AND (D.EffectiveToDateTime IS NULL OR D.EffectiveToDateTime>GETDATE())
+      AND D.EffectiveFromDateTime<=@BusinessNow
+      AND (D.EffectiveToDateTime IS NULL OR D.EffectiveToDateTime>@BusinessNow)
     ORDER BY D.EffectiveFromDateTime DESC,D.DeviceCodeAssignmentID DESC
 ) DC
 WHERE E.CompanyID=@CompanyID
   AND (@IsActive IS NULL OR E.IsActive=@IsActive)
   AND (@RequirementCode IS NULL OR ISNULL(AR.RequirementCode,'REQUIRED')=@RequirementCode)
+  AND (@DivisionOrgUnitID IS NULL OR E.DivisionOrgUnitID=@DivisionOrgUnitID)
+  AND (@DepartmentOrgUnitID IS NULL OR E.DepartmentOrgUnitID=@DepartmentOrgUnitID)
   AND (@Search IS NULL OR E.EmployeeCode LIKE N'%'+@Search+N'%'
        OR E.FullName LIKE N'%'+@Search+N'%'
        OR E.NickName LIKE N'%'+@Search+N'%'
+       OR DV.NameTH LIKE N'%'+@Search+N'%'
+       OR DP.NameTH LIKE N'%'+@Search+N'%'
        OR DC.DeviceCode LIKE N'%'+@Search+N'%')
   AND
   (
@@ -111,8 +121,8 @@ WHERE E.CompanyID=@CompanyID
           SELECT 1
           FROM dbo.TDTMEmployeeDataScopeGrant G
           WHERE G.CompanyID=@CompanyID AND G.IsActive=1
-            AND G.EffectiveFrom<=GETDATE()
-            AND (G.EffectiveTo IS NULL OR G.EffectiveTo>GETDATE())
+            AND G.EffectiveFrom<=@BusinessNow
+            AND (G.EffectiveTo IS NULL OR G.EffectiveTo>@BusinessNow)
             AND
             (
                 G.UserID=@UserID
@@ -122,8 +132,8 @@ WHERE E.CompanyID=@CompanyID
                     FROM dbo.TDADUserEmployee UE
                     JOIN dbo.TDADEmployeeRoleGroup ERG
                       ON ERG.EmployeeID=UE.EmployeeID AND ERG.IsActive=1
-                     AND ERG.EffectiveFrom<=CONVERT(date,GETDATE())
-                     AND (ERG.EffectiveTo IS NULL OR ERG.EffectiveTo>=CONVERT(date,GETDATE()))
+                     AND ERG.EffectiveFrom<=@BusinessDate
+                     AND (ERG.EffectiveTo IS NULL OR ERG.EffectiveTo>=@BusinessDate)
                     WHERE UE.CompanyID=@CompanyID AND UE.UserID=@UserID
                       AND UE.IsActive=1
                 )
@@ -147,11 +157,14 @@ WHERE E.CompanyID=@CompanyID
 
         await using var count = new SqlCommand(
             $"SELECT COUNT_BIG(1) {fromSql}", connection);
-        BindFilters(count, companyId, userId, search, isActive, requirementCode);
+        BindFilters(count, companyId, userId, search, isActive, requirementCode,
+            divisionOrgUnitId, departmentOrgUnitId);
         var total = Convert.ToInt64(await count.ExecuteScalarAsync(token));
 
         await using var command = new SqlCommand($"""
-SELECT E.EmployeeID,E.EmployeeCode,E.FullName,E.NickName,E.IsActive,
+SELECT E.EmployeeID,E.EmployeeCode,E.FullName,E.NickName,
+       E.DivisionOrgUnitID,DV.NameTH DivisionName,
+       E.DepartmentOrgUnitID,DP.NameTH DepartmentName,E.IsActive,
        ISNULL(AR.RequirementCode,'REQUIRED') RequirementCode,
        AR.EffectiveFrom,AR.EffectiveTo,AR.Reason,AR.RowVersion RequirementRowVersion,
        DC.DeviceCode,DC.EffectiveFromDateTime,DC.RowVersion DeviceCodeRowVersion,
@@ -166,7 +179,8 @@ SELECT E.EmployeeID,E.EmployeeCode,E.FullName,E.NickName,E.IsActive,
 ORDER BY E.EmployeeCode,E.EmployeeID
 OFFSET @Offset ROWS FETCH NEXT @Take ROWS ONLY;
 """, connection);
-        BindFilters(command, companyId, userId, search, isActive, requirementCode);
+        BindFilters(command, companyId, userId, search, isActive, requirementCode,
+            divisionOrgUnitId, departmentOrgUnitId);
         command.Parameters.Add("@Offset", SqlDbType.Int).Value = (page - 1) * pageSize;
         command.Parameters.Add("@Take", SqlDbType.Int).Value = pageSize;
 
@@ -180,21 +194,55 @@ OFFSET @Offset ROWS FETCH NEXT @Take ROWS ONLY;
                 employeeCode = reader.GetString(1),
                 fullName = reader.GetString(2),
                 nickName = Text(reader, 3),
-                isActive = reader.GetBoolean(4),
-                requiresAttendance = reader.GetString(5) == "REQUIRED",
-                requirementCode = reader.GetString(5),
-                requirementEffectiveFrom = Date(reader, 6),
-                requirementEffectiveTo = Date(reader, 7),
-                requirementReason = Text(reader, 8),
-                requirementRowVersion = Text(reader, 9),
-                deviceCode = Text(reader, 10),
-                deviceCodeEffectiveFrom = DateTimeValue(reader, 11),
-                deviceCodeRowVersion = Text(reader, 12),
-                hasActiveLogin = reader.GetBoolean(13),
+                divisionOrgUnitId = Long(reader, 4),
+                divisionName = Text(reader, 5),
+                departmentOrgUnitId = Long(reader, 6),
+                departmentName = Text(reader, 7),
+                isActive = reader.GetBoolean(8),
+                requiresAttendance = reader.GetString(9) == "REQUIRED",
+                requirementCode = reader.GetString(9),
+                requirementEffectiveFrom = Date(reader, 10),
+                requirementEffectiveTo = Date(reader, 11),
+                requirementReason = Text(reader, 12),
+                requirementRowVersion = Text(reader, 13),
+                deviceCode = Text(reader, 14),
+                deviceCodeEffectiveFrom = DateTimeValue(reader, 15),
+                deviceCodeRowVersion = Text(reader, 16),
+                hasActiveLogin = reader.GetBoolean(17),
             });
         }
 
         return Ok(new { total, page, pageSize, items });
+    }
+
+    [HttpGet("organization-filters")]
+    public async Task<IActionResult> OrganizationFilters(CancellationToken token)
+    {
+        if (!TryScope(out var companyId, out _)) return Forbid();
+        await using var connection = await Open(token);
+        if (!await CompanyMenuAccess.IsAllowedAsync(
+                connection, User, MenuCode, "VIEW", token))
+            return Forbid();
+
+        await using var command = new SqlCommand("""
+SELECT OrgUnitID,UnitType,NameTH,UnitCode
+FROM dbo.TDADOrganizationUnit
+WHERE CompanyID=@CompanyID AND IsActive=1 AND UnitType IN(N'DIV',N'DEP')
+ORDER BY UnitType,NameTH,UnitCode,OrgUnitID;
+""", connection);
+        Add(command, "@CompanyID", SqlDbType.BigInt, companyId);
+        await using var reader = await command.ExecuteReaderAsync(token);
+        var divisions = new List<object>();
+        var departments = new List<object>();
+        while (await reader.ReadAsync(token))
+        {
+            var item = new { id = reader.GetInt64(0), name = reader.GetString(2) };
+            if (string.Equals(reader.GetString(1), "DIV", StringComparison.OrdinalIgnoreCase))
+                divisions.Add(item);
+            else
+                departments.Add(item);
+        }
+        return Ok(new { divisions, departments });
     }
 
     [HttpPut("{employeeId:long}")]
@@ -206,12 +254,11 @@ OFFSET @Offset ROWS FETCH NEXT @Take ROWS ONLY;
         if (!TryScope(out var companyId, out var userId)) return Forbid();
         if (employeeId <= 0) return BadRequest(new { message = "รหัสพนักงานไม่ถูกต้อง" });
         var reason = Clean(request.Reason);
+        var auditReason = reason ?? "ไม่ระบุเหตุผล";
         var deviceCode = Clean(request.DeviceCode);
-        if (reason is null)
-            return BadRequest(new { message = "กรุณาระบุเหตุผลในการแก้ไข" });
-        if (reason.Length > 1000 || deviceCode?.Length > 100)
+        if (auditReason.Length > 1000 || deviceCode?.Length > 100)
             return BadRequest(new { message = "ข้อมูลยาวเกินกำหนด" });
-        if (request.EffectiveFrom < DateOnly.FromDateTime(DateTime.Today))
+        if (request.EffectiveFrom < ThailandBusinessDate())
             return BadRequest(new { message = "วันที่เริ่มใช้ต้องไม่ย้อนหลัง" });
 
         await using var connection = await Open(token);
@@ -256,15 +303,15 @@ OFFSET @Offset ROWS FETCH NEXT @Take ROWS ONLY;
             });
             await using var audit = new SqlCommand("""
 INSERT dbo.TDTMEmployeeTimeSettingAudit
-    (CompanyID,EmployeeID,SettingTypeCode,BeforeJson,AfterJson,Reason,ActorUserID)
+    (CompanyID,EmployeeID,SettingTypeCode,BeforeJson,AfterJson,Reason,ActorUserID,OccurredDate)
 VALUES
-    (@CompanyID,@EmployeeID,'EMPLOYEE_TIME_SETTINGS',@BeforeJson,@AfterJson,@Reason,@UserID);
+    (@CompanyID,@EmployeeID,'EMPLOYEE_TIME_SETTINGS',@BeforeJson,@AfterJson,@Reason,@UserID,SYSUTCDATETIME());
 """, connection, transaction);
             Add(audit, "@CompanyID", SqlDbType.BigInt, companyId);
             Add(audit, "@EmployeeID", SqlDbType.BigInt, employeeId);
             Add(audit, "@BeforeJson", SqlDbType.NVarChar, before, -1);
             Add(audit, "@AfterJson", SqlDbType.NVarChar, after, -1);
-            Add(audit, "@Reason", SqlDbType.NVarChar, reason, 1000);
+            Add(audit, "@Reason", SqlDbType.NVarChar, auditReason, 1000);
             Add(audit, "@UserID", SqlDbType.BigInt, userId);
             await audit.ExecuteNonQueryAsync(token);
 
@@ -336,8 +383,8 @@ SELECT CASE WHEN EXISTS
           (
               SELECT 1 FROM dbo.TDTMEmployeeDataScopeGrant G
               WHERE G.CompanyID=@CompanyID AND G.IsActive=1
-                AND G.EffectiveFrom<=GETDATE()
-                AND (G.EffectiveTo IS NULL OR G.EffectiveTo>GETDATE())
+                AND G.EffectiveFrom<=@BusinessNow
+                AND (G.EffectiveTo IS NULL OR G.EffectiveTo>@BusinessNow)
                 AND
                 (
                     G.UserID=@UserID
@@ -347,8 +394,8 @@ SELECT CASE WHEN EXISTS
                         FROM dbo.TDADUserEmployee UE
                         JOIN dbo.TDADEmployeeRoleGroup ERG
                           ON ERG.EmployeeID=UE.EmployeeID AND ERG.IsActive=1
-                         AND ERG.EffectiveFrom<=CONVERT(date,GETDATE())
-                         AND (ERG.EffectiveTo IS NULL OR ERG.EffectiveTo>=CONVERT(date,GETDATE()))
+                         AND ERG.EffectiveFrom<=@BusinessDate
+                         AND (ERG.EffectiveTo IS NULL OR ERG.EffectiveTo>=@BusinessDate)
                         WHERE UE.CompanyID=@CompanyID AND UE.UserID=@UserID AND UE.IsActive=1
                     )
                 )
@@ -372,6 +419,7 @@ SELECT CASE WHEN EXISTS
         Add(command, "@CompanyID", SqlDbType.BigInt, companyId);
         Add(command, "@UserID", SqlDbType.BigInt, userId);
         Add(command, "@EmployeeID", SqlDbType.BigInt, employeeId);
+        AddBusinessTime(command);
         return Convert.ToBoolean(await command.ExecuteScalarAsync(token));
     }
 
@@ -429,7 +477,7 @@ WHERE E.CompanyID=@CompanyID AND E.EmployeeID=@EmployeeID;
         long employeeId,
         string requirementCode,
         DateOnly effectiveFrom,
-        string reason,
+        string? reason,
         long userId,
         CurrentSettings current,
         CancellationToken token)
@@ -537,13 +585,34 @@ VALUES
         long userId,
         string? search,
         bool? isActive,
-        string? requirementCode)
+        string? requirementCode,
+        long? divisionOrgUnitId,
+        long? departmentOrgUnitId)
     {
         Add(command, "@CompanyID", SqlDbType.BigInt, companyId);
         Add(command, "@UserID", SqlDbType.BigInt, userId);
         Add(command, "@Search", SqlDbType.NVarChar, search, 200);
         Add(command, "@IsActive", SqlDbType.Bit, isActive);
         Add(command, "@RequirementCode", SqlDbType.VarChar, requirementCode, 20);
+        Add(command, "@DivisionOrgUnitID", SqlDbType.BigInt, divisionOrgUnitId);
+        Add(command, "@DepartmentOrgUnitID", SqlDbType.BigInt, departmentOrgUnitId);
+        AddBusinessTime(command);
+    }
+
+    private static readonly TimeSpan ThailandOffset = TimeSpan.FromHours(7);
+
+    private static DateTime ThailandBusinessNow() =>
+        DateTime.SpecifyKind(DateTime.UtcNow.Add(ThailandOffset), DateTimeKind.Unspecified);
+
+    private static DateOnly ThailandBusinessDate() =>
+        DateOnly.FromDateTime(ThailandBusinessNow());
+
+    private static void AddBusinessTime(SqlCommand command)
+    {
+        var now = ThailandBusinessNow();
+        Add(command, "@BusinessNow", SqlDbType.DateTime2, now);
+        Add(command, "@BusinessDate", SqlDbType.Date,
+            DateOnly.FromDateTime(now).ToDateTime(TimeOnly.MinValue));
     }
 
     private static string? Clean(string? value) =>

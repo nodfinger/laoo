@@ -179,12 +179,14 @@ BEGIN TRY
 
     INSERT dbo.TDTMOnBehalfReason(CompanyID,ReasonCode,ReasonName,RequireRemark,RequireEvidence,IsActive)
     SELECT C.CompanyID,N'ADMIN_REQUEST',N'พนักงานแจ้งให้ผู้ดูแลดำเนินการแทน',1,0,1 FROM dbo.TDSTCompanySetUp C
-    WHERE C.IsActive=1 AND NOT EXISTS(SELECT 1 FROM dbo.TDTMOnBehalfReason R WHERE R.CompanyID=C.CompanyID AND R.ReasonCode=N'ADMIN_REQUEST');
+    WHERE C.OwnerType='C' AND C.CompanyID IS NOT NULL AND C.IsActive=1
+      AND NOT EXISTS(SELECT 1 FROM dbo.TDTMOnBehalfReason R WHERE R.CompanyID=C.CompanyID AND R.ReasonCode=N'ADMIN_REQUEST');
 
     INSERT dbo.TDTMTimeAdjustmentReason(CompanyID,ReasonCode,ReasonName,RequireRemark,RequireEvidence,IsActive)
     SELECT C.CompanyID,V.Code,V.Name,1,V.Evidence,1 FROM dbo.TDSTCompanySetUp C
     CROSS JOIN(VALUES(N'FORGOT_PUNCH',N'ลืมลงเวลาทำงาน',CAST(0 AS bit)),(N'DEVICE_FAILURE',N'เครื่องบันทึกเวลาทำงานขัดข้อง',CAST(1 AS bit)),(N'OTHER',N'เหตุผลอื่น',CAST(0 AS bit)))V(Code,Name,Evidence)
-    WHERE C.IsActive=1 AND NOT EXISTS(SELECT 1 FROM dbo.TDTMTimeAdjustmentReason R WHERE R.CompanyID=C.CompanyID AND R.ReasonCode=V.Code);
+    WHERE C.OwnerType='C' AND C.CompanyID IS NOT NULL AND C.IsActive=1
+      AND NOT EXISTS(SELECT 1 FROM dbo.TDTMTimeAdjustmentReason R WHERE R.CompanyID=C.CompanyID AND R.ReasonCode=V.Code);
 
     COMMIT TRANSACTION;
 END TRY
