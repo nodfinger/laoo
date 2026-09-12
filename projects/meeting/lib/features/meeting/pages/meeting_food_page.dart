@@ -1,15 +1,12 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-
-import '../widgets/meeting_popup.dart';
 import 'package:image/image.dart' as img;
 
 import '../../../app/theme/laoo_design_tokens.dart';
 import '../../../app/theme/laoo_typography.dart';
 import '../../../app/theme/workspace_theme_presets.dart';
 import '../../../core/api/api_exception.dart';
-import '../../../core/auth/auth_storage.dart';
 import '../../../core/config/api_config.dart';
 import '../../../core/navigation/navigation_menu_repository.dart';
 import '../../../core/widgets/auto_dismiss_message.dart';
@@ -17,7 +14,6 @@ import '../../profile/pages/user_profile_dialog.dart';
 import '../../support/presentation/widgets/support_workspace_shell.dart';
 import '../data/meeting_food_repository.dart';
 import '../meeting_feature_host.dart';
-import '../widgets/meeting_pagination_card.dart';
 
 String _foodImageUrl(String value) {
   final uri = Uri.tryParse(value.trim());
@@ -25,31 +21,21 @@ String _foodImageUrl(String value) {
   return Uri.parse(ApiConfig.baseUrl).resolve(value.trim()).toString();
 }
 
-String _foodImageEndpoint(Map<String, dynamic> item, String fallback) {
-  final foodId = (item['foodId'] as num?)?.toInt();
-  if (foodId == null) return _foodImageUrl(fallback);
-  return Uri.parse(ApiConfig.baseUrl)
-      .resolve('/api/company/meeting-foods/$foodId/image')
-      .replace(queryParameters: {'version': fallback})
-      .toString();
-}
-
-Future<Uint8List> _compressFoodImage(Uint8List source) async {
+Uint8List _compressFoodImage(Uint8List source) {
   const maximumBytes = 70 * 1024;
   var decoded = img.decodeImage(source);
   if (decoded == null) {
     throw const FormatException('ไม่สามารถอ่านไฟล์รูปภาพได้');
   }
   decoded = img.bakeOrientation(decoded);
-  if (decoded.width > 800 || decoded.height > 800) {
+  if (decoded.width > 1280 || decoded.height > 1280) {
     decoded = decoded.width >= decoded.height
-        ? img.copyResize(decoded, width: 800)
-        : img.copyResize(decoded, height: 800);
+        ? img.copyResize(decoded, width: 1280)
+        : img.copyResize(decoded, height: 1280);
   }
   var working = decoded;
   while (true) {
-    for (final quality in [80, 60, 40]) {
-      if (kIsWeb) await Future<void>.delayed(const Duration(milliseconds: 16));
+    for (var quality = 88; quality >= 28; quality -= 10) {
       final compressed = Uint8List.fromList(
         img.encodeJpg(working, quality: quality),
       );
@@ -72,10 +58,6 @@ class MeetingFoodPage extends StatefulWidget {
 
 class _MeetingFoodPageState extends State<MeetingFoodPage> {
   final _repository = MeetingFoodRepository();
-  String? _accessToken;
-  Map<String, String> get _imageHeaders => {
-    if (_accessToken != null) 'Authorization': 'Bearer $_accessToken',
-  };
   final _search = TextEditingController();
   List<Map<String, dynamic>> _items = [];
   List<Map<String, dynamic>> _foodTypes = [];
@@ -131,7 +113,6 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
         _repository.types(),
         _repository.actions(),
       ]);
-      _accessToken = await AuthStorage().readAccessToken();
       if (!mounted) return;
       setState(() {
         _items = List<Map<String, dynamic>>.from(result[0] as List);
@@ -189,69 +170,31 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
   }) {
     final url = item['imageUrl']?.toString().trim() ?? '';
     if (url.isEmpty) {
-      return SizedBox(
+      return Container(
         width: size,
         height: size,
-        child: Center(
-          child: Icon(Icons.restaurant_menu_outlined, color: preset.primary),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: preset.primary.withValues(alpha: .08),
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
         ),
+        child: Icon(Icons.restaurant_menu_outlined, color: preset.primary),
       );
     }
-    final image = ClipRRect(
+    return ClipRRect(
       borderRadius: BorderRadius.circular(LaooRadius.xs),
       child: Image.network(
-        _foodImageEndpoint(item, url),
-        headers: _imageHeaders,
+        _foodImageUrl(url),
         width: size,
         height: size,
         fit: BoxFit.cover,
-        errorBuilder: (_, _, _) => SizedBox(
+        errorBuilder: (_, _, _) => Container(
           width: size,
           height: size,
-          child: Center(
-            child: Icon(Icons.broken_image_outlined, color: preset.primary),
-          ),
+          alignment: Alignment.center,
+          color: preset.primary.withValues(alpha: .08),
+          child: Icon(Icons.broken_image_outlined, color: preset.primary),
         ),
-      ),
-    );
-    return InkWell(
-      onTap: () => _showFoodImagePreview(item, preset),
-      borderRadius: BorderRadius.circular(LaooRadius.xs),
-      child: image,
-    );
-  }
-
-  Future<void> _showFoodImagePreview(
-    Map<String, dynamic> item,
-    WorkspaceThemePreset preset,
-  ) async {
-    final url = item['imageUrl']?.toString().trim() ?? '';
-    if (url.isEmpty) return;
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) => MeetingPopup(
-        title: MeetingPopupTitle(
-          icon: Icons.image_outlined,
-          text: '${item['nameTh'] ?? 'รูปอาหาร'}',
-        ),
-        content: InteractiveViewer(
-          child: Image.network(
-            _foodImageEndpoint(item, url),
-            headers: _imageHeaders,
-            fit: BoxFit.contain,
-            errorBuilder: (_, _, _) => const SizedBox(
-              width: 360,
-              height: 240,
-              child: Center(child: Icon(Icons.broken_image_outlined)),
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('ปิด'),
-          ),
-        ],
       ),
     );
   }
@@ -260,7 +203,6 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
     String label,
     WorkspaceThemePreset preset, {
     String? errorText,
-    Color? labelColor,
   }) {
     final border = OutlineInputBorder(
       borderRadius: BorderRadius.circular(LaooRadius.xs),
@@ -270,11 +212,11 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
       labelText: label,
       errorText: errorText,
       labelStyle: TextStyle(
-        color: labelColor ?? preset.primary,
+        color: preset.primary,
         fontSize: LaooTypography.inputLabel,
       ),
       floatingLabelStyle: TextStyle(
-        color: labelColor ?? preset.primary,
+        color: preset.primary,
         fontSize: LaooTypography.inputLabel,
       ),
       border: border,
@@ -318,82 +260,74 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
               final item = _visibleItems[index];
               return Card(
                 margin: EdgeInsets.zero,
-                color: LaooColors.white,
-                surfaceTintColor: Colors.transparent,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(LaooRadius.xs),
-                  side: BorderSide.none,
-                ),
                 child: ListTile(
                   leading: _foodImage(item, preset, size: 52),
-                  title: Text(
-                    '${item['foodTypeName'] ?? '-'} | ${item['nameTh']}',
-                  ),
+                  title: Text('${item['code']} | ${item['nameTh']}'),
+                  subtitle: Text('ประเภท: ${item['foodTypeName'] ?? '-'}'),
                   trailing: _actionsFor(item, preset),
                 ),
               );
             },
           );
         }
-        return WorkspaceSectionCard(
-          padding: EdgeInsets.zero,
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(minWidth: constraints.maxWidth),
-              child: DataTable(
-                horizontalMargin: LaooDataTable.horizontalMargin,
-                columnSpacing: LaooDataTable.columnSpacing,
-                dividerThickness: LaooDataTable.dividerThickness,
-                headingRowColor: WidgetStatePropertyAll(
-                  preset.primary.withValues(alpha: .10),
-                ),
-                headingTextStyle: TextStyle(
-                  color: preset.primary,
-                  fontSize: LaooTypography.tableHeader,
-                  fontWeight: FontWeight.w700,
-                ),
-                dataTextStyle: const TextStyle(
-                  fontSize: LaooTypography.tableBody,
-                ),
-                dataRowColor: LaooDataTable.rowColor(preset.primary),
-                border: const TableBorder(
-                  horizontalInside: BorderSide(color: LaooColors.border),
-                ),
-                columns: const [
-                  DataColumn(
-                    columnWidth: LaooDataTable.idColumnWidth,
-                    headingRowAlignment: MainAxisAlignment.center,
-                    label: Text('ID'),
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minWidth: constraints.maxWidth),
+            child: DataTable(
+              headingRowColor: WidgetStatePropertyAll(
+                preset.primary.withValues(alpha: .10),
+              ),
+              headingTextStyle: TextStyle(
+                color: preset.primary,
+                fontSize: LaooTypography.tableHeader,
+                fontWeight: FontWeight.w700,
+              ),
+              dataTextStyle: const TextStyle(
+                fontSize: LaooTypography.tableBody,
+              ),
+              dataRowColor: LaooDataTable.rowColor(preset.primary),
+              border: const TableBorder(
+                horizontalInside: BorderSide(color: LaooColors.border),
+              ),
+              columns: const [
+                DataColumn(
+                  columnWidth: LaooDataTable.idColumnWidth,
+                  numeric: true,
+                  label: Align(
+                    alignment: Alignment.centerRight,
+                    child: Text('ID'),
                   ),
-                  DataColumn(
-                    headingRowAlignment: MainAxisAlignment.center,
-                    label: Text('Action'),
-                  ),
-                  DataColumn(label: Text('รูป')),
-                  DataColumn(label: Text('ประเภทอาหาร')),
-                  DataColumn(label: Text('ชื่อรายการอาหาร')),
-                ],
-                rows: _visibleItems.asMap().entries.map((entry) {
-                  final item = entry.value;
-                  return DataRow(
-                    cells: [
-                      DataCell(
-                        Center(
-                          child: Text(
-                            '${_currentPage * _pageSize + entry.key + 1}',
-                          ),
+                ),
+                DataColumn(
+                  headingRowAlignment: MainAxisAlignment.center,
+                  label: Text('Action'),
+                ),
+                DataColumn(label: Text('รูป')),
+                DataColumn(label: Text('รหัส')),
+                DataColumn(label: Text('ชื่อรายการอาหาร')),
+                DataColumn(label: Text('ประเภทอาหาร')),
+              ],
+              rows: _visibleItems.asMap().entries.map((entry) {
+                final item = entry.value;
+                return DataRow(
+                  cells: [
+                    DataCell(
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          '${_currentPage * _pageSize + entry.key + 1}',
                         ),
                       ),
-                      DataCell(Center(child: _actionsFor(item, preset))),
-                      DataCell(_foodImage(item, preset, size: 44)),
-                      DataCell(Text('${item['foodTypeName'] ?? '-'}')),
-                      DataCell(Text('${item['nameTh']}')),
-                    ],
-                  );
-                }).toList(),
-              ),
+                    ),
+                    DataCell(Center(child: _actionsFor(item, preset))),
+                    DataCell(_foodImage(item, preset, size: 44)),
+                    DataCell(Text('${item['code']}')),
+                    DataCell(Text('${item['nameTh']}')),
+                    DataCell(Text('${item['foodTypeName'] ?? '-'}')),
+                  ],
+                );
+              }).toList(),
             ),
           ),
         );
@@ -403,98 +337,105 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
 
   Widget _pagination(WorkspaceThemePreset preset) {
     final total = _filtered.length;
-    return MeetingPaginationCard(
-      total: total,
-      pageIndex: _currentPage,
-      pageSize: _pageSize,
-      primary: preset.primary,
-      onPrevious: _currentPage > 0
-          ? () => setState(() => _currentPage--)
-          : null,
-      onNext: _currentPage < _pageCount - 1
-          ? () => setState(() => _currentPage++)
-          : null,
+    final start = total == 0 ? 0 : _currentPage * _pageSize + 1;
+    final end = ((_currentPage + 1) * _pageSize).clamp(0, total);
+    final neutral = Theme.of(context).colorScheme.surfaceContainerHighest;
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        OutlinedButton(
+          style: OutlinedButton.styleFrom(
+            backgroundColor: neutral,
+            side: BorderSide.none,
+          ),
+          onPressed: _currentPage > 0
+              ? () => setState(() => _currentPage--)
+              : null,
+          child: const Icon(Icons.chevron_left),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: preset.primary,
+            disabledBackgroundColor: preset.primary,
+            disabledForegroundColor: Theme.of(context).colorScheme.onPrimary,
+          ),
+          onPressed: null,
+          child: Text('${_pageCount == 0 ? 0 : _currentPage + 1}'),
+        ),
+        OutlinedButton(
+          style: OutlinedButton.styleFrom(
+            backgroundColor: neutral,
+            side: BorderSide.none,
+          ),
+          onPressed: _currentPage < _pageCount - 1
+              ? () => setState(() => _currentPage++)
+              : null,
+          child: const Icon(Icons.chevron_right),
+        ),
+        Text('$start-$end จาก $total'),
+      ],
     );
   }
 
   Future<void> _openForm({Map<String, dynamic>? item}) async {
     final preset = workspaceThemeController.value;
+    final code = TextEditingController(text: item?['code'] as String? ?? '');
     final name = TextEditingController(text: item?['nameTh'] as String? ?? '');
     String? selectedType = item?['foodTypeCode'] as String?;
+    String? codeError;
     String? nameError;
     String? typeError;
     Uint8List? selectedImage;
     String? selectedImageName;
     String? imageError;
     var imageBusy = false;
-    var saving = false;
-    await showDialog<void>(
+    final value = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, refresh) => AlertDialog(
-          backgroundColor: LaooColors.white,
-          surfaceTintColor: Colors.transparent,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(LaooRadius.xs),
-          ),
-          insetPadding: const EdgeInsets.all(LaooLayout.dialogInsetPadding),
-          titlePadding: const EdgeInsets.fromLTRB(
-            LaooLayout.cardPadding,
-            LaooLayout.cardPadding,
-            LaooLayout.cardPadding,
-            0,
-          ),
-          contentPadding: const EdgeInsets.fromLTRB(
-            LaooLayout.cardPadding,
-            LaooLayout.cardPadding,
-            LaooLayout.cardPadding,
-            0,
-          ),
-          actionsPadding: const EdgeInsets.fromLTRB(
-            LaooLayout.cardPadding,
-            0,
-            LaooLayout.cardPadding,
-            LaooLayout.cardPadding,
-          ),
-          title: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+          title: Row(
             children: [
-              Row(
-                children: [
-                  Icon(Icons.restaurant_menu_outlined, color: preset.primary),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      item == null ? 'เพิ่มรายการอาหาร' : 'แก้ไขรายการอาหาร',
-                      style: LaooTypography.popupTitleStyle,
-                    ),
-                  ),
-                ],
+              Icon(Icons.restaurant_menu_outlined, color: preset.primary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  item == null ? 'เพิ่มรายการอาหาร' : 'แก้ไขรายการอาหาร',
+                  style: LaooTypography.popupTitleStyle,
+                ),
               ),
-              const SizedBox(height: LaooLayout.cardSpacing),
-              const Divider(height: 1, color: LaooColors.border),
             ],
           ),
-          content: SizedBox(
-            width: 520,
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
             child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  const Divider(height: 1, color: LaooColors.border),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: code,
+                    textCapitalization: TextCapitalization.characters,
+                    onChanged: (_) => refresh(() => codeError = null),
+                    style: const TextStyle(fontSize: LaooTypography.inputText),
+                    decoration: _inputDecoration(
+                      'รหัสอาหาร *',
+                      preset,
+                      errorText: codeError,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   TextField(
                     controller: name,
                     onChanged: (_) => refresh(() => nameError = null),
-                    style: const TextStyle(
-                      color: Colors.black,
-                      fontSize: LaooTypography.inputText,
-                    ),
+                    style: const TextStyle(fontSize: LaooTypography.inputText),
                     decoration: _inputDecoration(
                       'ชื่อรายการอาหาร *',
                       preset,
                       errorText: nameError,
-                      labelColor: Colors.black,
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -504,15 +445,14 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
                         _foodTypes.any((type) => type['code'] == selectedType)
                         ? selectedType
                         : null,
-                    style: const TextStyle(
-                      color: Colors.black,
+                    style: TextStyle(
+                      color: preset.textPrimary,
                       fontSize: LaooTypography.comboBox,
                     ),
                     decoration: _inputDecoration(
                       'ประเภทอาหาร *',
                       preset,
                       errorText: typeError,
-                      labelColor: Colors.black,
                     ),
                     items: _foodTypes
                         .map(
@@ -522,7 +462,6 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
                               '${type['name']}',
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
-                                color: Colors.black,
                                 fontSize: LaooTypography.comboBox,
                               ),
                             ),
@@ -556,15 +495,6 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
                             width: 88,
                             height: 72,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, _, _) => const SizedBox(
-                              width: 88,
-                              height: 72,
-                              child: Center(
-                                child: Text(
-                                  'เปิดรูปไม่ได้ กรุณาเลือก JPG หรือ PNG',
-                                ),
-                              ),
-                            ),
                           ),
                         )
                       else if (item != null)
@@ -587,56 +517,38 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
                         style: OutlinedButton.styleFrom(
                           foregroundColor: preset.primary,
                           side: BorderSide(color: preset.primary),
-                          minimumSize: const Size(
-                            0,
-                            LaooTypography.buttonHeight,
-                          ),
-                          visualDensity: VisualDensity.standard,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(LaooRadius.xs),
-                          ),
                         ),
-                        onPressed: imageBusy || saving
+                        onPressed: imageBusy
                             ? null
                             : () async {
+                                final picked = await FilePicker.platform
+                                    .pickFiles(
+                                      type: FileType.image,
+                                      withData: true,
+                                    );
+                                final source = picked?.files.single.bytes;
+                                if (source == null || !dialogContext.mounted) {
+                                  return;
+                                }
                                 refresh(() {
                                   imageBusy = true;
                                   imageError = null;
                                 });
                                 try {
-                                  final picked = await FilePicker.platform
-                                      .pickFiles(
-                                        type: FileType.image,
-                                        withData: true,
-                                      );
-                                  if (picked == null || !context.mounted) {
-                                    return;
-                                  }
-                                  final file = picked.files.single;
-                                  final source =
-                                      file.bytes ??
-                                      await file.xFile.readAsBytes();
-                                  if (!context.mounted) return;
-                                  if (source.isEmpty) {
-                                    throw const FormatException('ไฟล์รูปว่าง');
-                                  }
-                                  final sourceBytes = Uint8List.fromList(
-                                    source,
+                                  final compressed = await compute(
+                                    _compressFoodImage,
+                                    Uint8List.fromList(source),
                                   );
+                                  if (!dialogContext.mounted) return;
                                   refresh(() {
-                                    selectedImage = sourceBytes;
-                                    selectedImageName = file.name;
-                                    imageBusy = true;
-                                    imageError = null;
+                                    selectedImage = compressed;
+                                    selectedImageName = 'food.jpg';
                                   });
                                 } catch (error) {
-                                  if (!context.mounted) return;
-                                  refresh(
-                                    () => imageError =
-                                        'เลือกรูปอาหารไม่สำเร็จ กรุณาเลือกไฟล์ JPG, PNG หรือ WebP ที่เปิดดูได้แล้วลองใหม่',
-                                  );
+                                  if (!dialogContext.mounted) return;
+                                  refresh(() => imageError = '$error');
                                 } finally {
-                                  if (context.mounted) {
+                                  if (dialogContext.mounted) {
                                     refresh(() => imageBusy = false);
                                   }
                                 }
@@ -651,17 +563,14 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
                               )
                             : const Icon(Icons.add_photo_alternate_outlined),
                         label: Text(
-                          imageBusy ? 'กำลังอ่านรูป...' : 'เลือกรูปอาหาร',
+                          imageBusy ? 'กำลังปรับรูป...' : 'เลือกรูปอาหาร',
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    imageError ??
-                        (selectedImageName == null
-                            ? 'ระบบจะปรับรูปเป็น JPG ขนาดไม่เกิน 70 KB เมื่อบันทึก'
-                            : 'เลือกแล้ว: $selectedImageName — จะปรับขนาดเมื่อบันทึก'),
+                    imageError ?? 'ระบบจะปรับรูปเป็น JPG ขนาดไม่เกิน 70 KB',
                     style: TextStyle(
                       color: imageError == null
                           ? preset.textSecondary
@@ -669,9 +578,6 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
                       fontSize: LaooTypography.inputHint,
                     ),
                   ),
-                  const SizedBox(height: LaooLayout.cardSpacing),
-                  const Divider(height: 1, color: LaooColors.border),
-                  const SizedBox(height: LaooLayout.cardSpacing),
                 ],
               ),
             ),
@@ -681,130 +587,120 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
               style: OutlinedButton.styleFrom(
                 foregroundColor: preset.primary,
                 side: BorderSide(color: preset.primary),
-                minimumSize: const Size(0, LaooTypography.buttonHeight),
-                visualDensity: VisualDensity.standard,
-                maximumSize: const Size(
-                  double.infinity,
-                  LaooTypography.buttonHeight,
-                ),
-                textStyle: const TextStyle(fontSize: LaooTypography.button),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(LaooRadius.xs),
-                ),
               ),
               onPressed: () => Navigator.pop(dialogContext),
               child: const Text('ยกเลิก'),
             ),
             FilledButton.icon(
-              style: FilledButton.styleFrom(
-                backgroundColor: preset.primary,
-                foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                minimumSize: const Size(0, LaooTypography.buttonHeight),
-                visualDensity: VisualDensity.standard,
-                maximumSize: const Size(
-                  double.infinity,
-                  LaooTypography.buttonHeight,
-                ),
-                textStyle: const TextStyle(fontSize: LaooTypography.button),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(LaooRadius.xs),
-                ),
-              ),
-              onPressed: imageBusy || saving || imageError != null
+              style: FilledButton.styleFrom(backgroundColor: preset.primary),
+              onPressed: imageBusy
                   ? null
                   : () {
+                      if (code.text.trim().isEmpty) {
+                        codeError = 'กรุณากรอกรหัสอาหาร';
+                      }
                       if (name.text.trim().isEmpty) {
                         nameError = 'กรุณากรอกชื่อรายการอาหาร';
                       }
                       if (selectedType == null) {
                         typeError = 'กรุณาเลือกประเภทอาหาร';
                       }
-                      if (nameError != null || typeError != null) {
+                      if (codeError != null ||
+                          nameError != null ||
+                          typeError != null) {
                         refresh(() {});
                         return;
                       }
-                      _saveFoodForm(
-                        dialogContext,
-                        item: item,
-                        name: name,
-                        selectedType: selectedType!,
-                        selectedImage: selectedImage,
-                        selectedImageName: selectedImageName,
-                        setSaving: (value) => refresh(() => saving = value),
-                        resetForm: item == null
-                            ? () => refresh(() {
-                                name.clear();
-                                selectedType = null;
-                                selectedImage = null;
-                                selectedImageName = null;
-                                imageError = null;
-                              })
-                            : null,
-                      );
+                      Navigator.pop(dialogContext, {
+                        'code': code.text.trim(),
+                        'nameTh': name.text.trim(),
+                        'foodTypeCode': selectedType,
+                      });
                     },
               icon: const Icon(Icons.save_outlined),
-              label: Text(saving ? 'กำลังบันทึก...' : 'บันทึก'),
+              label: const Text('บันทึก'),
             ),
           ],
         ),
       ),
     );
+    code.dispose();
     name.dispose();
-  }
-
-  Future<void> _saveFoodForm(
-    BuildContext dialogContext, {
-    required Map<String, dynamic>? item,
-    required TextEditingController name,
-    required String selectedType,
-    required Uint8List? selectedImage,
-    required String? selectedImageName,
-    required void Function(bool value) setSaving,
-    required VoidCallback? resetForm,
-  }) async {
-    setSaving(true);
+    if (value == null) return;
     try {
-      final uploadBytes = selectedImage == null
-          ? null
-          : await compute(_compressFoodImage, selectedImage);
-      if (!dialogContext.mounted) return;
-      final savedId = await _repository.save({
-        if (item?['code'] != null) 'code': item!['code'],
-        'nameTh': name.text.trim(),
-        'foodTypeCode': selectedType,
-      }, id: (item?['foodId'] as num?)?.toInt());
-      if (uploadBytes != null) {
-        final uploadedUrl = await _repository.uploadImage(
+      final savedId = await _repository.save(
+        value,
+        id: (item?['foodId'] as num?)?.toInt(),
+      );
+      if (selectedImage != null) {
+        await _repository.uploadImage(
           savedId,
-          uploadBytes,
-          'food.jpg',
+          selectedImage!,
+          selectedImageName ?? 'food.jpg',
         );
-        if (item != null) item['imageUrl'] = uploadedUrl;
       }
       if (!mounted) return;
-      if (item != null) {
-        if (dialogContext.mounted) Navigator.pop(dialogContext);
-        _showMessage('บันทึกรายการอาหารสำเร็จ');
-        await _load();
-      } else {
-        _showMessage('บันทึกรายการอาหารสำเร็จ');
-        await _load();
-        if (dialogContext.mounted) resetForm?.call();
-      }
+      _showMessage('บันทึกรายการอาหารสำเร็จ');
+      await _load();
     } catch (error) {
       if (mounted) {
         _showMessage(_errorText(error, 'บันทึกข้อมูลไม่สำเร็จ'), true);
       }
-    } finally {
-      if (dialogContext.mounted) setSaving(false);
     }
   }
 
   Future<void> _delete(Map<String, dynamic> item) async {
+    final preset = workspaceThemeController.value;
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) =>
-          MeetingDeletePopup(record: '${item['code']} | ${item['nameTh']}'),
+      builder: (dialogContext) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.delete_outline, color: LaooColors.error),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'ยืนยันการลบข้อมูล',
+                style: LaooTypography.popupTitleStyle,
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Divider(height: 1, color: LaooColors.border),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: LaooColors.error.withValues(alpha: .08),
+                borderRadius: BorderRadius.circular(LaooRadius.xs),
+              ),
+              child: Text('${item['code']} | ${item['nameTh']}'),
+            ),
+            const SizedBox(height: 12),
+            const Text('ข้อมูลที่ลบแล้วไม่สามารถเรียกคืนกลับมาได้'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: preset.primary),
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('ยกเลิก'),
+          ),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: LaooColors.error,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            icon: const Icon(Icons.delete_outline),
+            label: const Text('ลบ'),
+          ),
+        ],
+      ),
     );
     if (confirmed != true) return;
     try {
@@ -827,11 +723,11 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
         children: [
           Padding(
             padding: const EdgeInsets.all(LaooLayout.cardMargin),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                WorkspaceSectionCard(
-                  child: LayoutBuilder(
+            child: WorkspaceSectionCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  LayoutBuilder(
                     builder: (context, constraints) => WorkspaceActionHeader(
                       title: _caption,
                       favoriteKey: '23004',
@@ -860,10 +756,8 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
                       ],
                     ),
                   ),
-                ),
-                const SizedBox(height: LaooLayout.captionFilterSpacing),
-                WorkspaceSectionCard(
-                  child: LayoutBuilder(
+                  const Divider(height: 17, color: LaooColors.border),
+                  LayoutBuilder(
                     builder: (context, constraints) => Wrap(
                       spacing: 8,
                       runSpacing: 8,
@@ -950,13 +844,13 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
                       ],
                     ),
                   ),
-                ),
-                const SizedBox(height: LaooLayout.cardSpacing),
-                if (_loading) const LinearProgressIndicator(),
-                Expanded(child: _dataList(preset)),
-                const SizedBox(height: LaooLayout.cardSpacing),
-                _pagination(preset),
-              ],
+                  const Divider(height: 17, color: LaooColors.border),
+                  if (_loading) const LinearProgressIndicator(),
+                  Expanded(child: _dataList(preset)),
+                  const Divider(height: 17, color: LaooColors.border),
+                  _pagination(preset),
+                ],
+              ),
             ),
           ),
           if (_message != null)

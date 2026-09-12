@@ -78,6 +78,9 @@ abstract final class RoutePaths {
   static const String meetingRoomCalendar = MeetingRoutePaths.calendar;
   static const String meetingInvitationRsvp = MeetingRoutePaths.invitations;
   static const String meetingFoodPlans = MeetingRoutePaths.foodPlans;
+  static const String meetingFoodOrderSummary =
+      MeetingRoutePaths.foodOrderSummary;
+  static const String meetingAttendance = MeetingRoutePaths.attendance;
   static const String roomCheckIn = MeetingRoutePaths.roomCheckIn;
   static const String roomSupportTasks = MeetingRoutePaths.roomSupportTasks;
   static const String roomIssues = MeetingRoutePaths.roomIssues;

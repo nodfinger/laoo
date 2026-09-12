@@ -76,6 +76,9 @@ abstract final class RouteNames {
   static const String meetingRoomCalendar = MeetingRouteNames.calendar;
   static const String meetingInvitationRsvp = MeetingRouteNames.invitations;
   static const String meetingFoodPlans = MeetingRouteNames.foodPlans;
+  static const String meetingFoodOrderSummary =
+      MeetingRouteNames.foodOrderSummary;
+  static const String meetingAttendance = MeetingRouteNames.attendance;
   static const String roomCheckIn = MeetingRouteNames.roomCheckIn;
   static const String roomSupportTasks = MeetingRouteNames.roomSupportTasks;
   static const String roomIssues = MeetingRouteNames.roomIssues;

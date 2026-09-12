@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../widgets/meeting_popup.dart';
-
 import '../../../app/theme/laoo_design_tokens.dart';
 import '../../../app/theme/laoo_typography.dart';
 import '../../../app/theme/workspace_theme_presets.dart';
@@ -12,7 +10,6 @@ import '../../support/presentation/widgets/support_workspace_shell.dart';
 import '../../profile/pages/user_profile_dialog.dart';
 import '../data/meeting_facility_repository.dart';
 import '../meeting_feature_host.dart';
-import '../widgets/meeting_pagination_card.dart';
 
 class MeetingFacilityPage extends StatefulWidget {
   const MeetingFacilityPage({super.key});
@@ -128,18 +125,10 @@ class _MeetingFacilityPageState extends State<MeetingFacilityPage> {
       return cardMode
           ? ListView.separated(
               itemCount: _visibleItems.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 6),
+              separatorBuilder: (_, _) => const SizedBox(height: 8),
               itemBuilder: (context, index) {
                 final item = _visibleItems[index];
                 return Card(
-                  margin: EdgeInsets.zero,
-                  color: LaooColors.white,
-                  surfaceTintColor: Colors.transparent,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(LaooRadius.xs),
-                    side: BorderSide.none,
-                  ),
                   child: ListTile(
                     title: Text('${item['code']} | ${item['nameTh']}'),
                     subtitle: Text(
@@ -151,29 +140,21 @@ class _MeetingFacilityPageState extends State<MeetingFacilityPage> {
                 );
               },
             )
-          : WorkspaceSectionCard(
-              padding: EdgeInsets.zero,
+          : Card(
+              margin: EdgeInsets.zero,
+              clipBehavior: Clip.antiAlias,
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: ConstrainedBox(
                   constraints: BoxConstraints(minWidth: constraints.maxWidth),
                   child: DataTable(
-                    horizontalMargin: LaooDataTable.horizontalMargin,
-                    columnSpacing: LaooDataTable.columnSpacing,
-                    dividerThickness: LaooDataTable.dividerThickness,
                     headingRowColor: WidgetStatePropertyAll(
                       preset.primary.withValues(alpha: .10),
                     ),
                     headingTextStyle: TextStyle(
                       color: preset.primary,
-                      fontSize: LaooTypography.tableHeader,
                       fontWeight: FontWeight.w700,
                     ),
-                    dataTextStyle: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurface,
-                      fontSize: LaooTypography.tableBody,
-                    ),
-                    dataRowColor: LaooDataTable.rowColor(preset.primary),
                     dataRowMinHeight: 48,
                     dataRowMaxHeight: 56,
                     border: TableBorder(
@@ -246,17 +227,61 @@ class _MeetingFacilityPageState extends State<MeetingFacilityPage> {
 
   Widget _pagination(WorkspaceThemePreset preset) {
     final total = _filtered.length;
-    return MeetingPaginationCard(
-      total: total,
-      pageIndex: _currentPage,
-      pageSize: _pageSize,
-      primary: preset.primary,
-      onPrevious: _currentPage > 0
-          ? () => setState(() => _currentPage--)
-          : null,
-      onNext: _currentPage < _pageCount - 1
-          ? () => setState(() => _currentPage++)
-          : null,
+    final start = total == 0 ? 0 : _currentPage * _pageSize + 1;
+    final end = ((_currentPage + 1) * _pageSize).clamp(0, total);
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        OutlinedButton(
+          style: OutlinedButton.styleFrom(
+            backgroundColor: Theme.of(
+              context,
+            ).colorScheme.surfaceContainerHighest,
+            foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
+            side: BorderSide.none,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(LaooRadius.xs),
+            ),
+          ),
+          onPressed: _currentPage > 0
+              ? () => setState(() => _currentPage--)
+              : null,
+          child: const Icon(Icons.chevron_left),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: preset.primary,
+            disabledBackgroundColor: preset.primary,
+            disabledForegroundColor: Theme.of(context).colorScheme.onPrimary,
+            foregroundColor: Theme.of(context).colorScheme.onPrimary,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(LaooRadius.xs),
+            ),
+            padding: const EdgeInsets.all(14),
+          ),
+          onPressed: null,
+          child: Text('${_pageCount == 0 ? 0 : _currentPage + 1}'),
+        ),
+        OutlinedButton(
+          style: OutlinedButton.styleFrom(
+            backgroundColor: Theme.of(
+              context,
+            ).colorScheme.surfaceContainerHighest,
+            foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
+            side: BorderSide.none,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(LaooRadius.xs),
+            ),
+          ),
+          onPressed: _currentPage < _pageCount - 1
+              ? () => setState(() => _currentPage++)
+              : null,
+          child: const Icon(Icons.chevron_right),
+        ),
+        Text('$start-$end จาก $total'),
+      ],
     );
   }
 
@@ -303,37 +328,19 @@ class _MeetingFacilityPageState extends State<MeetingFacilityPage> {
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, refresh) => AlertDialog(
-          insetPadding: const EdgeInsets.all(LaooLayout.dialogInsetPadding),
-          backgroundColor: LaooColors.white,
-          surfaceTintColor: Colors.transparent,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(LaooRadius.xs),
-            side: BorderSide.none,
-          ),
-          titlePadding: const EdgeInsets.all(LaooLayout.cardPadding),
-          scrollable: true,
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+          title: Row(
             children: [
-              Row(
-                children: [
-                  Icon(
-                    item == null ? Icons.add : Icons.edit_outlined,
-                    color: preset.primary,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      item == null
-                          ? 'เพิ่มสิ่งอำนวยความสะดวก'
-                          : 'แก้ไขสิ่งอำนวยความสะดวก',
-                      style: LaooTypography.popupTitleStyle,
-                    ),
-                  ),
-                ],
+              Icon(
+                item == null ? Icons.add : Icons.edit_outlined,
+                color: preset.primary,
               ),
-              const SizedBox(height: 12),
-              const Divider(height: 1, thickness: 1, color: LaooColors.border),
+              const SizedBox(width: 8),
+              Text(
+                item == null
+                    ? 'เพิ่มสิ่งอำนวยความสะดวก'
+                    : 'แก้ไขสิ่งอำนวยความสะดวก',
+                style: LaooTypography.popupTitleStyle,
+              ),
             ],
           ),
           content: SizedBox(
@@ -341,6 +348,11 @@ class _MeetingFacilityPageState extends State<MeetingFacilityPage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                Divider(
+                  color: preset.primary.withValues(alpha: .45),
+                  height: 1,
+                ),
+                const SizedBox(height: 12),
                 TextField(
                   controller: code,
                   onChanged: (_) => refresh(() => codeError = null),
@@ -406,30 +418,12 @@ class _MeetingFacilityPageState extends State<MeetingFacilityPage> {
                   style: const TextStyle(fontSize: LaooTypography.inputText),
                   decoration: _facilityInputDecoration('รายละเอียด', preset),
                 ),
-                const SizedBox(height: 16),
-                const Divider(
-                  height: 1,
-                  thickness: 1,
-                  color: LaooColors.border,
-                ),
               ],
             ),
           ),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: LaooLayout.cardPadding,
-          ),
-          actionsPadding: const EdgeInsets.all(LaooLayout.cardPadding),
           actions: [
             TextButton(
-              style: TextButton.styleFrom(
-                foregroundColor: preset.primary,
-                minimumSize: const Size(0, LaooTypography.buttonHeight),
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(LaooRadius.xs),
-                ),
-                textStyle: const TextStyle(fontSize: LaooTypography.button),
-              ),
+              style: TextButton.styleFrom(foregroundColor: preset.primary),
               onPressed: () => Navigator.pop(dialogContext),
               child: const Text('ยกเลิก'),
             ),
@@ -437,12 +431,6 @@ class _MeetingFacilityPageState extends State<MeetingFacilityPage> {
               style: FilledButton.styleFrom(
                 backgroundColor: preset.primary,
                 foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                minimumSize: const Size(100, LaooTypography.buttonHeight),
-                maximumSize: const Size(160, LaooTypography.buttonHeight),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(LaooRadius.xs),
-                ),
-                textStyle: const TextStyle(fontSize: LaooTypography.button),
               ),
               onPressed: () {
                 if (code.text.trim().isEmpty) {
@@ -492,10 +480,59 @@ class _MeetingFacilityPageState extends State<MeetingFacilityPage> {
   }
 
   Future<void> _delete(Map<String, dynamic> item) async {
+    final preset = workspaceThemeController.value;
+    final red = Theme.of(context).colorScheme.error;
     final ok = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) =>
-          MeetingDeletePopup(record: '${item['code']} - ${item['nameTh']}'),
+      builder: (dialogContext) => AlertDialog(
+        title: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: red.withValues(alpha: .10),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(Icons.delete_outline, color: red),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'ยืนยันการลบข้อมูล',
+                style: LaooTypography.popupTitleStyle,
+              ),
+            ),
+          ],
+        ),
+        content: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: red.withValues(alpha: .07),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            'ต้องการลบ ${item['code']} - ${item['nameTh']} หรือไม่?\nข้อมูลที่ลบแล้วไม่สามารถเรียกคืนกลับมาได้',
+          ),
+        ),
+        actions: [
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: preset.primary),
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('ยกเลิก'),
+          ),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: red,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            icon: const Icon(Icons.delete_outline),
+            label: const Text('ลบ'),
+          ),
+        ],
+      ),
     );
     if (ok != true) return;
     try {
@@ -521,11 +558,11 @@ class _MeetingFacilityPageState extends State<MeetingFacilityPage> {
         children: [
           Padding(
             padding: const EdgeInsets.all(LaooLayout.cardMargin),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                WorkspaceSectionCard(
-                  child: Row(
+            child: WorkspaceSectionCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
                     children: [
                       Expanded(
                         child: WorkspacePageTitle(
@@ -563,10 +600,8 @@ class _MeetingFacilityPageState extends State<MeetingFacilityPage> {
                         ),
                     ],
                   ),
-                ),
-                const SizedBox(height: LaooLayout.captionFilterSpacing),
-                WorkspaceSectionCard(
-                  child: LayoutBuilder(
+                  const SizedBox(height: 8),
+                  LayoutBuilder(
                     builder: (context, constraints) => Wrap(
                       spacing: 8,
                       runSpacing: 8,
@@ -666,13 +701,13 @@ class _MeetingFacilityPageState extends State<MeetingFacilityPage> {
                       ],
                     ),
                   ),
-                ),
-                const SizedBox(height: LaooLayout.cardSpacing),
-                if (_loading) const LinearProgressIndicator(),
-                Expanded(child: _facilityList(preset)),
-                const SizedBox(height: LaooLayout.cardSpacing),
-                _pagination(preset),
-              ],
+                  const SizedBox(height: 8),
+                  if (_loading) const LinearProgressIndicator(),
+                  Expanded(child: _facilityList(preset)),
+                  const SizedBox(height: 8),
+                  _pagination(preset),
+                ],
+              ),
             ),
           ),
           if (_message != null)

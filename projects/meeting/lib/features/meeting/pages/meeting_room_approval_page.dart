@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../widgets/meeting_popup.dart';
-import '../widgets/meeting_participant_dialog.dart';
-
 import '../../../app/theme/laoo_design_tokens.dart';
 import '../../../app/theme/laoo_typography.dart';
 import '../../../app/theme/workspace_theme_presets.dart';
@@ -12,7 +9,6 @@ import '../../../core/widgets/auto_dismiss_message.dart';
 import '../../support/presentation/widgets/support_workspace_shell.dart';
 import '../data/meeting_room_booking_repository.dart';
 import '../meeting_feature_host.dart';
-import 'meeting_food_plan_page.dart';
 
 class MeetingRoomApprovalPage extends StatefulWidget {
   const MeetingRoomApprovalPage({super.key});
@@ -29,18 +25,18 @@ class _MeetingRoomApprovalPageState extends State<MeetingRoomApprovalPage> {
   String _caption = 'รายการรออนุมัติห้องประชุม';
   String? _message;
   bool _loading = true;
-  int _total = 0;
+  bool _canEdit = false;
   String _status = 'PENDING';
   DateTime? _dateFrom;
   DateTime? _dateTo;
   int _page = 1;
-  int? _foodPlanBookingId;
   static const _pageSize = 30;
 
   @override
   void initState() {
     super.initState();
     _loadCaption();
+    _loadActions();
     _load();
   }
 
@@ -49,6 +45,15 @@ class _MeetingRoomApprovalPageState extends State<MeetingRoomApprovalPage> {
     _search.dispose();
     _repository.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadActions() async {
+    try {
+      final actions = await _repository.actions();
+      if (mounted) {
+        setState(() => _canEdit = actions['approvalEdit'] == true);
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadCaption() async {
@@ -76,7 +81,6 @@ class _MeetingRoomApprovalPageState extends State<MeetingRoomApprovalPage> {
         _items = List<Map<String, dynamic>>.from(
           result['items'] as List? ?? const [],
         );
-        _total = (result['total'] as num?)?.toInt() ?? _items.length;
         _loading = false;
       });
     } catch (error) {
@@ -88,9 +92,6 @@ class _MeetingRoomApprovalPageState extends State<MeetingRoomApprovalPage> {
       }
     }
   }
-
-  static int? _int(Object? value) =>
-      value is num ? value.toInt() : int.tryParse(value?.toString() ?? '');
 
   String _error(Object error, String fallback) => error is ApiException
       ? '${error.message}${error.description == null ? '' : '\n${error.description}'}'
@@ -104,22 +105,24 @@ class _MeetingRoomApprovalPageState extends State<MeetingRoomApprovalPage> {
         : LaooColors.error;
     final result = await showDialog<String>(
       context: context,
-      builder: (dialogContext) => MeetingPopup(
-        scrollable: true,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: LaooColors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
+        ),
         title: Row(
           children: [
             Icon(
               decision == 'APPROVED'
                   ? Icons.check_circle_outline
                   : Icons.cancel_outlined,
-              color: preset.primary,
+              color: actionColor,
             ),
             const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                decision == 'APPROVED' ? 'ยืนยันอนุมัติ' : 'ยืนยันไม่อนุมัติ',
-                style: LaooTypography.popupTitleStyle,
-              ),
+            Text(
+              decision == 'APPROVED' ? 'ยืนยันอนุมัติ' : 'ยืนยันไม่อนุมัติ',
+              style: LaooTypography.popupTitleStyle,
             ),
           ],
         ),
@@ -221,7 +224,13 @@ class _MeetingRoomApprovalPageState extends State<MeetingRoomApprovalPage> {
     final preset = workspaceThemeController.value;
     await showDialog<void>(
       context: context,
-      builder: (dialogContext) => MeetingPopup(
+      builder: (dialogContext) => AlertDialog(
+        insetPadding: const EdgeInsets.all(LaooLayout.dialogInsetPadding),
+        backgroundColor: LaooColors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
+        ),
         title: Row(
           children: [
             Icon(Icons.history, color: preset.primary),
@@ -306,7 +315,6 @@ class _MeetingRoomApprovalPageState extends State<MeetingRoomApprovalPage> {
       initialDate: initial,
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 3650)),
-      builder: meetingPickerBuilder,
     );
     if (value == null || !mounted) return;
     setState(() {
@@ -337,8 +345,13 @@ class _MeetingRoomApprovalPageState extends State<MeetingRoomApprovalPage> {
     final remarkController = TextEditingController();
     final remark = await showDialog<String>(
       context: context,
-      builder: (dialogContext) => MeetingPopup(
-        scrollable: true,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: LaooColors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
+          side: BorderSide.none,
+        ),
         title: Row(
           children: [
             Icon(Icons.undo, color: preset.primary),
@@ -403,257 +416,85 @@ class _MeetingRoomApprovalPageState extends State<MeetingRoomApprovalPage> {
     }
   }
 
-  Widget _filterCard(WorkspaceThemePreset preset) => WorkspaceSectionCard(
-    child: LayoutBuilder(
-      builder: (context, constraints) {
-        final compact = constraints.maxWidth < 600;
-        return Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            SizedBox(
-              width: compact ? constraints.maxWidth : 260,
-              child: TextField(
-                controller: _search,
-                style: const TextStyle(fontSize: LaooTypography.inputText),
-                onSubmitted: (_) {
+  Widget _filterCard(WorkspaceThemePreset preset) => Card(
+    margin: EdgeInsets.zero,
+    child: Padding(
+      padding: const EdgeInsets.all(LaooLayout.cardPadding),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 600;
+          return Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              SizedBox(
+                width: compact ? constraints.maxWidth : 260,
+                child: TextField(
+                  controller: _search,
+                  style: const TextStyle(fontSize: LaooTypography.inputText),
+                  onSubmitted: (_) {
+                    _page = 1;
+                    _load();
+                  },
+                  decoration: const InputDecoration(
+                    labelText: 'ค้นหาเลขที่จอง/ห้อง/ผู้จอง',
+                    prefixIcon: Icon(Icons.search),
+                  ),
+                ),
+              ),
+              SizedBox(
+                width: compact ? constraints.maxWidth : 180,
+                child: DropdownButtonFormField<String>(
+                  isExpanded: true,
+                  key: ValueKey(_status),
+                  initialValue: _status,
+                  style: const TextStyle(
+                    color: LaooColors.textPrimary,
+                    fontSize: LaooTypography.comboBox,
+                  ),
+                  decoration: const InputDecoration(labelText: 'สถานะ'),
+                  items: const [
+                    DropdownMenuItem(value: '', child: Text('ทั้งหมด')),
+                    DropdownMenuItem(
+                      value: 'PENDING',
+                      child: Text('รออนุมัติ'),
+                    ),
+                    DropdownMenuItem(value: 'APPROVED', child: Text('อนุมัติ')),
+                    DropdownMenuItem(
+                      value: 'REJECTED',
+                      child: Text('ไม่อนุมัติ'),
+                    ),
+                  ],
+                  onChanged: (value) => setState(() => _status = value ?? ''),
+                ),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => _pickDate(from: true),
+                icon: const Icon(Icons.calendar_today_outlined),
+                label: Text('จาก ${_dateOnly(_dateFrom)}'),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => _pickDate(from: false),
+                icon: const Icon(Icons.event_outlined),
+                label: Text('ถึง ${_dateOnly(_dateTo)}'),
+              ),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: preset.primary,
+                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(LaooRadius.xs),
+                  ),
+                ),
+                onPressed: () {
                   _page = 1;
                   _load();
                 },
-                decoration: const InputDecoration(
-                  labelText: 'ค้นหาเลขที่จอง/ห้อง/ผู้จอง',
-                  prefixIcon: Icon(Icons.search),
-                ),
+                icon: const Icon(Icons.search),
+                label: const Text('ค้นหา'),
               ),
-            ),
-            SizedBox(
-              width: compact ? constraints.maxWidth : 180,
-              child: DropdownButtonFormField<String>(
-                isExpanded: true,
-                key: ValueKey(_status),
-                initialValue: _status,
-                style: const TextStyle(
-                  color: LaooColors.textPrimary,
-                  fontSize: LaooTypography.comboBox,
-                ),
-                decoration: const InputDecoration(labelText: 'สถานะ'),
-                items: const [
-                  DropdownMenuItem(value: '', child: Text('ทั้งหมด')),
-                  DropdownMenuItem(value: 'PENDING', child: Text('รออนุมัติ')),
-                  DropdownMenuItem(value: 'APPROVED', child: Text('อนุมัติ')),
-                  DropdownMenuItem(
-                    value: 'REJECTED',
-                    child: Text('ไม่อนุมัติ'),
-                  ),
-                ],
-                onChanged: (value) {
-                  setState(() {
-                    _status = value ?? '';
-                    _page = 1;
-                  });
-                  _load();
-                },
-              ),
-            ),
-            OutlinedButton.icon(
-              onPressed: () => _pickDate(from: true),
-              icon: const Icon(Icons.calendar_today_outlined),
-              label: Text('จาก ${_dateOnly(_dateFrom)}'),
-            ),
-            OutlinedButton.icon(
-              onPressed: () => _pickDate(from: false),
-              icon: const Icon(Icons.event_outlined),
-              label: Text('ถึง ${_dateOnly(_dateTo)}'),
-            ),
-            FilledButton.icon(
-              style: FilledButton.styleFrom(
-                backgroundColor: preset.primary,
-                foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(LaooRadius.xs),
-                ),
-              ),
-              onPressed: () {
-                _page = 1;
-                _load();
-              },
-              icon: const Icon(Icons.search),
-              label: const Text('ค้นหา'),
-            ),
-            OutlinedButton.icon(
-              style: OutlinedButton.styleFrom(
-                foregroundColor: preset.primary,
-                side: BorderSide(color: preset.primary),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(LaooRadius.xs),
-                ),
-              ),
-              onPressed: _clearFilters,
-              icon: const Icon(Icons.clear),
-              label: const Text('ล้าง Filter'),
-            ),
-          ],
-        );
-      },
-    ),
-  );
-
-  Widget _pagination(WorkspaceThemePreset preset) {
-    final pages = (_total / _pageSize).ceil();
-    final start = _total == 0 ? 0 : (_page - 1) * _pageSize + 1;
-    final end = (_page * _pageSize).clamp(0, _total);
-    return SizedBox(
-      height: LaooLayout.paginationCardHeight,
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          IconButton.filled(
-            onPressed: _page > 1
-                ? () async {
-                    setState(() => _page--);
-                    await _load();
-                  }
-                : null,
-            icon: const Icon(Icons.chevron_left),
-          ),
-          FilledButton(
-            onPressed: null,
-            child: Text('${pages == 0 ? 0 : _page}'),
-          ),
-          IconButton.filled(
-            onPressed: _page < pages
-                ? () async {
-                    setState(() => _page++);
-                    await _load();
-                  }
-                : null,
-            icon: const Icon(Icons.chevron_right),
-          ),
-          Text('$start-$end จาก $_total'),
-        ],
-      ),
-    );
-  }
-
-  Widget _itemCard(Map<String, dynamic> item, WorkspaceThemePreset preset) {
-    final start = _dateTime(item['startDateTime']);
-    final end = _dateTime(item['endDateTime']);
-    final status = '${item['status'] ?? 'PENDING'}';
-    return WorkspaceSectionCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.meeting_room_outlined, color: preset.primary),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  '${item['roomCode'] ?? '-'} | ${item['roomName'] ?? '-'}',
-                  style: TextStyle(
-                    color: preset.textPrimary,
-                    fontWeight: FontWeight.w700,
-                    fontSize: LaooTypography.inputText,
-                  ),
-                ),
-              ),
-              Text(
-                '${item['bookingNo'] ?? '-'}',
-                style: TextStyle(color: preset.primary),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: status == 'REJECTED'
-                      ? LaooColors.error.withValues(alpha: .1)
-                      : preset.primary.withValues(alpha: .1),
-                  borderRadius: BorderRadius.circular(LaooRadius.xs),
-                ),
-                child: Text(
-                  _statusText(status),
-                  style: TextStyle(
-                    color: status == 'REJECTED'
-                        ? LaooColors.error
-                        : preset.primary,
-                    fontSize: LaooTypography.inputText,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const Divider(),
-          Text(
-            '${item['subject'] ?? '-'}',
-            style: const TextStyle(fontSize: LaooTypography.inputText),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '$start - $end',
-            style: const TextStyle(fontSize: LaooTypography.inputText),
-          ),
-          Text(
-            'หมายเหตุ: ${item['remark'] ?? '-'}',
-            style: TextStyle(
-              color: preset.textSecondary,
-              fontSize: LaooTypography.inputText,
-            ),
-          ),
-          Text(
-            'ผู้จอง: ${item['requesterCode'] ?? '-'} | ${item['requesterName'] ?? '-'} | ผู้เข้าร่วม ${item['attendeeCount'] ?? '-'} คน',
-            style: TextStyle(
-              color: preset.textSecondary,
-              fontSize: LaooTypography.inputText,
-            ),
-          ),
-          Text(
-            'สถานที่: ${item['branchName'] ?? '-'} | ${item['buildingName'] ?? '-'} | ${item['floorName'] ?? '-'}',
-            style: TextStyle(
-              color: preset.textSecondary,
-              fontSize: LaooTypography.inputText,
-            ),
-          ),
-          const Divider(),
-          Wrap(
-            alignment: WrapAlignment.end,
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              if (status == 'APPROVED' && item['canManageParticipants'] == true)
-                OutlinedButton.icon(
-                  onPressed: () => _manageParticipants(item),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: preset.primary,
-                    side: BorderSide(color: preset.primary),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(LaooRadius.xs),
-                    ),
-                  ),
-                  icon: const Icon(Icons.group_add_outlined),
-                  label: const Text('เชิญผู้เข้าร่วมประชุม'),
-                ),
-              if (status == 'APPROVED' && item['canManageFoodPlan'] == true)
-                OutlinedButton.icon(
-                  onPressed: () => _manageFoodPlan(item),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: preset.primary,
-                    side: BorderSide(color: preset.primary),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(LaooRadius.xs),
-                    ),
-                  ),
-                  icon: const Icon(Icons.restaurant_menu_outlined),
-                  label: const Text('กำหนดชุดอาหาร'),
-                ),
               OutlinedButton.icon(
-                onPressed: () => _showHistory(item),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: preset.primary,
                   side: BorderSide(color: preset.primary),
@@ -661,34 +502,108 @@ class _MeetingRoomApprovalPageState extends State<MeetingRoomApprovalPage> {
                     borderRadius: BorderRadius.circular(LaooRadius.xs),
                   ),
                 ),
-                icon: const Icon(Icons.history),
-                label: const Text('ประวัติ'),
+                onPressed: _clearFilters,
+                icon: const Icon(Icons.clear),
+                label: const Text('ล้าง Filter'),
               ),
-              if (status == 'PENDING' && item['canApprove'] == true) ...[
-                OutlinedButton(
-                  onPressed: () => _decide(item, 'REJECTED'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: preset.primary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(LaooRadius.xs),
+            ],
+          );
+        },
+      ),
+    ),
+  );
+
+  Widget _itemCard(Map<String, dynamic> item, WorkspaceThemePreset preset) {
+    final start = _dateTime(item['startDateTime']);
+    final end = _dateTime(item['endDateTime']);
+    final status = '${item['status'] ?? 'PENDING'}';
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(LaooLayout.cardPadding),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.meeting_room_outlined, color: preset.primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '${item['roomCode'] ?? '-'} | ${item['roomName'] ?? '-'}',
+                    style: TextStyle(
+                      color: preset.textPrimary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: LaooTypography.inputText,
                     ),
                   ),
-                  child: const Text('ไม่อนุมัติ'),
                 ),
-                FilledButton(
-                  onPressed: () => _decide(item, 'APPROVED'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: preset.primary,
-                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(LaooRadius.xs),
+                Text(
+                  '${item['bookingNo'] ?? '-'}',
+                  style: TextStyle(color: preset.primary),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: status == 'REJECTED'
+                        ? LaooColors.error.withValues(alpha: .1)
+                        : preset.primary.withValues(alpha: .1),
+                    borderRadius: BorderRadius.circular(LaooRadius.xs),
+                  ),
+                  child: Text(
+                    _statusText(status),
+                    style: TextStyle(
+                      color: status == 'REJECTED'
+                          ? LaooColors.error
+                          : preset.primary,
+                      fontSize: LaooTypography.inputText,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                  child: const Text('อนุมัติ'),
                 ),
-              ] else if (item['canRollback'] == true)
+              ],
+            ),
+            const Divider(),
+            Text(
+              '${item['subject'] ?? '-'}',
+              style: const TextStyle(fontSize: LaooTypography.inputText),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '$start - $end',
+              style: const TextStyle(fontSize: LaooTypography.inputText),
+            ),
+            Text(
+              'หมายเหตุ: ${item['remark'] ?? '-'}',
+              style: TextStyle(
+                color: preset.textSecondary,
+                fontSize: LaooTypography.inputText,
+              ),
+            ),
+            Text(
+              'ผู้จอง: ${item['requesterCode'] ?? '-'} | ${item['requesterName'] ?? '-'} | ผู้เข้าร่วม ${item['attendeeCount'] ?? '-'} คน',
+              style: TextStyle(
+                color: preset.textSecondary,
+                fontSize: LaooTypography.inputText,
+              ),
+            ),
+            Text(
+              'สถานที่: ${item['branchName'] ?? '-'} | ${item['buildingName'] ?? '-'} | ${item['floorName'] ?? '-'}',
+              style: TextStyle(
+                color: preset.textSecondary,
+                fontSize: LaooTypography.inputText,
+              ),
+            ),
+            const Divider(),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
                 OutlinedButton.icon(
-                  onPressed: () => _rollback(item),
+                  onPressed: () => _showHistory(item),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: preset.primary,
                     side: BorderSide(color: preset.primary),
@@ -696,42 +611,52 @@ class _MeetingRoomApprovalPageState extends State<MeetingRoomApprovalPage> {
                       borderRadius: BorderRadius.circular(LaooRadius.xs),
                     ),
                   ),
-                  icon: const Icon(Icons.undo),
-                  label: const Text('ย้อนเป็นรออนุมัติ'),
+                  icon: const Icon(Icons.history),
+                  label: const Text('ประวัติ'),
                 ),
-            ],
-          ),
-        ],
+                const SizedBox(width: 8),
+                if (status == 'PENDING' && _canEdit) ...[
+                  OutlinedButton(
+                    onPressed: () => _decide(item, 'REJECTED'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: preset.primary,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(LaooRadius.xs),
+                      ),
+                    ),
+                    child: const Text('ไม่อนุมัติ'),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton(
+                    onPressed: () => _decide(item, 'APPROVED'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: preset.primary,
+                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(LaooRadius.xs),
+                      ),
+                    ),
+                    child: const Text('อนุมัติ'),
+                  ),
+                ] else if (_canEdit)
+                  OutlinedButton.icon(
+                    onPressed: () => _rollback(item),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: preset.primary,
+                      side: BorderSide(color: preset.primary),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(LaooRadius.xs),
+                      ),
+                    ),
+                    icon: const Icon(Icons.undo),
+                    label: const Text('ย้อนเป็นรออนุมัติ'),
+                  ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
-  }
-
-  Future<void> _manageParticipants(Map<String, dynamic> item) async {
-    final bookingId = _int(item['bookingId']);
-    if (bookingId == null) return;
-    try {
-      final saved = await showMeetingParticipantDialog(
-        context,
-        repository: _repository,
-        bookingId: bookingId,
-      );
-      if (saved && mounted) {
-        setState(() => _message = 'บันทึกผู้เข้าร่วมประชุมสำเร็จ');
-      }
-    } catch (error) {
-      if (mounted) {
-        setState(
-          () => _message = _error(error, 'จัดการผู้เข้าร่วมประชุมไม่สำเร็จ'),
-        );
-      }
-    }
-  }
-
-  void _manageFoodPlan(Map<String, dynamic> item) {
-    final bookingId = _int(item['bookingId']);
-    if (bookingId != null) {
-      setState(() => _foodPlanBookingId = bookingId);
-    }
   }
 
   @override
@@ -740,74 +665,69 @@ class _MeetingRoomApprovalPageState extends State<MeetingRoomApprovalPage> {
     return buildMeetingWorkspaceShell(
       pageTitle: _caption,
       activeMenu: '21004',
-      child: _foodPlanBookingId == null
-          ? Stack(
+      child: Stack(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(LaooLayout.cardMargin),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Padding(
-                  padding: const EdgeInsets.all(LaooLayout.cardMargin),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      WorkspaceSectionCard(
-                        child: WorkspaceActionHeader(
-                          title: _caption,
-                          favoriteKey: '21004',
-                          actions: [
-                            IconButton(
-                              tooltip: 'รีเฟรช',
-                              onPressed: _load,
-                              icon: Icon(Icons.refresh, color: preset.primary),
-                            ),
-                          ],
+                Card(
+                  margin: EdgeInsets.zero,
+                  child: Padding(
+                    padding: const EdgeInsets.all(LaooLayout.cardPadding),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: WorkspacePageTitle(
+                            title: _caption,
+                            favoriteKey: '21004',
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: LaooLayout.cardSpacing),
-                      _filterCard(preset),
-                      const SizedBox(height: LaooLayout.cardSpacing),
-                      Expanded(
-                        child: _loading
-                            ? const Center(child: CircularProgressIndicator())
-                            : _items.isEmpty
-                            ? const Center(child: Text('ไม่มีรายการรออนุมัติ'))
-                            : ListView.separated(
-                                padding: EdgeInsets.zero,
-                                itemCount: _items.length,
-                                separatorBuilder: (_, _) => const SizedBox(
-                                  height: LaooLayout.cardSpacing,
-                                ),
-                                itemBuilder: (_, index) =>
-                                    _itemCard(_items[index], preset),
-                              ),
-                      ),
-                      const SizedBox(height: LaooLayout.cardSpacing),
-                      WorkspaceSectionCard(
-                        padding: EdgeInsets.zero,
-                        child: _pagination(preset),
-                      ),
-                    ],
-                  ),
-                ),
-                if (_message != null)
-                  Positioned(
-                    top: 12,
-                    right: 12,
-                    child: AutoDismissMessage(
-                      message: _message!,
-                      onClose: () => setState(() => _message = null),
+                        IconButton(
+                          onPressed: _load,
+                          icon: Icon(Icons.refresh, color: preset.primary),
+                        ),
+                      ],
                     ),
                   ),
+                ),
+                const SizedBox(height: LaooLayout.cardSpacing),
+                _filterCard(preset),
+                const SizedBox(height: LaooLayout.cardSpacing),
+                Expanded(
+                  child: Card(
+                    margin: EdgeInsets.zero,
+                    child: _loading
+                        ? const Center(child: CircularProgressIndicator())
+                        : _items.isEmpty
+                        ? const Center(child: Text('ไม่มีรายการรออนุมัติ'))
+                        : ListView.separated(
+                            padding: const EdgeInsets.all(
+                              LaooLayout.cardPadding,
+                            ),
+                            itemCount: _items.length,
+                            separatorBuilder: (_, _) =>
+                                const SizedBox(height: LaooLayout.cardSpacing),
+                            itemBuilder: (_, index) =>
+                                _itemCard(_items[index], preset),
+                          ),
+                  ),
+                ),
               ],
-            )
-          : MeetingFoodPlanPage(
-              key: ValueKey(_foodPlanBookingId),
-              bookingId: _foodPlanBookingId!,
-              parentCaption: _caption,
-              parentMenuCode: '21004',
-              onClose: () {
-                setState(() => _foodPlanBookingId = null);
-                _load();
-              },
             ),
+          ),
+          if (_message != null)
+            Positioned(
+              top: 12,
+              right: 12,
+              child: AutoDismissMessage(
+                message: _message!,
+                onClose: () => setState(() => _message = null),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
