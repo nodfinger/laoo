@@ -20,6 +20,8 @@ export 'features/attendance_events/attendance_events_page.dart';
 export 'features/attendance_events/attendance_events_repository.dart';
 export 'features/attendance_results/attendance_results_page.dart';
 export 'features/attendance_results/attendance_results_repository.dart';
+export 'features/attendance_periods/attendance_period_pages.dart';
+export 'features/attendance_periods/attendance_period_repository.dart';
 export 'features/time/time_feature_host.dart';
 export 'features/time/time_go_routes.dart';
 export 'features/time/time_route_contract.dart';

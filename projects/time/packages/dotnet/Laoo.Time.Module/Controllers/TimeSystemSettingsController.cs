@@ -29,6 +29,7 @@ public sealed class TimeSystemSettingsController(IConfiguration configuration)
         string DefaultProfileCode,
         Dictionary<string, string> ProcessProfiles,
         Dictionary<string, string> RequestPolicies,
+        long? DefaultAttendancePeriodSchemeId,
         string Reason,
         string StateToken);
 
@@ -36,6 +37,9 @@ public sealed class TimeSystemSettingsController(IConfiguration configuration)
         string DefaultProfileCode,
         Dictionary<string, string> ProcessProfiles,
         Dictionary<string, string> RequestPolicies,
+        long? DefaultAttendancePeriodSchemeId,
+        string? DefaultAttendancePeriodSchemeCode,
+        string? DefaultAttendancePeriodSchemeName,
         int ActiveEmployeeCount,
         int EmployeeWithoutLoginCount);
 
@@ -74,6 +78,9 @@ public sealed class TimeSystemSettingsController(IConfiguration configuration)
             state.DefaultProfileCode,
             state.ProcessProfiles,
             state.RequestPolicies,
+            state.DefaultAttendancePeriodSchemeId,
+            state.DefaultAttendancePeriodSchemeCode,
+            state.DefaultAttendancePeriodSchemeName,
             state.ActiveEmployeeCount,
             state.EmployeeWithoutLoginCount,
             selfServiceReady = state.EmployeeWithoutLoginCount == 0,
@@ -142,12 +149,20 @@ public sealed class TimeSystemSettingsController(IConfiguration configuration)
                     process, request.EffectiveFrom,
                     Normalize(request.RequestPolicies[process]), userId, token);
             }
+            if (request.DefaultAttendancePeriodSchemeId !=
+                before.DefaultAttendancePeriodSchemeId)
+            {
+                await SaveDefaultAttendancePeriodScheme(connection, transaction,
+                    companyId, request.DefaultAttendancePeriodSchemeId,
+                    request.EffectiveFrom, userId, token);
+            }
 
             var after = new
             {
                 defaultProfileCode = defaultProfile,
                 processProfiles = NormalizeMap(request.ProcessProfiles),
                 requestPolicies = NormalizeMap(request.RequestPolicies),
+                request.DefaultAttendancePeriodSchemeId,
                 effectiveFrom = request.EffectiveFrom,
             };
             await using var audit = new SqlCommand("""
@@ -286,8 +301,70 @@ WHERE E.CompanyID=@CompanyID AND E.IsActive=1;
                 withoutLogin = reader.IsDBNull(1) ? 0 : reader.GetInt32(1);
             }
         }
+        long? defaultSchemeId = null;
+        string? defaultSchemeCode = null;
+        string? defaultSchemeName = null;
+        await using (var command = new SqlCommand("""
+SELECT TOP (1) D.AttendancePeriodSchemeID,S.SchemeCode,S.SchemeName
+FROM dbo.TDTMDefaultAttendancePeriodSchemeVersion D
+JOIN dbo.TDTMAttendancePeriodScheme S
+  ON S.AttendancePeriodSchemeID=D.AttendancePeriodSchemeID AND S.CompanyID=D.CompanyID
+WHERE D.CompanyID=@CompanyID AND D.IsActive=1 AND D.EffectiveFrom<=@Date
+  AND (D.EffectiveTo IS NULL OR D.EffectiveTo>=@Date)
+ORDER BY D.EffectiveFrom DESC,D.DefaultAttendancePeriodSchemeVersionID DESC;
+""", connection, transaction))
+        {
+            Add(command, "@CompanyID", SqlDbType.BigInt, companyId);
+            Add(command, "@Date", SqlDbType.Date, date.ToDateTime(TimeOnly.MinValue));
+            await using var reader = await command.ExecuteReaderAsync(token);
+            if (await reader.ReadAsync(token))
+            {
+                defaultSchemeId = reader.GetInt64(0);
+                defaultSchemeCode = reader.GetString(1);
+                defaultSchemeName = reader.GetString(2);
+            }
+        }
         return new State(defaultProfile, processProfiles, requestPolicies,
+            defaultSchemeId, defaultSchemeCode, defaultSchemeName,
             activeEmployees, withoutLogin);
+    }
+
+    private static async Task SaveDefaultAttendancePeriodScheme(
+        SqlConnection connection, SqlTransaction transaction, long companyId,
+        long? schemeId, DateOnly effectiveFrom, long userId,
+        CancellationToken token)
+    {
+        if (schemeId.HasValue)
+        {
+            await using var exists = new SqlCommand("""
+SELECT COUNT_BIG(1) FROM dbo.TDTMAttendancePeriodScheme WITH (UPDLOCK,HOLDLOCK)
+WHERE CompanyID=@CompanyID AND AttendancePeriodSchemeID=@SchemeID AND IsActive=1;
+""", connection, transaction);
+            Add(exists, "@CompanyID", SqlDbType.BigInt, companyId);
+            Add(exists, "@SchemeID", SqlDbType.BigInt, schemeId);
+            if (Convert.ToInt64(await exists.ExecuteScalarAsync(token)) == 0)
+                throw new InvalidOperationException("ไม่พบรูปแบบงวดลงเวลาที่เลือก");
+        }
+        await using var current = new SqlCommand("""
+SELECT TOP (1) DefaultAttendancePeriodSchemeVersionID,EffectiveFrom
+FROM dbo.TDTMDefaultAttendancePeriodSchemeVersion WITH (UPDLOCK,HOLDLOCK)
+WHERE CompanyID=@CompanyID AND IsActive=1 AND EffectiveTo IS NULL
+ORDER BY EffectiveFrom DESC,DefaultAttendancePeriodSchemeVersionID DESC;
+""", connection, transaction);
+        Add(current, "@CompanyID", SqlDbType.BigInt, companyId);
+        await using var reader = await current.ExecuteReaderAsync(token);
+        long? currentId = null; DateOnly? currentStart = null;
+        if (await reader.ReadAsync(token)) { currentId = reader.GetInt64(0); currentStart = DateOnly.FromDateTime(reader.GetDateTime(1)); }
+        await reader.CloseAsync();
+        if (currentId.HasValue)
+        {
+            if (currentStart > effectiveFrom) throw new InvalidOperationException("วันที่เริ่มใช้ต้องไม่ก่อนค่าตั้งต้นเดิม");
+            await using var close = new SqlCommand("UPDATE dbo.TDTMDefaultAttendancePeriodSchemeVersion SET EffectiveTo=DATEADD(day,-1,@EffectiveFrom),UpdateDate=SYSUTCDATETIME(),UpdateBy=@UserID WHERE DefaultAttendancePeriodSchemeVersionID=@ID;", connection, transaction);
+            Add(close, "@EffectiveFrom", SqlDbType.Date, effectiveFrom.ToDateTime(TimeOnly.MinValue)); Add(close, "@UserID", SqlDbType.BigInt, userId); Add(close, "@ID", SqlDbType.BigInt, currentId); await close.ExecuteNonQueryAsync(token);
+        }
+        if (!schemeId.HasValue) return;
+        await using var insert = new SqlCommand("INSERT dbo.TDTMDefaultAttendancePeriodSchemeVersion(CompanyID,AttendancePeriodSchemeID,EffectiveFrom,CreateBy) VALUES(@CompanyID,@SchemeID,@EffectiveFrom,@UserID);", connection, transaction);
+        Add(insert, "@CompanyID", SqlDbType.BigInt, companyId); Add(insert, "@SchemeID", SqlDbType.BigInt, schemeId); Add(insert, "@EffectiveFrom", SqlDbType.Date, effectiveFrom.ToDateTime(TimeOnly.MinValue)); Add(insert, "@UserID", SqlDbType.BigInt, userId); await insert.ExecuteNonQueryAsync(token);
     }
 
     private static async Task SaveDefaultProfile(
@@ -479,6 +556,7 @@ ORDER BY EffectiveFrom DESC,{idColumn} DESC;
             state.DefaultProfileCode,
             ProcessProfiles = state.ProcessProfiles.OrderBy(x => x.Key),
             RequestPolicies = state.RequestPolicies.OrderBy(x => x.Key),
+            state.DefaultAttendancePeriodSchemeId,
             state.ActiveEmployeeCount,
             state.EmployeeWithoutLoginCount,
         });
