@@ -179,6 +179,42 @@ class _PersonRegistryWorkspaceState extends State<PersonRegistryWorkspace> {
     ],
   );
 
+  List<Widget> _roleChips(Map<String, dynamic> row) {
+    final labels = <String>[
+      if (row['hasEmployee'] == true)
+        '\u0e1e\u0e19\u0e31\u0e01\u0e07\u0e32\u0e19',
+      if (row['hasUser'] == true)
+        '\u0e1c\u0e39\u0e49\u0e43\u0e0a\u0e49\u0e23\u0e30\u0e1a\u0e1a',
+      if (row['hasResident'] == true)
+        '\u0e1c\u0e39\u0e49\u0e1e\u0e31\u0e01\u0e2d\u0e32\u0e28\u0e31\u0e22',
+      if (row['hasServiceCustomer'] == true)
+        '\u0e1c\u0e39\u0e49\u0e43\u0e0a\u0e49\u0e1a\u0e23\u0e34\u0e01\u0e32\u0e23',
+    ];
+    if (labels.isEmpty) {
+      labels.add(
+        '\u0e1a\u0e38\u0e04\u0e04\u0e25\u0e17\u0e31\u0e48\u0e27\u0e44\u0e1b',
+      );
+    }
+    return [
+      for (final label in labels)
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: _primary.withValues(alpha: .1),
+            borderRadius: BorderRadius.circular(LaooRadius.xs),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: _primary,
+              fontSize: LaooTypography.bodySmall,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, box) {
@@ -332,6 +368,13 @@ class _PersonRegistryWorkspaceState extends State<PersonRegistryWorkspace> {
                         '${(_page - 1) * _pageSize + index + 1}. ${row['fullName']}',
                         style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: _roleChips(row),
+                      ),
+                      const SizedBox(height: 6),
                       Text(
                         '${row['nickName'] ?? '-'} • ${row['mobile'] ?? '-'}',
                       ),
@@ -367,6 +410,10 @@ class _PersonRegistryWorkspaceState extends State<PersonRegistryWorkspace> {
             headingRowAlignment: MainAxisAlignment.center,
           ),
           DataColumn(label: Text('ชื่อบุคคล'), columnWidth: FlexColumnWidth()),
+          DataColumn(
+            label: Text('\u0e1a\u0e17\u0e1a\u0e32\u0e17'),
+            columnWidth: FlexColumnWidth(),
+          ),
           DataColumn(label: Text('ชื่อเล่น')),
           DataColumn(label: Text('โทรศัพท์')),
           DataColumn(label: Text('อีเมล')),
@@ -379,6 +426,13 @@ class _PersonRegistryWorkspaceState extends State<PersonRegistryWorkspace> {
                 DataCell(Text('${(_page - 1) * _pageSize + i + 1}')),
                 DataCell(Center(child: _actionsFor(_rows[i]))),
                 DataCell(Text('${_rows[i]['fullName']}')),
+                DataCell(
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: _roleChips(_rows[i]),
+                  ),
+                ),
                 DataCell(Text('${_rows[i]['nickName'] ?? '-'}')),
                 DataCell(Text('${_rows[i]['mobile'] ?? '-'}')),
                 DataCell(Text('${_rows[i]['email'] ?? '-'}')),

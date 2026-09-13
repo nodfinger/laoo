@@ -22,6 +22,14 @@ _Avoid_: Shared Menu, Common Screen
 Project ระบบธุรกิจที่ Partner สามารถเปิดหรือปิดให้แต่ละ Company ได้
 _Avoid_: Core Project, Feature
 
+**Shared Person Identity**:
+Company-scoped identity in `TDADPerson` used by every Project. It owns shared name and contact attributes but does not own Employee, Resident, or Service role details.
+_Avoid_: copying one real person into separate Project person tables
+
+**Project Person Role**:
+A Project-owned relationship from one shared Person to a business meaning. Service roles currently include Resident (`TDADResident`) and Service Customer (`TDADServiceCustomer`); labels are derived from these relationships rather than edited independently.
+_Avoid_: free-form role tags, exposing another Project's roles in a Project registry
+
 **Time Management Project**:
 Business Project สำหรับจัดการเวลาทำงาน ตารางการทำงาน การลา และผลสรุปเวลาของ Employee โดยใช้ข้อมูลบุคคลและโครงสร้างองค์กรจาก Core Project
 _Avoid_: Core Project, ระบบพนักงาน, ระบบเงินเดือน

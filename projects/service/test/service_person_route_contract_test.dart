@@ -1,0 +1,128 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:laoo_service/features/company/person/data/service_person_api.dart';
+import 'package:laoo_service/service_feature.dart';
+
+void main() {
+  test('menu 14004 is a Service-owned CRUD route', () {
+    final route = ServiceRoutes.byMenuCode('14004');
+
+    expect(route.projectCode, ServiceProject.code);
+    expect(route.screenType, 1);
+    expect(route.routeName, 'servicePersons');
+    expect(route.routePath, '/service/persons');
+  });
+
+  test('Service routes remain unique', () {
+    final names = ServiceRoutes.all.map((route) => route.routeName).toList();
+    final paths = ServiceRoutes.all.map((route) => route.routePath).toList();
+
+    expect(names.toSet(), hasLength(names.length));
+    expect(paths.toSet(), hasLength(paths.length));
+  });
+
+  for (final size in const [Size(1200, 700), Size(390, 700)]) {
+    testWidgets('Service Person renders without overflow at $size', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(size);
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final api = _FakeServicePersonApi();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ServicePersonWorkspace(caption: 'Service Person', api: api),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Somchai', skipOffstage: false), findsWidgets);
+      expect(
+        find.text(
+          '\u0e1c\u0e39\u0e49\u0e43\u0e0a\u0e49\u0e1a\u0e23\u0e34\u0e01\u0e32\u0e23',
+          skipOffstage: false,
+        ),
+        findsWidgets,
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('Service Person popup follows the narrow-screen contract', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 700));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ServicePersonWorkspace(
+            caption: 'Service Person',
+            api: _FakeServicePersonApi(),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('\u0e40\u0e1e\u0e34\u0e48\u0e21'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(
+      find.text(
+        '\u0e1a\u0e17\u0e1a\u0e32\u0e17\u0e43\u0e19\u0e23\u0e30\u0e1a\u0e1a Service',
+      ),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+}
+
+class _FakeServicePersonApi extends ServicePersonApi {
+  @override
+  Future<Map<String, bool>> actions() async => {
+    'view': true,
+    'create': true,
+    'edit': true,
+    'delete': false,
+    'personEdit': true,
+  };
+
+  @override
+  Future<Map<String, dynamic>> list({
+    String search = '',
+    bool? isActive,
+    int page = 1,
+    int pageSize = 20,
+  }) async => {
+    'items': [
+      {
+        'personID': 10,
+        'fullName': 'Somchai',
+        'nickName': 'Chai',
+        'mobile': '0200000000',
+        'email': 'chai@example.test',
+        'isActive': true,
+        'serviceRoles': ['SERVICE_CUSTOMER', 'RESIDENT'],
+      },
+    ],
+    'total': 1,
+  };
+
+  @override
+  Future<Map<String, dynamic>> lookup({int? personId, int? roomId}) async => {
+    'businessTypeCode': 'DORMITORY',
+    'persons': const [],
+    'buildings': const [],
+    'floors': const [],
+    'rooms': const [
+      {'id': 1, 'code': 'A101', 'name': 'Room 101'},
+    ],
+  };
+
+  @override
+  void dispose() {}
+}
