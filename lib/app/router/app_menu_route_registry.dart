@@ -615,6 +615,27 @@ abstract final class AppMenuRouteRegistry {
       path: RoutePaths.timeAttendanceResults,
       scope: AppMenuScope.company,
     ),
+    '29001': AppMenuRouteSpec(
+      menuCode: '29001',
+      databaseRouteName: 'timeAttendancePeriodSchemes',
+      goRouteName: RouteNames.timeAttendancePeriodSchemes,
+      path: RoutePaths.timeAttendancePeriodSchemes,
+      scope: AppMenuScope.company,
+    ),
+    '29002': AppMenuRouteSpec(
+      menuCode: '29002',
+      databaseRouteName: 'timeAttendancePeriodAssignments',
+      goRouteName: RouteNames.timeAttendancePeriodAssignments,
+      path: RoutePaths.timeAttendancePeriodAssignments,
+      scope: AppMenuScope.company,
+    ),
+    '29003': AppMenuRouteSpec(
+      menuCode: '29003',
+      databaseRouteName: 'timeAttendancePeriods',
+      goRouteName: RouteNames.timeAttendancePeriods,
+      path: RoutePaths.timeAttendancePeriods,
+      scope: AppMenuScope.company,
+    ),
     for (final route in ServiceRoutes.all)
       route.menuCode: AppMenuRouteSpec(
         menuCode: route.menuCode,

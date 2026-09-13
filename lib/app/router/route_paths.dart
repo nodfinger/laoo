@@ -75,6 +75,12 @@ abstract final class RoutePaths {
   static const String companySupervisors = '/company/supervisors';
   static const String timeAttendanceResults =
       '/company/time-attendance-results';
+  static const String timeAttendancePeriodSchemes =
+      '/company/time-attendance-period-schemes';
+  static const String timeAttendancePeriodAssignments =
+      '/company/time-attendance-period-assignments';
+  static const String timeAttendancePeriods =
+      '/company/time-attendance-periods';
   static const String meetingRoomBookings = MeetingRoutePaths.bookings;
   static const String meetingRoomApprovals = MeetingRoutePaths.approvals;
   static const String meetingRoomCalendar = MeetingRoutePaths.calendar;
