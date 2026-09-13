@@ -10,12 +10,18 @@ import 'time_route_contract.dart';
 import '../time_corrections/time_correction_page.dart';
 import '../time_reasons/time_reason_page.dart';
 import '../attendance_events/attendance_events_page.dart';
+import '../attendance_results/attendance_results_page.dart';
 
 List<GoRoute> buildTimeFeatureRoutes() => <GoRoute>[
   GoRoute(
     name: TimeRouteNames.attendanceEvents,
     path: TimeRoutePaths.attendanceEvents,
     builder: (context, state) => const AttendanceEventsPage(),
+  ),
+  GoRoute(
+    name: TimeRouteNames.attendanceResults,
+    path: TimeRoutePaths.attendanceResults,
+    builder: (context, state) => const AttendanceResultsPage(),
   ),
   GoRoute(
     name: TimeRouteNames.shiftTemplates,

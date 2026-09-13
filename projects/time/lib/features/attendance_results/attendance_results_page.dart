@@ -5,24 +5,23 @@ import 'package:laoo_shared_workspace_ui/laoo_shared_workspace_ui.dart';
 
 import '../time/time_feature_host.dart';
 import '../time/time_route_contract.dart';
-import 'attendance_events_repository.dart';
+import 'attendance_results_repository.dart';
 
-class AttendanceEventsPage extends StatefulWidget {
-  const AttendanceEventsPage({super.key});
+class AttendanceResultsPage extends StatefulWidget {
+  const AttendanceResultsPage({super.key});
 
   @override
-  State<AttendanceEventsPage> createState() => _AttendanceEventsPageState();
+  State<AttendanceResultsPage> createState() => _AttendanceResultsPageState();
 }
 
-class _AttendanceEventsPageState extends State<AttendanceEventsPage> {
+class _AttendanceResultsPageState extends State<AttendanceResultsPage> {
   static const _pageSize = 30;
   final _employee = TextEditingController();
-  final _deviceCode = TextEditingController();
-  final _sourceCode = TextEditingController();
   late final JsonApiClient _api;
-  late final AttendanceEventsRepository _repository;
+  late final AttendanceResultsRepository _repository;
   late DateTime _fromDate;
   late DateTime _toDate;
+  String? _statusCode;
   Map<String, dynamic>? _actions;
   List<Map<String, dynamic>> _items = const [];
   int _total = 0;
@@ -30,13 +29,12 @@ class _AttendanceEventsPageState extends State<AttendanceEventsPage> {
   bool _loading = true;
   String? _message;
   bool _messageError = false;
-  bool _routeFilterInitialized = false;
 
   @override
   void initState() {
     super.initState();
     _api = createTimeApiClient();
-    _repository = AttendanceEventsRepository(_api);
+    _repository = AttendanceResultsRepository(_api);
     final today = DateUtils.dateOnly(timeUiTokens.businessDate);
     _fromDate = today;
     _toDate = today;
@@ -44,21 +42,8 @@ class _AttendanceEventsPageState extends State<AttendanceEventsPage> {
   }
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (_routeFilterInitialized) return;
-    _routeFilterInitialized = true;
-    final parameters = GoRouterState.of(context).uri.queryParameters;
-    _fromDate = _parseDate(parameters['fromDate']) ?? _fromDate;
-    _toDate = _parseDate(parameters['toDate']) ?? _fromDate;
-    _employee.text = parameters['employee'] ?? '';
-  }
-
-  @override
   void dispose() {
     _employee.dispose();
-    _deviceCode.dispose();
-    _sourceCode.dispose();
     disposeTimeApiClient(_api);
     super.dispose();
   }
@@ -66,9 +51,7 @@ class _AttendanceEventsPageState extends State<AttendanceEventsPage> {
   Future<void> _initialize() async {
     try {
       final actions = await _repository.actions();
-      if (actions['view'] != true) {
-        throw StateError('ไม่มีสิทธิ์ดูข้อมูลหน้าจอนี้');
-      }
+      if (actions['view'] != true) throw StateError('ไม่มีสิทธิ์ดูข้อมูลหน้าจอนี้');
       if (mounted) setState(() => _actions = actions);
       await _load();
     } catch (error) {
@@ -81,13 +64,10 @@ class _AttendanceEventsPageState extends State<AttendanceEventsPage> {
     setState(() => _loading = true);
     try {
       final value = await _repository.list(
-        fromDateTime: _fromDate,
-        toDateTime: _toDate.add(const Duration(days: 1)).subtract(
-          const Duration(microseconds: 1),
-        ),
+        fromWorkDate: _fromDate,
+        toWorkDate: _toDate,
         employee: _employee.text,
-        deviceCode: _deviceCode.text,
-        sourceCode: _sourceCode.text,
+        statusCode: _statusCode,
         page: page,
         pageSize: _pageSize,
       );
@@ -108,12 +88,11 @@ class _AttendanceEventsPageState extends State<AttendanceEventsPage> {
 
   void _clear() {
     _employee.clear();
-    _deviceCode.clear();
-    _sourceCode.clear();
     final today = DateUtils.dateOnly(timeUiTokens.businessDate);
     setState(() {
       _fromDate = today;
       _toDate = today;
+      _statusCode = null;
     });
     _load();
   }
@@ -145,21 +124,28 @@ class _AttendanceEventsPageState extends State<AttendanceEventsPage> {
     });
   }
 
+  void _openRaw(Map<String, dynamic> item) {
+    final date = _isoDate(item['workDate']);
+    final employeeCode = item['employeeCode']?.toString() ?? '';
+    context.go(
+      '${TimeRoutePaths.attendanceEvents}?employee=${Uri.encodeComponent(employeeCode)}&fromDate=$date&toDate=$date',
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final caption = _actions?['caption'] as String? ?? '';
-    const pageSize = _pageSize;
-    final pageCount = _total == 0 ? 1 : (_total / pageSize).ceil();
+    final pageCount = _total == 0 ? 1 : (_total / _pageSize).ceil();
     return buildTimeWorkspaceShell(
       pageTitle: caption,
-      activeMenu: TimeMenuCodes.attendanceEvents,
+      activeMenu: TimeMenuCodes.attendanceResults,
       child: Stack(
         children: [
           LaooListWorkspace(
             tokens: timeUiTokens.workspace,
             caption: TimeCaptionCard(
               api: _api,
-              menuCode: TimeMenuCodes.attendanceEvents,
+              menuCode: TimeMenuCodes.attendanceResults,
               caption: caption,
             ),
             filter: Wrap(
@@ -182,18 +168,16 @@ class _AttendanceEventsPageState extends State<AttendanceEventsPage> {
                 ),
                 SizedBox(
                   width: 180,
-                  child: TextField(
-                    controller: _deviceCode,
-                    onSubmitted: (_) => _load(),
-                    decoration: const InputDecoration(labelText: 'รหัสที่เครื่อง'),
-                  ),
-                ),
-                SizedBox(
-                  width: 180,
-                  child: TextField(
-                    controller: _sourceCode,
-                    onSubmitted: (_) => _load(),
-                    decoration: const InputDecoration(labelText: 'รหัสแหล่งข้อมูล'),
+                  child: DropdownButtonFormField<String?>(
+                    initialValue: _statusCode,
+                    decoration: const InputDecoration(labelText: 'สถานะ'),
+                    items: const [
+                      DropdownMenuItem(value: null, child: Text('ทั้งหมด')),
+                      DropdownMenuItem(value: 'COMPLETE', child: Text('ครบถ้วน')),
+                      DropdownMenuItem(value: 'UNRESOLVED', child: Text('รอตรวจสอบ')),
+                      DropdownMenuItem(value: 'DAY_OFF', child: Text('วันหยุด')),
+                    ],
+                    onChanged: (value) => setState(() => _statusCode = value),
                   ),
                 ),
                 Wrap(
@@ -225,7 +209,7 @@ class _AttendanceEventsPageState extends State<AttendanceEventsPage> {
               tokens: timeUiTokens.workspace,
               page: _page,
               pageCount: pageCount,
-              pageSize: pageSize,
+              pageSize: _pageSize,
               total: _total,
               onPrevious: _page > 1 ? () => _load(page: _page - 1) : null,
               onNext: _page < pageCount ? () => _load(page: _page + 1) : null,
@@ -250,8 +234,8 @@ class _AttendanceEventsPageState extends State<AttendanceEventsPage> {
     width: 170,
     child: TextFormField(
       key: ValueKey('${label}_${value.toIso8601String()}'),
+      initialValue: _date(value),
       readOnly: true,
-      initialValue: _dateText(value),
       onTap: onTap,
       decoration: InputDecoration(
         labelText: label,
@@ -268,11 +252,15 @@ class _AttendanceEventsPageState extends State<AttendanceEventsPage> {
       final item = _items[index];
       return Card(
         child: ListTile(
-          title: Text('${item['employeeCode']} - ${item['fullName']}'),
+          title: Text('${_date(item['workDate'])} | ${item['employeeCode']} - ${item['fullName']}'),
           subtitle: Text(
-            '${_dateTimeText(item['eventDateTime'])}\n'
-            'รหัสเครื่อง: ${item['deviceCode']}  |  แหล่งข้อมูล: ${item['sourceCode']}\n'
-            'รหัส Event: ${item['sourceEventId']}  |  นำเข้า: ${_dateTimeText(item['importedDateTime'])}',
+            '${_status(item['statusCode'])} | กำหนด ${_minutes(item['scheduledWorkMinutes'])} | ทำงาน ${_minutes(item['actualWorkMinutes'])}\n'
+            'สาย ${item['lateMinutes']} นาที | ออกก่อน ${item['earlyMinutes']} นาที${item['unresolvedReason'] == null ? '' : '\n${item['unresolvedReason']}'}',
+          ),
+          trailing: IconButton(
+            tooltip: 'ดูข้อมูล Raw',
+            onPressed: () => _openRaw(item),
+            icon: const Icon(Icons.fact_check_outlined),
           ),
         ),
       );
@@ -290,26 +278,38 @@ class _AttendanceEventsPageState extends State<AttendanceEventsPage> {
         ),
         columns: const [
           LaooWorkspaceTableColumns.id,
-          DataColumn(label: Text('วันเวลา')),
-          DataColumn(label: Text('รหัสที่เครื่อง')),
+          DataColumn(label: Text('ดู Raw')),
+          DataColumn(label: Text('วันที่')),
           DataColumn(label: Text('รหัสพนักงาน')),
           DataColumn(label: Text('ชื่อพนักงาน')),
-          DataColumn(label: Text('แหล่งข้อมูล')),
-          DataColumn(label: Text('รหัส Event ต้นทาง')),
-          DataColumn(label: Text('เวลานำเข้า')),
+          DataColumn(label: Text('สถานะ')),
+          DataColumn(label: Text('ตามกะ')),
+          DataColumn(label: Text('ทำงาน')),
+          DataColumn(label: Text('สาย')),
+          DataColumn(label: Text('ออกก่อน')),
+          DataColumn(label: Text('เหตุผลรอตรวจสอบ')),
         ],
         rows: [
           for (var index = 0; index < _items.length; index++)
             DataRow(
               cells: [
                 DataCell(Text('${(_page - 1) * _pageSize + index + 1}')),
-                DataCell(Text(_dateTimeText(_items[index]['eventDateTime']))),
-                DataCell(Text('${_items[index]['deviceCode']}')),
+                DataCell(
+                  IconButton(
+                    tooltip: 'ดูข้อมูล Raw',
+                    onPressed: () => _openRaw(_items[index]),
+                    icon: const Icon(Icons.fact_check_outlined),
+                  ),
+                ),
+                DataCell(Text(_date(_items[index]['workDate']))),
                 DataCell(Text('${_items[index]['employeeCode']}')),
                 DataCell(Text('${_items[index]['fullName']}')),
-                DataCell(Text('${_items[index]['sourceCode']}')),
-                DataCell(Text('${_items[index]['sourceEventId']}')),
-                DataCell(Text(_dateTimeText(_items[index]['importedDateTime']))),
+                DataCell(Text(_status(_items[index]['statusCode']))),
+                DataCell(Text(_minutes(_items[index]['scheduledWorkMinutes']))),
+                DataCell(Text(_minutes(_items[index]['actualWorkMinutes']))),
+                DataCell(Text('${_items[index]['lateMinutes']} นาที')),
+                DataCell(Text('${_items[index]['earlyMinutes']} นาที')),
+                DataCell(Text('${_items[index]['unresolvedReason'] ?? '-'}')),
               ],
             ),
         ],
@@ -317,20 +317,30 @@ class _AttendanceEventsPageState extends State<AttendanceEventsPage> {
     ),
   );
 
-  static String _dateText(DateTime value) =>
-      '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
-
-  static DateTime? _parseDate(String? value) {
-    final parsed = DateTime.tryParse(value ?? '');
-    return parsed == null ? null : DateUtils.dateOnly(parsed);
-  }
-
-  static String _dateTimeText(Object? value) {
-    final dateTime = value is DateTime
+  static String _date(Object? value) {
+    final date = value is DateTime
         ? value
         : DateTime.tryParse(value?.toString() ?? '');
-    return dateTime == null
+    return date == null
         ? '-'
-        : '${_dateText(dateTime)} ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+        : '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
   }
+
+  static String _minutes(Object? value) => '${(value as num?)?.toInt() ?? 0} นาที';
+
+  static String _isoDate(Object? value) {
+    final date = value is DateTime
+        ? value
+        : DateTime.tryParse(value?.toString() ?? '');
+    return date == null
+        ? ''
+        : '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  }
+
+  static String _status(Object? value) => switch (value) {
+    'COMPLETE' => 'ครบถ้วน',
+    'UNRESOLVED' => 'รอตรวจสอบ',
+    'DAY_OFF' => 'วันหยุด',
+    _ => '-',
+  };
 }
