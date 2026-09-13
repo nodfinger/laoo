@@ -94,7 +94,6 @@ abstract final class RoutePaths {
   static const String roomIssues = MeetingRoutePaths.roomIssues;
   static const String meetingBuildings = MeetingRoutePaths.buildings;
   static const String meetingRooms = MeetingRoutePaths.rooms;
-  static const String meetingFacilities = MeetingRoutePaths.facilities;
   static const String meetingFoods = MeetingRoutePaths.foods;
   static const String meetingRoomUtilizationReport =
       MeetingRoutePaths.utilizationReport;

@@ -90,7 +90,6 @@ abstract final class RouteNames {
   static const String roomIssues = MeetingRouteNames.roomIssues;
   static const String meetingBuildings = MeetingRouteNames.buildings;
   static const String meetingRooms = MeetingRouteNames.rooms;
-  static const String meetingFacilities = MeetingRouteNames.facilities;
   static const String meetingFoods = MeetingRouteNames.foods;
   static const String meetingRoomUtilizationReport =
       MeetingRouteNames.utilizationReport;

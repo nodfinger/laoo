@@ -559,13 +559,6 @@ abstract final class AppMenuRouteRegistry {
       path: RoutePaths.meetingRooms,
       scope: AppMenuScope.company,
     ),
-    MeetingMenuCodes.facilities: AppMenuRouteSpec(
-      menuCode: MeetingMenuCodes.facilities,
-      databaseRouteName: 'meetingFacilities',
-      goRouteName: RouteNames.meetingFacilities,
-      path: RoutePaths.meetingFacilities,
-      scope: AppMenuScope.company,
-    ),
     MeetingMenuCodes.foods: AppMenuRouteSpec(
       menuCode: MeetingMenuCodes.foods,
       databaseRouteName: 'meetingFoods',
