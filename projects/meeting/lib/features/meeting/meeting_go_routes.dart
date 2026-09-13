@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import 'meeting_feature_host.dart';
 import 'meeting_route_contract.dart';
 import 'pages/meeting_building_page.dart';
-import 'pages/meeting_facility_page.dart';
 import 'pages/meeting_food_page.dart';
 import 'pages/meeting_food_plan_page.dart';
 import 'pages/meeting_food_order_summary_page.dart';
@@ -13,12 +12,25 @@ import 'pages/meeting_invitation_page.dart';
 import 'pages/meeting_room_approval_page.dart';
 import 'pages/meeting_room_booking_page.dart';
 import 'pages/meeting_room_page.dart';
+import 'pages/meeting_room_issue_page.dart';
+import 'pages/meeting_equipment_request_page.dart';
+import 'pages/meeting_system_settings_page.dart';
 
 List<GoRoute> buildMeetingFeatureRoutes() => [
   GoRoute(
     path: MeetingRoutePaths.bookings,
     name: MeetingRouteNames.bookings,
     builder: (context, state) => const MeetingRoomBookingPage(),
+  ),
+  GoRoute(
+    path: MeetingRoutePaths.equipmentRequests,
+    name: MeetingRouteNames.equipmentRequests,
+    builder: (context, state) => const MeetingEquipmentRequestPage(),
+  ),
+  GoRoute(
+    path: MeetingRoutePaths.systemSettings,
+    name: MeetingRouteNames.systemSettings,
+    builder: (context, state) => const MeetingSystemSettingsPage(),
   ),
   GoRoute(
     path: MeetingRoutePaths.foodOrderSummary,
@@ -55,7 +67,11 @@ List<GoRoute> buildMeetingFeatureRoutes() => [
   ),
   _placeholder(MeetingRoutes.roomCheckIn, 'เช็กอินและคืนห้อง'),
   _placeholder(MeetingRoutes.roomSupportTasks, 'งานเตรียมห้องและอุปกรณ์'),
-  _placeholder(MeetingRoutes.roomIssues, 'แจ้งปัญหาห้องประชุม'),
+  GoRoute(
+    path: MeetingRoutePaths.roomIssues,
+    name: MeetingRouteNames.roomIssues,
+    builder: (context, state) => const MeetingRoomIssuePage(),
+  ),
   GoRoute(
     path: MeetingRoutePaths.buildings,
     name: MeetingRouteNames.buildings,
@@ -65,11 +81,6 @@ List<GoRoute> buildMeetingFeatureRoutes() => [
     path: MeetingRoutePaths.rooms,
     name: MeetingRouteNames.rooms,
     builder: (context, state) => const MeetingRoomPage(),
-  ),
-  GoRoute(
-    path: MeetingRoutePaths.facilities,
-    name: MeetingRouteNames.facilities,
-    builder: (context, state) => const MeetingFacilityPage(),
   ),
   GoRoute(
     path: MeetingRoutePaths.foods,

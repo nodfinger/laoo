@@ -17,13 +17,14 @@ CREATE TABLE dbo.TDADMeetingRoom (
 CREATE UNIQUE INDEX UX_TDADMeetingRoom_Company_Code ON dbo.TDADMeetingRoom(CompanyID, RoomCode);
 CREATE INDEX IX_TDADMeetingRoom_Company ON dbo.TDADMeetingRoom(CompanyID, BuildingID, FloorID);
 
-CREATE TABLE dbo.TDADMeetingRoomFacility (
+CREATE TABLE dbo.TDADMeetingRoomItem (
     RoomID BIGINT NOT NULL,
-    FacilityID BIGINT NOT NULL,
+    ItemID BIGINT NOT NULL,
     Quantity INT NULL,
     Remark NVARCHAR(500) NULL,
-    CreateDate DATETIME2 NOT NULL CONSTRAINT DF_TDADMeetingRoomFacility_CreateDate DEFAULT(SYSUTCDATETIME()),
-    CONSTRAINT PK_TDADMeetingRoomFacility PRIMARY KEY(RoomID, FacilityID),
-    CONSTRAINT FK_TDADMeetingRoomFacility_Room FOREIGN KEY(RoomID) REFERENCES dbo.TDADMeetingRoom(RoomID) ON DELETE CASCADE,
-    CONSTRAINT FK_TDADMeetingRoomFacility_Facility FOREIGN KEY(FacilityID) REFERENCES dbo.TDADMeetingFacility(FacilityID)
+    IsActive BIT NOT NULL CONSTRAINT DF_TDADMeetingRoomItem_IsActive DEFAULT(1),
+    CreateDate DATETIME2 NOT NULL CONSTRAINT DF_TDADMeetingRoomItem_CreateDate DEFAULT(SYSUTCDATETIME()),
+    CONSTRAINT PK_TDADMeetingRoomItem PRIMARY KEY(RoomID, ItemID),
+    CONSTRAINT FK_TDADMeetingRoomItem_Room FOREIGN KEY(RoomID) REFERENCES dbo.TDADMeetingRoom(RoomID) ON DELETE CASCADE,
+    CONSTRAINT FK_TDADMeetingRoomItem_Item FOREIGN KEY(ItemID) REFERENCES dbo.TDIVItem(ItemID)
 );

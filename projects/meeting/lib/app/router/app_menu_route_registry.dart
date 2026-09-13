@@ -262,6 +262,20 @@ abstract final class AppMenuRouteRegistry {
       path: RoutePaths.meetingFoodPlans,
       scope: AppMenuScope.company,
     ),
+    MeetingMenuCodes.foodOrderSummary: AppMenuRouteSpec(
+      menuCode: MeetingMenuCodes.foodOrderSummary,
+      databaseRouteName: 'meetingFoodOrderSummary',
+      goRouteName: RouteNames.meetingFoodOrderSummary,
+      path: RoutePaths.meetingFoodOrderSummary,
+      scope: AppMenuScope.company,
+    ),
+    MeetingMenuCodes.attendance: AppMenuRouteSpec(
+      menuCode: MeetingMenuCodes.attendance,
+      databaseRouteName: 'meetingAttendance',
+      goRouteName: RouteNames.meetingAttendance,
+      path: RoutePaths.meetingAttendance,
+      scope: AppMenuScope.company,
+    ),
     MeetingMenuCodes.roomCheckIn: AppMenuRouteSpec(
       menuCode: MeetingMenuCodes.roomCheckIn,
       databaseRouteName: 'roomCheckIn',
@@ -283,6 +297,20 @@ abstract final class AppMenuRouteRegistry {
       path: RoutePaths.roomIssues,
       scope: AppMenuScope.company,
     ),
+    MeetingMenuCodes.equipmentRequests: AppMenuRouteSpec(
+      menuCode: MeetingMenuCodes.equipmentRequests,
+      databaseRouteName: 'meetingEquipmentRequests',
+      goRouteName: RouteNames.equipmentRequests,
+      path: RoutePaths.equipmentRequests,
+      scope: AppMenuScope.company,
+    ),
+    MeetingMenuCodes.systemSettings: AppMenuRouteSpec(
+      menuCode: MeetingMenuCodes.systemSettings,
+      databaseRouteName: 'meetingSystemSettings',
+      goRouteName: RouteNames.meetingSystemSettings,
+      path: RoutePaths.meetingSystemSettings,
+      scope: AppMenuScope.company,
+    ),
     MeetingMenuCodes.buildings: AppMenuRouteSpec(
       menuCode: MeetingMenuCodes.buildings,
       databaseRouteName: 'meetingBuildings',
@@ -295,13 +323,6 @@ abstract final class AppMenuRouteRegistry {
       databaseRouteName: 'meetingRooms',
       goRouteName: RouteNames.meetingRooms,
       path: RoutePaths.meetingRooms,
-      scope: AppMenuScope.company,
-    ),
-    MeetingMenuCodes.facilities: AppMenuRouteSpec(
-      menuCode: MeetingMenuCodes.facilities,
-      databaseRouteName: 'meetingFacilities',
-      goRouteName: RouteNames.meetingFacilities,
-      path: RoutePaths.meetingFacilities,
       scope: AppMenuScope.company,
     ),
     MeetingMenuCodes.foods: AppMenuRouteSpec(

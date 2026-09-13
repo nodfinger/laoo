@@ -76,12 +76,14 @@ ORDER BY 7,B.BookingID OFFSET @offset ROWS FETCH NEXT @take ROWS ONLY;
         await reader.CloseAsync();
         var foods=await FoodSummaries(db,company,bookingIds,token);
         var participantFoods=await ParticipantFoodSummaries(db,company,bookingIds,token);
+        var participantRemarks=await ParticipantRemarkSummaries(db,company,bookingIds,token);
         var requirements=await RequirementSummaries(db,company,bookingIds,token);
         foreach(var item in items)
         {
             var id=(long)item["bookingId"]!;
             item["foods"]=foods.TryGetValue(id,out var rows)?rows:Array.Empty<object>();
             item["participantFoods"]=participantFoods.TryGetValue(id,out var participantRows)?participantRows:Array.Empty<object>();
+            item["participantRemarks"] = participantRemarks.TryGetValue(id,out var remarkRows)?remarkRows:Array.Empty<object>();
             item["requirements"]=requirements.TryGetValue(id,out var answers)?answers:Array.Empty<object>();
         }
         return Ok(new {available=true,total,page,pageSize,items});
@@ -133,8 +135,9 @@ ORDER BY ISNULL(T.Seq,0),F.FoodNameTH,F.FoodCode;
         await using var reader=await cmd.ExecuteReaderAsync(token);var items=new List<object>();
         while(await reader.ReadAsync(token)) items.Add(new {foodId=reader.GetInt64(0),code=reader.GetString(1),nameTh=reader.GetString(2),
             foodTypeCode=reader.GetString(3),foodTypeName=Text(reader,4),orderedParticipantCount=reader.GetInt32(5),orderedQuantity=reader.GetInt32(6)});
+        var participantRemarks=await ParticipantRemarkSummaries(db,company,[bookingId],token);
         var requirements=await RequirementSummaries(db,company,[bookingId],token);
-        return Ok(new {header,items,requirements=requirements.GetValueOrDefault(bookingId)??[]});
+        return Ok(new {header,items,participantRemarks=participantRemarks.GetValueOrDefault(bookingId)??[],requirements=requirements.GetValueOrDefault(bookingId)??[]});
     }
 
     private bool Scope(out long company,out long user)
@@ -225,6 +228,29 @@ ORDER BY H.BookingID,E.FullName,E.NickName,ISNULL(T.Seq,0),F.FoodNameTH,F.FoodCo
         return result;
     }
 
+    private static async Task<Dictionary<long,List<object>>> ParticipantRemarkSummaries(SqlConnection db,long company,IReadOnlyList<long> bookingIds,CancellationToken token)
+    {
+        var result=new Dictionary<long,List<object>>();if(bookingIds.Count==0)return result;
+        var ids=string.Join(',',bookingIds.Select((_,index)=>$"@remarkBooking{index}"));
+        await using var cmd=new SqlCommand($"""
+SELECT P.BookingID,P.BookingParticipantID,E.FullName,E.NickName,P.Remark
+FROM dbo.TDADMeetingRoomBookingParticipant P
+JOIN dbo.TDADEmployee E ON E.CompanyID=P.CompanyID AND E.EmployeeID=P.EmployeeID
+WHERE P.CompanyID=@company AND P.BookingID IN ({ids})
+  AND P.InvitationStatus='ACCEPTED' AND NULLIF(LTRIM(RTRIM(P.Remark)),'') IS NOT NULL
+ORDER BY P.BookingID,E.FullName,E.NickName,P.BookingParticipantID;
+""",db);
+        cmd.Parameters.AddWithValue("@company",company);
+        for(var index=0;index<bookingIds.Count;index++)cmd.Parameters.AddWithValue($"@remarkBooking{index}",bookingIds[index]);
+        await using var reader=await cmd.ExecuteReaderAsync(token);
+        while(await reader.ReadAsync(token))
+        {
+            var booking=reader.GetInt64(0);if(!result.TryGetValue(booking,out var rows))result[booking]=rows=[];
+            rows.Add(new {participantId=reader.GetInt64(1),participantName=reader.GetString(2),
+                participantNickname=Text(reader,3),remark=reader.GetString(4)});
+        }
+        return result;
+    }
     private static async Task<Dictionary<long,List<object>>> RequirementSummaries(SqlConnection db,long company,IReadOnlyList<long> bookingIds,CancellationToken token)
     {
         var result=new Dictionary<long,List<object>>();if(bookingIds.Count==0)return result;

@@ -937,6 +937,8 @@ class _MeetingRoomCalendarViewState extends State<MeetingRoomCalendarView> {
     decoration: BoxDecoration(
       color: status == 'REJECTED' || status == 'CANCELLED'
           ? LaooColors.error.withValues(alpha: .10)
+          : status == 'PENDING'
+          ? LaooColors.gold.withValues(alpha: .18)
           : widget.preset.primary.withValues(alpha: .10),
       borderRadius: BorderRadius.circular(LaooRadius.xs),
     ),
@@ -945,6 +947,8 @@ class _MeetingRoomCalendarViewState extends State<MeetingRoomCalendarView> {
       style: TextStyle(
         color: status == 'REJECTED' || status == 'CANCELLED'
             ? LaooColors.error
+            : status == 'PENDING'
+            ? LaooColors.pageCaption
             : widget.preset.primary,
         fontWeight: FontWeight.w700,
       ),
@@ -985,6 +989,7 @@ class _MeetingRoomCalendarViewState extends State<MeetingRoomCalendarView> {
       return LaooColors.error.withValues(alpha: .10);
     }
     if (status == 'APPROVED') return widget.preset.primary;
+    if (status == 'PENDING') return LaooColors.gold.withValues(alpha: .18);
     return widget.preset.primary.withValues(alpha: .12);
   }
 
@@ -994,6 +999,7 @@ class _MeetingRoomCalendarViewState extends State<MeetingRoomCalendarView> {
       return LaooColors.error;
     }
     if (status == 'APPROVED') return Theme.of(context).colorScheme.onPrimary;
+    if (status == 'PENDING') return LaooColors.pageCaption;
     return widget.preset.primary;
   }
 

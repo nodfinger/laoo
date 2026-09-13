@@ -2,12 +2,10 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../widgets/meeting_popup.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/laoo_design_tokens.dart';
 import '../../../app/theme/workspace_theme_presets.dart';
 import '../../../app/theme/laoo_typography.dart';
-import '../../../app/router/route_paths.dart';
 import '../../../core/api/api_exception.dart';
 import '../../../core/auth/auth_storage.dart';
 import '../../../core/config/api_config.dart';
@@ -35,7 +33,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
   final _authStorage = AuthStorage();
   final _search = TextEditingController();
   List<Map<String, dynamic>> _rooms = [],
-      _facilities = [],
+      _items = [],
       _buildings = [],
       _branches = [];
   Map<String, bool> _actions = {};
@@ -103,8 +101,8 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
           _buildings = List<Map<String, dynamic>>.from(
             lookup['buildings'] as List,
           );
-          _facilities = List<Map<String, dynamic>>.from(
-            lookup['facilities'] as List,
+          _items = List<Map<String, dynamic>>.from(
+            lookup['items'] as List? ?? const [],
           );
           _branches = List<Map<String, dynamic>>.from(
             lookup['branches'] as List,
@@ -433,34 +431,29 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
     );
   }
 
-  Widget _facilityButton(
+  Widget _itemButton(
     WorkspaceThemePreset preset, {
     Map<String, dynamic>? room,
-  }) => SizedBox(
-    width: 100,
-    child: OutlinedButton.icon(
-      onPressed: room == null
-          ? () => context.push(RoutePaths.meetingFacilities)
-          : () => _editRoomFacilities(room, preset),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: preset.primary,
-        side: BorderSide(color: preset.primary),
-        padding: EdgeInsets.zero,
-      ),
-      icon: const Icon(Icons.devices_other_outlined, size: 16),
-      label: const Text('อุปกรณ์'),
+  }) => Tooltip(
+    message: 'เลือกอุปกรณ์',
+    child: IconButton(
+      onPressed: room == null ? null : () => _editRoomItems(room, preset),
+      color: preset.primary,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints.tightFor(width: 40, height: 40),
+      icon: const Icon(Icons.devices_other_outlined, size: 18),
     ),
   );
-  Future<void> _editRoomFacilities(
+  Future<void> _editRoomItems(
     Map<String, dynamic> room,
     WorkspaceThemePreset preset,
   ) async {
     final selected = <int, Map<String, dynamic>>{};
-    for (final raw in (room['facilityItems'] as List?) ?? const []) {
+    for (final raw in (room['itemItems'] as List?) ?? const []) {
       final m = Map<String, dynamic>.from(raw as Map);
-      selected[(m['facilityId'] as num).toInt()] = m;
+      selected[(m['itemId'] as num).toInt()] = m;
     }
-    final picked = await _pickFacilities(
+    final picked = await _pickItems(
       preset,
       selected,
       roomName: '${room['code']} ${room['nameTh']}',
@@ -468,12 +461,18 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
     if (picked == null) return;
     try {
       await _repo.save({
-        ...room,
-        'facilityItems': picked.values.toList(),
+        'buildingId': room['buildingId'],
+        'floorId': room['floorId'],
+        'code': room['code'],
+        'nameTh': room['nameTh'],
+        'capacity': room['capacity'],
+        'description': room['description'],
+        'isActive': room['isActive'] != false,
+        'itemItems': picked.values.toList(),
       }, id: room['roomId']);
       if (mounted) {
         setState(() {
-          _message = 'บันทึกอุปกรณ์สำเร็จ';
+          _message = 'บันทึกสินค้าอุปกรณ์สำเร็จ';
           _messageError = false;
         });
         await _load();
@@ -481,7 +480,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
     } catch (error) {
       if (mounted) {
         setState(() {
-          _message = _error(error, 'บันทึกอุปกรณ์ไม่สำเร็จ');
+          _message = _error(error, 'บันทึกสินค้าอุปกรณ์ไม่สำเร็จ');
           _messageError = true;
         });
       }
@@ -503,17 +502,14 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
         ),
       );
   Widget _rulesButton(Map<String, dynamic> room, WorkspaceThemePreset preset) =>
-      SizedBox(
-        width: 72,
-        child: OutlinedButton.icon(
+      Tooltip(
+        message: 'กฎห้องประชุม',
+        child: IconButton(
           onPressed: () => _showRoomRulePopup(room, preset),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: preset.primary,
-            side: BorderSide(color: preset.primary),
-            padding: EdgeInsets.zero,
-          ),
-          icon: const Icon(Icons.rule_outlined, size: 16),
-          label: const Text('กฎ'),
+          color: preset.primary,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints.tightFor(width: 40, height: 40),
+          icon: const Icon(Icons.rule_outlined, size: 18),
         ),
       );
   Future<void> _showRoomAdmin(
@@ -1243,7 +1239,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                 ],
               ),
               const SizedBox(height: 4),
-              const Divider(color: LaooColors.border, height: 14),
+              const SizedBox(height: 10),
               Row(
                 children: [
                   _statusCell(item, preset),
@@ -1252,7 +1248,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                   const SizedBox(width: 8),
                   _rulesButton(item, preset),
                   const SizedBox(width: 8),
-                  _facilityButton(preset, room: item),
+                  _itemButton(preset, room: item),
                 ],
               ),
             ],
@@ -1316,9 +1312,9 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                                 child: Center(child: Text('Action')),
                               ),
                             ),
-                            DataColumn(label: Text('Admin')),
-                            DataColumn(label: Text('กฎ')),
-                            DataColumn(label: Text('กำหนดอุปกรณ์')),
+                            DataColumn(label: Center(child: Text('Admin'))),
+                            DataColumn(label: Center(child: Text('กฎ'))),
+                            DataColumn(label: Center(child: Text('อุปกรณ์'))),
                             DataColumn(label: Text('รูปห้อง/แผนผัง')),
                             DataColumn(label: Text('สถานที่ตั้ง')),
                             DataColumn(
@@ -1355,7 +1351,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                                       ),
                                     ),
                                     DataCell(_rulesButton(e.value, p)),
-                                    DataCell(_facilityButton(p, room: e.value)),
+                                    DataCell(_itemButton(p, room: e.value)),
                                     DataCell(_roomImages(e.value)),
                                     DataCell(_roomLocationCell(e.value, p)),
                                     DataCell(
@@ -1422,10 +1418,10 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
             : matchingBuilding.first['branchId'] as int?,
         buildingId = item?['buildingId'],
         floorId = item?['floorId'];
-    final facilityValues = <int, Map<String, dynamic>>{};
-    for (final raw in (item?['facilityItems'] as List?) ?? const []) {
+    final itemValues = <int, Map<String, dynamic>>{};
+    for (final raw in (item?['itemItems'] as List?) ?? const []) {
       final m = Map<String, dynamic>.from(raw as Map);
-      facilityValues[(m['facilityId'] as num).toInt()] = m;
+      itemValues[(m['itemId'] as num).toInt()] = m;
     }
     final preset = workspaceThemeController.value;
     String? branchError,
@@ -1699,9 +1695,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                               .map(
                                 (b) => DropdownMenuItem<int>(
                                   value: b['buildingId'] as int,
-                                  child: Text(
-                                    '${b['code']} ${b['nameTh']}',
-                                  ),
+                                  child: Text('${b['code']} ${b['nameTh']}'),
                                 ),
                               )
                               .toList(),
@@ -1729,9 +1723,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                               .map(
                                 (f) => DropdownMenuItem<int>(
                                   value: f['floorId'] as int,
-                                  child: Text(
-                                    '${f['code']} ${f['nameTh']}',
-                                  ),
+                                  child: Text('${f['code']} ${f['nameTh']}'),
                                 ),
                               )
                               .toList(),
@@ -1911,16 +1903,16 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                     children: [
                       OutlinedButton.icon(
                         onPressed: () async {
-                          final picked = await _pickFacilities(
+                          final picked = await _pickItems(
                             preset,
-                            facilityValues,
+                            itemValues,
                             roomName: item == null
                                 ? null
                                 : '${item['code']} ${item['nameTh']}',
                           );
                           if (picked != null) {
                             refresh(
-                              () => facilityValues
+                              () => itemValues
                                 ..clear()
                                 ..addAll(picked),
                             );
@@ -2017,7 +2009,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                             'nameTh': name.text.trim(),
                             'capacity': parsedCapacity,
                             'description': description.text.trim(),
-                            'facilityItems': facilityValues.values.toList(),
+                            'itemItems': itemValues.values.toList(),
                             'isActive': active,
                           });
                         },
@@ -2075,7 +2067,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
     }
   }
 
-  Future<Map<int, Map<String, dynamic>>?> _pickFacilities(
+  Future<Map<int, Map<String, dynamic>>?> _pickItems(
     WorkspaceThemePreset preset,
     Map<int, Map<String, dynamic>> selected, {
     String? roomName,
@@ -2083,12 +2075,19 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
     final checked = <int>{...selected.keys};
     final quantities = <int, TextEditingController>{
       for (final e in selected.entries)
-        e.key: TextEditingController(text: '${e.value['quantity'] ?? ''}'),
+        e.key: TextEditingController(text: '${e.value['quantity'] ?? 1}'),
     };
     final remarks = <int, TextEditingController>{
       for (final e in selected.entries)
         e.key: TextEditingController(text: '${e.value['remark'] ?? ''}'),
     };
+    final itemTypes = <String, String>{
+      for (final item in _items)
+        if ((item['itemTypeCode'] ?? '').toString().trim().isNotEmpty)
+          (item['itemTypeCode'] ?? '').toString().trim():
+              (item['itemTypeName'] ?? item['itemTypeCode']).toString().trim(),
+    };
+    var selectedTypeCode = '';
     final result = await showDialog<Map<int, Map<String, dynamic>>>(
       context: context,
       builder: (dc) => StatefulBuilder(
@@ -2140,82 +2139,120 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
           ),
           content: SizedBox(
             width: 560,
-            height: 420,
+            height: 460,
             child: Column(
               children: [
+                DropdownButtonFormField<String>(
+                  initialValue: selectedTypeCode,
+                  isExpanded: true,
+                  style: TextStyle(
+                    color: _popupInputTextColor(preset),
+                    fontSize: LaooTypography.inputText,
+                  ),
+                  decoration: _roomInput('ประเภทสินค้า', preset),
+                  items: [
+                    const DropdownMenuItem(value: '', child: Text('ทั้งหมด')),
+                    ...itemTypes.entries.map(
+                      (type) => DropdownMenuItem(
+                        value: type.key,
+                        child: Text(type.value),
+                      ),
+                    ),
+                  ],
+                  onChanged: (value) =>
+                      refresh(() => selectedTypeCode = value ?? ''),
+                ),
+                const SizedBox(height: 12),
                 Expanded(
                   child: ListView(
-                    children: _facilities.map((f) {
-                      final id = (f['facilityId'] as num).toInt();
-                      final on = checked.contains(id);
-                      final facilityActive = selected[id]?['isActive'] != false;
-                      quantities.putIfAbsent(id, () => TextEditingController());
-                      remarks.putIfAbsent(id, () => TextEditingController());
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            CheckboxListTile(
-                              value: on,
-                              activeColor: preset.primary,
-                              controlAffinity: ListTileControlAffinity.leading,
-                              contentPadding: EdgeInsets.zero,
-                              title: Text('${f['code']} ${f['nameTh']}'),
-                              secondary: Switch(
-                                value: facilityActive,
-                                activeTrackColor: preset.primary,
-                                onChanged: (v) => refresh(() {
-                                  selected[id] = {
-                                    ...(selected[id] ?? {'facilityId': id}),
-                                    'isActive': v,
-                                  };
-                                }),
-                              ),
-                              onChanged: (v) => refresh(() {
-                                if (v == true) {
-                                  checked.add(id);
-                                } else {
-                                  checked.remove(id);
-                                }
-                              }),
+                    children: _items
+                        .where(
+                          (item) =>
+                              selectedTypeCode.isEmpty ||
+                              item['itemTypeCode'] == selectedTypeCode,
+                        )
+                        .map((f) {
+                          final id = (f['itemId'] as num).toInt();
+                          final on = checked.contains(id);
+                          quantities.putIfAbsent(
+                            id,
+                            () => TextEditingController(text: '1'),
+                          );
+                          remarks.putIfAbsent(
+                            id,
+                            () => TextEditingController(),
+                          );
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                CheckboxListTile(
+                                  value: on,
+                                  activeColor: preset.primary,
+                                  controlAffinity:
+                                      ListTileControlAffinity.leading,
+                                  contentPadding: EdgeInsets.zero,
+                                  title: Text('${f['code']} ${f['nameTh']}'),
+                                  onChanged: (v) => refresh(() {
+                                    if (v == true) {
+                                      checked.add(id);
+                                    } else {
+                                      checked.remove(id);
+                                    }
+                                  }),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    12,
+                                    0,
+                                    12,
+                                    12,
+                                  ),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      SizedBox(
+                                        width: 116,
+                                        child: TextField(
+                                          controller: quantities[id],
+                                          enabled: on,
+                                          keyboardType: TextInputType.number,
+                                          style: TextStyle(
+                                            color: _popupInputTextColor(preset),
+                                            fontSize: LaooTypography.inputText,
+                                          ),
+                                          decoration: _roomInput(
+                                            'จำนวน',
+                                            preset,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: TextField(
+                                          controller: remarks[id],
+                                          enabled: on,
+                                          style: TextStyle(
+                                            color: _popupInputTextColor(preset),
+                                            fontSize: LaooTypography.inputText,
+                                          ),
+                                          decoration: _roomInput(
+                                            'หมายเหตุ',
+                                            preset,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Divider(color: preset.border, height: 18),
+                              ],
                             ),
-                            if (on)
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: TextField(
-                                      controller: quantities[id],
-                                      keyboardType: TextInputType.number,
-                                      style: TextStyle(
-                                        color: _popupInputTextColor(preset),
-                                        fontSize: LaooTypography.inputText,
-                                      ),
-                                      decoration: _roomInput('จำนวน', preset),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    flex: 2,
-                                    child: TextField(
-                                      controller: remarks[id],
-                                      style: TextStyle(
-                                        color: _popupInputTextColor(preset),
-                                        fontSize: LaooTypography.inputText,
-                                      ),
-                                      decoration: _roomInput(
-                                        'หมายเหตุ',
-                                        preset,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            Divider(color: preset.border, height: 18),
-                          ],
-                        ),
-                      );
-                    }).toList(),
+                          );
+                        })
+                        .toList(),
                   ),
                 ),
                 const Divider(color: LaooColors.border, height: 1),
@@ -2246,12 +2283,12 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
               onPressed: () => Navigator.pop(dc, {
                 for (final id in checked)
                   id: {
-                    'facilityId': id,
-                    'quantity': int.tryParse(quantities[id]!.text),
+                    'itemId': id,
+                    'quantity': int.tryParse(quantities[id]!.text) ?? 1,
                     'remark': remarks[id]!.text.trim().isEmpty
                         ? null
                         : remarks[id]!.text.trim(),
-                    'isActive': selected[id]?['isActive'] != false,
+                    'isActive': true,
                   },
               }),
               child: const Text('บันทึก'),
@@ -2346,17 +2383,6 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (_message != null) ...[
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: AutoDismissMessage(
-                      message: _message!,
-                      error: _messageError,
-                      onClose: () => setState(() => _message = null),
-                    ),
-                  ),
-                  const SizedBox(height: LaooLayout.cardSpacing),
-                ],
                 WorkspaceSectionCard(
                   child: Row(
                     children: [
@@ -2611,6 +2637,16 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
               ],
             ),
           ),
+          if (_message != null)
+            Positioned(
+              top: LaooLayout.cardMargin,
+              right: LaooLayout.cardMargin,
+              child: AutoDismissMessage(
+                message: _message!,
+                error: _messageError,
+                onClose: () => setState(() => _message = null),
+              ),
+            ),
         ],
       ),
     );

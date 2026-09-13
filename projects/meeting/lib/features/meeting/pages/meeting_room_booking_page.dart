@@ -15,6 +15,7 @@ import '../../../core/navigation/navigation_menu_repository.dart';
 import '../../../core/widgets/auto_dismiss_message.dart';
 import '../../support/presentation/widgets/support_workspace_shell.dart';
 import '../data/meeting_room_booking_repository.dart';
+import '../data/meeting_equipment_request_repository.dart';
 import '../widgets/meeting_room_calendar_view.dart';
 import '../meeting_feature_host.dart';
 import 'meeting_food_plan_page.dart';
@@ -35,6 +36,7 @@ class MeetingRoomBookingPage extends StatefulWidget {
 
 class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
   final _repository = MeetingRoomBookingRepository();
+  final _equipmentRequests = MeetingEquipmentRequestRepository();
   final _subject = TextEditingController();
   final _description = TextEditingController();
   final _attendeeCount = TextEditingController(text: '1');
@@ -692,7 +694,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
                       ),
                       const SizedBox(width: 8),
                       if ((_editingId == null && _actions['create'] == true) ||
-                          (_editingId != null && _actions['edit'] == true) ||
+                          _editingId != null ||
                           _repository.adminRoomIds.contains(_selectedRoomId))
                         FilledButton.icon(
                           style: FilledButton.styleFrom(
@@ -1137,6 +1139,907 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
     }
   }
 
+  // ignore: unused_element
+  Future<void> _showEquipmentRequestPlan(Map<String, dynamic> item) async {
+    final bookingId = _int(item['bookingId']);
+    if (bookingId == null) return;
+    try {
+      final detail = await _equipmentRequests.booking(bookingId);
+      if (!mounted) return;
+      final start = DateTime.tryParse('${detail['start'] ?? ''}')?.toLocal();
+      if (start == null) {
+        _showMessage('ไม่พบเวลาเริ่มประชุม', error: true);
+        return;
+      }
+      final now = DateTime.now();
+      var active = detail['active'] == true;
+      var cutoff =
+          DateTime.tryParse('${detail['cutoff'] ?? ''}')?.toLocal() ??
+          start.subtract(const Duration(hours: 1));
+      if (!cutoff.isAfter(now)) {
+        cutoff = now.add(const Duration(minutes: 15));
+      }
+      String? cutoffError;
+      final primary = workspaceThemeController.value.primary;
+      final screen = MediaQuery.sizeOf(context);
+      final saved = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (context, refresh) {
+            final fieldBorder = OutlineInputBorder(
+              borderRadius: BorderRadius.circular(LaooRadius.xs),
+              borderSide: const BorderSide(color: LaooColors.border),
+            );
+            final focusedBorder = fieldBorder.copyWith(
+              borderSide: BorderSide(color: primary),
+            );
+
+            Future<void> pickCutoff() async {
+              final today = DateTime(now.year, now.month, now.day);
+              final meetingDate = DateTime(start.year, start.month, start.day);
+              var initialDate = DateTime(cutoff.year, cutoff.month, cutoff.day);
+              if (initialDate.isBefore(today)) initialDate = today;
+              if (initialDate.isAfter(meetingDate)) {
+                initialDate = meetingDate;
+              }
+              final date = await showDatePicker(
+                context: dialogContext,
+                initialDate: initialDate,
+                firstDate: today,
+                lastDate: meetingDate,
+                builder: meetingPickerBuilder,
+              );
+              if (date == null || !dialogContext.mounted) return;
+              final time = await showTimePicker(
+                context: dialogContext,
+                initialTime: TimeOfDay.fromDateTime(cutoff),
+                initialEntryMode: TimePickerEntryMode.dial,
+                builder: meetingPickerBuilder,
+              );
+              if (time == null) return;
+              refresh(() {
+                cutoff = DateTime(
+                  date.year,
+                  date.month,
+                  date.day,
+                  time.hour,
+                  time.minute,
+                );
+                cutoffError = null;
+              });
+            }
+
+            return MeetingPopup(
+              scrollable: true,
+              title: const MeetingPopupTitle(
+                icon: Icons.timer_outlined,
+                text: 'กำหนดเวลารับคำขออุปกรณ์',
+              ),
+              content: SizedBox(
+                width: screen.width < 540 ? screen.width - 64 : 460,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(LaooLayout.cardPadding),
+                      color: primary.withValues(alpha: .08),
+                      child: Text(
+                        '${detail['bookingNo'] ?? '-'} | ${detail['subject'] ?? '-'}\n'
+                        '${detail['roomCode'] ?? '-'} | ${detail['roomName'] ?? '-'}\n'
+                        '${_equipmentRequestDateRange(detail)}',
+                        style: TextStyle(
+                          color: primary,
+                          fontSize: LaooTypography.inputText,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        const Text(
+                          'เปิดรับคำขอ',
+                          style: TextStyle(
+                            color: LaooColors.pageCaption,
+                            fontSize: LaooTypography.inputLabel,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Switch(
+                          value: active,
+                          activeTrackColor: primary,
+                          onChanged: (value) => refresh(() => active = value),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    InkWell(
+                      onTap: pickCutoff,
+                      borderRadius: BorderRadius.circular(LaooRadius.xs),
+                      child: InputDecorator(
+                        decoration: InputDecoration(
+                          labelText: 'เวลาปิดรับคำขอ *',
+                          suffixIcon: Icon(
+                            Icons.calendar_today_outlined,
+                            color: primary,
+                          ),
+                          errorText: cutoffError,
+                          border: fieldBorder,
+                          enabledBorder: fieldBorder,
+                          focusedBorder: focusedBorder,
+                          errorBorder: fieldBorder.copyWith(
+                            borderSide: const BorderSide(
+                              color: LaooColors.error,
+                            ),
+                          ),
+                          focusedErrorBorder: fieldBorder.copyWith(
+                            borderSide: const BorderSide(
+                              color: LaooColors.error,
+                            ),
+                          ),
+                        ),
+                        child: Text(
+                          _equipmentRequestCutoffText(cutoff),
+                          style: const TextStyle(
+                            fontSize: LaooTypography.inputText,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'เวลาปิดรับต้องมากกว่าเวลาปัจจุบันและก่อนเวลาเริ่มประชุม',
+                      style: TextStyle(
+                        color: LaooColors.textSecondary,
+                        fontSize: LaooTypography.inputHint,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  style: TextButton.styleFrom(
+                    foregroundColor: primary,
+                    minimumSize: const Size(80, LaooTypography.buttonHeight),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(LaooRadius.xs),
+                    ),
+                  ),
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  child: const Text('ยกเลิก'),
+                ),
+                FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: primary,
+                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                    minimumSize: const Size(100, LaooTypography.buttonHeight),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(LaooRadius.xs),
+                    ),
+                  ),
+                  onPressed: () async {
+                    if (!cutoff.isAfter(DateTime.now()) ||
+                        !cutoff.isBefore(start)) {
+                      refresh(
+                        () => cutoffError = 'กรุณากำหนดเวลาปิดรับให้ถูกต้อง',
+                      );
+                      return;
+                    }
+                    try {
+                      await _equipmentRequests.savePlan(
+                        bookingId,
+                        cutoff,
+                        active,
+                      );
+                      if (dialogContext.mounted) {
+                        Navigator.pop(dialogContext, true);
+                      }
+                    } catch (error) {
+                      _showError(error, 'บันทึกเวลารับคำขออุปกรณ์ไม่สำเร็จ');
+                    }
+                  },
+                  icon: const Icon(Icons.save_outlined),
+                  label: const Text('บันทึก'),
+                ),
+              ],
+            );
+          },
+        ),
+      );
+      if (saved == true && mounted) {
+        _showMessage('บันทึกเวลารับคำขออุปกรณ์สำเร็จ');
+      }
+    } catch (error) {
+      _showError(error, 'ไม่สามารถเปิดการกำหนดเวลารับคำขออุปกรณ์ได้');
+    }
+  }
+
+  Future<void> _showEquipmentRequestStyled(Map<String, dynamic> item) async {
+    final bookingId = _int(item['bookingId']);
+    if (bookingId == null) return;
+    try {
+      final detail = await _equipmentRequests.booking(bookingId);
+      if (!mounted) return;
+      final equipmentItems = List<Map<String, dynamic>>.from(
+        detail['items'] as List? ?? const [],
+      );
+      final requests = List<Map<String, dynamic>>.from(
+        detail['requests'] as List? ?? const [],
+      );
+      final activeRequests = requests
+          .where((request) => '${request['statusCode']}' != 'CANCELLED')
+          .toList();
+      final selected = <int, Map<String, dynamic>>{};
+      // A saved submission is immutable; selecting here always creates a new request.
+      final screen = MediaQuery.sizeOf(context);
+      final primary = workspaceThemeController.value.primary;
+      final canConfigurePlan = detail['canConfigurePlan'] == true;
+      final start = DateTime.tryParse('${detail['start'] ?? ''}')?.toLocal();
+      var planActive = detail['active'] == true;
+      var cutoff =
+          DateTime.tryParse('${detail['cutoff'] ?? ''}')?.toLocal() ??
+          (start?.subtract(const Duration(hours: 1)) ??
+              DateTime.now().add(const Duration(hours: 1)));
+      if (!cutoff.isAfter(DateTime.now())) {
+        cutoff = DateTime.now().add(const Duration(minutes: 15));
+      }
+      String? cutoffError;
+      await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (context, refresh) {
+            final fieldBorder = OutlineInputBorder(
+              borderRadius: BorderRadius.circular(LaooRadius.xs),
+              borderSide: const BorderSide(color: LaooColors.border),
+            );
+            final focusedBorder = fieldBorder.copyWith(
+              borderSide: BorderSide(color: primary),
+            );
+            Future<void> pickCutoff() async {
+              if (start == null) return;
+              final now = DateTime.now();
+              final today = DateTime(now.year, now.month, now.day);
+              final meetingDate = DateTime(start.year, start.month, start.day);
+              var initial = DateTime(cutoff.year, cutoff.month, cutoff.day);
+              if (initial.isBefore(today)) initial = today;
+              if (initial.isAfter(meetingDate)) initial = meetingDate;
+              final date = await showDatePicker(
+                context: dialogContext,
+                initialDate: initial,
+                firstDate: today,
+                lastDate: meetingDate,
+                builder: meetingPickerBuilder,
+              );
+              if (date == null || !dialogContext.mounted) return;
+              final time = await showTimePicker(
+                context: dialogContext,
+                initialTime: TimeOfDay.fromDateTime(cutoff),
+                initialEntryMode: TimePickerEntryMode.dial,
+                builder: meetingPickerBuilder,
+              );
+              if (time == null) return;
+              refresh(() {
+                cutoff = DateTime(
+                  date.year,
+                  date.month,
+                  date.day,
+                  time.hour,
+                  time.minute,
+                );
+                cutoffError = null;
+              });
+            }
+
+            return MeetingPopup(
+              title: Row(
+                children: [
+                  Icon(Icons.handyman_outlined, color: primary),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'ขออุปกรณ์เพิ่มเติม',
+                      style: LaooTypography.popupTitleStyle,
+                    ),
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: screen.width < 720 ? screen.width - 64 : 650,
+                height: screen.height < 680 ? screen.height - 190 : 480,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(LaooLayout.cardPadding),
+                      color: primary.withValues(alpha: .08),
+                      child: Text(
+                        '${detail['bookingNo'] ?? '-'} | ${detail['subject'] ?? '-'}\n${detail['roomCode'] ?? '-'} | ${detail['roomName'] ?? '-'}\n${_equipmentRequestDateRange(detail)}',
+                        style: TextStyle(
+                          color: primary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    if (canConfigurePlan) ...[
+                      Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              'เปิดรับคำขอ',
+                              style: TextStyle(
+                                color: LaooColors.pageCaption,
+                                fontSize: LaooTypography.inputLabel,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          Switch(
+                            value: planActive,
+                            activeTrackColor: primary,
+                            onChanged: (value) =>
+                                refresh(() => planActive = value),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      InkWell(
+                        onTap: pickCutoff,
+                        borderRadius: BorderRadius.circular(LaooRadius.xs),
+                        child: InputDecorator(
+                          decoration: InputDecoration(
+                            labelText: 'เวลาปิดรับคำขอ *',
+                            suffixIcon: Icon(
+                              Icons.calendar_today_outlined,
+                              color: primary,
+                            ),
+                            errorText: cutoffError,
+                            border: fieldBorder,
+                            enabledBorder: fieldBorder,
+                            focusedBorder: focusedBorder,
+                            errorBorder: fieldBorder.copyWith(
+                              borderSide: const BorderSide(
+                                color: LaooColors.error,
+                              ),
+                            ),
+                            focusedErrorBorder: fieldBorder.copyWith(
+                              borderSide: const BorderSide(
+                                color: LaooColors.error,
+                              ),
+                            ),
+                          ),
+                          child: Text(
+                            _equipmentRequestCutoffText(cutoff),
+                            style: const TextStyle(
+                              fontSize: LaooTypography.inputText,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'เวลาปิดรับต้องมากกว่าเวลาปัจจุบันและก่อนเวลาเริ่มประชุม',
+                        style: TextStyle(
+                          color: LaooColors.textSecondary,
+                          fontSize: LaooTypography.inputHint,
+                        ),
+                      ),
+                    ] else
+                      Text(
+                        'ปิดรับ: ${detail['cutoff'] == null ? '-' : _equipmentRequestCutoffText(DateTime.parse('${detail['cutoff']}').toLocal())}',
+                      ),
+                    if (detail['canRequest'] != true && !canConfigurePlan)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          _equipmentRequestStateMessage(detail['requestState']),
+                          style: TextStyle(color: Colors.red.shade700),
+                        ),
+                      ),
+                    const SizedBox(height: 10),
+                    const Divider(height: 1, color: LaooColors.border),
+                    const SizedBox(height: 8),
+                    Text(
+                      'เลือกอุปกรณ์และระบุจำนวน',
+                      style: TextStyle(
+                        color: LaooColors.pageCaption,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Expanded(
+                      child: ListView(
+                        children: [
+                          ...List.generate(equipmentItems.length, (index) {
+                            final equipment = equipmentItems[index];
+                            final id = _int(equipment['itemId']);
+                            if (id == null) return const SizedBox.shrink();
+                            final line = selected[id];
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 8,
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Checkbox(
+                                            value: line != null,
+                                            activeColor: primary,
+                                            onChanged:
+                                                detail['canRequest'] != true &&
+                                                    !(canConfigurePlan &&
+                                                        planActive)
+                                                ? null
+                                                : (checked) => refresh(() {
+                                                    if (checked == true) {
+                                                      selected[id] = {
+                                                        'itemId': id,
+                                                        'quantityController':
+                                                            TextEditingController(
+                                                              text: '1',
+                                                            ),
+                                                        'remarkController':
+                                                            TextEditingController(),
+                                                      };
+                                                    } else {
+                                                      selected.remove(id);
+                                                    }
+                                                  }),
+                                          ),
+                                          Expanded(
+                                            child: Text(
+                                              '${equipment['name'] ?? '-'} | แผนก: ${equipment['departmentName'] ?? '-'}',
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      if (line != null)
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                            left: 48,
+                                            top: 4,
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              SizedBox(
+                                                width: 100,
+                                                child: TextField(
+                                                  controller:
+                                                      line['quantityController']
+                                                          as TextEditingController,
+                                                  keyboardType:
+                                                      TextInputType.number,
+                                                  decoration: InputDecoration(
+                                                    labelText: 'จำนวน',
+                                                    isDense: true,
+                                                    border: fieldBorder,
+                                                    enabledBorder: fieldBorder,
+                                                    focusedBorder:
+                                                        focusedBorder,
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Expanded(
+                                                child: TextField(
+                                                  controller:
+                                                      line['remarkController']
+                                                          as TextEditingController,
+                                                  decoration: InputDecoration(
+                                                    labelText: 'หมายเหตุ',
+                                                    isDense: true,
+                                                    border: fieldBorder,
+                                                    enabledBorder: fieldBorder,
+                                                    focusedBorder:
+                                                        focusedBorder,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                                if (index < equipmentItems.length - 1)
+                                  const Divider(
+                                    height: 1,
+                                    color: LaooColors.border,
+                                  ),
+                              ],
+                            );
+                          }),
+                          if (activeRequests.isNotEmpty) ...[
+                            const Divider(height: 16, color: LaooColors.border),
+                            Text(
+                              'อุปกรณ์ที่แจ้งเพิ่ม',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: LaooColors.pageCaption,
+                              ),
+                            ),
+                            ...activeRequests.map((request) {
+                              final remark = '${request['remark'] ?? ''}'
+                                  .trim();
+                              final resultRemark =
+                                  '${request['resultRemark'] ?? ''}'.trim();
+                              return Container(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 8,
+                                ),
+                                decoration: const BoxDecoration(
+                                  border: Border(
+                                    bottom: BorderSide(
+                                      color: LaooColors.border,
+                                    ),
+                                  ),
+                                ),
+                                child: Text(
+                                  '${request['itemName']} × ${request['quantity']} — ${request['statusCode']}'
+                                  '${remark.isEmpty ? '' : '\nหมายเหตุ: $remark'}'
+                                  '${resultRemark.isEmpty ? '' : '\nผลดำเนินการ: $resultRemark'}',
+                                ),
+                              );
+                            }),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  style: TextButton.styleFrom(
+                    foregroundColor: primary,
+                    minimumSize: const Size(0, LaooTypography.buttonHeight),
+                  ),
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  child: const Text('ยกเลิก'),
+                ),
+                FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: primary,
+                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                    minimumSize: const Size(0, LaooTypography.buttonHeight),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(LaooRadius.xs),
+                    ),
+                  ),
+                  onPressed:
+                      (!canConfigurePlan &&
+                              (detail['canRequest'] != true ||
+                                  selected.isEmpty)) ||
+                          (canConfigurePlan &&
+                              !planActive &&
+                              selected.isNotEmpty)
+                      ? null
+                      : () async {
+                          if (canConfigurePlan) {
+                            if (start == null ||
+                                !cutoff.isAfter(DateTime.now()) ||
+                                !cutoff.isBefore(start)) {
+                              refresh(
+                                () => cutoffError =
+                                    'กรุณากำหนดเวลาปิดรับให้ถูกต้อง',
+                              );
+                              return;
+                            }
+                            try {
+                              await _equipmentRequests.savePlan(
+                                bookingId,
+                                cutoff,
+                                planActive,
+                              );
+                            } catch (error) {
+                              _showError(
+                                error,
+                                'บันทึกเวลารับคำขออุปกรณ์ไม่สำเร็จ',
+                              );
+                              return;
+                            }
+                            if (!planActive || selected.isEmpty) {
+                              if (dialogContext.mounted) {
+                                Navigator.pop(dialogContext, true);
+                              }
+                              _showMessage('บันทึกเวลารับคำขออุปกรณ์สำเร็จ');
+                              return;
+                            }
+                          }
+                          final lines = selected.values
+                              .map(
+                                (line) => {
+                                  'itemId': line['itemId'],
+                                  'quantity':
+                                      num.tryParse(
+                                        (line['quantityController']
+                                                as TextEditingController)
+                                            .text,
+                                      ) ??
+                                      0,
+                                  'remark':
+                                      (line['remarkController']
+                                              as TextEditingController)
+                                          .text,
+                                },
+                              )
+                              .toList();
+                          try {
+                            await _equipmentRequests.save(bookingId, lines);
+                            if (dialogContext.mounted) {
+                              Navigator.pop(dialogContext, true);
+                            }
+                            _showMessage('ส่งคำขออุปกรณ์เพิ่มเติมแล้ว');
+                          } catch (error) {
+                            _showError(error, 'ส่งคำขออุปกรณ์ไม่สำเร็จ');
+                          }
+                        },
+                  icon: const Icon(Icons.send_outlined),
+                  label: Text(
+                    canConfigurePlan && selected.isEmpty
+                        ? 'บันทึก'
+                        : canConfigurePlan
+                        ? 'บันทึกและส่งคำขอ'
+                        : 'ส่งคำขอ',
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      );
+      return;
+    } catch (error) {
+      _showError(error, 'ไม่สามารถเปิดคำขออุปกรณ์ได้');
+    }
+  }
+
+  String _equipmentRequestDateRange(Map<String, dynamic> detail) {
+    final start = DateTime.tryParse('${detail['start'] ?? ''}')?.toLocal();
+    final end = DateTime.tryParse('${detail['end'] ?? ''}')?.toLocal();
+    if (start == null || end == null) return '-';
+    String date(DateTime value) =>
+        '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
+    String time(DateTime value) =>
+        '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
+    return '${date(start)} ${time(start)} - ${date(end)} ${time(end)}';
+  }
+
+  String _equipmentRequestCutoffText(DateTime value) =>
+      '${_formatDate(value)} ${_two(value.hour)}:${_two(value.minute)}';
+
+  String _equipmentRequestStateMessage(Object? state) => switch ('$state') {
+    'CUTOFF_NOT_CONFIGURED' => 'ยังไม่ได้กำหนดเวลาปิดรับคำขออุปกรณ์เพิ่มเติม',
+    'CUTOFF_DISABLED' => 'ปิดรับคำขออุปกรณ์เพิ่มเติมแล้ว',
+    'CUTOFF_EXPIRED' => 'เกินเวลาปิดรับคำขออุปกรณ์เพิ่มเติม',
+    'MEETING_STARTED' => 'เริ่มประชุมแล้ว จึงไม่สามารถขออุปกรณ์เพิ่มเติมได้',
+    'BOOKING_NOT_APPROVED' => 'รายการจองยังไม่ได้รับการอนุมัติ',
+    'NO_PERMISSION' => 'ผู้ใช้ไม่มีสิทธิ์ขออุปกรณ์เพิ่มเติมสำหรับรายการนี้',
+    _ => 'ไม่สามารถส่งคำขออุปกรณ์เพิ่มเติมได้',
+  };
+
+  // Legacy implementation kept temporarily for reference while the new popup
+  // is validated in the booking flow.
+  // ignore: unused_element
+  Future<void> _showEquipmentRequest(Map<String, dynamic> item) async {
+    final bookingId = _int(item['bookingId']);
+    if (bookingId == null) return;
+    try {
+      final detail = await _equipmentRequests.booking(bookingId);
+      if (!mounted) return;
+      final items = List<Map<String, dynamic>>.from(
+        detail['items'] as List? ?? const [],
+      );
+      final requests = List<Map<String, dynamic>>.from(
+        detail['requests'] as List? ?? const [],
+      );
+      final activeRequests = requests
+          .where((request) => '${request['statusCode']}' != 'CANCELLED')
+          .toList();
+      final selected = <int, Map<String, dynamic>>{};
+      for (final request in activeRequests) {
+        if (request['isOwnRequest'] != true ||
+            '${request['statusCode']}' != 'PENDING') {
+          continue;
+        }
+        final itemId = _int(request['itemId']);
+        if (itemId == null || selected.containsKey(itemId)) continue;
+        final quantity = request['quantity'];
+        final quantityText = quantity is num && quantity % 1 == 0
+            ? quantity.toInt().toString()
+            : '${quantity ?? 1}';
+        selected[itemId] = {
+          'itemId': itemId,
+          'detailId': _int(request['detailId']),
+          'quantityController': TextEditingController(text: quantityText),
+          'remarkController': TextEditingController(
+            text: '${request['remark'] ?? ''}',
+          ),
+        };
+      }
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 18,
+              vertical: 24,
+            ),
+            titlePadding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
+            contentPadding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+            actionsPadding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(LaooRadius.xs),
+            ),
+            icon: Icon(
+              Icons.handyman_outlined,
+              color: workspaceThemeController.value.primary,
+              size: 26,
+            ),
+            iconPadding: const EdgeInsets.only(top: 18, bottom: 0),
+            scrollable: true,
+            title: const Text('ขออุปกรณ์เพิ่มเติม'),
+            content: SizedBox(
+              width: 680,
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${detail['bookingNo'] ?? ''} | ${detail['subject'] ?? ''}',
+                    ),
+                    const SizedBox(height: 8),
+                    Text('ปิดรับ: ${detail['cutoff'] ?? '-'}'),
+                    if (detail['canRequest'] != true)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 8),
+                        child: Text(
+                          'ไม่สามารถส่งคำขอได้ เนื่องจากเกินเวลาปิดรับหรือยังไม่ได้เปิดรับ',
+                          style: TextStyle(color: Colors.red),
+                        ),
+                      ),
+                    const Divider(height: 24),
+                    ...items.map((equipment) {
+                      final id = _int(equipment['itemId'])!;
+                      final line = selected[id];
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Column(
+                          children: [
+                            CheckboxListTile(
+                              contentPadding: EdgeInsets.zero,
+                              value: line != null,
+                              title: Text('${equipment['name'] ?? ''}'),
+                              subtitle: Text(
+                                '${equipment['departmentName'] ?? ''}',
+                              ),
+                              onChanged: detail['canRequest'] != true
+                                  ? null
+                                  : (checked) => setDialogState(() {
+                                      if (checked == true) {
+                                        selected[id] = {
+                                          'itemId': id,
+                                          'quantity': 1,
+                                          'remark': '',
+                                          'quantityController':
+                                              TextEditingController(text: '1'),
+                                          'remarkController':
+                                              TextEditingController(),
+                                        };
+                                      } else {
+                                        selected.remove(id);
+                                      }
+                                    }),
+                            ),
+                            if (line != null)
+                              Row(
+                                children: [
+                                  SizedBox(
+                                    width: 120,
+                                    child: TextField(
+                                      controller:
+                                          line['quantityController']
+                                              as TextEditingController,
+                                      keyboardType: TextInputType.number,
+                                      decoration: const InputDecoration(
+                                        labelText: 'จำนวน',
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: TextField(
+                                      controller:
+                                          line['remarkController']
+                                              as TextEditingController,
+                                      decoration: const InputDecoration(
+                                        labelText: 'หมายเหตุ',
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                          ],
+                        ),
+                      );
+                    }),
+                    if ((detail['requests'] as List? ?? const [])
+                        .isNotEmpty) ...[
+                      const Divider(height: 24),
+                      const Text('สถานะล่าสุด'),
+                      ...List<Map<String, dynamic>>.from(
+                        detail['requests'] as List,
+                      ).map(
+                        (request) => Text(
+                          '${request['itemName']} × ${request['quantity']} — ${request['statusCode']}${request['resultRemark'] == null ? '' : ' (${request['resultRemark']})'}',
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('ยกเลิก'),
+              ),
+              FilledButton(
+                onPressed: detail['canRequest'] != true || selected.isEmpty
+                    ? null
+                    : () async {
+                        final lines = selected.values
+                            .map(
+                              (line) => {
+                                'itemId': line['itemId'],
+                                'quantity':
+                                    num.tryParse(
+                                      (line['quantityController']
+                                              as TextEditingController)
+                                          .text,
+                                    ) ??
+                                    0,
+                                'remark':
+                                    (line['remarkController']
+                                            as TextEditingController)
+                                        .text,
+                              },
+                            )
+                            .toList();
+                        try {
+                          await _equipmentRequests.save(bookingId, lines);
+                          if (dialogContext.mounted) {
+                            Navigator.pop(dialogContext);
+                          }
+                          _notify('ส่งคำขออุปกรณ์เพิ่มเติมแล้ว', false);
+                        } catch (error) {
+                          _notify(
+                            _error(error, 'ส่งคำขออุปกรณ์ไม่สำเร็จ'),
+                            true,
+                          );
+                        }
+                      },
+                child: const Text('ส่งคำขอ'),
+              ),
+            ],
+          ),
+        ),
+      );
+    } catch (error) {
+      _notify(_error(error, 'ไม่สามารถเปิดคำขออุปกรณ์ได้'), true);
+    }
+  }
+
   Future<void> _showParticipantDialog(Map<String, dynamic> item) async {
     final bookingId = _int(item['bookingId']);
     if (bookingId == null) return;
@@ -1208,6 +2111,14 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
         : '$fallback\n$error';
     _showMessage(text, error: true);
   }
+
+  void _notify(String message, bool error) =>
+      _showMessage(message, error: error);
+
+  String _error(Object error, String fallback) =>
+      error is ApiException && error.message.isNotEmpty
+      ? error.message
+      : fallback;
 
   @override
   Widget build(BuildContext context) {
@@ -1661,7 +2572,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
       margin: EdgeInsets.zero,
       color: LaooColors.white,
       surfaceTintColor: Colors.transparent,
-      elevation: 1,
+      elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(LaooRadius.xs),
         side: BorderSide.none,
@@ -2006,7 +2917,6 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
     required bool availability,
   }) {
     final id = _int(room['roomId']);
-    final selected = id == _selectedRoomId;
     final available = !availability || room['isAvailable'] == true;
     final imageUrl = room['roomImageUrl']?.toString();
     final bookingsForSelectedDate = _sortBookings(
@@ -2016,7 +2926,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
       margin: EdgeInsets.zero,
       color: LaooColors.white,
       surfaceTintColor: Colors.transparent,
-      elevation: selected ? 2 : 1,
+      elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(LaooRadius.xs),
         side: BorderSide.none,
@@ -2370,7 +3280,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
                     _bookingCard(_bookings[index], preset),
               );
             }
-            return SingleChildScrollView(
+            return _bookingTable(preset); /*
               scrollDirection: Axis.horizontal,
               child: ConstrainedBox(
                 constraints: BoxConstraints(minWidth: constraints.maxWidth),
@@ -2433,7 +3343,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
                   }).toList(),
                 ),
               ),
-            );
+            );*/
           },
         ),
         const SizedBox(height: 8),
@@ -2444,11 +3354,140 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
     ),
   );
 
+  Widget _bookingTable(WorkspaceThemePreset preset) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Container(
+        color: preset.primary.withValues(alpha: .10),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+        child: Row(
+          children: [
+            _bookingTableHeader('สถานะ', 94),
+            Expanded(flex: 2, child: _bookingTableHeader('เลขที่จอง', 0)),
+            Expanded(flex: 2, child: _bookingTableHeader('ห้องประชุม', 0)),
+            Expanded(flex: 2, child: _bookingTableHeader('วันและเวลา', 0)),
+            SizedBox(width: 340, child: _bookingTableHeader('การดำเนินการ', 0)),
+          ],
+        ),
+      ),
+      ListView.separated(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: _bookings.length,
+        separatorBuilder: (_, _) =>
+            const Divider(height: 1, thickness: .5, color: LaooColors.border),
+        itemBuilder: (context, index) =>
+            _bookingTableRow(_bookings[index], preset, index),
+      ),
+    ],
+  );
+
+  Widget _bookingTableHeader(String text, double width) => SizedBox(
+    width: width == 0 ? null : width,
+    child: Text(
+      text,
+      style: TextStyle(
+        color: workspaceThemeController.value.primary,
+        fontSize: LaooTypography.tableHeader,
+        fontWeight: FontWeight.w700,
+      ),
+    ),
+  );
+
+  Widget _bookingTableRow(
+    Map<String, dynamic> item,
+    WorkspaceThemePreset preset,
+    int index,
+  ) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            SizedBox(
+              width: 94,
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 20,
+                    child: Text(
+                      '${(_page - 1) * _pageSize + index + 1}',
+                      style: TextStyle(color: preset.textSecondary),
+                    ),
+                  ),
+                  Expanded(child: _status(item['status']?.toString(), preset)),
+                ],
+              ),
+            ),
+            Expanded(flex: 2, child: Text('${item['bookingNo'] ?? '-'}')),
+            Expanded(
+              flex: 2,
+              child: Text(
+                '${item['roomCode'] ?? '-'} | ${item['roomNameTh'] ?? '-'}',
+              ),
+            ),
+            Expanded(flex: 2, child: Text(_bookingDateTime(item))),
+            SizedBox(
+              width: 340,
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: _bookingActions(item, preset),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Padding(
+          padding: const EdgeInsets.only(left: 94),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  'หัวข้อ: ${item['subject'] ?? '-'}',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 16),
+              SizedBox(
+                width: 220,
+                child: Text(
+                  'ผู้จอง: ${item['requesterCode'] ?? ''}${item['requesterCode'] == null ? '' : ' | '}${item['requesterName'] ?? '-'}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: preset.textSecondary),
+                ),
+              ),
+              const SizedBox(width: 16),
+              SizedBox(
+                width: 100,
+                child: Text(
+                  'ผู้เข้าร่วม: ${item['attendeeCount'] ?? '-'} คน',
+                  style: TextStyle(color: preset.textSecondary),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+
   Widget _bookingCard(
     Map<String, dynamic> item,
     WorkspaceThemePreset preset,
   ) => Card(
     margin: EdgeInsets.zero,
+    color: LaooColors.white,
+    surfaceTintColor: Colors.transparent,
+    elevation: 0,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(LaooRadius.xs),
+      side: const BorderSide(color: LaooColors.border, width: .8),
+    ),
     child: Padding(
       padding: const EdgeInsets.all(10),
       child: Column(
@@ -2525,6 +3564,12 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
             onPressed: () =>
                 setState(() => _foodPlanBookingId = _int(item['bookingId'])),
             icon: Icon(Icons.restaurant_menu_outlined, color: preset.primary),
+          ),
+        if (item['canManageEquipmentPlan'] == true)
+          IconButton(
+            tooltip: 'ขออุปกรณ์เพิ่มเติม',
+            onPressed: () => _showEquipmentRequestStyled(item),
+            icon: Icon(Icons.handyman_outlined, color: preset.primary),
           ),
         if (item['canManageParticipants'] == true)
           IconButton(
@@ -2619,6 +3664,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
   }
 
   Widget _status(String? value, WorkspaceThemePreset preset) {
+    final pending = value == 'PENDING';
     final negative = value == 'CANCELLED' || value == 'REJECTED';
     final label = switch (value) {
       'APPROVED' => 'อนุมัติแล้ว',
@@ -2627,11 +3673,18 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
       'CANCELLED' => 'ยกเลิก',
       _ => value ?? '-',
     };
-    final color = negative ? Colors.red : preset.primary;
+    final color = negative
+        ? Colors.red
+        : pending
+        ? LaooColors.pageCaption
+        : preset.primary;
+    final background = pending
+        ? LaooColors.gold.withValues(alpha: .18)
+        : color.withValues(alpha: .12);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: .12),
+        color: background,
         borderRadius: BorderRadius.circular(LaooRadius.xs),
       ),
       child: Text(label, style: TextStyle(color: color)),

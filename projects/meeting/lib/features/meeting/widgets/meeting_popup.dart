@@ -264,7 +264,10 @@ Widget meetingPickerBuilder(BuildContext context, Widget? child) {
         style: IconButton.styleFrom(foregroundColor: preset.primary),
       ),
     ),
-    child: child!,
+    child: MediaQuery(
+      data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+      child: child!,
+    ),
   );
 }
 

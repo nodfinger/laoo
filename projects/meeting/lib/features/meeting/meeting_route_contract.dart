@@ -23,9 +23,10 @@ abstract final class MeetingRouteNames {
   static const roomCheckIn = 'roomCheckIn';
   static const roomSupportTasks = 'roomSupportTasks';
   static const roomIssues = 'roomIssues';
+  static const equipmentRequests = 'meetingEquipmentRequests';
+  static const systemSettings = 'meetingSystemSettings';
   static const buildings = 'meetingBuildings';
   static const rooms = 'meetingRooms';
-  static const facilities = 'meetingFacilities';
   static const foods = 'meetingFoods';
   static const utilizationReport = 'meetingRoomUtilizationReport';
   static const noShowReport = 'meetingNoShowReport';
@@ -43,9 +44,10 @@ abstract final class MeetingMenuCodes {
   static const roomCheckIn = '22001';
   static const roomSupportTasks = '22002';
   static const roomIssues = '22003';
+  static const equipmentRequests = '22005';
+  static const systemSettings = '22006';
   static const buildings = '23001';
   static const rooms = '23002';
-  static const facilities = '23003';
   static const foods = '23004';
   static const utilizationReport = '24001';
   static const noShowReport = '24002';
@@ -63,9 +65,10 @@ abstract final class MeetingRoutePaths {
   static const roomCheckIn = '/company/room-check-in';
   static const roomSupportTasks = '/company/room-support-tasks';
   static const roomIssues = '/company/room-issues';
+  static const equipmentRequests = '/company/meeting-equipment-requests';
+  static const systemSettings = '/company/meeting-system-settings';
   static const buildings = '/company/meeting-buildings';
   static const rooms = '/company/meeting-rooms';
-  static const facilities = '/company/meeting-facilities';
   static const foods = '/company/meeting-foods';
   static const utilizationReport = '/company/reports/meeting-room-utilization';
   static const noShowReport = '/company/reports/meeting-no-show';
@@ -133,6 +136,18 @@ abstract final class MeetingRoutes {
     name: MeetingRouteNames.roomIssues,
     path: MeetingRoutePaths.roomIssues,
   );
+  static const equipmentRequests = MeetingRouteSpec(
+    menuCode: MeetingMenuCodes.equipmentRequests,
+    screenType: 2,
+    name: MeetingRouteNames.equipmentRequests,
+    path: MeetingRoutePaths.equipmentRequests,
+  );
+  static const systemSettings = MeetingRouteSpec(
+    menuCode: MeetingMenuCodes.systemSettings,
+    screenType: 2,
+    name: MeetingRouteNames.systemSettings,
+    path: MeetingRoutePaths.systemSettings,
+  );
   static const buildings = MeetingRouteSpec(
     menuCode: MeetingMenuCodes.buildings,
     screenType: 1,
@@ -144,12 +159,6 @@ abstract final class MeetingRoutes {
     screenType: 1,
     name: MeetingRouteNames.rooms,
     path: MeetingRoutePaths.rooms,
-  );
-  static const facilities = MeetingRouteSpec(
-    menuCode: MeetingMenuCodes.facilities,
-    screenType: 1,
-    name: MeetingRouteNames.facilities,
-    path: MeetingRoutePaths.facilities,
   );
   static const foods = MeetingRouteSpec(
     menuCode: MeetingMenuCodes.foods,
@@ -187,9 +196,10 @@ abstract final class MeetingRoutes {
     roomCheckIn,
     roomSupportTasks,
     roomIssues,
+    equipmentRequests,
+    systemSettings,
     buildings,
     rooms,
-    facilities,
     foods,
     utilizationReport,
     noShowReport,
