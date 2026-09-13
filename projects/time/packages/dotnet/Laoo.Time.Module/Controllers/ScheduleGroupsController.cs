@@ -14,7 +14,7 @@ namespace LaooTimeModule.Controllers;
 public sealed class ScheduleGroupsController(IConfiguration configuration) : ControllerBase
 {
     private const string MenuCode = "27002";
-    public sealed record SaveRequest(string GroupCode,string GroupName,string? DescriptionText,bool IsActive,string? RowVersion);
+    public sealed record ScheduleGroupSaveRequest(string GroupCode,string GroupName,string? DescriptionText,bool IsActive,string? RowVersion);
 
     [HttpGet("actions")]
     public async Task<IActionResult> Actions(CancellationToken token)
@@ -36,7 +36,7 @@ public sealed class ScheduleGroupsController(IConfiguration configuration) : Con
     }
 
     [HttpPost]
-    public async Task<IActionResult> Create(SaveRequest request,CancellationToken token)
+    public async Task<IActionResult> Create(ScheduleGroupSaveRequest request,CancellationToken token)
     {
         if(!Scope(out var companyId,out var userId))return Forbid();var error=Validate(request);if(error!=null)return BadRequest(new{message=error});await using var c=await Open(token);if(!await Can(c,"CREATE",token))return Forbid();
         await using var cmd=new SqlCommand("INSERT dbo.TDTMWorkScheduleGroup(CompanyID,GroupCode,GroupName,DescriptionText,IsActive,CreateBy) OUTPUT INSERTED.WorkScheduleGroupID VALUES(@CompanyID,@Code,@Name,@Description,@Active,@UserID)",c);BindSave(cmd,companyId,userId,request);
@@ -44,7 +44,7 @@ public sealed class ScheduleGroupsController(IConfiguration configuration) : Con
     }
 
     [HttpPut("{id:long}")]
-    public async Task<IActionResult> Update(long id,SaveRequest request,CancellationToken token)
+    public async Task<IActionResult> Update(long id,ScheduleGroupSaveRequest request,CancellationToken token)
     {
         if(!Scope(out var companyId,out var userId))return Forbid();var error=Validate(request);if(error!=null)return BadRequest(new{message=error});if(string.IsNullOrWhiteSpace(request.RowVersion))return BadRequest(new{message="ไม่พบ Version ของข้อมูล"});await using var c=await Open(token);if(!await Can(c,"EDIT",token))return Forbid();
         await using var cmd=new SqlCommand("UPDATE dbo.TDTMWorkScheduleGroup SET GroupCode=@Code,GroupName=@Name,DescriptionText=@Description,IsActive=@Active,UpdateDate=SYSDATETIME(),UpdateBy=@UserID WHERE CompanyID=@CompanyID AND WorkScheduleGroupID=@ID AND RowVersion=CONVERT(binary(8),@RowVersion,2)",c);BindSave(cmd,companyId,userId,request);Add(cmd,"@ID",SqlDbType.BigInt,id);Add(cmd,"@RowVersion",SqlDbType.VarChar,request.RowVersion,32);
@@ -57,11 +57,11 @@ public sealed class ScheduleGroupsController(IConfiguration configuration) : Con
         if(!Scope(out var companyId,out var userId))return Forbid();await using var c=await Open(token);if(!await Can(c,"DELETE",token))return Forbid();await using var cmd=new SqlCommand("IF EXISTS(SELECT 1 FROM dbo.TDTMWorkScheduleGroupAssignment WHERE CompanyID=@CompanyID AND WorkScheduleGroupID=@ID) OR EXISTS(SELECT 1 FROM dbo.TDTMGroupShiftRotation WHERE CompanyID=@CompanyID AND WorkScheduleGroupID=@ID) THROW 52331,N'กลุ่มนี้ถูกใช้งานในตารางแล้ว ไม่สามารถลบได้',1; UPDATE dbo.TDTMWorkScheduleGroup SET IsActive=0,UpdateDate=SYSDATETIME(),UpdateBy=@UserID WHERE CompanyID=@CompanyID AND WorkScheduleGroupID=@ID AND RowVersion=CONVERT(binary(8),@RowVersion,2)",c);Add(cmd,"@CompanyID",SqlDbType.BigInt,companyId);Add(cmd,"@ID",SqlDbType.BigInt,id);Add(cmd,"@UserID",SqlDbType.BigInt,userId);Add(cmd,"@RowVersion",SqlDbType.VarChar,rowVersion,32);try{return await cmd.ExecuteNonQueryAsync(token)==1?NoContent():Conflict(new{message="ข้อมูลถูกแก้ไขแล้ว กรุณาโหลดใหม่"});}catch(SqlException e)when(e.Number==52331){return Conflict(new{message=e.Message});}
     }
 
-    private static string? Validate(SaveRequest r){if(Clean(r.GroupCode)is null||r.GroupCode.Trim().Length>30)return"กรุณาระบุรหัสกลุ่มไม่เกิน 30 ตัวอักษร";if(Clean(r.GroupName)is null||r.GroupName.Trim().Length>150)return"กรุณาระบุชื่อกลุ่มไม่เกิน 150 ตัวอักษร";if(Clean(r.DescriptionText)?.Length>500)return"รายละเอียดต้องไม่เกิน 500 ตัวอักษร";return null;}
+    private static string? Validate(ScheduleGroupSaveRequest r){if(Clean(r.GroupCode)is null||r.GroupCode.Trim().Length>30)return"กรุณาระบุรหัสกลุ่มไม่เกิน 30 ตัวอักษร";if(Clean(r.GroupName)is null||r.GroupName.Trim().Length>150)return"กรุณาระบุชื่อกลุ่มไม่เกิน 150 ตัวอักษร";if(Clean(r.DescriptionText)?.Length>500)return"รายละเอียดต้องไม่เกิน 500 ตัวอักษร";return null;}
     private async Task<bool> Can(SqlConnection c,string a,CancellationToken t)=>await CompanyMenuAccess.IsAllowedAsync(c,User,MenuCode,a,t);private async Task<SqlConnection> Open(CancellationToken t){var c=new SqlConnection(configuration.GetConnectionString("LaooDatabase"));await c.OpenAsync(t);return c;}
     private bool Scope(out long companyId,out long userId){companyId=0;userId=0;return string.Equals(User.FindFirstValue("user_type"),"COMPANY_USER",StringComparison.OrdinalIgnoreCase)&&long.TryParse(User.FindFirstValue("company_id"),out companyId)&&long.TryParse(User.FindFirstValue("user_id"),out userId)&&companyId>0&&userId>0;}
     private static async Task<string> Caption(SqlConnection c,CancellationToken t){await using var q=new SqlCommand("SELECT TOP(1) MenuName FROM dbo.TDADMainMenu WHERE MenuCode=@Code",c);Add(q,"@Code",SqlDbType.Char,MenuCode,5);return Convert.ToString(await q.ExecuteScalarAsync(t))??"กลุ่มตารางทำงาน";}
     private static void Bind(SqlCommand c,long id,string? search,bool? active){Add(c,"@CompanyID",SqlDbType.BigInt,id);Add(c,"@Search",SqlDbType.NVarChar,search,150);Add(c,"@Active",SqlDbType.Bit,active);}
-    private static void BindSave(SqlCommand c,long id,long user,SaveRequest r){Add(c,"@CompanyID",SqlDbType.BigInt,id);Add(c,"@Code",SqlDbType.NVarChar,r.GroupCode.Trim().ToUpperInvariant(),30);Add(c,"@Name",SqlDbType.NVarChar,r.GroupName.Trim(),150);Add(c,"@Description",SqlDbType.NVarChar,Clean(r.DescriptionText),500);Add(c,"@Active",SqlDbType.Bit,r.IsActive);Add(c,"@UserID",SqlDbType.BigInt,user);}
+    private static void BindSave(SqlCommand c,long id,long user,ScheduleGroupSaveRequest r){Add(c,"@CompanyID",SqlDbType.BigInt,id);Add(c,"@Code",SqlDbType.NVarChar,r.GroupCode.Trim().ToUpperInvariant(),30);Add(c,"@Name",SqlDbType.NVarChar,r.GroupName.Trim(),150);Add(c,"@Description",SqlDbType.NVarChar,Clean(r.DescriptionText),500);Add(c,"@Active",SqlDbType.Bit,r.IsActive);Add(c,"@UserID",SqlDbType.BigInt,user);}
     private static string? Clean(string? x)=>string.IsNullOrWhiteSpace(x)?null:x.Trim();private static void Add(SqlCommand c,string n,SqlDbType t,object? v,int s=0){var p=s==0?c.Parameters.Add(n,t):c.Parameters.Add(n,t,s);p.Value=v??DBNull.Value;}
 }

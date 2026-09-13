@@ -14,6 +14,8 @@ abstract final class TimeMenuGroups {
 }
 
 abstract final class TimeMenuCodes {
+  static const attendanceEvents = '25001';
+  static const attendanceResults = '25002';
   static const shiftTemplates = '27001';
   static const scheduleGroups = '27002';
   static const rotationPatterns = '27003';
@@ -25,9 +27,14 @@ abstract final class TimeMenuCodes {
   static const onBehalfReasons = '28003';
   static const adjustmentReasons = '28004';
   static const myTimeCorrections = '30001';
+  static const attendancePeriodSchemes = '29001';
+  static const attendancePeriodAssignments = '29002';
+  static const attendancePeriods = '29003';
 }
 
 abstract final class TimeRouteNames {
+  static const attendanceEvents = 'timeAttendanceEvents';
+  static const attendanceResults = 'timeAttendanceResults';
   static const shiftTemplates = 'timeShiftTemplates';
   static const scheduleGroups = 'timeScheduleGroups';
   static const rotationPatterns = 'timeRotationPatterns';
@@ -39,9 +46,14 @@ abstract final class TimeRouteNames {
   static const onBehalfReasons = 'timeOnBehalfReasons';
   static const adjustmentReasons = 'timeAdjustmentReasons';
   static const myTimeCorrections = 'myTimeCorrections';
+  static const attendancePeriodSchemes = 'timeAttendancePeriodSchemes';
+  static const attendancePeriodAssignments = 'timeAttendancePeriodAssignments';
+  static const attendancePeriods = 'timeAttendancePeriods';
 }
 
 abstract final class TimeRoutePaths {
+  static const attendanceEvents = '/company/time-attendance-events';
+  static const attendanceResults = '/company/time-attendance-results';
   static const shiftTemplates = '/company/time-shift-templates';
   static const scheduleGroups = '/company/time-schedule-groups';
   static const rotationPatterns = '/company/time-rotation-patterns';
@@ -53,9 +65,32 @@ abstract final class TimeRoutePaths {
   static const onBehalfReasons = '/company/time-on-behalf-reasons';
   static const adjustmentReasons = '/company/time-adjustment-reasons';
   static const myTimeCorrections = '/company/my-time-corrections';
+  static const attendancePeriodSchemes =
+      '/company/time-attendance-period-schemes';
+  static const attendancePeriodAssignments =
+      '/company/time-attendance-period-assignments';
+  static const attendancePeriods = '/company/time-attendance-periods';
 }
 
 abstract final class TimeRoutes {
+  static const attendanceEvents = FeatureRouteContract(
+    projectCode: TimeProject.code,
+    menuCode: TimeMenuCodes.attendanceEvents,
+    screenType: 3,
+    routeName: TimeRouteNames.attendanceEvents,
+    routePath: TimeRoutePaths.attendanceEvents,
+    isImplemented: true,
+  );
+
+  static const attendanceResults = FeatureRouteContract(
+    projectCode: TimeProject.code,
+    menuCode: TimeMenuCodes.attendanceResults,
+    screenType: 3,
+    routeName: TimeRouteNames.attendanceResults,
+    routePath: TimeRoutePaths.attendanceResults,
+    isImplemented: true,
+  );
+
   static const shiftTemplates = FeatureRouteContract(
     projectCode: TimeProject.code,
     menuCode: TimeMenuCodes.shiftTemplates,
@@ -149,8 +184,34 @@ abstract final class TimeRoutes {
     routePath: TimeRoutePaths.myTimeCorrections,
     isImplemented: true,
   );
+  static const attendancePeriodSchemes = FeatureRouteContract(
+    projectCode: TimeProject.code,
+    menuCode: TimeMenuCodes.attendancePeriodSchemes,
+    screenType: 1,
+    routeName: TimeRouteNames.attendancePeriodSchemes,
+    routePath: TimeRoutePaths.attendancePeriodSchemes,
+    isImplemented: true,
+  );
+  static const attendancePeriodAssignments = FeatureRouteContract(
+    projectCode: TimeProject.code,
+    menuCode: TimeMenuCodes.attendancePeriodAssignments,
+    screenType: 4,
+    routeName: TimeRouteNames.attendancePeriodAssignments,
+    routePath: TimeRoutePaths.attendancePeriodAssignments,
+    isImplemented: true,
+  );
+  static const attendancePeriods = FeatureRouteContract(
+    projectCode: TimeProject.code,
+    menuCode: TimeMenuCodes.attendancePeriods,
+    screenType: 3,
+    routeName: TimeRouteNames.attendancePeriods,
+    routePath: TimeRoutePaths.attendancePeriods,
+    isImplemented: true,
+  );
 
   static const all = <FeatureRouteContract>[
+    attendanceEvents,
+    attendanceResults,
     shiftTemplates,
     scheduleGroups,
     rotationPatterns,
@@ -162,6 +223,9 @@ abstract final class TimeRoutes {
     onBehalfReasons,
     adjustmentReasons,
     myTimeCorrections,
+    attendancePeriodSchemes,
+    attendancePeriodAssignments,
+    attendancePeriods,
   ];
 
   static Iterable<FeatureRouteContract> get implemented =>

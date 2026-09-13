@@ -32,6 +32,9 @@ class TimeSystemSettings {
     required this.defaultProfileCode,
     required this.processProfiles,
     required this.requestPolicies,
+    required this.defaultAttendancePeriodSchemeId,
+    required this.defaultAttendancePeriodSchemeCode,
+    required this.defaultAttendancePeriodSchemeName,
     required this.activeEmployeeCount,
     required this.employeeWithoutLoginCount,
     required this.selfServiceReady,
@@ -42,6 +45,9 @@ class TimeSystemSettings {
   final String defaultProfileCode;
   final Map<String, String> processProfiles;
   final Map<String, String> requestPolicies;
+  final int? defaultAttendancePeriodSchemeId;
+  final String? defaultAttendancePeriodSchemeCode;
+  final String? defaultAttendancePeriodSchemeName;
   final int activeEmployeeCount;
   final int employeeWithoutLoginCount;
   final bool selfServiceReady;
@@ -56,6 +62,12 @@ class TimeSystemSettings {
             json['defaultProfileCode']?.toString() ?? 'OWNER_OPERATED',
         processProfiles: _stringMap(json['processProfiles']),
         requestPolicies: _stringMap(json['requestPolicies']),
+        defaultAttendancePeriodSchemeId:
+            (json['defaultAttendancePeriodSchemeId'] as num?)?.toInt(),
+        defaultAttendancePeriodSchemeCode:
+            json['defaultAttendancePeriodSchemeCode']?.toString(),
+        defaultAttendancePeriodSchemeName:
+            json['defaultAttendancePeriodSchemeName']?.toString(),
         activeEmployeeCount:
             (json['activeEmployeeCount'] as num?)?.toInt() ?? 0,
         employeeWithoutLoginCount:
@@ -71,6 +83,7 @@ class TimeSystemSettingsUpdate {
     required this.defaultProfileCode,
     required this.processProfiles,
     required this.requestPolicies,
+    required this.defaultAttendancePeriodSchemeId,
     required this.reason,
     required this.stateToken,
   });
@@ -79,6 +92,7 @@ class TimeSystemSettingsUpdate {
   final String defaultProfileCode;
   final Map<String, String> processProfiles;
   final Map<String, String> requestPolicies;
+  final int? defaultAttendancePeriodSchemeId;
   final String reason;
   final String stateToken;
 
@@ -87,6 +101,7 @@ class TimeSystemSettingsUpdate {
     'defaultProfileCode': defaultProfileCode,
     'processProfiles': processProfiles,
     'requestPolicies': requestPolicies,
+    'defaultAttendancePeriodSchemeId': defaultAttendancePeriodSchemeId,
     'reason': reason.trim(),
     'stateToken': stateToken,
   };
