@@ -82,6 +82,9 @@ void main() {
       '24001',
       '24002',
       '24003',
+      '29001',
+      '29002',
+      '29003',
     };
 
     final specs = AppMenuRouteRegistry.all.toList();
