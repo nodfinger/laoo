@@ -40,7 +40,8 @@ public sealed class PersonRegistryController(IConfiguration configuration) : Con
 SELECT COUNT_BIG(1) OVER(),P.PersonID,P.FullName,P.NickName,P.Email,P.Mobile,P.IsActive,P.RowVersion,
        CAST(CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADEmployee E WHERE E.CompanyID=P.CompanyID AND E.PersonID=P.PersonID) THEN 1 ELSE 0 END AS bit),
        CAST(CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADUser U WHERE U.CompanyID=P.CompanyID AND U.PersonID=P.PersonID) THEN 1 ELSE 0 END AS bit),
-       CAST(CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADResident R WHERE R.CompanyID=P.CompanyID AND R.PersonID=P.PersonID) THEN 1 ELSE 0 END AS bit)
+       CAST(CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADResident R WHERE R.CompanyID=P.CompanyID AND R.PersonID=P.PersonID) THEN 1 ELSE 0 END AS bit),
+       CAST(CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADServiceCustomer S WHERE S.CompanyID=P.CompanyID AND S.PersonID=P.PersonID AND S.IsActive=1) THEN 1 ELSE 0 END AS bit)
 FROM dbo.TDADPerson P
 WHERE P.CompanyID=@company AND (@active IS NULL OR P.IsActive=@active)
   AND (@search=N'' OR P.FullName LIKE @like OR P.NickName LIKE @like OR P.Email LIKE @like OR P.Mobile LIKE @like)
@@ -78,7 +79,7 @@ OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY;
     {
         await using var connection=await Open(token);
         if(!await ScopeValid(connection,token)||!await Can(connection,"VIEW",token))return Forbid();
-        const string sql="SELECT PersonID,FullName,NickName,Email,Mobile,IsActive,RowVersion,CAST(0 AS bit),CAST(0 AS bit),CAST(0 AS bit) FROM dbo.TDADPerson WHERE CompanyID=@company AND PersonID=@id";
+        const string sql="SELECT PersonID,FullName,NickName,Email,Mobile,IsActive,RowVersion,CAST(0 AS bit),CAST(0 AS bit),CAST(0 AS bit),CAST(CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADServiceCustomer S WHERE S.CompanyID=P.CompanyID AND S.PersonID=P.PersonID AND S.IsActive=1) THEN 1 ELSE 0 END AS bit) FROM dbo.TDADPerson P WHERE CompanyID=@company AND PersonID=@id";
         await using var command=new SqlCommand(sql,connection);Add(command,"@company",SqlDbType.BigInt,CompanyId);Add(command,"@id",SqlDbType.BigInt,id);
         await using var reader=await command.ExecuteReaderAsync(token);return await reader.ReadAsync(token)?Ok(PersonRow(reader,0)):NotFound();
     }
@@ -99,6 +100,7 @@ OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY;
 IF EXISTS(SELECT 1 FROM dbo.TDADEmployee WHERE CompanyID=@company AND PersonID=@id)
  OR EXISTS(SELECT 1 FROM dbo.TDADUser WHERE CompanyID=@company AND PersonID=@id)
  OR EXISTS(SELECT 1 FROM dbo.TDADResident WHERE CompanyID=@company AND PersonID=@id)
+ OR EXISTS(SELECT 1 FROM dbo.TDADServiceCustomer WHERE CompanyID=@company AND PersonID=@id)
  THROW 52810,'PERSON_REFERENCED',1;
 DELETE dbo.TDADPerson WHERE CompanyID=@company AND PersonID=@id AND RowVersion=@version;
 SELECT @@ROWCOUNT;
@@ -153,7 +155,7 @@ SELECT @id;
     private Task<SqlConnection> Open(CancellationToken token)=>RegistryControllerSupport.Open(configuration,token);
     private Task<bool> Can(SqlConnection connection,string action,CancellationToken token)=>CompanyProjectPermission.IsAllowedAsync(connection,User,ScreenCode,action,token);
     private Task<bool> ScopeValid(SqlConnection connection,CancellationToken token)=>RegistryControllerSupport.ScopeValid(connection,User,token);
-    private static object PersonRow(SqlDataReader r,int i)=>new {personID=r.GetInt64(i),fullName=r.GetString(i+1),nickName=Text(r,i+2),email=Text(r,i+3),mobile=Text(r,i+4),isActive=r.GetBoolean(i+5),rowVersion=Convert.ToBase64String((byte[])r[i+6]),hasEmployee=r.GetBoolean(i+7),hasUser=r.GetBoolean(i+8),hasResident=r.GetBoolean(i+9)};
+    private static object PersonRow(SqlDataReader r,int i)=>new {personID=r.GetInt64(i),fullName=r.GetString(i+1),nickName=Text(r,i+2),email=Text(r,i+3),mobile=Text(r,i+4),isActive=r.GetBoolean(i+5),rowVersion=Convert.ToBase64String((byte[])r[i+6]),hasEmployee=r.GetBoolean(i+7),hasUser=r.GetBoolean(i+8),hasResident=r.GetBoolean(i+9),hasServiceCustomer=r.GetBoolean(i+10)};
     private static string? Text(SqlDataReader r,int i)=>r.IsDBNull(i)?null:r.GetString(i);
     private static string? Blank(string? value)=>string.IsNullOrWhiteSpace(value)?null:value.Trim();
     private static object Problem(string message,string description)=>new{message,description};

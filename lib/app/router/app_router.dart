@@ -4,7 +4,6 @@ import '../../features/company/vendor/data/vendor_api.dart';
 import '../../core/navigation/navigation_menu_repository.dart';
 import '../../features/company/vendor/pages/vendor_page.dart';
 import '../../features/company/person/pages/person_registry_page.dart';
-import '../../features/company/resident/pages/resident_registry_page.dart';
 import 'package:laoo_meeting/meeting_feature.dart';
 import 'package:laoo_service/service_feature.dart';
 import 'package:laoo_time/time_feature.dart';
@@ -125,11 +124,7 @@ final GoRouter appRouter = GoRouter(
       name: RouteNames.companyPersons,
       builder: (context, state) => const PersonRegistryPage(),
     ),
-    GoRoute(
-      path: RoutePaths.assetResidents,
-      name: RouteNames.assetResidents,
-      builder: (context, state) => const ResidentRegistryPage(),
-    ),
+
     GoRoute(
       path: RoutePaths.landing,
       name: RouteNames.landing,

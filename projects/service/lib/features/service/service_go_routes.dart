@@ -3,12 +3,13 @@ import 'package:go_router/go_router.dart';
 import 'package:laoo_shared_core/laoo_shared_core.dart';
 
 import '../company/customer/pages/customer_page.dart';
+import '../company/person/pages/service_person_page.dart';
 import '../company/delivery_note/pages/delivery_note_page.dart';
 import '../company/pre_order/pages/pre_order_page.dart';
 import '../company/quotation/pages/quotation_page.dart';
 import '../company/tax_invoice/pages/tax_invoice_page.dart';
 import '../company/temporary_receipt/pages/temporary_receipt_page.dart';
-import '../inventory/pages/inventory_pages.dart' hide StockReceiptPage;
+import '../inventory/pages/inventory_pages.dart';
 import '../inventory/pages/stock_receipt_page.dart';
 import '../support/presentation/widgets/support_workspace_shell.dart';
 import 'service_route_contract.dart';
@@ -70,6 +71,7 @@ List<GoRoute> buildServiceFeatureRoutes({
     (state) => StockReceiptPage(onCreateVendor: onCreateReceiptVendor),
   ),
   _page('08006', (state) => const SerialRegistryPage()),
+  _page('14004', (state) => const ServicePersonPage()),
   ..._workspacePlaceholders.entries.map(
     (entry) =>
         _workspacePlaceholder(ServiceRoutes.byMenuCode(entry.key), entry.value),

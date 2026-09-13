@@ -7,7 +7,7 @@ import 'package:laoo/features/company/resident/data/resident_registry_api.dart';
 import 'package:laoo/features/company/resident/pages/resident_registry_page.dart';
 
 void main() {
-  test('Person and Resident menus are registered as Core CRUD routes', () {
+  test('Person stays in Core while Service owns menu 14004', () {
     final person = AppMenuRouteRegistry.byMenuCode('13002');
     final resident = AppMenuRouteRegistry.byMenuCode('14004');
 
@@ -15,7 +15,7 @@ void main() {
     expect(person!.path, '/company/persons');
     expect(person.scope, AppMenuScope.company);
     expect(resident, isNotNull);
-    expect(resident!.path, '/asset/residents');
+    expect(resident!.path, '/service/persons');
     expect(resident.scope, AppMenuScope.company);
   });
 

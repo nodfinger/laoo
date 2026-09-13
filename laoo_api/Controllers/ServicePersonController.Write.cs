@@ -1,0 +1,181 @@
+using System.Data;
+using LaooApi.Models;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.SqlClient;
+
+namespace LaooApi.Controllers;
+
+public sealed partial class ServicePersonController
+{
+    [HttpGet("lookup")]
+    public async Task<IActionResult> Lookup([FromQuery] long? includePersonId, [FromQuery] long? includeRoomId, CancellationToken token)
+    {
+        await using var c = await Open(token);
+        if (!await InServiceScope(c, token) || !await Allowed(c, "VIEW", token)) return Forbid();
+        const string sql = """
+SELECT ISNULL(NULLIF(UPPER(LTRIM(RTRIM(BusinessTypeCode))),N''),N'COMPANY') FROM dbo.TDSTCompanySetUp WHERE CompanyID=@company;
+SELECT PersonID id,FullName name,NickName nickName,Mobile mobile,Email email,IsActive active,RowVersion rowVersion
+FROM dbo.TDADPerson WHERE CompanyID=@company AND (IsActive=1 OR PersonID=@person) ORDER BY FullName,PersonID;
+SELECT BuildingID id,BuildingCode code,BuildingNameTH name FROM dbo.TDADBuilding WHERE CompanyID=@company AND IsActive=1 ORDER BY BuildingCode;
+SELECT F.FloorID id,F.BuildingID parentId,F.FloorCode code,F.FloorNameTH name FROM dbo.TDADFloor F JOIN dbo.TDADBuilding B ON B.BuildingID=F.BuildingID WHERE B.CompanyID=@company AND F.IsActive=1 ORDER BY F.FloorNumber,F.FloorCode;
+SELECT RoomID id,BuildingID buildingId,FloorID parentId,RoomCode code,RoomNameTH name FROM dbo.TDADRoom WHERE CompanyID=@company AND (IsActive=1 OR RoomID=@room) AND RoomTypeCode=N'RESIDENTIAL' ORDER BY RoomCode;
+""";
+        await using var cmd = new SqlCommand(sql, c);
+        Add(cmd, "@company", SqlDbType.BigInt, CompanyId); Add(cmd, "@person", SqlDbType.BigInt, includePersonId); Add(cmd, "@room", SqlDbType.BigInt, includeRoomId);
+        await using var reader = await cmd.ExecuteReaderAsync(token);
+        var businessType = CompanyBusinessType.Company;
+        if (await reader.ReadAsync(token)) businessType = CompanyBusinessType.Normalize(reader.GetString(0));
+        var sets = new List<List<Dictionary<string, object?>>>();
+        while (await reader.NextResultAsync(token))
+        {
+            var rows = new List<Dictionary<string, object?>>();
+            while (await reader.ReadAsync(token))
+            {
+                var row = new Dictionary<string, object?>();
+                for (var i = 0; i < reader.FieldCount; i++)
+                    row[reader.GetName(i)] = reader.IsDBNull(i) ? null : reader.GetValue(i) is byte[] bytes ? Convert.ToBase64String(bytes) : reader.GetValue(i);
+                rows.Add(row);
+            }
+            sets.Add(rows);
+        }
+        return Ok(new { businessTypeCode = businessType, persons = sets[0], buildings = sets[1], floors = sets[2], rooms = sets[3] });
+    }
+
+    [HttpPost]
+    public Task<IActionResult> Create(ServicePersonSaveRequest request, CancellationToken token) => Save(null, request, token);
+
+    [HttpPut("{personId:long}")]
+    public Task<IActionResult> Update(long personId, ServicePersonSaveRequest request, CancellationToken token) => Save(personId, request, token);
+
+    private async Task<IActionResult> Save(long? routePersonId, ServicePersonSaveRequest x, CancellationToken token)
+    {
+        if (routePersonId.HasValue && x.PersonId.HasValue && routePersonId != x.PersonId)
+            return BadRequest(Issue("ข้อมูลบุคคลไม่ถูกต้อง", "PersonID ใน URL และข้อมูลบันทึกไม่ตรงกัน"));
+        var personId = routePersonId ?? x.PersonId;
+        var name = x.FullName?.Trim() ?? string.Empty;
+        if (!personId.HasValue && (name.Length is 0 or > 200))
+            return BadRequest(Issue("ข้อมูลบุคคลไม่ถูกต้อง", "กรุณาระบุชื่อ-นามสกุลไม่เกิน 200 ตัวอักษร"));
+        if (x.NickName?.Trim().Length > 100 || x.Email?.Trim().Length > 320 || x.Mobile?.Trim().Length > 50)
+            return BadRequest(Issue("ข้อมูลบุคคลไม่ถูกต้อง", "ชื่อเล่น อีเมล หรือโทรศัพท์ยาวเกินกำหนด"));
+        if (x.EndDate.HasValue && (!x.StartDate.HasValue || x.EndDate < x.StartDate))
+            return BadRequest(Issue("ช่วงเวลาพักอาศัยไม่ถูกต้อง", "วันสิ้นสุดต้องไม่ก่อนวันเริ่มต้น"));
+
+        await using var c = await Open(token);
+        if (!await InServiceScope(c, token) || !await Allowed(c, routePersonId.HasValue ? "EDIT" : "CREATE", token)) return Forbid();
+        var businessType = await BusinessType(c, token);
+        var dormitory = businessType == CompanyBusinessType.Dormitory;
+        var serviceCustomer = dormitory ? x.IsServiceCustomer : true;
+        var resident = dormitory && x.IsResident;
+        if (!serviceCustomer && !resident)
+            return BadRequest(Issue("กรุณาเลือกบทบาท", "บุคคลในระบบ Service ต้องมีอย่างน้อยหนึ่งบทบาท"));
+        if (resident && (!x.RoomId.HasValue || !x.StartDate.HasValue))
+            return BadRequest(Issue("ข้อมูลผู้พักอาศัยไม่ครบ", "กรุณาเลือกห้องและวันเริ่มพัก"));
+
+        byte[]? personVersion = Version(x.PersonRowVersion);
+        byte[]? customerVersion = Version(x.ServiceCustomerRowVersion);
+        byte[]? residentVersion = Version(x.ResidentRowVersion);
+        await using var tx = (SqlTransaction)await c.BeginTransactionAsync(IsolationLevel.Serializable, token);
+        try
+        {
+            if (!personId.HasValue)
+            {
+                const string insertPerson = "INSERT dbo.TDADPerson(CompanyID,FullName,NickName,Email,Mobile,IsActive,CreateBy) OUTPUT INSERTED.PersonID VALUES(@company,@name,@nick,@email,@mobile,@active,@actor);";
+                await using var cmd = new SqlCommand(insertPerson, c, tx); BindPerson(cmd, x, name); personId = Convert.ToInt64(await cmd.ExecuteScalarAsync(token));
+            }
+            else
+            {
+                await using var exists = new SqlCommand("SELECT COUNT(1) FROM dbo.TDADPerson WITH(UPDLOCK,HOLDLOCK) WHERE CompanyID=@company AND PersonID=@person", c, tx);
+                Add(exists, "@company", SqlDbType.BigInt, CompanyId); Add(exists, "@person", SqlDbType.BigInt, personId);
+                if (Convert.ToInt32(await exists.ExecuteScalarAsync(token)) == 0) throw new ServicePersonException("NOT_FOUND");
+                if (x.UpdatePerson)
+                {
+                    if (!await CanEditPerson(c, tx, token)) return Forbid();
+                    if (name.Length is 0 or > 200 || personVersion is null) return BadRequest(Issue("ข้อมูลกลางไม่ครบ", "กรุณาระบุชื่อและโหลดข้อมูลล่าสุดก่อนแก้ไข"));
+                    const string updatePerson = """
+DECLARE @before nvarchar(max)=(SELECT PersonID,FullName,NickName,Email,Mobile,IsActive FROM dbo.TDADPerson WHERE CompanyID=@company AND PersonID=@person FOR JSON PATH,WITHOUT_ARRAY_WRAPPER);
+UPDATE dbo.TDADPerson SET FullName=@name,NickName=@nick,Email=@email,Mobile=@mobile,IsActive=@active,UpdateDate=SYSUTCDATETIME(),UpdateBy=@actor
+WHERE CompanyID=@company AND PersonID=@person AND RowVersion=@version;
+IF @@ROWCOUNT=0 THROW 52951,'PERSON_CONFLICT',1;
+UPDATE dbo.TDADEmployee SET FullName=@name,NickName=@nick,Email=@email,PersonalTelephone=@mobile,IsActive=@active,UpdateDate=SYSUTCDATETIME() WHERE CompanyID=@company AND PersonID=@person;
+UPDATE dbo.TDADUser SET DisplayName=@name,Email=@email,Mobile=@mobile,UpdateDate=SYSUTCDATETIME(),UpdateBy=@actor WHERE CompanyID=@company AND PersonID=@person;
+DECLARE @after nvarchar(max)=(SELECT PersonID,FullName,NickName,Email,Mobile,IsActive FROM dbo.TDADPerson WHERE CompanyID=@company AND PersonID=@person FOR JSON PATH,WITHOUT_ARRAY_WRAPPER);
+INSERT dbo.TDADServicePersonAudit(CompanyID,PersonID,ActionCode,BeforeData,AfterData,CreateBy) VALUES(@company,@person,N'PERSON_UPDATE',@before,@after,@actor);
+""";
+                    await using var cmd = new SqlCommand(updatePerson, c, tx); BindPerson(cmd, x, name); Add(cmd, "@person", SqlDbType.BigInt, personId); Add(cmd, "@version", SqlDbType.Timestamp, personVersion); await cmd.ExecuteNonQueryAsync(token);
+                }
+            }
+
+            await UpsertServiceCustomer(c, tx, personId.Value, serviceCustomer, x.IsActive, customerVersion, token);
+            await UpsertResident(c, tx, personId.Value, resident, x, residentVersion, token);
+            await tx.CommitAsync(token);
+            return Ok(new { personID = personId });
+        }
+        catch (SqlException e) when (e.Number is 52951 or 52952 or 52953)
+        {
+            await tx.RollbackAsync(token);
+            return Conflict(Issue("ข้อมูลถูกเปลี่ยนแล้ว", "กรุณาโหลดรายการใหม่ก่อนบันทึก"));
+        }
+        catch (SqlException e) when (e.Number is 52954 or 52955)
+        {
+            await tx.RollbackAsync(token);
+            return Conflict(Issue("ข้อมูลผู้พักอาศัยซ้ำ", "บุคคลนี้มีช่วงเวลาพักอาศัยที่ทับซ้อนกัน"));
+        }
+        catch (ServicePersonException)
+        {
+            await tx.RollbackAsync(token);
+            return NotFound(Issue("ไม่พบข้อมูลบุคคล", "กรุณาโหลดรายการใหม่"));
+        }
+    }
+
+    private async Task UpsertServiceCustomer(SqlConnection c, SqlTransaction tx, long personId, bool selected, bool active, byte[]? version, CancellationToken token)
+    {
+        const string sql = """
+DECLARE @id bigint,@current varbinary(8); SELECT @id=ServiceCustomerID,@current=RowVersion FROM dbo.TDADServiceCustomer WITH(UPDLOCK,HOLDLOCK) WHERE CompanyID=@company AND PersonID=@person;
+IF @id IS NULL
+BEGIN IF @selected=1 INSERT dbo.TDADServiceCustomer(CompanyID,PersonID,IsActive,CreateBy) VALUES(@company,@person,@active,@actor); END
+ELSE BEGIN
+ IF @version IS NOT NULL AND @current<>@version THROW 52952,'SERVICE_CUSTOMER_CONFLICT',1;
+ UPDATE dbo.TDADServiceCustomer SET IsActive=CASE WHEN @selected=1 THEN @active ELSE 0 END,UpdateDate=SYSUTCDATETIME(),UpdateBy=@actor WHERE ServiceCustomerID=@id AND CompanyID=@company;
+END
+""";
+        await using var cmd = new SqlCommand(sql, c, tx); Add(cmd,"@company",SqlDbType.BigInt,CompanyId);Add(cmd,"@person",SqlDbType.BigInt,personId);Add(cmd,"@selected",SqlDbType.Bit,selected);Add(cmd,"@active",SqlDbType.Bit,active);Add(cmd,"@actor",SqlDbType.BigInt,ClaimLong("user_id"));Add(cmd,"@version",SqlDbType.Timestamp,version);await cmd.ExecuteNonQueryAsync(token);
+    }
+
+    private async Task UpsertResident(SqlConnection c, SqlTransaction tx, long personId, bool selected, ServicePersonSaveRequest x, byte[]? version, CancellationToken token)
+    {
+        const string sql = """
+DECLARE @id bigint,@current varbinary(8); SELECT TOP(1) @id=ResidentID,@current=RowVersion FROM dbo.TDADResident WITH(UPDLOCK,HOLDLOCK) WHERE CompanyID=@company AND PersonID=@person ORDER BY IsActive DESC,StartDate DESC,ResidentID DESC;
+IF @selected=0 BEGIN IF @id IS NOT NULL UPDATE dbo.TDADResident SET IsActive=0,UpdateDate=SYSUTCDATETIME(),UpdateBy=@actor WHERE CompanyID=@company AND ResidentID=@id; RETURN; END
+IF NOT EXISTS(SELECT 1 FROM dbo.TDADRoom RM JOIN dbo.TDADBuilding B ON B.CompanyID=RM.CompanyID AND B.BuildingID=RM.BuildingID JOIN dbo.TDADFloor F ON F.BuildingID=RM.BuildingID AND F.FloorID=RM.FloorID WHERE RM.CompanyID=@company AND RM.RoomID=@room AND RM.RoomTypeCode=N'RESIDENTIAL' AND RM.IsActive=1 AND B.IsActive=1 AND F.IsActive=1) THROW 52954,'INVALID_ROOM',1;
+IF EXISTS(SELECT 1 FROM dbo.TDADResident R WHERE R.CompanyID=@company AND R.PersonID=@person AND R.ResidentID<>ISNULL(@id,0) AND R.IsActive=1 AND @start<=ISNULL(R.EndDate,CONVERT(date,'99991231')) AND ISNULL(@end,CONVERT(date,'99991231'))>=R.StartDate) THROW 52955,'RESIDENT_OVERLAP',1;
+IF @id IS NULL INSERT dbo.TDADResident(CompanyID,PersonID,RoomID,StartDate,EndDate,IsActive,CreateBy) VALUES(@company,@person,@room,@start,@end,@active,@actor);
+ELSE BEGIN IF @version IS NOT NULL AND @current<>@version THROW 52953,'RESIDENT_CONFLICT',1; UPDATE dbo.TDADResident SET RoomID=@room,StartDate=@start,EndDate=@end,IsActive=@active,UpdateDate=SYSUTCDATETIME(),UpdateBy=@actor WHERE CompanyID=@company AND ResidentID=@id; END
+""";
+        await using var cmd = new SqlCommand(sql, c, tx);Add(cmd,"@company",SqlDbType.BigInt,CompanyId);Add(cmd,"@person",SqlDbType.BigInt,personId);Add(cmd,"@selected",SqlDbType.Bit,selected);Add(cmd,"@room",SqlDbType.BigInt,x.RoomId);Add(cmd,"@start",SqlDbType.Date,x.StartDate);Add(cmd,"@end",SqlDbType.Date,x.EndDate);Add(cmd,"@active",SqlDbType.Bit,x.IsActive);Add(cmd,"@actor",SqlDbType.BigInt,ClaimLong("user_id"));Add(cmd,"@version",SqlDbType.Timestamp,version);await cmd.ExecuteNonQueryAsync(token);
+    }
+
+    private async Task<string> BusinessType(SqlConnection c, CancellationToken token)
+    {
+        await using var cmd = new SqlCommand("SELECT ISNULL(NULLIF(UPPER(LTRIM(RTRIM(BusinessTypeCode))),N''),N'COMPANY') FROM dbo.TDSTCompanySetUp WHERE CompanyID=@company", c);Add(cmd,"@company",SqlDbType.BigInt,CompanyId);return CompanyBusinessType.Normalize(Convert.ToString(await cmd.ExecuteScalarAsync(token)));
+    }
+
+    private async Task<bool> CanEditPerson(SqlConnection c, SqlTransaction? tx, CancellationToken token)
+    {
+        const string sql = """
+SELECT CAST(CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADUser WHERE CompanyID=@company AND UserID=@user AND IsCompanyAdmin=1 AND IsActive=1)
+ OR EXISTS(SELECT 1 FROM dbo.TDADUserEmployee UE JOIN dbo.TDADUserPermissionPoint PP ON PP.CompanyID=UE.CompanyID AND PP.EmployeeID=UE.EmployeeID AND PP.PartnerID=@partner AND PP.MenuCode=N'14004' AND PP.PermissionPointCode=N'PERSON_EDIT' AND PP.IsAllowed=1 AND PP.IsActive=1 JOIN dbo.TDADProject PR ON PR.ProjectID=PP.ProjectID AND PR.ProjectCode=N'LAOO_SERVICE' AND PR.IsActive=1 JOIN dbo.TDADUserProject UP ON UP.ProjectID=PR.ProjectID AND UP.CompanyID=UE.CompanyID AND UP.UserID=UE.UserID AND UP.IsActive=1 WHERE UE.CompanyID=@company AND UE.UserID=@user AND UE.IsActive=1) THEN 1 ELSE 0 END AS bit);
+""";
+        await using var cmd = new SqlCommand(sql,c,tx);Add(cmd,"@company",SqlDbType.BigInt,CompanyId);Add(cmd,"@user",SqlDbType.BigInt,ClaimLong("user_id"));Add(cmd,"@partner",SqlDbType.BigInt,ClaimLong("partner_id"));return Convert.ToBoolean(await cmd.ExecuteScalarAsync(token));
+    }
+
+    private void BindPerson(SqlCommand cmd, ServicePersonSaveRequest x, string name)
+    {
+        Add(cmd,"@company",SqlDbType.BigInt,CompanyId);Add(cmd,"@name",SqlDbType.NVarChar,name,200);Add(cmd,"@nick",SqlDbType.NVarChar,Blank(x.NickName),100);Add(cmd,"@email",SqlDbType.NVarChar,Blank(x.Email),320);Add(cmd,"@mobile",SqlDbType.NVarChar,Blank(x.Mobile),50);Add(cmd,"@active",SqlDbType.Bit,x.IsActive);Add(cmd,"@actor",SqlDbType.BigInt,ClaimLong("user_id"));
+    }
+    private static byte[]? Version(string? value) { try { return string.IsNullOrWhiteSpace(value) ? null : Convert.FromBase64String(value); } catch { return null; } }
+    private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    private static object Issue(string message,string description) => new { message,description };
+}
+
+public sealed record ServicePersonSaveRequest(long? PersonId,string? FullName,string? NickName,string? Email,string? Mobile,bool IsActive,bool IsServiceCustomer,bool IsResident,long? RoomId,DateOnly? StartDate,DateOnly? EndDate,bool UpdatePerson=false,string? PersonRowVersion=null,string? ServiceCustomerRowVersion=null,string? ResidentRowVersion=null);
+file sealed class ServicePersonException(string code) : Exception(code);
