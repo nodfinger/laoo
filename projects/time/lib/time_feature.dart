@@ -18,6 +18,8 @@ export 'features/employee_schedules/employee_schedule_page.dart';
 export 'features/employee_schedules/employee_schedule_repository.dart';
 export 'features/attendance_events/attendance_events_page.dart';
 export 'features/attendance_events/attendance_events_repository.dart';
+export 'features/attendance_results/attendance_results_page.dart';
+export 'features/attendance_results/attendance_results_repository.dart';
 export 'features/time/time_feature_host.dart';
 export 'features/time/time_go_routes.dart';
 export 'features/time/time_route_contract.dart';

@@ -17,6 +17,7 @@ public sealed class AttendanceController(IConfiguration configuration) : Control
 {
     private const string MenuCode = "27001";
     private const string RawEventsMenuCode = "25001";
+    private const string DailyResultsMenuCode = "25002";
     public sealed record EventRequest(string SourceEventId, string DeviceCode, DateTime EventDateTime, string? PayloadHash);
     public sealed record ImportRequest(string IdempotencyKey, string SourceCode, IReadOnlyList<EventRequest> Events);
 
@@ -57,11 +58,141 @@ public sealed class AttendanceController(IConfiguration configuration) : Control
         catch (InvalidOperationException exception) { await transaction.RollbackAsync(token); return Conflict(new { message = exception.Message }); }
     }
 
-    [HttpGet("results")]
-    public async Task<IActionResult> Results([FromQuery] long? employeeId, [FromQuery] DateOnly? workDate, CancellationToken token)
+    [HttpGet("results/actions")]
+    public async Task<IActionResult> ResultActions(CancellationToken token)
     {
-        if (!Scope(out var companyId, out _)) return Forbid(); await using var c = await Open(token); if (!await Can(c, "VIEW", token)) return Forbid();
-        await using var q = new SqlCommand("SELECT R.AttendanceResultID,R.EmployeeID,E.EmployeeCode,E.FullName,R.WorkDate,R.StatusCode,R.ScheduledWorkMinutes,R.ActualWorkMinutes,R.LateMinutes,R.EarlyMinutes,R.UnresolvedReason,R.ResultVersion FROM dbo.TDTMAttendanceResult R JOIN dbo.TDADEmployee E ON E.EmployeeID=R.EmployeeID AND E.CompanyID=R.CompanyID WHERE R.CompanyID=@C AND R.IsCurrent=1 AND(@E IS NULL OR R.EmployeeID=@E) AND(@D IS NULL OR R.WorkDate=@D) ORDER BY R.WorkDate DESC,E.EmployeeCode", c); Add(q,"@C",SqlDbType.BigInt,companyId);Add(q,"@E",SqlDbType.BigInt,employeeId);Add(q,"@D",SqlDbType.Date,workDate?.ToDateTime(TimeOnly.MinValue)); await using var r=await q.ExecuteReaderAsync(token);var items=new List<object>();while(await r.ReadAsync(token))items.Add(new{attendanceResultId=r.GetInt64(0),employeeId=r.GetInt64(1),employeeCode=r.GetString(2),fullName=r.GetString(3),workDate=DateOnly.FromDateTime(r.GetDateTime(4)),statusCode=r.GetString(5),scheduledWorkMinutes=r.GetInt32(6),actualWorkMinutes=r.GetInt32(7),lateMinutes=r.GetInt32(8),earlyMinutes=r.GetInt32(9),unresolvedReason=r.IsDBNull(10)?null:r.GetString(10),resultVersion=r.GetInt32(11)});return Ok(new{items});
+        if (!Scope(out _, out _)) return Forbid();
+        await using var connection = await Open(token);
+        if (!await Can(connection, DailyResultsMenuCode, "VIEW", token)) return Forbid();
+        return Ok(new
+        {
+            menuCode = DailyResultsMenuCode,
+            caption = await Caption(connection, DailyResultsMenuCode, token),
+            screenType = 3,
+            view = true,
+        });
+    }
+
+    [HttpGet("results")]
+    public async Task<IActionResult> Results(
+        [FromQuery] DateOnly? fromWorkDate,
+        [FromQuery] DateOnly? toWorkDate,
+        [FromQuery] long? employeeId,
+        [FromQuery] DateOnly? workDate,
+        [FromQuery] string? employee,
+        [FromQuery] string? statusCode,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 30,
+        CancellationToken token = default)
+    {
+        if (!Scope(out var companyId, out var userId)) return Forbid();
+        await using var connection = await Open(token);
+        if (!await Can(connection, DailyResultsMenuCode, "VIEW", token)) return Forbid();
+
+        var from = workDate ?? fromWorkDate ?? ThailandToday();
+        var to = workDate ?? toWorkDate ?? ThailandToday();
+        if (from > to) return BadRequest(new { message = "วันที่เริ่มต้นต้องไม่เกินวันที่สิ้นสุด" });
+        if (page < 1) page = 1;
+        pageSize = Math.Clamp(pageSize, 1, 30);
+
+        const string where = """
+WHERE R.CompanyID=@CompanyID AND R.IsCurrent=1
+  AND R.WorkDate>=@FromWorkDate AND R.WorkDate<=@ToWorkDate
+  AND (@EmployeeID IS NULL OR R.EmployeeID=@EmployeeID)
+  AND (@Employee IS NULL OR E.EmployeeCode LIKE N'%'+@Employee+'%' OR E.FullName LIKE N'%'+@Employee+'%')
+  AND (@StatusCode IS NULL OR R.StatusCode=@StatusCode)
+  AND
+  (
+    EXISTS(SELECT 1 FROM dbo.TDADUser U WHERE U.CompanyID=@CompanyID AND U.UserID=@UserID AND U.IsActive=1 AND U.IsCompanyAdmin=1)
+    OR EXISTS
+    (
+      SELECT 1 FROM dbo.TDTMEmployeeDataScopeGrant G
+      WHERE G.CompanyID=@CompanyID AND G.IsActive=1
+        AND G.EffectiveFrom<=@BusinessNow AND (G.EffectiveTo IS NULL OR G.EffectiveTo>@BusinessNow)
+        AND
+        (
+          G.UserID=@UserID
+          OR G.RoleGroupID IN
+          (
+            SELECT ERG.RoleGroupID
+            FROM dbo.TDADUserEmployee UE
+            JOIN dbo.TDADEmployeeRoleGroup ERG ON ERG.EmployeeID=UE.EmployeeID AND ERG.IsActive=1
+              AND ERG.EffectiveFrom<=@BusinessDate AND (ERG.EffectiveTo IS NULL OR ERG.EffectiveTo>=@BusinessDate)
+            WHERE UE.CompanyID=@CompanyID AND UE.UserID=@UserID AND UE.IsActive=1
+          )
+        )
+        AND
+        (
+          G.ScopeTypeCode='ALL'
+          OR (G.ScopeTypeCode='SELF' AND EXISTS(SELECT 1 FROM dbo.TDADUserEmployee UE WHERE UE.CompanyID=@CompanyID AND UE.UserID=@UserID AND UE.EmployeeID=E.EmployeeID AND UE.IsActive=1))
+          OR (G.ScopeTypeCode='DIVISION' AND G.ScopeReferenceID=E.DivisionOrgUnitID)
+          OR (G.ScopeTypeCode='DEPARTMENT' AND G.ScopeReferenceID=E.DepartmentOrgUnitID)
+        )
+    )
+  )
+""";
+        var total = await CountResults(connection, where, companyId, userId, from, to, employeeId, employee, statusCode, token);
+        await using var command = new SqlCommand($"""
+SELECT R.AttendanceResultID,R.EmployeeID,E.EmployeeCode,E.FullName,R.WorkDate,R.StatusCode,
+       R.ScheduledWorkMinutes,R.ActualWorkMinutes,R.LateMinutes,R.EarlyMinutes,R.UnresolvedReason,R.ResultVersion
+FROM dbo.TDTMAttendanceResult R
+JOIN dbo.TDADEmployee E ON E.EmployeeID=R.EmployeeID AND E.CompanyID=R.CompanyID
+{where}
+ORDER BY R.WorkDate DESC,E.EmployeeCode,R.AttendanceResultID DESC
+OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;
+""", connection);
+        BindResultFilters(command, companyId, userId, from, to, employeeId, employee, statusCode, page, pageSize);
+        await using var reader = await command.ExecuteReaderAsync(token);
+        var items = new List<object>();
+        while (await reader.ReadAsync(token))
+        {
+            items.Add(new
+            {
+                attendanceResultId = reader.GetInt64(0),
+                employeeId = reader.GetInt64(1),
+                employeeCode = reader.GetString(2),
+                fullName = reader.GetString(3),
+                workDate = DateOnly.FromDateTime(reader.GetDateTime(4)),
+                statusCode = reader.GetString(5),
+                scheduledWorkMinutes = reader.GetInt32(6),
+                actualWorkMinutes = reader.GetInt32(7),
+                lateMinutes = reader.GetInt32(8),
+                earlyMinutes = reader.GetInt32(9),
+                unresolvedReason = reader.IsDBNull(10) ? null : reader.GetString(10),
+                resultVersion = reader.GetInt32(11),
+            });
+        }
+        return Ok(new { total, page, pageSize, items });
+    }
+
+    private static async Task<long> CountResults(SqlConnection connection, string where,
+        long companyId, long userId, DateOnly from, DateOnly to, long? employeeId, string? employee,
+        string? statusCode, CancellationToken token)
+    {
+        await using var command = new SqlCommand($"""
+SELECT COUNT_BIG(1)
+FROM dbo.TDTMAttendanceResult R
+JOIN dbo.TDADEmployee E ON E.EmployeeID=R.EmployeeID AND E.CompanyID=R.CompanyID
+{where}
+""", connection);
+        BindResultFilters(command, companyId, userId, from, to, employeeId, employee, statusCode, 1, 30);
+        return Convert.ToInt64(await command.ExecuteScalarAsync(token));
+    }
+
+    private static void BindResultFilters(SqlCommand command, long companyId, long userId,
+        DateOnly from, DateOnly to, long? employeeId, string? employee, string? statusCode, int page, int pageSize)
+    {
+        Add(command, "@CompanyID", SqlDbType.BigInt, companyId);
+        Add(command, "@UserID", SqlDbType.BigInt, userId);
+        Add(command, "@FromWorkDate", SqlDbType.Date, from.ToDateTime(TimeOnly.MinValue));
+        Add(command, "@ToWorkDate", SqlDbType.Date, to.ToDateTime(TimeOnly.MinValue));
+        Add(command, "@EmployeeID", SqlDbType.BigInt, employeeId);
+        Add(command, "@Employee", SqlDbType.NVarChar, Clean(employee), 150);
+        Add(command, "@StatusCode", SqlDbType.VarChar, Clean(statusCode)?.ToUpperInvariant(), 20);
+        Add(command, "@BusinessNow", SqlDbType.DateTime2, ThailandNow());
+        Add(command, "@BusinessDate", SqlDbType.Date, ThailandToday().ToDateTime(TimeOnly.MinValue));
+        Add(command, "@Offset", SqlDbType.Int, (page - 1) * pageSize);
+        Add(command, "@PageSize", SqlDbType.Int, pageSize);
     }
 
     [HttpGet("events/actions")]
