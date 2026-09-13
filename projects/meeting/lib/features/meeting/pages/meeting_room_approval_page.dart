@@ -505,35 +505,38 @@ class _MeetingRoomApprovalPageState extends State<MeetingRoomApprovalPage> {
     final end = (_page * _pageSize).clamp(0, _total);
     return SizedBox(
       height: LaooLayout.paginationCardHeight,
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          IconButton.filled(
-            onPressed: _page > 1
-                ? () async {
-                    setState(() => _page--);
-                    await _load();
-                  }
-                : null,
-            icon: const Icon(Icons.chevron_left),
-          ),
-          FilledButton(
-            onPressed: null,
-            child: Text('${pages == 0 ? 0 : _page}'),
-          ),
-          IconButton.filled(
-            onPressed: _page < pages
-                ? () async {
-                    setState(() => _page++);
-                    await _load();
-                  }
-                : null,
-            icon: const Icon(Icons.chevron_right),
-          ),
-          Text('$start-$end จาก $_total'),
-        ],
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            IconButton.filled(
+              onPressed: _page > 1
+                  ? () async {
+                      setState(() => _page--);
+                      await _load();
+                    }
+                  : null,
+              icon: const Icon(Icons.chevron_left),
+            ),
+            FilledButton(
+              onPressed: null,
+              child: Text('${pages == 0 ? 0 : _page}'),
+            ),
+            IconButton.filled(
+              onPressed: _page < pages
+                  ? () async {
+                      setState(() => _page++);
+                      await _load();
+                    }
+                  : null,
+              icon: const Icon(Icons.chevron_right),
+            ),
+            Text('$start-$end จาก $_total'),
+          ],
+        ),
       ),
     );
   }
@@ -578,6 +581,8 @@ class _MeetingRoomApprovalPageState extends State<MeetingRoomApprovalPage> {
                 decoration: BoxDecoration(
                   color: status == 'REJECTED'
                       ? LaooColors.error.withValues(alpha: .1)
+                      : status == 'PENDING'
+                      ? LaooColors.gold.withValues(alpha: .18)
                       : preset.primary.withValues(alpha: .1),
                   borderRadius: BorderRadius.circular(LaooRadius.xs),
                 ),
@@ -586,6 +591,8 @@ class _MeetingRoomApprovalPageState extends State<MeetingRoomApprovalPage> {
                   style: TextStyle(
                     color: status == 'REJECTED'
                         ? LaooColors.error
+                        : status == 'PENDING'
+                        ? LaooColors.pageCaption
                         : preset.primary,
                     fontSize: LaooTypography.inputText,
                     fontWeight: FontWeight.w700,

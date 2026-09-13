@@ -50,9 +50,7 @@ class MeetingPaginationCard extends StatelessWidget {
             disabledBackgroundColor: LaooColors.white,
             foregroundColor: onPressed == null ? mutedText : primary,
             disabledForegroundColor: mutedText,
-            side: BorderSide(
-              color: onPressed == null ? LaooColors.border : primary,
-            ),
+            side: const BorderSide(color: LaooColors.white),
             shape: shape,
           ),
           onPressed: onPressed,

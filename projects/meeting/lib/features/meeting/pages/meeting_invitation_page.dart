@@ -10,10 +10,12 @@ import '../../../core/config/api_config.dart';
 import '../../../core/navigation/navigation_menu_repository.dart';
 import '../../../core/widgets/auto_dismiss_message.dart';
 import '../../support/presentation/widgets/support_workspace_shell.dart';
+import '../data/meeting_equipment_request_repository.dart';
 import '../data/meeting_invitation_repository.dart';
 import '../meeting_feature_host.dart';
 import '../widgets/meeting_attendance_panel.dart';
 import '../widgets/meeting_pagination_card.dart';
+import '../widgets/meeting_popup.dart';
 
 class MeetingInvitationPage extends StatefulWidget {
   const MeetingInvitationPage({super.key});
@@ -23,6 +25,7 @@ class MeetingInvitationPage extends StatefulWidget {
 
 class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
   final _repository = MeetingInvitationRepository();
+  final _equipmentRequests = MeetingEquipmentRequestRepository();
   final _search = TextEditingController();
   final _remark = TextEditingController();
   final _changeReason = TextEditingController();
@@ -232,6 +235,258 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
     }
   }
 
+  Future<void> _showEquipmentRequest(Map<String, dynamic> invitation) async {
+    final bookingId = invitation['bookingId'] as num?;
+    if (bookingId == null) return;
+    try {
+      final detail = await _equipmentRequests.booking(bookingId.toInt());
+      if (!mounted) return;
+      final items = List<Map<String, dynamic>>.from(
+        detail['items'] as List? ?? const [],
+      );
+      final selected = <int, Map<String, TextEditingController>>{};
+      final primary = workspaceThemeController.value.primary;
+      final screen = MediaQuery.sizeOf(context);
+      await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (context, refresh) {
+            final border = OutlineInputBorder(
+              borderRadius: BorderRadius.circular(LaooRadius.xs),
+              borderSide: const BorderSide(color: LaooColors.border),
+            );
+            return MeetingPopup(
+              title: const MeetingPopupTitle(
+                icon: Icons.handyman_outlined,
+                text: 'ขออุปกรณ์เพิ่มเติม',
+              ),
+              content: SizedBox(
+                width: screen.width < 540 ? screen.width - 64 : 460,
+                height: screen.height < 720 ? screen.height - 190 : 500,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(LaooLayout.cardPadding),
+                      color: primary.withValues(alpha: .08),
+                      child: Text(
+                        '${detail['bookingNo'] ?? '-'} | ${detail['subject'] ?? '-'}\n'
+                        '${detail['roomCode'] ?? '-'} | ${detail['roomName'] ?? '-'}\n'
+                        '${_meetingPeriod(invitation)}',
+                        style: TextStyle(
+                          color: primary,
+                          fontSize: LaooTypography.inputText,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text('ปิดรับ: ${_date(detail['cutoff'])}'),
+                    if (detail['canRequest'] != true)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Text(
+                          _equipmentRequestState(detail['requestState']),
+                          style: const TextStyle(color: LaooColors.error),
+                        ),
+                      ),
+                    const SizedBox(height: 10),
+                    const Divider(height: 1, color: LaooColors.border),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'เลือกอุปกรณ์และระบุจำนวน',
+                      style: TextStyle(
+                        color: LaooColors.pageCaption,
+                        fontSize: LaooTypography.sectionTitle,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Expanded(
+                      child: ListView.separated(
+                        itemCount: items.length,
+                        separatorBuilder: (_, _) =>
+                            const Divider(height: 1, color: LaooColors.border),
+                        itemBuilder: (_, index) {
+                          final equipment = items[index];
+                          final id = (equipment['itemId'] as num?)?.toInt();
+                          if (id == null) return const SizedBox.shrink();
+                          final line = selected[id];
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Row(
+                                  children: [
+                                    Checkbox(
+                                      value: line != null,
+                                      activeColor: primary,
+                                      onChanged: detail['canRequest'] != true
+                                          ? null
+                                          : (checked) => refresh(() {
+                                              if (checked == true) {
+                                                selected[id] = {
+                                                  'quantity':
+                                                      TextEditingController(
+                                                        text: '1',
+                                                      ),
+                                                  'remark':
+                                                      TextEditingController(),
+                                                };
+                                              } else {
+                                                selected.remove(id);
+                                              }
+                                            }),
+                                    ),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text('${equipment['name'] ?? '-'}'),
+                                          Text(
+                                            'แผนก: ${equipment['departmentName'] ?? '-'}',
+                                            style: TextStyle(
+                                              color: Theme.of(
+                                                context,
+                                              ).colorScheme.onSurfaceVariant,
+                                              fontSize:
+                                                  LaooTypography.inputHint,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                if (line != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(
+                                      left: 48,
+                                      top: 4,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        SizedBox(
+                                          width: 96,
+                                          child: TextField(
+                                            controller: line['quantity'],
+                                            keyboardType: TextInputType.number,
+                                            decoration: InputDecoration(
+                                              labelText: 'จำนวน',
+                                              isDense: true,
+                                              border: border,
+                                              enabledBorder: border,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: TextField(
+                                            controller: line['remark'],
+                                            decoration: InputDecoration(
+                                              labelText: 'หมายเหตุ',
+                                              isDense: true,
+                                              border: border,
+                                              enabledBorder: border,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    if ((detail['requests'] as List? ?? const []).isNotEmpty)
+                      const SizedBox(height: 8),
+                    if ((detail['requests'] as List? ?? const []).isNotEmpty)
+                      Text(
+                        'สถานะล่าสุด: ${(detail['requests'] as List).map((request) => '${request['itemName']} · ${request['statusCode']}').join(', ')}',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: LaooColors.textSecondary,
+                          fontSize: LaooTypography.inputHint,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  style: TextButton.styleFrom(
+                    foregroundColor: primary,
+                    minimumSize: const Size(80, LaooTypography.buttonHeight),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(LaooRadius.xs),
+                    ),
+                  ),
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('ยกเลิก'),
+                ),
+                FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: primary,
+                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                    minimumSize: const Size(100, LaooTypography.buttonHeight),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(LaooRadius.xs),
+                    ),
+                  ),
+                  onPressed: detail['canRequest'] != true || selected.isEmpty
+                      ? null
+                      : () async {
+                          try {
+                            await _equipmentRequests.save(
+                              bookingId.toInt(),
+                              selected.entries
+                                  .map(
+                                    (entry) => {
+                                      'itemId': entry.key,
+                                      'quantity':
+                                          num.tryParse(
+                                            entry.value['quantity']!.text,
+                                          ) ??
+                                          0,
+                                      'remark': entry.value['remark']!.text
+                                          .trim(),
+                                    },
+                                  )
+                                  .toList(),
+                            );
+                            if (dialogContext.mounted) {
+                              Navigator.pop(dialogContext, true);
+                            }
+                            _notify('ส่งคำขออุปกรณ์เพิ่มเติมแล้ว');
+                          } catch (error) {
+                            _notify(
+                              _error(error, 'ส่งคำขออุปกรณ์ไม่สำเร็จ'),
+                              true,
+                            );
+                          }
+                        },
+                  icon: const Icon(Icons.send_outlined),
+                  label: const Text('ส่งคำขอ'),
+                ),
+              ],
+            );
+          },
+        ),
+      );
+      for (final line in selected.values) {
+        for (final controller in line.values) {
+          controller.dispose();
+        }
+      }
+    } catch (error) {
+      _notify(_error(error, 'ไม่สามารถเปิดคำขออุปกรณ์ได้'), true);
+    }
+  }
+
   String _error(Object error, String fallback) => error is ApiException
       ? error.description == null
             ? error.message
@@ -257,6 +512,14 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
     final date = DateTime.tryParse('$value')?.toLocal();
     return date != null && !DateTime.now().isBefore(date);
   }
+
+  String _equipmentRequestState(Object? state) => switch ('$state') {
+    'CUTOFF_NOT_CONFIGURED' => 'ผู้จัดยังไม่ได้เปิดรับคำขออุปกรณ์',
+    'CUTOFF_DISABLED' => 'ผู้จัดปิดรับคำขออุปกรณ์แล้ว',
+    'CUTOFF_EXPIRED' => 'เกินเวลาปิดรับคำขออุปกรณ์แล้ว',
+    'MEETING_STARTED' => 'เริ่มประชุมแล้ว จึงไม่สามารถขออุปกรณ์ได้',
+    _ => 'ยังไม่สามารถส่งคำขออุปกรณ์ได้',
+  };
 
   String _statusName(String value, {bool late = false}) => switch (value) {
     'ACCEPTED' when late => 'ตอบรับภายหลัง',
@@ -308,14 +571,41 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
           Row(
             children: [
               Expanded(
-                child: Text(
-                  '${group['foodTypeName']}',
-                  style: const TextStyle(
-                    fontSize: LaooTypography.sectionTitle,
-                    fontWeight: FontWeight.w700,
-                  ),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      '${group['foodTypeName']}',
+                      style: const TextStyle(
+                        fontSize: LaooTypography.sectionTitle,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    if (group['isRequired'] == true)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: preset.primary.withValues(alpha: .10),
+                          borderRadius: BorderRadius.circular(LaooRadius.xs),
+                        ),
+                        child: Text(
+                          'บังคับเลือก',
+                          style: TextStyle(
+                            color: preset.primary,
+                            fontSize: LaooTypography.inputHint,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
@@ -323,8 +613,7 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
                   borderRadius: BorderRadius.circular(LaooRadius.xs),
                 ),
                 child: Text(
-                  'เลือกแล้ว $total / $max'
-                  '${group['isRequired'] == true ? ' · ต้องเลือก' : ''}',
+                  'เลือกแล้ว $total / $max',
                   style: TextStyle(color: preset.primary),
                 ),
               ),
@@ -531,6 +820,7 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
     final questions = List<Map<String, dynamic>>.from(
       detail['questions'] as List? ?? const [],
     );
+    final canRequestEquipment = invitation['canRequestEquipment'] == true;
     final canRespond = invitation['canRespond'] == true;
     final canEditPreferences = invitation['canEditPreferences'] == true;
     final hasFoodPlan = groups.isNotEmpty;
@@ -861,6 +1151,79 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
                       ),
                     ),
                   ],
+                  if (_responseStatus == 'ACCEPTED') ...[
+                    const SizedBox(height: LaooLayout.cardSpacing),
+                    const Divider(color: LaooColors.border),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(Icons.handyman_outlined, color: preset.primary),
+                        const SizedBox(width: 8),
+                        const Expanded(
+                          child: Text(
+                            'อุปกรณ์เพิ่มเติม',
+                            style: TextStyle(
+                              color: LaooColors.pageCaption,
+                              fontSize: LaooTypography.sectionTitle,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: canRequestEquipment
+                              ? () => _showEquipmentRequest(invitation)
+                              : null,
+                          icon: const Icon(Icons.add_outlined),
+                          label: const Text('ขออุปกรณ์'),
+                        ),
+                      ],
+                    ),
+                    if (!canRequestEquipment) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        '${invitation['equipmentRequestUnavailableReason'] ?? 'ผู้จัดยังไม่ได้เปิดรับคำขออุปกรณ์'}',
+                        style: TextStyle(
+                          color: preset.textSecondary,
+                          fontSize: LaooTypography.inputHint,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 8),
+                    const Text(
+                      'อุปกรณ์มาตรฐานของห้อง',
+                      style: TextStyle(
+                        color: LaooColors.pageCaption,
+                        fontSize: LaooTypography.inputText,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    ...(List<Map<String, dynamic>>.from(
+                          _detail?['roomItems'] as List? ?? const [],
+                        ).isEmpty
+                        ? const [
+                            Text(
+                              'ห้องนี้ยังไม่ได้กำหนดอุปกรณ์มาตรฐาน',
+                              style: TextStyle(
+                                color: LaooColors.textSecondary,
+                                fontSize: LaooTypography.inputHint,
+                              ),
+                            ),
+                          ]
+                        : List<Map<String, dynamic>>.from(
+                            _detail?['roomItems'] as List? ?? const [],
+                          ).map(
+                            (item) => Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              child: Text(
+                                '${item['name'] ?? '-'} × ${item['quantity'] ?? 1}${item['unitName'] == null || '${item['unitName']}'.isEmpty ? '' : ' ${item['unitName']}'}',
+                                style: const TextStyle(
+                                  fontSize: LaooTypography.inputText,
+                                ),
+                              ),
+                            ),
+                          )),
+                  ],
                 ],
               ),
             ),
@@ -1031,7 +1394,8 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
                                 subtitle: Text(
                                   '${item['roomCode']} | ${item['roomName']}\n'
                                   '${_meetingPeriod(item)}\n'
-                                  'ผู้ถูกเชิญ: ${item['participantName'] ?? '-'}${participantNickName.isEmpty ? '' : ' ($participantNickName)'}',
+                                  'ผู้ถูกเชิญ: ${item['participantName'] ?? '-'}${participantNickName.isEmpty ? '' : ' ($participantNickName)'}\n'
+                                  'ผู้จัด: ${item['organizerName'] ?? '-'}',
                                 ),
                                 trailing: SizedBox(
                                   width: 124,

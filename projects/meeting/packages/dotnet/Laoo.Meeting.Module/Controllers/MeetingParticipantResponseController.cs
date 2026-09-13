@@ -27,6 +27,31 @@ public sealed class MeetingParticipantResponseController(IConfiguration configur
         var canRespond = access.End > now && (access.Own && !duringMeeting && !afterCutoff || lateAcceptanceOnly || access.Manager);
         var canEditPreferences = canRespond && !duringMeeting && (!afterCutoff || access.Manager);
 
+        DateTime? equipmentCutoff = null;
+        var equipmentActive = false;
+        const string equipmentPlanSql = """
+SELECT RequestCutoffDateTime,IsActive
+FROM dbo.TDADMeetingBookingEquipmentPlan
+WHERE BookingID=@booking AND CompanyID=@company;
+""";
+        await using (var cmd = new SqlCommand(equipmentPlanSql, db))
+        {
+            Add(cmd, "@booking", access.BookingId); Add(cmd, "@company", company);
+            await using var r = await cmd.ExecuteReaderAsync(token);
+            if (await r.ReadAsync(token))
+            {
+                equipmentCutoff = Date(r, 0);
+                equipmentActive = !r.IsDBNull(1) && r.GetBoolean(1);
+            }
+        }
+        var canRequestEquipment = access.Own && access.Status == "ACCEPTED" && equipmentActive
+            && equipmentCutoff is not null && equipmentCutoff > now && access.Start > now;
+        var equipmentRequestUnavailableReason = canRequestEquipment ? null
+            : !equipmentActive || equipmentCutoff is null ? "ผู้จัดยังไม่ได้เปิดรับคำขออุปกรณ์"
+            : equipmentCutoff <= now ? "เกินเวลาปิดรับคำขออุปกรณ์แล้ว"
+            : access.Start <= now ? "เริ่มประชุมแล้ว จึงไม่สามารถขออุปกรณ์ได้"
+            : "ไม่สามารถส่งคำขออุปกรณ์ได้";
+
         var groups = new List<object>();
         const string groupSql = """
 SELECT G.FoodTypeCode,ISNULL(M.Name,G.FoodTypeCode),G.MaxQuantity,G.IsRequired
@@ -61,6 +86,29 @@ WHERE O.BookingID=@booking AND O.CompanyID=@company ORDER BY F.FoodTypeCode,F.Fo
             while(await r.ReadAsync(token)) foods.Add(new {foodId=r.GetInt64(0),code=r.GetString(1),nameTh=r.GetString(2),foodTypeCode=r.GetString(3),imageUrl=Text(r,4),orderQuantity=r.GetInt32(5)});
         }
 
+        var roomItems = new List<object>();
+        const string roomItemSql = """
+SELECT I.ItemName,COALESCE(RI.Quantity,1),COALESCE(U.Name,N'')
+FROM dbo.TDADMeetingRoomItem RI
+JOIN dbo.TDIVItem I ON I.ItemID=RI.ItemID AND I.CompanyID=@company
+LEFT JOIN dbo.TDSTMaster U ON U.MasterGroupCode=N'002' AND U.MasterCode=I.UnitCode
+    AND U.OwnerType=N'C' AND U.OwnerCompanyID=I.CompanyID AND U.IsActive=1
+JOIN dbo.TDADMeetingRoomBooking B ON B.RoomID=RI.RoomID AND B.CompanyID=@company
+WHERE B.BookingID=@booking AND RI.IsActive=1
+ORDER BY I.ItemCode;
+""";
+        await using (var cmd = new SqlCommand(roomItemSql, db))
+        {
+            Add(cmd, "@booking", access.BookingId); Add(cmd, "@company", company);
+            await using var r = await cmd.ExecuteReaderAsync(token);
+            while (await r.ReadAsync(token)) roomItems.Add(new
+            {
+                name = r.GetString(0),
+                quantity = r.IsDBNull(1) ? 1 : Convert.ToInt32(r.GetValue(1)),
+                unitName = Text(r, 2),
+            });
+        }
+
         var rows = new List<QuestionRow>();
         const string questionSql = """
 SELECT Q.RequirementQuestionID,Q.QuestionText,Q.AnswerType,Q.IsRequired,Q.SortOrder,A.AnswerValue,
@@ -90,7 +138,8 @@ ORDER BY Q.SortOrder,Q.RequirementQuestionID,O.SortOrder,O.RequirementOptionID;
             canEditPreferences,lateResponseMode,lateAcceptanceOnly,access.IsLateResponse,access.LateResponseReason,access.LateResponseAtUtc,
             requiresChangeReason=lateResponseMode||((duringMeeting||afterCutoff)&&access.Manager),responseUnavailableReason=canRespond?null:
                 afterCutoff?"พ้นเวลาปิดรับแล้ว กรุณาติดต่อผู้จัดประชุมหรือผู้ดูแลห้อง":"การประชุมสิ้นสุดแล้วจึงไม่สามารถเปลี่ยนคำตอบได้"},
-            groups,foods,questions});
+            canRequestEquipment,equipmentRequestUnavailableReason,equipmentCutoff,
+            groups,foods,questions,roomItems});
     }
 
     [HttpPut("{participantId:long}")]

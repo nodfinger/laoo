@@ -244,28 +244,63 @@ class _State extends State<MeetingFoodOrderSummaryPage> {
         'ห้องประชุม',
         'หัวข้อ',
         'วันและเวลาประชุม',
-        'ประเภทอาหาร',
-        'รายการอาหาร',
-        'ผู้สั่ง',
-        'รวมจำนวน',
+        'ประเภทข้อมูล',
+        'รายการ/คำถาม',
+        'ผู้แจ้ง',
+        'จำนวน',
+        'ข้อความ/คำตอบ',
       ],
     ];
     for (final booking in visibleItems) {
+      final meeting = [
+        '${booking['roomCode']} | ${booking['roomName']}',
+        booking['subject'],
+        '${dateTime(booking['startDateTime'])} - ${dateTime(booking['endDateTime'])}',
+      ];
       for (final food in orderedFoods(booking)) {
         rows.add([
-          '${booking['roomCode']} | ${booking['roomName']}',
-          booking['subject'],
-          '${dateTime(booking['startDateTime'])} - ${dateTime(booking['endDateTime'])}',
+          ...meeting,
           food['foodTypeName'],
           food['nameTh'],
-          food['orderedParticipantCount'],
+          'ผู้สั่ง ${food['orderedParticipantCount']} คน',
           food['orderedQuantity'],
+          '',
+        ]);
+      }
+      if (groupBy == 'participant') continue;
+
+      for (final remark in participantRemarksOf(booking)) {
+        final nickname = '${remark['participantNickname'] ?? ''}'.trim();
+        final name = '${remark['participantName'] ?? '-'}';
+        rows.add([
+          ...meeting,
+          'ข้อความเพิ่มเติม',
+          '',
+          nickname.isEmpty ? name : '$name ($nickname)',
+          '',
+          remark['remark'],
+        ]);
+      }
+      final requirements = List<Map<String, dynamic>>.from(
+        booking['requirements'] as List? ?? const [],
+      );
+      for (final answer in requirements) {
+        final value = '${answer['answerValue'] ?? ''}'.trim();
+        if (value.isEmpty) continue;
+        final nickname = '${answer['participantNickname'] ?? ''}'.trim();
+        final name = '${answer['participantName'] ?? '-'}';
+        rows.add([
+          ...meeting,
+          'คำตอบเพิ่มเติม',
+          answer['questionText'],
+          nickname.isEmpty ? name : '$name ($nickname)',
+          '',
+          value,
         ]);
       }
     }
     downloadFoodSummary(
-      'สรุปการสั่งอาหาร_${date(from).replaceAll('/', '-')}_ ${date(to).replaceAll('/', '-')}.csv'
-          .replaceAll('_ ', '_'),
+      'สรุปการสั่งอาหาร_${date(from).replaceAll('/', '-')}_${date(to).replaceAll('/', '-')}.csv',
       rows.map((row) => row.map(csvCell).join(',')).join('\r\n'),
     );
   }
@@ -413,31 +448,85 @@ class _State extends State<MeetingFoodOrderSummaryPage> {
         total + ((row['food']['orderedQuantity'] as num?)?.toInt() ?? 0),
   );
 
+  List<Map<String, dynamic>> participantRemarksOf(Map<String, dynamic> item) {
+    final seen = <String>{};
+    return List<Map<String, dynamic>>.from(
+      item['participantRemarks'] as List? ?? const [],
+    ).where((row) {
+      final remark = '${row['remark'] ?? ''}'.trim();
+      final participantId = '${row['participantId'] ?? ''}';
+      return remark.isNotEmpty && seen.add('$participantId:$remark');
+    }).toList();
+  }
+
+  Widget participantRemarkSection(
+    Map<String, dynamic> item,
+    WorkspaceThemePreset preset,
+  ) {
+    final remarks = participantRemarksOf(item);
+    if (remarks.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'ข้อความเพิ่มเติมจากผู้เข้าร่วม',
+            style: TextStyle(
+              color: preset.primary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 4),
+          ...remarks.map(
+            (row) => Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(
+                '${row['participantName'] ?? '-'}'
+                '${row['participantNickname'] == null ? '' : ' (${row['participantNickname']})'} : ${row['remark']}',
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget foodMeetingRow(Map<String, dynamic> row, WorkspaceThemePreset preset) {
     final booking = Map<String, dynamic>.from(row['booking'] as Map);
     final food = Map<String, dynamic>.from(row['food'] as Map);
     return Padding(
       padding: const EdgeInsets.only(top: 6),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.meeting_room_outlined, size: 18, color: preset.primary),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${booking['roomCode']} | ${booking['roomName']}\n'
-                  '${dateTime(booking['startDateTime'])} - ${dateTime(booking['endDateTime'])}',
+          Row(
+            children: [
+              Icon(
+                Icons.meeting_room_outlined,
+                size: 18,
+                color: preset.primary,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${booking['roomCode']} | ${booking['roomName']}\n'
+                      '${dateTime(booking['startDateTime'])} - ${dateTime(booking['endDateTime'])}',
+                    ),
+                    const SizedBox(height: 4),
+                    quantityBadge(
+                      'รวมจำนวน ${food['orderedQuantity'] ?? 0}',
+                      preset,
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 4),
-                quantityBadge(
-                  'รวมจำนวน ${food['orderedQuantity'] ?? 0}',
-                  preset,
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
+          participantRemarkSection(booking, preset),
         ],
       ),
     );
@@ -587,6 +676,7 @@ class _State extends State<MeetingFoodOrderSummaryPage> {
                                 ),
                               ),
                             ),
+                            participantRemarkSection(item, preset),
                           ],
                         ),
                       ),
@@ -896,6 +986,7 @@ class _State extends State<MeetingFoodOrderSummaryPage> {
                 ),
               ),
             ),
+          participantRemarkSection(item, preset),
           if (requirementGroups.isNotEmpty) ...[
             const SizedBox(height: 8),
             const Text(

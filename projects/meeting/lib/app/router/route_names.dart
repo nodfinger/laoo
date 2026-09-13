@@ -45,9 +45,10 @@ abstract final class RouteNames {
   static const String roomCheckIn = MeetingRouteNames.roomCheckIn;
   static const String roomSupportTasks = MeetingRouteNames.roomSupportTasks;
   static const String roomIssues = MeetingRouteNames.roomIssues;
+  static const String equipmentRequests = MeetingRouteNames.equipmentRequests;
+  static const String meetingSystemSettings = MeetingRouteNames.systemSettings;
   static const String meetingBuildings = MeetingRouteNames.buildings;
   static const String meetingRooms = MeetingRouteNames.rooms;
-  static const String meetingFacilities = MeetingRouteNames.facilities;
   static const String meetingFoods = MeetingRouteNames.foods;
   static const String meetingRoomUtilizationReport =
       MeetingRouteNames.utilizationReport;
