@@ -69,7 +69,12 @@ SELECT RoomID id,BuildingID buildingId,FloorID parentId,RoomCode code,RoomNameTH
         {
             "buildings" => "IF EXISTS(SELECT 1 FROM dbo.TDADMeetingRoom WHERE BuildingID=@id AND CompanyID=@company) THROW 51204,'REFERENCED',1; DELETE FROM dbo.TDADBuilding WHERE BuildingID=@id AND CompanyID=@company;",
             "floors" => "IF EXISTS(SELECT 1 FROM dbo.TDADMeetingRoom WHERE FloorID=@id AND CompanyID=@company) THROW 51204,'REFERENCED',1; DELETE F FROM dbo.TDADFloor F JOIN dbo.TDADBuilding B ON B.BuildingID=F.BuildingID WHERE F.FloorID=@id AND B.CompanyID=@company;",
-            "rooms" => "DELETE FROM dbo.TDADRoom WHERE RoomID=@id AND CompanyID=@company;",
+            "rooms" => """
+IF OBJECT_ID(N'dbo.TDADResident', N'U') IS NOT NULL
+   AND EXISTS(SELECT 1 FROM dbo.TDADResident WHERE CompanyID=@company AND RoomID=@id)
+    THROW 51204,'REFERENCED',1;
+DELETE FROM dbo.TDADRoom WHERE RoomID=@id AND CompanyID=@company;
+""",
             _ => null
         };
         if(sql is null) return NotFound();
