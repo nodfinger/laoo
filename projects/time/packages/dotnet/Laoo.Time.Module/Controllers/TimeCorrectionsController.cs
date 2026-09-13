@@ -27,7 +27,7 @@ public sealed class TimeCorrectionsController(IConfiguration configuration) : Co
         DateTime? OriginalDateTime,
         DateTime RequestedDateTime);
 
-    public sealed record SaveRequest(
+    public sealed record TimeCorrectionSaveRequest(
         long? EmployeeId,
         DateOnly WorkDate,
         long TimeAdjustmentReasonId,
@@ -235,11 +235,11 @@ FROM dbo.TDTMTimeCorrectionDetail WHERE RequestID=@ID ORDER BY SequenceNo;
     }
 
     [HttpPost("proxy")]
-    public Task<IActionResult> CreateProxy(SaveRequest request, CancellationToken token) =>
+    public Task<IActionResult> CreateProxy(TimeCorrectionSaveRequest request, CancellationToken token) =>
         Create(request, false, token);
 
     [HttpPost("self")]
-    public Task<IActionResult> CreateSelf(SaveRequest request, CancellationToken token) =>
+    public Task<IActionResult> CreateSelf(TimeCorrectionSaveRequest request, CancellationToken token) =>
         Create(request, true, token);
 
     [HttpPost("{id:long}/decision")]
@@ -273,7 +273,12 @@ FROM dbo.TDTMTimeCorrectionDetail WHERE RequestID=@ID ORDER BY SequenceNo;
             if (await update.ExecuteNonQueryAsync(token) != 1) throw new InvalidOperationException("คำขอถูกแก้ไขแล้ว กรุณาโหลดใหม่");
             await InsertDecision(connection, transaction, id, userId, actorEmployee, selfApprove,
                 decision, Clean(request.Reason), Clean(request.EvidenceReference), token);
-            if (decision == "APPROVED") await CreateAdjustments(connection, transaction, companyId, id, current.EmployeeId, userId, token);
+            if (decision == "APPROVED")
+            {
+                await CreateAdjustments(connection, transaction, companyId, id, current.EmployeeId, userId, token);
+                await AttendanceCalculator.RecalculateAsync(connection, transaction, companyId,
+                    current.EmployeeId, await CorrectionWorkDate(connection, transaction, id, token), userId, token);
+            }
             await InsertNotification(connection, transaction, companyId, id, current.EmployeeId, decision, token);
             await transaction.CommitAsync(token);
             return NoContent();
@@ -316,7 +321,7 @@ FROM dbo.TDTMTimeCorrectionDetail WHERE RequestID=@ID ORDER BY SequenceNo;
         return NoContent();
     }
 
-    private async Task<IActionResult> Create(SaveRequest request, bool self,
+    private async Task<IActionResult> Create(TimeCorrectionSaveRequest request, bool self,
         CancellationToken token)
     {
         if (!TryScope(out var companyId, out var userId)) return Forbid();
@@ -367,6 +372,8 @@ FROM dbo.TDTMTimeCorrectionDetail WHERE RequestID=@ID ORDER BY SequenceNo;
                 await InsertDecision(connection, transaction, requestId, userId, actorEmployee,
                     selfApprove, "APPROVED", Clean(request.RequestRemark), Clean(request.EvidenceReference), token);
                 await CreateAdjustments(connection, transaction, companyId, requestId, employeeId.Value, userId, token);
+                await AttendanceCalculator.RecalculateAsync(connection, transaction, companyId,
+                    employeeId.Value, request.WorkDate, userId, token);
             }
             await InsertNotification(connection, transaction, companyId, requestId,
                 employeeId.Value, direct ? "APPROVED" : "PENDING", token);
@@ -384,7 +391,7 @@ FROM dbo.TDTMTimeCorrectionDetail WHERE RequestID=@ID ORDER BY SequenceNo;
     private sealed record Profile(long Id, long? ProcessId, string Code);
     private sealed record Pending(long EmployeeId, long ActorUserId, string ProfileCode);
 
-    private static string? Validate(SaveRequest request)
+    private static string? Validate(TimeCorrectionSaveRequest request)
     {
         if (request.TimeAdjustmentReasonId <= 0 || request.Details is null || request.Details.Count == 0)
             return "กรุณาระบุเหตุผลและรายการเวลาที่ต้องการปรับ";
@@ -436,7 +443,7 @@ ORDER BY B.EffectiveFrom DESC,B.ApprovalProfileVersionID DESC;
     }
 
     private static async Task<long> InsertRequest(SqlConnection c, SqlTransaction tx,
-        long companyId, long userId, long employeeId, SaveRequest request,
+        long companyId, long userId, long employeeId, TimeCorrectionSaveRequest request,
         bool self, bool direct, CancellationToken token)
     {
         await using var q = new SqlCommand("INSERT dbo.TDTMRequest(CompanyID,ProcessCode,SubjectEmployeeID,InitiationModeCode,ActorUserID,OnBehalfReasonID,OnBehalfRemark,EvidenceReference,StatusCode,SubmittedDate,CreateBy) OUTPUT INSERTED.RequestID VALUES(@C,'TIME_CORRECTION',@E,@Mode,@U,@OnBehalf,@Remark,@Evidence,@Status,SYSDATETIME(),@U)", c, tx);
@@ -460,7 +467,7 @@ ORDER BY B.EffectiveFrom DESC,B.ApprovalProfileVersionID DESC;
     }
 
     private static async Task InsertCorrection(SqlConnection c, SqlTransaction tx,
-        long companyId, long employeeId, long requestId, SaveRequest request,
+        long companyId, long employeeId, long requestId, TimeCorrectionSaveRequest request,
         CancellationToken token)
     {
         await using var h = new SqlCommand("INSERT dbo.TDTMTimeCorrectionRequest(RequestID,CompanyID,SubjectEmployeeID,WorkDate,TimeAdjustmentReasonID,RequestRemark)VALUES(@R,@C,@E,@D,@Reason,@Remark)", c, tx);
@@ -486,6 +493,16 @@ VALUES(@C,@R,@Detail,@E,@D,@Rule,@Name,@Endpoint,@Value,@Previous,@U,NEWID());
 """, c, tx);
             Add(q, "@C", SqlDbType.BigInt, companyId); Add(q, "@R", SqlDbType.BigInt, requestId); Add(q, "@Detail", SqlDbType.BigInt, row.Id); Add(q, "@E", SqlDbType.BigInt, employeeId); Add(q, "@D", SqlDbType.Date, row.Date); Add(q, "@Rule", SqlDbType.BigInt, row.RuleId); Add(q, "@Name", SqlDbType.NVarChar, row.Name, 100); Add(q, "@Endpoint", SqlDbType.VarChar, row.Endpoint, 10); Add(q, "@Value", SqlDbType.DateTime2, row.Value); Add(q, "@U", SqlDbType.BigInt, userId); await q.ExecuteNonQueryAsync(token);
         }
+    }
+
+    private static async Task<DateOnly> CorrectionWorkDate(SqlConnection c, SqlTransaction tx,
+        long requestId, CancellationToken token)
+    {
+        await using var q = new SqlCommand("SELECT WorkDate FROM dbo.TDTMTimeCorrectionRequest WHERE RequestID=@R", c, tx);
+        Add(q, "@R", SqlDbType.BigInt, requestId);
+        var value = await q.ExecuteScalarAsync(token);
+        if (value is not DateTime date) throw new InvalidOperationException("ไม่พบวันที่ทำงานของคำขอปรับเวลา");
+        return DateOnly.FromDateTime(date);
     }
 
     private static async Task InsertDecision(SqlConnection c, SqlTransaction tx,
@@ -516,7 +533,7 @@ VALUES(@C,@R,@Detail,@E,@D,@Rule,@Name,@Endpoint,@Value,@Previous,@U,NEWID());
     }
 
     private static async Task EnsureNoPendingDuplicates(SqlConnection c, SqlTransaction tx,
-        long companyId, long employeeId, SaveRequest request, CancellationToken token)
+        long companyId, long employeeId, TimeCorrectionSaveRequest request, CancellationToken token)
     {
         foreach (var d in request.Details)
         {
@@ -525,7 +542,7 @@ VALUES(@C,@R,@Detail,@E,@D,@Rule,@Name,@Endpoint,@Value,@Previous,@U,NEWID());
     }
 
     private static async Task EnsureSessionsValid(SqlConnection c, SqlTransaction tx,
-        long companyId, long employeeId, SaveRequest request, CancellationToken token)
+        long companyId, long employeeId, TimeCorrectionSaveRequest request, CancellationToken token)
     {
         var valid = await EffectiveSessions(c, tx, companyId, employeeId, request.WorkDate, token);
         foreach (var detail in request.Details)
