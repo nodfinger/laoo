@@ -531,7 +531,7 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '${food['code']} | ${food['nameTh']}',
+                    '${food['nameTh']}',
                     style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                   Text('${food['foodTypeName'] ?? '-'}'),
@@ -581,10 +581,7 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
         children: [
           Container(
             padding: const EdgeInsets.all(LaooLayout.cardPadding),
-            decoration: BoxDecoration(
-              color: preset.primary.withValues(alpha: .10),
-              borderRadius: BorderRadius.circular(LaooRadius.xs),
-            ),
+            color: Colors.transparent,
             child: Row(
               children: [
                 Expanded(

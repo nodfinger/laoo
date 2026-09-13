@@ -27,8 +27,23 @@ SELECT
  JSON_QUERY((SELECT F.FloorID floorId,F.BuildingID buildingId,F.FloorCode code,F.FloorNameTH nameTh,F.IsActive isActive
  FROM dbo.TDADFloor F WHERE F.BuildingID=B.BuildingID ORDER BY F.FloorNumber,F.FloorCode FOR JSON PATH)) floors
  FROM dbo.TDADBuilding B WHERE B.CompanyID=@company AND @rooms=1 ORDER BY B.BuildingCode FOR JSON PATH)) buildings,
- JSON_QUERY((SELECT FacilityID facilityId,FacilityCode code,FacilityNameTH nameTh
- FROM dbo.TDADMeetingFacility WHERE CompanyID=@company AND @rooms=1 ORDER BY FacilityCode FOR JSON PATH)) facilities
+ JSON_QUERY((SELECT I.ItemID itemId,I.ItemCode code,I.ItemName nameTh,I.UnitCode unitCode,
+                    I.ItemTypeCode itemTypeCode,COALESCE(T.Name,I.ItemTypeCode) itemTypeName
+ FROM dbo.TDIVItem I
+ INNER JOIN dbo.TDIVItemUsage IU ON IU.CompanyID=I.CompanyID
+     AND IU.ItemID=I.ItemID AND IU.UsageCode=N'EQUIPMENT'
+ LEFT JOIN dbo.TDSTMaster T ON T.MasterGroupCode=N'007' AND T.MasterCode=I.ItemTypeCode
+ WHERE I.CompanyID=@company AND I.IsActive=1 AND @rooms=1
+   AND (NOT EXISTS
+        (SELECT 1 FROM dbo.TDIVItemProjectPolicy IP
+         WHERE IP.CompanyID=I.CompanyID AND IP.ItemID=I.ItemID
+           AND IP.AccessModeCode=N'SELECTED')
+        OR EXISTS
+        (SELECT 1 FROM dbo.TDIVItemProject IX
+         INNER JOIN dbo.TDADProject MP ON MP.ProjectID=IX.ProjectID
+             AND MP.ProjectCode=N'LAOO_MEETING' AND MP.IsActive=1
+         WHERE IX.CompanyID=I.CompanyID AND IX.ItemID=I.ItemID))
+ ORDER BY I.ItemCode FOR JSON PATH)) items
 FOR JSON PATH, WITHOUT_ARRAY_WRAPPER;
 """;
         await using var cmd = new SqlCommand(sql, db);

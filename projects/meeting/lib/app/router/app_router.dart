@@ -22,7 +22,6 @@ import '../../features/support/employee/pages/employee_shared_page.dart';
 import '../../features/support/partner_user/pages/shared_partner_user_page.dart';
 import '../../features/partner/pages/partner_company_user_page.dart';
 import '../../features/meeting/pages/meeting_building_page.dart';
-import '../../features/meeting/pages/meeting_facility_page.dart';
 import '../../features/meeting/pages/meeting_food_page.dart';
 import '../../features/meeting/pages/meeting_room_page.dart';
 import '../../features/meeting/pages/meeting_room_booking_page.dart';
@@ -31,6 +30,9 @@ import '../../features/meeting/pages/meeting_food_plan_page.dart';
 import '../../features/meeting/pages/meeting_food_order_summary_page.dart';
 import '../../features/meeting/pages/meeting_attendance_page.dart';
 import '../../features/meeting/pages/meeting_invitation_page.dart';
+import '../../features/meeting/pages/meeting_room_issue_page.dart';
+import '../../features/meeting/pages/meeting_equipment_request_page.dart';
+import '../../features/meeting/pages/meeting_system_settings_page.dart';
 import '../../features/access/role_group/pages/role_group_page.dart';
 import '../../features/access/menu_permission/pages/menu_permission_page.dart';
 import 'app_menu_route_registry.dart';
@@ -457,10 +459,20 @@ final List<GoRoute> _meetingRoomPlaceholderRoutes = [
     RouteNames.roomSupportTasks,
     'งานเตรียมห้องและอุปกรณ์',
   ),
-  _companyPlaceholder(
-    RoutePaths.roomIssues,
-    RouteNames.roomIssues,
-    'แจ้งปัญหาห้องประชุม',
+  GoRoute(
+    path: RoutePaths.roomIssues,
+    name: RouteNames.roomIssues,
+    builder: (context, state) => const MeetingRoomIssuePage(),
+  ),
+  GoRoute(
+    path: RoutePaths.equipmentRequests,
+    name: RouteNames.equipmentRequests,
+    builder: (context, state) => const MeetingEquipmentRequestPage(),
+  ),
+  GoRoute(
+    path: RoutePaths.meetingSystemSettings,
+    name: RouteNames.meetingSystemSettings,
+    builder: (context, state) => const MeetingSystemSettingsPage(),
   ),
   GoRoute(
     path: RoutePaths.meetingBuildings,
@@ -471,11 +483,6 @@ final List<GoRoute> _meetingRoomPlaceholderRoutes = [
     path: RoutePaths.meetingRooms,
     name: RouteNames.meetingRooms,
     builder: (context, state) => const MeetingRoomPage(),
-  ),
-  GoRoute(
-    path: RoutePaths.meetingFacilities,
-    name: RouteNames.meetingFacilities,
-    builder: (context, state) => const MeetingFacilityPage(),
   ),
   GoRoute(
     path: RoutePaths.meetingFoods,
