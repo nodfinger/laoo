@@ -287,6 +287,9 @@ ORDER BY UnitType,NameTH,UnitCode,OrgUnitID;
             var effectiveAt = request.EffectiveFrom.ToDateTime(TimeOnly.MinValue);
             await SaveRequirement(connection, transaction, companyId, employeeId,
                 requirementCode, request.EffectiveFrom, reason, userId, current, token);
+            if (request.RequiresAttendance)
+                await EnsureDefaultPeriodAssignment(connection, transaction,
+                    companyId, employeeId, request.EffectiveFrom, userId, token);
             await SaveDeviceCode(connection, transaction, companyId, employeeId,
                 deviceCode, effectiveAt, userId, current, token);
 
@@ -572,6 +575,61 @@ VALUES
         Add(insert, "@EmployeeID", SqlDbType.BigInt, employeeId);
         Add(insert, "@DeviceCode", SqlDbType.NVarChar, deviceCode, 100);
         Add(insert, "@EffectiveAt", SqlDbType.DateTime2, effectiveAt);
+        Add(insert, "@UserID", SqlDbType.BigInt, userId);
+        await insert.ExecuteNonQueryAsync(token);
+    }
+
+    /// The default is deliberately materialized as an assignment.  Changing the
+    /// company default later therefore never moves an existing employee.
+    private static async Task EnsureDefaultPeriodAssignment(
+        SqlConnection connection,
+        SqlTransaction transaction,
+        long companyId,
+        long employeeId,
+        DateOnly effectiveFrom,
+        long userId,
+        CancellationToken token)
+    {
+        await using var defaultCommand = new SqlCommand("""
+SELECT TOP (1) AttendancePeriodSchemeID
+FROM dbo.TDTMDefaultAttendancePeriodSchemeVersion WITH (UPDLOCK,HOLDLOCK)
+WHERE CompanyID=@CompanyID AND IsActive=1 AND EffectiveFrom<=@EffectiveFrom
+  AND (EffectiveTo IS NULL OR EffectiveTo>=@EffectiveFrom)
+ORDER BY EffectiveFrom DESC,DefaultAttendancePeriodSchemeVersionID DESC;
+""", connection, transaction);
+        Add(defaultCommand, "@CompanyID", SqlDbType.BigInt, companyId);
+        Add(defaultCommand, "@EffectiveFrom", SqlDbType.Date,
+            effectiveFrom.ToDateTime(TimeOnly.MinValue));
+        var selected = await defaultCommand.ExecuteScalarAsync(token);
+        if (selected is null || selected is DBNull) return;
+        var schemeId = Convert.ToInt64(selected);
+
+        await using var assigned = new SqlCommand("""
+SELECT COUNT_BIG(1)
+FROM dbo.TDTMEmployeeAttendancePeriodAssignment WITH (UPDLOCK,HOLDLOCK)
+WHERE CompanyID=@CompanyID AND EmployeeID=@EmployeeID
+  AND EffectiveFrom<=@EffectiveFrom
+  AND (EffectiveTo IS NULL OR EffectiveTo>=@EffectiveFrom);
+""", connection, transaction);
+        Add(assigned, "@CompanyID", SqlDbType.BigInt, companyId);
+        Add(assigned, "@EmployeeID", SqlDbType.BigInt, employeeId);
+        Add(assigned, "@EffectiveFrom", SqlDbType.Date,
+            effectiveFrom.ToDateTime(TimeOnly.MinValue));
+        if (Convert.ToInt64(await assigned.ExecuteScalarAsync(token)) > 0) return;
+
+        await using var insert = new SqlCommand("""
+INSERT dbo.TDTMEmployeeAttendancePeriodAssignment
+    (CompanyID,EmployeeID,AttendancePeriodSchemeID,EffectiveFrom,
+     AssignmentSourceCode,Reason,CreateBy)
+VALUES
+    (@CompanyID,@EmployeeID,@SchemeID,@EffectiveFrom,'DEFAULT',
+     N'สร้างจากงวดลงเวลาเริ่มต้นของบริษัท',@UserID);
+""", connection, transaction);
+        Add(insert, "@CompanyID", SqlDbType.BigInt, companyId);
+        Add(insert, "@EmployeeID", SqlDbType.BigInt, employeeId);
+        Add(insert, "@SchemeID", SqlDbType.BigInt, schemeId);
+        Add(insert, "@EffectiveFrom", SqlDbType.Date,
+            effectiveFrom.ToDateTime(TimeOnly.MinValue));
         Add(insert, "@UserID", SqlDbType.BigInt, userId);
         await insert.ExecuteNonQueryAsync(token);
     }

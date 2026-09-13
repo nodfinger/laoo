@@ -57,6 +57,8 @@ class _TimeSystemSettingsPageState extends State<TimeSystemSettingsPage> {
   String _defaultProfile = 'OWNER_OPERATED';
   Map<String, String> _selectedProfiles = {};
   Map<String, String> _selectedPolicies = {};
+  List<Map<String, dynamic>> _periodSchemes = const [];
+  int? _defaultPeriodSchemeId;
   bool _loading = true;
   bool _saving = false;
   bool _favoriteSaving = false;
@@ -144,6 +146,9 @@ class _TimeSystemSettingsPageState extends State<TimeSystemSettingsPage> {
     });
     try {
       final data = await _repository.get(effectiveDate: _effectiveFrom);
+      final schemeResponse = Map<String, dynamic>.from(
+        await _api.get('/api/time/attendance-periods/schemes') as Map,
+      );
       if (!mounted) return;
       setState(() {
         _source = data;
@@ -156,6 +161,11 @@ class _TimeSystemSettingsPageState extends State<TimeSystemSettingsPage> {
           for (final key in _requestProcesses.keys)
             key: data.requestPolicies[key] ?? 'SELF_SERVICE_AND_PROXY',
         };
+        _periodSchemes = (schemeResponse['items'] as List? ?? const [])
+            .map((item) => Map<String, dynamic>.from(item as Map))
+            .where((item) => item['isActive'] == true)
+            .toList(growable: false);
+        _defaultPeriodSchemeId = data.defaultAttendancePeriodSchemeId;
         _reason.clear();
       });
     } catch (error) {
@@ -236,6 +246,7 @@ class _TimeSystemSettingsPageState extends State<TimeSystemSettingsPage> {
           defaultProfileCode: _defaultProfile,
           processProfiles: _selectedProfiles,
           requestPolicies: _selectedPolicies,
+          defaultAttendancePeriodSchemeId: _defaultPeriodSchemeId,
           reason: _reason.text,
           stateToken: source.stateToken,
         ),
@@ -401,6 +412,38 @@ class _TimeSystemSettingsPageState extends State<TimeSystemSettingsPage> {
                 onChanged: (value) =>
                     setState(() => _selectedProfiles[entry.key] = value),
               ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        _section(
+          title: 'งวดลงเวลาเริ่มต้น',
+          description:
+              'ใช้สร้างการผูกงวดจริงเมื่อเปิดให้พนักงานต้องลงเวลา ค่านี้ไม่ย้ายพนักงานเดิมย้อนหลัง',
+          children: [
+            DropdownButtonFormField<int?>(
+              value: _defaultPeriodSchemeId,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'รูปแบบงวดลงเวลาเริ่มต้น',
+              ),
+              items: _uniqueDropdownItems<int?>([
+                const DropdownMenuItem<int?>(
+                  value: null,
+                  child: Text('ยังไม่กำหนด'),
+                ),
+                for (final scheme in _periodSchemes)
+                  DropdownMenuItem<int?>(
+                    value: (scheme['attendancePeriodSchemeId'] as num?)
+                        ?.toInt(),
+                    child: Text(
+                      '${scheme['schemeCode']} — ${scheme['schemeName']}',
+                    ),
+                  ),
+              ]),
+              onChanged: _canEdit
+                  ? (value) => setState(() => _defaultPeriodSchemeId = value)
+                  : null,
+            ),
           ],
         ),
         const SizedBox(height: 6),
