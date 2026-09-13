@@ -73,6 +73,8 @@ abstract final class RoutePaths {
   static const String laooEmployees = '/support/employees';
   static const String laooUsers = '/support/users';
   static const String companySupervisors = '/company/supervisors';
+  static const String timeAttendanceResults =
+      '/company/time-attendance-results';
   static const String meetingRoomBookings = MeetingRoutePaths.bookings;
   static const String meetingRoomApprovals = MeetingRoutePaths.approvals;
   static const String meetingRoomCalendar = MeetingRoutePaths.calendar;
