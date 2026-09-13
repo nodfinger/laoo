@@ -111,7 +111,7 @@ GoRoute _portalPlaceholder(FeatureRouteContract route, String title) => GoRoute(
 );
 
 const _workspacePlaceholders = <String, String>{
-  '14001': 'ผังสถานที่และห้องพัก',
+  '14001': 'ผังสถานที่และพื้นที่',
   '14002': 'ทะเบียนอุปกรณ์และ QR Code',
   '14003': 'ทะเบียนลูกค้าภายนอก',
   '15001': 'รายการแจ้งซ่อมทั้งหมด',

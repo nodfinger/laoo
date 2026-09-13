@@ -1,3 +1,9 @@
+## Shared Location Master and Project Context
+
+- `TDADBuilding`, `TDADFloor`, and `TDADRoom` are the single physical-location master for one Company. `14001 ผังสถานที่และพื้นที่` is Core-owned and is the only UI that creates, changes, or deactivates physical locations.
+- Service, Visitor, and Meeting own only their business context. They reference the shared `BuildingID`, `FloorID`, and/or `RoomID`; they never duplicate a physical location master.
+- Service resident records reference an active `RESIDENTIAL` `RoomID`. Visitor destination rules, when implemented, will reference the same `RoomID`. Location records with business references are deactivated instead of deleted.
+
 # LAOO Platform
 
 LAOO Platform รวมข้อมูลส่วนกลางและระบบธุรกิจหลายระบบไว้ในพื้นที่ทำงานเดียว โดยลูกค้าแต่ละรายเปิดใช้ระบบได้ไม่เท่ากัน

@@ -510,7 +510,7 @@ final List<GoRoute> _placeholderRoutes = [
   _scopePlaceholder(
     RoutePaths.assetLocations,
     RouteNames.assetLocations,
-    'ผังสถานที่และห้องพัก',
+    'ผังสถานที่และพื้นที่',
     WorkspaceMenuScope.company,
     'assetLocations',
   ),
