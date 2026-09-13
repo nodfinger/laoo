@@ -45,6 +45,7 @@ class _ItemPageState extends State<ItemPage> {
   static const _usageModes = [
     {'code': 'SALE', 'name': 'ขาย'},
     {'code': 'MATERIAL', 'name': 'วัสดุ'},
+    {'code': 'EQUIPMENT', 'name': 'อุปกรณ์'},
     {'code': 'SPARE_PART', 'name': 'อะไหล่'},
   ];
   final _api = ItemApi();

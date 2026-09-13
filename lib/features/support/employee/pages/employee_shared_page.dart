@@ -16,6 +16,8 @@ import '../../../../core/master/master_group_codes.dart';
 import '../../../../core/navigation/navigation_menu_repository.dart';
 import '../../../../core/widgets/auto_dismiss_message.dart';
 import '../../../access/role_group/data/role_group_repository.dart';
+import '../../../access/role_group/models/role_group.dart';
+import '../../../partner/models/partner_company.dart';
 import '../../../partner/data/partner_company_repository.dart';
 import '../../master_data/data/master_data_api.dart';
 import '../../organization/data/organization_repository.dart' as local_org;
@@ -97,21 +99,29 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
     }
     try {
       final results = await Future.wait<Object?>([
-        NavigationMenuRepository(apiClient: _api).resolveMenuName(
-          menuCode: _contract.menuCode,
-          routeName: _contract.routeName,
-          fallback: _caption,
-        ),
+        NavigationMenuRepository(apiClient: _api)
+            .resolveMenuName(
+              menuCode: _contract.menuCode,
+              routeName: _contract.routeName,
+              fallback: _caption,
+            )
+            .catchError((_) => _caption),
         _organizationRepository.load(),
-        _roleGroupRepository.list(
-          widget.customer || widget.companyScoped ? 'customer' : 'partner',
-        ),
-        _masterDataApi.list(MasterGroupCodes.carType),
-        _masterDataApi.list(MasterGroupCodes.oilType),
+        _roleGroupRepository
+            .list(
+              widget.customer || widget.companyScoped ? 'customer' : 'partner',
+            )
+            .catchError((_) => const <RoleGroup>[]),
+        _masterDataApi
+            .list(MasterGroupCodes.carType)
+            .catchError((_) => const <Map<String, dynamic>>[]),
+        _masterDataApi
+            .list(MasterGroupCodes.oilType)
+            .catchError((_) => const <Map<String, dynamic>>[]),
         widget.customer && !widget.companyScoped
-            ? _companyRepository.getCompanies(
-                support: _ownerScope == LaooOwnerScope.support,
-              )
+            ? _companyRepository
+                  .getCompanies(support: _ownerScope == LaooOwnerScope.support)
+                  .catchError((_) => const <PartnerCompany>[])
             : Future.value(const <dynamic>[]),
       ]);
       final organization = results[1] as OrganizationStructureSnapshot;

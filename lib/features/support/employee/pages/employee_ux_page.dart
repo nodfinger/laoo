@@ -99,6 +99,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
   final fullNameController = TextEditingController();
   final usernameController = TextEditingController();
   final passwordController = TextEditingController();
+  final confirmPasswordController = TextEditingController();
   final nickNameController = TextEditingController();
   final positionController = TextEditingController();
   final emailController = TextEditingController();
@@ -571,6 +572,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
     carColor2Controller.dispose();
     _masterDataApi.dispose();
     searchController.dispose();
+    confirmPasswordController.dispose();
     super.dispose();
   }
 
@@ -1893,7 +1895,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
                                         ).colorScheme.onSurface,
                                       ),
                                       decoration: const InputDecoration(
-                                        labelText: 'กลุ่มสิทธิ์ *',
+                                        labelText: 'กลุ่มสิทธิ์',
                                         labelStyle: TextStyle(fontSize: 14),
                                       ),
                                       items: _roleGroups
@@ -1915,6 +1917,13 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
                                     ),
                                   ),
                                 ],
+                              ),
+                              const SizedBox(height: 12),
+                              _actionField(
+                                'ยืนยัน Password',
+                                confirmPasswordController,
+                                width: double.infinity,
+                                obscureText: true,
                               ),
                             ],
                           ),
@@ -2324,6 +2333,17 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
     final username = usernameController.text.trim();
     final maskedPassword = passwordController.text == '****';
     final password = maskedPassword ? '' : passwordController.text;
+    if (username.isNotEmpty &&
+        !maskedPassword &&
+        password != confirmPasswordController.text) {
+      if (mounted) {
+        setState(() {
+          _alertMessage = 'Password และยืนยัน Password ไม่ตรงกัน';
+          _alertIsError = true;
+        });
+      }
+      return;
+    }
     if (username.isNotEmpty && password.isEmpty && !maskedPassword) {
       if (mounted) {
         setState(() {
@@ -2457,6 +2477,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
     fullNameController.clear();
     usernameController.clear();
     passwordController.clear();
+    confirmPasswordController.clear();
     nickNameController.clear();
     positionController.clear();
     emailController.clear();
@@ -2508,6 +2529,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
     fullNameController.clear();
     usernameController.clear();
     passwordController.clear();
+    confirmPasswordController.clear();
     nickNameController.clear();
     positionController.clear();
     emailController.clear();
@@ -2552,6 +2574,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
         editingEmployeeId = id;
         usernameController.clear();
         passwordController.clear();
+        confirmPasswordController.clear();
         _formalImageBytes = null;
         _formalImageName = null;
         _carImage1Bytes = null;
@@ -2627,6 +2650,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
     } on ApiException {
       usernameController.clear();
       passwordController.clear();
+      confirmPasswordController.clear();
       if (mounted) {
         setState(() => _selectedRoleGroupId = null);
       }
@@ -2642,12 +2666,14 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
     }
     final usernameController = TextEditingController();
     final passwordController = TextEditingController();
+    final confirmPasswordController = TextEditingController();
     final roleGroups = await RoleGroupRepository().list(
       widget.customer || widget.companyScoped ? 'customer' : 'partner',
     );
     if (!mounted) {
       usernameController.dispose();
       passwordController.dispose();
+      confirmPasswordController.dispose();
       return;
     }
     int? selectedRoleGroupId;
@@ -2669,6 +2695,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
     if (!mounted) {
       usernameController.dispose();
       passwordController.dispose();
+      confirmPasswordController.dispose();
       return;
     }
     var saving = false;
@@ -2749,7 +2776,16 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
                           }
                         },
                         decoration: const InputDecoration(
-                          labelText: 'Password *',
+                          labelText: 'Password',
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: confirmPasswordController,
+                        enabled: !saving,
+                        obscureText: true,
+                        decoration: const InputDecoration(
+                          labelText: 'ยืนยัน Password',
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -2818,6 +2854,15 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
                                 );
                                 return;
                               }
+                              if (!maskedPassword &&
+                                  passwordController.text !=
+                                      confirmPasswordController.text) {
+                                setDialogState(
+                                  () => errorMessage =
+                                      'Password และยืนยัน Password ไม่ตรงกัน',
+                                );
+                                return;
+                              }
                               if (selectedRoleGroupId == null) {
                                 setDialogState(
                                   () => errorMessage = 'กรุณาเลือกกลุ่มสิทธิ์',
@@ -2873,6 +2918,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
     );
     usernameController.dispose();
     passwordController.dispose();
+    confirmPasswordController.dispose();
     if (saved == true && mounted) {
       setState(() {
         _alertMessage = 'สร้างผู้ใช้งานสำหรับ $employeeName สำเร็จ';

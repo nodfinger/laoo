@@ -117,7 +117,7 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
-  testWidgets('new item applies defaults and second save updates same item', (
+  testWidgets('new item applies defaults and keeps the form in add mode', (
     tester,
   ) async {
     final api = FakeItemApi();
@@ -135,10 +135,18 @@ void main() {
       'accessModeCode': 'ALL',
       'projectIds': [],
     });
+    expect(find.text('โปรเจกเตอร์'), findsNothing);
+    expect(find.text('NEW1'), findsNothing);
     await tester.tap(find.widgetWithText(FilledButton, 'บันทึก'));
     await tester.pumpAndSettle();
     expect(api.created, 1);
-    expect(api.updated, 1);
+    expect(api.updated, 0);
+    await tester.enterText(find.byType(TextFormField).at(0), 'NEW2');
+    await tester.enterText(find.byType(TextFormField).at(1), 'รายการสอง');
+    await tester.tap(find.widgetWithText(FilledButton, 'บันทึก'));
+    await tester.pumpAndSettle();
+    expect(api.created, 2);
+    expect(api.updated, 0);
   });
   testWidgets('editing preserves classification and selected projects', (
     tester,

@@ -89,15 +89,16 @@ void main() {
     expect(api.calls.first.body, isNot(contains('password')));
   });
 
-  test('company employee requires a login and role group', () async {
+  test('company employee can be saved without a login', () async {
+    final api = _RecordingApi();
     final service = EmployeeFormService(
-      EmployeeRepository(_RecordingApi(), scope: EmployeeOwnerScope.company),
+      EmployeeRepository(api, scope: EmployeeOwnerScope.company),
     );
 
-    expect(
-      () => service.save(_validInput(), organizationMode: 1),
-      throwsA(isA<EmployeeFormValidationException>()),
-    );
+    final id = await service.save(_validInput(), organizationMode: 1);
+    expect(id, 17);
+    expect(api.calls, hasLength(1));
+    expect(api.calls.single.body?['username'], isNull);
   });
 
   test('partner employee keeps the existing separate user flow', () async {

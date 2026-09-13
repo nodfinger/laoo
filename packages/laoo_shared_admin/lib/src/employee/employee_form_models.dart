@@ -100,7 +100,7 @@ class EmployeeFormInput {
     final normalizedEmail = _text(email);
     final normalizedUsername = _text(username);
     final normalizedPassword = password?.trim() ?? '';
-    final requiresLogin = loginRequired || forceLogin;
+    final requiresLogin = loginRequired;
     if (!notifyByEmail && !notifyInSystem) {
       return 'กรุณาเลือกรูปแบบแจ้งเตือนอย่างน้อย 1 รูปแบบ';
     }

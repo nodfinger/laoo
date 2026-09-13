@@ -113,7 +113,8 @@ class _EmployeeActionWorkspaceState extends State<EmployeeActionWorkspace> {
 
   EmployeeRecord? get employee => widget.employee;
   bool get editing => employee != null;
-  bool get loginRequired => widget.repository.usesCompanyPerson;
+  // Employee records may exist before a system Login is provisioned.
+  bool get loginRequired => false;
   TextEditingController field(String key) => _fields[key]!;
 
   List<OrganizationUnitRecord> get _scopedUnits => widget.organizationUnits
@@ -592,7 +593,7 @@ class _EmployeeActionWorkspaceState extends State<EmployeeActionWorkspace> {
             return null;
           },
           decoration: InputDecoration(
-            labelText: editing ? 'กำหนด Password ใหม่' : 'Password *',
+            labelText: editing ? 'กำหนด Password ใหม่' : 'Password',
             helperText: editing
                 ? 'เว้นว่างหากไม่ต้องการเปลี่ยน Password'
                 : 'Password ต้องผ่านนโยบายของ Company',
@@ -607,7 +608,7 @@ class _EmployeeActionWorkspaceState extends State<EmployeeActionWorkspace> {
             return value == password ? null : 'ยืนยัน Password ไม่ตรงกัน';
           },
           decoration: InputDecoration(
-            labelText: editing ? 'ยืนยัน Password ใหม่' : 'ยืนยัน Password *',
+            labelText: editing ? 'ยืนยัน Password ใหม่' : 'ยืนยัน Password',
           ),
         ),
         DropdownButtonFormField<int>(

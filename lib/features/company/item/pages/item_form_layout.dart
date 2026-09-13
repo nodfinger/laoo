@@ -580,14 +580,53 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
       'packUnits': _packs,
       'images': _images,
     };
+    final creating = _data['itemID'] == null;
     final api = widget.apiFactory?.call() ?? ItemApi();
     try {
-      if (_data['itemID'] == null) {
-        final saved = await api.create(body);
-        _data['itemID'] = saved['itemID'];
-        if (saved['itemCode'] != null) _code.text = '${saved['itemCode']}';
+      if (creating) {
+        await api.create(body);
       } else {
         await api.update((_data['itemID'] as num).toInt(), body);
+      }
+      if (creating && mounted) {
+        setState(() {
+          _code.clear();
+          _name.clear();
+          _price.text = '0';
+          _cost.text = '0';
+          _min.text = '0';
+          _purchase.text = '0';
+          _orderCode.clear();
+          _orderLink1.clear();
+          _orderLink2.clear();
+          _remarkItem1.clear();
+          _note1.clear();
+          _note2.clear();
+          _note3.clear();
+          _note4.clear();
+          _note5.clear();
+          _group = _firstCode(widget.groups);
+          _type = _firstCode(widget.types);
+          _unit = _firstCode(widget.units);
+          _responsibleDepartment = null;
+          _receiveStockPriceModeCode = widget.defaultReceiveStockPriceModeCode;
+          _itemKind = 'GOODS';
+          _stockTracking = 'QUANTITY';
+          _usageCodes = {'SALE'};
+          _projectMode = 'ALL';
+          _projectIds = {};
+          _supplierWarrantyMode = 'NONE';
+          _customerWarrantyMode = 'NONE';
+          _supplierWarrantyMonths.clear();
+          _customerWarrantyMonths.clear();
+          _packs = [];
+          _images = [];
+          _active = true;
+          _showShop = false;
+          _additionalExpanded = true;
+          _additionalTab = 0;
+          _saving = false;
+        });
       }
       widget.onSaved();
       if (mounted) setState(() => _saving = false);

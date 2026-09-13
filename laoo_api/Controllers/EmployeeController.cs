@@ -164,22 +164,29 @@ WHERE PersonID=@PersonID AND CompanyID=@company;
         if (isCompanyEmployee)
         {
             username = x.Username?.Trim();
-            if (string.IsNullOrWhiteSpace(username) || x.RoleGroupId is null)
+            if (string.IsNullOrWhiteSpace(username) && x.RoleGroupId is not null)
                 return BadRequest(new
                 {
                     message = "ข้อมูลบัญชีเข้าใช้งานไม่ครบ",
                     description = "พนักงาน Company ต้องมี Username และกลุ่มสิทธิ์",
                 });
-            if (username.Length > 100)
+            if (!string.IsNullOrWhiteSpace(username) && x.RoleGroupId is null)
+                return BadRequest(new { message = "กรุณาเลือกกลุ่มสิทธิ์", description = "Login ต้องมีกลุ่มสิทธิ์" });
+            if (!string.IsNullOrWhiteSpace(username) && username.Length > 100)
                 return BadRequest(new { message = "Username ยาวเกินกำหนด", description = "Username ต้องไม่เกิน 100 ตัวอักษร" });
-            if (id is null && string.IsNullOrWhiteSpace(x.Password))
+            if (!string.IsNullOrWhiteSpace(username) && id is null && string.IsNullOrWhiteSpace(x.Password))
                 return BadRequest(new { message = "กรุณากรอก Password", description = "พนักงาน Company ใหม่ต้องมี Password สำหรับเข้าใช้งานระบบ" });
-            if (!long.TryParse(User.FindFirstValue("project_id"), out var resolvedProjectId)) return Forbid();
-            projectId = resolvedProjectId;
+            if (!string.IsNullOrWhiteSpace(username))
+            {
+                if (!long.TryParse(User.FindFirstValue("project_id"), out var resolvedProjectId)) return Forbid();
+                projectId = resolvedProjectId;
+            }
             actorId = long.TryParse(User.FindFirstValue("user_id"), out var resolvedActorId)
                 ? resolvedActorId
                 : null;
-            var policyCode = await passwordService.GetPolicyAsync(c, "C", scope.Value.PartnerId, scope.Value.CompanyId, token);
+            if (!string.IsNullOrWhiteSpace(username))
+            {
+                var policyCode = await passwordService.GetPolicyAsync(c, "C", scope.Value.PartnerId, scope.Value.CompanyId, token);
             if (!string.IsNullOrWhiteSpace(x.Password)
                 && !PasswordService.MeetsPolicy(username, x.Password, policyCode))
                 return BadRequest(new
@@ -191,6 +198,7 @@ WHERE PersonID=@PersonID AND CompanyID=@company;
             passwordHash = string.IsNullOrWhiteSpace(x.Password)
                 ? null
                 : passwordService.HashPassword(username, x.Password);
+            }
         }
         const string sql = """
             IF EXISTS(SELECT 1 FROM dbo.TDADEmployee WHERE PartnerID=@partner AND ((@company IS NULL AND CompanyID IS NULL) OR CompanyID=@company) AND EmployeeCode=@code AND (@id IS NULL OR EmployeeID<>@id)) THROW 50001,'DUPLICATE_EMPLOYEE_CODE',1;
@@ -220,19 +228,19 @@ WHERE PersonID=@PersonID AND CompanyID=@company;
             CompanyEmployeeIdentityResult? identity = null;
             if (isCompanyEmployee)
             {
-                identity = await companyPersonService.UpsertEmployeeIdentityAsync(
-                    c,
-                    transaction,
-                    scope.Value.CompanyId!.Value,
-                    savedId,
-                    x,
-                    username!,
-                    normalizedUsername!,
-                    passwordHash,
-                    x.RoleGroupId!.Value,
-                    projectId!.Value,
-                    actorId,
-                    token);
+                if (!string.IsNullOrWhiteSpace(username))
+                {
+                    identity = await companyPersonService.UpsertEmployeeIdentityAsync(
+                        c, transaction, scope.Value.CompanyId!.Value, savedId, x,
+                        username, normalizedUsername!, passwordHash, x.RoleGroupId!.Value,
+                        projectId!.Value, actorId, token);
+                }
+                else
+                {
+                    var personId = await companyPersonService.EnsureEmployeePersonAsync(
+                        c, transaction, scope.Value.CompanyId!.Value, savedId, x, actorId, token);
+                    identity = new CompanyEmployeeIdentityResult(personId, null);
+                }
             }
             await transaction.CommitAsync(token);
             return Ok(new
