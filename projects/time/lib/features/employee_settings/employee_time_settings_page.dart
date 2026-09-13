@@ -666,6 +666,7 @@ class _EmployeeTimeSettingsEditorState
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  SizedBox(height: tokens.cardSpacing),
                   Text(
                     '${widget.employee.employeeCode} - ${widget.employee.fullName}',
                     style: tokens.inputStyle.copyWith(

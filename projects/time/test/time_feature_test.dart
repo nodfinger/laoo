@@ -58,6 +58,90 @@ void main() {
     expect(find.text('content'), findsOneWidget);
   });
 
+  testWidgets('Time applies the Center floating label contract', (
+    tester,
+  ) async {
+    late InputDecorationThemeData decorationTheme;
+    configureTimeFeatureHost(
+      ({required pageTitle, required activeMenu, required child}) => child,
+      uiTokens: _testTimeUiTokens,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: TimeWorkspaceTheme(
+          child: Builder(
+            builder: (context) {
+              decorationTheme = Theme.of(context).inputDecorationTheme;
+              return Scaffold(
+                body: Column(
+                  children: [
+                    const TextField(
+                      decoration: InputDecoration(labelText: 'Text field'),
+                    ),
+                    DropdownButtonFormField<String>(
+                      initialValue: 'A',
+                      decoration: const InputDecoration(labelText: 'Combo box'),
+                      items: const [
+                        DropdownMenuItem(value: 'A', child: Text('A')),
+                      ],
+                      onChanged: (_) {},
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byType(TextField), findsOneWidget);
+    expect(find.byType(DropdownButtonFormField<String>), findsOneWidget);
+    expect(decorationTheme.floatingLabelStyle?.fontSize, 16);
+    expect(decorationTheme.floatingLabelStyle?.color, Colors.green);
+  });
+
+  testWidgets('Time action dialog applies the shared popup contract', (
+    tester,
+  ) async {
+    late InputDecorationThemeData dialogDecorationTheme;
+    configureTimeFeatureHost(
+      ({required pageTitle, required activeMenu, required child}) => child,
+      uiTokens: _testTimeUiTokens,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TimeActionDialog(
+            icon: Icons.edit_outlined,
+            title: 'Action',
+            content: Builder(
+              builder: (context) {
+                dialogDecorationTheme = Theme.of(context).inputDecorationTheme;
+                return const TextField(
+                  decoration: InputDecoration(labelText: 'Field'),
+                );
+              },
+            ),
+            actions: const [
+              TextButton(onPressed: null, child: Text('Cancel')),
+              FilledButton(onPressed: null, child: Text('Save')),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Action'), findsOneWidget);
+    expect(find.byIcon(Icons.edit_outlined), findsOneWidget);
+    expect(find.byType(Divider), findsNWidgets(2));
+    expect(dialogDecorationTheme.border, isA<OutlineInputBorder>());
+    expect(dialogDecorationTheme.floatingLabelStyle?.fontSize, 16);
+    expect(tester.getSize(find.byType(FilledButton)).height, 48);
+    expect(tester.getSize(find.byType(TextButton)).height, 48);
+  });
   test(
     'employee settings repository preserves paging and update contract',
     () async {
@@ -187,10 +271,7 @@ void main() {
     expect(find.text('รูปแบบการอนุมัติ'), findsOneWidget);
     expect(find.text('ผู้เริ่มคำขอ'), findsOneWidget);
     expect(find.textContaining('ไม่มี Active Login'), findsOneWidget);
-    expect(
-      find.text('ยังมีพนักงานไม่มี Active Login 2 คน'),
-      findsOneWidget,
-    );
+    expect(find.text('ยังมีพนักงานไม่มี Active Login 2 คน'), findsOneWidget);
     await tester.scrollUntilVisible(
       find.text('บันทึก'),
       500,
@@ -295,6 +376,7 @@ final _testTimeUiTokens = TimeUiTokens(
   captionStyle: TextStyle(fontSize: 20),
   sectionStyle: TextStyle(fontSize: 16),
   inputStyle: TextStyle(fontSize: 14),
+  inputLabelStyle: TextStyle(fontSize: 16, color: Colors.green),
   tableStyle: TextStyle(fontSize: 14),
   buttonStyle: TextStyle(fontSize: 14),
   buttonHeight: 40,

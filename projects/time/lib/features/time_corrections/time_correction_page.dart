@@ -485,10 +485,13 @@ class _CorrectionDialogState extends State<_CorrectionDialog> {
     final employees = lookup('employees');
     final reasons = lookup('adjustmentReasons');
     final proxyReasons = lookup('onBehalfReasons');
-    return AlertDialog(
-      title: Text(
-        widget.mode == 'self' ? 'คำขอปรับเวลาของฉัน' : 'คำขอปรับเวลาแทนพนักงาน',
-      ),
+    return TimeActionDialog(
+      icon: Icons.edit_calendar_outlined,
+      title: widget.mode == 'self'
+          ? 'คำขอปรับเวลาของฉัน'
+          : 'คำขอปรับเวลาแทนพนักงาน',
+      maxWidth: 760,
+      scrollable: false,
       content: SizedBox(
         width: 760,
         child: Form(
@@ -780,10 +783,13 @@ class _RequestDetailDialogState extends State<_RequestDetailDialog> {
     final details = (widget.value['details'] as List? ?? const [])
         .map((x) => Map<String, dynamic>.from(x as Map))
         .toList();
-    return AlertDialog(
-      title: Text('คำขอ #${header['requestId']}'),
+    return TimeActionDialog(
+      icon: Icons.approval_outlined,
+      title: 'คำขอ #${header['requestId']}',
+      maxWidth: 760,
+      scrollable: false,
       content: SizedBox(
-        width: 650,
+        width: double.infinity,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,

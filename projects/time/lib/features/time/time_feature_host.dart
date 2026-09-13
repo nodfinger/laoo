@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:laoo_shared_core/laoo_shared_core.dart';
 import 'package:laoo_shared_workspace_ui/laoo_shared_workspace_ui.dart';
@@ -48,6 +50,7 @@ class TimeUiTokens {
     required this.captionStyle,
     required this.sectionStyle,
     required this.inputStyle,
+    required this.inputLabelStyle,
     required this.tableStyle,
     required this.buttonStyle,
     required this.buttonHeight,
@@ -67,6 +70,7 @@ class TimeUiTokens {
   final TextStyle captionStyle;
   final TextStyle sectionStyle;
   final TextStyle inputStyle;
+  final TextStyle inputLabelStyle;
   final TextStyle tableStyle;
   final TextStyle buttonStyle;
   final double buttonHeight;
@@ -196,6 +200,38 @@ class TimeWorkspaceTheme extends StatelessWidget {
             borderSide: const BorderSide(color: Colors.red),
           ),
           labelStyle: tokens.inputStyle,
+          floatingLabelStyle: tokens.inputLabelStyle,
+        ),
+        textButtonTheme: TextButtonThemeData(
+          style: TextButton.styleFrom(
+            minimumSize: Size(0, tokens.buttonHeight),
+            textStyle: tokens.buttonStyle,
+            foregroundColor: tokens.primaryColor,
+            shape: buttonShape,
+          ),
+        ),
+        datePickerTheme: DatePickerThemeData(
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+          shape: buttonShape,
+          headerBackgroundColor: Colors.white,
+          headerForegroundColor: Colors.black,
+          todayForegroundColor: WidgetStatePropertyAll(tokens.primaryColor),
+          dayForegroundColor: WidgetStateProperty.resolveWith(
+            (states) =>
+                states.contains(WidgetState.selected) ? Colors.white : null,
+          ),
+          dayBackgroundColor: WidgetStateProperty.resolveWith(
+            (states) => states.contains(WidgetState.selected)
+                ? tokens.primaryColor
+                : null,
+          ),
+          cancelButtonStyle: TextButton.styleFrom(
+            foregroundColor: tokens.primaryColor,
+          ),
+          confirmButtonStyle: TextButton.styleFrom(
+            foregroundColor: tokens.primaryColor,
+          ),
         ),
         filledButtonTheme: FilledButtonThemeData(
           style: FilledButton.styleFrom(
@@ -225,6 +261,127 @@ class TimeWorkspaceTheme extends StatelessWidget {
       child: child,
     );
   }
+}
+
+class TimeActionDialog extends StatelessWidget {
+  const TimeActionDialog({
+    required this.icon,
+    required this.title,
+    required this.content,
+    required this.actions,
+    this.iconColor,
+    this.maxWidth = 480,
+    this.maxHeight = 720,
+    this.scrollable = true,
+    super.key,
+  });
+
+  final IconData icon;
+  final String title;
+  final Widget content;
+  final List<Widget> actions;
+  final Color? iconColor;
+  final double maxWidth;
+  final double maxHeight;
+  final bool scrollable;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = timeUiTokens;
+    final availableWidth = math
+        .max(0, MediaQuery.sizeOf(context).width - 32)
+        .toDouble();
+    final availableHeight = math
+        .max(0, MediaQuery.sizeOf(context).height - 32)
+        .toDouble();
+    final body = scrollable
+        ? SingleChildScrollView(padding: tokens.cardPadding, child: content)
+        : Padding(padding: tokens.cardPadding, child: content);
+    return TimeWorkspaceTheme(
+      child: Dialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(tokens.radius),
+        ),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: math.min(maxWidth, availableWidth),
+            maxHeight: math.min(maxHeight, availableHeight),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+                child: Row(
+                  children: [
+                    Icon(icon, color: iconColor ?? tokens.primaryColor),
+                    const SizedBox(width: 10),
+                    Expanded(child: Text(title, style: tokens.captionStyle)),
+                  ],
+                ),
+              ),
+              Divider(height: 1, color: tokens.borderColor),
+              Flexible(child: body),
+              Divider(height: 1, color: tokens.borderColor),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Wrap(
+                    alignment: WrapAlignment.end,
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: actions,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class TimeDeleteDialog extends StatelessWidget {
+  const TimeDeleteDialog({required this.itemLabel, super.key});
+
+  final String itemLabel;
+
+  @override
+  Widget build(BuildContext context) => TimeActionDialog(
+    icon: Icons.delete_outline,
+    iconColor: Colors.red,
+    title: 'ยืนยันการลบ',
+    content: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          color: Colors.red.shade50,
+          child: Text(itemLabel),
+        ),
+        const SizedBox(height: 12),
+        const Text('รายการที่ลบแล้วไม่สามารถเรียกคืนได้'),
+      ],
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context, false),
+        child: const Text('ยกเลิก'),
+      ),
+      FilledButton.icon(
+        style: FilledButton.styleFrom(backgroundColor: Colors.red),
+        onPressed: () => Navigator.pop(context, true),
+        icon: const Icon(Icons.delete_outline),
+        label: const Text('ลบ'),
+      ),
+    ],
+  );
 }
 
 JsonApiClient createTimeApiClient() {

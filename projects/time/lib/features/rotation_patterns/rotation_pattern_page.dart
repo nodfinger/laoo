@@ -107,34 +107,8 @@ class _State extends State<RotationPatternPage> {
   Future<void> remove(RotationPattern x) async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (c) => AlertDialog(
-        icon: const Icon(Icons.delete_outline, color: Colors.red, size: 42),
-        title: const Text('ยืนยันการลบ', style: TextStyle(color: Colors.red)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              color: Colors.red.shade50,
-              padding: const EdgeInsets.all(12),
-              child: Text('${x.code} — ${x.name}'),
-            ),
-            const SizedBox(height: 12),
-            const Text('รายการที่ลบแล้วไม่สามารถเรียกคืนได้'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(c, false),
-            child: const Text('ยกเลิก'),
-          ),
-          FilledButton.icon(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () => Navigator.pop(c, true),
-            icon: const Icon(Icons.delete_outline),
-            label: const Text('ลบ'),
-          ),
-        ],
-      ),
+      builder: (context) =>
+          TimeDeleteDialog(itemLabel: '${x.code} — ${x.name}'),
     );
     if (ok == true) {
       try {
@@ -345,188 +319,197 @@ class _DialogState extends State<_Dialog> {
   }
 
   @override
-  Widget build(BuildContext context) => Dialog(
-    child: ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 760, maxHeight: 720),
-      child: Form(
-        key: key,
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      x.id == null ? 'เพิ่มรูปแบบหมุนกะ' : 'แก้ไขรูปแบบหมุนกะ',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
+  Widget build(BuildContext context) => TimeWorkspaceTheme(
+    child: Dialog(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 760, maxHeight: 720),
+        child: Form(
+          key: key,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.autorenew_outlined,
+                      color: timeUiTokens.primaryColor,
                     ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(height: 1),
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.all(20),
-                children: [
-                  Row(
-                    children: [
-                      const Text('สถานะ'),
-                      Switch(
-                        value: x.active,
-                        onChanged: (v) => setState(() => x.active = v),
-                      ),
-                    ],
-                  ),
-                  TextFormField(
-                    initialValue: x.code,
-                    decoration: const InputDecoration(
-                      labelText: 'รหัสรูปแบบ *',
-                    ),
-                    validator: req,
-                    onChanged: (v) => x.code = v,
-                  ),
-                  const SizedBox(height: 12),
-                  InkWell(
-                    onTap: () async {
-                      final picked = await showDatePicker(
-                        context: context,
-                        initialDate: x.effectiveFrom,
-                        firstDate: DateTime(
-                          DateTime.now().year,
-                          DateTime.now().month,
-                          DateTime.now().day,
-                        ),
-                        lastDate: DateTime(DateTime.now().year + 5, 12, 31),
-                      );
-                      if (picked != null) {
-                        setState(() => x.effectiveFrom = picked);
-                      }
-                    },
-                    child: InputDecorator(
-                      decoration: const InputDecoration(
-                        labelText: 'วันที่เริ่มใช้ *',
-                        suffixIcon: Icon(Icons.calendar_month_outlined),
-                      ),
+                    const SizedBox(width: 10),
+                    Expanded(
                       child: Text(
-                        '${x.effectiveFrom.day.toString().padLeft(2, '0')}/'
-                        '${x.effectiveFrom.month.toString().padLeft(2, '0')}/'
-                        '${x.effectiveFrom.year}',
+                        x.id == null
+                            ? 'เพิ่มรูปแบบหมุนกะ'
+                            : 'แก้ไขรูปแบบหมุนกะ',
+                        style: timeUiTokens.captionStyle,
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    initialValue: x.name,
-                    decoration: const InputDecoration(
-                      labelText: 'ชื่อรูปแบบ *',
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.close),
                     ),
-                    validator: req,
-                    onChanged: (v) => x.name = v,
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    initialValue: '${x.cycleDays}',
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'จำนวนวันในวงรอบ *',
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.all(20),
+                  children: [
+                    Row(
+                      children: [
+                        const Text('สถานะ'),
+                        Switch(
+                          value: x.active,
+                          onChanged: (v) => setState(() => x.active = v),
+                        ),
+                      ],
                     ),
-                    validator: (v) {
-                      final n = int.tryParse(v ?? '');
-                      return n == null || n < 1 || n > 366
-                          ? 'ระบุ 1–366 วัน'
-                          : null;
-                    },
-                    onChanged: (v) {
-                      final n = int.tryParse(v);
-                      if (n != null && n >= 1 && n <= 366) cycle(n);
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'ตารางวงรอบ',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  ...x.days.map(
-                    (d) => Padding(
-                      padding: const EdgeInsets.only(top: 12),
-                      child: Row(
-                        children: [
-                          SizedBox(width: 70, child: Text('วันที่ ${d.dayNo}')),
-                          SizedBox(
-                            width: 120,
-                            child: CheckboxListTile(
-                              contentPadding: EdgeInsets.zero,
-                              title: const Text('วันหยุด'),
-                              value: d.dayOff,
-                              onChanged: (v) => setState(() => d.dayOff = v!),
-                            ),
+                    TextFormField(
+                      initialValue: x.code,
+                      decoration: const InputDecoration(
+                        labelText: 'รหัสรูปแบบ *',
+                      ),
+                      validator: req,
+                      onChanged: (v) => x.code = v,
+                    ),
+                    const SizedBox(height: 12),
+                    InkWell(
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: x.effectiveFrom,
+                          firstDate: DateTime(
+                            DateTime.now().year,
+                            DateTime.now().month,
+                            DateTime.now().day,
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: DropdownButtonFormField<int>(
-                              initialValue: d.dayOff ? null : d.shiftId,
-                              isExpanded: true,
-                              decoration: const InputDecoration(
-                                labelText: 'กะทำงาน',
+                          lastDate: DateTime(DateTime.now().year + 5, 12, 31),
+                        );
+                        if (picked != null) {
+                          setState(() => x.effectiveFrom = picked);
+                        }
+                      },
+                      child: InputDecorator(
+                        decoration: const InputDecoration(
+                          labelText: 'วันที่เริ่มใช้ *',
+                          suffixIcon: Icon(Icons.calendar_month_outlined),
+                        ),
+                        child: Text(
+                          '${x.effectiveFrom.day.toString().padLeft(2, '0')}/'
+                          '${x.effectiveFrom.month.toString().padLeft(2, '0')}/'
+                          '${x.effectiveFrom.year}',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      initialValue: x.name,
+                      decoration: const InputDecoration(
+                        labelText: 'ชื่อรูปแบบ *',
+                      ),
+                      validator: req,
+                      onChanged: (v) => x.name = v,
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      initialValue: '${x.cycleDays}',
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'จำนวนวันในวงรอบ *',
+                      ),
+                      validator: (v) {
+                        final n = int.tryParse(v ?? '');
+                        return n == null || n < 1 || n > 366
+                            ? 'ระบุ 1–366 วัน'
+                            : null;
+                      },
+                      onChanged: (v) {
+                        final n = int.tryParse(v);
+                        if (n != null && n >= 1 && n <= 366) cycle(n);
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'ตารางวงรอบ',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    ...x.days.map(
+                      (d) => Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: 70,
+                              child: Text('วันที่ ${d.dayNo}'),
+                            ),
+                            SizedBox(
+                              width: 120,
+                              child: CheckboxListTile(
+                                contentPadding: EdgeInsets.zero,
+                                title: const Text('วันหยุด'),
+                                value: d.dayOff,
+                                onChanged: (v) => setState(() => d.dayOff = v!),
                               ),
-                              items: widget.shifts
-                                  .map(
-                                    (s) => DropdownMenuItem(
-                                      value: s.id,
-                                      child: Text(
-                                        '${s.code} — ${s.name}',
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  )
-                                  .toList(),
-                              onChanged: d.dayOff
-                                  ? null
-                                  : (v) => setState(() => d.shiftId = v),
-                              validator: (v) => !d.dayOff && v == null
-                                  ? 'กรุณาเลือกกะ'
-                                  : null,
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: DropdownButtonFormField<int>(
+                                initialValue: d.dayOff ? null : d.shiftId,
+                                isExpanded: true,
+                                decoration: const InputDecoration(
+                                  labelText: 'กะทำงาน',
+                                ),
+                                items: widget.shifts
+                                    .map(
+                                      (s) => DropdownMenuItem(
+                                        value: s.id,
+                                        child: Text(
+                                          '${s.code} — ${s.name}',
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
+                                onChanged: d.dayOff
+                                    ? null
+                                    : (v) => setState(() => d.shiftId = v),
+                                validator: (v) => !d.dayOff && v == null
+                                    ? 'กรุณาเลือกกะ'
+                                    : null,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            const Divider(height: 1),
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('ยกเลิก'),
-                  ),
-                  FilledButton.icon(
-                    onPressed: () {
-                      if (key.currentState!.validate()) {
-                        Navigator.pop(context, x);
-                      }
-                    },
-                    icon: const Icon(Icons.save_outlined),
-                    label: const Text('บันทึก'),
-                  ),
-                ],
+              const Divider(height: 1),
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('ยกเลิก'),
+                    ),
+                    FilledButton.icon(
+                      onPressed: () {
+                        if (key.currentState!.validate()) {
+                          Navigator.pop(context, x);
+                        }
+                      },
+                      icon: const Icon(Icons.save_outlined),
+                      label: const Text('บันทึก'),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     ),

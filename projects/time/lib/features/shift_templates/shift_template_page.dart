@@ -108,35 +108,8 @@ class _ShiftTemplatePageState extends State<ShiftTemplatePage> {
   Future<void> remove(ShiftSummary row) async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (c) => AlertDialog(
-        icon: const Icon(Icons.delete_outline, color: Colors.red, size: 42),
-        title: const Text('ยืนยันการลบ', style: TextStyle(color: Colors.red)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              color: Colors.red.shade50,
-              child: Text('${row.code} — ${row.name}'),
-            ),
-            const SizedBox(height: 12),
-            const Text('รายการที่ลบแล้วไม่สามารถเรียกคืนได้'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(c, false),
-            child: const Text('ยกเลิก'),
-          ),
-          FilledButton.icon(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () => Navigator.pop(c, true),
-            icon: const Icon(Icons.delete_outline),
-            label: const Text('ลบ'),
-          ),
-        ],
-      ),
+      builder: (context) =>
+          TimeDeleteDialog(itemLabel: '${row.code} — ${row.name}'),
     );
     if (ok != true) return;
     try {
@@ -393,141 +366,159 @@ class _ShiftDialogState extends State<_ShiftDialog> {
   }
 
   @override
-  Widget build(BuildContext context) => Dialog(
-    child: ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 1000, maxHeight: 760),
-      child: Form(
-        key: form,
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 12, 12),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      v.id == null ? 'เพิ่มกะทำงาน' : 'แก้ไขกะทำงาน',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
+  Widget build(BuildContext context) => TimeWorkspaceTheme(
+    child: Dialog(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1000, maxHeight: 760),
+        child: Form(
+          key: form,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 12, 12),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.schedule_outlined,
+                      color: timeUiTokens.primaryColor,
                     ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(height: 1),
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.all(20),
-                children: [
-                  Row(
-                    children: [
-                      const Text('สถานะ'),
-                      const SizedBox(width: 8),
-                      Switch(
-                        value: v.active,
-                        onChanged: (x) => setState(() => v.active = x),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
-                    children: [
-                      field('รหัสกะ *', v.code, (x) => v.code = x, width: 220),
-                      field('ชื่อกะ *', v.name, (x) => v.name = x, width: 360),
-                      number('สายได้ (นาที)', v.late, (x) => v.late = x),
-                      number('ออกก่อนได้ (นาที)', v.early, (x) => v.early = x),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  InkWell(
-                    onTap: () async {
-                      final picked = await showDatePicker(
-                        context: context,
-                        initialDate: v.effectiveFrom,
-                        firstDate: DateTime(
-                          DateTime.now().year,
-                          DateTime.now().month,
-                          DateTime.now().day,
-                        ),
-                        lastDate: DateTime(DateTime.now().year + 5, 12, 31),
-                      );
-                      if (picked != null) {
-                        setState(() => v.effectiveFrom = picked);
-                      }
-                    },
-                    child: InputDecorator(
-                      decoration: const InputDecoration(
-                        labelText: 'วันที่เริ่มใช้ *',
-                        suffixIcon: Icon(Icons.calendar_month_outlined),
-                      ),
+                    const SizedBox(width: 10),
+                    Expanded(
                       child: Text(
-                        '${v.effectiveFrom.day.toString().padLeft(2, '0')}/'
-                        '${v.effectiveFrom.month.toString().padLeft(2, '0')}/'
-                        '${v.effectiveFrom.year}',
+                        v.id == null ? 'เพิ่มกะทำงาน' : 'แก้ไขกะทำงาน',
+                        style: timeUiTokens.captionStyle,
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  field(
-                    'รายละเอียด',
-                    v.description,
-                    (x) => v.description = x,
-                    width: double.infinity,
-                    required: false,
-                  ),
-                  const SizedBox(height: 20),
-                  header(
-                    'ช่วงเวลาของกะ',
-                    () => setState(
-                      () => v.segments.add(
-                        ShiftSegment(sequenceNo: v.segments.length + 1),
-                      ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.close),
                     ),
-                  ),
-                  ...v.segments.asMap().entries.map(
-                    (e) => segment(e.key, e.value),
-                  ),
-                  const SizedBox(height: 20),
-                  header(
-                    'รอบลงเวลา',
-                    () => setState(
-                      () => v.rules.add(
-                        ShiftSessionRule(sequenceNo: v.rules.length + 1),
-                      ),
-                    ),
-                  ),
-                  ...v.rules.asMap().entries.map((e) => rule(e.key, e.value)),
-                ],
+                  ],
+                ),
               ),
-            ),
-            const Divider(height: 1),
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('ยกเลิก'),
-                  ),
-                  const SizedBox(width: 8),
-                  FilledButton.icon(
-                    onPressed: save,
-                    icon: const Icon(Icons.save_outlined),
-                    label: const Text('บันทึก'),
-                  ),
-                ],
+              const Divider(height: 1),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.all(20),
+                  children: [
+                    Row(
+                      children: [
+                        const Text('สถานะ'),
+                        const SizedBox(width: 8),
+                        Switch(
+                          value: v.active,
+                          onChanged: (x) => setState(() => v.active = x),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: [
+                        field(
+                          'รหัสกะ *',
+                          v.code,
+                          (x) => v.code = x,
+                          width: 220,
+                        ),
+                        field(
+                          'ชื่อกะ *',
+                          v.name,
+                          (x) => v.name = x,
+                          width: 360,
+                        ),
+                        number('สายได้ (นาที)', v.late, (x) => v.late = x),
+                        number(
+                          'ออกก่อนได้ (นาที)',
+                          v.early,
+                          (x) => v.early = x,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    InkWell(
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: v.effectiveFrom,
+                          firstDate: DateTime(
+                            DateTime.now().year,
+                            DateTime.now().month,
+                            DateTime.now().day,
+                          ),
+                          lastDate: DateTime(DateTime.now().year + 5, 12, 31),
+                        );
+                        if (picked != null) {
+                          setState(() => v.effectiveFrom = picked);
+                        }
+                      },
+                      child: InputDecorator(
+                        decoration: const InputDecoration(
+                          labelText: 'วันที่เริ่มใช้ *',
+                          suffixIcon: Icon(Icons.calendar_month_outlined),
+                        ),
+                        child: Text(
+                          '${v.effectiveFrom.day.toString().padLeft(2, '0')}/'
+                          '${v.effectiveFrom.month.toString().padLeft(2, '0')}/'
+                          '${v.effectiveFrom.year}',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    field(
+                      'รายละเอียด',
+                      v.description,
+                      (x) => v.description = x,
+                      width: double.infinity,
+                      required: false,
+                    ),
+                    const SizedBox(height: 20),
+                    header(
+                      'ช่วงเวลาของกะ',
+                      () => setState(
+                        () => v.segments.add(
+                          ShiftSegment(sequenceNo: v.segments.length + 1),
+                        ),
+                      ),
+                    ),
+                    ...v.segments.asMap().entries.map(
+                      (e) => segment(e.key, e.value),
+                    ),
+                    const SizedBox(height: 20),
+                    header(
+                      'รอบลงเวลา',
+                      () => setState(
+                        () => v.rules.add(
+                          ShiftSessionRule(sequenceNo: v.rules.length + 1),
+                        ),
+                      ),
+                    ),
+                    ...v.rules.asMap().entries.map((e) => rule(e.key, e.value)),
+                  ],
+                ),
               ),
-            ),
-          ],
+              const Divider(height: 1),
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('ยกเลิก'),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton.icon(
+                      onPressed: save,
+                      icon: const Icon(Icons.save_outlined),
+                      label: const Text('บันทึก'),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     ),

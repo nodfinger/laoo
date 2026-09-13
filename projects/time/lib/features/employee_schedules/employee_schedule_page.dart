@@ -99,16 +99,15 @@ class _State extends State<EmployeeSchedulePage> {
       context: context,
       barrierDismissible: false,
       builder: (c) => StatefulBuilder(
-        builder: (c, set) => AlertDialog(
-          title: Text(
-            mode == 'assign'
-                ? 'จัดพนักงานเข้ากลุ่ม'
-                : mode == 'rotate'
-                ? 'กำหนด Rotation ให้กลุ่ม'
-                : 'ปรับตารางเฉพาะวัน',
-          ),
+        builder: (c, set) => TimeActionDialog(
+          icon: Icons.calendar_month_outlined,
+          title: mode == 'assign'
+              ? 'จัดพนักงานเข้ากลุ่ม'
+              : mode == 'rotate'
+              ? 'กำหนด Rotation ให้กลุ่ม'
+              : 'ปรับตารางเฉพาะวัน',
           content: SizedBox(
-            width: 600,
+            width: double.infinity,
             child: Form(
               key: key,
               child: Column(

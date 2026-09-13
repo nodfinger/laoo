@@ -97,56 +97,53 @@ class _State extends State<ScheduleGroupPage> {
     final saved = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (c) => AlertDialog(
-        title: Text(
-          x.id == null ? 'เพิ่มกลุ่มตารางทำงาน' : 'แก้ไขกลุ่มตารางทำงาน',
-        ),
-        content: SizedBox(
-          width: 560,
-          child: Form(
-            key: key,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    const Text('สถานะ'),
-                    const SizedBox(width: 8),
-                    StatefulBuilder(
-                      builder: (c, set) => Switch(
-                        value: x.active,
-                        onChanged: (v) => set(() => x.active = v),
-                      ),
+      builder: (c) => TimeActionDialog(
+        icon: Icons.group_work_outlined,
+        title: x.id == null ? 'เพิ่มกลุ่มตารางทำงาน' : 'แก้ไขกลุ่มตารางทำงาน',
+        content: Form(
+          key: key,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  const Text('สถานะ'),
+                  const SizedBox(width: 8),
+                  StatefulBuilder(
+                    builder: (c, set) => Switch(
+                      value: x.active,
+                      onChanged: (v) => set(() => x.active = v),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  initialValue: x.code,
-                  decoration: const InputDecoration(labelText: 'รหัสกลุ่ม *'),
-                  validator: (v) =>
-                      v!.trim().isEmpty ? 'กรุณาระบุรหัสกลุ่ม' : null,
-                  onChanged: (v) => x.code = v,
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  initialValue: x.name,
-                  decoration: const InputDecoration(labelText: 'ชื่อกลุ่ม *'),
-                  validator: (v) =>
-                      v!.trim().isEmpty ? 'กรุณาระบุชื่อกลุ่ม' : null,
-                  onChanged: (v) => x.name = v,
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  initialValue: x.description,
-                  maxLines: 3,
-                  decoration: const InputDecoration(labelText: 'รายละเอียด'),
-                  onChanged: (v) => x.description = v,
-                ),
-              ],
-            ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                initialValue: x.code,
+                decoration: const InputDecoration(labelText: 'รหัสกลุ่ม *'),
+                validator: (v) =>
+                    v!.trim().isEmpty ? 'กรุณาระบุรหัสกลุ่ม' : null,
+                onChanged: (v) => x.code = v,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                initialValue: x.name,
+                decoration: const InputDecoration(labelText: 'ชื่อกลุ่ม *'),
+                validator: (v) =>
+                    v!.trim().isEmpty ? 'กรุณาระบุชื่อกลุ่ม' : null,
+                onChanged: (v) => x.name = v,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                initialValue: x.description,
+                maxLines: 3,
+                decoration: const InputDecoration(labelText: 'รายละเอียด'),
+                onChanged: (v) => x.description = v,
+              ),
+            ],
           ),
         ),
+
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(c, false),
@@ -175,35 +172,8 @@ class _State extends State<ScheduleGroupPage> {
   Future<void> remove(ScheduleGroup x) async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (c) => AlertDialog(
-        icon: const Icon(Icons.delete_outline, color: Colors.red, size: 42),
-        title: const Text('ยืนยันการลบ', style: TextStyle(color: Colors.red)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              color: Colors.red.shade50,
-              child: Text('${x.code} — ${x.name}'),
-            ),
-            const SizedBox(height: 12),
-            const Text('รายการที่ลบแล้วไม่สามารถเรียกคืนได้'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(c, false),
-            child: const Text('ยกเลิก'),
-          ),
-          FilledButton.icon(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () => Navigator.pop(c, true),
-            icon: const Icon(Icons.delete_outline),
-            label: const Text('ลบ'),
-          ),
-        ],
-      ),
+      builder: (context) =>
+          TimeDeleteDialog(itemLabel: '${x.code} — ${x.name}'),
     );
     if (ok != true) return;
     try {

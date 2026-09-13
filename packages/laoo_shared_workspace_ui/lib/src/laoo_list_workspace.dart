@@ -305,31 +305,41 @@ class LaooPaginationCard extends StatelessWidget {
         padding: EdgeInsets.symmetric(
           horizontal: tokens.cardPadding.horizontal / 2,
         ),
-        child: Wrap(
-          crossAxisAlignment: WrapCrossAlignment.center,
-          spacing: tokens.itemSpacing,
-          runSpacing: tokens.itemSpacing,
-          children: [
-            OutlinedButton(
-              onPressed: onPrevious,
-              style: _buttonStyle(tokens),
-              child: const Text('<'),
-            ),
-            IgnorePointer(
-              child: FilledButton(
-                onPressed: () {},
-                style: _buttonStyle(tokens, current: true),
-                child: Text('$page'),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Wrap(
+            alignment: WrapAlignment.start,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: tokens.itemSpacing * 2,
+            runSpacing: tokens.itemSpacing,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  OutlinedButton(
+                    onPressed: onPrevious,
+                    style: _buttonStyle(tokens),
+                    child: const Text('<'),
+                  ),
+                  SizedBox(width: tokens.itemSpacing),
+                  IgnorePointer(
+                    child: FilledButton(
+                      onPressed: () {},
+                      style: _buttonStyle(tokens, current: true),
+                      child: Text('$page'),
+                    ),
+                  ),
+                  SizedBox(width: tokens.itemSpacing),
+                  OutlinedButton(
+                    onPressed: onNext,
+                    style: _buttonStyle(tokens),
+                    child: const Text('>'),
+                  ),
+                ],
               ),
-            ),
-            OutlinedButton(
-              onPressed: onNext,
-              style: _buttonStyle(tokens),
-              child: const Text('>'),
-            ),
-            SizedBox(width: tokens.itemSpacing),
-            Text('$start-$end จาก $total', style: tokens.tableStyle),
-          ],
+              Text('$start-$end จาก $total', style: tokens.tableStyle),
+            ],
+          ),
         ),
       ),
     );

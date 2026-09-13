@@ -59,6 +59,13 @@ void main() {
           height: LaooTypography.inputLineHeight,
           color: LaooColors.textPrimary,
         ),
+        inputLabelStyle: TextStyle(
+          fontFamily: LaooTypography.fontFamily,
+          fontFamilyFallback: LaooTypography.fontFallback,
+          fontSize: LaooTypography.inputLabel,
+          height: LaooTypography.bodyLineHeight,
+          color: theme.primary,
+        ),
         tableStyle: const TextStyle(
           fontFamily: LaooTypography.fontFamily,
           fontFamilyFallback: LaooTypography.fontFallback,

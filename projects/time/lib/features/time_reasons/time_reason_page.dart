@@ -116,34 +116,8 @@ class _TimeReasonPageState extends State<TimeReasonPage> {
   Future<void> remove(Map<String, dynamic> row) async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        icon: const Icon(Icons.delete_outline, color: Colors.red, size: 42),
-        title: const Text('ยืนยันการลบ', style: TextStyle(color: Colors.red)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              color: Colors.red.shade50,
-              child: Text('${row['reasonCode']} — ${row['reasonName']}'),
-            ),
-            const SizedBox(height: 12),
-            const Text('รายการที่ลบแล้วไม่สามารถเรียกคืนได้'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('ยกเลิก'),
-          ),
-          FilledButton.icon(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () => Navigator.pop(context, true),
-            icon: const Icon(Icons.delete_outline),
-            label: const Text('ลบ'),
-          ),
-        ],
+      builder: (context) => TimeDeleteDialog(
+        itemLabel: '${row['reasonCode']} — ${row['reasonName']}',
       ),
     );
     if (ok != true) return;
@@ -424,8 +398,7 @@ class _ReasonDialogState extends State<_ReasonDialog> {
   }
 
   @override
-  Widget build(BuildContext context) => LaooActionDialog(
-    tokens: timeUiTokens.workspace,
+  Widget build(BuildContext context) => TimeActionDialog(
     icon: widget.icon,
     title: '${widget.caption} > ${widget.value == null ? 'เพิ่ม' : 'แก้ไข'}',
     content: Form(
