@@ -24,7 +24,7 @@ public sealed class TimeSystemSettingsController(IConfiguration configuration)
     private static readonly string[] RequestProcesses =
         ["LEAVE_REQUEST", "LEAVE_CANCELLATION", "TIME_CORRECTION", "RECONFIRMATION"];
 
-    public sealed record UpdateRequest(
+    public sealed record TimeSystemSettingsUpdateRequest(
         DateOnly EffectiveFrom,
         string DefaultProfileCode,
         Dictionary<string, string> ProcessProfiles,
@@ -83,7 +83,7 @@ public sealed class TimeSystemSettingsController(IConfiguration configuration)
 
     [HttpPut]
     public async Task<IActionResult> Update(
-        UpdateRequest request,
+        TimeSystemSettingsUpdateRequest request,
         CancellationToken token)
     {
         if (!TryScope(out var companyId, out var userId)) return Forbid();

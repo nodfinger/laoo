@@ -17,7 +17,7 @@ public sealed class EmployeeTimeSettingsController(IConfiguration configuration)
 {
     private const string MenuCode = "28001";
 
-    public sealed record UpdateRequest(
+    public sealed record EmployeeTimeSettingsUpdateRequest(
         bool RequiresAttendance,
         string? DeviceCode,
         DateOnly EffectiveFrom,
@@ -248,7 +248,7 @@ ORDER BY UnitType,NameTH,UnitCode,OrgUnitID;
     [HttpPut("{employeeId:long}")]
     public async Task<IActionResult> Update(
         long employeeId,
-        UpdateRequest request,
+        EmployeeTimeSettingsUpdateRequest request,
         CancellationToken token)
     {
         if (!TryScope(out var companyId, out var userId)) return Forbid();

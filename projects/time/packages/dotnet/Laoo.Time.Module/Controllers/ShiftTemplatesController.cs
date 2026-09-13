@@ -29,7 +29,7 @@ public sealed class ShiftTemplatesController(IConfiguration configuration) : Con
         int OutWindowEndDayOffset, TimeOnly OutWindowEndTime,
         int? LateToleranceMinutes, int? EarlyToleranceMinutes);
 
-    public sealed record SaveRequest(
+    public sealed record ShiftTemplateSaveRequest(
         string ShiftCode, string ShiftName, string? DescriptionText,
         bool IsActive, DateOnly EffectiveFrom, int LateToleranceMinutes,
         int EarlyToleranceMinutes, List<SegmentRequest> Segments,
@@ -148,7 +148,7 @@ WHERE T.CompanyID=@CompanyID AND T.ShiftTemplateID=@ID AND V.IsActive=1 AND V.Ef
     }
 
     [HttpPost]
-    public async Task<IActionResult> Create(SaveRequest request, CancellationToken token)
+    public async Task<IActionResult> Create(ShiftTemplateSaveRequest request, CancellationToken token)
     {
         if (!TryScope(out var companyId, out var userId)) return Forbid();
         var error = Validate(request);
@@ -177,7 +177,7 @@ VALUES(@CompanyID,@Code,@Name,@Description,@IsActive,@UserID);
     }
 
     [HttpPut("{id:long}")]
-    public async Task<IActionResult> Update(long id, SaveRequest request, CancellationToken token)
+    public async Task<IActionResult> Update(long id, ShiftTemplateSaveRequest request, CancellationToken token)
     {
         if (!TryScope(out var companyId, out var userId)) return Forbid();
         var error = Validate(request);
@@ -239,7 +239,7 @@ WHERE CompanyID=@CompanyID AND ShiftTemplateID=@ID AND RowVersion=CONVERT(binary
         catch (SqlException exception) when (exception.Number == 52330) { return Conflict(new { message = exception.Message }); }
     }
 
-    private static string? Validate(SaveRequest request)
+    private static string? Validate(ShiftTemplateSaveRequest request)
     {
         if (Clean(request.ShiftCode) is null || request.ShiftCode.Trim().Length > 30) return "กรุณาระบุรหัสกะไม่เกิน 30 ตัวอักษร";
         if (Clean(request.ShiftName) is null || request.ShiftName.Trim().Length > 150) return "กรุณาระบุชื่อกะไม่เกิน 150 ตัวอักษร";
@@ -268,7 +268,7 @@ WHERE CompanyID=@CompanyID AND ShiftTemplateID=@ID AND RowVersion=CONVERT(binary
         return null;
     }
 
-    private static async Task SaveVersion(SqlConnection connection, SqlTransaction transaction, long companyId, long id, long userId, SaveRequest request, CancellationToken token)
+    private static async Task SaveVersion(SqlConnection connection, SqlTransaction transaction, long companyId, long id, long userId, ShiftTemplateSaveRequest request, CancellationToken token)
     {
         long versionId;
         await using (var find = new SqlCommand("SELECT TOP(1) ShiftTemplateVersionID,EffectiveFrom FROM dbo.TDTMShiftTemplateVersion WITH(UPDLOCK,HOLDLOCK) WHERE CompanyID=@CompanyID AND ShiftTemplateID=@ID AND IsActive=1 AND EffectiveTo IS NULL ORDER BY EffectiveFrom DESC", connection, transaction))
@@ -300,13 +300,13 @@ WHERE CompanyID=@CompanyID AND ShiftTemplateID=@ID AND RowVersion=CONVERT(binary
         foreach (var item in request.SessionRules) await InsertRule(connection, transaction, companyId, versionId, userId, item, token);
     }
 
-    private static async Task<long> InsertVersion(SqlConnection c, SqlTransaction t, long companyId, long id, long userId, SaveRequest r, CancellationToken token)
+    private static async Task<long> InsertVersion(SqlConnection c, SqlTransaction t, long companyId, long id, long userId, ShiftTemplateSaveRequest r, CancellationToken token)
     {
         await using var command = new SqlCommand("INSERT dbo.TDTMShiftTemplateVersion(CompanyID,ShiftTemplateID,EffectiveFrom,LateToleranceMinutes,EarlyToleranceMinutes,IsActive,CreateBy) OUTPUT INSERTED.ShiftTemplateVersionID VALUES(@CompanyID,@ID,@EffectiveFrom,@Late,@Early,1,@UserID);", c, t);
         Add(command,"@CompanyID",SqlDbType.BigInt,companyId); Add(command,"@ID",SqlDbType.BigInt,id); Add(command,"@EffectiveFrom",SqlDbType.Date,r.EffectiveFrom.ToDateTime(TimeOnly.MinValue)); Add(command,"@Late",SqlDbType.Int,r.LateToleranceMinutes); Add(command,"@Early",SqlDbType.Int,r.EarlyToleranceMinutes); Add(command,"@UserID",SqlDbType.BigInt,userId); return Convert.ToInt64(await command.ExecuteScalarAsync(token));
     }
 
-    private static async Task Execute(SqlConnection c, SqlTransaction t, string sql, long companyId, long versionId, long userId, SaveRequest r, CancellationToken token)
+    private static async Task Execute(SqlConnection c, SqlTransaction t, string sql, long companyId, long versionId, long userId, ShiftTemplateSaveRequest r, CancellationToken token)
     { await using var command = new SqlCommand(sql,c,t); Add(command,"@CompanyID",SqlDbType.BigInt,companyId); Add(command,"@VersionID",SqlDbType.BigInt,versionId); Add(command,"@EffectiveFrom",SqlDbType.Date,r.EffectiveFrom.ToDateTime(TimeOnly.MinValue)); Add(command,"@Late",SqlDbType.Int,r.LateToleranceMinutes); Add(command,"@Early",SqlDbType.Int,r.EarlyToleranceMinutes); Add(command,"@UserID",SqlDbType.BigInt,userId); await command.ExecuteNonQueryAsync(token); }
 
     private static async Task InsertRule(SqlConnection c, SqlTransaction t, long companyId, long versionId, long userId, SessionRuleRequest r, CancellationToken token)
@@ -323,7 +323,7 @@ WHERE CompanyID=@CompanyID AND ShiftTemplateID=@ID AND RowVersion=CONVERT(binary
     private bool TryScope(out long companyId,out long userId){companyId=0;userId=0;return string.Equals(User.FindFirstValue("user_type"),"COMPANY_USER",StringComparison.OrdinalIgnoreCase)&&long.TryParse(User.FindFirstValue("company_id"),out companyId)&&long.TryParse(User.FindFirstValue("user_id"),out userId)&&companyId>0&&userId>0;}
     private static async Task<string> Caption(SqlConnection c,CancellationToken token){await using var command=new SqlCommand("SELECT TOP(1) MenuName FROM dbo.TDADMainMenu WHERE MenuCode=@Code",c);Add(command,"@Code",SqlDbType.Char,MenuCode,5);return Convert.ToString(await command.ExecuteScalarAsync(token))??"Master กะทำงาน";}
     private static void BindList(SqlCommand c,long companyId,string? search,bool? active){Add(c,"@CompanyID",SqlDbType.BigInt,companyId);Add(c,"@Search",SqlDbType.NVarChar,search,150);Add(c,"@IsActive",SqlDbType.Bit,active);}
-    private static void BindHeader(SqlCommand c,long companyId,long userId,SaveRequest r){Add(c,"@CompanyID",SqlDbType.BigInt,companyId);Add(c,"@Code",SqlDbType.NVarChar,r.ShiftCode.Trim().ToUpperInvariant(),30);Add(c,"@Name",SqlDbType.NVarChar,r.ShiftName.Trim(),150);Add(c,"@Description",SqlDbType.NVarChar,Clean(r.DescriptionText),500);Add(c,"@IsActive",SqlDbType.Bit,r.IsActive);Add(c,"@UserID",SqlDbType.BigInt,userId);}
+    private static void BindHeader(SqlCommand c,long companyId,long userId,ShiftTemplateSaveRequest r){Add(c,"@CompanyID",SqlDbType.BigInt,companyId);Add(c,"@Code",SqlDbType.NVarChar,r.ShiftCode.Trim().ToUpperInvariant(),30);Add(c,"@Name",SqlDbType.NVarChar,r.ShiftName.Trim(),150);Add(c,"@Description",SqlDbType.NVarChar,Clean(r.DescriptionText),500);Add(c,"@IsActive",SqlDbType.Bit,r.IsActive);Add(c,"@UserID",SqlDbType.BigInt,userId);}
     private static (int Start,int End)? Span(int sd,TimeOnly st,int ed,TimeOnly et){if(sd is<0 or>1||ed is<0 or>1)return null;var start=sd*86400+st.Hour*3600+st.Minute*60+st.Second;var end=ed*86400+et.Hour*3600+et.Minute*60+et.Second;return end>start?(start,end):null;}
     private static string Normalize(string value)=>value.Trim().ToUpperInvariant(); private static string? Clean(string? value)=>string.IsNullOrWhiteSpace(value)?null:value.Trim();
     private static string? Text(SqlDataReader r,int i)=>r.IsDBNull(i)?null:r.GetString(i); private static DateOnly? Date(SqlDataReader r,int i)=>r.IsDBNull(i)?null:DateOnly.FromDateTime(r.GetDateTime(i)); private static int? Int(SqlDataReader r,int i)=>r.IsDBNull(i)?null:r.GetInt32(i);
