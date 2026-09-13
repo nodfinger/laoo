@@ -6,6 +6,67 @@ namespace LaooApi.Services;
 
 public sealed class CompanyPersonService
 {
+    public async Task<long> EnsureEmployeePersonAsync(
+        SqlConnection connection,
+        SqlTransaction transaction,
+        long companyId,
+        long employeeId,
+        EmployeeUpsertRequest request,
+        long? actorId,
+        CancellationToken cancellationToken)
+    {
+        long? personId;
+        await using (var employee = new SqlCommand(
+            "SELECT ISNULL(PersonID,0) FROM dbo.TDADEmployee WITH (UPDLOCK,HOLDLOCK) WHERE EmployeeID=@EmployeeID AND CompanyID=@CompanyID",
+            connection,
+            transaction))
+        {
+            Add(employee, "@EmployeeID", SqlDbType.BigInt, employeeId);
+            Add(employee, "@CompanyID", SqlDbType.BigInt, companyId);
+            var value = await employee.ExecuteScalarAsync(cancellationToken);
+            if (value is null or DBNull)
+                throw new CompanyPersonException("EMPLOYEE_NOT_FOUND", "ไม่พบข้อมูลพนักงาน", "พนักงานไม่อยู่ในขอบเขต Company ที่กำลังดำเนินการ");
+            var existingPersonId = Convert.ToInt64(value);
+            personId = existingPersonId == 0 ? null : existingPersonId;
+        }
+
+        if (personId is null)
+        {
+            const string insertPerson = """
+INSERT dbo.TDADPerson(CompanyID,FullName,NickName,Email,Mobile,IsActive,CreateBy)
+VALUES(@CompanyID,@FullName,@NickName,@Email,@Mobile,@IsActive,@ActorID);
+SELECT CONVERT(bigint,SCOPE_IDENTITY());
+""";
+            await using var command = new SqlCommand(insertPerson, connection, transaction);
+            BindPerson(command, companyId, request, actorId);
+            personId = Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken));
+        }
+        else
+        {
+            const string updatePerson = """
+UPDATE dbo.TDADPerson
+SET FullName=@FullName,NickName=@NickName,Email=@Email,Mobile=@Mobile,
+    IsActive=@IsActive,UpdateDate=SYSUTCDATETIME(),UpdateBy=@ActorID
+WHERE PersonID=@PersonID AND CompanyID=@CompanyID;
+IF @@ROWCOUNT=0 THROW 51102, 'PERSON_SCOPE_MISMATCH', 1;
+""";
+            await using var command = new SqlCommand(updatePerson, connection, transaction);
+            BindPerson(command, companyId, request, actorId);
+            Add(command, "@PersonID", SqlDbType.BigInt, personId.Value);
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        await using var link = new SqlCommand(
+            "UPDATE dbo.TDADEmployee SET PersonID=@PersonID WHERE EmployeeID=@EmployeeID AND CompanyID=@CompanyID",
+            connection,
+            transaction);
+        Add(link, "@PersonID", SqlDbType.BigInt, personId.Value);
+        Add(link, "@EmployeeID", SqlDbType.BigInt, employeeId);
+        Add(link, "@CompanyID", SqlDbType.BigInt, companyId);
+        await link.ExecuteNonQueryAsync(cancellationToken);
+        return personId.Value;
+    }
+
     public async Task<CompanyEmployeeIdentityResult> UpsertEmployeeIdentityAsync(
         SqlConnection connection,
         SqlTransaction transaction,
@@ -266,7 +327,7 @@ IF NOT EXISTS
     }
 }
 
-public sealed record CompanyEmployeeIdentityResult(long PersonId, long UserId);
+public sealed record CompanyEmployeeIdentityResult(long PersonId, long? UserId);
 
 public sealed class CompanyPersonException(
     string code,
