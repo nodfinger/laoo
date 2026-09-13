@@ -9,7 +9,9 @@ void main() {
     expect(AppConfig.projectCode, 'LAOO_TIME');
     expect(AppConfig.apiBaseUrl, 'http://localhost:5080');
     expect(TimeMenuGroups.setup, '28');
-    expect(TimeRoutes.all, hasLength(11));
+    expect(TimeRoutes.all, hasLength(12));
+    expect(TimeRoutes.attendanceEvents.menuCode, '25001');
+    expect(TimeRoutes.attendanceEvents.screenType, 3);
     expect(TimeRoutes.shiftTemplates.menuCode, '27001');
     expect(TimeRoutes.scheduleGroups.menuCode, '27002');
     expect(TimeRoutes.rotationPatterns.menuCode, '27003');
@@ -28,8 +30,31 @@ void main() {
     expect(TimeRoutes.adjustmentReasons.screenType, 1);
     expect(TimeRoutes.myTimeCorrections.menuCode, '30001');
     expect(TimeRoutes.myTimeCorrections.screenType, 4);
-    expect(TimeRoutes.implemented, hasLength(11));
-    expect(buildTimeFeatureRoutes(), hasLength(11));
+    expect(TimeRoutes.implemented, hasLength(12));
+    expect(buildTimeFeatureRoutes(), hasLength(12));
+  });
+
+  test('attendance event repository preserves raw-data filter contract', () async {
+    final api = _FakeAttendanceEventsApi();
+    final repository = AttendanceEventsRepository(api);
+
+    final actions = await repository.actions();
+    expect(actions['menuCode'], '25001');
+    expect(actions['view'], isTrue);
+
+    final result = await repository.list(
+      fromDateTime: DateTime(2026, 9, 13),
+      toDateTime: DateTime(2026, 9, 13, 23, 59, 59),
+      employee: 'C1',
+      deviceCode: '1',
+      sourceCode: 'TEST',
+    );
+    expect(result['total'], 1);
+    expect(api.lastPath, '/api/time/attendance/events');
+    expect(api.lastQuery?['employee'], 'C1');
+    expect(api.lastQuery?['deviceCode'], '1');
+    expect(api.lastQuery?['sourceCode'], 'TEST');
+    expect(api.lastQuery?['pageSize'], '30');
   });
 
   testWidgets('Time delegates workspace composition to the Center host', (
@@ -297,6 +322,57 @@ void main() {
     expect(find.text('รายละเอียดเพิ่มเติม: กรุณาลองใหม่'), findsOneWidget);
     expect(find.text('ลองใหม่'), findsOneWidget);
   });
+}
+
+class _FakeAttendanceEventsApi implements JsonApiClient {
+  String? lastPath;
+  Map<String, String>? lastQuery;
+
+  @override
+  Future<dynamic> get(
+    String path, {
+    Map<String, String>? query,
+    bool authenticated = true,
+  }) async {
+    lastPath = path;
+    lastQuery = query;
+    if (path.endsWith('/actions')) {
+      return {
+        'menuCode': '25001',
+        'caption': 'ตรวจสอบข้อมูลลงเวลา Raw',
+        'screenType': 3,
+        'view': true,
+      };
+    }
+    return {
+      'total': 1,
+      'page': 1,
+      'pageSize': 30,
+      'items': const [],
+    };
+  }
+
+  @override
+  Future<void> put(
+    String path, {
+    Object? body,
+    bool authenticated = true,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<void> post(
+    String path, {
+    Object? body,
+    bool authenticated = true,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<void> delete(
+    String path, {
+    Object? body,
+    Map<String, String>? query,
+    bool authenticated = true,
+  }) => throw UnimplementedError();
 }
 
 class _FakeApi implements JsonApiClient {

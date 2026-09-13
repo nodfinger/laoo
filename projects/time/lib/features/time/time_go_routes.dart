@@ -9,8 +9,14 @@ import '../employee_schedules/employee_schedule_page.dart';
 import 'time_route_contract.dart';
 import '../time_corrections/time_correction_page.dart';
 import '../time_reasons/time_reason_page.dart';
+import '../attendance_events/attendance_events_page.dart';
 
 List<GoRoute> buildTimeFeatureRoutes() => <GoRoute>[
+  GoRoute(
+    name: TimeRouteNames.attendanceEvents,
+    path: TimeRoutePaths.attendanceEvents,
+    builder: (context, state) => const AttendanceEventsPage(),
+  ),
   GoRoute(
     name: TimeRouteNames.shiftTemplates,
     path: TimeRoutePaths.shiftTemplates,

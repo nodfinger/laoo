@@ -14,6 +14,7 @@ abstract final class TimeMenuGroups {
 }
 
 abstract final class TimeMenuCodes {
+  static const attendanceEvents = '25001';
   static const shiftTemplates = '27001';
   static const scheduleGroups = '27002';
   static const rotationPatterns = '27003';
@@ -28,6 +29,7 @@ abstract final class TimeMenuCodes {
 }
 
 abstract final class TimeRouteNames {
+  static const attendanceEvents = 'timeAttendanceEvents';
   static const shiftTemplates = 'timeShiftTemplates';
   static const scheduleGroups = 'timeScheduleGroups';
   static const rotationPatterns = 'timeRotationPatterns';
@@ -42,6 +44,7 @@ abstract final class TimeRouteNames {
 }
 
 abstract final class TimeRoutePaths {
+  static const attendanceEvents = '/company/time-attendance-events';
   static const shiftTemplates = '/company/time-shift-templates';
   static const scheduleGroups = '/company/time-schedule-groups';
   static const rotationPatterns = '/company/time-rotation-patterns';
@@ -56,6 +59,15 @@ abstract final class TimeRoutePaths {
 }
 
 abstract final class TimeRoutes {
+  static const attendanceEvents = FeatureRouteContract(
+    projectCode: TimeProject.code,
+    menuCode: TimeMenuCodes.attendanceEvents,
+    screenType: 3,
+    routeName: TimeRouteNames.attendanceEvents,
+    routePath: TimeRoutePaths.attendanceEvents,
+    isImplemented: true,
+  );
+
   static const shiftTemplates = FeatureRouteContract(
     projectCode: TimeProject.code,
     menuCode: TimeMenuCodes.shiftTemplates,
@@ -151,6 +163,7 @@ abstract final class TimeRoutes {
   );
 
   static const all = <FeatureRouteContract>[
+    attendanceEvents,
     shiftTemplates,
     scheduleGroups,
     rotationPatterns,
