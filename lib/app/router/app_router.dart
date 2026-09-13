@@ -175,13 +175,6 @@ final GoRouter appRouter = GoRouter(
     ).where((route) => route.path != RoutePaths.assetLocations),
     ...buildVisitorFeatureRoutes(),
     ...buildTimeFeatureRoutes(),
-    _scopePlaceholder(
-      RoutePaths.timeAttendanceResults,
-      RouteNames.timeAttendanceResults,
-      'ผลการลงเวลารายวัน',
-      WorkspaceMenuScope.company,
-      'timeAttendanceResults',
-    ),
     GoRoute(
       path: RoutePaths.companyBranches,
       name: RouteNames.companyBranches,
