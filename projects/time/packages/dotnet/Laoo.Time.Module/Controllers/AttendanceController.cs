@@ -18,6 +18,7 @@ public sealed class AttendanceController(IConfiguration configuration) : Control
     private const string MenuCode = "27001";
     private const string RawEventsMenuCode = "25001";
     private const string DailyResultsMenuCode = "25002";
+    private const string SummaryReportMenuCode = "29004";
     public sealed record EventRequest(string SourceEventId, string DeviceCode, DateTime EventDateTime, string? PayloadHash);
     public sealed record ImportRequest(string IdempotencyKey, string SourceCode, IReadOnlyList<EventRequest> Events);
 
@@ -193,6 +194,132 @@ JOIN dbo.TDADEmployee E ON E.EmployeeID=R.EmployeeID AND E.CompanyID=R.CompanyID
         Add(command, "@BusinessDate", SqlDbType.Date, ThailandToday().ToDateTime(TimeOnly.MinValue));
         Add(command, "@Offset", SqlDbType.Int, (page - 1) * pageSize);
         Add(command, "@PageSize", SqlDbType.Int, pageSize);
+    }
+
+    [HttpGet("summary/actions")]
+    public async Task<IActionResult> SummaryActions(CancellationToken token)
+    {
+        if (!Scope(out _, out _)) return Forbid();
+        await using var connection = await Open(token);
+        if (!await Can(connection, SummaryReportMenuCode, "VIEW", token)) return Forbid();
+        return Ok(new
+        {
+            menuCode = SummaryReportMenuCode,
+            caption = await Caption(connection, SummaryReportMenuCode, token),
+            screenType = 3,
+            view = true,
+        });
+    }
+
+    [HttpGet("summary")]
+    public async Task<IActionResult> Summary(
+        [FromQuery] DateOnly? fromWorkDate,
+        [FromQuery] DateOnly? toWorkDate,
+        [FromQuery] string? employee,
+        [FromQuery] long? divisionOrgUnitId,
+        [FromQuery] long? departmentOrgUnitId,
+        CancellationToken token = default)
+    {
+        if (!Scope(out var companyId, out var userId)) return Forbid();
+        await using var connection = await Open(token);
+        if (!await Can(connection, SummaryReportMenuCode, "VIEW", token)) return Forbid();
+
+        var from = fromWorkDate ?? ThailandToday().AddDays(-30);
+        var to = toWorkDate ?? ThailandToday();
+        if (from > to)
+            return BadRequest(new { message = "วันที่เริ่มต้นต้องไม่เกินวันที่สิ้นสุด" });
+
+        const string sql = """
+SELECT E.EmployeeID,E.EmployeeCode,E.FullName,
+       COUNT_BIG(1) WorkDayCount,
+       SUM(CASE WHEN R.StatusCode='COMPLETE' THEN 1 ELSE 0 END) CompleteDayCount,
+       SUM(CASE WHEN R.StatusCode='UNRESOLVED' THEN 1 ELSE 0 END) UnresolvedDayCount,
+       SUM(R.ScheduledWorkMinutes) ScheduledWorkMinutes,
+       SUM(R.ActualWorkMinutes) ActualWorkMinutes,
+       SUM(R.LateMinutes) LateMinutes,
+       SUM(R.EarlyMinutes) EarlyMinutes
+FROM dbo.TDTMAttendanceResult R
+JOIN dbo.TDADEmployee E ON E.EmployeeID=R.EmployeeID AND E.CompanyID=R.CompanyID
+JOIN dbo.TDTMEmployeeAttendancePeriodAssignment A ON A.CompanyID=R.CompanyID AND A.EmployeeID=R.EmployeeID
+  AND A.EffectiveFrom<=R.WorkDate AND(A.EffectiveTo IS NULL OR A.EffectiveTo>=R.WorkDate)
+JOIN dbo.TDTMAttendancePeriod P ON P.CompanyID=R.CompanyID AND P.AttendancePeriodSchemeID=A.AttendancePeriodSchemeID
+  AND R.WorkDate BETWEEN P.PeriodStartDate AND P.PeriodEndDate AND P.PeriodStatusCode='FINALIZED'
+WHERE R.CompanyID=@CompanyID AND R.IsCurrent=1
+  AND R.WorkDate BETWEEN @FromWorkDate AND @ToWorkDate
+  AND (@Employee IS NULL OR E.EmployeeCode LIKE N'%'+@Employee+'%' OR E.FullName LIKE N'%'+@Employee+'%')
+  AND (@DivisionOrgUnitID IS NULL OR E.DivisionOrgUnitID=@DivisionOrgUnitID)
+  AND (@DepartmentOrgUnitID IS NULL OR E.DepartmentOrgUnitID=@DepartmentOrgUnitID)
+  AND
+  (
+    EXISTS(SELECT 1 FROM dbo.TDADUser U WHERE U.CompanyID=@CompanyID AND U.UserID=@UserID AND U.IsActive=1 AND U.IsCompanyAdmin=1)
+    OR EXISTS
+    (
+      SELECT 1 FROM dbo.TDTMEmployeeDataScopeGrant G
+      WHERE G.CompanyID=@CompanyID AND G.IsActive=1
+        AND G.EffectiveFrom<=@BusinessNow AND(G.EffectiveTo IS NULL OR G.EffectiveTo>@BusinessNow)
+        AND(G.UserID=@UserID OR G.RoleGroupID IN
+          (SELECT ERG.RoleGroupID FROM dbo.TDADUserEmployee UE
+           JOIN dbo.TDADEmployeeRoleGroup ERG ON ERG.EmployeeID=UE.EmployeeID AND ERG.IsActive=1
+             AND ERG.EffectiveFrom<=@BusinessDate AND(ERG.EffectiveTo IS NULL OR ERG.EffectiveTo>=@BusinessDate)
+           WHERE UE.CompanyID=@CompanyID AND UE.UserID=@UserID AND UE.IsActive=1))
+        AND(G.ScopeTypeCode='ALL'
+          OR(G.ScopeTypeCode='SELF' AND EXISTS(SELECT 1 FROM dbo.TDADUserEmployee UE WHERE UE.CompanyID=@CompanyID AND UE.UserID=@UserID AND UE.EmployeeID=E.EmployeeID AND UE.IsActive=1))
+          OR(G.ScopeTypeCode='DIVISION' AND G.ScopeReferenceID=E.DivisionOrgUnitID)
+          OR(G.ScopeTypeCode='DEPARTMENT' AND G.ScopeReferenceID=E.DepartmentOrgUnitID))
+    )
+  )
+GROUP BY E.EmployeeID,E.EmployeeCode,E.FullName
+ORDER BY E.EmployeeCode,E.EmployeeID;
+""";
+        await using var command = new SqlCommand(sql, connection);
+        Add(command, "@CompanyID", SqlDbType.BigInt, companyId);
+        Add(command, "@UserID", SqlDbType.BigInt, userId);
+        Add(command, "@FromWorkDate", SqlDbType.Date, from.ToDateTime(TimeOnly.MinValue));
+        Add(command, "@ToWorkDate", SqlDbType.Date, to.ToDateTime(TimeOnly.MinValue));
+        Add(command, "@Employee", SqlDbType.NVarChar, Clean(employee), 150);
+        Add(command, "@DivisionOrgUnitID", SqlDbType.BigInt, divisionOrgUnitId);
+        Add(command, "@DepartmentOrgUnitID", SqlDbType.BigInt, departmentOrgUnitId);
+        Add(command, "@BusinessNow", SqlDbType.DateTime2, ThailandNow());
+        Add(command, "@BusinessDate", SqlDbType.Date, ThailandToday().ToDateTime(TimeOnly.MinValue));
+        await using var reader = await command.ExecuteReaderAsync(token);
+        var items = new List<object>();
+        while (await reader.ReadAsync(token))
+        {
+            items.Add(new
+            {
+                employeeId = reader.GetInt64(0),
+                employeeCode = reader.GetString(1),
+                fullName = reader.GetString(2),
+                workDayCount = reader.GetInt64(3),
+                completeDayCount = reader.GetInt32(4),
+                unresolvedDayCount = reader.GetInt32(5),
+                scheduledWorkMinutes = reader.GetInt32(6),
+                actualWorkMinutes = reader.GetInt32(7),
+                lateMinutes = reader.GetInt32(8),
+                earlyMinutes = reader.GetInt32(9),
+            });
+        }
+        return Ok(new { items });
+    }
+
+    [HttpGet("summary/organization-units")]
+    public async Task<IActionResult> SummaryOrganizationUnits(CancellationToken token)
+    {
+        if (!Scope(out var companyId, out _)) return Forbid();
+        await using var connection = await Open(token);
+        if (!await Can(connection, SummaryReportMenuCode, "VIEW", token)) return Forbid();
+        await using var command = new SqlCommand("""
+SELECT OrgUnitID,UnitType,UnitCode,NameTH
+FROM dbo.TDADOrganizationUnit
+WHERE CompanyID=@CompanyID AND IsActive=1 AND UnitType IN('DIV','DEP')
+ORDER BY UnitType,UnitCode,OrgUnitID;
+""", connection);
+        Add(command, "@CompanyID", SqlDbType.BigInt, companyId);
+        await using var reader = await command.ExecuteReaderAsync(token);
+        var items = new List<object>();
+        while (await reader.ReadAsync(token))
+            items.Add(new { orgUnitId = reader.GetInt64(0), unitType = reader.GetString(1), unitCode = reader.GetString(2), name = reader.GetString(3) });
+        return Ok(new { items });
     }
 
     [HttpGet("events/actions")]

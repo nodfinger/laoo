@@ -4,13 +4,18 @@ import 'package:laoo_service/features/company/person/data/service_person_api.dar
 import 'package:laoo_service/service_feature.dart';
 
 void main() {
-  test('menu 14004 is a Service-owned CRUD route', () {
-    final route = ServiceRoutes.byMenuCode('14004');
+  test('menus 14005 and 14006 are Service-owned CRUD routes', () {
+    final customer = ServiceRoutes.byMenuCode('14005');
+    final resident = ServiceRoutes.byMenuCode('14006');
 
-    expect(route.projectCode, ServiceProject.code);
-    expect(route.screenType, 1);
-    expect(route.routeName, 'servicePersons');
-    expect(route.routePath, '/service/persons');
+    expect(customer.projectCode, ServiceProject.code);
+    expect(customer.screenType, 1);
+    expect(customer.routeName, 'serviceCustomers');
+    expect(customer.routePath, '/service/customers');
+    expect(resident.projectCode, ServiceProject.code);
+    expect(resident.screenType, 1);
+    expect(resident.routeName, 'serviceResidents');
+    expect(resident.routePath, '/service/residents');
   });
 
   test('Service routes remain unique', () {
@@ -32,7 +37,11 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: ServicePersonWorkspace(caption: 'Service Person', api: api),
+            body: ServicePersonWorkspace(
+              caption: 'Service Person',
+              role: ServicePersonRole.customer,
+              api: api,
+            ),
           ),
         ),
       );
@@ -61,6 +70,7 @@ void main() {
         home: Scaffold(
           body: ServicePersonWorkspace(
             caption: 'Service Person',
+            role: ServicePersonRole.customer,
             api: _FakeServicePersonApi(),
           ),
         ),

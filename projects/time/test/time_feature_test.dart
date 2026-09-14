@@ -9,7 +9,7 @@ void main() {
     expect(AppConfig.projectCode, 'LAOO_TIME');
     expect(AppConfig.apiBaseUrl, 'http://localhost:5080');
     expect(TimeMenuGroups.setup, '28');
-    expect(TimeRoutes.all, hasLength(16));
+    expect(TimeRoutes.all, hasLength(22));
     expect(TimeRoutes.attendanceEvents.menuCode, '25001');
     expect(TimeRoutes.attendanceEvents.screenType, 3);
     expect(TimeRoutes.attendanceResults.menuCode, '25002');
@@ -30,16 +30,28 @@ void main() {
     expect(TimeRoutes.onBehalfReasons.screenType, 1);
     expect(TimeRoutes.adjustmentReasons.menuCode, '28004');
     expect(TimeRoutes.adjustmentReasons.screenType, 1);
+    expect(TimeRoutes.holidayCalendars.menuCode, '28005');
+    expect(TimeRoutes.holidayCalendars.screenType, 1);
+    expect(TimeRoutes.holidayDates.menuCode, '28006');
+    expect(TimeRoutes.holidayDates.screenType, 1);
+    expect(TimeRoutes.branchHolidayCalendars.menuCode, '28007');
+    expect(TimeRoutes.branchHolidayCalendars.screenType, 1);
+    expect(TimeRoutes.branchHolidayExceptions.menuCode, '28008');
+    expect(TimeRoutes.branchHolidayExceptions.screenType, 1);
     expect(TimeRoutes.myTimeCorrections.menuCode, '30001');
     expect(TimeRoutes.myTimeCorrections.screenType, 4);
+    expect(TimeRoutes.myAttendanceHistory.menuCode, '30002');
+    expect(TimeRoutes.myAttendanceHistory.screenType, 3);
     expect(TimeRoutes.attendancePeriodSchemes.menuCode, '29001');
     expect(TimeRoutes.attendancePeriodSchemes.screenType, 1);
     expect(TimeRoutes.attendancePeriodAssignments.menuCode, '29002');
     expect(TimeRoutes.attendancePeriodAssignments.screenType, 4);
     expect(TimeRoutes.attendancePeriods.menuCode, '29003');
     expect(TimeRoutes.attendancePeriods.screenType, 3);
-    expect(TimeRoutes.implemented, hasLength(16));
-    expect(buildTimeFeatureRoutes(), hasLength(16));
+    expect(TimeRoutes.attendanceSummaryReport.menuCode, '29004');
+    expect(TimeRoutes.attendanceSummaryReport.screenType, 3);
+    expect(TimeRoutes.implemented, hasLength(21));
+    expect(buildTimeFeatureRoutes(), hasLength(21));
   });
 
   test(
@@ -61,6 +73,27 @@ void main() {
       expect(api.lastPath, '/api/time/attendance/results');
       expect(api.lastQuery?['fromWorkDate'], '2026-09-13');
       expect(api.lastQuery?['statusCode'], 'COMPLETE');
+    },
+  );
+
+  test(
+    'my attendance history keeps the logged-in employee API contract',
+    () async {
+      final api = _FakeMyAttendanceApi();
+      final repository = MyAttendanceHistoryRepository(api);
+
+      final actions = await repository.actions();
+      expect(actions['menuCode'], '30002');
+      expect(actions['view'], isTrue);
+      await repository.list(
+        fromWorkDate: DateTime(2026, 9, 1),
+        toWorkDate: DateTime(2026, 9, 15),
+        statusCode: 'COMPLETE',
+      );
+      expect(api.lastPath, '/api/time/my-attendance-history');
+      expect(api.lastQuery?['fromWorkDate'], '2026-09-01');
+      expect(api.lastQuery?['statusCode'], 'COMPLETE');
+      expect(api.lastQuery?.containsKey('employeeId'), isFalse);
     },
   );
 
@@ -303,6 +336,7 @@ void main() {
             'RECONFIRMATION': 'PROXY_ONLY',
           },
           defaultAttendancePeriodSchemeId: null,
+          defaultHolidayCalendarId: null,
           reason: 'policy update',
           stateToken: 'STATE-1',
         ),
@@ -411,6 +445,45 @@ class _FakeAttendanceEventsApi implements JsonApiClient {
       };
     }
     return {'total': 1, 'page': 1, 'pageSize': 30, 'items': const []};
+  }
+
+  @override
+  Future<void> put(String path, {Object? body, bool authenticated = true}) =>
+      throw UnimplementedError();
+
+  @override
+  Future<void> post(String path, {Object? body, bool authenticated = true}) =>
+      throw UnimplementedError();
+
+  @override
+  Future<void> delete(
+    String path, {
+    Object? body,
+    Map<String, String>? query,
+    bool authenticated = true,
+  }) => throw UnimplementedError();
+}
+
+class _FakeMyAttendanceApi implements JsonApiClient {
+  String? lastPath;
+  Map<String, String>? lastQuery;
+
+  @override
+  Future<dynamic> get(
+    String path, {
+    Map<String, String>? query,
+    bool authenticated = true,
+  }) async {
+    lastPath = path;
+    lastQuery = query;
+    return path.endsWith('/actions')
+        ? {
+            'menuCode': '30002',
+            'caption': 'ประวัติการลงเวลาของฉัน',
+            'screenType': 3,
+            'view': true,
+          }
+        : {'total': 0, 'page': 1, 'pageSize': 30, 'items': const []};
   }
 
   @override

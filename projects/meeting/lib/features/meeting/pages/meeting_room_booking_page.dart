@@ -43,6 +43,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
   final _remark = TextEditingController();
 
   String _caption = '';
+  String _activityTypeCode = 'MEETING';
   late String _workspaceMode;
   String _searchMode = 'DATE';
   bool _multipleDays = false;
@@ -367,10 +368,8 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
       initialEntryMode: TimePickerEntryMode.dial,
       builder: (context, child) => Theme(
         data: Theme.of(context).copyWith(
-          colorScheme: Theme.of(context).colorScheme.copyWith(
-            primary: preset.primary,
-            surface: LaooColors.white,
-          ),
+          colorScheme: Theme.of(context).colorScheme
+              .copyWith(primary: preset.primary, surface: LaooColors.white),
           timePickerTheme: TimePickerThemeData(
             backgroundColor: LaooColors.white,
             shape: RoundedRectangleBorder(
@@ -699,9 +698,9 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
                         FilledButton.icon(
                           style: FilledButton.styleFrom(
                             backgroundColor: preset.primary,
-                            foregroundColor: Theme.of(
-                              context,
-                            ).colorScheme.onPrimary,
+                            foregroundColor: Theme.of(context)
+                                .colorScheme
+                                .onPrimary,
                             minimumSize: const Size(110, 48),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(
@@ -790,6 +789,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
       final savedRoomId = _selectedRoomId;
       final result = await _repository.save({
         'roomId': _selectedRoomId,
+        'activityTypeCode': _activityTypeCode,
         'subject': subject,
         'description': _description.text.trim(),
         'attendeeCount': attendee,
@@ -839,6 +839,9 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
       final last = DateTime.parse('${slots.last['endDateTime']}');
       _editingId = id;
       _selectedRoomId = _int(booking['roomId']);
+      _activityTypeCode = booking['activityTypeCode']?.toString() == 'TRAINING'
+          ? 'TRAINING'
+          : 'MEETING';
       _subject.text = booking['subject']?.toString() ?? '';
       _description.text = booking['description']?.toString() ?? '';
       _attendeeCount.text = '${booking['attendeeCount'] ?? 1}';
@@ -1684,10 +1687,43 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
                                     ),
                                   ),
                                 ),
-                                child: Text(
-                                  '${request['itemName']} × ${request['quantity']} — ${request['statusCode']}'
-                                  '${remark.isEmpty ? '' : '\nหมายเหตุ: $remark'}'
-                                  '${resultRemark.isEmpty ? '' : '\nผลดำเนินการ: $resultRemark'}',
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '${request['itemName']} × ${request['quantity']} — ${request['statusCode']}'
+                                      '\nผู้ขอ: ${request['requesterName'] ?? '-'}'
+                                      '${remark.isEmpty ? '' : '\nหมายเหตุ: $remark'}'
+                                      '${resultRemark.isEmpty ? '' : '\nผลดำเนินการ: $resultRemark'}',
+                                    ),
+                                    if (request['canCancel'] == true)
+                                      TextButton(
+                                        onPressed: () async {
+                                          try {
+                                            await _equipmentRequests.cancel(
+                                              (request['detailId'] as num)
+                                                  .toInt(),
+                                            );
+                                            if (dialogContext.mounted) {
+                                              refresh(() {
+                                                request['statusCode'] =
+                                                    'CANCELLED';
+                                                request['canCancel'] = false;
+                                              });
+                                            }
+                                            _showMessage(
+                                              'ยกเลิกคำขอแล้ว สามารถส่งคำขอใหม่ได้',
+                                            );
+                                          } catch (error) {
+                                            _showError(
+                                              error,
+                                              'ยกเลิกคำขอไม่สำเร็จ',
+                                            );
+                                          }
+                                        },
+                                        child: const Text('ยกเลิกคำขอนี้'),
+                                      ),
+                                  ],
                                 ),
                               );
                             }),
@@ -2060,6 +2096,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
     setState(() {
       _editingId = null;
       _selectedRoomId = roomId;
+      _activityTypeCode = 'MEETING';
       _subject.clear();
       _description.clear();
       _remark.clear();
@@ -2478,89 +2515,92 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
     );
   }
 
-  Widget _roomScheduleSelector(WorkspaceThemePreset preset) =>
-      WorkspaceSectionCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _sectionTitle(
-              Icons.meeting_room_outlined,
-              'รายการห้องประชุมและการจอง',
-              preset,
-            ),
-            const Divider(color: LaooColors.border),
-            if (_roomBookingCalendarVisible) ...[
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final calendarSearch = Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _sectionTitle(
-                              Icons.calendar_month_outlined,
-                              'เลือกวันที่และเวลา',
-                              preset,
-                            ),
-                          ),
-                          IconButton(
-                            tooltip: 'ซ่อนปฏิทิน',
-                            color: preset.primary,
-                            onPressed: () => setState(
-                              () => _roomBookingCalendarVisible = false,
-                            ),
-                            icon: const Icon(Icons.close),
-                          ),
-                        ],
-                      ),
-                      const Divider(color: LaooColors.border),
-                      _dateTimeSearchPanel(preset),
-                      const SizedBox(height: 8),
-                      _styledCalendar(preset),
-                    ],
-                  );
-                  if (constraints.maxWidth < 900) {
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        calendarSearch,
-                        const SizedBox(height: 8),
-                        _roomResultPanel(preset),
-                      ],
-                    );
-                  }
-                  return Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SizedBox(width: 380, child: calendarSearch),
-                      const SizedBox(width: 8),
-                      Expanded(child: _roomResultPanel(preset)),
-                    ],
-                  );
-                },
-              ),
-              const Divider(color: LaooColors.border),
-            ],
-            if (_roomScheduleLoading)
-              const LinearProgressIndicator()
-            else if (_filteredRooms.isEmpty)
-              const Padding(
-                padding: EdgeInsets.all(24),
-                child: Center(child: Text('ไม่พบห้องประชุมตามตัวกรอง')),
-              )
-            else
-              ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: _filteredRooms.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 6),
-                itemBuilder: (context, index) =>
-                    _roomScheduleCard(_filteredRooms[index], preset),
-              ),
-          ],
+  Widget _roomScheduleSelector(
+    WorkspaceThemePreset preset,
+  ) => WorkspaceSectionCard(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _sectionTitle(
+          Icons.meeting_room_outlined,
+          'รายการห้องประชุมและการจอง',
+          preset,
         ),
-      );
+        const Divider(color: LaooColors.border),
+        if (_roomBookingCalendarVisible) ...[
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final calendarSearch = Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _sectionTitle(
+                          Icons.calendar_month_outlined,
+                          'เลือกวันที่และเวลา',
+                          preset,
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'ซ่อนปฏิทิน',
+                        color: preset.primary,
+                        onPressed: () =>
+                            setState(() => _roomBookingCalendarVisible = false),
+                        icon: const Icon(Icons.close),
+                      ),
+                    ],
+                  ),
+                  const Divider(color: LaooColors.border),
+                  _dateTimeSearchPanel(preset),
+                  const SizedBox(height: 8),
+                  _styledCalendar(preset),
+                ],
+              );
+              if (constraints.maxWidth < 900) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    calendarSearch,
+                    const SizedBox(height: 8),
+                    _roomResultPanel(preset),
+                  ],
+                );
+              }
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(width: 380, child: calendarSearch),
+                  const SizedBox(width: 8),
+                  Expanded(child: _roomResultPanel(preset)),
+                ],
+              );
+            },
+          ),
+          const Divider(color: LaooColors.border),
+        ],
+        if (_roomScheduleLoading)
+          const LinearProgressIndicator()
+        else if (_filteredRooms.isEmpty)
+          const Padding(
+            padding: EdgeInsets.all(24),
+            child: Center(child: Text('ไม่พบห้องประชุมตามตัวกรอง')),
+          )
+        else
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _filteredRooms.length,
+            separatorBuilder: (_, _) => const Padding(
+              padding: EdgeInsets.symmetric(vertical: 3),
+              child: Divider(color: LaooColors.border, height: 1, thickness: 1),
+            ),
+            itemBuilder: (context, index) =>
+                _roomScheduleCard(_filteredRooms[index], preset),
+          ),
+      ],
+    ),
+  );
 
   Widget _roomScheduleCard(
     Map<String, dynamic> room,
@@ -2658,9 +2698,38 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    '${_bookingDateTime(booking)} | ${booking['subject'] ?? '-'}',
-                    style: const TextStyle(fontSize: LaooTypography.inputText),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: preset.primary.withValues(alpha: .10),
+                          borderRadius: BorderRadius.circular(LaooRadius.xs),
+                        ),
+                        child: Text(
+                          booking['activityTypeCode'] == 'TRAINING'
+                              ? 'อบรม'
+                              : 'ประชุม',
+                          style: TextStyle(
+                            color: preset.primary,
+                            fontSize: LaooTypography.inputHint,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          '${_bookingDateTime(booking)} | ${booking['subject'] ?? '-'}',
+                          style: const TextStyle(
+                            fontSize: LaooTypography.inputText,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 2),
                   Row(
@@ -3000,9 +3069,8 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
               ),
             ],
             if (_searchMode == 'ROOM') ...[
-              ..._roomBookingsForSchedule(
-                id,
-              ).map((booking) => _roomScheduleBookingRow(booking, preset)),
+              ..._roomBookingsForSchedule(id)
+                  .map((booking) => _roomScheduleBookingRow(booking, preset)),
             ],
           ],
         ),
@@ -3056,12 +3124,41 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            '${_conflictDateTime(conflict)} | ${conflict['subject'] ?? '-'}',
-                            style: const TextStyle(
-                              color: LaooColors.textPrimary,
-                              fontSize: LaooTypography.inputText,
-                            ),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: preset.primary.withValues(alpha: .10),
+                                  borderRadius: BorderRadius.circular(
+                                    LaooRadius.xs,
+                                  ),
+                                ),
+                                child: Text(
+                                  conflict['activityTypeCode'] == 'TRAINING'
+                                      ? 'อบรม'
+                                      : 'ประชุม',
+                                  style: TextStyle(
+                                    color: preset.primary,
+                                    fontSize: LaooTypography.inputHint,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                '${_conflictDateTime(conflict)} | ${conflict['subject'] ?? '-'}',
+                                style: const TextStyle(
+                                  color: LaooColors.textPrimary,
+                                  fontSize: LaooTypography.inputText,
+                                ),
+                              ),
+                            ],
                           ),
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.center,
@@ -3138,6 +3235,20 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
         Row(
           children: [
             Expanded(
+              flex: 2,
+              child: InputDecorator(
+                decoration: const InputDecoration(labelText: 'วันที่เลือก'),
+                child: Text(
+                  _formatDate(_startDate),
+                  style: const TextStyle(
+                    color: LaooColors.textPrimary,
+                    fontSize: LaooTypography.inputText,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
               child: _timeField(
                 label: 'เวลาเริ่ม *',
                 value: _startTime,
@@ -3163,6 +3274,19 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
           ],
         ),
         const SizedBox(height: 12),
+        DropdownButtonFormField<String>(
+          initialValue: _activityTypeCode,
+          isExpanded: true,
+          decoration: const InputDecoration(labelText: 'ประเภทกิจกรรม *'),
+          items: const [
+            DropdownMenuItem(value: 'MEETING', child: Text('ประชุม')),
+            DropdownMenuItem(value: 'TRAINING', child: Text('อบรม')),
+          ],
+          onChanged: (value) {
+            if (value != null) refresh(() => _activityTypeCode = value);
+          },
+        ),
+        const SizedBox(height: 18),
         TextField(
           controller: _subject,
           style: const TextStyle(
@@ -3170,7 +3294,9 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
             fontSize: LaooTypography.inputText,
           ),
           decoration: InputDecoration(
-            labelText: 'หัวข้อประชุม *',
+            labelText: _activityTypeCode == 'TRAINING'
+                ? 'หัวข้ออบรม *'
+                : 'หัวข้อประชุม *',
             errorText: _subjectError,
           ),
           onChanged: (_) {
@@ -3444,6 +3570,22 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: preset.primary.withValues(alpha: .10),
+                  borderRadius: BorderRadius.circular(LaooRadius.xs),
+                ),
+                child: Text(
+                  item['activityTypeCode'] == 'TRAINING' ? 'อบรม' : 'ประชุม',
+                  style: TextStyle(
+                    color: preset.primary,
+                    fontSize: LaooTypography.inputHint,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   'หัวข้อ: ${item['subject'] ?? '-'}',
@@ -3507,7 +3649,9 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
             ],
           ),
           const SizedBox(height: 6),
-          Text('${item['subject'] ?? ''}'),
+          Text(
+            '${item['activityTypeCode'] == 'TRAINING' ? 'อบรม' : 'ประชุม'} | ${item['subject'] ?? ''}',
+          ),
           const SizedBox(height: 4),
           Text(
             'ผู้จอง: ${item['requesterCode'] ?? '-'} | ${item['requesterName'] ?? '-'}',
@@ -3622,9 +3766,9 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
       children: [
         IconButton.filled(
           style: IconButton.styleFrom(
-            backgroundColor: Theme.of(
-              context,
-            ).colorScheme.surfaceContainerHighest,
+            backgroundColor: Theme.of(context)
+                .colorScheme
+                .surfaceContainerHighest,
             foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
           onPressed: _page > 1
@@ -3645,9 +3789,9 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
         ),
         IconButton.filled(
           style: IconButton.styleFrom(
-            backgroundColor: Theme.of(
-              context,
-            ).colorScheme.surfaceContainerHighest,
+            backgroundColor: Theme.of(context)
+                .colorScheme
+                .surfaceContainerHighest,
             foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
           onPressed: _page < pages

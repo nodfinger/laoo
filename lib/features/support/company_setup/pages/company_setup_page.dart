@@ -50,6 +50,7 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
   final _passwordEmpDefault = TextEditingController();
 
   final _api = CompanySetupApi();
+  final _meetingSettingsApi = MeetingEquipmentRequestSettingsApi();
   bool _loading = true;
   bool _messageIsError = false;
   String _yearFormat = CompanySetupConstants.yearFormatAd;
@@ -66,6 +67,9 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
   final _customerDigit = TextEditingController(text: '5');
   final _markCus = TextEditingController();
   bool _receiveStockImmediately = true;
+  bool _meetingSettingsVisible = false;
+  bool _meetingRequireEquipmentRequestReview = false;
+  bool _savingMeetingSettings = false;
   String _receiveStockPriceModeCode = 'CUSTOM';
   static const _receiveStockPriceModes = [
     {'code': 'CUSTOM', 'name': 'กำหนดเอง'},
@@ -543,6 +547,72 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
   bool _isValidEmail(String value) =>
       RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(value.trim());
 
+  Future<void> _loadMeetingSettings() async {
+    if (!widget.additionalOnly) return;
+    try {
+      final requireReview = await _meetingSettingsApi.load();
+      if (mounted) {
+        setState(() {
+          _meetingSettingsVisible = true;
+          _meetingRequireEquipmentRequestReview = requireReview;
+        });
+      }
+    } catch (_) {
+      // The Meeting API enforces entitlement and Company Admin scope.
+    }
+  }
+
+  Future<void> _saveMeetingSettings(bool value) async {
+    if (_savingMeetingSettings) return;
+    setState(() => _savingMeetingSettings = true);
+    try {
+      await _meetingSettingsApi.save(value);
+      if (!mounted) return;
+      setState(() {
+        _meetingRequireEquipmentRequestReview = value;
+        _messageIsError = false;
+        _message = 'บันทึกการตั้งค่าระบบ Meeting สำเร็จ';
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _messageIsError = true;
+        _message = 'บันทึกการตั้งค่าระบบ Meeting ไม่สำเร็จ';
+      });
+    } finally {
+      if (mounted) setState(() => _savingMeetingSettings = false);
+    }
+  }
+
+  Widget _meetingSettingsCard(Color accent) => Card(
+    margin: EdgeInsets.zero,
+    color: Colors.white,
+    elevation: 0,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Meeting',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: accent,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          SwitchListTile.adaptive(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('ต้องตรวจสอบคำขออุปกรณ์เพิ่มเติมก่อนส่งแผนก'),
+            subtitle: const Text('ปิดไว้: ส่งคำขอไปยังแผนกรับผิดชอบทันที'),
+            value: _meetingRequireEquipmentRequestReview,
+            onChanged: _savingMeetingSettings ? null : _saveMeetingSettings,
+          ),
+        ],
+      ),
+    ),
+  );
   void _cancel() => context.goNamed(RouteNames.authenticatedHome);
 
   @override
@@ -630,7 +700,13 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
                           const SizedBox(height: 8),
                         ],
                       ],
-                      if (widget.additionalOnly) _runItemCard(preset.primary),
+                      if (widget.additionalOnly) ...[
+                        _runItemCard(preset.primary),
+                        if (_meetingSettingsVisible) ...[
+                          const SizedBox(height: 8),
+                          _meetingSettingsCard(preset.primary),
+                        ],
+                      ],
                       if (!widget.additionalOnly) ...[
                         const SizedBox(height: 8),
                         _LegacySetupCards(

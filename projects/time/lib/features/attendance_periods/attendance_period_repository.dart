@@ -30,6 +30,8 @@ class AttendancePeriodRepository {
   }
 
   Future<void> extendScheme(int id) => api.post('$_path/schemes/$id/extend');
+  Future<void> deleteScheme(int id, String rowVersion) =>
+      api.delete('$_path/schemes/$id', query: {'rowVersion': rowVersion});
   Future<List<Map<String, dynamic>>> employees({String? search}) async {
     final value = Map<String, dynamic>.from(
       await api.get(

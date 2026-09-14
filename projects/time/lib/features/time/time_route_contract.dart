@@ -26,10 +26,16 @@ abstract final class TimeMenuCodes {
   static const timeApprovalInbox = '26002';
   static const onBehalfReasons = '28003';
   static const adjustmentReasons = '28004';
+  static const holidayCalendars = '28005';
+  static const holidayDates = '28006';
+  static const branchHolidayCalendars = '28007';
+  static const branchHolidayExceptions = '28008';
   static const myTimeCorrections = '30001';
+  static const myAttendanceHistory = '30002';
   static const attendancePeriodSchemes = '29001';
   static const attendancePeriodAssignments = '29002';
   static const attendancePeriods = '29003';
+  static const attendanceSummaryReport = '29004';
 }
 
 abstract final class TimeRouteNames {
@@ -45,10 +51,16 @@ abstract final class TimeRouteNames {
   static const timeApprovalInbox = 'timeApprovalInbox';
   static const onBehalfReasons = 'timeOnBehalfReasons';
   static const adjustmentReasons = 'timeAdjustmentReasons';
+  static const holidayCalendars = 'timeHolidayCalendars';
+  static const holidayDates = 'timeHolidayDates';
+  static const branchHolidayCalendars = 'timeBranchHolidayCalendars';
+  static const branchHolidayExceptions = 'timeBranchHolidayExceptions';
   static const myTimeCorrections = 'myTimeCorrections';
+  static const myAttendanceHistory = 'myAttendanceHistory';
   static const attendancePeriodSchemes = 'timeAttendancePeriodSchemes';
   static const attendancePeriodAssignments = 'timeAttendancePeriodAssignments';
   static const attendancePeriods = 'timeAttendancePeriods';
+  static const attendanceSummaryReport = 'timeAttendanceSummaryReport';
 }
 
 abstract final class TimeRoutePaths {
@@ -64,12 +76,21 @@ abstract final class TimeRoutePaths {
   static const timeApprovalInbox = '/company/time-approval-inbox';
   static const onBehalfReasons = '/company/time-on-behalf-reasons';
   static const adjustmentReasons = '/company/time-adjustment-reasons';
+  static const holidayCalendars = '/company/time-holiday-calendars';
+  static const holidayDates = '/company/time-holiday-dates';
+  static const branchHolidayCalendars =
+      '/company/time-branch-holiday-calendars';
+  static const branchHolidayExceptions =
+      '/company/time-branch-holiday-exceptions';
   static const myTimeCorrections = '/company/my-time-corrections';
+  static const myAttendanceHistory = '/company/my-attendance-history';
   static const attendancePeriodSchemes =
       '/company/time-attendance-period-schemes';
   static const attendancePeriodAssignments =
       '/company/time-attendance-period-assignments';
   static const attendancePeriods = '/company/time-attendance-periods';
+  static const attendanceSummaryReport =
+      '/company/time-attendance-summary-report';
 }
 
 abstract final class TimeRoutes {
@@ -184,6 +205,14 @@ abstract final class TimeRoutes {
     routePath: TimeRoutePaths.myTimeCorrections,
     isImplemented: true,
   );
+  static const myAttendanceHistory = FeatureRouteContract(
+    projectCode: TimeProject.code,
+    menuCode: TimeMenuCodes.myAttendanceHistory,
+    screenType: 3,
+    routeName: TimeRouteNames.myAttendanceHistory,
+    routePath: TimeRoutePaths.myAttendanceHistory,
+    isImplemented: true,
+  );
   static const attendancePeriodSchemes = FeatureRouteContract(
     projectCode: TimeProject.code,
     menuCode: TimeMenuCodes.attendancePeriodSchemes,
@@ -208,6 +237,46 @@ abstract final class TimeRoutes {
     routePath: TimeRoutePaths.attendancePeriods,
     isImplemented: true,
   );
+  static const holidayCalendars = FeatureRouteContract(
+    projectCode: TimeProject.code,
+    menuCode: TimeMenuCodes.holidayCalendars,
+    screenType: 1,
+    routeName: TimeRouteNames.holidayCalendars,
+    routePath: TimeRoutePaths.holidayCalendars,
+    isImplemented: true,
+  );
+  static const holidayDates = FeatureRouteContract(
+    projectCode: TimeProject.code,
+    menuCode: TimeMenuCodes.holidayDates,
+    screenType: 1,
+    routeName: TimeRouteNames.holidayDates,
+    routePath: TimeRoutePaths.holidayDates,
+    isImplemented: true,
+  );
+  static const branchHolidayCalendars = FeatureRouteContract(
+    projectCode: TimeProject.code,
+    menuCode: TimeMenuCodes.branchHolidayCalendars,
+    screenType: 1,
+    routeName: TimeRouteNames.branchHolidayCalendars,
+    routePath: TimeRoutePaths.branchHolidayCalendars,
+    isImplemented: true,
+  );
+  static const branchHolidayExceptions = FeatureRouteContract(
+    projectCode: TimeProject.code,
+    menuCode: TimeMenuCodes.branchHolidayExceptions,
+    screenType: 1,
+    routeName: TimeRouteNames.branchHolidayExceptions,
+    routePath: TimeRoutePaths.branchHolidayExceptions,
+    isImplemented: true,
+  );
+  static const attendanceSummaryReport = FeatureRouteContract(
+    projectCode: TimeProject.code,
+    menuCode: TimeMenuCodes.attendanceSummaryReport,
+    screenType: 3,
+    routeName: TimeRouteNames.attendanceSummaryReport,
+    routePath: TimeRoutePaths.attendanceSummaryReport,
+    isImplemented: true,
+  );
 
   static const all = <FeatureRouteContract>[
     attendanceEvents,
@@ -222,10 +291,16 @@ abstract final class TimeRoutes {
     timeApprovalInbox,
     onBehalfReasons,
     adjustmentReasons,
+    holidayCalendars,
+    holidayDates,
+    branchHolidayCalendars,
+    branchHolidayExceptions,
     myTimeCorrections,
+    myAttendanceHistory,
     attendancePeriodSchemes,
     attendancePeriodAssignments,
     attendancePeriods,
+    attendanceSummaryReport,
   ];
 
   static Iterable<FeatureRouteContract> get implemented =>
