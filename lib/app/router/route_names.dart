@@ -77,6 +77,8 @@ abstract final class RouteNames {
   static const String timeAttendancePeriodAssignments =
       'timeAttendancePeriodAssignments';
   static const String timeAttendancePeriods = 'timeAttendancePeriods';
+  static const String timeAttendanceSummaryReport =
+      'timeAttendanceSummaryReport';
   static const String meetingRoomBookings = MeetingRouteNames.bookings;
   static const String meetingRoomApprovals = MeetingRouteNames.approvals;
   static const String meetingRoomCalendar = MeetingRouteNames.calendar;

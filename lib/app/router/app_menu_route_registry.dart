@@ -623,6 +623,13 @@ abstract final class AppMenuRouteRegistry {
       path: RoutePaths.timeAttendancePeriods,
       scope: AppMenuScope.company,
     ),
+    '29004': AppMenuRouteSpec(
+      menuCode: '29004',
+      databaseRouteName: 'timeAttendanceSummaryReport',
+      goRouteName: RouteNames.timeAttendanceSummaryReport,
+      path: RoutePaths.timeAttendanceSummaryReport,
+      scope: AppMenuScope.company,
+    ),
     for (final route in ServiceRoutes.all)
       route.menuCode: AppMenuRouteSpec(
         menuCode: route.menuCode,

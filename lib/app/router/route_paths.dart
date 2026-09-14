@@ -81,6 +81,8 @@ abstract final class RoutePaths {
       '/company/time-attendance-period-assignments';
   static const String timeAttendancePeriods =
       '/company/time-attendance-periods';
+  static const String timeAttendanceSummaryReport =
+      '/company/time-attendance-summary-report';
   static const String meetingRoomBookings = MeetingRoutePaths.bookings;
   static const String meetingRoomApprovals = MeetingRoutePaths.approvals;
   static const String meetingRoomCalendar = MeetingRoutePaths.calendar;
