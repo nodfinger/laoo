@@ -89,6 +89,7 @@ abstract final class RoutePaths {
       '/company/time-branch-holiday-calendars';
   static const String timeBranchHolidayExceptions =
       '/company/time-branch-holiday-exceptions';
+  static const String myAttendanceHistory = '/company/my-attendance-history';
   static const String meetingRoomBookings = MeetingRoutePaths.bookings;
   static const String meetingRoomApprovals = MeetingRoutePaths.approvals;
   static const String meetingRoomCalendar = MeetingRoutePaths.calendar;

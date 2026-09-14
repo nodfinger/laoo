@@ -658,6 +658,13 @@ abstract final class AppMenuRouteRegistry {
       path: RoutePaths.timeBranchHolidayExceptions,
       scope: AppMenuScope.company,
     ),
+    '30002': AppMenuRouteSpec(
+      menuCode: '30002',
+      databaseRouteName: 'myAttendanceHistory',
+      goRouteName: RouteNames.myAttendanceHistory,
+      path: RoutePaths.myAttendanceHistory,
+      scope: AppMenuScope.company,
+    ),
     for (final route in ServiceRoutes.all)
       route.menuCode: AppMenuRouteSpec(
         menuCode: route.menuCode,
