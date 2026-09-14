@@ -630,6 +630,34 @@ abstract final class AppMenuRouteRegistry {
       path: RoutePaths.timeAttendanceSummaryReport,
       scope: AppMenuScope.company,
     ),
+    '28005': AppMenuRouteSpec(
+      menuCode: '28005',
+      databaseRouteName: 'timeHolidayCalendars',
+      goRouteName: RouteNames.timeHolidayCalendars,
+      path: RoutePaths.timeHolidayCalendars,
+      scope: AppMenuScope.company,
+    ),
+    '28006': AppMenuRouteSpec(
+      menuCode: '28006',
+      databaseRouteName: 'timeHolidayDates',
+      goRouteName: RouteNames.timeHolidayDates,
+      path: RoutePaths.timeHolidayDates,
+      scope: AppMenuScope.company,
+    ),
+    '28007': AppMenuRouteSpec(
+      menuCode: '28007',
+      databaseRouteName: 'timeBranchHolidayCalendars',
+      goRouteName: RouteNames.timeBranchHolidayCalendars,
+      path: RoutePaths.timeBranchHolidayCalendars,
+      scope: AppMenuScope.company,
+    ),
+    '28008': AppMenuRouteSpec(
+      menuCode: '28008',
+      databaseRouteName: 'timeBranchHolidayExceptions',
+      goRouteName: RouteNames.timeBranchHolidayExceptions,
+      path: RoutePaths.timeBranchHolidayExceptions,
+      scope: AppMenuScope.company,
+    ),
     for (final route in ServiceRoutes.all)
       route.menuCode: AppMenuRouteSpec(
         menuCode: route.menuCode,
