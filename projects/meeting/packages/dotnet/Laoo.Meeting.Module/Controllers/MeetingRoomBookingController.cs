@@ -871,7 +871,7 @@ ORDER BY E.EmployeeCode,E.FullName;
         await using var connection = await Open(token);
         const string sql = """
 SELECT B.BookingID,B.BookingNo,B.RoomID,B.Subject,B.Description,B.AttendeeCount,
-       B.BookingStatus,B.ApprovalMode,B.RequireAllApprovers,B.Remark,B.RequesterUserID,B.CancelRemark
+       B.BookingStatus,B.ApprovalMode,B.RequireAllApprovers,B.Remark,B.RequesterUserID,B.CancelRemark,B.ActivityTypeCode
 FROM dbo.TDADMeetingRoomBooking B
 WHERE B.BookingID=@id AND B.CompanyID=@company;
 
@@ -899,7 +899,7 @@ ORDER BY A.ApprovalOrder,E.EmployeeCode;
             subject = reader.GetString(3), description = Text(reader, 4), attendeeCount = reader.GetInt32(5),
             status = reader.GetString(6), approvalMode = reader.GetString(7), requireAllApprovers = reader.GetBoolean(8),
             remark = Text(reader, 9), requesterUserId = reader.GetInt64(10),
-            cancelRemark = Text(reader, 11),
+            cancelRemark = Text(reader, 11), activityTypeCode = reader.GetString(12),
         };
         await reader.NextResultAsync(token);
         var slots = new List<object>();
@@ -1094,6 +1094,8 @@ WHERE BookingID=@id AND CompanyID=@company AND BookingStatus<>'CANCELLED'
         }
         if (string.IsNullOrWhiteSpace(request.Subject)) return BadRequest(Error("กรุณาระบุหัวข้อประชุม", "หัวข้อประชุมเป็นข้อมูลบังคับ"));
         if (request.AttendeeCount <= 0) return BadRequest(Error("จำนวนผู้เข้าร่วมไม่ถูกต้อง", "จำนวนผู้เข้าร่วมต้องมากกว่า 0"));
+        var activityTypeCode = (request.ActivityTypeCode ?? "MEETING").Trim().ToUpperInvariant();
+        if (activityTypeCode is not ("MEETING" or "TRAINING")) return BadRequest(Error("ประเภทกิจกรรมไม่ถูกต้อง", "กรุณาเลือกประชุมหรืออบรม"));
         var slotValidation = ValidateSlots(request.Slots);
         if (slotValidation is not null) return BadRequest(slotValidation);
 
@@ -1138,10 +1140,10 @@ WHERE BookingID=@id AND CompanyID=@company AND BookingStatus<>'CANCELLED'
             {
                 const string insert = """
 INSERT dbo.TDADMeetingRoomBooking
-    (CompanyID,RoomID,RequesterUserID,RequesterEmployeeID,Subject,Description,AttendeeCount,
+    (CompanyID,RoomID,RequesterUserID,RequesterEmployeeID,Subject,Description,ActivityTypeCode,AttendeeCount,
      BookingStatus,ApprovalMode,RequireAllApprovers,Remark,CreateBy)
 VALUES
-    (@company,@room,@user,@employee,@subject,@description,@attendee,@status,@mode,@requireAll,@remark,@user);
+    (@company,@room,@user,@employee,@subject,@description,@activityType,@attendee,@status,@mode,@requireAll,@remark,@user);
 DECLARE @id BIGINT=CONVERT(BIGINT,SCOPE_IDENTITY());
 UPDATE dbo.TDADMeetingRoomBooking
 SET BookingNo=CONCAT('BK',CONVERT(char(8),GETDATE(),112),RIGHT(CONCAT('000000',@id),6))
@@ -1156,7 +1158,7 @@ SELECT @id;
             {
                 const string update = """
 UPDATE dbo.TDADMeetingRoomBooking
-SET RoomID=@room,RequesterEmployeeID=@employee,Subject=@subject,Description=@description,
+SET RoomID=@room,RequesterEmployeeID=@employee,Subject=@subject,Description=@description,ActivityTypeCode=@activityType,
     AttendeeCount=@attendee,BookingStatus=@status,ApprovalMode=@mode,
     RequireAllApprovers=@requireAll,Remark=@remark,UpdateDate=SYSUTCDATETIME(),UpdateBy=@user,CancelDate=NULL
 WHERE BookingID=@id AND CompanyID=@company AND BookingStatus NOT IN ('REJECTED','CANCELLED');
@@ -1502,7 +1504,7 @@ VALUES(@booking,@company,@from,@to,@user,@remark,@source);
     private static void BindHeader(SqlCommand command, long companyId, long userId, long? employeeId, BookingSaveRequest request, ApprovalResolution approval, string status)
     {
         Add(command, "@company", companyId); Add(command, "@room", request.RoomId); Add(command, "@user", userId); Add(command, "@employee", employeeId);
-        Add(command, "@subject", request.Subject.Trim()); Add(command, "@description", Clean(request.Description)); Add(command, "@attendee", request.AttendeeCount);
+        Add(command, "@subject", request.Subject.Trim()); Add(command, "@description", Clean(request.Description)); Add(command, "@activityType", (request.ActivityTypeCode ?? "MEETING").Trim().ToUpperInvariant()); Add(command, "@attendee", request.AttendeeCount);
         Add(command, "@status", status); Add(command, "@mode", approval.Mode); Add(command, "@requireAll", approval.RequireAll); Add(command, "@remark", Clean(request.Remark));
     }
 
@@ -1523,7 +1525,7 @@ VALUES(@booking,@company,@from,@to,@user,@remark,@source);
 }
 
 public sealed record BookingSlotRequest(DateTime StartDateTime, DateTime EndDateTime);
-public sealed record BookingSaveRequest(long RoomId, string Subject, string? Description, int AttendeeCount, List<BookingSlotRequest>? Slots, string? Remark);
+public sealed record BookingSaveRequest(long RoomId, string Subject, string? Description, int AttendeeCount, List<BookingSlotRequest>? Slots, string? Remark, string? ActivityTypeCode = "MEETING");
 public sealed record ApprovalDecisionRequest(string Decision, string? Remark);
 public sealed record RollbackBookingRequest(string? Remark);
 public sealed record BookingCancellationRequest(string? Remark);

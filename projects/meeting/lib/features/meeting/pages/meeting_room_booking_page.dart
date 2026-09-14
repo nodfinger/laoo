@@ -43,6 +43,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
   final _remark = TextEditingController();
 
   String _caption = '';
+  String _activityTypeCode = 'MEETING';
   late String _workspaceMode;
   String _searchMode = 'DATE';
   bool _multipleDays = false;
@@ -367,10 +368,8 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
       initialEntryMode: TimePickerEntryMode.dial,
       builder: (context, child) => Theme(
         data: Theme.of(context).copyWith(
-          colorScheme: Theme.of(context).colorScheme.copyWith(
-            primary: preset.primary,
-            surface: LaooColors.white,
-          ),
+          colorScheme: Theme.of(context).colorScheme
+              .copyWith(primary: preset.primary, surface: LaooColors.white),
           timePickerTheme: TimePickerThemeData(
             backgroundColor: LaooColors.white,
             shape: RoundedRectangleBorder(
@@ -699,9 +698,9 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
                         FilledButton.icon(
                           style: FilledButton.styleFrom(
                             backgroundColor: preset.primary,
-                            foregroundColor: Theme.of(
-                              context,
-                            ).colorScheme.onPrimary,
+                            foregroundColor: Theme.of(context)
+                                .colorScheme
+                                .onPrimary,
                             minimumSize: const Size(110, 48),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(
@@ -790,6 +789,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
       final savedRoomId = _selectedRoomId;
       final result = await _repository.save({
         'roomId': _selectedRoomId,
+        'activityTypeCode': _activityTypeCode,
         'subject': subject,
         'description': _description.text.trim(),
         'attendeeCount': attendee,
@@ -839,6 +839,9 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
       final last = DateTime.parse('${slots.last['endDateTime']}');
       _editingId = id;
       _selectedRoomId = _int(booking['roomId']);
+      _activityTypeCode = booking['activityTypeCode']?.toString() == 'TRAINING'
+          ? 'TRAINING'
+          : 'MEETING';
       _subject.text = booking['subject']?.toString() ?? '';
       _description.text = booking['description']?.toString() ?? '';
       _attendeeCount.text = '${booking['attendeeCount'] ?? 1}';
@@ -2060,6 +2063,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
     setState(() {
       _editingId = null;
       _selectedRoomId = roomId;
+      _activityTypeCode = 'MEETING';
       _subject.clear();
       _description.clear();
       _remark.clear();
@@ -3000,9 +3004,8 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
               ),
             ],
             if (_searchMode == 'ROOM') ...[
-              ..._roomBookingsForSchedule(
-                id,
-              ).map((booking) => _roomScheduleBookingRow(booking, preset)),
+              ..._roomBookingsForSchedule(id)
+                  .map((booking) => _roomScheduleBookingRow(booking, preset)),
             ],
           ],
         ),
@@ -3163,6 +3166,19 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
           ],
         ),
         const SizedBox(height: 12),
+        DropdownButtonFormField<String>(
+          initialValue: _activityTypeCode,
+          isExpanded: true,
+          decoration: const InputDecoration(labelText: 'ประเภทกิจกรรม *'),
+          items: const [
+            DropdownMenuItem(value: 'MEETING', child: Text('ประชุม')),
+            DropdownMenuItem(value: 'TRAINING', child: Text('อบรม')),
+          ],
+          onChanged: (value) {
+            if (value != null) refresh(() => _activityTypeCode = value);
+          },
+        ),
+        const SizedBox(height: 18),
         TextField(
           controller: _subject,
           style: const TextStyle(
@@ -3170,7 +3186,9 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
             fontSize: LaooTypography.inputText,
           ),
           decoration: InputDecoration(
-            labelText: 'หัวข้อประชุม *',
+            labelText: _activityTypeCode == 'TRAINING'
+                ? 'หัวข้ออบรม *'
+                : 'หัวข้อประชุม *',
             errorText: _subjectError,
           ),
           onChanged: (_) {
@@ -3622,9 +3640,9 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
       children: [
         IconButton.filled(
           style: IconButton.styleFrom(
-            backgroundColor: Theme.of(
-              context,
-            ).colorScheme.surfaceContainerHighest,
+            backgroundColor: Theme.of(context)
+                .colorScheme
+                .surfaceContainerHighest,
             foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
           onPressed: _page > 1
@@ -3645,9 +3663,9 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
         ),
         IconButton.filled(
           style: IconButton.styleFrom(
-            backgroundColor: Theme.of(
-              context,
-            ).colorScheme.surfaceContainerHighest,
+            backgroundColor: Theme.of(context)
+                .colorScheme
+                .surfaceContainerHighest,
             foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
           onPressed: _page < pages
