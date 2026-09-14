@@ -105,6 +105,46 @@ ORDER BY S.SchemeCode,S.AttendancePeriodSchemeID;
         catch (InvalidOperationException exception) { await transaction.RollbackAsync(token); return Conflict(new { message = exception.Message }); }
     }
 
+    [HttpDelete("schemes/{schemeId:long}")]
+    public async Task<IActionResult> DeleteScheme(long schemeId, [FromQuery] string? rowVersion, CancellationToken token)
+    {
+        if (!Scope(out var companyId, out var userId)) return Forbid();
+        if (string.IsNullOrWhiteSpace(rowVersion))
+            return BadRequest(new { message = "ไม่สามารถลบรูปแบบงวดได้ เพราะข้อมูลสำหรับตรวจสอบรายการไม่ครบ กรุณาโหลดข้อมูลใหม่" });
+        await using var connection = await Open(token);
+        if (!await Can(connection, SchemeMenu, "DELETE", token)) return Forbid();
+        await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(IsolationLevel.Serializable, token);
+        try
+        {
+            string? schemeCode;
+            string? schemeName;
+            await using (var current = new SqlCommand("SELECT SchemeCode,SchemeName FROM dbo.TDTMAttendancePeriodScheme WITH (UPDLOCK,HOLDLOCK) WHERE CompanyID=@CompanyID AND AttendancePeriodSchemeID=@SchemeID AND RowVersion=CONVERT(binary(8),@RowVersion,2);", connection, transaction))
+            {
+                Add(current, "@CompanyID", SqlDbType.BigInt, companyId); Add(current, "@SchemeID", SqlDbType.BigInt, schemeId); Add(current, "@RowVersion", SqlDbType.VarChar, rowVersion, 32);
+                await using var reader = await current.ExecuteReaderAsync(token);
+                if (!await reader.ReadAsync(token)) throw new InvalidOperationException("ข้อมูลรูปแบบงวดถูกแก้ไขหรือลบไปแล้ว กรุณาโหลดข้อมูลใหม่");
+                schemeCode = reader.GetString(0); schemeName = reader.GetString(1);
+            }
+            await using (var used = new SqlCommand("IF EXISTS(SELECT 1 FROM dbo.TDTMEmployeeAttendancePeriodAssignment WHERE CompanyID=@CompanyID AND AttendancePeriodSchemeID=@SchemeID) OR EXISTS(SELECT 1 FROM dbo.TDTMDefaultAttendancePeriodSchemeVersion WHERE CompanyID=@CompanyID AND AttendancePeriodSchemeID=@SchemeID) THROW 52340,N'รูปแบบงวดนี้ถูกผูกกับพนักงานหรือกำหนดเป็นงวดเริ่มต้นแล้ว ไม่สามารถลบได้',1;", connection, transaction))
+            {
+                Add(used, "@CompanyID", SqlDbType.BigInt, companyId); Add(used, "@SchemeID", SqlDbType.BigInt, schemeId); await used.ExecuteNonQueryAsync(token);
+            }
+            await using (var removeReviews = new SqlCommand("DELETE R FROM dbo.TDTMAttendancePeriodBranchReview R JOIN dbo.TDTMAttendancePeriod P ON P.AttendancePeriodID=R.AttendancePeriodID WHERE P.CompanyID=@CompanyID AND P.AttendancePeriodSchemeID=@SchemeID;", connection, transaction))
+            {
+                Add(removeReviews, "@CompanyID", SqlDbType.BigInt, companyId); Add(removeReviews, "@SchemeID", SqlDbType.BigInt, schemeId); await removeReviews.ExecuteNonQueryAsync(token);
+            }
+            await using (var removePeriods = new SqlCommand("DELETE FROM dbo.TDTMAttendancePeriod WHERE CompanyID=@CompanyID AND AttendancePeriodSchemeID=@SchemeID; DELETE FROM dbo.TDTMAttendancePeriodSchemeVersion WHERE CompanyID=@CompanyID AND AttendancePeriodSchemeID=@SchemeID; DELETE FROM dbo.TDTMAttendancePeriodScheme WHERE CompanyID=@CompanyID AND AttendancePeriodSchemeID=@SchemeID;", connection, transaction))
+            {
+                Add(removePeriods, "@CompanyID", SqlDbType.BigInt, companyId); Add(removePeriods, "@SchemeID", SqlDbType.BigInt, schemeId); await removePeriods.ExecuteNonQueryAsync(token);
+            }
+            await Audit(connection, transaction, companyId, null, "DELETE_SCHEME", new { schemeId, schemeCode, schemeName }, null, null, userId, token);
+            await transaction.CommitAsync(token);
+            return NoContent();
+        }
+        catch (InvalidOperationException exception) { await transaction.RollbackAsync(token); return Conflict(new { message = exception.Message }); }
+        catch (SqlException exception) when (exception.Number == 52340) { await transaction.RollbackAsync(token); return Conflict(new { message = exception.Message }); }
+    }
+
     [HttpGet("assignment-employees")]
     public async Task<IActionResult> AssignmentEmployees([FromQuery] string? search, CancellationToken token)
     {

@@ -58,7 +58,9 @@ class _TimeSystemSettingsPageState extends State<TimeSystemSettingsPage> {
   Map<String, String> _selectedProfiles = {};
   Map<String, String> _selectedPolicies = {};
   List<Map<String, dynamic>> _periodSchemes = const [];
+  List<Map<String, dynamic>> _holidayCalendars = const [];
   int? _defaultPeriodSchemeId;
+  int? _defaultHolidayCalendarId;
   bool _loading = true;
   bool _saving = false;
   bool _favoriteSaving = false;
@@ -149,6 +151,9 @@ class _TimeSystemSettingsPageState extends State<TimeSystemSettingsPage> {
       final schemeResponse = Map<String, dynamic>.from(
         await _api.get('/api/time/attendance-periods/schemes') as Map,
       );
+      final holidayResponse = Map<String, dynamic>.from(
+        await _api.get('/api/time/system-settings/holiday-calendars') as Map,
+      );
       if (!mounted) return;
       setState(() {
         _source = data;
@@ -166,6 +171,11 @@ class _TimeSystemSettingsPageState extends State<TimeSystemSettingsPage> {
             .where((item) => item['isActive'] == true)
             .toList(growable: false);
         _defaultPeriodSchemeId = data.defaultAttendancePeriodSchemeId;
+        _holidayCalendars = (holidayResponse['items'] as List? ?? const [])
+            .map((item) => Map<String, dynamic>.from(item as Map))
+            .where((item) => item['isActive'] == true)
+            .toList(growable: false);
+        _defaultHolidayCalendarId = data.defaultHolidayCalendarId;
         _reason.clear();
       });
     } catch (error) {
@@ -247,6 +257,7 @@ class _TimeSystemSettingsPageState extends State<TimeSystemSettingsPage> {
           processProfiles: _selectedProfiles,
           requestPolicies: _selectedPolicies,
           defaultAttendancePeriodSchemeId: _defaultPeriodSchemeId,
+          defaultHolidayCalendarId: _defaultHolidayCalendarId,
           reason: _reason.text,
           stateToken: source.stateToken,
         ),
@@ -416,7 +427,7 @@ class _TimeSystemSettingsPageState extends State<TimeSystemSettingsPage> {
         ),
         const SizedBox(height: 6),
         _section(
-          title: 'งวดลงเวลาเริ่มต้น',
+          title: 'งวดปิดผลเริ่มต้น',
           description:
               'ใช้สร้างการผูกงวดจริงเมื่อเปิดให้พนักงานต้องลงเวลา ค่านี้ไม่ย้ายพนักงานเดิมย้อนหลัง',
           children: [
@@ -424,7 +435,7 @@ class _TimeSystemSettingsPageState extends State<TimeSystemSettingsPage> {
               value: _defaultPeriodSchemeId,
               isExpanded: true,
               decoration: const InputDecoration(
-                labelText: 'รูปแบบงวดลงเวลาเริ่มต้น',
+                labelText: 'รูปแบบงวดปิดผลเริ่มต้น',
               ),
               items: _uniqueDropdownItems<int?>([
                 const DropdownMenuItem<int?>(
@@ -442,6 +453,35 @@ class _TimeSystemSettingsPageState extends State<TimeSystemSettingsPage> {
               ]),
               onChanged: _canEdit
                   ? (value) => setState(() => _defaultPeriodSchemeId = value)
+                  : null,
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        _section(
+          title: 'ปฏิทินวันหยุดเริ่มต้น',
+          description:
+              'ใช้เมื่อสาขายังไม่มีปฏิทินของตนเอง การเปลี่ยนมีผลตามวันที่เริ่มใช้ และไม่แก้ผลลงเวลาที่คำนวณแล้ว',
+          children: [
+            DropdownButtonFormField<int?>(
+              value: _defaultHolidayCalendarId,
+              isExpanded: true,
+              decoration: const InputDecoration(labelText: 'ปฏิทินวันหยุด'),
+              items: _uniqueDropdownItems<int?>([
+                const DropdownMenuItem<int?>(
+                  value: null,
+                  child: Text('ยังไม่กำหนด'),
+                ),
+                for (final calendar in _holidayCalendars)
+                  DropdownMenuItem<int?>(
+                    value: (calendar['holidayCalendarId'] as num?)?.toInt(),
+                    child: Text(
+                      '${calendar['calendarCode']} — ${calendar['calendarName']}',
+                    ),
+                  ),
+              ]),
+              onChanged: _canEdit
+                  ? (value) => setState(() => _defaultHolidayCalendarId = value)
                   : null,
             ),
           ],

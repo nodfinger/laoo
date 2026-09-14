@@ -35,6 +35,9 @@ class TimeSystemSettings {
     required this.defaultAttendancePeriodSchemeId,
     required this.defaultAttendancePeriodSchemeCode,
     required this.defaultAttendancePeriodSchemeName,
+    required this.defaultHolidayCalendarId,
+    required this.defaultHolidayCalendarCode,
+    required this.defaultHolidayCalendarName,
     required this.activeEmployeeCount,
     required this.employeeWithoutLoginCount,
     required this.selfServiceReady,
@@ -48,33 +51,40 @@ class TimeSystemSettings {
   final int? defaultAttendancePeriodSchemeId;
   final String? defaultAttendancePeriodSchemeCode;
   final String? defaultAttendancePeriodSchemeName;
+  final int? defaultHolidayCalendarId;
+  final String? defaultHolidayCalendarCode;
+  final String? defaultHolidayCalendarName;
   final int activeEmployeeCount;
   final int employeeWithoutLoginCount;
   final bool selfServiceReady;
   final String stateToken;
 
-  factory TimeSystemSettings.fromJson(Map<String, dynamic> json) =>
-      TimeSystemSettings(
-        effectiveDate:
-            DateTime.tryParse(json['effectiveDate']?.toString() ?? '') ??
-            DateTime.now(),
-        defaultProfileCode:
-            json['defaultProfileCode']?.toString() ?? 'OWNER_OPERATED',
-        processProfiles: _stringMap(json['processProfiles']),
-        requestPolicies: _stringMap(json['requestPolicies']),
-        defaultAttendancePeriodSchemeId:
-            (json['defaultAttendancePeriodSchemeId'] as num?)?.toInt(),
-        defaultAttendancePeriodSchemeCode:
-            json['defaultAttendancePeriodSchemeCode']?.toString(),
-        defaultAttendancePeriodSchemeName:
-            json['defaultAttendancePeriodSchemeName']?.toString(),
-        activeEmployeeCount:
-            (json['activeEmployeeCount'] as num?)?.toInt() ?? 0,
-        employeeWithoutLoginCount:
-            (json['employeeWithoutLoginCount'] as num?)?.toInt() ?? 0,
-        selfServiceReady: json['selfServiceReady'] == true,
-        stateToken: json['stateToken']?.toString() ?? '',
-      );
+  factory TimeSystemSettings.fromJson(
+    Map<String, dynamic> json,
+  ) => TimeSystemSettings(
+    effectiveDate:
+        DateTime.tryParse(json['effectiveDate']?.toString() ?? '') ??
+        DateTime.now(),
+    defaultProfileCode:
+        json['defaultProfileCode']?.toString() ?? 'OWNER_OPERATED',
+    processProfiles: _stringMap(json['processProfiles']),
+    requestPolicies: _stringMap(json['requestPolicies']),
+    defaultAttendancePeriodSchemeId:
+        (json['defaultAttendancePeriodSchemeId'] as num?)?.toInt(),
+    defaultAttendancePeriodSchemeCode: json['defaultAttendancePeriodSchemeCode']
+        ?.toString(),
+    defaultAttendancePeriodSchemeName: json['defaultAttendancePeriodSchemeName']
+        ?.toString(),
+    defaultHolidayCalendarId: (json['defaultHolidayCalendarId'] as num?)
+        ?.toInt(),
+    defaultHolidayCalendarCode: json['defaultHolidayCalendarCode']?.toString(),
+    defaultHolidayCalendarName: json['defaultHolidayCalendarName']?.toString(),
+    activeEmployeeCount: (json['activeEmployeeCount'] as num?)?.toInt() ?? 0,
+    employeeWithoutLoginCount:
+        (json['employeeWithoutLoginCount'] as num?)?.toInt() ?? 0,
+    selfServiceReady: json['selfServiceReady'] == true,
+    stateToken: json['stateToken']?.toString() ?? '',
+  );
 }
 
 class TimeSystemSettingsUpdate {
@@ -84,6 +94,7 @@ class TimeSystemSettingsUpdate {
     required this.processProfiles,
     required this.requestPolicies,
     required this.defaultAttendancePeriodSchemeId,
+    required this.defaultHolidayCalendarId,
     required this.reason,
     required this.stateToken,
   });
@@ -93,6 +104,7 @@ class TimeSystemSettingsUpdate {
   final Map<String, String> processProfiles;
   final Map<String, String> requestPolicies;
   final int? defaultAttendancePeriodSchemeId;
+  final int? defaultHolidayCalendarId;
   final String reason;
   final String stateToken;
 
@@ -102,6 +114,7 @@ class TimeSystemSettingsUpdate {
     'processProfiles': processProfiles,
     'requestPolicies': requestPolicies,
     'defaultAttendancePeriodSchemeId': defaultAttendancePeriodSchemeId,
+    'defaultHolidayCalendarId': defaultHolidayCalendarId,
     'reason': reason.trim(),
     'stateToken': stateToken,
   };

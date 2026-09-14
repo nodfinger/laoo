@@ -73,7 +73,7 @@ class _AttendancePeriodSchemesPageState
         id: (row?['attendancePeriodSchemeId'] as num?)?.toInt(),
       );
       await _load();
-      _show('บันทึกรูปแบบงวดแล้ว', false);
+      _show('บันทึกรูปแบบงวดปิดผลแล้ว', false);
     } catch (error) {
       _show(timeErrorText(error), true);
     }
@@ -86,6 +86,26 @@ class _AttendancePeriodSchemesPageState
       );
       await _load();
       _show('สร้างงวดล่วงหน้าเพิ่มแล้ว', false);
+    } catch (error) {
+      _show(timeErrorText(error), true);
+    }
+  }
+
+  Future<void> _delete(Map<String, dynamic> row) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => TimeDeleteDialog(
+        itemLabel: '${row['schemeCode']} — ${row['schemeName']}',
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await _repo.deleteScheme(
+        (row['attendancePeriodSchemeId'] as num).toInt(),
+        row['rowVersion'] as String,
+      );
+      await _load();
+      _show('ลบรูปแบบงวดปิดผลแล้ว', false);
     } catch (error) {
       _show(timeErrorText(error), true);
     }
@@ -116,7 +136,7 @@ class _AttendancePeriodSchemesPageState
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _items.isEmpty
-          ? const Center(child: Text('ไม่พบรูปแบบงวดลงเวลา'))
+          ? const Center(child: Text('ไม่พบรูปแบบงวดปิดผล'))
           : ListView.separated(
               padding: timeUiTokens.cardPadding,
               itemCount: _items.length,
@@ -144,6 +164,15 @@ class _AttendancePeriodSchemesPageState
                             tooltip: 'แก้ไข',
                             onPressed: () => _edit(item),
                             icon: const Icon(Icons.edit_outlined),
+                          ),
+                        if (_actions?['delete'] == true)
+                          IconButton(
+                            tooltip: 'ลบ',
+                            onPressed: () => _delete(item),
+                            icon: const Icon(
+                              Icons.delete_outline,
+                              color: Colors.red,
+                            ),
                           ),
                       ],
                     ),
@@ -233,7 +262,7 @@ class _AttendancePeriodAssignmentsPageState
 
   Future<void> _save() async {
     if (_schemeId == null || _selected.isEmpty) {
-      _show('กรุณาเลือกรูปแบบงวดและพนักงานอย่างน้อย 1 คน', true);
+      _show('กรุณาเลือกรูปแบบงวดปิดผลและพนักงานอย่างน้อย 1 คน', true);
       return;
     }
     setState(() => _saving = true);
@@ -281,7 +310,7 @@ class _AttendancePeriodAssignmentsPageState
             child: DropdownButtonFormField<int>(
               value: _schemeId,
               isExpanded: true,
-              decoration: const InputDecoration(labelText: 'รูปแบบงวดลงเวลา'),
+              decoration: const InputDecoration(labelText: 'รูปแบบงวดปิดผล'),
               items: [
                 for (final scheme in _schemes)
                   DropdownMenuItem(
@@ -635,7 +664,7 @@ class _SchemeDialogState extends State<_SchemeDialog> {
   @override
   Widget build(BuildContext context) => TimeActionDialog(
     icon: Icons.calendar_month_outlined,
-    title: widget.row == null ? 'เพิ่มรูปแบบงวด' : 'แก้ไขรูปแบบงวด',
+    title: widget.row == null ? 'เพิ่มรูปแบบงวดปิดผล' : 'แก้ไขรูปแบบงวดปิดผล',
     content: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
