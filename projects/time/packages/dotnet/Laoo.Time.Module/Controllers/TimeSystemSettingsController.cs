@@ -30,6 +30,7 @@ public sealed class TimeSystemSettingsController(IConfiguration configuration)
         Dictionary<string, string> ProcessProfiles,
         Dictionary<string, string> RequestPolicies,
         long? DefaultAttendancePeriodSchemeId,
+        long? DefaultHolidayCalendarId,
         string Reason,
         string StateToken);
 
@@ -40,6 +41,9 @@ public sealed class TimeSystemSettingsController(IConfiguration configuration)
         long? DefaultAttendancePeriodSchemeId,
         string? DefaultAttendancePeriodSchemeCode,
         string? DefaultAttendancePeriodSchemeName,
+        long? DefaultHolidayCalendarId,
+        string? DefaultHolidayCalendarCode,
+        string? DefaultHolidayCalendarName,
         int ActiveEmployeeCount,
         int EmployeeWithoutLoginCount);
 
@@ -81,11 +85,38 @@ public sealed class TimeSystemSettingsController(IConfiguration configuration)
             state.DefaultAttendancePeriodSchemeId,
             state.DefaultAttendancePeriodSchemeCode,
             state.DefaultAttendancePeriodSchemeName,
+            state.DefaultHolidayCalendarId,
+            state.DefaultHolidayCalendarCode,
+            state.DefaultHolidayCalendarName,
             state.ActiveEmployeeCount,
             state.EmployeeWithoutLoginCount,
             selfServiceReady = state.EmployeeWithoutLoginCount == 0,
             stateToken = Token(state),
         });
+    }
+
+    [HttpGet("holiday-calendars")]
+    public async Task<IActionResult> HolidayCalendars(CancellationToken token)
+    {
+        if (!TryScope(out var companyId, out _)) return Forbid();
+        await using var connection = await Open(token);
+        if (!await Can(connection, "VIEW", token)) return Forbid();
+        await using var command = new SqlCommand("""
+SELECT HolidayCalendarID,CalendarCode,CalendarName
+FROM dbo.TDTMHolidayCalendar
+WHERE CompanyID=@CompanyID AND IsActive=1
+ORDER BY CalendarCode,HolidayCalendarID;
+""", connection);
+        Add(command, "@CompanyID", SqlDbType.BigInt, companyId);
+        await using var reader = await command.ExecuteReaderAsync(token);
+        var items = new List<object>();
+        while (await reader.ReadAsync(token)) items.Add(new
+        {
+            holidayCalendarId = reader.GetInt64(0),
+            calendarCode = reader.GetString(1),
+            calendarName = reader.GetString(2),
+        });
+        return Ok(new { items });
     }
 
     [HttpPut]
@@ -156,6 +187,12 @@ public sealed class TimeSystemSettingsController(IConfiguration configuration)
                     companyId, request.DefaultAttendancePeriodSchemeId,
                     request.EffectiveFrom, userId, token);
             }
+            if (request.DefaultHolidayCalendarId != before.DefaultHolidayCalendarId)
+            {
+                await SaveDefaultHolidayCalendar(connection, transaction, companyId,
+                    request.DefaultHolidayCalendarId, request.EffectiveFrom,
+                    userId, token);
+            }
 
             var after = new
             {
@@ -163,6 +200,7 @@ public sealed class TimeSystemSettingsController(IConfiguration configuration)
                 processProfiles = NormalizeMap(request.ProcessProfiles),
                 requestPolicies = NormalizeMap(request.RequestPolicies),
                 request.DefaultAttendancePeriodSchemeId,
+                request.DefaultHolidayCalendarId,
                 effectiveFrom = request.EffectiveFrom,
             };
             await using var audit = new SqlCommand("""
@@ -324,9 +362,84 @@ ORDER BY D.EffectiveFrom DESC,D.DefaultAttendancePeriodSchemeVersionID DESC;
                 defaultSchemeName = reader.GetString(2);
             }
         }
+        long? defaultHolidayCalendarId = null;
+        string? defaultHolidayCalendarCode = null;
+        string? defaultHolidayCalendarName = null;
+        await using (var command = new SqlCommand("""
+SELECT TOP (1) D.HolidayCalendarID,C.CalendarCode,C.CalendarName
+FROM dbo.TDTMDefaultHolidayCalendarVersion D
+JOIN dbo.TDTMHolidayCalendar C
+  ON C.HolidayCalendarID=D.HolidayCalendarID AND C.CompanyID=D.CompanyID
+WHERE D.CompanyID=@CompanyID AND D.IsActive=1 AND D.EffectiveFrom<=@Date
+  AND (D.EffectiveTo IS NULL OR D.EffectiveTo>=@Date)
+ORDER BY D.EffectiveFrom DESC,D.DefaultHolidayCalendarVersionID DESC;
+""", connection, transaction))
+        {
+            Add(command, "@CompanyID", SqlDbType.BigInt, companyId);
+            Add(command, "@Date", SqlDbType.Date, date.ToDateTime(TimeOnly.MinValue));
+            await using var reader = await command.ExecuteReaderAsync(token);
+            if (await reader.ReadAsync(token))
+            {
+                defaultHolidayCalendarId = reader.GetInt64(0);
+                defaultHolidayCalendarCode = reader.GetString(1);
+                defaultHolidayCalendarName = reader.GetString(2);
+            }
+        }
         return new State(defaultProfile, processProfiles, requestPolicies,
             defaultSchemeId, defaultSchemeCode, defaultSchemeName,
+            defaultHolidayCalendarId, defaultHolidayCalendarCode,
+            defaultHolidayCalendarName,
             activeEmployees, withoutLogin);
+    }
+
+    private static async Task SaveDefaultHolidayCalendar(
+        SqlConnection connection, SqlTransaction transaction, long companyId,
+        long? calendarId, DateOnly effectiveFrom, long userId,
+        CancellationToken token)
+    {
+        if (calendarId.HasValue)
+        {
+            await using var exists = new SqlCommand("""
+SELECT COUNT_BIG(1) FROM dbo.TDTMHolidayCalendar WITH (UPDLOCK,HOLDLOCK)
+WHERE CompanyID=@CompanyID AND HolidayCalendarID=@CalendarID AND IsActive=1;
+""", connection, transaction);
+            Add(exists, "@CompanyID", SqlDbType.BigInt, companyId);
+            Add(exists, "@CalendarID", SqlDbType.BigInt, calendarId);
+            if (Convert.ToInt64(await exists.ExecuteScalarAsync(token)) == 0)
+                throw new InvalidOperationException("ไม่พบปฏิทินวันหยุดที่เลือก");
+        }
+        await using var current = new SqlCommand("""
+SELECT TOP (1) DefaultHolidayCalendarVersionID,EffectiveFrom
+FROM dbo.TDTMDefaultHolidayCalendarVersion WITH (UPDLOCK,HOLDLOCK)
+WHERE CompanyID=@CompanyID AND IsActive=1 AND EffectiveTo IS NULL
+ORDER BY EffectiveFrom DESC,DefaultHolidayCalendarVersionID DESC;
+""", connection, transaction);
+        Add(current, "@CompanyID", SqlDbType.BigInt, companyId);
+        await using var reader = await current.ExecuteReaderAsync(token);
+        long? currentId = null; DateOnly? currentStart = null;
+        if (await reader.ReadAsync(token))
+        {
+            currentId = reader.GetInt64(0);
+            currentStart = DateOnly.FromDateTime(reader.GetDateTime(1));
+        }
+        await reader.CloseAsync();
+        if (currentId.HasValue)
+        {
+            if (currentStart > effectiveFrom)
+                throw new InvalidOperationException("วันที่เริ่มใช้ต้องไม่ก่อนค่าตั้งต้นเดิม");
+            await using var close = new SqlCommand("UPDATE dbo.TDTMDefaultHolidayCalendarVersion SET EffectiveTo=DATEADD(day,-1,@EffectiveFrom),UpdateDate=SYSUTCDATETIME(),UpdateBy=@UserID WHERE DefaultHolidayCalendarVersionID=@ID;", connection, transaction);
+            Add(close, "@EffectiveFrom", SqlDbType.Date, effectiveFrom.ToDateTime(TimeOnly.MinValue));
+            Add(close, "@UserID", SqlDbType.BigInt, userId);
+            Add(close, "@ID", SqlDbType.BigInt, currentId);
+            await close.ExecuteNonQueryAsync(token);
+        }
+        if (!calendarId.HasValue) return;
+        await using var insert = new SqlCommand("INSERT dbo.TDTMDefaultHolidayCalendarVersion(CompanyID,HolidayCalendarID,EffectiveFrom,CreateBy) VALUES(@CompanyID,@CalendarID,@EffectiveFrom,@UserID);", connection, transaction);
+        Add(insert, "@CompanyID", SqlDbType.BigInt, companyId);
+        Add(insert, "@CalendarID", SqlDbType.BigInt, calendarId);
+        Add(insert, "@EffectiveFrom", SqlDbType.Date, effectiveFrom.ToDateTime(TimeOnly.MinValue));
+        Add(insert, "@UserID", SqlDbType.BigInt, userId);
+        await insert.ExecuteNonQueryAsync(token);
     }
 
     private static async Task SaveDefaultAttendancePeriodScheme(

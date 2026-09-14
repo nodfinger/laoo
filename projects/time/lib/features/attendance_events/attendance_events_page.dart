@@ -31,6 +31,7 @@ class _AttendanceEventsPageState extends State<AttendanceEventsPage> {
   String? _message;
   bool _messageError = false;
   bool _routeFilterInitialized = false;
+  bool _initialized = false;
 
   @override
   void initState() {
@@ -40,7 +41,6 @@ class _AttendanceEventsPageState extends State<AttendanceEventsPage> {
     final today = DateUtils.dateOnly(timeUiTokens.businessDate);
     _fromDate = today;
     _toDate = today;
-    _initialize();
   }
 
   @override
@@ -52,6 +52,10 @@ class _AttendanceEventsPageState extends State<AttendanceEventsPage> {
     _fromDate = _parseDate(parameters['fromDate']) ?? _fromDate;
     _toDate = _parseDate(parameters['toDate']) ?? _fromDate;
     _employee.text = parameters['employee'] ?? '';
+    if (!_initialized) {
+      _initialized = true;
+      _initialize();
+    }
   }
 
   @override
