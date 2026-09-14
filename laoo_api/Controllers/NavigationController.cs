@@ -24,7 +24,23 @@ public sealed class NavigationController : ControllerBase
         var groups = projects
             .SelectMany(project => project.MenuGroups)
             .GroupBy(group => group.MenuGroupCode)
-            .Select(group => group.First())
+            .Select(groups =>
+            {
+                var first = groups.First();
+                var merged = new NavigationMenuGroupResponse
+                {
+                    MenuGroupCode = first.MenuGroupCode,
+                    MenuGroupName = first.MenuGroupName,
+                    IconName = first.IconName,
+                    SortOrder = first.SortOrder,
+                    IsExpandedDefault = first.IsExpandedDefault
+                };
+                // Shared groups must retain authorized items from every project.
+                merged.Items.AddRange(groups.SelectMany(group => group.Items)
+                    .GroupBy(item => item.MenuCode)
+                    .Select(items => items.First()));
+                return merged;
+            })
             .ToList();
         return Ok(groups);
     }
