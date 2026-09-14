@@ -60,3 +60,23 @@ class CompanySetupApi {
 
   void dispose() => _client.dispose();
 }
+
+class MeetingEquipmentRequestSettingsApi {
+  MeetingEquipmentRequestSettingsApi({ApiClient? client})
+    : _client = client ?? ApiClient();
+
+  final ApiClient _client;
+  static const _path = '/api/company/meeting-equipment-requests/settings';
+
+  Future<bool> load() async {
+    final data = await _client.get(_path);
+    return data is Map && data['requireEquipmentRequestReview'] == true;
+  }
+
+  Future<void> save(bool requireReview) => _client.put(
+    _path,
+    body: {'requireEquipmentRequestReview': requireReview},
+  );
+
+  void dispose() => _client.dispose();
+}
