@@ -17,8 +17,14 @@ import '../holiday_calendars/holiday_calendar_page.dart';
 import '../holiday_calendars/holiday_date_page.dart';
 import '../holiday_calendars/branch_holiday_calendar_page.dart';
 import '../holiday_calendars/branch_holiday_exception_page.dart';
+import '../my_attendance_history/my_attendance_history_page.dart';
 
 List<GoRoute> buildTimeFeatureRoutes() => <GoRoute>[
+  GoRoute(
+    name: TimeRouteNames.myAttendanceHistory,
+    path: TimeRoutePaths.myAttendanceHistory,
+    builder: (context, state) => const MyAttendanceHistoryPage(),
+  ),
   GoRoute(
     name: TimeRouteNames.branchHolidayExceptions,
     path: TimeRoutePaths.branchHolidayExceptions,

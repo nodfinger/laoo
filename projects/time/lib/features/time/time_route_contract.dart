@@ -31,6 +31,7 @@ abstract final class TimeMenuCodes {
   static const branchHolidayCalendars = '28007';
   static const branchHolidayExceptions = '28008';
   static const myTimeCorrections = '30001';
+  static const myAttendanceHistory = '30002';
   static const attendancePeriodSchemes = '29001';
   static const attendancePeriodAssignments = '29002';
   static const attendancePeriods = '29003';
@@ -55,6 +56,7 @@ abstract final class TimeRouteNames {
   static const branchHolidayCalendars = 'timeBranchHolidayCalendars';
   static const branchHolidayExceptions = 'timeBranchHolidayExceptions';
   static const myTimeCorrections = 'myTimeCorrections';
+  static const myAttendanceHistory = 'myAttendanceHistory';
   static const attendancePeriodSchemes = 'timeAttendancePeriodSchemes';
   static const attendancePeriodAssignments = 'timeAttendancePeriodAssignments';
   static const attendancePeriods = 'timeAttendancePeriods';
@@ -81,6 +83,7 @@ abstract final class TimeRoutePaths {
   static const branchHolidayExceptions =
       '/company/time-branch-holiday-exceptions';
   static const myTimeCorrections = '/company/my-time-corrections';
+  static const myAttendanceHistory = '/company/my-attendance-history';
   static const attendancePeriodSchemes =
       '/company/time-attendance-period-schemes';
   static const attendancePeriodAssignments =
@@ -202,6 +205,14 @@ abstract final class TimeRoutes {
     routePath: TimeRoutePaths.myTimeCorrections,
     isImplemented: true,
   );
+  static const myAttendanceHistory = FeatureRouteContract(
+    projectCode: TimeProject.code,
+    menuCode: TimeMenuCodes.myAttendanceHistory,
+    screenType: 3,
+    routeName: TimeRouteNames.myAttendanceHistory,
+    routePath: TimeRoutePaths.myAttendanceHistory,
+    isImplemented: true,
+  );
   static const attendancePeriodSchemes = FeatureRouteContract(
     projectCode: TimeProject.code,
     menuCode: TimeMenuCodes.attendancePeriodSchemes,
@@ -285,6 +296,7 @@ abstract final class TimeRoutes {
     branchHolidayCalendars,
     branchHolidayExceptions,
     myTimeCorrections,
+    myAttendanceHistory,
     attendancePeriodSchemes,
     attendancePeriodAssignments,
     attendancePeriods,
