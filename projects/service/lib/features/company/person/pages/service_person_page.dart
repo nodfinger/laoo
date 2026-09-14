@@ -11,8 +11,11 @@ import '../../../../core/widgets/timed_snack_bar.dart';
 import '../../../../features/support/presentation/widgets/support_workspace_shell.dart';
 import '../data/service_person_api.dart';
 
+enum ServicePersonRole { customer, resident }
+
 class ServicePersonPage extends StatefulWidget {
-  const ServicePersonPage({super.key});
+  const ServicePersonPage({super.key, required this.role});
+  final ServicePersonRole role;
   @override
   State<ServicePersonPage> createState() => _ServicePersonPageState();
 }
@@ -23,7 +26,14 @@ class _ServicePersonPageState extends State<ServicePersonPage> {
   void initState() {
     super.initState();
     NavigationMenuRepository()
-        .resolveMenuName(menuCode: '14004', routeName: 'servicePersons')
+        .resolveMenuName(
+          menuCode: widget.role == ServicePersonRole.customer
+              ? '14005'
+              : '14006',
+          routeName: widget.role == ServicePersonRole.customer
+              ? 'serviceCustomers'
+              : 'serviceResidents',
+        )
         .then((value) {
           if (mounted) setState(() => _caption = value);
         });
@@ -32,22 +42,36 @@ class _ServicePersonPageState extends State<ServicePersonPage> {
   @override
   Widget build(BuildContext context) => SupportWorkspaceShell(
     pageTitle: _caption,
-    activeMenu: 'servicePersons',
+    activeMenu: widget.role == ServicePersonRole.customer
+        ? 'serviceCustomers'
+        : 'serviceResidents',
     menuScope: WorkspaceMenuScope.company,
-    child: ServicePersonWorkspace(caption: _caption),
+    child: ServicePersonWorkspace(caption: _caption, role: widget.role),
   );
 }
 
 class ServicePersonWorkspace extends StatefulWidget {
-  const ServicePersonWorkspace({super.key, required this.caption, this.api});
+  const ServicePersonWorkspace({
+    super.key,
+    required this.caption,
+    required this.role,
+    this.api,
+  });
   final String caption;
+  final ServicePersonRole role;
   final ServicePersonApi? api;
   @override
   State<ServicePersonWorkspace> createState() => _ServicePersonWorkspaceState();
 }
 
 class _ServicePersonWorkspaceState extends State<ServicePersonWorkspace> {
-  late final ServicePersonApi _api = widget.api ?? ServicePersonApi();
+  late final ServicePersonApi _api =
+      widget.api ??
+      ServicePersonApi(
+        path: widget.role == ServicePersonRole.customer
+            ? '/api/service/customers'
+            : '/api/service/residents',
+      );
   final _search = TextEditingController();
   List<Map<String, dynamic>> _rows = const [];
   Map<String, bool> _actions = const {};
@@ -131,6 +155,7 @@ class _ServicePersonWorkspaceState extends State<ServicePersonWorkspace> {
         api: _api,
         caption: widget.caption,
         initial: row,
+        role: widget.role,
         canEditPerson: _actions['personEdit'] == true,
       ),
     );
@@ -156,7 +181,9 @@ class _ServicePersonWorkspaceState extends State<ServicePersonWorkspace> {
                     Expanded(
                       child: WorkspacePageTitle(
                         title: widget.caption,
-                        favoriteKey: '14004',
+                        favoriteKey: widget.role == ServicePersonRole.customer
+                            ? '14005'
+                            : '14006',
                       ),
                     ),
                     if (!compact)
@@ -501,11 +528,13 @@ class _ServicePersonDialog extends StatefulWidget {
   const _ServicePersonDialog({
     required this.api,
     required this.caption,
+    required this.role,
     required this.canEditPerson,
     this.initial,
   });
   final ServicePersonApi api;
   final String caption;
+  final ServicePersonRole role;
   final bool canEditPerson;
   final Map<String, dynamic>? initial;
   @override
@@ -546,9 +575,8 @@ class _ServicePersonDialogState extends State<_ServicePersonDialog> {
       _mobile.text = '${row['mobile'] ?? ''}';
       _email.text = '${row['email'] ?? ''}';
       _active = row['isActive'] == true;
-      final roles = List<String>.from(row['serviceRoles'] as List? ?? const []);
-      _customer = roles.contains('SERVICE_CUSTOMER');
-      _resident = roles.contains('RESIDENT');
+      _customer = widget.role == ServicePersonRole.customer;
+      _resident = widget.role == ServicePersonRole.resident;
       _roomId = (row['roomID'] as num?)?.toInt();
       _start = DateTime.tryParse('${row['startDate'] ?? ''}') ?? DateTime.now();
       _end = DateTime.tryParse('${row['endDate'] ?? ''}');
@@ -565,10 +593,8 @@ class _ServicePersonDialogState extends State<_ServicePersonDialog> {
       if (!mounted) return;
       setState(() {
         _lookup = value;
-        if (!_dormitory) {
-          _customer = true;
-          _resident = false;
-        }
+        _customer = widget.role == ServicePersonRole.customer;
+        _resident = widget.role == ServicePersonRole.resident;
         _loading = false;
       });
     } catch (error) {
@@ -667,8 +693,8 @@ class _ServicePersonDialogState extends State<_ServicePersonDialog> {
           _personId = null;
           _roomId = null;
           _active = true;
-          _customer = true;
-          _resident = false;
+          _customer = widget.role == ServicePersonRole.customer;
+          _resident = widget.role == ServicePersonRole.resident;
           _newPerson = true;
           _start = DateTime.now();
           _end = null;
@@ -839,38 +865,20 @@ class _ServicePersonDialogState extends State<_ServicePersonDialog> {
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    if (_dormitory) ...[
-                      CheckboxListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text('ผู้ใช้บริการ'),
-                        value: _customer,
-                        onChanged: _saving
-                            ? null
-                            : (value) =>
-                                  setState(() => _customer = value == true),
-                      ),
-                      CheckboxListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: const Text('ผู้พักอาศัย'),
-                        value: _resident,
-                        onChanged: _saving
-                            ? null
-                            : (value) =>
-                                  setState(() => _resident = value == true),
-                      ),
-                    ] else
-                      Container(
-                        margin: const EdgeInsets.only(top: 8),
-                        padding: const EdgeInsets.all(10),
-                        color: _primary.withValues(alpha: .08),
-                        child: Text(
-                          'ผู้ใช้บริการ',
-                          style: TextStyle(
-                            color: _primary,
-                            fontWeight: FontWeight.w700,
-                          ),
+                    Container(
+                      margin: const EdgeInsets.only(top: 8),
+                      padding: const EdgeInsets.all(10),
+                      color: _primary.withValues(alpha: .08),
+                      child: Text(
+                        widget.role == ServicePersonRole.customer
+                            ? 'ผู้ใช้บริการ'
+                            : 'ผู้พักอาศัย',
+                        style: TextStyle(
+                          color: _primary,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
+                    ),
                     if (_resident) ...[
                       const SizedBox(height: 12),
                       DropdownButtonFormField<int>(

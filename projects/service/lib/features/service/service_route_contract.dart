@@ -71,10 +71,17 @@ abstract final class ServiceRoutes {
     ),
     FeatureRouteContract(
       projectCode: ServiceProject.code,
-      menuCode: '14004',
+      menuCode: '14005',
       screenType: 1,
-      routeName: 'servicePersons',
-      routePath: '/service/persons',
+      routeName: 'serviceCustomers',
+      routePath: '/service/customers',
+    ),
+    FeatureRouteContract(
+      projectCode: ServiceProject.code,
+      menuCode: '14006',
+      screenType: 1,
+      routeName: 'serviceResidents',
+      routePath: '/service/residents',
     ),
     FeatureRouteContract(
       projectCode: ServiceProject.code,

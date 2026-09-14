@@ -9,9 +9,11 @@ namespace LaooApi.Controllers;
 
 [ApiController, Authorize]
 [Route("api/service/persons")]
+[Route("api/service/customers")]
+[Route("api/service/residents")]
 public sealed partial class ServicePersonController(IConfiguration configuration) : ControllerBase
 {
-    private const string ScreenCode = "14004";
+    private string ScreenCode => Request.Path.StartsWithSegments("/api/service/customers") ? "14005" : Request.Path.StartsWithSegments("/api/service/residents") ? "14006" : "14004";
     private long CompanyId => ClaimLong("company_id");
 
     [HttpGet("actions")]
@@ -43,13 +45,13 @@ SELECT COUNT_BIG(1) OVER(),P.PersonID,P.FullName,P.NickName,P.Email,P.Mobile,P.I
 FROM dbo.TDADPerson P
 OUTER APPLY(SELECT TOP(1) ServiceCustomerID,RowVersion FROM dbo.TDADServiceCustomer WHERE CompanyID=P.CompanyID AND PersonID=P.PersonID AND IsActive=1) SC
 OUTER APPLY(SELECT TOP(1) ResidentID,RoomID,StartDate,EndDate,RowVersion FROM dbo.TDADResident WHERE CompanyID=P.CompanyID AND PersonID=P.PersonID AND IsActive=1 ORDER BY StartDate DESC,ResidentID DESC) R
-WHERE P.CompanyID=@company AND (SC.ServiceCustomerID IS NOT NULL OR R.ResidentID IS NOT NULL)
+WHERE P.CompanyID=@company AND (@role=N'CUSTOMER' AND SC.ServiceCustomerID IS NOT NULL OR @role=N'RESIDENT' AND R.ResidentID IS NOT NULL OR @role=N'ANY' AND (SC.ServiceCustomerID IS NOT NULL OR R.ResidentID IS NOT NULL))
  AND (@active IS NULL OR P.IsActive=@active)
  AND (@search=N'' OR P.FullName LIKE @like OR P.NickName LIKE @like OR P.Email LIKE @like OR P.Mobile LIKE @like)
 ORDER BY P.FullName,P.PersonID OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY;
 """;
         await using var cmd = new SqlCommand(sql, c);
-        Add(cmd, "@company", SqlDbType.BigInt, CompanyId); Add(cmd, "@active", SqlDbType.Bit, isActive); Add(cmd, "@search", SqlDbType.NVarChar, query, 320); Add(cmd, "@like", SqlDbType.NVarChar, $"%{query}%", 330); Add(cmd, "@offset", SqlDbType.Int, (page - 1) * pageSize); Add(cmd, "@pageSize", SqlDbType.Int, pageSize);
+        Add(cmd, "@company", SqlDbType.BigInt, CompanyId); Add(cmd, "@role", SqlDbType.NVarChar, Request.Path.StartsWithSegments("/api/service/customers") ? "CUSTOMER" : Request.Path.StartsWithSegments("/api/service/residents") ? "RESIDENT" : "ANY", 20); Add(cmd, "@active", SqlDbType.Bit, isActive); Add(cmd, "@search", SqlDbType.NVarChar, query, 320); Add(cmd, "@like", SqlDbType.NVarChar, $"%{query}%", 330); Add(cmd, "@offset", SqlDbType.Int, (page - 1) * pageSize); Add(cmd, "@pageSize", SqlDbType.Int, pageSize);
         var items = new List<object>(); long total = 0;
         await using var reader = await cmd.ExecuteReaderAsync(token);
         while (await reader.ReadAsync(token)) { total = reader.GetInt64(0); items.Add(Row(reader)); }

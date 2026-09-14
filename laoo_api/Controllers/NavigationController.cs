@@ -88,6 +88,7 @@ WHERE UPPER(LTRIM(RTRIM(G.AudienceType))) IN (N'A',@AudienceType)
   AND (@UserType <> N'COMPANY_USER' OR G.MenuGroupCode <> N'07')
   -- The Company branch menu remains Company-only in the shared settings group.
   AND (M.MenuCode <> N'13001' OR @UserType = N'COMPANY_USER')
+  AND (M.MenuCode <> N'14006' OR EXISTS(SELECT 1 FROM dbo.TDSTCompanySetUp CS WHERE CS.CompanyID=@CompanyID AND UPPER(LTRIM(RTRIM(CS.BusinessTypeCode)))=N'DORMITORY'))
   AND (
         ISNULL(G.OpenOption, 0) = 0
         OR @UserType <> N'COMPANY_USER'

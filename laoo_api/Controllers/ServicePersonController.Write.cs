@@ -64,8 +64,11 @@ SELECT RoomID id,BuildingID buildingId,FloorID parentId,RoomCode code,RoomNameTH
         if (!await InServiceScope(c, token) || !await Allowed(c, routePersonId.HasValue ? "EDIT" : "CREATE", token)) return Forbid();
         var businessType = await BusinessType(c, token);
         var dormitory = businessType == CompanyBusinessType.Dormitory;
-        var serviceCustomer = dormitory ? x.IsServiceCustomer : true;
-        var resident = dormitory && x.IsResident;
+        var customerEndpoint = Request.Path.StartsWithSegments("/api/service/customers");
+        var residentEndpoint = Request.Path.StartsWithSegments("/api/service/residents");
+        if (residentEndpoint && !dormitory) return Forbid();
+        var serviceCustomer = customerEndpoint ? true : residentEndpoint ? false : dormitory ? x.IsServiceCustomer : true;
+        var resident = residentEndpoint ? true : customerEndpoint ? false : dormitory && x.IsResident;
         if (!serviceCustomer && !resident)
             return BadRequest(Issue("กรุณาเลือกบทบาท", "บุคคลในระบบ Service ต้องมีอย่างน้อยหนึ่งบทบาท"));
         if (resident && (!x.RoomId.HasValue || !x.StartDate.HasValue))
@@ -79,7 +82,13 @@ SELECT RoomID id,BuildingID buildingId,FloorID parentId,RoomCode code,RoomNameTH
         {
             if (!personId.HasValue)
             {
-                const string insertPerson = "INSERT dbo.TDADPerson(CompanyID,FullName,NickName,Email,Mobile,IsActive,CreateBy) OUTPUT INSERTED.PersonID VALUES(@company,@name,@nick,@email,@mobile,@active,@actor);";
+                await using (var duplicate = new SqlCommand("SELECT COUNT(1) FROM dbo.TDADPerson WITH(UPDLOCK,HOLDLOCK) WHERE CompanyID=@company AND REPLACE(FullName,N'' '',N'''')=REPLACE(@name,N'' '',N'''')", c, tx))
+                {
+                    Add(duplicate, "@company", SqlDbType.BigInt, CompanyId);
+                    Add(duplicate, "@name", SqlDbType.NVarChar, name, 200);
+                    if (Convert.ToInt32(await duplicate.ExecuteScalarAsync(token)) > 0)
+                        throw new ServicePersonException("DUPLICATE_NAME");
+                }                const string insertPerson = "INSERT dbo.TDADPerson(CompanyID,FullName,NickName,Email,Mobile,IsActive,CreateBy) OUTPUT INSERTED.PersonID VALUES(@company,@name,@nick,@email,@mobile,@active,@actor);";
                 await using var cmd = new SqlCommand(insertPerson, c, tx); BindPerson(cmd, x, name); personId = Convert.ToInt64(await cmd.ExecuteScalarAsync(token));
             }
             else
@@ -119,6 +128,11 @@ INSERT dbo.TDADServicePersonAudit(CompanyID,PersonID,ActionCode,BeforeData,After
         {
             await tx.RollbackAsync(token);
             return Conflict(Issue("ข้อมูลผู้พักอาศัยซ้ำ", "บุคคลนี้มีช่วงเวลาพักอาศัยที่ทับซ้อนกัน"));
+        }
+        catch (ServicePersonException e) when (e.Code == "DUPLICATE_NAME")
+        {
+            await tx.RollbackAsync(token);
+            return Conflict(Issue("พบชื่อบุคคลซ้ำ", "กรุณาตรวจสอบทะเบียนบุคคลกลาง หรือใช้การผูกบุคคลเดิม"));
         }
         catch (ServicePersonException)
         {
@@ -163,9 +177,9 @@ ELSE BEGIN IF @version IS NOT NULL AND @current<>@version THROW 52953,'RESIDENT_
     {
         const string sql = """
 SELECT CAST(CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADUser WHERE CompanyID=@company AND UserID=@user AND IsCompanyAdmin=1 AND IsActive=1)
- OR EXISTS(SELECT 1 FROM dbo.TDADUserEmployee UE JOIN dbo.TDADUserPermissionPoint PP ON PP.CompanyID=UE.CompanyID AND PP.EmployeeID=UE.EmployeeID AND PP.PartnerID=@partner AND PP.MenuCode=N'14004' AND PP.PermissionPointCode=N'PERSON_EDIT' AND PP.IsAllowed=1 AND PP.IsActive=1 JOIN dbo.TDADProject PR ON PR.ProjectID=PP.ProjectID AND PR.ProjectCode=N'LAOO_SERVICE' AND PR.IsActive=1 JOIN dbo.TDADUserProject UP ON UP.ProjectID=PR.ProjectID AND UP.CompanyID=UE.CompanyID AND UP.UserID=UE.UserID AND UP.IsActive=1 WHERE UE.CompanyID=@company AND UE.UserID=@user AND UE.IsActive=1) THEN 1 ELSE 0 END AS bit);
+ OR EXISTS(SELECT 1 FROM dbo.TDADUserEmployee UE JOIN dbo.TDADUserPermissionPoint PP ON PP.CompanyID=UE.CompanyID AND PP.EmployeeID=UE.EmployeeID AND PP.PartnerID=@partner AND PP.MenuCode=@screen AND PP.PermissionPointCode=N'PERSON_EDIT' AND PP.IsAllowed=1 AND PP.IsActive=1 JOIN dbo.TDADProject PR ON PR.ProjectID=PP.ProjectID AND PR.ProjectCode=N'LAOO_SERVICE' AND PR.IsActive=1 JOIN dbo.TDADUserProject UP ON UP.ProjectID=PR.ProjectID AND UP.CompanyID=UE.CompanyID AND UP.UserID=UE.UserID AND UP.IsActive=1 WHERE UE.CompanyID=@company AND UE.UserID=@user AND UE.IsActive=1) THEN 1 ELSE 0 END AS bit);
 """;
-        await using var cmd = new SqlCommand(sql,c,tx);Add(cmd,"@company",SqlDbType.BigInt,CompanyId);Add(cmd,"@user",SqlDbType.BigInt,ClaimLong("user_id"));Add(cmd,"@partner",SqlDbType.BigInt,ClaimLong("partner_id"));return Convert.ToBoolean(await cmd.ExecuteScalarAsync(token));
+        await using var cmd = new SqlCommand(sql,c,tx);Add(cmd,"@company",SqlDbType.BigInt,CompanyId);Add(cmd,"@user",SqlDbType.BigInt,ClaimLong("user_id"));Add(cmd,"@partner",SqlDbType.BigInt,ClaimLong("partner_id"));Add(cmd,"@screen",SqlDbType.NVarChar,ScreenCode,5);return Convert.ToBoolean(await cmd.ExecuteScalarAsync(token));
     }
 
     private void BindPerson(SqlCommand cmd, ServicePersonSaveRequest x, string name)
@@ -178,4 +192,7 @@ SELECT CAST(CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADUser WHERE CompanyID=@company
 }
 
 public sealed record ServicePersonSaveRequest(long? PersonId,string? FullName,string? NickName,string? Email,string? Mobile,bool IsActive,bool IsServiceCustomer,bool IsResident,long? RoomId,DateOnly? StartDate,DateOnly? EndDate,bool UpdatePerson=false,string? PersonRowVersion=null,string? ServiceCustomerRowVersion=null,string? ResidentRowVersion=null);
-file sealed class ServicePersonException(string code) : Exception(code);
+file sealed class ServicePersonException(string code) : Exception(code)
+{
+    public string Code { get; } = code;
+}

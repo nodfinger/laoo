@@ -1,9 +1,10 @@
 import '../../../../core/api/api_client.dart';
 
 class ServicePersonApi {
-  ServicePersonApi({ApiClient? client}) : _client = client ?? ApiClient();
+  ServicePersonApi({ApiClient? client, this.path = '/api/service/persons'})
+    : _client = client ?? ApiClient();
   final ApiClient _client;
-  static const path = '/api/service/persons';
+  final String path;
 
   Future<Map<String, bool>> actions() async => Map<String, bool>.fromEntries(
     (await _client.get('$path/actions') as Map).entries.map(

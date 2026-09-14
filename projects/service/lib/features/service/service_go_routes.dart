@@ -71,7 +71,14 @@ List<GoRoute> buildServiceFeatureRoutes({
     (state) => StockReceiptPage(onCreateVendor: onCreateReceiptVendor),
   ),
   _page('08006', (state) => const SerialRegistryPage()),
-  _page('14004', (state) => const ServicePersonPage()),
+  _page(
+    '14005',
+    (state) => const ServicePersonPage(role: ServicePersonRole.customer),
+  ),
+  _page(
+    '14006',
+    (state) => const ServicePersonPage(role: ServicePersonRole.resident),
+  ),
   ..._workspacePlaceholders.entries.map(
     (entry) =>
         _workspacePlaceholder(ServiceRoutes.byMenuCode(entry.key), entry.value),
