@@ -402,15 +402,53 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
                       ),
                     ),
                     if ((detail['requests'] as List? ?? const []).isNotEmpty)
-                      const SizedBox(height: 8),
-                    if ((detail['requests'] as List? ?? const []).isNotEmpty)
-                      Text(
-                        'สถานะล่าสุด: ${(detail['requests'] as List).map((request) => '${request['itemName']} · ${request['statusCode']}').join(', ')}',
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: LaooColors.textSecondary,
-                          fontSize: LaooTypography.inputHint,
+                      SizedBox(
+                        height: 140,
+                        child: ListView(
+                          children: [
+                            for (final request in detail['requests'] as List)
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    "${request['itemName']} × ${request['quantity']} — ${request['statusCode']}\n"
+                                    "ผู้ขอ: ${request['requesterName'] ?? '-'}\n"
+                                    "หมายเหตุ: ${request['remark'] ?? '-'}",
+                                  ),
+                                  if (request['canCancel'] == true)
+                                    TextButton(
+                                      onPressed: () async {
+                                        try {
+                                          await _equipmentRequests.cancel(
+                                            (request['detailId'] as num)
+                                                .toInt(),
+                                          );
+                                          if (dialogContext.mounted) {
+                                            refresh(() {
+                                              request['statusCode'] =
+                                                  'CANCELLED';
+                                              request['canCancel'] = false;
+                                            });
+                                          }
+                                          _notify(
+                                            'ยกเลิกคำขอแล้ว สามารถเลือกและส่งคำขอใหม่ได้',
+                                          );
+                                        } catch (error) {
+                                          _notify(
+                                            _error(
+                                              error,
+                                              'ยกเลิกคำขอไม่สำเร็จ',
+                                            ),
+                                            true,
+                                          );
+                                        }
+                                      },
+                                      child: const Text('ยกเลิกคำขอนี้'),
+                                    ),
+                                  const Divider(color: LaooColors.border),
+                                ],
+                              ),
+                          ],
                         ),
                       ),
                   ],
@@ -1169,13 +1207,14 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
                             ),
                           ),
                         ),
-                        OutlinedButton.icon(
-                          onPressed: canRequestEquipment
-                              ? () => _showEquipmentRequest(invitation)
-                              : null,
-                          icon: const Icon(Icons.add_outlined),
-                          label: const Text('ขออุปกรณ์'),
-                        ),
+                        if (canRequestEquipment)
+                          OutlinedButton.icon(
+                            onPressed: canRequestEquipment
+                                ? () => _showEquipmentRequest(invitation)
+                                : null,
+                            icon: const Icon(Icons.add_outlined),
+                            label: const Text('ขออุปกรณ์'),
+                          ),
                       ],
                     ),
                     if (!canRequestEquipment) ...[
