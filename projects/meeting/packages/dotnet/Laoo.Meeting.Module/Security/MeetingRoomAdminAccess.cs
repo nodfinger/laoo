@@ -5,6 +5,15 @@ namespace LaooMeetingApi.Security;
 
 internal static class MeetingRoomAdminAccess
 {
+    // B is the company-scoped booking; @company and @user come from the session.
+    internal const string BookingRoomSql = """
+EXISTS(SELECT 1 FROM dbo.TDADMeetingRoomContact C
+ JOIN dbo.TDADMeetingRoom MR ON MR.RoomID=C.RoomID AND MR.CompanyID=B.CompanyID
+ JOIN dbo.TDADUserEmployee UE ON UE.EmployeeID=C.EmployeeID AND UE.CompanyID=MR.CompanyID AND UE.UserID=@user AND UE.IsActive=1
+ JOIN dbo.TDADEmployee E ON E.EmployeeID=UE.EmployeeID AND E.CompanyID=UE.CompanyID AND E.IsActive=1
+ JOIN dbo.TDADUser AU ON AU.UserID=UE.UserID AND AU.CompanyID=UE.CompanyID AND AU.IsActive=1
+ WHERE C.RoomID=B.RoomID AND MR.CompanyID=@company AND C.IsActive=1)
+""";
     internal static async Task<HashSet<long>> Rooms(SqlConnection db, ClaimsPrincipal user, CancellationToken token)
     {
         var rooms = new HashSet<long>();

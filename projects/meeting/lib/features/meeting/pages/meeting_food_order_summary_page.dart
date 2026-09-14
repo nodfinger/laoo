@@ -305,6 +305,89 @@ class _State extends State<MeetingFoodOrderSummaryPage> {
     );
   }
 
+  void exportDistributionChecklist() {
+    final rows = <List<Object?>>[
+      [
+        'ห้องประชุม',
+        'หัวข้อ',
+        'วันและเวลาประชุม',
+        'รหัสพนักงาน',
+        'ผู้เข้าร่วม',
+        'ฝ่าย',
+        'แผนก',
+        'รายการอาหารและเครื่องดื่ม',
+        'ข้อความและคำตอบเพิ่มเติม',
+        'รับอาหาร',
+        'รับเครื่องดื่ม',
+        'ผู้แจก',
+        'เวลาแจก',
+      ],
+    ];
+    for (final booking in visibleItems) {
+      final foods =
+          List<Map<String, dynamic>>.from(
+            booking['participantFoods'] as List? ?? const [],
+          ).where((row) {
+            return foodFilterId == null || row['foodId'] == foodFilterId;
+          }).toList();
+      final participants = <String, List<Map<String, dynamic>>>{};
+      for (final food in foods) {
+        final participantId = '${food['participantId'] ?? ''}';
+        if (participantId.isEmpty) continue;
+        participants.putIfAbsent(participantId, () => []).add(food);
+      }
+      final groups = participants.entries.toList()
+        ..sort((left, right) {
+          final leftName = '${left.value.first['participantName'] ?? ''}';
+          final rightName = '${right.value.first['participantName'] ?? ''}';
+          return leftName.compareTo(rightName);
+        });
+      for (final group in groups) {
+        final participant = group.value.first;
+        final participantId = group.key;
+        final nickname = '${participant['participantNickname'] ?? ''}'.trim();
+        final name = '${participant['participantName'] ?? '-'}';
+        final remarks = participantRemarksOf(booking)
+            .where((row) => '${row['participantId']}' == participantId)
+            .map((row) => 'ข้อความเพิ่มเติม: ${row['remark']}');
+        final answers =
+            List<Map<String, dynamic>>.from(
+                  booking['requirements'] as List? ?? const [],
+                )
+                .where((row) {
+                  return '${row['participantId']}' == participantId &&
+                      '${row['answerValue'] ?? ''}'.trim().isNotEmpty;
+                })
+                .map((row) => '${row['questionText']}: ${row['answerValue']}');
+        rows.add([
+          '${booking['roomCode']} | ${booking['roomName']}',
+          booking['subject'],
+          '${dateTime(booking['startDateTime'])} - ${dateTime(booking['endDateTime'])}',
+          participant['employeeCode'],
+          nickname.isEmpty ? name : '$name ($nickname)',
+          participant['divisionName'],
+          participant['departmentName'],
+          group.value
+              .map(
+                (food) =>
+                    '${food['foodTypeName'] ?? '-'}: '
+                    '${food['foodName'] ?? '-'} × ${food['quantity'] ?? 0}',
+              )
+              .join('\n'),
+          [...remarks, ...answers].join('\n'),
+          '',
+          '',
+          '',
+          '',
+        ]);
+      }
+    }
+    downloadFoodSummary(
+      'checklist_แจกอาหารและเครื่องดื่ม_${date(from).replaceAll('/', '-')}_${date(to).replaceAll('/', '-')}.csv',
+      rows.map((row) => row.map(csvCell).join(',')).join('\r\n'),
+    );
+  }
+
   Widget filterCard() => WorkspaceSectionCard(
     child: LayoutBuilder(
       builder: (_, box) => Wrap(
@@ -1070,7 +1153,14 @@ class _State extends State<MeetingFoodOrderSummaryPage> {
                       OutlinedButton.icon(
                         onPressed: items.isEmpty ? null : exportSummary,
                         icon: const Icon(Icons.file_download_outlined),
-                        label: const Text('Export ข้อมูล'),
+                        label: const Text('ส่งออกรายการสั่งอาหาร'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: items.isEmpty
+                            ? null
+                            : exportDistributionChecklist,
+                        icon: const Icon(Icons.restaurant_outlined),
+                        label: const Text('ส่งออกเพื่อแจกอาหาร'),
                       ),
                     ],
                   ),

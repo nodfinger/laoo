@@ -338,9 +338,7 @@ class _MeetingEquipmentRequestPageState
                     child: const Text('อนุมัติทั้งคำขอ'),
                   ),
                 ],
-                if ((status == 'WAITING_REVIEW' || status == 'PENDING') &&
-                    (item['isOwnRequest'] == true ||
-                        item['canManageBooking'] == true))
+                if (item['canCancel'] == true)
                   TextButton(
                     onPressed: () => _cancel(item),
                     child: const Text('ยกเลิกรายการ'),

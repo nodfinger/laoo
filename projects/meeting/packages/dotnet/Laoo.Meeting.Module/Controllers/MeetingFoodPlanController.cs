@@ -146,7 +146,7 @@ ORDER BY SortOrder,RequirementQuestionID;
             questions.Add(new { questionId = question.Id, questionText = question.Text, answerType = question.Type, isRequired = question.Required, sortOrder = question.Sort, options });
         }
         var canManageFoodPlan = header.Status == "APPROVED" &&
-                                header.EndDateTime > DateTime.Now;
+                                header.StartDateTime > DateTime.Now;
         return Ok(new { header.BookingId, header.BookingNo, header.Subject, header.RoomCode, header.RoomName, header.StartDateTime, header.EndDateTime, header.OrderCutoffDateTime, header.IsActive, canManageFoodPlan, foods, groups, questions });
     }
 
@@ -166,8 +166,8 @@ ORDER BY SortOrder,RequirementQuestionID;
         await using var connection = await Open(token);
         var header = await BookingHeader(connection, bookingId, company, user, token);
         if (header is null) return NotFound(Error("ไม่พบรายการประชุม", $"BookingID {bookingId} ไม่อยู่ในขอบเขตของผู้ใช้งาน"));
-        if (header.Status != "APPROVED" || header.EndDateTime < DateTime.Now)
-            return BadRequest(Error("กำหนดเมนูอาหารไม่ได้", "รายการประชุมต้องอนุมัติแล้วและยังไม่สิ้นสุด"));
+        if (header.Status != "APPROVED" || header.StartDateTime <= DateTime.Now)
+            return BadRequest(Error("กำหนดเมนูอาหารไม่ได้", "รายการประชุมต้องอนุมัติแล้วและยังไม่เริ่ม"));
         if (request.OrderCutoffDateTime <= DateTime.Now || request.OrderCutoffDateTime >= header.StartDateTime)
             return BadRequest(Error("เวลาปิดรับไม่ถูกต้อง", "เวลาปิดรับต้องมากกว่าเวลาปัจจุบันและก่อนเวลาเริ่มประชุม"));
 
@@ -244,7 +244,9 @@ ELSE
     {
         if (!Scope(out var company, out var user)) return Forbid();
         await using var connection = await Open(token);
-        if (await BookingHeader(connection, bookingId, company, user, token) is null) return Forbid();
+        var header = await BookingHeader(connection, bookingId, company, user, token);
+        if (header is null) return Forbid();
+        if (header.Status != "APPROVED" || header.StartDateTime <= DateTime.Now) return BadRequest(Error("แก้ชุดอาหารไม่ได้", "การจองต้องอนุมัติแล้วและยังไม่เริ่มประชุม"));
         await using var command = new SqlCommand("DELETE FROM dbo.TDADMeetingBookingFoodOption WHERE BookingID=@booking AND CompanyID=@company; DELETE FROM dbo.TDADMeetingBookingFoodPlan WHERE BookingID=@booking AND CompanyID=@company; SELECT @@ROWCOUNT;", connection);
         Add(command, "@booking", bookingId); Add(command, "@company", company);
         return Convert.ToInt32(await command.ExecuteScalarAsync(token)) == 0 ? NotFound() : NoContent();

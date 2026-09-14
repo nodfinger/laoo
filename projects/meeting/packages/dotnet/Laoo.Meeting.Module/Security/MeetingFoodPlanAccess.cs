@@ -5,18 +5,14 @@ namespace LaooMeetingApi.Security;
 
 internal static class MeetingFoodPlanAccess
 {
-    internal const string OwnershipSql = """
-(B.RequesterUserID=@user OR EXISTS
+    internal static readonly string OwnershipSql = $"""
+(EXISTS(SELECT 1 FROM dbo.TDADUser U WHERE U.UserID=@user AND U.CompanyID=@company AND U.IsActive=1)
+ AND (B.RequesterUserID=@user OR EXISTS
  (SELECT 1 FROM dbo.TDADUser U WHERE U.UserID=@user AND U.CompanyID=@company AND U.IsActive=1 AND U.IsCompanyAdmin=1)
- OR EXISTS
- (SELECT 1 FROM dbo.TDADMeetingRoomContact C
-  INNER JOIN dbo.TDADUserEmployee UE ON UE.EmployeeID=C.EmployeeID AND UE.CompanyID=@company AND UE.UserID=@user
-  INNER JOIN dbo.TDADEmployee E ON E.EmployeeID=C.EmployeeID AND E.CompanyID=@company AND E.IsActive=1
-  WHERE C.RoomID=B.RoomID AND C.IsActive=1))
+ OR {MeetingRoomAdminAccess.BookingRoomSql}))
 """;
-
-    internal static bool CanManage(string status, DateTime end, bool inScope, bool allowed) =>
-        status == "APPROVED" && end > DateTime.Now && inScope && allowed;
+    internal static bool CanManage(string status, DateTime start, bool inScope, bool allowed) =>
+        status == "APPROVED" && start > DateTime.Now && inScope && allowed;
 
     internal static async Task<bool> Allowed(SqlConnection connection, ClaimsPrincipal principal, string action, CancellationToken token, string screenCode = "21005")
     {
