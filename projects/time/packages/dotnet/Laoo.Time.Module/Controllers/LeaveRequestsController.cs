@@ -46,6 +46,39 @@ public sealed class LeaveRequestsController(IConfiguration configuration) : Cont
             approve=normalizedMode=="approval" && await Can(c,menu,"APPROVE",token), cancel=normalizedMode=="self" && await Can(c,menu,"CANCEL",token) });
     }
 
+    [HttpGet("lookups")]
+    public async Task<IActionResult> Lookups([FromQuery] string mode,
+        CancellationToken token)
+    {
+        if (!Scope(out var companyId, out var userId)) return Forbid();
+        var self = mode.Equals("self", StringComparison.OrdinalIgnoreCase);
+        if (!self && !mode.Equals("proxy", StringComparison.OrdinalIgnoreCase))
+            return BadRequest(new { message = "รูปแบบหน้าจอไม่ถูกต้อง" });
+        var menu = self ? SelfMenu : ProxyMenu;
+        await using var c = await Open(token);
+        if (!await Can(c, menu, "CREATE", token) ||
+            self && !await Can(c, menu, "SUBMIT", token) ||
+            !self && !await Can(c, menu, "ACT_ON_BEHALF", token)) return Forbid();
+        var leaveTypes = await LookupRows(c, """
+SELECT LeaveTypeID,LeaveTypeCode,LeaveTypeName,UnitCode,RequireRemark,RequireEvidence
+FROM dbo.TDTMLeaveType WHERE CompanyID=@C AND IsActive=1
+ORDER BY LeaveTypeCode
+""", companyId, token);
+        var onBehalfReasons = self ? new List<object>() : await LookupRows(c, """
+SELECT OnBehalfReasonID,ReasonCode,ReasonName,RequireRemark,RequireEvidence
+FROM dbo.TDTMOnBehalfReason WHERE CompanyID=@C AND IsActive=1
+ORDER BY ReasonCode
+""", companyId, token);
+        var employees = self ? new List<object>() : await LookupRows(c, """
+SELECT E.EmployeeID,E.EmployeeCode,E.FullName
+FROM dbo.TDADEmployee E WHERE E.CompanyID=@C AND E.IsActive=1
+AND(EXISTS(SELECT 1 FROM dbo.TDADUser U WHERE U.CompanyID=@C AND U.UserID=@U AND U.IsActive=1 AND U.IsCompanyAdmin=1)
+ OR EXISTS(SELECT 1 FROM dbo.TDTMEmployeeDataScopeGrant G WHERE G.CompanyID=@C AND G.IsActive=1 AND(G.UserID=@U OR G.RoleGroupID IN(SELECT ERG.RoleGroupID FROM dbo.TDADUserEmployee UE JOIN dbo.TDADEmployeeRoleGroup ERG ON ERG.EmployeeID=UE.EmployeeID AND ERG.IsActive=1 AND ERG.EffectiveFrom<=CONVERT(date,SYSDATETIME()) AND(ERG.EffectiveTo IS NULL OR ERG.EffectiveTo>=CONVERT(date,SYSDATETIME())) WHERE UE.CompanyID=@C AND UE.UserID=@U AND UE.IsActive=1)) AND G.EffectiveFrom<=SYSDATETIME() AND(G.EffectiveTo IS NULL OR G.EffectiveTo>SYSDATETIME()) AND(G.ScopeTypeCode='ALL' OR G.ScopeTypeCode='SELF' AND E.EmployeeID=@ActorEmployee OR G.ScopeTypeCode='DIVISION' AND G.ScopeReferenceID=E.DivisionOrgUnitID OR G.ScopeTypeCode='DEPARTMENT' AND G.ScopeReferenceID=E.DepartmentOrgUnitID)))
+ORDER BY E.EmployeeCode
+""", companyId, token, userId, await EmployeeForUser(c, companyId, userId, token));
+        return Ok(new { leaveTypes, onBehalfReasons, employees });
+    }
+
     [HttpGet]
     public async Task<IActionResult> List([FromQuery] string mode,
         [FromQuery] string? status, [FromQuery] DateOnly? fromWorkDate,
@@ -252,6 +285,15 @@ SELECT CAST(CASE WHEN EXISTS
     private static async Task Notify(SqlConnection c,SqlTransaction tx,long company,long request,long employee,string status,CancellationToken t){var json=JsonSerializer.Serialize(new{requestId=request,processCode="LEAVE_REQUEST",statusCode=status});await using var q=new SqlCommand("INSERT dbo.TDTMNotificationDelivery(CompanyID,RequestID,RecipientEmployeeID,ChannelCode,StatusCode,PayloadJson)VALUES(@C,@R,@E,'IN_APP','PENDING',@J)",c,tx);Add(q,"@C",SqlDbType.BigInt,company);Add(q,"@R",SqlDbType.BigInt,request);Add(q,"@E",SqlDbType.BigInt,employee);Add(q,"@J",SqlDbType.NVarChar,json,-1);await q.ExecuteNonQueryAsync(t);}
     private static DateOnly ThailandToday()=>DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow,TimeZoneInfo.FindSystemTimeZoneById("Asia/Bangkok")));
     private static bool RowVersion(string? value)=>value is {Length:16}&&value.All(Uri.IsHexDigit);
+    private static async Task<List<object>> LookupRows(SqlConnection c,
+        string sql,long company,CancellationToken token,long? user=null,long? actorEmployee=null)
+    {
+        await using var q=new SqlCommand(sql,c);Add(q,"@C",SqlDbType.BigInt,company);
+        if(sql.Contains("@U",StringComparison.Ordinal))Add(q,"@U",SqlDbType.BigInt,user);
+        if(sql.Contains("@ActorEmployee",StringComparison.Ordinal))Add(q,"@ActorEmployee",SqlDbType.BigInt,actorEmployee);
+        await using var r=await q.ExecuteReaderAsync(token);var rows=new List<object>();
+        while(await r.ReadAsync(token)){var row=new Dictionary<string,object?>();for(var i=0;i<r.FieldCount;i++)row[r.GetName(i)]=r.IsDBNull(i)?null:r.GetValue(i);rows.Add(row);}return rows;
+    }
     private static void BindList(SqlCommand q,long company,long user,long? employee,string? status,DateOnly from,DateOnly to,bool self,bool approval){Add(q,"@C",SqlDbType.BigInt,company);Add(q,"@U",SqlDbType.BigInt,user);Add(q,"@Employee",SqlDbType.BigInt,employee);Add(q,"@ActorEmployee",SqlDbType.BigInt,employee);Add(q,"@Status",SqlDbType.VarChar,string.IsNullOrWhiteSpace(status)?null:status.Trim().ToUpperInvariant(),20);Add(q,"@F",SqlDbType.Date,from.ToDateTime(TimeOnly.MinValue));Add(q,"@T",SqlDbType.Date,to.ToDateTime(TimeOnly.MinValue));Add(q,"@Self",SqlDbType.Bit,self);Add(q,"@Approval",SqlDbType.Bit,approval);}
     private static void Add(SqlCommand q,string n,SqlDbType t,object? v,int s=0){var p=s==0?q.Parameters.Add(n,t):q.Parameters.Add(n,t,s);p.Value=v??DBNull.Value;}
 }

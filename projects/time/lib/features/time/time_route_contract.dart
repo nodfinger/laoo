@@ -28,12 +28,15 @@ abstract final class TimeMenuCodes {
   static const adjustmentReasons = '28004';
   static const leaveTypes = '28009';
   static const leaveEntitlementPolicies = '28010';
+  static const leaveRequests = '26003';
+  static const leaveApprovalInbox = '26004';
   static const holidayCalendars = '28005';
   static const holidayDates = '28006';
   static const branchHolidayCalendars = '28007';
   static const branchHolidayExceptions = '28008';
   static const myTimeCorrections = '30001';
   static const myAttendanceHistory = '30002';
+  static const myLeaveRequests = '30003';
   static const attendancePeriodSchemes = '29001';
   static const attendancePeriodAssignments = '29002';
   static const attendancePeriods = '29003';
@@ -55,12 +58,15 @@ abstract final class TimeRouteNames {
   static const adjustmentReasons = 'timeAdjustmentReasons';
   static const leaveTypes = 'timeLeaveTypes';
   static const leaveEntitlementPolicies = 'timeLeaveEntitlementPolicies';
+  static const leaveRequests = 'timeLeaveRequests';
+  static const leaveApprovalInbox = 'timeLeaveApprovalInbox';
   static const holidayCalendars = 'timeHolidayCalendars';
   static const holidayDates = 'timeHolidayDates';
   static const branchHolidayCalendars = 'timeBranchHolidayCalendars';
   static const branchHolidayExceptions = 'timeBranchHolidayExceptions';
   static const myTimeCorrections = 'myTimeCorrections';
   static const myAttendanceHistory = 'myAttendanceHistory';
+  static const myLeaveRequests = 'myLeaveRequests';
   static const attendancePeriodSchemes = 'timeAttendancePeriodSchemes';
   static const attendancePeriodAssignments = 'timeAttendancePeriodAssignments';
   static const attendancePeriods = 'timeAttendancePeriods';
@@ -83,6 +89,8 @@ abstract final class TimeRoutePaths {
   static const leaveTypes = '/company/time-leave-types';
   static const leaveEntitlementPolicies =
       '/company/time-leave-entitlement-policies';
+  static const leaveRequests = '/company/time-leave-requests';
+  static const leaveApprovalInbox = '/company/time-leave-approval-inbox';
   static const holidayCalendars = '/company/time-holiday-calendars';
   static const holidayDates = '/company/time-holiday-dates';
   static const branchHolidayCalendars =
@@ -91,6 +99,7 @@ abstract final class TimeRoutePaths {
       '/company/time-branch-holiday-exceptions';
   static const myTimeCorrections = '/company/my-time-corrections';
   static const myAttendanceHistory = '/company/my-attendance-history';
+  static const myLeaveRequests = '/company/my-leave-requests';
   static const attendancePeriodSchemes =
       '/company/time-attendance-period-schemes';
   static const attendancePeriodAssignments =
@@ -220,6 +229,30 @@ abstract final class TimeRoutes {
     routePath: TimeRoutePaths.leaveEntitlementPolicies,
     isImplemented: true,
   );
+  static const leaveRequests = FeatureRouteContract(
+    projectCode: TimeProject.code,
+    menuCode: TimeMenuCodes.leaveRequests,
+    screenType: 4,
+    routeName: TimeRouteNames.leaveRequests,
+    routePath: TimeRoutePaths.leaveRequests,
+    isImplemented: true,
+  );
+  static const leaveApprovalInbox = FeatureRouteContract(
+    projectCode: TimeProject.code,
+    menuCode: TimeMenuCodes.leaveApprovalInbox,
+    screenType: 3,
+    routeName: TimeRouteNames.leaveApprovalInbox,
+    routePath: TimeRoutePaths.leaveApprovalInbox,
+    isImplemented: true,
+  );
+  static const myLeaveRequests = FeatureRouteContract(
+    projectCode: TimeProject.code,
+    menuCode: TimeMenuCodes.myLeaveRequests,
+    screenType: 4,
+    routeName: TimeRouteNames.myLeaveRequests,
+    routePath: TimeRoutePaths.myLeaveRequests,
+    isImplemented: true,
+  );
   static const myTimeCorrections = FeatureRouteContract(
     projectCode: TimeProject.code,
     menuCode: TimeMenuCodes.myTimeCorrections,
@@ -316,12 +349,15 @@ abstract final class TimeRoutes {
     adjustmentReasons,
     leaveTypes,
     leaveEntitlementPolicies,
+    leaveRequests,
+    leaveApprovalInbox,
     holidayCalendars,
     holidayDates,
     branchHolidayCalendars,
     branchHolidayExceptions,
     myTimeCorrections,
     myAttendanceHistory,
+    myLeaveRequests,
     attendancePeriodSchemes,
     attendancePeriodAssignments,
     attendancePeriods,
