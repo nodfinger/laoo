@@ -507,6 +507,20 @@ final List<GoRoute> _placeholderRoutes = [
     builder: (context, state) => const OrganizationStructurePage(),
   ),
   _scopePlaceholder(
+    RoutePaths.trainingTypes,
+    RouteNames.trainingTypes,
+    'Training types',
+    WorkspaceMenuScope.company,
+    'trainingTypes',
+  ),
+  _scopePlaceholder(
+    RoutePaths.trainingInstructors,
+    RouteNames.trainingInstructors,
+    'Training instructors',
+    WorkspaceMenuScope.company,
+    'trainingInstructors',
+  ),
+  _scopePlaceholder(
     RoutePaths.timeLeaveTypes,
     RouteNames.timeLeaveTypes,
     'Leave types',

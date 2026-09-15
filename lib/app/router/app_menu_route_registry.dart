@@ -602,6 +602,20 @@ abstract final class AppMenuRouteRegistry {
       path: RoutePaths.timeAttendanceResults,
       scope: AppMenuScope.company,
     ),
+    '37001': AppMenuRouteSpec(
+      menuCode: '37001',
+      databaseRouteName: 'trainingTypes',
+      goRouteName: RouteNames.trainingTypes,
+      path: RoutePaths.trainingTypes,
+      scope: AppMenuScope.company,
+    ),
+    '37002': AppMenuRouteSpec(
+      menuCode: '37002',
+      databaseRouteName: 'trainingInstructors',
+      goRouteName: RouteNames.trainingInstructors,
+      path: RoutePaths.trainingInstructors,
+      scope: AppMenuScope.company,
+    ),
     '29001': AppMenuRouteSpec(
       menuCode: '29001',
       databaseRouteName: 'timeAttendancePeriodSchemes',
