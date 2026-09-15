@@ -366,6 +366,13 @@ packages:
       relative: true
     source: path
     version: "1.0.0+1"
+  laoo_training:
+    dependency: "direct main"
+    description:
+      path: "projects/training"
+      relative: true
+    source: path
+    version: "1.0.0+1"
   laoo_visitor:
     dependency: "direct main"
     description:

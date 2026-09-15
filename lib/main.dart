@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:laoo_meeting/meeting_feature.dart';
 import 'package:laoo_service/service_feature.dart';
 import 'package:laoo_time/time_feature.dart';
+import 'package:laoo_training/training_feature.dart';
 import 'package:laoo_visitor/visitor_feature.dart';
+import 'package:laoo_shared_workspace_ui/laoo_shared_workspace_ui.dart';
 
 import 'app/laoo_app.dart';
 import 'app/theme/laoo_design_tokens.dart';
@@ -84,6 +86,66 @@ void main() {
         borderColor: theme.border,
         backgroundColor: LaooColors.background,
         businessDate: DateTime.now(),
+      );
+    },
+  );
+  configureTrainingFeatureHost(
+    _buildMeetingWorkspaceShell,
+    apiClientFactory: ApiClient.new,
+    apiClientDisposer: (client) => (client as ApiClient).dispose(),
+    errorText: (error) =>
+        error is ApiException ? error.message : error.toString(),
+    messageBuilder: ({required message, required error, required onClose}) =>
+        AutoDismissMessage(message: message, error: error, onClose: onClose),
+    pageSizeProvider: () => companySetupController.pageSize,
+    uiTokensProvider: () {
+      final theme = workspaceThemeController.value;
+      return TrainingUiTokens(
+        workspace: LaooWorkspaceUiTokens(
+          contentMargin: const EdgeInsets.all(LaooLayout.cardMargin),
+          cardPadding: const EdgeInsets.all(LaooLayout.cardPadding),
+          sectionSpacing: LaooLayout.cardSpacing,
+          captionFilterSpacing: 6,
+          itemSpacing: 6,
+          radius: LaooRadius.xs,
+          compactBreakpoint: 900,
+          paginationHeight: LaooLayout.paginationCardHeight,
+          captionStyle: LaooTypography.screenCaptionStyle,
+          sectionStyle: const TextStyle(
+            fontFamily: LaooTypography.fontFamily,
+            fontFamilyFallback: LaooTypography.fontFallback,
+            fontSize: LaooTypography.sectionTitle,
+            height: LaooTypography.titleLineHeight,
+            fontWeight: LaooTypography.emphasizedWeight,
+            color: LaooColors.textPrimary,
+          ),
+          inputStyle: const TextStyle(
+            fontFamily: LaooTypography.fontFamily,
+            fontFamilyFallback: LaooTypography.fontFallback,
+            fontSize: LaooTypography.inputText,
+            height: LaooTypography.inputLineHeight,
+            color: LaooColors.textPrimary,
+          ),
+          tableStyle: const TextStyle(
+            fontFamily: LaooTypography.fontFamily,
+            fontFamilyFallback: LaooTypography.fontFallback,
+            fontSize: LaooTypography.tableBody,
+            height: LaooTypography.bodyLineHeight,
+            color: LaooColors.textPrimary,
+          ),
+          buttonStyle: const TextStyle(
+            fontFamily: LaooTypography.fontFamily,
+            fontFamilyFallback: LaooTypography.fontFallback,
+            fontSize: LaooTypography.button,
+            fontWeight: LaooTypography.emphasizedWeight,
+          ),
+          buttonHeight: LaooTypography.buttonHeight,
+          primaryColor: theme.primary,
+          borderColor: theme.border,
+          backgroundColor: LaooColors.background,
+        ),
+        primaryColor: theme.primary,
+        borderColor: theme.border,
       );
     },
   );
