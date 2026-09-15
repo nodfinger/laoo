@@ -5,6 +5,7 @@ import 'package:laoo/app/router/app_router.dart';
 import 'package:laoo_meeting/meeting_feature.dart';
 import 'package:laoo_service/service_feature.dart';
 import 'package:laoo_time/time_feature.dart';
+import 'package:laoo_training/training_feature.dart';
 import 'package:laoo_visitor/visitor_feature.dart';
 
 void main() {
@@ -70,6 +71,33 @@ void main() {
     for (final route in implemented) {
       expect(AppMenuRouteRegistry.byMenuCode(route.menuCode), isNotNull);
     }
+  });
+
+  test('Training feature replaces both Center placeholders', () {
+    final routes = buildTrainingFeatureRoutes();
+    final names = routes.map((route) => route.name).toSet();
+    final paths = routes.map((route) => route.path).toSet();
+    final centerPaths = appRouter.configuration.routes
+        .whereType<GoRoute>()
+        .map((route) => route.path)
+        .toSet();
+
+    expect(routes, hasLength(2));
+    expect(
+      names,
+      containsAll(<String>{
+        TrainingRouteNames.types,
+        TrainingRouteNames.instructors,
+      }),
+    );
+    expect(
+      paths,
+      containsAll(<String>{
+        TrainingRoutePaths.types,
+        TrainingRoutePaths.instructors,
+      }),
+    );
+    expect(centerPaths, containsAll(paths));
   });
 
   test('Time leave request routes replace Root placeholders exactly once', () {
