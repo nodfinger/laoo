@@ -98,6 +98,9 @@ void main() {
       }),
     );
     expect(centerPaths, containsAll(paths));
+    for (final route in TrainingRoutes.all) {
+      expect(AppMenuRouteRegistry.byMenuCode(route.menuCode), isNotNull);
+    }
   });
 
   test('Time leave request routes replace Root placeholders exactly once', () {

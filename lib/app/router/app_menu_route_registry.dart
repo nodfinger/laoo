@@ -2,6 +2,7 @@ import 'package:laoo_meeting/meeting_feature.dart'
     show MeetingMenuCodes, MeetingRoutes;
 import 'package:laoo_service/service_feature.dart' show ServiceRoutes;
 import 'package:laoo_time/time_feature.dart' show TimeRoutes;
+import 'package:laoo_training/training_feature.dart' show TrainingRoutes;
 import 'package:laoo_visitor/visitor_feature.dart' show VisitorRoutes;
 
 import 'route_names.dart';
@@ -739,6 +740,14 @@ abstract final class AppMenuRouteRegistry {
         scope: AppMenuScope.company,
       ),
     for (final route in TimeRoutes.implemented)
+      route.menuCode: AppMenuRouteSpec(
+        menuCode: route.menuCode,
+        databaseRouteName: route.routeName,
+        goRouteName: route.effectiveGoRouteName,
+        path: route.routePath,
+        scope: AppMenuScope.company,
+      ),
+    for (final route in TrainingRoutes.all)
       route.menuCode: AppMenuRouteSpec(
         menuCode: route.menuCode,
         databaseRouteName: route.routeName,
