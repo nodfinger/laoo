@@ -521,20 +521,6 @@ final List<GoRoute> _placeholderRoutes = [
     'trainingInstructors',
   ),
   _scopePlaceholder(
-    RoutePaths.timeLeaveTypes,
-    RouteNames.timeLeaveTypes,
-    'Leave types',
-    WorkspaceMenuScope.company,
-    'timeLeaveTypes',
-  ),
-  _scopePlaceholder(
-    RoutePaths.timeLeaveEntitlementPolicies,
-    RouteNames.timeLeaveEntitlementPolicies,
-    'Leave entitlement policies',
-    WorkspaceMenuScope.company,
-    'timeLeaveEntitlementPolicies',
-  ),
-  _scopePlaceholder(
     RoutePaths.timeLeaveRequests,
     RouteNames.timeLeaveRequests,
     'Leave requests',
