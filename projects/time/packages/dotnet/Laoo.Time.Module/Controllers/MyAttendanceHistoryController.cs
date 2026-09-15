@@ -22,8 +22,6 @@ public sealed class MyAttendanceHistoryController(IConfiguration configuration) 
         await using var connection = await Open(token);
         if (!await CanView(connection, token)) return Forbid();
         var employeeId = await ResolveEmployee(connection, companyId, userId, token);
-        if (!employeeId.HasValue)
-            return Conflict(new { message = "ไม่สามารถแสดงประวัติการลงเวลาของฉันได้", description = "บัญชีผู้ใช้ยังไม่ได้ผูกกับพนักงานที่ใช้งานอยู่ กรุณาติดต่อผู้ดูแลระบบ" });
 
         return Ok(new
         {
@@ -31,6 +29,7 @@ public sealed class MyAttendanceHistoryController(IConfiguration configuration) 
             caption = await Caption(connection, token),
             screenType = 3,
             view = true,
+            employeeLinked = employeeId.HasValue,
         });
     }
 

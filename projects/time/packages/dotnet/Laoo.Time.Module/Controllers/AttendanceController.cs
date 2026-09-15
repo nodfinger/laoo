@@ -216,6 +216,7 @@ JOIN dbo.TDADEmployee E ON E.EmployeeID=R.EmployeeID AND E.CompanyID=R.CompanyID
         [FromQuery] DateOnly? fromWorkDate,
         [FromQuery] DateOnly? toWorkDate,
         [FromQuery] string? employee,
+        [FromQuery] long? branchId,
         [FromQuery] long? divisionOrgUnitId,
         [FromQuery] long? departmentOrgUnitId,
         CancellationToken token = default)
@@ -244,11 +245,20 @@ JOIN dbo.TDTMEmployeeAttendancePeriodAssignment A ON A.CompanyID=R.CompanyID AND
   AND A.EffectiveFrom<=R.WorkDate AND(A.EffectiveTo IS NULL OR A.EffectiveTo>=R.WorkDate)
 JOIN dbo.TDTMAttendancePeriod P ON P.CompanyID=R.CompanyID AND P.AttendancePeriodSchemeID=A.AttendancePeriodSchemeID
   AND R.WorkDate BETWEEN P.PeriodStartDate AND P.PeriodEndDate AND P.PeriodStatusCode='FINALIZED'
+OUTER APPLY
+(
+  SELECT TOP(1) O.HomeBranchID,O.DivisionOrgUnitID,O.DepartmentOrgUnitID
+  FROM dbo.TDADEmployeeOrganizationAssignment O
+  WHERE O.CompanyID=R.CompanyID AND O.EmployeeID=R.EmployeeID AND O.IsActive=1
+    AND O.EffectiveFrom<=R.WorkDate AND(O.EffectiveTo IS NULL OR O.EffectiveTo>=R.WorkDate)
+  ORDER BY O.EffectiveFrom DESC,O.EmployeeOrganizationAssignmentID DESC
+) O
 WHERE R.CompanyID=@CompanyID AND R.IsCurrent=1
   AND R.WorkDate BETWEEN @FromWorkDate AND @ToWorkDate
   AND (@Employee IS NULL OR E.EmployeeCode LIKE N'%'+@Employee+'%' OR E.FullName LIKE N'%'+@Employee+'%')
-  AND (@DivisionOrgUnitID IS NULL OR E.DivisionOrgUnitID=@DivisionOrgUnitID)
-  AND (@DepartmentOrgUnitID IS NULL OR E.DepartmentOrgUnitID=@DepartmentOrgUnitID)
+  AND (@BranchID IS NULL OR COALESCE(O.HomeBranchID,E.BranchID)=@BranchID)
+  AND (@DivisionOrgUnitID IS NULL OR COALESCE(O.DivisionOrgUnitID,E.DivisionOrgUnitID)=@DivisionOrgUnitID)
+  AND (@DepartmentOrgUnitID IS NULL OR COALESCE(O.DepartmentOrgUnitID,E.DepartmentOrgUnitID)=@DepartmentOrgUnitID)
   AND
   (
     EXISTS(SELECT 1 FROM dbo.TDADUser U WHERE U.CompanyID=@CompanyID AND U.UserID=@UserID AND U.IsActive=1 AND U.IsCompanyAdmin=1)
@@ -264,8 +274,8 @@ WHERE R.CompanyID=@CompanyID AND R.IsCurrent=1
            WHERE UE.CompanyID=@CompanyID AND UE.UserID=@UserID AND UE.IsActive=1))
         AND(G.ScopeTypeCode='ALL'
           OR(G.ScopeTypeCode='SELF' AND EXISTS(SELECT 1 FROM dbo.TDADUserEmployee UE WHERE UE.CompanyID=@CompanyID AND UE.UserID=@UserID AND UE.EmployeeID=E.EmployeeID AND UE.IsActive=1))
-          OR(G.ScopeTypeCode='DIVISION' AND G.ScopeReferenceID=E.DivisionOrgUnitID)
-          OR(G.ScopeTypeCode='DEPARTMENT' AND G.ScopeReferenceID=E.DepartmentOrgUnitID))
+          OR(G.ScopeTypeCode='DIVISION' AND G.ScopeReferenceID=COALESCE(O.DivisionOrgUnitID,E.DivisionOrgUnitID))
+          OR(G.ScopeTypeCode='DEPARTMENT' AND G.ScopeReferenceID=COALESCE(O.DepartmentOrgUnitID,E.DepartmentOrgUnitID)))
     )
   )
 GROUP BY E.EmployeeID,E.EmployeeCode,E.FullName
@@ -277,6 +287,7 @@ ORDER BY E.EmployeeCode,E.EmployeeID;
         Add(command, "@FromWorkDate", SqlDbType.Date, from.ToDateTime(TimeOnly.MinValue));
         Add(command, "@ToWorkDate", SqlDbType.Date, to.ToDateTime(TimeOnly.MinValue));
         Add(command, "@Employee", SqlDbType.NVarChar, Clean(employee), 150);
+        Add(command, "@BranchID", SqlDbType.BigInt, branchId);
         Add(command, "@DivisionOrgUnitID", SqlDbType.BigInt, divisionOrgUnitId);
         Add(command, "@DepartmentOrgUnitID", SqlDbType.BigInt, departmentOrgUnitId);
         Add(command, "@BusinessNow", SqlDbType.DateTime2, ThailandNow());
@@ -299,6 +310,26 @@ ORDER BY E.EmployeeCode,E.EmployeeID;
                 earlyMinutes = reader.GetInt32(9),
             });
         }
+        return Ok(new { items });
+    }
+
+    [HttpGet("summary/branches")]
+    public async Task<IActionResult> SummaryBranches(CancellationToken token)
+    {
+        if (!Scope(out var companyId, out _)) return Forbid();
+        await using var connection = await Open(token);
+        if (!await Can(connection, SummaryReportMenuCode, "VIEW", token)) return Forbid();
+        await using var command = new SqlCommand("""
+SELECT BranchID,BranchCode,BranchNameTH
+FROM dbo.TDADBranch
+WHERE CompanyID=@CompanyID AND IsActive=1
+ORDER BY BranchCode,BranchID;
+""", connection);
+        Add(command, "@CompanyID", SqlDbType.BigInt, companyId);
+        await using var reader = await command.ExecuteReaderAsync(token);
+        var items = new List<object>();
+        while (await reader.ReadAsync(token))
+            items.Add(new { branchId = reader.GetInt64(0), branchCode = reader.GetString(1), branchName = reader.GetString(2) });
         return Ok(new { items });
     }
 
