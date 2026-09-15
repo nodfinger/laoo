@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('service', 'meeting', 'visitor', 'time')]
+    [ValidateSet('service', 'meeting', 'visitor', 'time', 'training')]
     [string]$Module,
 
     [ValidateSet('center-service', 'meeting', 'visitor', 'time')]
@@ -36,7 +36,14 @@ if ($Role -eq 'center-service') {
     return
 }
 
-if ($Role -ne $Module) {
+$ownedRoleByModule = @{
+    meeting = 'meeting'
+    visitor = 'visitor'
+    time = 'time'
+    training = 'meeting'
+}
+
+if ($Role -ne $ownedRoleByModule[$Module]) {
     throw "Machine role '$Role' cannot verify module '$Module'. Use the owned module or move integration work to the Center machine."
 }
 
@@ -56,15 +63,15 @@ try {
     git ls-files --others --exclude-standard |
         ForEach-Object { if ($_){ [void]$changed.Add($_.Replace('\', '/')) } }
 
-    $ownedPrefix = "projects/$Role/"
+    $ownedPrefix = "projects/$Module/"
     $outsideOwnership = @($changed | Where-Object { -not $_.StartsWith($ownedPrefix, [System.StringComparison]::OrdinalIgnoreCase) } | Sort-Object)
     if ($outsideOwnership.Count -gt 0) {
         $details = $outsideOwnership -join "`n - "
-        throw "Machine role '$Role' has changes outside '$ownedPrefix'. Split Core Impact into a Center-owned PR:`n - $details"
+        throw "Machine role '$Role' has changes outside '$ownedPrefix' while verifying module '$Module'. Split Core Impact into a Center-owned PR:`n - $details"
     }
 }
 finally {
     Pop-Location
 }
 
-Write-Host "MACHINE BOUNDARY PASSED: $Role changes are contained in projects/$Role/."
+Write-Host "MACHINE BOUNDARY PASSED: $Role changes for module '$Module' are contained in $ownedPrefix."
