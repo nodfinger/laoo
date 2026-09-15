@@ -1,0 +1,6 @@
+{
+  role: training,
+  allowedProjects: [LAOO, LAOO_TRAINING],
+  webPort: 8080,
+  apiPort: 5080
+}

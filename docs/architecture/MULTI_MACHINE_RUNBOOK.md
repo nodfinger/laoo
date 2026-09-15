@@ -8,6 +8,7 @@
 | `meeting` | `projects/meeting` and `projects/training` |
 | `visitor` | `projects/visitor` |
 | `time` | `projects/time` |
+| `training` | `projects/training` |
 
 Every machine clones `nodfinger/laoo` to `C:\laooplatform\laoo`. Never
 share a live working tree, `.git`, `.dart_tool`, `build`, `bin`, or `obj`.
@@ -50,14 +51,17 @@ Before assigning a new machine, the Center machine must merge a Bootstrap PR
 that defines:
 
 - ProjectCode, approved MenuCode and ScreenType, and the data ownership table;
-- an inactive menu/feature entitlement until the route and API are ready;
-- Flutter route contract and Center API module composition;
+- entitlement, Menu/ScreenType/Permission baseline, and Navigation API registration;
+- `projects/<project>/pubspec.yaml`, `<project>_feature.dart`, Feature Host, route contract, and `build<Project>FeatureRoutes()`;
+- Root `pubspec.yaml`, `lib/main.dart`, and `app_router.dart` composition;
 - a Project-owned migration directory and unique ProjectCode filename prefix;
 - Core read contracts and Project-owned write contracts.
 
 After Bootstrap reaches `main`, every machine pulls with `--ff-only`. The new
 machine then works only under `projects/<project>` and runs through the Center
-host. Do not build the complete Business Project in Root and move it later.
+host. Route placeholders belong only inside the Project package; Root must not
+keep a per-menu `_scopePlaceholder` after Bootstrap. Do not build the complete
+Business Project in Root and move it later.
 
 ## Core Impact protocol
 

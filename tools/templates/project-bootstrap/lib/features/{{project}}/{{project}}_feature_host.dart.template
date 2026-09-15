@@ -1,0 +1,28 @@
+import 'package:flutter/widgets.dart';
+
+typedef {{ProjectPascal}}WorkspaceShellBuilder =
+    Widget Function({
+      required String pageTitle,
+      required String activeMenu,
+      required Widget child,
+    });
+
+{{ProjectPascal}}WorkspaceShellBuilder? _workspaceShellBuilder;
+
+void configure{{ProjectPascal}}FeatureHost(
+  {{ProjectPascal}}WorkspaceShellBuilder builder,
+) {
+  _workspaceShellBuilder = builder;
+}
+
+Widget build{{ProjectPascal}}WorkspaceShell({
+  required String pageTitle,
+  required String activeMenu,
+  required Widget child,
+}) {
+  final builder = _workspaceShellBuilder;
+  if (builder == null) {
+    throw StateError('{{ProjectPascal}} feature host is not configured.');
+  }
+  return builder(pageTitle: pageTitle, activeMenu: activeMenu, child: child);
+}

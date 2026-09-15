@@ -3,7 +3,7 @@ param(
     [ValidateSet('service', 'meeting', 'visitor', 'time', 'training')]
     [string]$Module,
 
-    [ValidateSet('center-service', 'meeting', 'visitor', 'time')]
+    [ValidateSet('center-service', 'meeting', 'visitor', 'time', 'training')]
     [string]$Role,
 
     [string]$BaseRef = 'origin/main'
@@ -26,7 +26,7 @@ if ([string]::IsNullOrWhiteSpace($Role)) {
     $Role = [string]$machineConfig.role
 }
 
-$validRoles = @('center-service', 'meeting', 'visitor', 'time')
+$validRoles = @('center-service', 'meeting', 'visitor', 'time', 'training')
 if ($Role -notin $validRoles) {
     throw "Invalid machine role '$Role'. Expected: $($validRoles -join ', ')."
 }
@@ -40,7 +40,7 @@ $ownedRoleByModule = @{
     meeting = 'meeting'
     visitor = 'visitor'
     time = 'time'
-    training = 'meeting'
+    training = 'training'
 }
 
 if ($Role -ne $ownedRoleByModule[$Module]) {

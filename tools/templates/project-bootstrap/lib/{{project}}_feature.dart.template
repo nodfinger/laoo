@@ -1,0 +1,3 @@
+export 'features/{{project}}/{{project}}_feature_host.dart';
+export 'features/{{project}}/{{project}}_go_routes.dart';
+export 'features/{{project}}/{{project}}_route_contract.dart';

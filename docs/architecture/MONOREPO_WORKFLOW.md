@@ -29,14 +29,18 @@ schema are owned by the Center machine.
 New Business Projects use two stages:
 
 1. Center creates and merges the Project Bootstrap: ProjectCode, approved
-   MenuCode/ScreenType, ownership, inactive navigation, route/API composition,
-   entitlement, and migration namespace.
-2. The Project machine pulls `main` and develops Business code only under its
-   `projects/<project>` directory.
+   MenuCode/ScreenType and Permission baseline, ownership, navigation/API
+   composition, entitlement, migration namespace, and the Project Flutter
+   package contract.
+2. The Project machine pulls `main` and develops Business code, screens, and
+   routes only under its `projects/<project>` directory.
 
 If Project work needs a Core or shared change, describe the Core Impact before
 dependent coding. Use a separate backward-compatible Core PR, merge it first,
 sync every machine, and only then merge the dependent Project PR.
+
+See [Project Bootstrap Standard](PROJECT_BOOTSTRAP_STANDARD.md) for the
+required package files, route ownership, templates, and validation command.
 
 Use one task branch and Pull Request per change. Before Merge, merge current
 `origin/main` into the task branch and run:

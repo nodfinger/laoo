@@ -1,0 +1,16 @@
+import 'package:go_router/go_router.dart';
+
+import '{{project}}_route_contract.dart';
+
+List<GoRoute> build{{ProjectPascal}}FeatureRoutes() =>
+    {{ProjectPascal}}Routes.implemented
+        .map(
+          (route) => GoRoute(
+            name: route.routeName,
+            path: route.routePath,
+            builder: (context, state) => throw UnimplementedError(
+              'Implement ${route.routeName} inside the {{project}} package.',
+            ),
+          ),
+        )
+        .toList(growable: false);

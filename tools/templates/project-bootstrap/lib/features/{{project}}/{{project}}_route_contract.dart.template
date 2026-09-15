@@ -1,0 +1,14 @@
+import 'package:laoo_shared_core/laoo_shared_core.dart';
+
+abstract final class {{ProjectPascal}}Project {
+  static const code = 'LAOO_{{PROJECT_CODE}}';
+}
+
+abstract final class {{ProjectPascal}}Routes {
+  static const all = <FeatureRouteContract>[
+    // Core Bootstrap adds approved MenuCode, ScreenType, routeName and routePath.
+  ];
+
+  static Iterable<FeatureRouteContract> get implemented =>
+      all.where((route) => route.isImplemented);
+}
