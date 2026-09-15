@@ -51,6 +51,7 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
 
   final _api = CompanySetupApi();
   final _meetingSettingsApi = MeetingEquipmentRequestSettingsApi();
+  final _trainingSettingsApi = TrainingSettingsApi();
   bool _loading = true;
   bool _messageIsError = false;
   String _yearFormat = CompanySetupConstants.yearFormatAd;
@@ -68,6 +69,7 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
   final _markCus = TextEditingController();
   bool _receiveStockImmediately = true;
   bool _meetingSettingsVisible = false;
+  bool _trainingSettingsVisible = false;
   bool _meetingRequireEquipmentRequestReview = false;
   bool _savingMeetingSettings = false;
   String _receiveStockPriceModeCode = 'CUSTOM';
@@ -91,6 +93,7 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
     super.initState();
     _loadActions();
     _load();
+    if (widget.additionalOnly) _loadTrainingSettings();
   }
 
   Future<void> _loadActions() async {
@@ -210,6 +213,7 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
       controller.dispose();
     }
     _api.dispose();
+    _trainingSettingsApi.dispose();
     super.dispose();
   }
 
@@ -584,6 +588,19 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
     }
   }
 
+  Future<void> _loadTrainingSettings() async {
+    if (!widget.additionalOnly) return;
+    try {
+      final enabled = await _trainingSettingsApi.load();
+      if (mounted && enabled) {
+        setState(() => _trainingSettingsVisible = true);
+      }
+    } catch (_) {
+      // The Training API deliberately returns no settings to Companies without
+      // the Training entitlement or Company Admin scope.
+    }
+  }
+
   Widget _meetingSettingsCard(Color accent) => Card(
     margin: EdgeInsets.zero,
     color: Colors.white,
@@ -608,6 +625,34 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
             subtitle: const Text('ปิดไว้: ส่งคำขอไปยังแผนกรับผิดชอบทันที'),
             value: _meetingRequireEquipmentRequestReview,
             onChanged: _savingMeetingSettings ? null : _saveMeetingSettings,
+          ),
+        ],
+      ),
+    ),
+  );
+
+  Widget _trainingSettingsCard(Color accent) => Card(
+    margin: EdgeInsets.zero,
+    color: Colors.white,
+    elevation: 0,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Training',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: accent,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text('ระบบอบรมเปิดใช้งานสำหรับบริษัทนี้แล้ว'),
+          const SizedBox(height: 4),
+          const Text(
+            'การกำหนดหลักสูตร วิทยากร แบบประเมิน และแบบทดสอบจะเพิ่มในระยะถัดไป',
           ),
         ],
       ),
@@ -705,6 +750,10 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
                         if (_meetingSettingsVisible) ...[
                           const SizedBox(height: 8),
                           _meetingSettingsCard(preset.primary),
+                        ],
+                        if (_trainingSettingsVisible) ...[
+                          const SizedBox(height: 8),
+                          _trainingSettingsCard(preset.primary),
                         ],
                       ],
                       if (!widget.additionalOnly) ...[

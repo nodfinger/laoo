@@ -4,6 +4,7 @@ using LaooApi.Security;
 using LaooApi.Services;
 using Laoo.Service.Api.Endpoints;
 using Laoo.Service.Api.Infrastructure.Database;
+using LaooTrainingModule;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.RateLimiting;
@@ -35,7 +36,8 @@ builder.Services
     .AddApplicationPart(typeof(LaooServiceModule.ServiceModuleMarker).Assembly)
     .AddApplicationPart(typeof(LaooMeetingApi.Controllers.MeetingRoomBookingController).Assembly)
     .AddApplicationPart(typeof(LaooVisitorModule.Controllers.VisitorStatusController).Assembly)
-    .AddApplicationPart(typeof(LaooTimeModule.TimeModuleMarker).Assembly);
+    .AddApplicationPart(typeof(LaooTimeModule.TimeModuleMarker).Assembly)
+    .AddApplicationPart(typeof(TrainingModuleMarker).Assembly);
 builder.Services.AddProblemDetails(options =>
 {
     options.CustomizeProblemDetails = context =>
