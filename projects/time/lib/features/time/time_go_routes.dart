@@ -11,6 +11,7 @@ import '../time_corrections/time_correction_page.dart';
 import '../time_reasons/time_reason_page.dart';
 import '../leave_types/leave_type_page.dart';
 import '../leave_entitlement_policies/leave_entitlement_policy_page.dart';
+import '../leave_requests/leave_request_page.dart';
 import '../attendance_periods/attendance_period_pages.dart';
 import '../attendance_events/attendance_events_page.dart';
 import '../attendance_results/attendance_results_page.dart';
@@ -22,6 +23,30 @@ import '../holiday_calendars/branch_holiday_exception_page.dart';
 import '../my_attendance_history/my_attendance_history_page.dart';
 
 List<GoRoute> buildTimeFeatureRoutes() => <GoRoute>[
+  GoRoute(
+    name: TimeRouteNames.leaveRequests,
+    path: TimeRoutePaths.leaveRequests,
+    builder: (context, state) => const LeaveRequestPage(
+      menuCode: TimeMenuCodes.leaveRequests,
+      mode: 'proxy',
+    ),
+  ),
+  GoRoute(
+    name: TimeRouteNames.leaveApprovalInbox,
+    path: TimeRoutePaths.leaveApprovalInbox,
+    builder: (context, state) => const LeaveRequestPage(
+      menuCode: TimeMenuCodes.leaveApprovalInbox,
+      mode: 'approval',
+    ),
+  ),
+  GoRoute(
+    name: TimeRouteNames.myLeaveRequests,
+    path: TimeRoutePaths.myLeaveRequests,
+    builder: (context, state) => const LeaveRequestPage(
+      menuCode: TimeMenuCodes.myLeaveRequests,
+      mode: 'self',
+    ),
+  ),
   GoRoute(
     name: TimeRouteNames.leaveEntitlementPolicies,
     path: TimeRoutePaths.leaveEntitlementPolicies,

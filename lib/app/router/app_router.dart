@@ -520,27 +520,6 @@ final List<GoRoute> _placeholderRoutes = [
     WorkspaceMenuScope.company,
     'trainingInstructors',
   ),
-  _scopePlaceholder(
-    RoutePaths.timeLeaveRequests,
-    RouteNames.timeLeaveRequests,
-    'Leave requests',
-    WorkspaceMenuScope.company,
-    'timeLeaveRequests',
-  ),
-  _scopePlaceholder(
-    RoutePaths.timeLeaveApprovalInbox,
-    RouteNames.timeLeaveApprovalInbox,
-    'Leave approval inbox',
-    WorkspaceMenuScope.company,
-    'timeLeaveApprovalInbox',
-  ),
-  _scopePlaceholder(
-    RoutePaths.myLeaveRequests,
-    RouteNames.myLeaveRequests,
-    'My leave requests',
-    WorkspaceMenuScope.company,
-    'myLeaveRequests',
-  ),
 ];
 
 GoRoute _scopePlaceholder(
