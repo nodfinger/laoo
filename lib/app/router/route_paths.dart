@@ -89,6 +89,13 @@ abstract final class RoutePaths {
       '/company/time-branch-holiday-calendars';
   static const String timeBranchHolidayExceptions =
       '/company/time-branch-holiday-exceptions';
+  static const String timeLeaveTypes = '/company/time-leave-types';
+  static const String timeLeaveEntitlementPolicies =
+      '/company/time-leave-entitlement-policies';
+  static const String timeLeaveRequests = '/company/time-leave-requests';
+  static const String timeLeaveApprovalInbox =
+      '/company/time-leave-approval-inbox';
+  static const String myLeaveRequests = '/company/my-leave-requests';
   static const String myAttendanceHistory = '/company/my-attendance-history';
   static const String meetingRoomBookings = MeetingRoutePaths.bookings;
   static const String meetingRoomApprovals = MeetingRoutePaths.approvals;

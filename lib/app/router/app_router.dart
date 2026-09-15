@@ -506,6 +506,41 @@ final List<GoRoute> _placeholderRoutes = [
     name: RouteNames.organizationStructure,
     builder: (context, state) => const OrganizationStructurePage(),
   ),
+  _scopePlaceholder(
+    RoutePaths.timeLeaveTypes,
+    RouteNames.timeLeaveTypes,
+    'Leave types',
+    WorkspaceMenuScope.company,
+    'timeLeaveTypes',
+  ),
+  _scopePlaceholder(
+    RoutePaths.timeLeaveEntitlementPolicies,
+    RouteNames.timeLeaveEntitlementPolicies,
+    'Leave entitlement policies',
+    WorkspaceMenuScope.company,
+    'timeLeaveEntitlementPolicies',
+  ),
+  _scopePlaceholder(
+    RoutePaths.timeLeaveRequests,
+    RouteNames.timeLeaveRequests,
+    'Leave requests',
+    WorkspaceMenuScope.company,
+    'timeLeaveRequests',
+  ),
+  _scopePlaceholder(
+    RoutePaths.timeLeaveApprovalInbox,
+    RouteNames.timeLeaveApprovalInbox,
+    'Leave approval inbox',
+    WorkspaceMenuScope.company,
+    'timeLeaveApprovalInbox',
+  ),
+  _scopePlaceholder(
+    RoutePaths.myLeaveRequests,
+    RouteNames.myLeaveRequests,
+    'My leave requests',
+    WorkspaceMenuScope.company,
+    'myLeaveRequests',
+  ),
 ];
 
 GoRoute _scopePlaceholder(
