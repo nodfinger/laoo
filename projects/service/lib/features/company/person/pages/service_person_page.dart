@@ -311,12 +311,6 @@ class _ServicePersonWorkspaceState extends State<ServicePersonWorkspace> {
                         style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
                       const SizedBox(height: 6),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
-                        children: _roleChips(row),
-                      ),
-                      const SizedBox(height: 6),
                       Text(
                         '${row['nickName'] ?? '-'} • ${row['mobile'] ?? '-'} • ${row['email'] ?? '-'}',
                       ),
@@ -361,7 +355,6 @@ class _ServicePersonWorkspaceState extends State<ServicePersonWorkspace> {
             label: Text('ชื่อบุคคล'),
             columnWidth: FixedColumnWidth(180),
           ),
-          DataColumn(label: Text('บทบาท'), columnWidth: FixedColumnWidth(240)),
           DataColumn(label: Text('ชื่อเล่น')),
           DataColumn(label: Text('โทรศัพท์')),
           DataColumn(label: Text('อีเมล')),
@@ -385,13 +378,6 @@ class _ServicePersonWorkspaceState extends State<ServicePersonWorkspace> {
                   ),
                 ),
                 DataCell(Text('${_rows[i]['fullName']}')),
-                DataCell(
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 4,
-                    children: _roleChips(_rows[i]),
-                  ),
-                ),
                 DataCell(Text('${_rows[i]['nickName'] ?? '-'}')),
                 DataCell(Text('${_rows[i]['mobile'] ?? '-'}')),
                 DataCell(Text('${_rows[i]['email'] ?? '-'}')),
@@ -405,31 +391,6 @@ class _ServicePersonWorkspaceState extends State<ServicePersonWorkspace> {
       padding: EdgeInsets.zero,
     );
   }
-
-  List<Widget> _roleChips(Map<String, dynamic> row) => [
-    for (final role in List<String>.from(
-      row['serviceRoles'] as List? ?? const [],
-    ))
-      Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: _primary.withValues(alpha: .1),
-          borderRadius: BorderRadius.circular(LaooRadius.xs),
-        ),
-        child: Text(
-          role == 'RESIDENT'
-              ? 'ผู้พักอาศัย'
-              : role == 'REQUESTER'
-              ? 'ผู้แจ้งซ่อม'
-              : 'ผู้ใช้บริการ',
-          style: TextStyle(
-            color: _primary,
-            fontSize: LaooTypography.bodySmall,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ),
-  ];
 
   Widget _pagination() {
     final pages = _total == 0 ? 1 : (_total / _pageSize).ceil();
@@ -777,7 +738,8 @@ class _ServicePersonDialogState extends State<_ServicePersonDialog> {
                         ),
                       ],
                     ),
-                    if (!_editing) ...[
+                    if (!_editing &&
+                        widget.role == ServicePersonRole.customer) ...[
                       SegmentedButton<bool>(
                         segments: const [
                           ButtonSegment(
