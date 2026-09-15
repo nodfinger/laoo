@@ -17,6 +17,7 @@ public sealed record LeaveRequestSaveRequest(long? EmployeeId, long LeaveTypeId,
     string? OnBehalfRemark);
 public sealed record LeaveDecisionRequest(string DecisionCode, string? Reason,
     string RowVersion);
+public sealed record LeaveCancelRequest(string RowVersion, string? Reason);
 
 [ApiController]
 [Route("api/time/leave-requests")]
@@ -245,6 +246,37 @@ AND (@Self=1
             await tx.CommitAsync(token); return NoContent();
         }
         catch (InvalidOperationException e) { await tx.RollbackAsync(token); return Conflict(new { message=e.Message }); }
+    }
+
+    [HttpPost("{requestId:long}/cancel")]
+    public async Task<IActionResult> Cancel(long requestId, LeaveCancelRequest request,
+        CancellationToken token)
+    {
+        if (!RowVersion(request.RowVersion) || !Scope(out var companyId, out var userId))
+            return BadRequest(new { message = "ข้อมูลการยกเลิกคำขอไม่ถูกต้อง" });
+        await using var c = await Open(token);
+        if (!await Can(c, SelfMenu, "CANCEL", token)) return Forbid();
+        var actorEmployee = await EmployeeForUser(c, companyId, userId, token);
+        if (!actorEmployee.HasValue) return Conflict(new { message = "บัญชีผู้ใช้ยังไม่ผูกกับพนักงานที่ใช้งานอยู่" });
+        await using var tx = (SqlTransaction)await c.BeginTransactionAsync(IsolationLevel.Serializable, token);
+        try
+        {
+            await using var owner = new SqlCommand("SELECT SubjectEmployeeID FROM dbo.TDTMRequest WITH(UPDLOCK,HOLDLOCK) WHERE CompanyID=@C AND RequestID=@R AND ProcessCode='LEAVE_REQUEST' AND StatusCode='PENDING' AND ActorUserID=@U", c, tx);
+            Add(owner,"@C",SqlDbType.BigInt,companyId);Add(owner,"@R",SqlDbType.BigInt,requestId);Add(owner,"@U",SqlDbType.BigInt,userId);
+            var value=await owner.ExecuteScalarAsync(token);
+            if(value is null || Convert.ToInt64(value)!=actorEmployee.Value) throw new InvalidOperationException("ยกเลิกได้เฉพาะคำขอของตนที่ยังรออนุมัติ");
+            var reservation=await ReservationForRequest(c,tx,requestId,token) ?? throw new InvalidOperationException("ไม่พบยอดสิทธิ์ที่กันไว้สำหรับคำขอนี้");
+            var releaseLedgerId=await Ledger(c,tx,companyId,actorEmployee.Value,new Type(reservation.LeaveTypeId,reservation.UnitCode,false,false),requestId,"RELEASE",reservation.Quantity,userId,token);
+            await using(var update=new SqlCommand("UPDATE dbo.TDTMRequest SET StatusCode='CANCELLED',UpdateDate=SYSDATETIME(),UpdateBy=@U WHERE CompanyID=@C AND RequestID=@R AND StatusCode='PENDING' AND RowVersion=CONVERT(binary(8),@V,2)",c,tx))
+            {Add(update,"@U",SqlDbType.BigInt,userId);Add(update,"@C",SqlDbType.BigInt,companyId);Add(update,"@R",SqlDbType.BigInt,requestId);Add(update,"@V",SqlDbType.VarChar,request.RowVersion,32);if(await update.ExecuteNonQueryAsync(token)!=1)throw new InvalidOperationException("คำขอถูกแก้ไขแล้ว กรุณาโหลดใหม่");}
+            await using(var close=new SqlCommand("UPDATE dbo.TDTMLeaveReservation SET StatusCode='RELEASED',ReleasedLedgerID=@L,ResolvedDate=SYSDATETIME() WHERE RequestID=@R AND StatusCode='ACTIVE'",c,tx))
+            {Add(close,"@L",SqlDbType.BigInt,releaseLedgerId);Add(close,"@R",SqlDbType.BigInt,requestId);if(await close.ExecuteNonQueryAsync(token)!=1)throw new InvalidOperationException("คำขอไม่มีรายการกันสิทธิ์ที่ยกเลิกได้");}
+            await using(var audit=new SqlCommand("INSERT dbo.TDTMApprovalDecision(RequestID,StepOrder,DecisionCode,ActorUserID,ActorEmployeeID,Reason,CorrelationID)VALUES(@R,0,'CANCELLED',@U,@E,@Reason,NEWID())",c,tx))
+            {Add(audit,"@R",SqlDbType.BigInt,requestId);Add(audit,"@U",SqlDbType.BigInt,userId);Add(audit,"@E",SqlDbType.BigInt,actorEmployee);Add(audit,"@Reason",SqlDbType.NVarChar,request.Reason,1000);await audit.ExecuteNonQueryAsync(token);}
+            await Notify(c,tx,companyId,requestId,actorEmployee.Value,"CANCELLED",token);
+            await tx.CommitAsync(token);return NoContent();
+        }
+        catch(InvalidOperationException e){await tx.RollbackAsync(token);return Conflict(new { message=e.Message });}
     }
 
     private sealed record Policy(long Id,string Code); private sealed record Profile(long BaseId,long? ProcessId,string Code); private sealed record Type(long Id,string Unit,bool RequireRemark,bool RequireEvidence); private sealed record Allocation(long Id,DateOnly WorkDate,decimal Quantity); private sealed record PendingRequest(long EmployeeId); private sealed record Reserved(long LeaveTypeId,string UnitCode,decimal Quantity);

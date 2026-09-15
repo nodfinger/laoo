@@ -128,6 +128,22 @@ class _LeaveRequestPageState extends State<LeaveRequestPage> {
     }
   }
 
+  Future<void> _cancel(Map<String, dynamic> row) async {
+    final reason = await _reasonDialog('เหตุผลยกเลิกคำขอ');
+    if (reason == null) return;
+    try {
+      await _repo.cancel(
+        row['requestId'] as int,
+        rowVersion: row['rowVersion'] as String,
+        reason: reason,
+      );
+      await _load(page: _page);
+      _show('ยกเลิกคำขอเรียบร้อย', false);
+    } catch (error) {
+      _show(timeErrorText(error), true);
+    }
+  }
+
   Future<String?> _reasonDialog(String title) async {
     final controller = TextEditingController();
     final value = await showDialog<String>(
@@ -159,6 +175,8 @@ class _LeaveRequestPageState extends State<LeaveRequestPage> {
   Widget build(BuildContext context) {
     final caption = _actions?['caption'] as String? ?? '';
     final pageCount = _total == 0 ? 1 : (_total / timePageSize).ceil();
+    final actionColumn = (_approval && _actions?['approve'] == true) ||
+        (widget.mode == 'self' && _actions?['cancel'] == true);
     return buildTimeWorkspaceShell(
       pageTitle: caption,
       activeMenu: widget.menuCode,
@@ -233,7 +251,7 @@ class _LeaveRequestPageState extends State<LeaveRequestPage> {
                               const DataColumn(label: Text('จำนวน')),
                               const DataColumn(label: Text('ผู้เริ่มคำขอ')),
                               const DataColumn(label: Text('สถานะ')),
-                              if (_approval && _actions?['approve'] == true) const DataColumn(label: Text('ดำเนินการ')),
+                              if (actionColumn) const DataColumn(label: Text('ดำเนินการ')),
                             ],
                             rows: List.generate(_items.length, (index) {
                               final row = _items[index];
@@ -249,7 +267,11 @@ class _LeaveRequestPageState extends State<LeaveRequestPage> {
                                   DataCell(Row(mainAxisSize: MainAxisSize.min, children: [
                                     IconButton(tooltip: 'อนุมัติ', onPressed: () => _decide(row, 'APPROVED'), icon: Icon(Icons.check_circle_outline, color: timeUiTokens.primaryColor)),
                                     IconButton(tooltip: 'ไม่อนุมัติ', onPressed: () => _decide(row, 'REJECTED'), icon: const Icon(Icons.cancel_outlined, color: Colors.red)),
-                                  ])),
+                                  ]))
+                                else if (widget.mode == 'self' && _actions?['cancel'] == true)
+                                  DataCell(row['statusCode'] == 'PENDING'
+                                      ? TextButton.icon(onPressed: () => _cancel(row), icon: const Icon(Icons.cancel_outlined), label: const Text('ยกเลิก'))
+                                      : const SizedBox.shrink()),
                               ]);
                             }),
                           ),
