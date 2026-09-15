@@ -48,13 +48,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.textContaining('Somchai', skipOffstage: false), findsWidgets);
-      expect(
-        find.text(
-          '\u0e1c\u0e39\u0e49\u0e43\u0e0a\u0e49\u0e1a\u0e23\u0e34\u0e01\u0e32\u0e23',
-          skipOffstage: false,
-        ),
-        findsWidgets,
-      );
+      expect(find.text('บทบาท', skipOffstage: false), findsNothing);
       expect(tester.takeException(), isNull);
     });
   }
@@ -86,6 +80,33 @@ void main() {
         '\u0e1a\u0e17\u0e1a\u0e32\u0e17\u0e43\u0e19\u0e23\u0e30\u0e1a\u0e1a Service',
       ),
       findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Resident registration never offers an existing-person picker', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ServicePersonWorkspace(
+            caption: 'Resident Registry',
+            role: ServicePersonRole.resident,
+            api: _FakeServicePersonApi(),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('\u0e40\u0e1e\u0e34\u0e48\u0e21'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        '\u0e40\u0e25\u0e37\u0e2d\u0e01\u0e1a\u0e38\u0e04\u0e04\u0e25\u0e40\u0e14\u0e34\u0e21',
+      ),
+      findsNothing,
     );
     expect(tester.takeException(), isNull);
   });

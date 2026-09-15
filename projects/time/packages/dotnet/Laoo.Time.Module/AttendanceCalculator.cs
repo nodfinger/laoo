@@ -40,6 +40,22 @@ public static class AttendanceCalculator
             unresolved ? "UNRESOLVED" : "COMPLETE", Math.Max(0, scheduled), rows.Sum(x => x.Work), rows.Sum(x => x.Late), rows.Sum(x => x.Early), reason, actorId, rows, token);
     }
 
+    public static async Task<int> ScheduledNetMinutesAsync(
+        SqlConnection connection, SqlTransaction transaction, long companyId,
+        long employeeId, DateOnly workDate, CancellationToken token)
+    {
+        var (_, sessions, breaks) = await Schedule(
+            connection, transaction, companyId, employeeId, workDate, token);
+        if (sessions.Count == 0) return 0;
+        var scheduled = sessions.Sum(x =>
+            (int)(x.ScheduledOut - x.ScheduledIn).TotalMinutes);
+        var deductedBreaks = OverlapMinutes(
+            sessions.Min(x => x.ScheduledIn),
+            sessions.Max(x => x.ScheduledOut),
+            breaks);
+        return Math.Max(0, scheduled - deductedBreaks);
+    }
+
     private static async Task<DateTime?> Endpoint(SqlConnection c, SqlTransaction tx, long company, long employee, DateOnly date,
         long rule, string endpoint, DateTime start, DateTime end, bool first, CancellationToken token)
     {
