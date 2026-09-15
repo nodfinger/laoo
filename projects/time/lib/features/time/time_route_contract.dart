@@ -212,6 +212,14 @@ abstract final class TimeRoutes {
     routePath: TimeRoutePaths.leaveTypes,
     isImplemented: true,
   );
+  static const leaveEntitlementPolicies = FeatureRouteContract(
+    projectCode: TimeProject.code,
+    menuCode: TimeMenuCodes.leaveEntitlementPolicies,
+    screenType: 1,
+    routeName: TimeRouteNames.leaveEntitlementPolicies,
+    routePath: TimeRoutePaths.leaveEntitlementPolicies,
+    isImplemented: true,
+  );
   static const myTimeCorrections = FeatureRouteContract(
     projectCode: TimeProject.code,
     menuCode: TimeMenuCodes.myTimeCorrections,
@@ -307,6 +315,7 @@ abstract final class TimeRoutes {
     onBehalfReasons,
     adjustmentReasons,
     leaveTypes,
+    leaveEntitlementPolicies,
     holidayCalendars,
     holidayDates,
     branchHolidayCalendars,

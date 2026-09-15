@@ -29,3 +29,5 @@ export 'features/time/time_go_routes.dart';
 export 'features/time/time_route_contract.dart';
 export 'features/leave_types/leave_type_page.dart';
 export 'features/leave_types/leave_type_repository.dart';
+export 'features/leave_entitlement_policies/leave_entitlement_policy_page.dart';
+export 'features/leave_entitlement_policies/leave_entitlement_policy_repository.dart';
