@@ -71,4 +71,17 @@ void main() {
       expect(AppMenuRouteRegistry.byMenuCode(route.menuCode), isNotNull);
     }
   });
+
+  test('Time leave request routes replace Root placeholders exactly once', () {
+    final centerRoutes = appRouter.configuration.routes.whereType<GoRoute>();
+    const leavePaths = <String>{
+      TimeRoutePaths.leaveRequests,
+      TimeRoutePaths.leaveApprovalInbox,
+      TimeRoutePaths.myLeaveRequests,
+    };
+
+    for (final path in leavePaths) {
+      expect(centerRoutes.where((route) => route.path == path), hasLength(1));
+    }
+  });
 }
