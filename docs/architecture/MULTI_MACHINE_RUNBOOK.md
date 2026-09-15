@@ -52,6 +52,7 @@ that defines:
 
 - ProjectCode, approved MenuCode and ScreenType, and the data ownership table;
 - entitlement, Menu/ScreenType/Permission baseline, and Navigation API registration;
+- every approved menu and route contract for the Project, not only the first screen;
 - `projects/<project>/pubspec.yaml`, `<project>_feature.dart`, Feature Host, route contract, and `build<Project>FeatureRoutes()`;
 - Root `pubspec.yaml`, `lib/main.dart`, and `app_router.dart` composition;
 - a Project-owned migration directory and unique ProjectCode filename prefix;
@@ -62,6 +63,11 @@ machine then works only under `projects/<project>` and runs through the Center
 host. Route placeholders belong only inside the Project package; Root must not
 keep a per-menu `_scopePlaceholder` after Bootstrap. Do not build the complete
 Business Project in Root and move it later.
+
+Bootstrap creates unfinished Project menus with `TDADProjectMenu.IsVisible = 0`.
+The Project machine opens each menu with `IsVisible = 1` only in the same
+Project PR that makes its route and screen usable. Menu map or route-contract
+changes still require a separate Core Bootstrap extension PR first.
 
 ## Core Impact protocol
 

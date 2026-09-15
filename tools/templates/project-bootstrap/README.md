@@ -6,6 +6,10 @@ Core uses this template during the Bootstrap PR. Once merged, the Project
 machine owns the package files and may replace its Project-local placeholder
 with a real screen without changing Root.
 
+Core registers every approved MenuCode and route contract in the Bootstrap PR.
+Keep unfinished menus at `TDADProjectMenu.IsVisible = 0`; the Project PR that
+delivers a real screen sets only its completed menu to `IsVisible = 1`.
+
 Required files:
 
 - `pubspec.yaml`

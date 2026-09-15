@@ -6,7 +6,9 @@ abstract final class {{ProjectPascal}}Project {
 
 abstract final class {{ProjectPascal}}Routes {
   static const all = <FeatureRouteContract>[
-    // Core Bootstrap adds approved MenuCode, ScreenType, routeName and routePath.
+    // Core Bootstrap lists every approved MenuCode, ScreenType, routeName and
+    // routePath here. Unfinished entries stay Project-local and hidden in
+    // TDADProjectMenu until their implementation PR is ready.
   ];
 
   static Iterable<FeatureRouteContract> get implemented =>

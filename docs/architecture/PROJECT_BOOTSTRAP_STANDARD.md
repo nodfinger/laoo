@@ -32,6 +32,26 @@ authentication, or schema dependency is a separate compatible Core PR to
 
 Start from `tools/templates/project-bootstrap/` when creating a package.
 
+## Menu and route rollout
+
+Core Bootstrap creates the complete approved menu map for the Project in one
+PR: MenuGroup, every MenuCode/ScreenType, Permission baseline, Navigation
+registration, and matching route contract entries. It does not wait for each
+screen to be built.
+
+Every approved route is owned by the Project package from that point onward.
+The package may use a Project-local placeholder until the screen is ready, but
+Root must not add a placeholder for an individual Project menu.
+
+To avoid exposing unfinished work, the Bootstrap migration creates each
+unfinished Project menu with `IsVisible = 0`. The Project machine changes only
+its own `TDADProjectMenu.IsVisible` to `1` in the same Project PR that delivers
+the real screen, route, API behavior, and tests. A visible menu must never
+route to a Root fallback or an unimplemented screen.
+
+If the menu map itself changes later, Core adds the new approved menu/route
+contract in a separate Bootstrap extension PR before the Project feature PR.
+
 ## Route ownership
 
 Root composes `build<Project>FeatureRoutes()` exactly once. The Project package
@@ -40,8 +60,10 @@ placeholder while a screen is not implemented. Root must never add or retain a
 per-menu `_scopePlaceholder` for a bootstrapped Project.
 
 Changing a Project-local placeholder to a real screen is a Project-only
-change. Adding a new menu, changing a public route contract, or changing Root
-composition is Core work and requires a separate Core PR.
+change. The Project also opens its own completed menu by setting
+`TDADProjectMenu.IsVisible = 1`. Adding a new menu, changing a public route
+contract, or changing Root composition is Core work and requires a separate
+Core PR.
 
 ## Validation
 
