@@ -64,8 +64,8 @@ host. Route placeholders belong only inside the Project package; Root must not
 keep a per-menu `_scopePlaceholder` after Bootstrap. Do not build the complete
 Business Project in Root and move it later.
 
-Bootstrap creates unfinished Project menus with `TDADProjectMenu.IsVisible = 0`.
-The Project machine opens each menu with `IsVisible = 1` only in the same
+Bootstrap creates unfinished Project menus with `TDADProjectMenu.IsActive = 0`.
+The Project machine opens each menu with `IsActive = 1` only in the same
 Project PR that makes its route and screen usable. Menu map or route-contract
 changes still require a separate Core Bootstrap extension PR first.
 

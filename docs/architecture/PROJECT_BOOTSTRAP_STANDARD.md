@@ -44,9 +44,11 @@ The package may use a Project-local placeholder until the screen is ready, but
 Root must not add a placeholder for an individual Project menu.
 
 To avoid exposing unfinished work, the Bootstrap migration creates each
-unfinished Project menu with `IsVisible = 0`. The Project machine changes only
-its own `TDADProjectMenu.IsVisible` to `1` in the same Project PR that delivers
-the real screen, route, API behavior, and tests. A visible menu must never
+unfinished Project menu with `TDADProjectMenu.IsActive = 0`. The Project
+machine changes only its own Project Menu row to `IsActive = 1` in the same
+Project PR that delivers the real screen, route, API behavior, and tests.
+`TDADMainMenu.IsVisible` remains a global menu-display setting and must not be
+used to hide a menu for only one Project. An active Project menu must never
 route to a Root fallback or an unimplemented screen.
 
 If the menu map itself changes later, Core adds the new approved menu/route
@@ -61,7 +63,7 @@ per-menu `_scopePlaceholder` for a bootstrapped Project.
 
 Changing a Project-local placeholder to a real screen is a Project-only
 change. The Project also opens its own completed menu by setting
-`TDADProjectMenu.IsVisible = 1`. Adding a new menu, changing a public route
+`TDADProjectMenu.IsActive = 1`. Adding a new menu, changing a public route
 contract, or changing Root composition is Core work and requires a separate
 Core PR.
 

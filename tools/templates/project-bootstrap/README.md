@@ -7,8 +7,8 @@ machine owns the package files and may replace its Project-local placeholder
 with a real screen without changing Root.
 
 Core registers every approved MenuCode and route contract in the Bootstrap PR.
-Keep unfinished menus at `TDADProjectMenu.IsVisible = 0`; the Project PR that
-delivers a real screen sets only its completed menu to `IsVisible = 1`.
+Keep unfinished menus at `TDADProjectMenu.IsActive = 0`; the Project PR that
+delivers a real screen sets only its completed menu to `IsActive = 1`.
 
 Required files:
 
