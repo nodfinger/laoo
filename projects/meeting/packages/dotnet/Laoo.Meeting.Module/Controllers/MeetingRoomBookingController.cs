@@ -16,6 +16,8 @@ public sealed class MeetingRoomBookingController(IConfiguration configuration) :
     private const string ScreenCode = "21001";
     private const string CalendarScreenCode = "21002";
     private const string ApprovalScreenCode = "21004";
+    private const string TrainingTypeScreenCode = "37001";
+    private const string TrainingInstructorScreenCode = "37002";
     private HashSet<long>? _adminRooms;
 
     private async Task<HashSet<long>> AdminRooms(SqlConnection db, CancellationToken token) =>
@@ -82,6 +84,36 @@ SELECT CASE WHEN EXISTS
             admin = isAdmin,
             adminRoomIds = await AdminRooms(connection, token),
         });
+    }
+
+    [HttpGet("training-types")]
+    public async Task<IActionResult> TrainingTypes(CancellationToken token)
+    {
+        if (!TryCompany(out var companyId)) return Forbid();
+        await using var connection = await Open(token);
+        if (!await Laoo.Shared.Contracts.CompanyMenuAccess.IsAllowedAsync(connection, User, TrainingTypeScreenCode, "VIEW", token)) return Forbid();
+        const string sql = "SELECT TrainingTypeID,TrainingTypeCode,TrainingTypeName FROM dbo.TDTRTrainingType WHERE CompanyID=@company AND IsActive=1 ORDER BY TrainingTypeName,TrainingTypeCode;";
+        await using var command = new SqlCommand(sql, connection);
+        Add(command, "@company", companyId);
+        await using var reader = await command.ExecuteReaderAsync(token);
+        var items = new List<object>();
+        while (await reader.ReadAsync(token)) items.Add(new { trainingTypeId = reader.GetInt64(0), trainingTypeCode = reader.GetString(1), trainingTypeName = reader.GetString(2) });
+        return Ok(new { items });
+    }
+
+    [HttpGet("training-instructors")]
+    public async Task<IActionResult> TrainingInstructors(CancellationToken token)
+    {
+        if (!TryCompany(out var companyId)) return Forbid();
+        await using var connection = await Open(token);
+        if (!await Laoo.Shared.Contracts.CompanyMenuAccess.IsAllowedAsync(connection, User, TrainingInstructorScreenCode, "VIEW", token)) return Forbid();
+        const string sql = "SELECT TrainingInstructorID,TrainingInstructorCode,TrainingInstructorName,InstituteName FROM dbo.TDTRTrainingInstructor WHERE CompanyID=@company AND IsActive=1 ORDER BY TrainingInstructorName,TrainingInstructorCode;";
+        await using var command = new SqlCommand(sql, connection);
+        Add(command, "@company", companyId);
+        await using var reader = await command.ExecuteReaderAsync(token);
+        var items = new List<object>();
+        while (await reader.ReadAsync(token)) items.Add(new { trainingInstructorId = reader.GetInt64(0), trainingInstructorCode = reader.GetString(1), trainingInstructorName = reader.GetString(2), instituteName = Text(reader, 3) });
+        return Ok(new { items });
     }
 
     [HttpGet("approval-requests")]
@@ -628,6 +660,7 @@ WHERE B.CompanyID=@company
         var sql = $"""
 SELECT B.BookingID,B.BookingNo,B.RoomID,R.RoomCode,R.RoomNameTH,B.Subject,B.Description,
        B.AttendeeCount,B.BookingStatus,B.ApprovalMode,B.Remark,B.RequesterUserID,B.ActivityTypeCode,
+       B.TrainingTypeID,B.TrainingInstructorID,B.TrainingTypeNameSnapshot,B.TrainingInstructorNameSnapshot,B.TrainingInstituteSnapshot,
        E.EmployeeCode,NULLIF(E.FullName,''),
        MIN(S.StartDateTime) AS StartDateTime,MAX(S.EndDateTime) AS EndDateTime,COUNT_BIG(S.BookingSlotID) AS SlotCount,
        BR.BranchNameTH,BD.BuildingNameTH,F.FloorNameTH,
@@ -656,6 +689,7 @@ LEFT JOIN dbo.TDADFloor F ON F.FloorID=R.FloorID
 {where}
 GROUP BY B.BookingID,B.BookingNo,B.RoomID,R.RoomCode,R.RoomNameTH,B.Subject,B.Description,
          B.CompanyID,B.AttendeeCount,B.BookingStatus,B.ApprovalMode,B.Remark,B.RequesterUserID,B.ActivityTypeCode,
+         B.TrainingTypeID,B.TrainingInstructorID,B.TrainingTypeNameSnapshot,B.TrainingInstructorNameSnapshot,B.TrainingInstituteSnapshot,
          E.EmployeeCode,E.FullName,BR.BranchNameTH,BD.BuildingNameTH,F.FloorNameTH,B.CreateDate
 ORDER BY CASE WHEN B.BookingStatus='CANCELLED' THEN 1 ELSE 0 END,
          MIN(S.StartDateTime) DESC,B.CreateDate DESC,B.BookingID DESC
@@ -694,36 +728,41 @@ OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY;
             remark = Text(reader, 10),
             requesterUserId = reader.GetInt64(11),
             activityTypeCode = reader.GetString(12),
-            requesterCode = Text(reader, 13),
-            requesterName = Text(reader, 14),
-            startDateTime = reader.GetDateTime(15),
-            endDateTime = reader.GetDateTime(16),
-            slotCount = reader.GetInt64(17),
-            branchName = Text(reader, 18),
-            buildingName = Text(reader, 19),
-            floorName = Text(reader, 20),
+            trainingTypeId = Long(reader, 13),
+            trainingInstructorId = Long(reader, 14),
+            trainingTypeNameSnapshot = Text(reader, 15),
+            trainingInstructorNameSnapshot = Text(reader, 16),
+            trainingInstituteSnapshot = Text(reader, 17),
+            requesterCode = Text(reader, 18),
+            requesterName = Text(reader, 19),
+            startDateTime = reader.GetDateTime(20),
+            endDateTime = reader.GetDateTime(21),
+            slotCount = reader.GetInt64(22),
+            branchName = Text(reader, 23),
+            buildingName = Text(reader, 24),
+            floorName = Text(reader, 25),
             canEditBooking = (canManageAllParticipants || adminRooms.Contains(reader.GetInt64(2)) ||
                              reader.GetInt64(11) == userId) &&
                              reader.GetString(8) is "PENDING" or "APPROVED" &&
-                             reader.GetDateTime(15) > DateTime.Now,
+                             reader.GetDateTime(20) > DateTime.Now,
             canCancelBooking = (canManageAllParticipants || adminRooms.Contains(reader.GetInt64(2)) ||
                                reader.GetInt64(11) == userId) &&
                                reader.GetString(8) is "PENDING" or "APPROVED" &&
-                               reader.GetDateTime(15) > DateTime.Now,
-            canManageFoodPlan = MeetingFoodPlanAccess.CanManage(reader.GetString(8), reader.GetDateTime(15),
-                reader.GetInt32(21) == 1,
-                reader.GetInt32(21) == 1 || (reader.GetInt32(22) == 1 ? foodEdit : foodCreate)),
+                               reader.GetDateTime(20) > DateTime.Now,
+            canManageFoodPlan = MeetingFoodPlanAccess.CanManage(reader.GetString(8), reader.GetDateTime(20),
+                reader.GetInt32(26) == 1,
+                reader.GetInt32(26) == 1 || (reader.GetInt32(27) == 1 ? foodEdit : foodCreate)),
             canManageEquipmentPlan = reader.GetString(8) == "APPROVED" &&
-                                     reader.GetDateTime(15) > DateTime.Now &&
-                                     reader.GetInt32(21) == 1,
+                                     reader.GetDateTime(20) > DateTime.Now &&
+                                     reader.GetInt32(26) == 1,
             canManageParticipants = reader.GetString(8) is "PENDING" or "APPROVED" &&
-                                    reader.GetDateTime(16) > DateTime.Now &&
+                                    reader.GetDateTime(21) > DateTime.Now &&
                                     (reader.GetInt64(11) == userId ||
                                      canManageAllParticipants ||
                                      adminRooms.Contains(reader.GetInt64(2))),
-            approvalId = reader.IsDBNull(23) ? (long?)null : reader.GetInt64(23),
-            canApprove = reader.GetInt32(24) == 1,
-            canRollback = reader.GetInt32(25) == 1 && reader.GetDateTime(15) > DateTime.Now,
+            approvalId = reader.IsDBNull(28) ? (long?)null : reader.GetInt64(28),
+            canApprove = reader.GetInt32(29) == 1,
+            canRollback = reader.GetInt32(30) == 1 && reader.GetDateTime(20) > DateTime.Now,
         });
         return Ok(new { items, total, page, pageSize });
     }
@@ -869,7 +908,8 @@ ORDER BY E.EmployeeCode,E.FullName;
         await using var connection = await Open(token);
         const string sql = """
 SELECT B.BookingID,B.BookingNo,B.RoomID,B.Subject,B.Description,B.AttendeeCount,
-       B.BookingStatus,B.ApprovalMode,B.RequireAllApprovers,B.Remark,B.RequesterUserID,B.CancelRemark,B.ActivityTypeCode
+       B.BookingStatus,B.ApprovalMode,B.RequireAllApprovers,B.Remark,B.RequesterUserID,B.CancelRemark,B.ActivityTypeCode,
+       B.TrainingTypeID,B.TrainingInstructorID,B.TrainingTypeNameSnapshot,B.TrainingInstructorNameSnapshot,B.TrainingInstituteSnapshot
 FROM dbo.TDADMeetingRoomBooking B
 WHERE B.BookingID=@id AND B.CompanyID=@company;
 
@@ -898,6 +938,9 @@ ORDER BY A.ApprovalOrder,E.EmployeeCode;
             status = reader.GetString(6), approvalMode = reader.GetString(7), requireAllApprovers = reader.GetBoolean(8),
             remark = Text(reader, 9), requesterUserId = reader.GetInt64(10),
             cancelRemark = Text(reader, 11), activityTypeCode = reader.GetString(12),
+            trainingTypeId = Long(reader, 13), trainingInstructorId = Long(reader, 14),
+            trainingTypeNameSnapshot = Text(reader, 15), trainingInstructorNameSnapshot = Text(reader, 16),
+            trainingInstituteSnapshot = Text(reader, 17),
         };
         await reader.NextResultAsync(token);
         var slots = new List<object>();
@@ -1116,6 +1159,7 @@ WHERE BookingID=@id AND CompanyID=@company AND BookingStatus IN ('PENDING','APPR
             if (reason is not null) return Conflict(Error("ไม่สามารถจองห้องประชุมได้", reason));
 
             var requesterEmployeeId = await RequesterEmployee(connection, transaction, companyId, userId, token);
+            var training = await ResolveTrainingSelection(connection, transaction, companyId, activityTypeCode, request, token);
             if (id is long originalBookingId)
             {
                 await using var original = new SqlCommand("SELECT RequesterEmployeeID FROM dbo.TDADMeetingRoomBooking WITH (UPDLOCK,HOLDLOCK) WHERE BookingID=@booking AND CompanyID=@company", connection, transaction);
@@ -1154,9 +1198,11 @@ WHERE BookingID=@id AND CompanyID=@company AND BookingStatus IN ('PENDING','APPR
                 const string insert = """
 INSERT dbo.TDADMeetingRoomBooking
     (CompanyID,RoomID,RequesterUserID,RequesterEmployeeID,Subject,Description,ActivityTypeCode,AttendeeCount,
-     BookingStatus,ApprovalMode,RequireAllApprovers,Remark,CreateBy)
+     BookingStatus,ApprovalMode,RequireAllApprovers,Remark,TrainingTypeID,TrainingInstructorID,
+     TrainingTypeNameSnapshot,TrainingInstructorNameSnapshot,TrainingInstituteSnapshot,CreateBy)
 VALUES
-    (@company,@room,@user,@employee,@subject,@description,@activityType,@attendee,@status,@mode,@requireAll,@remark,@user);
+    (@company,@room,@user,@employee,@subject,@description,@activityType,@attendee,@status,@mode,@requireAll,@remark,
+     @trainingType,@trainingInstructor,@trainingTypeName,@trainingInstructorName,@trainingInstitute,@user);
 DECLARE @id BIGINT=CONVERT(BIGINT,SCOPE_IDENTITY());
 UPDATE dbo.TDADMeetingRoomBooking
 SET BookingNo=CONCAT('BK',CONVERT(char(8),GETDATE(),112),RIGHT(CONCAT('000000',@id),6))
@@ -1164,7 +1210,7 @@ WHERE BookingID=@id;
 SELECT @id;
 """;
                 await using var insertCommand = new SqlCommand(insert, connection, transaction);
-                BindHeader(insertCommand, companyId, userId, requesterEmployeeId, request, approval, status);
+                BindHeader(insertCommand, companyId, userId, requesterEmployeeId, request, approval, status, training);
                 bookingId = Convert.ToInt64(await insertCommand.ExecuteScalarAsync(token));
             }
             else
@@ -1173,12 +1219,14 @@ SELECT @id;
 UPDATE dbo.TDADMeetingRoomBooking
 SET RoomID=@room,Subject=@subject,Description=@description,ActivityTypeCode=@activityType,
     AttendeeCount=@attendee,BookingStatus=@status,ApprovalMode=@mode,
-    RequireAllApprovers=@requireAll,Remark=@remark,UpdateDate=SYSUTCDATETIME(),UpdateBy=@user,CancelDate=NULL
+    RequireAllApprovers=@requireAll,Remark=@remark,TrainingTypeID=@trainingType,TrainingInstructorID=@trainingInstructor,
+    TrainingTypeNameSnapshot=@trainingTypeName,TrainingInstructorNameSnapshot=@trainingInstructorName,
+    TrainingInstituteSnapshot=@trainingInstitute,UpdateDate=SYSUTCDATETIME(),UpdateBy=@user,CancelDate=NULL
 WHERE BookingID=@id AND CompanyID=@company AND BookingStatus NOT IN ('REJECTED','CANCELLED');
 SELECT @@ROWCOUNT;
 """;
                 await using var updateCommand = new SqlCommand(update, connection, transaction);
-                BindHeader(updateCommand, companyId, userId, requesterEmployeeId, request, approval, status);
+                BindHeader(updateCommand, companyId, userId, requesterEmployeeId, request, approval, status, training);
                 Add(updateCommand, "@id", id.Value);
                 if (Convert.ToInt32(await updateCommand.ExecuteScalarAsync(token)) == 0)
                     return BadRequest(Error("แก้ไขรายการจองไม่ได้", "ไม่พบรายการ หรือรายการถูกปฏิเสธ/ยกเลิกแล้ว"));
@@ -1210,7 +1258,17 @@ VALUES(@booking,@employee,@order);
                 await approvalCommand.ExecuteNonQueryAsync(token);
             }
             await transaction.CommitAsync(token);
-            return Ok(new { bookingId, status, approvalMode = approval.Mode });
+            return Ok(new
+            {
+                bookingId,
+                status,
+                approvalMode = approval.Mode,
+                trainingTypeId = training.TypeId,
+                trainingInstructorId = training.InstructorId,
+                trainingTypeNameSnapshot = training.TypeNameSnapshot,
+                trainingInstructorNameSnapshot = training.InstructorNameSnapshot,
+                trainingInstituteSnapshot = training.InstituteSnapshot,
+            });
         }
         catch (BookingValidationException error)
         {
@@ -1515,11 +1573,53 @@ VALUES(@booking,@company,@from,@to,@user,@remark,@source);
         await command.ExecuteNonQueryAsync(token);
     }
 
-    private static void BindHeader(SqlCommand command, long companyId, long userId, long? employeeId, BookingSaveRequest request, ApprovalResolution approval, string status)
+    private async Task<TrainingSelection> ResolveTrainingSelection(
+        SqlConnection connection, SqlTransaction transaction, long companyId, string activityTypeCode,
+        BookingSaveRequest request, CancellationToken token)
+    {
+        if (activityTypeCode != "TRAINING") return TrainingSelection.Empty;
+        if (request.TrainingTypeId is null && request.TrainingInstructorId is null) return TrainingSelection.Empty;
+
+        if (request.TrainingTypeId is not null && !await Laoo.Shared.Contracts.CompanyMenuAccess.IsAllowedAsync(connection, User, TrainingTypeScreenCode, "VIEW", token))
+            throw new BookingValidationException("ไม่มีสิทธิ์เลือกประเภทการอบรม", "กรุณาตรวจสิทธิ์ระบบอบรมของผู้ใช้");
+        if (request.TrainingInstructorId is not null && !await Laoo.Shared.Contracts.CompanyMenuAccess.IsAllowedAsync(connection, User, TrainingInstructorScreenCode, "VIEW", token))
+            throw new BookingValidationException("ไม่มีสิทธิ์เลือกวิทยากร", "กรุณาตรวจสิทธิ์ระบบอบรมของผู้ใช้");
+
+        string? typeName = null;
+        if (request.TrainingTypeId is long typeId)
+        {
+            const string typeSql = "SELECT TrainingTypeName FROM dbo.TDTRTrainingType WITH (UPDLOCK,HOLDLOCK) WHERE TrainingTypeID=@id AND CompanyID=@company AND IsActive=1;";
+            await using var typeCommand = new SqlCommand(typeSql, connection, transaction);
+            Add(typeCommand, "@id", typeId); Add(typeCommand, "@company", companyId);
+            typeName = Convert.ToString(await typeCommand.ExecuteScalarAsync(token));
+            if (string.IsNullOrWhiteSpace(typeName))
+                throw new BookingValidationException("ไม่พบประเภทการอบรม", "ประเภทการอบรมต้องเป็นข้อมูลที่ใช้งานอยู่ในบริษัทเดียวกัน");
+        }
+
+        string? instructorName = null;
+        string? instituteName = null;
+        if (request.TrainingInstructorId is long instructorId)
+        {
+            const string instructorSql = "SELECT TrainingInstructorName,InstituteName FROM dbo.TDTRTrainingInstructor WITH (UPDLOCK,HOLDLOCK) WHERE TrainingInstructorID=@id AND CompanyID=@company AND IsActive=1;";
+            await using var instructorCommand = new SqlCommand(instructorSql, connection, transaction);
+            Add(instructorCommand, "@id", instructorId); Add(instructorCommand, "@company", companyId);
+            await using var reader = await instructorCommand.ExecuteReaderAsync(token);
+            if (!await reader.ReadAsync(token))
+                throw new BookingValidationException("ไม่พบวิทยากร", "วิทยากรต้องเป็นข้อมูลที่ใช้งานอยู่ในบริษัทเดียวกัน");
+            instructorName = reader.GetString(0);
+            instituteName = Text(reader, 1);
+        }
+
+        return new TrainingSelection(request.TrainingTypeId, request.TrainingInstructorId, typeName, instructorName, instituteName);
+    }
+
+    private static void BindHeader(SqlCommand command, long companyId, long userId, long? employeeId, BookingSaveRequest request, ApprovalResolution approval, string status, TrainingSelection training)
     {
         Add(command, "@company", companyId); Add(command, "@room", request.RoomId); Add(command, "@user", userId); Add(command, "@employee", employeeId);
         Add(command, "@subject", request.Subject.Trim()); Add(command, "@description", Clean(request.Description)); Add(command, "@activityType", (request.ActivityTypeCode ?? "MEETING").Trim().ToUpperInvariant()); Add(command, "@attendee", request.AttendeeCount);
         Add(command, "@status", status); Add(command, "@mode", approval.Mode); Add(command, "@requireAll", approval.RequireAll); Add(command, "@remark", Clean(request.Remark));
+        Add(command, "@trainingType", training.TypeId); Add(command, "@trainingInstructor", training.InstructorId);
+        Add(command, "@trainingTypeName", training.TypeNameSnapshot); Add(command, "@trainingInstructorName", training.InstructorNameSnapshot); Add(command, "@trainingInstitute", training.InstituteSnapshot);
     }
 
     private static async Task Execute(SqlConnection connection, SqlTransaction transaction, string sql, CancellationToken token, params (string Name, object? Value)[] parameters)
@@ -1539,7 +1639,7 @@ VALUES(@booking,@company,@from,@to,@user,@remark,@source);
 }
 
 public sealed record BookingSlotRequest(DateTime StartDateTime, DateTime EndDateTime);
-public sealed record BookingSaveRequest(long RoomId, string Subject, string? Description, int AttendeeCount, List<BookingSlotRequest>? Slots, string? Remark, string? ActivityTypeCode = "MEETING");
+public sealed record BookingSaveRequest(long RoomId, string Subject, string? Description, int AttendeeCount, List<BookingSlotRequest>? Slots, string? Remark, string? ActivityTypeCode = "MEETING", long? TrainingTypeId = null, long? TrainingInstructorId = null, string? TrainingTypeNameSnapshot = null, string? TrainingInstructorNameSnapshot = null, string? TrainingInstituteSnapshot = null);
 public sealed record ApprovalDecisionRequest(string Decision, string? Remark);
 public sealed record RollbackBookingRequest(string? Remark);
 public sealed record BookingCancellationRequest(string? Remark);
@@ -1547,6 +1647,10 @@ public sealed record ParticipantSaveRequest(List<long>? EmployeeIds);
 public sealed record AvailabilityRequest(List<BookingSlotRequest>? Slots, long? RoomId, long? BranchId, long? BuildingId, long? FloorId, int? AttendeeCount, long? ExcludeBookingId);
 
 internal sealed record ApprovalResolution(string Mode, bool RequireAll, List<long> EmployeeIds);
+internal sealed record TrainingSelection(long? TypeId, long? InstructorId, string? TypeNameSnapshot, string? InstructorNameSnapshot, string? InstituteSnapshot)
+{
+    internal static TrainingSelection Empty { get; } = new(null, null, null, null, null);
+}
 internal sealed record BookingConflict(
     long BookingId, string? BookingNo, string Subject, string? RequesterName,
     DateTime Start, DateTime End, string Status, long RequesterUserId,
