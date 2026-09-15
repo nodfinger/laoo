@@ -42,7 +42,7 @@ Use one task branch and Pull Request per change. Before Merge, merge current
 `origin/main` into the task branch and run:
 
 ```powershell
-.\tools\scripts\verify-center.ps1 -Module <service|meeting|visitor>
+.\tools\scripts\verify-center.ps1 -Module <service|meeting|visitor|time|training>
 ```
 
 Each machine may squash-merge its own verified PR. Database changes use only

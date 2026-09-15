@@ -5,7 +5,7 @@
 | Machine role | Owned source |
 | --- | --- |
 | `center-service` | Root Core, `laoo_api`, shared packages, `projects/service` |
-| `meeting` | `projects/meeting` |
+| `meeting` | `projects/meeting` and `projects/training` |
 | `visitor` | `projects/visitor` |
 | `time` | `projects/time` |
 
@@ -24,6 +24,20 @@ Time machine example:
   "apiPort": 5080
 }
 ```
+
+Meeting machine with Training example:
+
+```json
+{
+  "role": "meeting",
+  "allowedProjects": ["LAOO", "LAOO_MEETING", "LAOO_TRAINING"],
+  "webPort": 8080,
+  "apiPort": 5080
+}
+```
+
+Copy local.machine.meeting-training.example.json to the ignored
+local.machine.json on the Meeting machine. Never commit a machine local.machine.json.
 
 Run `tools/scripts/check-machine-boundaries.ps1 -Module <module>` before full
 verification. On Meeting, Visitor, and Time machines it rejects changed files
@@ -137,6 +151,8 @@ and runs them only after explicit approval and after pulling current `main`:
 
 For the Time role, use `-Module time`; its owned migrations are under
 `projects/time/database/migrations`.
+For Training work on the Meeting machine, use `-Module training`; its owned
+migrations are under `projects/training/database/migrations`.
 
 The runner validates names and checksums, writes
 `dbo.TDSTSchemaMigration`, and serializes execution with the SQL application
