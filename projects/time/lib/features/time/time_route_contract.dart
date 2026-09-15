@@ -26,6 +26,8 @@ abstract final class TimeMenuCodes {
   static const timeApprovalInbox = '26002';
   static const onBehalfReasons = '28003';
   static const adjustmentReasons = '28004';
+  static const leaveTypes = '28009';
+  static const leaveEntitlementPolicies = '28010';
   static const holidayCalendars = '28005';
   static const holidayDates = '28006';
   static const branchHolidayCalendars = '28007';
@@ -51,6 +53,8 @@ abstract final class TimeRouteNames {
   static const timeApprovalInbox = 'timeApprovalInbox';
   static const onBehalfReasons = 'timeOnBehalfReasons';
   static const adjustmentReasons = 'timeAdjustmentReasons';
+  static const leaveTypes = 'timeLeaveTypes';
+  static const leaveEntitlementPolicies = 'timeLeaveEntitlementPolicies';
   static const holidayCalendars = 'timeHolidayCalendars';
   static const holidayDates = 'timeHolidayDates';
   static const branchHolidayCalendars = 'timeBranchHolidayCalendars';
@@ -76,6 +80,9 @@ abstract final class TimeRoutePaths {
   static const timeApprovalInbox = '/company/time-approval-inbox';
   static const onBehalfReasons = '/company/time-on-behalf-reasons';
   static const adjustmentReasons = '/company/time-adjustment-reasons';
+  static const leaveTypes = '/company/time-leave-types';
+  static const leaveEntitlementPolicies =
+      '/company/time-leave-entitlement-policies';
   static const holidayCalendars = '/company/time-holiday-calendars';
   static const holidayDates = '/company/time-holiday-dates';
   static const branchHolidayCalendars =
@@ -197,6 +204,14 @@ abstract final class TimeRoutes {
     routePath: TimeRoutePaths.adjustmentReasons,
     isImplemented: true,
   );
+  static const leaveTypes = FeatureRouteContract(
+    projectCode: TimeProject.code,
+    menuCode: TimeMenuCodes.leaveTypes,
+    screenType: 1,
+    routeName: TimeRouteNames.leaveTypes,
+    routePath: TimeRoutePaths.leaveTypes,
+    isImplemented: true,
+  );
   static const myTimeCorrections = FeatureRouteContract(
     projectCode: TimeProject.code,
     menuCode: TimeMenuCodes.myTimeCorrections,
@@ -291,6 +306,7 @@ abstract final class TimeRoutes {
     timeApprovalInbox,
     onBehalfReasons,
     adjustmentReasons,
+    leaveTypes,
     holidayCalendars,
     holidayDates,
     branchHolidayCalendars,

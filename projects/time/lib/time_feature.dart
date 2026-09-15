@@ -27,3 +27,5 @@ export 'features/attendance_periods/attendance_period_repository.dart';
 export 'features/time/time_feature_host.dart';
 export 'features/time/time_go_routes.dart';
 export 'features/time/time_route_contract.dart';
+export 'features/leave_types/leave_type_page.dart';
+export 'features/leave_types/leave_type_repository.dart';

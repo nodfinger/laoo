@@ -9,6 +9,7 @@ import '../employee_schedules/employee_schedule_page.dart';
 import 'time_route_contract.dart';
 import '../time_corrections/time_correction_page.dart';
 import '../time_reasons/time_reason_page.dart';
+import '../leave_types/leave_type_page.dart';
 import '../attendance_periods/attendance_period_pages.dart';
 import '../attendance_events/attendance_events_page.dart';
 import '../attendance_results/attendance_results_page.dart';
@@ -20,6 +21,11 @@ import '../holiday_calendars/branch_holiday_exception_page.dart';
 import '../my_attendance_history/my_attendance_history_page.dart';
 
 List<GoRoute> buildTimeFeatureRoutes() => <GoRoute>[
+  GoRoute(
+    name: TimeRouteNames.leaveTypes,
+    path: TimeRoutePaths.leaveTypes,
+    builder: (context, state) => const LeaveTypePage(),
+  ),
   GoRoute(
     name: TimeRouteNames.myAttendanceHistory,
     path: TimeRoutePaths.myAttendanceHistory,
