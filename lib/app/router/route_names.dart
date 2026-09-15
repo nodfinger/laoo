@@ -71,6 +71,8 @@ abstract final class RouteNames {
   static const String laooEmployees = 'laooEmployees';
   static const String laooUsers = 'laooUsers';
   static const String companySupervisors = 'companySupervisors';
+  static const String trainingTypes = 'trainingTypes';
+  static const String trainingInstructors = 'trainingInstructors';
   static const String timeAttendanceResults = 'timeAttendanceResults';
   static const String timeAttendancePeriodSchemes =
       'timeAttendancePeriodSchemes';

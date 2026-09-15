@@ -73,6 +73,8 @@ abstract final class RoutePaths {
   static const String laooEmployees = '/support/employees';
   static const String laooUsers = '/support/users';
   static const String companySupervisors = '/company/supervisors';
+  static const String trainingTypes = '/company/training-types';
+  static const String trainingInstructors = '/company/training-instructors';
   static const String timeAttendanceResults =
       '/company/time-attendance-results';
   static const String timeAttendancePeriodSchemes =
