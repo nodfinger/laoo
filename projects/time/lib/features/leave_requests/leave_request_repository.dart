@@ -50,6 +50,14 @@ class LeaveRequestRepository {
         'reason': reason,
       });
 
+  Future<void> cancel(int requestId, {
+    required String rowVersion,
+    String? reason,
+  }) => api.post('$_path/$requestId/cancel', body: {
+        'rowVersion': rowVersion,
+        'reason': reason,
+      });
+
   static String _date(DateTime value) =>
       '${value.year}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
 }
