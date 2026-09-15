@@ -234,67 +234,149 @@ class _TrainingMasterPageState extends State<TrainingMasterPage> {
             ),
             table: loading
                 ? const Center(child: CircularProgressIndicator())
-                : SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: DataTable(
-                      columns: [
-                        LaooWorkspaceTableColumns.id,
-                        const DataColumn(label: Text('จัดการ')),
-                        const DataColumn(label: Text('รหัส')),
-                        DataColumn(
-                          label: Text(
-                            instructors ? 'ชื่อวิทยากร' : 'ประเภทการอบรม',
-                          ),
-                        ),
-                        if (instructors)
-                          const DataColumn(label: Text('สถาบัน')),
-                        const DataColumn(label: Text('สถานะ')),
-                      ],
-                      rows: items.asMap().entries.map((entry) {
-                        final x = entry.value;
-                        return DataRow(
-                          cells: [
-                            DataCell(
-                              Text(
-                                '${(page - 1) * trainingPageSize + entry.key + 1}',
-                              ),
-                            ),
-                            DataCell(
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  if (actions?['edit'] == true)
-                                    IconButton(
-                                      onPressed: () => _edit(x),
-                                      icon: Icon(
-                                        Icons.edit_outlined,
-                                        color: tokens.primaryColor,
+                : LayoutBuilder(
+                    builder: (context, constraints) {
+                      if (constraints.maxWidth < 900) {
+                        return ListView.separated(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: items.length,
+                          separatorBuilder: (_, _) => const SizedBox(height: 6),
+                          itemBuilder: (context, index) {
+                            final item = items[index];
+                            return Card(
+                              margin: EdgeInsets.zero,
+                              child: Padding(
+                                padding: tokens.workspace.cardPadding,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Text(
+                                          '${(page - 1) * trainingPageSize + index + 1}',
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Text(
+                                            '${item['code']} | ${item['name']}',
+                                            style:
+                                                tokens.workspace.sectionStyle,
+                                          ),
+                                        ),
+                                        if (actions?['edit'] == true)
+                                          IconButton(
+                                            tooltip: 'แก้ไข',
+                                            onPressed: () => _edit(item),
+                                            icon: Icon(
+                                              Icons.edit_outlined,
+                                              color: tokens.primaryColor,
+                                            ),
+                                          ),
+                                        if (actions?['delete'] == true)
+                                          IconButton(
+                                            tooltip: 'ลบ',
+                                            onPressed: () => _delete(item),
+                                            icon: const Icon(
+                                              Icons.delete_outline,
+                                              color: Colors.red,
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                    if (instructors &&
+                                        (item['instituteName']
+                                                ?.toString()
+                                                .isNotEmpty ??
+                                            false))
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 4),
+                                        child: Text(
+                                          'สถาบัน: ${item['instituteName']}',
+                                        ),
+                                      ),
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 4),
+                                      child: Text(
+                                        item['isActive'] == true
+                                            ? 'สถานะ: ใช้งาน'
+                                            : 'สถานะ: ไม่ใช้งาน',
                                       ),
                                     ),
-                                  if (actions?['delete'] == true)
-                                    IconButton(
-                                      onPressed: () => _delete(x),
-                                      icon: const Icon(
-                                        Icons.delete_outline,
-                                        color: Colors.red,
-                                      ),
-                                    ),
-                                ],
+                                  ],
+                                ),
                               ),
-                            ),
-                            DataCell(Text('${x['code']}')),
-                            DataCell(Text('${x['name']}')),
-                            if (instructors)
-                              DataCell(Text('${x['instituteName'] ?? '-'}')),
-                            DataCell(
-                              Text(
-                                x['isActive'] == true ? 'ใช้งาน' : 'ไม่ใช้งาน',
-                              ),
-                            ),
-                          ],
+                            );
+                          },
                         );
-                      }).toList(),
-                    ),
+                      }
+                      return SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: DataTable(
+                          columns: [
+                            LaooWorkspaceTableColumns.id,
+                            const DataColumn(label: Text('จัดการ')),
+                            const DataColumn(label: Text('รหัส')),
+                            DataColumn(
+                              label: Text(
+                                instructors ? 'ชื่อวิทยากร' : 'ประเภทการอบรม',
+                              ),
+                            ),
+                            if (instructors)
+                              const DataColumn(label: Text('สถาบัน')),
+                            const DataColumn(label: Text('สถานะ')),
+                          ],
+                          rows: items.asMap().entries.map((entry) {
+                            final x = entry.value;
+                            return DataRow(
+                              cells: [
+                                DataCell(
+                                  Text(
+                                    '${(page - 1) * trainingPageSize + entry.key + 1}',
+                                  ),
+                                ),
+                                DataCell(
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      if (actions?['edit'] == true)
+                                        IconButton(
+                                          onPressed: () => _edit(x),
+                                          icon: Icon(
+                                            Icons.edit_outlined,
+                                            color: tokens.primaryColor,
+                                          ),
+                                        ),
+                                      if (actions?['delete'] == true)
+                                        IconButton(
+                                          onPressed: () => _delete(x),
+                                          icon: const Icon(
+                                            Icons.delete_outline,
+                                            color: Colors.red,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                                DataCell(Text('${x['code']}')),
+                                DataCell(Text('${x['name']}')),
+                                if (instructors)
+                                  DataCell(
+                                    Text('${x['instituteName'] ?? '-'}'),
+                                  ),
+                                DataCell(
+                                  Text(
+                                    x['isActive'] == true
+                                        ? 'ใช้งาน'
+                                        : 'ไม่ใช้งาน',
+                                  ),
+                                ),
+                              ],
+                            );
+                          }).toList(),
+                        ),
+                      );
+                    },
                   ),
             pagination: LaooPaginationCard(
               tokens: tokens.workspace,
