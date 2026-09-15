@@ -11,6 +11,7 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.4" />
+    <ProjectReference Include="../../../../../packages/dotnet/Laoo.Shared.Contracts/Laoo.Shared.Contracts.csproj" />
   </ItemGroup>
 
 </Project>

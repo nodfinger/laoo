@@ -1,0 +1,24 @@
+name: laoo_training
+description: LAOO Training business feature package for the Center host.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  laoo_shared_core:
+    path: ../../packages/laoo_shared_core
+  laoo_shared_workspace_ui:
+    path: ../../packages/laoo_shared_workspace_ui
+  go_router: ^17.4.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
