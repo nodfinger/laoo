@@ -80,3 +80,19 @@ class MeetingEquipmentRequestSettingsApi {
 
   void dispose() => _client.dispose();
 }
+
+/// Read-only bootstrap contract. Training settings are added by the Training
+/// module later; this endpoint only confirms the Company entitlement now.
+class TrainingSettingsApi {
+  TrainingSettingsApi({ApiClient? client}) : _client = client ?? ApiClient();
+
+  final ApiClient _client;
+  static const _path = '/api/company/training/settings';
+
+  Future<bool> load() async {
+    final data = await _client.get(_path);
+    return data is Map && data['trainingEnabled'] == true;
+  }
+
+  void dispose() => _client.dispose();
+}
