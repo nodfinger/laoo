@@ -44,6 +44,11 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
 
   String _caption = '';
   String _activityTypeCode = 'MEETING';
+  int? _trainingTypeId;
+  int? _trainingInstructorId;
+  bool _trainingOptionsLoading = false;
+  bool _trainingTypesAvailable = false;
+  bool _trainingInstructorsAvailable = false;
   late String _workspaceMode;
   String _searchMode = 'DATE';
   bool _multipleDays = false;
@@ -68,6 +73,8 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
   List<Map<String, dynamic>> _availableRooms = [];
   List<Map<String, dynamic>> _bookings = [];
   List<Map<String, dynamic>> _roomScheduleBookings = [];
+  List<Map<String, dynamic>> _trainingTypes = [];
+  List<Map<String, dynamic>> _trainingInstructors = [];
   final Set<int> _expandedConflictRooms = <int>{};
 
   int? _branchId;
@@ -368,8 +375,10 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
       initialEntryMode: TimePickerEntryMode.dial,
       builder: (context, child) => Theme(
         data: Theme.of(context).copyWith(
-          colorScheme: Theme.of(context).colorScheme
-              .copyWith(primary: preset.primary, surface: LaooColors.white),
+          colorScheme: Theme.of(context).colorScheme.copyWith(
+            primary: preset.primary,
+            surface: LaooColors.white,
+          ),
           timePickerTheme: TimePickerThemeData(
             backgroundColor: LaooColors.white,
             shape: RoundedRectangleBorder(
@@ -698,9 +707,9 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
                         FilledButton.icon(
                           style: FilledButton.styleFrom(
                             backgroundColor: preset.primary,
-                            foregroundColor: Theme.of(context)
-                                .colorScheme
-                                .onPrimary,
+                            foregroundColor: Theme.of(
+                              context,
+                            ).colorScheme.onPrimary,
                             minimumSize: const Size(110, 48),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(
@@ -755,6 +764,42 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
     return null;
   }
 
+  Future<void> _loadTrainingOptions() async {
+    if (_trainingOptionsLoading ||
+        (_trainingTypesAvailable && _trainingInstructorsAvailable)) {
+      return;
+    }
+    _trainingOptionsLoading = true;
+    try {
+      await Future.wait([
+        _repository
+            .trainingTypes()
+            .then((items) {
+              _trainingTypes = items;
+              _trainingTypesAvailable = true;
+            })
+            .catchError((Object error) {
+              if (error is! ApiException || !error.isForbidden) {
+                _showError(error, 'ไม่สามารถโหลดประเภทการอบรมได้');
+              }
+            }),
+        _repository
+            .trainingInstructors()
+            .then((items) {
+              _trainingInstructors = items;
+              _trainingInstructorsAvailable = true;
+            })
+            .catchError((Object error) {
+              if (error is! ApiException || !error.isForbidden) {
+                _showError(error, 'ไม่สามารถโหลดวิทยากรได้');
+              }
+            }),
+      ]);
+    } finally {
+      _trainingOptionsLoading = false;
+    }
+  }
+
   Future<bool> _save() async {
     final subject = _subject.text.trim();
     final attendee = int.tryParse(_attendeeCount.text.trim());
@@ -790,6 +835,12 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
       final result = await _repository.save({
         'roomId': _selectedRoomId,
         'activityTypeCode': _activityTypeCode,
+        'trainingTypeId': _activityTypeCode == 'TRAINING'
+            ? _trainingTypeId
+            : null,
+        'trainingInstructorId': _activityTypeCode == 'TRAINING'
+            ? _trainingInstructorId
+            : null,
         'subject': subject,
         'description': _description.text.trim(),
         'attendeeCount': attendee,
@@ -842,6 +893,8 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
       _activityTypeCode = booking['activityTypeCode']?.toString() == 'TRAINING'
           ? 'TRAINING'
           : 'MEETING';
+      _trainingTypeId = _int(booking['trainingTypeId']);
+      _trainingInstructorId = _int(booking['trainingInstructorId']);
       _subject.text = booking['subject']?.toString() ?? '';
       _description.text = booking['description']?.toString() ?? '';
       _attendeeCount.text = '${booking['attendeeCount'] ?? 1}';
@@ -852,6 +905,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
       _awaitingRangeEnd = false;
       _startTime = TimeOfDay(hour: first.hour, minute: first.minute);
       _endTime = TimeOfDay(hour: last.hour, minute: last.minute);
+      if (_activityTypeCode == 'TRAINING') await _loadTrainingOptions();
       await _showBookingDialog(
         onCancelled: () => setState(() {
           _editingId = null;
@@ -2097,6 +2151,8 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
       _editingId = null;
       _selectedRoomId = roomId;
       _activityTypeCode = 'MEETING';
+      _trainingTypeId = null;
+      _trainingInstructorId = null;
       _subject.clear();
       _description.clear();
       _remark.clear();
@@ -3069,8 +3125,9 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
               ),
             ],
             if (_searchMode == 'ROOM') ...[
-              ..._roomBookingsForSchedule(id)
-                  .map((booking) => _roomScheduleBookingRow(booking, preset)),
+              ..._roomBookingsForSchedule(
+                id,
+              ).map((booking) => _roomScheduleBookingRow(booking, preset)),
             ],
           ],
         ),
@@ -3282,10 +3339,98 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
             DropdownMenuItem(value: 'MEETING', child: Text('ประชุม')),
             DropdownMenuItem(value: 'TRAINING', child: Text('อบรม')),
           ],
-          onChanged: (value) {
-            if (value != null) refresh(() => _activityTypeCode = value);
+          onChanged: (value) async {
+            if (value == null) return;
+            refresh(() {
+              _activityTypeCode = value;
+              if (value != 'TRAINING') {
+                _trainingTypeId = null;
+                _trainingInstructorId = null;
+              }
+            });
+            if (value == 'TRAINING') {
+              await _loadTrainingOptions();
+              if (mounted) refresh(() {});
+            }
           },
         ),
+        if (_activityTypeCode == 'TRAINING') ...[
+          const SizedBox(height: 12),
+          if (_trainingOptionsLoading)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(8),
+                child: CircularProgressIndicator(),
+              ),
+            )
+          else ...[
+            if (_trainingTypesAvailable) ...[
+              DropdownButtonFormField<int>(
+                initialValue:
+                    _trainingTypes.any(
+                      (item) => _int(item['trainingTypeId']) == _trainingTypeId,
+                    )
+                    ? _trainingTypeId
+                    : null,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'ประเภทการอบรม'),
+                hint: Text(
+                  _trainingTypes.isEmpty
+                      ? 'ไม่มีประเภทการอบรมที่ใช้งาน'
+                      : 'เลือกประเภทการอบรม',
+                ),
+                items: [
+                  for (final item in _trainingTypes)
+                    if (_int(item['trainingTypeId']) case final id?)
+                      DropdownMenuItem(
+                        value: id,
+                        child: Text(item['trainingTypeName']?.toString() ?? ''),
+                      ),
+                ],
+                onChanged: _trainingTypes.isEmpty
+                    ? null
+                    : (value) => refresh(() => _trainingTypeId = value),
+              ),
+              const SizedBox(height: 12),
+            ],
+            if (_trainingInstructorsAvailable)
+              DropdownButtonFormField<int>(
+                initialValue:
+                    _trainingInstructors.any(
+                      (item) =>
+                          _int(item['trainingInstructorId']) ==
+                          _trainingInstructorId,
+                    )
+                    ? _trainingInstructorId
+                    : null,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'วิทยากร'),
+                hint: Text(
+                  _trainingInstructors.isEmpty
+                      ? 'ไม่มีวิทยากรที่ใช้งาน'
+                      : 'เลือกวิทยากร',
+                ),
+                items: [
+                  for (final item in _trainingInstructors)
+                    if (_int(item['trainingInstructorId']) case final id?)
+                      DropdownMenuItem(
+                        value: id,
+                        child: Text(
+                          [
+                            item['trainingInstructorName']?.toString() ?? '',
+                            if ((item['instituteName']?.toString() ?? '')
+                                .isNotEmpty)
+                              item['instituteName'].toString(),
+                          ].where((text) => text.isNotEmpty).join(' | '),
+                        ),
+                      ),
+                ],
+                onChanged: _trainingInstructors.isEmpty
+                    ? null
+                    : (value) => refresh(() => _trainingInstructorId = value),
+              ),
+          ],
+        ],
         const SizedBox(height: 18),
         TextField(
           controller: _subject,
@@ -3766,9 +3911,9 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
       children: [
         IconButton.filled(
           style: IconButton.styleFrom(
-            backgroundColor: Theme.of(context)
-                .colorScheme
-                .surfaceContainerHighest,
+            backgroundColor: Theme.of(
+              context,
+            ).colorScheme.surfaceContainerHighest,
             foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
           onPressed: _page > 1
@@ -3789,9 +3934,9 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
         ),
         IconButton.filled(
           style: IconButton.styleFrom(
-            backgroundColor: Theme.of(context)
-                .colorScheme
-                .surfaceContainerHighest,
+            backgroundColor: Theme.of(
+              context,
+            ).colorScheme.surfaceContainerHighest,
             foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
           onPressed: _page < pages
