@@ -23,6 +23,16 @@ class MeetingRoomBookingRepository {
   Future<Map<String, dynamic>> options() async =>
       Map<String, dynamic>.from(await _api.get('$_path/options') as Map);
 
+  Future<List<Map<String, dynamic>>> trainingTypes() async {
+    final data = await _api.get('$_path/training-types') as Map;
+    return List<Map<String, dynamic>>.from(data['items'] as List? ?? const []);
+  }
+
+  Future<List<Map<String, dynamic>>> trainingInstructors() async {
+    final data = await _api.get('$_path/training-instructors') as Map;
+    return List<Map<String, dynamic>>.from(data['items'] as List? ?? const []);
+  }
+
   Future<Map<String, dynamic>> list({
     required DateTime dateFrom,
     required DateTime dateTo,
