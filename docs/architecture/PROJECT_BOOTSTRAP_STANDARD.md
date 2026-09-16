@@ -16,6 +16,21 @@ Any later Root, shared-contract, Navigation, entitlement, permission,
 authentication, or schema dependency is a separate compatible Core PR to
 `main`. It must merge before the dependent Project PR.
 
+## Change classification
+
+Project machines classify a change before coding:
+
+| Level | Scope | Owner and merge order |
+| --- | --- | --- |
+| Green | UI/UX, Project-local GoRoutes under an existing contract, business API, Project migration/schema, report, and test inside projects/<project>/ | Project machine opens one Project PR directly to main. |
+| Yellow | MenuCode, public route contract, entitlement, permission baseline, Root integration, or shared UI contract | Core merges a compatible Bootstrap/contract PR first; then the Project PR continues. |
+| Red | Person, Employee, User, Authentication, Building/Room, Item, or any shared schema/contract | Stop dependent work until Core designs and merges a compatible contract. |
+
+Each Project keeps its own package, migration namespace, API package, and PR.
+A machine may own more than one Project, but a Feature PR still contains one
+Project only. A Project machine must not edit Root Router, TDADMainMenu, or the
+shared permission model.
+
 ## Mandatory Bootstrap contents
 
 - ProjectCode and Company entitlement;

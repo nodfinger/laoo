@@ -3,7 +3,7 @@ param(
     [ValidateSet('service', 'meeting', 'visitor', 'time', 'training')]
     [string]$Module,
 
-    [ValidateSet('center-service', 'meeting', 'visitor', 'time', 'training')]
+    [ValidateSet('center-service', 'business', 'meeting', 'visitor', 'time', 'training')]
     [string]$Role
 )
 

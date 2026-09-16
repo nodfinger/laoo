@@ -3,7 +3,7 @@ param(
     [ValidateSet('service', 'meeting', 'visitor', 'time', 'training')]
     [string]$Module,
 
-    [ValidateSet('center-service', 'meeting', 'visitor', 'time', 'training')]
+    [ValidateSet('center-service', 'business', 'meeting', 'visitor', 'time', 'training')]
     [string]$Role,
 
     [string]$BaseRef = 'origin/main'
@@ -12,6 +12,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 
+$machineConfig = $null
 if ([string]::IsNullOrWhiteSpace($Role)) {
     $machineConfigPath = Join-Path $repoRoot 'local.machine.json'
     if (-not (Test-Path $machineConfigPath)) {
@@ -25,8 +26,15 @@ if ([string]::IsNullOrWhiteSpace($Role)) {
     $machineConfig = Get-Content $machineConfigPath -Raw | ConvertFrom-Json
     $Role = [string]$machineConfig.role
 }
+elseif ($Role -eq 'business') {
+    $machineConfigPath = Join-Path $repoRoot 'local.machine.json'
+    if (-not (Test-Path $machineConfigPath)) {
+        throw "Machine role 'business' requires local.machine.json with ownedModules."
+    }
+    $machineConfig = Get-Content $machineConfigPath -Raw | ConvertFrom-Json
+}
 
-$validRoles = @('center-service', 'meeting', 'visitor', 'time', 'training')
+$validRoles = @('center-service', 'business', 'meeting', 'visitor', 'time', 'training')
 if ($Role -notin $validRoles) {
     throw "Invalid machine role '$Role'. Expected: $($validRoles -join ', ')."
 }
@@ -43,8 +51,25 @@ $ownedRoleByModule = @{
     training = 'training'
 }
 
-if ($Role -ne $ownedRoleByModule[$Module]) {
-    throw "Machine role '$Role' cannot verify module '$Module'. Use the owned module or move integration work to the Center machine."
+$ownedModules = @()
+if ($null -ne $machineConfig -and $null -ne $machineConfig.PSObject.Properties['ownedModules']) {
+    $ownedModules = @($machineConfig.ownedModules | ForEach-Object { ([string]$_).Trim().ToLowerInvariant() } | Where-Object { $_ })
+}
+
+if ($ownedModules.Count -eq 0) {
+    if ($Role -eq 'business') {
+        throw "Machine role 'business' requires a non-empty ownedModules array in local.machine.json."
+    }
+    $ownedModules = @($ownedRoleByModule[$Role])
+}
+
+$unknownModules = @($ownedModules | Where-Object { $_ -notin $ownedRoleByModule.Keys } | Sort-Object -Unique)
+if ($unknownModules.Count -gt 0) {
+    throw "local.machine.json contains unsupported ownedModules: $($unknownModules -join ', '). Bootstrap the Project before assigning it to a machine."
+}
+
+if ($Module -notin $ownedModules) {
+    throw "Machine role '$Role' does not own module '$Module'. ownedModules: $($ownedModules -join ', ')."
 }
 
 Push-Location $repoRoot
@@ -67,11 +92,11 @@ try {
     $outsideOwnership = @($changed | Where-Object { -not $_.StartsWith($ownedPrefix, [System.StringComparison]::OrdinalIgnoreCase) } | Sort-Object)
     if ($outsideOwnership.Count -gt 0) {
         $details = $outsideOwnership -join "`n - "
-        throw "Machine role '$Role' has changes outside '$ownedPrefix' while verifying module '$Module'. Split Core Impact into a Center-owned PR:`n - $details"
+        throw "Machine role '$Role' has changes outside '$ownedPrefix' while verifying module '$Module'. Keep one Project per PR; split Core Impact into a Center-owned PR:`n - $details"
     }
 }
 finally {
     Pop-Location
 }
 
-Write-Host "MACHINE BOUNDARY PASSED: $Role changes for module '$Module' are contained in $ownedPrefix."
+Write-Host "MACHINE BOUNDARY PASSED: $Role owns $($ownedModules -join ', ') and changes for module '$Module' are contained in $ownedPrefix."

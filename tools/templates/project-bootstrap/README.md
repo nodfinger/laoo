@@ -4,7 +4,9 @@ Replace `{{project}}`, `{{ProjectPascal}}`, and `LAOO_{{PROJECT_CODE}}`.
 
 Core uses this template during the Bootstrap PR. Once merged, the Project
 machine owns the package files and may replace its Project-local placeholder
-with a real screen without changing Root.
+with a real screen without changing Root. Project Feature PRs contain only
+`projects/<project>/`; a new MenuCode, entitlement, public route contract,
+Root integration, or shared-domain dependency remains a separate Core PR.
 
 Required files:
 

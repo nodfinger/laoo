@@ -1,6 +1,7 @@
 {
-  role: training,
-  allowedProjects: [LAOO, LAOO_TRAINING],
-  webPort: 8080,
-  apiPort: 5080
+  "role": "business",
+  "ownedModules": ["training"],
+  "allowedProjects": ["LAOO_TRAINING"],
+  "webPort": 8080,
+  "apiPort": 5080
 }

@@ -2,24 +2,25 @@
 
 ## Ownership
 
-| Machine role | Owned source |
-| --- | --- |
-| `center-service` | Root Core, `laoo_api`, shared packages, `projects/service` |
-| `meeting` | `projects/meeting` and `projects/training` |
-| `visitor` | `projects/visitor` |
-| `time` | `projects/time` |
-| `training` | `projects/training` |
+| Machine | ownedModules | Owned source |
+| --- | --- | --- |
+| Core | `service` | Root Core, `laoo_api`, shared packages, and `projects/service` temporarily |
+| Meeting Business | `meeting`, `visitor`, `training` | Each listed Project package; later `five_s` after its Bootstrap |
+| Time | `time` | `projects/time` |
 
 Every machine clones `nodfinger/laoo` to `C:\laooplatform\laoo`. Never
 share a live working tree, `.git`, `.dart_tool`, `build`, `bin`, or `obj`.
 Copy `local.machine.example.json` to ignored `local.machine.json` and set the
-role for that machine.
+role and `ownedModules` for that machine. `ownedModules` is the authority
+for Project-machine boundary checks; `allowedProjects` documents the matching
+LAOO ProjectCodes.
 
 Time machine example:
 
 ```json
 {
-  "role": "time",
+  "role": "business",
+  "ownedModules": ["time"],
   "allowedProjects": ["LAOO_TIME"],
   "webPort": 8080,
   "apiPort": 5080
@@ -30,8 +31,9 @@ Meeting machine with Training example:
 
 ```json
 {
-  "role": "meeting",
-  "allowedProjects": ["LAOO", "LAOO_MEETING", "LAOO_TRAINING"],
+  "role": "business",
+  "ownedModules": ["meeting", "visitor", "training"],
+  "allowedProjects": ["LAOO_MEETING", "LAOO_VISITOR", "LAOO_TRAINING"],
   "webPort": 8080,
   "apiPort": 5080
 }
@@ -41,9 +43,11 @@ Copy local.machine.meeting-training.example.json to the ignored
 local.machine.json on the Meeting machine. Never commit a machine local.machine.json.
 
 Run `tools/scripts/check-machine-boundaries.ps1 -Module <module>` before full
-verification. On Meeting, Visitor, and Time machines it rejects changed files
-outside the owned Project directory. The Center machine may change Root, Core,
-shared packages, and Service, and is responsible for integration verification.
+verification. It confirms that the requested Module belongs to
+`ownedModules`, then rejects changes outside `projects/<module>/`. This
+keeps each Feature PR to one Project even when a machine owns several. The Core
+machine may change Root, Core, shared packages, and Service, and is responsible
+for integration verification.
 
 ## New Project bootstrap
 
@@ -69,9 +73,9 @@ Classify every change before coding:
 
 | Level | Meaning | Required action |
 | --- | --- | --- |
-| Green | Only `projects/<project>`; no public contract change | Continue in the Project PR |
-| Yellow | Adds API/field/shared component | Notify Center; merge a separate compatible Core PR first |
-| Red | Authentication, Permission, Person, Employee, shared schema or migration | Stop dependent work until Core PR is merged and every machine syncs |
+| Green | UI/UX, Project-local API/schema/migration/report/test and an existing route contract inside `projects/<project>` | Continue in the Project PR |
+| Yellow | New MenuCode, public route contract, entitlement, permission baseline, Root integration, or shared UI contract | Notify Core; merge a separate compatible Core PR first |
+| Red | Person, Employee, User, Authentication, Building/Room, Item, shared schema or contract | Stop dependent work until Core PR is merged and every machine syncs |
 
 A Core Impact description records the requested change, consuming Projects,
 API/contract/schema impact, backward compatibility, migration, and merge order.
@@ -135,7 +139,8 @@ Resolve conflicts and run Center verification before Commit/Push/Merge:
 .\tools\scripts\verify-center.ps1 -Module meeting
 ```
 
-Each machine may create and squash-merge its own PR after verification. Never
+Each machine may create and squash-merge its own Project PR after verification.
+Keep one Project per PR even if its machine owns several Projects. Never
 push directly to `main`, force-push, reset shared work, or copy whole projects
 over another clone. After Merge, switch to `main` and pull with `--ff-only`.
 
@@ -157,6 +162,7 @@ For the Time role, use `-Module time`; its owned migrations are under
 `projects/time/database/migrations`.
 For Training work on the Meeting machine, use `-Module training`; its owned
 migrations are under `projects/training/database/migrations`.
+Add `five_s` to `ownedModules` only after its Core Bootstrap has merged.
 
 The runner validates names and checksums, writes
 `dbo.TDSTSchemaMigration`, and serializes execution with the SQL application

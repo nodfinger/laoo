@@ -1,6 +1,7 @@
 {
-  "role": "meeting",
-  "allowedProjects": ["LAOO", "LAOO_MEETING", "LAOO_TRAINING"],
+  "role": "business",
+  "ownedModules": ["meeting", "visitor", "training"],
+  "allowedProjects": ["LAOO_MEETING", "LAOO_VISITOR", "LAOO_TRAINING"],
   "webPort": 8080,
   "apiPort": 5080
 }
