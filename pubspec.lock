@@ -317,6 +317,13 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.0.0"
+  laoo_gate_pass:
+    dependency: "direct main"
+    description:
+      path: "projects/gate_pass"
+      relative: true
+    source: path
+    version: "1.0.0+1"
   laoo_meeting:
     dependency: "direct main"
     description:

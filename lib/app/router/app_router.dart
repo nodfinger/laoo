@@ -8,6 +8,7 @@ import 'package:laoo_meeting/meeting_feature.dart';
 import 'package:laoo_service/service_feature.dart';
 import 'package:laoo_time/time_feature.dart';
 import 'package:laoo_training/training_feature.dart';
+import 'package:laoo_gate_pass/gate_pass_feature.dart';
 import 'package:laoo_visitor/visitor_feature.dart';
 
 import '../../core/auth/app_auth_controller.dart';
@@ -172,6 +173,7 @@ final GoRouter appRouter = GoRouter(
     ...buildVisitorFeatureRoutes(),
     ...buildTimeFeatureRoutes(),
     ...buildTrainingFeatureRoutes(),
+    ...buildGatePassFeatureRoutes(),
     GoRoute(
       path: RoutePaths.companyBranches,
       name: RouteNames.companyBranches,
