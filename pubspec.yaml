@@ -32,6 +32,8 @@ dependencies:
     path: projects/training
   laoo_gate_pass:
     path: projects/gate_pass
+  laoo_five_s:
+    path: projects/five_s
 
   cupertino_icons: ^1.0.8
   flutter_riverpod: ^3.4.2

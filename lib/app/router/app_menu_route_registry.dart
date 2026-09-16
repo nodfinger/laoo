@@ -1,5 +1,7 @@
 import 'package:laoo_gate_pass/gate_pass_feature.dart'
     show GatePassMenuCodes, GatePassRouteNames, GatePassRoutePaths;
+import 'package:laoo_five_s/five_s_feature.dart'
+    show FiveSMenuCodes, FiveSRouteNames, FiveSRoutePaths;
 import 'package:laoo_meeting/meeting_feature.dart'
     show MeetingMenuCodes, MeetingRoutes;
 import 'package:laoo_service/service_feature.dart' show ServiceRoutes;
@@ -673,6 +675,69 @@ abstract final class AppMenuRouteRegistry {
       databaseRouteName: GatePassRouteNames.reports,
       goRouteName: GatePassRouteNames.reports,
       path: GatePassRoutePaths.reports,
+      scope: AppMenuScope.company,
+    ),
+    FiveSMenuCodes.inspectionAreas: AppMenuRouteSpec(
+      menuCode: FiveSMenuCodes.inspectionAreas,
+      databaseRouteName: FiveSRouteNames.inspectionAreas,
+      goRouteName: FiveSRouteNames.inspectionAreas,
+      path: FiveSRoutePaths.inspectionAreas,
+      scope: AppMenuScope.company,
+    ),
+    FiveSMenuCodes.templates: AppMenuRouteSpec(
+      menuCode: FiveSMenuCodes.templates,
+      databaseRouteName: FiveSRouteNames.templates,
+      goRouteName: FiveSRouteNames.templates,
+      path: FiveSRoutePaths.templates,
+      scope: AppMenuScope.company,
+    ),
+    FiveSMenuCodes.inspectionTeams: AppMenuRouteSpec(
+      menuCode: FiveSMenuCodes.inspectionTeams,
+      databaseRouteName: FiveSRouteNames.inspectionTeams,
+      goRouteName: FiveSRouteNames.inspectionTeams,
+      path: FiveSRoutePaths.inspectionTeams,
+      scope: AppMenuScope.company,
+    ),
+    FiveSMenuCodes.inspectionPlans: AppMenuRouteSpec(
+      menuCode: FiveSMenuCodes.inspectionPlans,
+      databaseRouteName: FiveSRouteNames.inspectionPlans,
+      goRouteName: FiveSRouteNames.inspectionPlans,
+      path: FiveSRoutePaths.inspectionPlans,
+      scope: AppMenuScope.company,
+    ),
+    FiveSMenuCodes.inspections: AppMenuRouteSpec(
+      menuCode: FiveSMenuCodes.inspections,
+      databaseRouteName: FiveSRouteNames.inspections,
+      goRouteName: FiveSRouteNames.inspections,
+      path: FiveSRoutePaths.inspections,
+      scope: AppMenuScope.company,
+    ),
+    FiveSMenuCodes.inspectionConfirmations: AppMenuRouteSpec(
+      menuCode: FiveSMenuCodes.inspectionConfirmations,
+      databaseRouteName: FiveSRouteNames.inspectionConfirmations,
+      goRouteName: FiveSRouteNames.inspectionConfirmations,
+      path: FiveSRoutePaths.inspectionConfirmations,
+      scope: AppMenuScope.company,
+    ),
+    FiveSMenuCodes.findings: AppMenuRouteSpec(
+      menuCode: FiveSMenuCodes.findings,
+      databaseRouteName: FiveSRouteNames.findings,
+      goRouteName: FiveSRouteNames.findings,
+      path: FiveSRoutePaths.findings,
+      scope: AppMenuScope.company,
+    ),
+    FiveSMenuCodes.inspectionHistory: AppMenuRouteSpec(
+      menuCode: FiveSMenuCodes.inspectionHistory,
+      databaseRouteName: FiveSRouteNames.inspectionHistory,
+      goRouteName: FiveSRouteNames.inspectionHistory,
+      path: FiveSRoutePaths.inspectionHistory,
+      scope: AppMenuScope.company,
+    ),
+    FiveSMenuCodes.reports: AppMenuRouteSpec(
+      menuCode: FiveSMenuCodes.reports,
+      databaseRouteName: FiveSRouteNames.reports,
+      goRouteName: FiveSRouteNames.reports,
+      path: FiveSRoutePaths.reports,
       scope: AppMenuScope.company,
     ),
     '29001': AppMenuRouteSpec(
