@@ -14,7 +14,7 @@ namespace LaooTimeModule.Controllers;
 public sealed record LeaveRequestSaveRequest(long? EmployeeId, long LeaveTypeId,
     DateOnly StartWorkDate, DateOnly EndWorkDate, decimal RequestedQuantity,
     string? RequestRemark, string? EvidenceReference, long? OnBehalfReasonId,
-    string? OnBehalfRemark);
+    string? OnBehalfRemark, int? StartMinute, int? EndMinute);
 public sealed record LeaveDecisionRequest(string DecisionCode, string? Reason,
     string RowVersion);
 public sealed record LeaveCancelRequest(string RowVersion, string? Reason);
@@ -130,6 +130,36 @@ AND (@Self=1
         var total=Convert.ToInt64(await count.ExecuteScalarAsync(token));
         await using var q=new SqlCommand("SELECT R.RequestID,R.SubjectEmployeeID,E.EmployeeCode,E.FullName,T.LeaveTypeCode,T.LeaveTypeName,L.UnitCode,L.StartWorkDate,L.EndWorkDate,L.RequestedQuantity,R.InitiationModeCode,R.StatusCode,R.SubmittedDate,CONVERT(varchar(32),R.RowVersion,2) "+where+" ORDER BY R.CreateDate DESC,R.RequestID DESC OFFSET @O ROWS FETCH NEXT @Take ROWS ONLY",c);BindList(q,companyId,userId,ownEmployee,status,from,to,self,approval);Add(q,"@O",SqlDbType.Int,(page-1)*pageSize);Add(q,"@Take",SqlDbType.Int,pageSize);
         await using var r=await q.ExecuteReaderAsync(token);var items=new List<object>();while(await r.ReadAsync(token))items.Add(new{requestId=r.GetInt64(0),employeeId=r.GetInt64(1),employeeCode=r.GetString(2),fullName=r.GetString(3),leaveTypeCode=r.GetString(4),leaveTypeName=r.GetString(5),unitCode=r.GetString(6),startWorkDate=DateOnly.FromDateTime(r.GetDateTime(7)),endWorkDate=DateOnly.FromDateTime(r.GetDateTime(8)),requestedQuantity=r.GetDecimal(9),initiationModeCode=r.GetString(10),statusCode=r.GetString(11),submittedDate=r.IsDBNull(12)?(DateTime?)null:r.GetDateTime(12),rowVersion=r.GetString(13)});return Ok(new{total,page,pageSize,items});
+    }
+
+    [HttpGet("{requestId:long}")]
+    public async Task<IActionResult> Get(long requestId, [FromQuery] string mode,
+        CancellationToken token)
+    {
+        if (!Scope(out var companyId, out var userId)) return Forbid();
+        var menu = mode.ToLowerInvariant() switch
+        { "proxy" => ProxyMenu, "self" => SelfMenu, "approval" => InboxMenu, _ => null };
+        if (menu is null) return BadRequest(new { message = "รูปแบบหน้าจอไม่ถูกต้อง" });
+        await using var c = await Open(token);
+        if (!await Can(c, menu, "VIEW", token)) return Forbid();
+        await using var header = new SqlCommand("""
+SELECT R.RequestID,R.SubjectEmployeeID,E.EmployeeCode,E.FullName,T.LeaveTypeCode,T.LeaveTypeName,L.UnitCode,L.StartWorkDate,L.EndWorkDate,L.RequestedQuantity,L.RequestRemark,R.InitiationModeCode,R.StatusCode,R.OnBehalfRemark,R.EvidenceReference,O.ReasonName,CONVERT(varchar(32),R.RowVersion,2)
+FROM dbo.TDTMRequest R JOIN dbo.TDTMLeaveRequest L ON L.RequestID=R.RequestID
+JOIN dbo.TDTMLeaveType T ON T.LeaveTypeID=L.LeaveTypeID
+JOIN dbo.TDADEmployee E ON E.CompanyID=R.CompanyID AND E.EmployeeID=R.SubjectEmployeeID
+LEFT JOIN dbo.TDTMOnBehalfReason O ON O.CompanyID=R.CompanyID AND O.OnBehalfReasonID=R.OnBehalfReasonID
+WHERE R.CompanyID=@C AND R.RequestID=@R AND R.ProcessCode='LEAVE_REQUEST'
+""",c);Add(header,"@C",SqlDbType.BigInt,companyId);Add(header,"@R",SqlDbType.BigInt,requestId);
+        await using var reader=await header.ExecuteReaderAsync(token);
+        if(!await reader.ReadAsync(token))return NotFound();
+        var subject=reader.GetInt64(1);
+        var value=new { requestId=reader.GetInt64(0),employeeId=subject,employeeCode=reader.GetString(2),fullName=reader.GetString(3),leaveTypeCode=reader.GetString(4),leaveTypeName=reader.GetString(5),unitCode=reader.GetString(6),startWorkDate=DateOnly.FromDateTime(reader.GetDateTime(7)),endWorkDate=DateOnly.FromDateTime(reader.GetDateTime(8)),requestedQuantity=reader.GetDecimal(9),requestRemark=reader.IsDBNull(10)?null:reader.GetString(10),initiationModeCode=reader.GetString(11),statusCode=reader.GetString(12),onBehalfRemark=reader.IsDBNull(13)?null:reader.GetString(13),evidenceReference=reader.IsDBNull(14)?null:reader.GetString(14),onBehalfReasonName=reader.IsDBNull(15)?null:reader.GetString(15),rowVersion=reader.GetString(16)};
+        await reader.CloseAsync();
+        var selfEmployee=await EmployeeForUser(c,companyId,userId,token);
+        if(mode.Equals("self",StringComparison.OrdinalIgnoreCase) ? selfEmployee!=subject : !await InScope(c,companyId,userId,subject,token))return Forbid();
+        await using var details=new SqlCommand("SELECT WorkDate,StartMinute,EndMinute,RequestedQuantity,ScheduledNetMinutes FROM dbo.TDTMLeaveRequestDate WHERE RequestID=@R ORDER BY WorkDate",c);Add(details,"@R",SqlDbType.BigInt,requestId);await using var d=await details.ExecuteReaderAsync(token);var dateRows=new List<object>();while(await d.ReadAsync(token))dateRows.Add(new{workDate=DateOnly.FromDateTime(d.GetDateTime(0)),startMinute=d.IsDBNull(1)?(int?)null:d.GetInt32(1),endMinute=d.IsDBNull(2)?(int?)null:d.GetInt32(2),requestedQuantity=d.GetDecimal(3),scheduledNetMinutes=d.IsDBNull(4)?(int?)null:d.GetInt32(4)});await d.CloseAsync();
+        await using var decisions=new SqlCommand("SELECT DecisionCode,Reason,DecisionDate FROM dbo.TDTMApprovalDecision WHERE RequestID=@R ORDER BY DecisionDate",c);Add(decisions,"@R",SqlDbType.BigInt,requestId);await using var a=await decisions.ExecuteReaderAsync(token);var decisionRows=new List<object>();while(await a.ReadAsync(token))decisionRows.Add(new{decisionCode=a.GetString(0),reason=a.IsDBNull(1)?null:a.GetString(1),decisionDate=a.GetDateTime(2)});
+        return Ok(new { header=value, details=dateRows, decisions=decisionRows });
     }
 
     [HttpPost]
@@ -306,6 +336,12 @@ SELECT CAST(CASE WHEN EXISTS
     private static async Task Snapshots(SqlConnection c,SqlTransaction tx,long id,Policy policy,Profile profile,CancellationToken t){var p=JsonSerializer.Serialize(new{processCode="LEAVE_REQUEST",policyCode=policy.Code,policyVersionId=policy.Id});var w=JsonSerializer.Serialize(new{processCode="LEAVE",profileCode=profile.Code,approvalProfileVersionId=profile.BaseId,processApprovalPolicyVersionId=profile.ProcessId});await using var a=new SqlCommand("INSERT dbo.TDTMRequestPolicySnapshot(RequestID,RequestPolicyVersionID,PolicyCode,SnapshotJson,SnapshotHash)VALUES(@R,@V,@C,@J,@H)",c,tx);Add(a,"@R",SqlDbType.BigInt,id);Add(a,"@V",SqlDbType.BigInt,policy.Id);Add(a,"@C",SqlDbType.VarChar,policy.Code,30);Add(a,"@J",SqlDbType.NVarChar,p,-1);Add(a,"@H",SqlDbType.VarBinary,SHA256.HashData(Encoding.UTF8.GetBytes(p)),32);await a.ExecuteNonQueryAsync(t);await using var b=new SqlCommand("INSERT dbo.TDTMWorkflowSnapshot(RequestID,ApprovalProfileVersionID,ProcessApprovalPolicyVersionID,SnapshotJson,SnapshotHash)VALUES(@R,@B,@P,@J,@H)",c,tx);Add(b,"@R",SqlDbType.BigInt,id);Add(b,"@B",SqlDbType.BigInt,profile.BaseId);Add(b,"@P",SqlDbType.BigInt,profile.ProcessId);Add(b,"@J",SqlDbType.NVarChar,w,-1);Add(b,"@H",SqlDbType.VarBinary,SHA256.HashData(Encoding.UTF8.GetBytes(w)),32);await b.ExecuteNonQueryAsync(t);}
     private static async Task<List<Allocation>> Detail(SqlConnection c,SqlTransaction tx,long company,long employee,long id,Type type,LeaveRequestSaveRequest x,CancellationToken t){await using var q=new SqlCommand("INSERT dbo.TDTMLeaveRequest(RequestID,CompanyID,SubjectEmployeeID,LeaveTypeID,UnitCode,StartWorkDate,EndWorkDate,RequestedQuantity,RequestRemark)VALUES(@R,@C,@E,@T,@U,@S,@End,@Q,@Remark)",c,tx);Add(q,"@R",SqlDbType.BigInt,id);Add(q,"@C",SqlDbType.BigInt,company);Add(q,"@E",SqlDbType.BigInt,employee);Add(q,"@T",SqlDbType.BigInt,type.Id);Add(q,"@U",SqlDbType.VarChar,type.Unit,10);Add(q,"@S",SqlDbType.Date,x.StartWorkDate.ToDateTime(TimeOnly.MinValue));Add(q,"@End",SqlDbType.Date,x.EndWorkDate.ToDateTime(TimeOnly.MinValue));Add(q,"@Q",SqlDbType.Decimal,x.RequestedQuantity);q.Parameters["@Q"].Precision=18;q.Parameters["@Q"].Scale=4;Add(q,"@Remark",SqlDbType.NVarChar,x.RequestRemark,1000);await q.ExecuteNonQueryAsync(t);
         var scheduled=new List<(DateOnly Date,int Minutes)>();for(var date=x.StartWorkDate;date<=x.EndWorkDate;date=date.AddDays(1)){var minutes=await AttendanceCalculator.ScheduledNetMinutesAsync(c,tx,company,employee,date,t);if(minutes>0)scheduled.Add((date,minutes));}
+        if(type.Unit=="MINUTE"){
+            if(scheduled.Count!=1||x.StartWorkDate!=x.EndWorkDate||!x.StartMinute.HasValue||!x.EndMinute.HasValue||x.StartMinute<0||x.EndMinute>1440||x.EndMinute<=x.StartMinute)throw new InvalidOperationException("การลาแบบนาทีต้องเลือกช่วงเวลาในวันทำงานเดียว");
+            var netMinutes=await AttendanceCalculator.ScheduledLeaveMinutesAsync(c,tx,company,employee,x.StartWorkDate,x.StartMinute.Value,x.EndMinute.Value,t);
+            if(netMinutes<=0||x.RequestedQuantity!=netMinutes)throw new InvalidOperationException("ช่วงเวลาที่ขอลาไม่อยู่ในเวลาทำงาน หรือจำนวนไม่ตรงกับนาทีงานสุทธิ");
+            await using var minuteDetail=new SqlCommand("INSERT dbo.TDTMLeaveRequestDate(RequestID,CompanyID,SubjectEmployeeID,WorkDate,StartMinute,EndMinute,RequestedQuantity,ScheduledNetMinutes) OUTPUT INSERTED.LeaveRequestDateID VALUES(@R,@C,@E,@D,@S,@End,@Q,@M)",c,tx);Add(minuteDetail,"@R",SqlDbType.BigInt,id);Add(minuteDetail,"@C",SqlDbType.BigInt,company);Add(minuteDetail,"@E",SqlDbType.BigInt,employee);Add(minuteDetail,"@D",SqlDbType.Date,x.StartWorkDate.ToDateTime(TimeOnly.MinValue));Add(minuteDetail,"@S",SqlDbType.Int,x.StartMinute);Add(minuteDetail,"@End",SqlDbType.Int,x.EndMinute);Add(minuteDetail,"@Q",SqlDbType.Decimal,x.RequestedQuantity);minuteDetail.Parameters["@Q"].Precision=18;minuteDetail.Parameters["@Q"].Scale=4;Add(minuteDetail,"@M",SqlDbType.Int,scheduled[0].Minutes);return[new Allocation(Convert.ToInt64(await minuteDetail.ExecuteScalarAsync(t)),x.StartWorkDate,x.RequestedQuantity)];
+        }
         if(scheduled.Count==0)throw new InvalidOperationException("ช่วงวันที่ลาไม่มีวันทำงานตามตารางที่มีผล");
         if(type.Unit=="DAY"&&x.RequestedQuantity!=scheduled.Count)throw new InvalidOperationException("จำนวนวันลาต้องเท่ากับจำนวนวันทำงานในช่วงที่เลือก");
         if(type.Unit=="MINUTE"&&(scheduled.Count!=1||x.RequestedQuantity!=decimal.Truncate(x.RequestedQuantity)||x.RequestedQuantity>scheduled[0].Minutes))throw new InvalidOperationException("การลาแบบนาทีต้องอยู่ในวันทำงานเดียวและไม่เกินนาทีงานสุทธิ");
