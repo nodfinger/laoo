@@ -17,8 +17,8 @@ BEGIN TRY
         ALTER TABLE dbo.TDADMeetingRoomBooking ADD TrainingInstituteSnapshot nvarchar(200) NULL;
 
     IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.TDADMeetingRoomBooking') AND name=N'CK_TDADMeetingRoomBooking_TrainingFields')
-        ALTER TABLE dbo.TDADMeetingRoomBooking ADD CONSTRAINT CK_TDADMeetingRoomBooking_TrainingFields CHECK
-        (ActivityTypeCode='TRAINING' OR (TrainingTypeID IS NULL AND TrainingInstructorID IS NULL AND TrainingTypeNameSnapshot IS NULL AND TrainingInstructorNameSnapshot IS NULL AND TrainingInstituteSnapshot IS NULL));
+        EXEC(N'ALTER TABLE dbo.TDADMeetingRoomBooking ADD CONSTRAINT CK_TDADMeetingRoomBooking_TrainingFields CHECK
+        (ActivityTypeCode=''TRAINING'' OR (TrainingTypeID IS NULL AND TrainingInstructorID IS NULL AND TrainingTypeNameSnapshot IS NULL AND TrainingInstructorNameSnapshot IS NULL AND TrainingInstituteSnapshot IS NULL));');
 
     COMMIT TRANSACTION;
 END TRY
