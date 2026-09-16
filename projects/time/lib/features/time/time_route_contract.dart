@@ -241,7 +241,7 @@ abstract final class TimeRoutes {
     screenType: 3,
     routeName: TimeRouteNames.leaveBalances,
     routePath: TimeRoutePaths.leaveBalances,
-    isImplemented: false,
+    isImplemented: true,
   );
   static const leaveRequests = FeatureRouteContract(
     projectCode: TimeProject.code,
@@ -273,7 +273,7 @@ abstract final class TimeRoutes {
     screenType: 3,
     routeName: TimeRouteNames.myLeaveBalance,
     routePath: TimeRoutePaths.myLeaveBalance,
-    isImplemented: false,
+    isImplemented: true,
   );
   static const myTimeCorrections = FeatureRouteContract(
     projectCode: TimeProject.code,
