@@ -1,12 +1,13 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('service', 'meeting', 'visitor', 'time', 'training')]
+    [ValidateSet('service', 'meeting', 'visitor', 'time', 'training', 'gate_pass')]
     [string]$Project
 )
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
-$projectPascal = (Get-Culture).TextInfo.ToTitleCase($Project)
+$projectPascal = (($Project -split '[_-]' |
+    ForEach-Object { (Get-Culture).TextInfo.ToTitleCase($_) }) -join '')
 $packageName = 'laoo_' + $Project
 $featureDirectory = Join-Path $repoRoot ('projects\' + $Project + '\lib\features\' + $Project)
 $rootRouterPath = Join-Path $repoRoot 'lib\app\router\app_router.dart'

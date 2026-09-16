@@ -3,6 +3,7 @@ import 'package:laoo_meeting/meeting_feature.dart';
 import 'package:laoo_service/service_feature.dart';
 import 'package:laoo_time/time_feature.dart';
 import 'package:laoo_training/training_feature.dart';
+import 'package:laoo_gate_pass/gate_pass_feature.dart';
 import 'package:laoo_visitor/visitor_feature.dart';
 import 'package:laoo_shared_workspace_ui/laoo_shared_workspace_ui.dart';
 
@@ -19,6 +20,7 @@ import 'features/support/presentation/widgets/support_workspace_shell.dart';
 void main() {
   configureMeetingFeatureHost(_buildMeetingWorkspaceShell);
   configureServiceWorkspaceShell(_buildMeetingWorkspaceShell);
+  configureGatePassFeatureHost(_buildMeetingWorkspaceShell);
   configureTimeFeatureHost(
     _buildMeetingWorkspaceShell,
     apiClientFactory: ApiClient.new,

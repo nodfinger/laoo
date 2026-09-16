@@ -1,3 +1,5 @@
+import 'package:laoo_gate_pass/gate_pass_feature.dart'
+    show GatePassMenuCodes, GatePassRouteNames, GatePassRoutePaths;
 import 'package:laoo_meeting/meeting_feature.dart'
     show MeetingMenuCodes, MeetingRoutes;
 import 'package:laoo_service/service_feature.dart' show ServiceRoutes;
@@ -615,6 +617,62 @@ abstract final class AppMenuRouteRegistry {
       databaseRouteName: 'trainingInstructors',
       goRouteName: RouteNames.trainingInstructors,
       path: RoutePaths.trainingInstructors,
+      scope: AppMenuScope.company,
+    ),
+    GatePassMenuCodes.settings: AppMenuRouteSpec(
+      menuCode: GatePassMenuCodes.settings,
+      databaseRouteName: GatePassRouteNames.settings,
+      goRouteName: GatePassRouteNames.settings,
+      path: GatePassRoutePaths.settings,
+      scope: AppMenuScope.company,
+    ),
+    GatePassMenuCodes.purposes: AppMenuRouteSpec(
+      menuCode: GatePassMenuCodes.purposes,
+      databaseRouteName: GatePassRouteNames.purposes,
+      goRouteName: GatePassRouteNames.purposes,
+      path: GatePassRoutePaths.purposes,
+      scope: AppMenuScope.company,
+    ),
+    GatePassMenuCodes.requests: AppMenuRouteSpec(
+      menuCode: GatePassMenuCodes.requests,
+      databaseRouteName: GatePassRouteNames.requests,
+      goRouteName: GatePassRouteNames.requests,
+      path: GatePassRoutePaths.requests,
+      scope: AppMenuScope.company,
+    ),
+    GatePassMenuCodes.approvalInbox: AppMenuRouteSpec(
+      menuCode: GatePassMenuCodes.approvalInbox,
+      databaseRouteName: GatePassRouteNames.approvalInbox,
+      goRouteName: GatePassRouteNames.approvalInbox,
+      path: GatePassRoutePaths.approvalInbox,
+      scope: AppMenuScope.company,
+    ),
+    GatePassMenuCodes.exitCheck: AppMenuRouteSpec(
+      menuCode: GatePassMenuCodes.exitCheck,
+      databaseRouteName: GatePassRouteNames.exitCheck,
+      goRouteName: GatePassRouteNames.exitCheck,
+      path: GatePassRoutePaths.exitCheck,
+      scope: AppMenuScope.company,
+    ),
+    GatePassMenuCodes.returnTracking: AppMenuRouteSpec(
+      menuCode: GatePassMenuCodes.returnTracking,
+      databaseRouteName: GatePassRouteNames.returnTracking,
+      goRouteName: GatePassRouteNames.returnTracking,
+      path: GatePassRoutePaths.returnTracking,
+      scope: AppMenuScope.company,
+    ),
+    GatePassMenuCodes.myGatePasses: AppMenuRouteSpec(
+      menuCode: GatePassMenuCodes.myGatePasses,
+      databaseRouteName: GatePassRouteNames.myGatePasses,
+      goRouteName: GatePassRouteNames.myGatePasses,
+      path: GatePassRoutePaths.myGatePasses,
+      scope: AppMenuScope.company,
+    ),
+    GatePassMenuCodes.reports: AppMenuRouteSpec(
+      menuCode: GatePassMenuCodes.reports,
+      databaseRouteName: GatePassRouteNames.reports,
+      goRouteName: GatePassRouteNames.reports,
+      path: GatePassRoutePaths.reports,
       scope: AppMenuScope.company,
     ),
     '29001': AppMenuRouteSpec(

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>LaooGatePassModule</RootNamespace>
+    <AssemblyName>Laoo.GatePass.Module</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="../../../../../packages/dotnet/Laoo.Shared.Contracts/Laoo.Shared.Contracts.csproj" />
+  </ItemGroup>
+</Project>
