@@ -56,6 +56,22 @@ public static class AttendanceCalculator
         return Math.Max(0, scheduled - deductedBreaks);
     }
 
+    public static async Task<int> ScheduledLeaveMinutesAsync(
+        SqlConnection connection, SqlTransaction transaction, long companyId,
+        long employeeId, DateOnly workDate, int startMinute, int endMinute,
+        CancellationToken token)
+    {
+        if (startMinute < 0 || endMinute > 1440 || endMinute <= startMinute)
+            return 0;
+        var (_, sessions, breaks) = await Schedule(
+            connection, transaction, companyId, employeeId, workDate, token);
+        var start = workDate.ToDateTime(TimeOnly.MinValue).AddMinutes(startMinute);
+        var end = workDate.ToDateTime(TimeOnly.MinValue).AddMinutes(endMinute);
+        var scheduled = sessions.Sum(session => (int)Math.Max(0,
+            (Min(end, session.ScheduledOut) - Max(start, session.ScheduledIn)).TotalMinutes));
+        return Math.Max(0, scheduled - OverlapMinutes(start, end, breaks));
+    }
+
     private static async Task<DateTime?> Endpoint(SqlConnection c, SqlTransaction tx, long company, long employee, DateOnly date,
         long rule, string endpoint, DateTime start, DateTime end, bool first, CancellationToken token)
     {
@@ -94,6 +110,8 @@ FROM V JOIN dbo.TDTMAttendanceSessionRule R ON R.ShiftTemplateVersionID=V.ShiftT
         await using var b=new SqlCommand("SELECT StartDayOffset,StartTime,EndDayOffset,EndTime FROM dbo.TDTMShiftSegment WHERE CompanyID=@C AND ShiftTemplateVersionID=@V AND SegmentTypeCode='BREAK'",c,tx); Add(b,"@C",SqlDbType.BigInt,company);Add(b,"@V",SqlDbType.BigInt,version);await using var br=await b.ExecuteReaderAsync(token);while(await br.ReadAsync(token))breaks.Add((date.AddDays(br.GetByte(0)).ToDateTime(TimeOnly.FromTimeSpan(br.GetTimeSpan(1))),date.AddDays(br.GetByte(2)).ToDateTime(TimeOnly.FromTimeSpan(br.GetTimeSpan(3)))));return(version,sessions,breaks);
     }
     private static int OverlapMinutes(DateTime start,DateTime end,List<(DateTime Start,DateTime End)> ranges)=>ranges.Sum(x=>(int)Math.Max(0,((end<x.End?end:x.End)-(start>x.Start?start:x.Start)).TotalMinutes));
+    private static DateTime Min(DateTime left,DateTime right)=>left<right?left:right;
+    private static DateTime Max(DateTime left,DateTime right)=>left>right?left:right;
     private static async Task<int> NextVersion(SqlConnection c,SqlTransaction tx,long company,long employee,DateOnly date,CancellationToken token){await using var q=new SqlCommand("SELECT ISNULL(MAX(ResultVersion),0)+1 FROM dbo.TDTMAttendanceResult WITH(UPDLOCK,HOLDLOCK) WHERE CompanyID=@C AND EmployeeID=@E AND WorkDate=@D",c,tx);Add(q,"@C",SqlDbType.BigInt,company);Add(q,"@E",SqlDbType.BigInt,employee);Add(q,"@D",SqlDbType.Date,date.ToDateTime(TimeOnly.MinValue));return Convert.ToInt32(await q.ExecuteScalarAsync(token));}
     private static async Task InsertResult(SqlConnection c,SqlTransaction tx,long company,long employee,DateOnly date,long? version,int resultVersion,string status,int scheduled,int actual,int late,int early,string? reason,long actor,IReadOnlyList<(Session Session,DateTime? In,DateTime? Out,int Work,int Late,int Early)> rows,CancellationToken token){await using var h=new SqlCommand("INSERT dbo.TDTMAttendanceResult(CompanyID,EmployeeID,WorkDate,ShiftTemplateVersionID,ResultVersion,StatusCode,ScheduledWorkMinutes,ActualWorkMinutes,LateMinutes,EarlyMinutes,UnresolvedReason,CreateBy) OUTPUT INSERTED.AttendanceResultID VALUES(@C,@E,@D,@V,@N,@S,@SW,@AW,@L,@ER,@R,@U)",c,tx);Add(h,"@C",SqlDbType.BigInt,company);Add(h,"@E",SqlDbType.BigInt,employee);Add(h,"@D",SqlDbType.Date,date.ToDateTime(TimeOnly.MinValue));Add(h,"@V",SqlDbType.BigInt,version);Add(h,"@N",SqlDbType.Int,resultVersion);Add(h,"@S",SqlDbType.VarChar,status,20);Add(h,"@SW",SqlDbType.Int,scheduled);Add(h,"@AW",SqlDbType.Int,actual);Add(h,"@L",SqlDbType.Int,late);Add(h,"@ER",SqlDbType.Int,early);Add(h,"@R",SqlDbType.NVarChar,reason,1000);Add(h,"@U",SqlDbType.BigInt,actor);var id=Convert.ToInt64(await h.ExecuteScalarAsync(token));foreach(var row in rows){await using var d=new SqlCommand("INSERT dbo.TDTMAttendanceSessionResult(AttendanceResultID,AttendanceSessionRuleID,SequenceNo,SessionStatusCode,ActualInDateTime,ActualOutDateTime,WorkMinutes,LateMinutes,EarlyMinutes)VALUES(@I,@R,@N,@S,@IN,@OUT,@W,@L,@E)",c,tx);Add(d,"@I",SqlDbType.BigInt,id);Add(d,"@R",SqlDbType.BigInt,row.Session.Id);Add(d,"@N",SqlDbType.Int,row.Session.Sequence);Add(d,"@S",SqlDbType.VarChar,row.In.HasValue&&row.Out.HasValue&&row.Out>row.In?"COMPLETE":"UNRESOLVED",20);Add(d,"@IN",SqlDbType.DateTime2,row.In);Add(d,"@OUT",SqlDbType.DateTime2,row.Out);Add(d,"@W",SqlDbType.Int,row.Work);Add(d,"@L",SqlDbType.Int,row.Late);Add(d,"@E",SqlDbType.Int,row.Early);await d.ExecuteNonQueryAsync(token);}}
     private static void Add(SqlCommand q,string name,SqlDbType type,object? value,int size=0){var p=size==0?q.Parameters.Add(name,type):q.Parameters.Add(name,type,size);p.Value=value??DBNull.Value;}

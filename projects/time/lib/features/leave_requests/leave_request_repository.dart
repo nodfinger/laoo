@@ -35,6 +35,11 @@ class LeaveRequestRepository {
         ) as Map,
       );
 
+  Future<Map<String, dynamic>> get(int requestId) async =>
+      Map<String, dynamic>.from(
+        await api.get('$_path/$requestId', query: {'mode': mode}) as Map,
+      );
+
   Future<Map<String, dynamic>> submit(Map<String, dynamic> value) async =>
       Map<String, dynamic>.from(
         await api.post('$_path?mode=$mode', body: value) as Map,

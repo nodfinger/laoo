@@ -144,6 +144,19 @@ class _LeaveRequestPageState extends State<LeaveRequestPage> {
     }
   }
 
+  Future<void> _view(Map<String, dynamic> row) async {
+    try {
+      final value = await _repo.get(row['requestId'] as int);
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (_) => _LeaveRequestDetailDialog(value: value),
+      );
+    } catch (error) {
+      _show(timeErrorText(error), true);
+    }
+  }
+
   Future<String?> _reasonDialog(String title) async {
     final controller = TextEditingController();
     final value = await showDialog<String>(
@@ -245,6 +258,7 @@ class _LeaveRequestPageState extends State<LeaveRequestPage> {
                             headingRowColor: WidgetStatePropertyAll(timeUiTokens.primaryColor.withValues(alpha: .10)),
                             columns: [
                               LaooWorkspaceTableColumns.id,
+                              const DataColumn(label: Text('ดู')),
                               const DataColumn(label: Text('พนักงาน')),
                               const DataColumn(label: Text('ประเภทการลา')),
                               const DataColumn(label: Text('ช่วงวันลา')),
@@ -257,6 +271,7 @@ class _LeaveRequestPageState extends State<LeaveRequestPage> {
                               final row = _items[index];
                               return DataRow(cells: [
                                 DataCell(Text('${(_page - 1) * timePageSize + index + 1}')),
+                                DataCell(IconButton(tooltip: 'ดูรายละเอียด', onPressed: () => _view(row), icon: const Icon(Icons.visibility_outlined))),
                                 DataCell(Text('${row['employeeCode']} — ${row['fullName']}')),
                                 DataCell(Text('${row['leaveTypeName']}')),
                                 DataCell(Text('${_date(row['startWorkDate'])} - ${_date(row['endWorkDate'])}')),
@@ -297,6 +312,64 @@ class _LeaveRequestPageState extends State<LeaveRequestPage> {
   }
 }
 
+class _LeaveRequestDetailDialog extends StatelessWidget {
+  const _LeaveRequestDetailDialog({required this.value});
+  final Map<String, dynamic> value;
+
+  @override
+  Widget build(BuildContext context) {
+    final header = Map<String, dynamic>.from(value['header'] as Map);
+    final details = (value['details'] as List? ?? const [])
+        .map((x) => Map<String, dynamic>.from(x as Map))
+        .toList(growable: false);
+    final decisions = (value['decisions'] as List? ?? const [])
+        .map((x) => Map<String, dynamic>.from(x as Map))
+        .toList(growable: false);
+    return TimeActionDialog(
+      icon: Icons.event_note_outlined,
+      title: 'รายละเอียดคำขอลา',
+      maxWidth: 680,
+      scrollable: false,
+      content: SizedBox(
+        width: 680,
+        child: SingleChildScrollView(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text('${header['employeeCode']} — ${header['fullName']}', style: timeUiTokens.sectionStyle),
+            Text('${header['leaveTypeName']} | ${_statusText('${header['statusCode']}')}'),
+            const SizedBox(height: 12),
+            Text('รายการวันลา', style: timeUiTokens.sectionStyle),
+            ...details.map((x) => ListTile(
+              dense: true,
+              leading: const Icon(Icons.calendar_today_outlined),
+              title: Text(_date(x['workDate'])),
+              subtitle: Text(_leaveDetailText(x, '${header['unitCode']}')),
+            )),
+            if (header['requestRemark'] != null && '${header['requestRemark']}'.isNotEmpty) ...[
+              const SizedBox(height: 8), Text('หมายเหตุ: ${header['requestRemark']}'),
+            ],
+            if (header['onBehalfRemark'] != null && '${header['onBehalfRemark']}'.isNotEmpty) ...[
+              const SizedBox(height: 8), Text('หมายเหตุทำแทน: ${header['onBehalfRemark']}'),
+            ],
+            if (header['onBehalfReasonName'] != null) ...[
+              const SizedBox(height: 8), Text('เหตุผลทำแทน: ${header['onBehalfReasonName']}'),
+            ],
+            if (decisions.isNotEmpty) ...[
+              const SizedBox(height: 16), Text('ประวัติการดำเนินการ', style: timeUiTokens.sectionStyle),
+              ...decisions.map((x) => ListTile(
+                dense: true,
+                leading: const Icon(Icons.history_outlined),
+                title: Text(_statusText('${x['decisionCode']}')),
+                subtitle: x['reason'] == null ? null : Text('${x['reason']}'),
+              )),
+            ],
+          ]),
+        ),
+      ),
+      actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('ปิด'))],
+    );
+  }
+}
+
 class _LeaveRequestDialog extends StatefulWidget {
   const _LeaveRequestDialog({required this.mode, required this.lookups});
   final String mode;
@@ -317,6 +390,8 @@ class _LeaveRequestDialogState extends State<_LeaveRequestDialog> {
   int? _employeeId;
   int? _leaveTypeId;
   int? _onBehalfReasonId;
+  int? _startMinute;
+  int? _endMinute;
 
   List<Map<String, dynamic>> _lookup(String name) => (widget.lookups[name] as List? ?? const [])
       .map((item) => Map<String, dynamic>.from(item as Map))
@@ -348,12 +423,27 @@ class _LeaveRequestDialogState extends State<_LeaveRequestDialog> {
     });
   }
 
+  Future<void> _pickTime({required bool start}) async {
+    final current = start ? _startMinute : _endMinute;
+    final selected = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(hour: (current ?? (start ? 480 : 540)) ~/ 60, minute: (current ?? (start ? 480 : 540)) % 60),
+    );
+    if (selected == null || !mounted) return;
+    setState(() {
+      final minute = selected.hour * 60 + selected.minute;
+      if (start) _startMinute = minute; else _endMinute = minute;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final proxy = widget.mode == 'proxy';
     final types = _lookup('leaveTypes');
     final employees = _lookup('employees');
     final reasons = _lookup('onBehalfReasons');
+    final selectedType = types.where((item) => item['LeaveTypeID'] == _leaveTypeId).cast<Map<String, dynamic>>().toList();
+    final isMinute = selectedType.isNotEmpty && selectedType.first['UnitCode'] == 'MINUTE';
     return TimeActionDialog(
       icon: Icons.event_note_outlined,
       title: proxy ? 'สร้างคำขอลาแทนพนักงาน' : 'สร้างคำขอลาของฉัน',
@@ -378,14 +468,26 @@ class _LeaveRequestDialogState extends State<_LeaveRequestDialog> {
             value: _leaveTypeId,
             decoration: const InputDecoration(labelText: 'ประเภทการลา *'),
             items: types.map((x) => DropdownMenuItem(value: x['LeaveTypeID'] as int, child: Text('${x['LeaveTypeCode']} — ${x['LeaveTypeName']}'))).toList(),
-            onChanged: (value) => setState(() => _leaveTypeId = value),
+            onChanged: (value) => setState(() {
+              _leaveTypeId = value;
+              final type = types.where((item) => item['LeaveTypeID'] == value).cast<Map<String, dynamic>>().toList();
+              if (type.isNotEmpty && type.first['UnitCode'] == 'MINUTE') {
+                _to = _from;
+                _startMinute ??= 480;
+                _endMinute ??= 540;
+              }
+            }),
             validator: _required,
           ),
           const SizedBox(height: 12),
           Wrap(spacing: 12, runSpacing: 12, children: [
             _dateField('เริ่มวันที่ *', _from, () => _pick(from: true)),
-            _dateField('ถึงวันที่ *', _to, () => _pick(from: false)),
-            SizedBox(width: 180, child: TextFormField(controller: _quantity, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'จำนวน *'), validator: _positive)),
+            if (!isMinute) _dateField('ถึงวันที่ *', _to, () => _pick(from: false)),
+            if (isMinute) ...[
+              _timeField('เริ่มเวลา *', _startMinute, () => _pickTime(start: true)),
+              _timeField('สิ้นสุดเวลา *', _endMinute, () => _pickTime(start: false)),
+              SizedBox(width: 180, child: TextFormField(initialValue: '${(_endMinute ?? 0) - (_startMinute ?? 0)} นาที', readOnly: true, decoration: const InputDecoration(labelText: 'จำนวน'))),
+            ] else SizedBox(width: 180, child: TextFormField(controller: _quantity, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: const InputDecoration(labelText: 'จำนวน *'), validator: _positive)),
           ]),
           const SizedBox(height: 12),
           TextFormField(controller: _remark, maxLines: 2, decoration: const InputDecoration(labelText: 'หมายเหตุ')),
@@ -411,8 +513,10 @@ class _LeaveRequestDialogState extends State<_LeaveRequestDialog> {
             Navigator.pop(context, {
               'employeeId': proxy ? _employeeId : null,
               'leaveTypeId': _leaveTypeId,
-              'startWorkDate': _dateValue(_from), 'endWorkDate': _dateValue(_to),
-              'requestedQuantity': num.parse(_quantity.text.trim()),
+              'startWorkDate': _dateValue(_from), 'endWorkDate': _dateValue(isMinute ? _from : _to),
+              'requestedQuantity': isMinute ? (_endMinute! - _startMinute!) : num.parse(_quantity.text.trim()),
+              'startMinute': isMinute ? _startMinute : null,
+              'endMinute': isMinute ? _endMinute : null,
               'requestRemark': _remark.text.trim(), 'evidenceReference': _evidence.text.trim(),
               'onBehalfReasonId': proxy ? _onBehalfReasonId : null,
               'onBehalfRemark': proxy ? _onBehalfRemark.text.trim() : null,
@@ -425,6 +529,7 @@ class _LeaveRequestDialogState extends State<_LeaveRequestDialog> {
   }
 
   Widget _dateField(String label, DateTime value, VoidCallback onTap) => SizedBox(width: 190, child: TextFormField(key: ValueKey('$label$value'), initialValue: _date(value), readOnly: true, onTap: onTap, decoration: InputDecoration(labelText: label, suffixIcon: const Icon(Icons.calendar_month_outlined))));
+  Widget _timeField(String label, int? value, VoidCallback onTap) => SizedBox(width: 150, child: TextFormField(key: ValueKey('$label$value'), initialValue: value == null ? '' : _time(value), readOnly: true, onTap: onTap, validator: (_) => value == null ? 'กรุณาเลือกเวลา' : null, decoration: InputDecoration(labelText: label, suffixIcon: const Icon(Icons.schedule_outlined))));
 }
 
 String _date(Object? value) {
@@ -434,6 +539,16 @@ String _date(Object? value) {
 }
 
 String _dateValue(DateTime value) => '${value.year}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
+String _time(int minute) => '${(minute ~/ 60).toString().padLeft(2, '0')}:${(minute % 60).toString().padLeft(2, '0')}';
+String _leaveDetailText(Map<String, dynamic> value, String unitCode) {
+  final quantity = value['requestedQuantity'];
+  if (unitCode != 'MINUTE') return '$quantity วัน';
+  final start = (value['startMinute'] as num?)?.toInt();
+  final end = (value['endMinute'] as num?)?.toInt();
+  if (start == null || end == null) return '$quantity นาที';
+  String format(int minute) => '${(minute ~/ 60).toString().padLeft(2, '0')}:${(minute % 60).toString().padLeft(2, '0')}';
+  return '${format(start)}–${format(end)} · $quantity นาที';
+}
 String? _required(Object? value) => value == null ? 'กรุณาระบุข้อมูล' : null;
 String? _positive(String? value) => (num.tryParse(value ?? '') ?? 0) > 0 ? null : 'กรุณาระบุจำนวนมากกว่า 0';
 String _statusText(String value) => switch (value) { 'PENDING' => 'รออนุมัติ', 'APPROVED' => 'อนุมัติแล้ว', 'REJECTED' => 'ไม่อนุมัติ', 'CANCELLED' => 'ยกเลิก', _ => value };
