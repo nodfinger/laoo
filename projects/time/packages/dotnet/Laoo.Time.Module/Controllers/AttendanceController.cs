@@ -135,9 +135,11 @@ WHERE R.CompanyID=@CompanyID AND R.IsCurrent=1
         var total = await CountResults(connection, where, companyId, userId, from, to, employeeId, employee, statusCode, token);
         await using var command = new SqlCommand($"""
 SELECT R.AttendanceResultID,R.EmployeeID,E.EmployeeCode,E.FullName,R.WorkDate,R.StatusCode,
-       R.ScheduledWorkMinutes,R.ActualWorkMinutes,R.LateMinutes,R.EarlyMinutes,R.UnresolvedReason,R.ResultVersion
+       R.ScheduledWorkMinutes,R.ActualWorkMinutes,R.LateMinutes,R.EarlyMinutes,R.UnresolvedReason,R.ResultVersion,
+       LA.LeaveMinutes,LA.LeaveTypeNames
 FROM dbo.TDTMAttendanceResult R
 JOIN dbo.TDADEmployee E ON E.EmployeeID=R.EmployeeID AND E.CompanyID=R.CompanyID
+OUTER APPLY(SELECT SUM(A.AppliedLeaveMinutes) LeaveMinutes,STRING_AGG(T.LeaveTypeName,N', ') LeaveTypeNames FROM dbo.TDTMAttendanceLeaveApplication A JOIN dbo.TDTMLeaveRequest L ON L.RequestID=A.LeaveRequestID JOIN dbo.TDTMLeaveType T ON T.LeaveTypeID=L.LeaveTypeID WHERE A.AttendanceResultID=R.AttendanceResultID AND A.IsActive=1)LA
 {where}
 ORDER BY R.WorkDate DESC,E.EmployeeCode,R.AttendanceResultID DESC
 OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;
@@ -160,7 +162,7 @@ OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;
                 lateMinutes = reader.GetInt32(8),
                 earlyMinutes = reader.GetInt32(9),
                 unresolvedReason = reader.IsDBNull(10) ? null : reader.GetString(10),
-                resultVersion = reader.GetInt32(11),
+                resultVersion = reader.GetInt32(11), leaveMinutes = reader.IsDBNull(12)?0:reader.GetInt32(12), leaveTypeNames = reader.IsDBNull(13)?null:reader.GetString(13),
             });
         }
         return Ok(new { total, page, pageSize, items });

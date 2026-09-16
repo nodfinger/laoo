@@ -175,6 +175,8 @@ class _AttendanceResultsPageState extends State<AttendanceResultsPage> {
                       DropdownMenuItem(value: null, child: Text('ทั้งหมด')),
                       DropdownMenuItem(value: 'COMPLETE', child: Text('ครบถ้วน')),
                       DropdownMenuItem(value: 'UNRESOLVED', child: Text('รอตรวจสอบ')),
+                      DropdownMenuItem(value: 'LEAVE', child: Text('ลาเต็มวัน')),
+                      DropdownMenuItem(value: 'LEAVE_PARTIAL', child: Text('ลาบางช่วง')),
                       DropdownMenuItem(value: 'DAY_OFF', child: Text('วันหยุด')),
                     ],
                     onChanged: (value) => setState(() => _statusCode = value),
@@ -255,7 +257,7 @@ class _AttendanceResultsPageState extends State<AttendanceResultsPage> {
           title: Text('${_date(item['workDate'])} | ${item['employeeCode']} - ${item['fullName']}'),
           subtitle: Text(
             '${_status(item['statusCode'])} | กำหนด ${_minutes(item['scheduledWorkMinutes'])} | ทำงาน ${_minutes(item['actualWorkMinutes'])}\n'
-            'สาย ${item['lateMinutes']} นาที | ออกก่อน ${item['earlyMinutes']} นาที${item['unresolvedReason'] == null ? '' : '\n${item['unresolvedReason']}'}',
+            'สาย ${item['lateMinutes']} นาที | ออกก่อน ${item['earlyMinutes']} นาที${item['leaveTypeNames'] == null ? '' : '\nลา: ${item['leaveTypeNames']} ${item['leaveMinutes']} นาที'}${item['unresolvedReason'] == null ? '' : '\n${item['unresolvedReason']}'}',
           ),
           trailing: IconButton(
             tooltip: 'ดูข้อมูล Raw',
@@ -338,6 +340,8 @@ class _AttendanceResultsPageState extends State<AttendanceResultsPage> {
   }
 
   static String _status(Object? value) => switch (value) {
+    'LEAVE' => 'ลาเต็มวัน',
+    'LEAVE_PARTIAL' => 'ลาบางช่วง',
     'COMPLETE' => 'ครบถ้วน',
     'UNRESOLVED' => 'รอตรวจสอบ',
     'DAY_OFF' => 'วันหยุด',

@@ -165,6 +165,14 @@ class _MyAttendanceHistoryPageState extends State<MyAttendanceHistoryPage> {
                         child: Text('รอตรวจสอบ'),
                       ),
                       DropdownMenuItem(
+                        value: 'LEAVE',
+                        child: Text('ลาเต็มวัน'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'LEAVE_PARTIAL',
+                        child: Text('ลาบางช่วง'),
+                      ),
+                      DropdownMenuItem(
                         value: 'DAY_OFF',
                         child: Text('วันหยุด'),
                       ),
@@ -251,7 +259,7 @@ class _MyAttendanceHistoryPageState extends State<MyAttendanceHistoryPage> {
           title: Text(_date(item['workDate'])),
           subtitle: Text(
             '${_status(item['statusCode'])} | ตามกะ ${_minutes(item['scheduledWorkMinutes'])} | ทำงาน ${_minutes(item['actualWorkMinutes'])}\n'
-            'สาย ${item['lateMinutes'] ?? 0} นาที | ออกก่อน ${item['earlyMinutes'] ?? 0} นาที${item['unresolvedReason'] == null ? '' : '\n${item['unresolvedReason']}'}',
+            'สาย ${item['lateMinutes'] ?? 0} นาที | ออกก่อน ${item['earlyMinutes'] ?? 0} นาที${item['leaveTypeNames'] == null ? '' : '\nลา: ${item['leaveTypeNames']} ${item['leaveMinutes']} นาที'}${item['unresolvedReason'] == null ? '' : '\n${item['unresolvedReason']}'}',
           ),
         ),
       );
@@ -309,6 +317,8 @@ class _MyAttendanceHistoryPageState extends State<MyAttendanceHistoryPage> {
       '${(value as num?)?.toInt() ?? 0} นาที';
 
   static String _status(Object? value) => switch (value) {
+    'LEAVE' => 'ลาเต็มวัน',
+    'LEAVE_PARTIAL' => 'ลาบางช่วง',
     'COMPLETE' => 'ครบถ้วน',
     'UNRESOLVED' => 'รอตรวจสอบ',
     'DAY_OFF' => 'วันหยุด',
