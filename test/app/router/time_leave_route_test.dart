@@ -15,6 +15,11 @@ void main() {
       RouteNames.timeLeaveEntitlementPolicies,
       RoutePaths.timeLeaveEntitlementPolicies,
     ),
+    '28011': (
+      'timeLeaveBalances',
+      RouteNames.timeLeaveBalances,
+      RoutePaths.timeLeaveBalances,
+    ),
     '26003': (
       'timeLeaveRequests',
       RouteNames.timeLeaveRequests,
@@ -29,6 +34,11 @@ void main() {
       'myLeaveRequests',
       RouteNames.myLeaveRequests,
       RoutePaths.myLeaveRequests,
+    ),
+    '30004': (
+      'myLeaveBalance',
+      RouteNames.myLeaveBalance,
+      RoutePaths.myLeaveBalance,
     ),
   };
 
