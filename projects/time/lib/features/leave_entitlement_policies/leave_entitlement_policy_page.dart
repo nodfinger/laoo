@@ -292,7 +292,7 @@ class _PolicyDialog extends StatefulWidget {
 class _PolicyDialogState extends State<_PolicyDialog> {
   final key = GlobalKey<FormState>();
   late int typeId;
-  late final TextEditingController name, quantity;
+  late final TextEditingController name, quantity, minimumServiceDays;
   late DateTime effectiveFrom;
   DateTime? effectiveTo;
   late bool active;
@@ -305,6 +305,12 @@ class _PolicyDialogState extends State<_PolicyDialog> {
     quantity = TextEditingController(
       text: '${widget.item?['entitlementQuantity'] ?? ''}',
     );
+    var days = 0;
+    try {
+      final rules = widget.item?['eligibilityRuleJson'] as String?;
+      if (rules != null) days = (jsonDecode(rules) as Map)['minimumServiceDays'] as int? ?? 0;
+    } catch (_) {}
+    minimumServiceDays = TextEditingController(text: '$days');
     effectiveFrom =
         DateTime.tryParse('${widget.item?['effectiveFrom'] ?? ''}') ??
         DateTime.now();
@@ -318,6 +324,7 @@ class _PolicyDialogState extends State<_PolicyDialog> {
   void dispose() {
     name.dispose();
     quantity.dispose();
+    minimumServiceDays.dispose();
     super.dispose();
   }
 
@@ -396,6 +403,13 @@ class _PolicyDialogState extends State<_PolicyDialog> {
                 : null,
           ),
           const SizedBox(height: 12),
+          TextFormField(
+            controller: minimumServiceDays,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(labelText: 'อายุงานขั้นต่ำ (วัน)', helperText: '0 = ใช้ได้ตั้งแต่เริ่มงาน'),
+            validator: (v) => int.tryParse(v ?? '') == null || int.parse(v!) < 0 ? 'กรุณาระบุจำนวนวันตั้งแต่ 0 ขึ้นไป' : null,
+          ),
+          const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
@@ -435,6 +449,7 @@ class _PolicyDialogState extends State<_PolicyDialog> {
             'leaveTypeId': typeId,
             'policyName': name.text.trim(),
             'entitlementQuantity': num.parse(quantity.text),
+            'eligibilityRuleJson': int.parse(minimumServiceDays.text) == 0 ? null : jsonEncode({'minimumServiceDays': int.parse(minimumServiceDays.text)}),
             'effectiveFrom': _iso(effectiveFrom),
             'effectiveTo': effectiveTo == null ? null : _iso(effectiveTo!),
             'isActive': active,
@@ -451,3 +466,4 @@ class _PolicyDialogState extends State<_PolicyDialog> {
   String _iso(DateTime x) =>
       '${x.year.toString().padLeft(4, '0')}-${x.month.toString().padLeft(2, '0')}-${x.day.toString().padLeft(2, '0')}';
 }
+import 'dart:convert';
