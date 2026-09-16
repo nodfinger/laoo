@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net8.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><RootNamespace>LaooSurveyModule</RootNamespace></PropertyGroup>
+  <ItemGroup><ProjectReference Include="..\..\..\..\..\packages\dotnet\Laoo.Shared.Contracts\Laoo.Shared.Contracts.csproj" /></ItemGroup>
+</Project>

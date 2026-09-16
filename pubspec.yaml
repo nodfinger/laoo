@@ -30,6 +30,8 @@ dependencies:
     path: projects/time
   laoo_training:
     path: projects/training
+  laoo_survey:
+    path: projects/survey
 
   cupertino_icons: ^1.0.8
   flutter_riverpod: ^3.4.2
