@@ -4,6 +4,8 @@ import 'package:laoo_five_s/five_s_feature.dart'
     show FiveSMenuCodes, FiveSRouteNames, FiveSRoutePaths;
 import 'package:laoo_survey/survey_feature.dart'
     show SurveyMenuCodes, SurveyRouteNames, SurveyRoutePaths;
+import 'package:laoo_expense/expense_feature.dart'
+    show ExpenseMenuCodes, ExpenseRouteNames, ExpenseRoutePaths;
 import 'package:laoo_meeting/meeting_feature.dart'
     show MeetingMenuCodes, MeetingRoutes;
 import 'package:laoo_service/service_feature.dart' show ServiceRoutes;
@@ -782,6 +784,62 @@ abstract final class AppMenuRouteRegistry {
       databaseRouteName: SurveyRouteNames.reports,
       goRouteName: SurveyRouteNames.reports,
       path: SurveyRoutePaths.reports,
+      scope: AppMenuScope.company,
+    ),
+    ExpenseMenuCodes.settings: AppMenuRouteSpec(
+      menuCode: ExpenseMenuCodes.settings,
+      databaseRouteName: ExpenseRouteNames.settings,
+      goRouteName: ExpenseRouteNames.settings,
+      path: ExpenseRoutePaths.settings,
+      scope: AppMenuScope.company,
+    ),
+    ExpenseMenuCodes.categories: AppMenuRouteSpec(
+      menuCode: ExpenseMenuCodes.categories,
+      databaseRouteName: ExpenseRouteNames.categories,
+      goRouteName: ExpenseRouteNames.categories,
+      path: ExpenseRoutePaths.categories,
+      scope: AppMenuScope.company,
+    ),
+    ExpenseMenuCodes.advances: AppMenuRouteSpec(
+      menuCode: ExpenseMenuCodes.advances,
+      databaseRouteName: ExpenseRouteNames.advances,
+      goRouteName: ExpenseRouteNames.advances,
+      path: ExpenseRoutePaths.advances,
+      scope: AppMenuScope.company,
+    ),
+    ExpenseMenuCodes.claims: AppMenuRouteSpec(
+      menuCode: ExpenseMenuCodes.claims,
+      databaseRouteName: ExpenseRouteNames.claims,
+      goRouteName: ExpenseRouteNames.claims,
+      path: ExpenseRoutePaths.claims,
+      scope: AppMenuScope.company,
+    ),
+    ExpenseMenuCodes.approvalInbox: AppMenuRouteSpec(
+      menuCode: ExpenseMenuCodes.approvalInbox,
+      databaseRouteName: ExpenseRouteNames.approvalInbox,
+      goRouteName: ExpenseRouteNames.approvalInbox,
+      path: ExpenseRoutePaths.approvalInbox,
+      scope: AppMenuScope.company,
+    ),
+    ExpenseMenuCodes.settlements: AppMenuRouteSpec(
+      menuCode: ExpenseMenuCodes.settlements,
+      databaseRouteName: ExpenseRouteNames.settlements,
+      goRouteName: ExpenseRouteNames.settlements,
+      path: ExpenseRoutePaths.settlements,
+      scope: AppMenuScope.company,
+    ),
+    ExpenseMenuCodes.myExpenses: AppMenuRouteSpec(
+      menuCode: ExpenseMenuCodes.myExpenses,
+      databaseRouteName: ExpenseRouteNames.myExpenses,
+      goRouteName: ExpenseRouteNames.myExpenses,
+      path: ExpenseRoutePaths.myExpenses,
+      scope: AppMenuScope.company,
+    ),
+    ExpenseMenuCodes.reports: AppMenuRouteSpec(
+      menuCode: ExpenseMenuCodes.reports,
+      databaseRouteName: ExpenseRouteNames.reports,
+      goRouteName: ExpenseRouteNames.reports,
+      path: ExpenseRoutePaths.reports,
       scope: AppMenuScope.company,
     ),
     '29001': AppMenuRouteSpec(

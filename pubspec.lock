@@ -328,6 +328,10 @@ packages:
     dependency: "direct main"
     description:
       path: "projects/gate_pass"
+  laoo_expense:
+    dependency: "direct main"
+    description:
+      path: "projects/expense"
       relative: true
     source: path
     version: "1.0.0+1"

@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey')]
+    [ValidateSet('service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense')]
     [string]$Project
 )
 
