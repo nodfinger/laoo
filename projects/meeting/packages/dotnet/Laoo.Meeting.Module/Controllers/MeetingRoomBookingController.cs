@@ -1123,6 +1123,9 @@ WHERE BookingID=@id AND CompanyID=@company AND BookingStatus IN ('PENDING','APPR
     {
         var action = id is null ? "CREATE" : "EDIT";
         if (!TryCompany(out var companyId) || !TryUser(out var userId)) return Forbid();
+        var activityTypeCode = (request.ActivityTypeCode ?? "MEETING").Trim().ToUpperInvariant();
+        var canViewTrainingType = false;
+        var canViewTrainingInstructor = false;
         await using (var accessDb = await Open(token))
         {
             var companyAdmin = await IsCompanyAdmin(accessDb, companyId, userId, token);
@@ -1139,10 +1142,13 @@ WHERE BookingID=@id AND CompanyID=@company AND BookingStatus IN ('PENDING','APPR
                 if (!companyAdmin && !roomAdmin && !owner) return Forbid();
                 if (roomAdmin && !companyAdmin && !roomAdmins.Contains(request.RoomId)) return Forbid();
             }
+            if (activityTypeCode == "TRAINING" && request.TrainingTypeId is not null)
+                canViewTrainingType = await Laoo.Shared.Contracts.CompanyMenuAccess.IsAllowedAsync(accessDb, User, TrainingTypeScreenCode, "VIEW", token);
+            if (activityTypeCode == "TRAINING" && request.TrainingInstructorId is not null)
+                canViewTrainingInstructor = await Laoo.Shared.Contracts.CompanyMenuAccess.IsAllowedAsync(accessDb, User, TrainingInstructorScreenCode, "VIEW", token);
         }
         if (string.IsNullOrWhiteSpace(request.Subject)) return BadRequest(Error("กรุณาระบุหัวข้อประชุม", "หัวข้อประชุมเป็นข้อมูลบังคับ"));
         if (request.AttendeeCount <= 0) return BadRequest(Error("จำนวนผู้เข้าร่วมไม่ถูกต้อง", "จำนวนผู้เข้าร่วมต้องมากกว่า 0"));
-        var activityTypeCode = (request.ActivityTypeCode ?? "MEETING").Trim().ToUpperInvariant();
         if (activityTypeCode is not ("MEETING" or "TRAINING"))
             return BadRequest(Error("ประเภทกิจกรรมไม่ถูกต้อง", "กรุณาเลือกประชุมหรืออบรม"));
         var slotValidation = ValidateSlots(request.Slots);
@@ -1159,7 +1165,7 @@ WHERE BookingID=@id AND CompanyID=@company AND BookingStatus IN ('PENDING','APPR
             if (reason is not null) return Conflict(Error("ไม่สามารถจองห้องประชุมได้", reason));
 
             var requesterEmployeeId = await RequesterEmployee(connection, transaction, companyId, userId, token);
-            var training = await ResolveTrainingSelection(connection, transaction, companyId, activityTypeCode, request, token);
+            var training = await ResolveTrainingSelection(connection, transaction, companyId, activityTypeCode, request, canViewTrainingType, canViewTrainingInstructor, token);
             if (id is long originalBookingId)
             {
                 await using var original = new SqlCommand("SELECT RequesterEmployeeID FROM dbo.TDADMeetingRoomBooking WITH (UPDLOCK,HOLDLOCK) WHERE BookingID=@booking AND CompanyID=@company", connection, transaction);
@@ -1575,14 +1581,14 @@ VALUES(@booking,@company,@from,@to,@user,@remark,@source);
 
     private async Task<TrainingSelection> ResolveTrainingSelection(
         SqlConnection connection, SqlTransaction transaction, long companyId, string activityTypeCode,
-        BookingSaveRequest request, CancellationToken token)
+        BookingSaveRequest request, bool canViewTrainingType, bool canViewTrainingInstructor, CancellationToken token)
     {
         if (activityTypeCode != "TRAINING") return TrainingSelection.Empty;
         if (request.TrainingTypeId is null && request.TrainingInstructorId is null) return TrainingSelection.Empty;
 
-        if (request.TrainingTypeId is not null && !await Laoo.Shared.Contracts.CompanyMenuAccess.IsAllowedAsync(connection, User, TrainingTypeScreenCode, "VIEW", token))
+        if (request.TrainingTypeId is not null && !canViewTrainingType)
             throw new BookingValidationException("ไม่มีสิทธิ์เลือกประเภทการอบรม", "กรุณาตรวจสิทธิ์ระบบอบรมของผู้ใช้");
-        if (request.TrainingInstructorId is not null && !await Laoo.Shared.Contracts.CompanyMenuAccess.IsAllowedAsync(connection, User, TrainingInstructorScreenCode, "VIEW", token))
+        if (request.TrainingInstructorId is not null && !canViewTrainingInstructor)
             throw new BookingValidationException("ไม่มีสิทธิ์เลือกวิทยากร", "กรุณาตรวจสิทธิ์ระบบอบรมของผู้ใช้");
 
         string? typeName = null;
