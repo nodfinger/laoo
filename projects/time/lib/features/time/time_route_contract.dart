@@ -28,6 +28,7 @@ abstract final class TimeMenuCodes {
   static const adjustmentReasons = '28004';
   static const leaveTypes = '28009';
   static const leaveEntitlementPolicies = '28010';
+  static const leaveBalances = '28011';
   static const leaveRequests = '26003';
   static const leaveApprovalInbox = '26004';
   static const holidayCalendars = '28005';
@@ -37,6 +38,7 @@ abstract final class TimeMenuCodes {
   static const myTimeCorrections = '30001';
   static const myAttendanceHistory = '30002';
   static const myLeaveRequests = '30003';
+  static const myLeaveBalance = '30004';
   static const attendancePeriodSchemes = '29001';
   static const attendancePeriodAssignments = '29002';
   static const attendancePeriods = '29003';
@@ -58,6 +60,7 @@ abstract final class TimeRouteNames {
   static const adjustmentReasons = 'timeAdjustmentReasons';
   static const leaveTypes = 'timeLeaveTypes';
   static const leaveEntitlementPolicies = 'timeLeaveEntitlementPolicies';
+  static const leaveBalances = 'timeLeaveBalances';
   static const leaveRequests = 'timeLeaveRequests';
   static const leaveApprovalInbox = 'timeLeaveApprovalInbox';
   static const holidayCalendars = 'timeHolidayCalendars';
@@ -67,6 +70,7 @@ abstract final class TimeRouteNames {
   static const myTimeCorrections = 'myTimeCorrections';
   static const myAttendanceHistory = 'myAttendanceHistory';
   static const myLeaveRequests = 'myLeaveRequests';
+  static const myLeaveBalance = 'myLeaveBalance';
   static const attendancePeriodSchemes = 'timeAttendancePeriodSchemes';
   static const attendancePeriodAssignments = 'timeAttendancePeriodAssignments';
   static const attendancePeriods = 'timeAttendancePeriods';
@@ -89,6 +93,7 @@ abstract final class TimeRoutePaths {
   static const leaveTypes = '/company/time-leave-types';
   static const leaveEntitlementPolicies =
       '/company/time-leave-entitlement-policies';
+  static const leaveBalances = '/company/time-leave-balances';
   static const leaveRequests = '/company/time-leave-requests';
   static const leaveApprovalInbox = '/company/time-leave-approval-inbox';
   static const holidayCalendars = '/company/time-holiday-calendars';
@@ -100,6 +105,7 @@ abstract final class TimeRoutePaths {
   static const myTimeCorrections = '/company/my-time-corrections';
   static const myAttendanceHistory = '/company/my-attendance-history';
   static const myLeaveRequests = '/company/my-leave-requests';
+  static const myLeaveBalance = '/company/my-leave-balance';
   static const attendancePeriodSchemes =
       '/company/time-attendance-period-schemes';
   static const attendancePeriodAssignments =
@@ -229,6 +235,14 @@ abstract final class TimeRoutes {
     routePath: TimeRoutePaths.leaveEntitlementPolicies,
     isImplemented: true,
   );
+  static const leaveBalances = FeatureRouteContract(
+    projectCode: TimeProject.code,
+    menuCode: TimeMenuCodes.leaveBalances,
+    screenType: 3,
+    routeName: TimeRouteNames.leaveBalances,
+    routePath: TimeRoutePaths.leaveBalances,
+    isImplemented: false,
+  );
   static const leaveRequests = FeatureRouteContract(
     projectCode: TimeProject.code,
     menuCode: TimeMenuCodes.leaveRequests,
@@ -252,6 +266,14 @@ abstract final class TimeRoutes {
     routeName: TimeRouteNames.myLeaveRequests,
     routePath: TimeRoutePaths.myLeaveRequests,
     isImplemented: true,
+  );
+  static const myLeaveBalance = FeatureRouteContract(
+    projectCode: TimeProject.code,
+    menuCode: TimeMenuCodes.myLeaveBalance,
+    screenType: 3,
+    routeName: TimeRouteNames.myLeaveBalance,
+    routePath: TimeRoutePaths.myLeaveBalance,
+    isImplemented: false,
   );
   static const myTimeCorrections = FeatureRouteContract(
     projectCode: TimeProject.code,
@@ -349,6 +371,7 @@ abstract final class TimeRoutes {
     adjustmentReasons,
     leaveTypes,
     leaveEntitlementPolicies,
+    leaveBalances,
     leaveRequests,
     leaveApprovalInbox,
     holidayCalendars,
@@ -358,6 +381,7 @@ abstract final class TimeRoutes {
     myTimeCorrections,
     myAttendanceHistory,
     myLeaveRequests,
+    myLeaveBalance,
     attendancePeriodSchemes,
     attendancePeriodAssignments,
     attendancePeriods,
