@@ -12,6 +12,7 @@ import '../time_reasons/time_reason_page.dart';
 import '../leave_types/leave_type_page.dart';
 import '../leave_entitlement_policies/leave_entitlement_policy_page.dart';
 import '../leave_requests/leave_request_page.dart';
+import '../leave_balances/leave_balance_page.dart';
 import '../attendance_periods/attendance_period_pages.dart';
 import '../attendance_events/attendance_events_page.dart';
 import '../attendance_results/attendance_results_page.dart';
@@ -49,29 +50,19 @@ List<GoRoute> buildTimeFeatureRoutes() => <GoRoute>[
     ),
   ),
   GoRoute(
+    name: TimeRouteNames.leaveBalances,
+    path: TimeRoutePaths.leaveBalances,
+    builder: (context, state) => const LeaveBalancePage(mine: false),
+  ),
+  GoRoute(
     name: TimeRouteNames.myLeaveBalance,
     path: TimeRoutePaths.myLeaveBalance,
-    builder: (context, state) => const TimePreviewPage(
-      route: TimeRoutes.myLeaveBalance,
-      title: 'สิทธิ์ลาคงเหลือของฉัน',
-      description: 'กำลังเตรียมหน้าจอสำหรับตรวจสิทธิ์ลาคงเหลือของผู้ใช้',
-      highlights: [],
-    ),
+    builder: (context, state) => const LeaveBalancePage(mine: true),
   ),
   GoRoute(
     name: TimeRouteNames.leaveEntitlementPolicies,
     path: TimeRoutePaths.leaveEntitlementPolicies,
     builder: (context, state) => const LeaveEntitlementPolicyPage(),
-  ),
-  GoRoute(
-    name: TimeRouteNames.leaveBalances,
-    path: TimeRoutePaths.leaveBalances,
-    builder: (context, state) => const TimePreviewPage(
-      route: TimeRoutes.leaveBalances,
-      title: 'สิทธิ์ลาคงเหลือ',
-      description: 'กำลังเตรียมหน้าจอสำหรับตรวจสิทธิ์ลาคงเหลือของพนักงาน',
-      highlights: [],
-    ),
   ),
   GoRoute(
     name: TimeRouteNames.leaveTypes,
