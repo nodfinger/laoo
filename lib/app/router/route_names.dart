@@ -89,9 +89,11 @@ abstract final class RouteNames {
   static const String timeLeaveTypes = 'timeLeaveTypes';
   static const String timeLeaveEntitlementPolicies =
       'timeLeaveEntitlementPolicies';
+  static const String timeLeaveBalances = 'timeLeaveBalances';
   static const String timeLeaveRequests = 'timeLeaveRequests';
   static const String timeLeaveApprovalInbox = 'timeLeaveApprovalInbox';
   static const String myLeaveRequests = 'myLeaveRequests';
+  static const String myLeaveBalance = 'myLeaveBalance';
   static const String myAttendanceHistory = 'myAttendanceHistory';
   static const String meetingRoomBookings = MeetingRouteNames.bookings;
   static const String meetingRoomApprovals = MeetingRouteNames.approvals;

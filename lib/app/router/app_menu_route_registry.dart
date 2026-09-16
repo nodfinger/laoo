@@ -687,6 +687,13 @@ abstract final class AppMenuRouteRegistry {
       path: RoutePaths.timeLeaveEntitlementPolicies,
       scope: AppMenuScope.company,
     ),
+    '28011': AppMenuRouteSpec(
+      menuCode: '28011',
+      databaseRouteName: 'timeLeaveBalances',
+      goRouteName: RouteNames.timeLeaveBalances,
+      path: RoutePaths.timeLeaveBalances,
+      scope: AppMenuScope.company,
+    ),
     '26003': AppMenuRouteSpec(
       menuCode: '26003',
       databaseRouteName: 'timeLeaveRequests',
@@ -713,6 +720,13 @@ abstract final class AppMenuRouteRegistry {
       databaseRouteName: 'myLeaveRequests',
       goRouteName: RouteNames.myLeaveRequests,
       path: RoutePaths.myLeaveRequests,
+      scope: AppMenuScope.company,
+    ),
+    '30004': AppMenuRouteSpec(
+      menuCode: '30004',
+      databaseRouteName: 'myLeaveBalance',
+      goRouteName: RouteNames.myLeaveBalance,
+      path: RoutePaths.myLeaveBalance,
       scope: AppMenuScope.company,
     ),
     for (final route in ServiceRoutes.all)

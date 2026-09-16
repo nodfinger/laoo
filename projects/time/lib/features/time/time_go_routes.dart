@@ -21,6 +21,7 @@ import '../holiday_calendars/holiday_date_page.dart';
 import '../holiday_calendars/branch_holiday_calendar_page.dart';
 import '../holiday_calendars/branch_holiday_exception_page.dart';
 import '../my_attendance_history/my_attendance_history_page.dart';
+import 'pages/time_preview_page.dart';
 
 List<GoRoute> buildTimeFeatureRoutes() => <GoRoute>[
   GoRoute(
@@ -48,9 +49,29 @@ List<GoRoute> buildTimeFeatureRoutes() => <GoRoute>[
     ),
   ),
   GoRoute(
+    name: TimeRouteNames.myLeaveBalance,
+    path: TimeRoutePaths.myLeaveBalance,
+    builder: (context, state) => const TimePreviewPage(
+      route: TimeRoutes.myLeaveBalance,
+      title: 'สิทธิ์ลาคงเหลือของฉัน',
+      description: 'กำลังเตรียมหน้าจอสำหรับตรวจสิทธิ์ลาคงเหลือของผู้ใช้',
+      highlights: [],
+    ),
+  ),
+  GoRoute(
     name: TimeRouteNames.leaveEntitlementPolicies,
     path: TimeRoutePaths.leaveEntitlementPolicies,
     builder: (context, state) => const LeaveEntitlementPolicyPage(),
+  ),
+  GoRoute(
+    name: TimeRouteNames.leaveBalances,
+    path: TimeRoutePaths.leaveBalances,
+    builder: (context, state) => const TimePreviewPage(
+      route: TimeRoutes.leaveBalances,
+      title: 'สิทธิ์ลาคงเหลือ',
+      description: 'กำลังเตรียมหน้าจอสำหรับตรวจสิทธิ์ลาคงเหลือของพนักงาน',
+      highlights: [],
+    ),
   ),
   GoRoute(
     name: TimeRouteNames.leaveTypes,

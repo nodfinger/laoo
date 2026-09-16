@@ -94,10 +94,12 @@ abstract final class RoutePaths {
   static const String timeLeaveTypes = '/company/time-leave-types';
   static const String timeLeaveEntitlementPolicies =
       '/company/time-leave-entitlement-policies';
+  static const String timeLeaveBalances = '/company/time-leave-balances';
   static const String timeLeaveRequests = '/company/time-leave-requests';
   static const String timeLeaveApprovalInbox =
       '/company/time-leave-approval-inbox';
   static const String myLeaveRequests = '/company/my-leave-requests';
+  static const String myLeaveBalance = '/company/my-leave-balance';
   static const String myAttendanceHistory = '/company/my-attendance-history';
   static const String meetingRoomBookings = MeetingRoutePaths.bookings;
   static const String meetingRoomApprovals = MeetingRoutePaths.approvals;

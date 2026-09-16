@@ -9,7 +9,7 @@ void main() {
     expect(AppConfig.projectCode, 'LAOO_TIME');
     expect(AppConfig.apiBaseUrl, 'http://localhost:5080');
     expect(TimeMenuGroups.setup, '28');
-    expect(TimeRoutes.all, hasLength(22));
+    expect(TimeRoutes.all, hasLength(29));
     expect(TimeRoutes.attendanceEvents.menuCode, '25001');
     expect(TimeRoutes.attendanceEvents.screenType, 3);
     expect(TimeRoutes.attendanceResults.menuCode, '25002');
@@ -38,10 +38,14 @@ void main() {
     expect(TimeRoutes.branchHolidayCalendars.screenType, 1);
     expect(TimeRoutes.branchHolidayExceptions.menuCode, '28008');
     expect(TimeRoutes.branchHolidayExceptions.screenType, 1);
+    expect(TimeRoutes.leaveBalances.menuCode, '28011');
+    expect(TimeRoutes.leaveBalances.screenType, 3);
     expect(TimeRoutes.myTimeCorrections.menuCode, '30001');
     expect(TimeRoutes.myTimeCorrections.screenType, 4);
     expect(TimeRoutes.myAttendanceHistory.menuCode, '30002');
     expect(TimeRoutes.myAttendanceHistory.screenType, 3);
+    expect(TimeRoutes.myLeaveBalance.menuCode, '30004');
+    expect(TimeRoutes.myLeaveBalance.screenType, 3);
     expect(TimeRoutes.attendancePeriodSchemes.menuCode, '29001');
     expect(TimeRoutes.attendancePeriodSchemes.screenType, 1);
     expect(TimeRoutes.attendancePeriodAssignments.menuCode, '29002');
@@ -50,8 +54,8 @@ void main() {
     expect(TimeRoutes.attendancePeriods.screenType, 3);
     expect(TimeRoutes.attendanceSummaryReport.menuCode, '29004');
     expect(TimeRoutes.attendanceSummaryReport.screenType, 3);
-    expect(TimeRoutes.implemented, hasLength(21));
-    expect(buildTimeFeatureRoutes(), hasLength(21));
+    expect(TimeRoutes.implemented, hasLength(27));
+    expect(buildTimeFeatureRoutes(), hasLength(29));
   });
 
   test(
