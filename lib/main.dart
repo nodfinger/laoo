@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:laoo_meeting/meeting_feature.dart';
+import 'package:laoo_expense/expense_feature.dart';
 import 'package:laoo_service/service_feature.dart';
 import 'package:laoo_time/time_feature.dart';
 import 'package:laoo_training/training_feature.dart';
@@ -17,6 +18,7 @@ import 'core/widgets/auto_dismiss_message.dart';
 import 'features/support/presentation/widgets/support_workspace_shell.dart';
 
 void main() {
+  configureExpenseFeatureHost(_buildMeetingWorkspaceShell);
   configureMeetingFeatureHost(_buildMeetingWorkspaceShell);
   configureServiceWorkspaceShell(_buildMeetingWorkspaceShell);
   configureTimeFeatureHost(

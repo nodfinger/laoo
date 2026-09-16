@@ -317,6 +317,13 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.0.0"
+  laoo_expense:
+    dependency: "direct main"
+    description:
+      path: "projects/expense"
+      relative: true
+    source: path
+    version: "1.0.0+1"
   laoo_meeting:
     dependency: "direct main"
     description:

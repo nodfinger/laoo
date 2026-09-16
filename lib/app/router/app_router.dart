@@ -5,6 +5,7 @@ import '../../core/navigation/navigation_menu_repository.dart';
 import '../../features/company/vendor/pages/vendor_page.dart';
 import '../../features/company/person/pages/person_registry_page.dart';
 import 'package:laoo_meeting/meeting_feature.dart';
+import 'package:laoo_expense/expense_feature.dart';
 import 'package:laoo_service/service_feature.dart';
 import 'package:laoo_time/time_feature.dart';
 import 'package:laoo_training/training_feature.dart';
@@ -172,6 +173,7 @@ final GoRouter appRouter = GoRouter(
     ...buildVisitorFeatureRoutes(),
     ...buildTimeFeatureRoutes(),
     ...buildTrainingFeatureRoutes(),
+    ...buildExpenseFeatureRoutes(),
     GoRoute(
       path: RoutePaths.companyBranches,
       name: RouteNames.companyBranches,
