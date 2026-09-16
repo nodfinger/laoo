@@ -246,7 +246,7 @@ class _AttendanceSummaryPageState extends State<AttendanceSummaryPage> {
             child: ListTile(
               title: Text('${item['employeeCode']} - ${item['fullName']}'),
               subtitle: Text(
-                'วันทำงาน ${item['workDayCount']} วัน | ครบ ${item['completeDayCount']} | ค้าง ${item['unresolvedDayCount']}\n'
+                'วันทำงาน ${item['workDayCount']} วัน | ครบ ${item['completeDayCount']} | ค้าง ${item['unresolvedDayCount']} | ลา ${item['leaveDayCount']} | ลาบางช่วง ${item['partialLeaveDayCount']}\n'
                 'ตามกะ ${_minutes(item['scheduledWorkMinutes'])} | ทำงาน ${_minutes(item['actualWorkMinutes'])} | สาย ${_minutes(item['lateMinutes'])} | ออกก่อน ${_minutes(item['earlyMinutes'])}',
               ),
             ),
@@ -270,6 +270,8 @@ class _AttendanceSummaryPageState extends State<AttendanceSummaryPage> {
               DataColumn(label: Text('วันทำงาน')),
               DataColumn(label: Text('ครบ')),
               DataColumn(label: Text('ค้าง')),
+              DataColumn(label: Text('ลา')),
+              DataColumn(label: Text('ลาบางช่วง')),
               DataColumn(label: Text('ตามกะ')),
               DataColumn(label: Text('ทำงาน')),
               DataColumn(label: Text('สาย')),
@@ -284,6 +286,8 @@ class _AttendanceSummaryPageState extends State<AttendanceSummaryPage> {
                   DataCell(Text('${_items[index]['workDayCount']}')),
                   DataCell(Text('${_items[index]['completeDayCount']}')),
                   DataCell(Text('${_items[index]['unresolvedDayCount']}')),
+                  DataCell(Text('${_items[index]['leaveDayCount']}')),
+                  DataCell(Text('${_items[index]['partialLeaveDayCount']}')),
                   DataCell(Text(_minutes(_items[index]['scheduledWorkMinutes']))),
                   DataCell(Text(_minutes(_items[index]['actualWorkMinutes']))),
                   DataCell(Text(_minutes(_items[index]['lateMinutes']))),

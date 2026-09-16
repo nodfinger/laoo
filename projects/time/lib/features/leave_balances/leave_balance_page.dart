@@ -3,6 +3,7 @@ import 'package:laoo_shared_core/laoo_shared_core.dart';
 import 'package:laoo_shared_workspace_ui/laoo_shared_workspace_ui.dart';
 
 import '../time/time_feature_host.dart';
+import '../time/time_route_contract.dart';
 
 class LeaveBalancePage extends StatefulWidget {
   const LeaveBalancePage({required this.mine, super.key});
@@ -49,7 +50,13 @@ class _LeaveBalancePageState extends State<LeaveBalancePage> {
   @override
   Widget build(BuildContext context) => Stack(children: [
     ListView(padding: const EdgeInsets.all(16), children: [
-      TimeCaptionCard(icon: Icons.account_balance_wallet_outlined, caption: _caption ?? ''),
+      TimeCaptionCard(
+        api: _api,
+        menuCode: widget.mine
+            ? TimeMenuCodes.myLeaveBalance
+            : TimeMenuCodes.leaveBalances,
+        caption: _caption ?? '',
+      ),
       const SizedBox(height: 6),
       if (!widget.mine && _canGenerate) Align(alignment: Alignment.centerRight, child: FilledButton.icon(onPressed: _generating ? null : _generate, icon: _generating ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.auto_awesome_outlined), label: const Text('ประมวลผลสิทธิ์'))),
       if (!widget.mine && _canGenerate) const SizedBox(height: 6),

@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace LaooTimeModule.Controllers;
 
@@ -22,7 +23,7 @@ public sealed record LeaveCancelRequest(string RowVersion, string? Reason);
 [ApiController]
 [Route("api/time/leave-requests")]
 [Authorize]
-public sealed class LeaveRequestsController(IConfiguration configuration) : ControllerBase
+public sealed class LeaveRequestsController(IConfiguration configuration, ILogger<LeaveRequestsController> logger) : ControllerBase
 {
     private const string ProxyMenu = "26003", InboxMenu = "26004", SelfMenu = "30003";
 
@@ -174,6 +175,7 @@ WHERE R.CompanyID=@C AND R.RequestID=@R AND R.ProcessCode='LEAVE_REQUEST'
         var employeeId = self ? await EmployeeForUser(c, companyId, userId, token) : request.EmployeeId;
         if (!employeeId.HasValue) return Conflict(new { message = "ไม่พบพนักงานสำหรับคำขอนี้" });
         if (!self && !await InScope(c, companyId, userId, employeeId.Value, token)) return Forbid();
+        var canDirectApprove = !self && await Can(c, ProxyMenu, "APPROVE", token);
         await using var tx = (SqlTransaction)await c.BeginTransactionAsync(IsolationLevel.Serializable, token);
         try
         {
@@ -186,8 +188,8 @@ WHERE R.CompanyID=@C AND R.RequestID=@R AND R.ProcessCode='LEAVE_REQUEST'
             if (!self && (!request.OnBehalfReasonId.HasValue || !await OnBehalfValid(c, tx, companyId, request.OnBehalfReasonId.Value, request.OnBehalfRemark, request.EvidenceReference, token))) throw new InvalidOperationException("กรุณาระบุเหตุผลทำแทนตามที่กำหนด");
             if ((type.RequireRemark && string.IsNullOrWhiteSpace(request.RequestRemark)) || (type.RequireEvidence && string.IsNullOrWhiteSpace(request.EvidenceReference))) throw new InvalidOperationException("ประเภทลานี้ต้องระบุข้อมูลประกอบให้ครบ");
             var profile = await ApprovalProfile(c, tx, companyId, today, token) ?? throw new InvalidOperationException("ยังไม่ได้กำหนดรูปแบบการอนุมัติสำหรับการลา");
-            var direct = !self && profile.Code == "OWNER_OPERATED" && await Can(c, ProxyMenu, "APPROVE", token);
-            var actorEmployee = await EmployeeForUser(c, companyId, userId, token);
+            var direct = !self && profile.Code == "OWNER_OPERATED" && canDirectApprove;
+            var actorEmployee = await EmployeeForUser(c, companyId, userId, token, tx);
             if (direct && actorEmployee == employeeId && !await Can(c, ProxyMenu, "SELF_APPROVE", token)) throw new InvalidOperationException("ไม่มีสิทธิ์อนุมัติคำขอของตนเอง");
             await EnsureNoOverlappingRequest(c, tx, companyId,
                 employeeId.Value, request.StartWorkDate,
@@ -225,6 +227,12 @@ WHERE R.CompanyID=@C AND R.RequestID=@R AND R.ProcessCode='LEAVE_REQUEST'
             await tx.CommitAsync(token); return Ok(new { requestId, statusCode = direct ? "APPROVED" : "PENDING" });
         }
         catch (InvalidOperationException e) { await tx.RollbackAsync(token); return Conflict(new { message = e.Message }); }
+        catch (Exception e)
+        {
+            logger.LogError(e, "Leave request creation failed. TraceId: {TraceId}", HttpContext.TraceIdentifier);
+            await tx.RollbackAsync(token);
+            throw;
+        }
     }
 
     [HttpPost("{requestId:long}/decision")]
@@ -243,9 +251,9 @@ WHERE R.CompanyID=@C AND R.RequestID=@R AND R.ProcessCode='LEAVE_REQUEST'
         {
             var pending = await Pending(c, tx, companyId, requestId, token)
                 ?? throw new InvalidOperationException("ไม่พบคำขอลาที่รออนุมัติ");
-            if (!await InScope(c, companyId, userId, pending.EmployeeId, token))
+            if (!await InScope(c, companyId, userId, pending.EmployeeId, token, tx))
                 return Forbid();
-            var actorEmployee = await EmployeeForUser(c, companyId, userId, token);
+            var actorEmployee = await EmployeeForUser(c, companyId, userId, token, tx);
             if (actorEmployee == pending.EmployeeId && !await Can(c, InboxMenu, "SELF_APPROVE", token))
                 throw new InvalidOperationException("ไม่มีสิทธิ์อนุมัติคำขอของตนเอง");
             if (decision == "REJECTED" && string.IsNullOrWhiteSpace(request.Reason))
@@ -315,16 +323,16 @@ WHERE R.CompanyID=@C AND R.RequestID=@R AND R.ProcessCode='LEAVE_REQUEST'
     private async Task<SqlConnection> Open(CancellationToken t){var c=new SqlConnection(configuration.GetConnectionString("LaooDatabase"));await c.OpenAsync(t);return c;}
     private bool Scope(out long c,out long u){c=0;u=0;return string.Equals(User.FindFirstValue("user_type"),"COMPANY_USER",StringComparison.OrdinalIgnoreCase)&&long.TryParse(User.FindFirstValue("company_id"),out c)&&long.TryParse(User.FindFirstValue("user_id"),out u)&&c>0&&u>0;}
     private Task<bool> Can(SqlConnection c,string m,string a,CancellationToken t)=>CompanyMenuAccess.IsAllowedAsync(c,User,m,a,t);
-    private static async Task<long?> EmployeeForUser(SqlConnection c,long company,long user,CancellationToken t){await using var q=new SqlCommand("SELECT TOP(1) E.EmployeeID FROM dbo.TDADUserEmployee UE JOIN dbo.TDADUser U ON U.CompanyID=UE.CompanyID AND U.UserID=UE.UserID AND U.IsActive=1 JOIN dbo.TDADEmployee E ON E.CompanyID=UE.CompanyID AND E.EmployeeID=UE.EmployeeID AND E.IsActive=1 WHERE UE.CompanyID=@C AND UE.UserID=@U AND UE.IsActive=1",c);Add(q,"@C",SqlDbType.BigInt,company);Add(q,"@U",SqlDbType.BigInt,user);var x=await q.ExecuteScalarAsync(t);return x is null?null:Convert.ToInt64(x);}
+    private static async Task<long?> EmployeeForUser(SqlConnection c,long company,long user,CancellationToken t,SqlTransaction? tx=null){await using var q=new SqlCommand("SELECT TOP(1) E.EmployeeID FROM dbo.TDADUserEmployee UE JOIN dbo.TDADUser U ON U.CompanyID=UE.CompanyID AND U.UserID=UE.UserID AND U.IsActive=1 JOIN dbo.TDADEmployee E ON E.CompanyID=UE.CompanyID AND E.EmployeeID=UE.EmployeeID AND E.IsActive=1 WHERE UE.CompanyID=@C AND UE.UserID=@U AND UE.IsActive=1",c,tx);Add(q,"@C",SqlDbType.BigInt,company);Add(q,"@U",SqlDbType.BigInt,user);var x=await q.ExecuteScalarAsync(t);return x is null?null:Convert.ToInt64(x);}
     private static async Task<bool> ActiveEmployee(SqlConnection c,SqlTransaction tx,long company,long employee,CancellationToken t){await using var q=new SqlCommand("SELECT COUNT_BIG(1) FROM dbo.TDADEmployee WHERE CompanyID=@C AND EmployeeID=@E AND IsActive=1",c,tx);Add(q,"@C",SqlDbType.BigInt,company);Add(q,"@E",SqlDbType.BigInt,employee);return Convert.ToInt64(await q.ExecuteScalarAsync(t))==1;}
-    private static async Task<bool> InScope(SqlConnection c,long company,long user,long employee,CancellationToken t){await using var q=new SqlCommand("""
+    private static async Task<bool> InScope(SqlConnection c,long company,long user,long employee,CancellationToken t,SqlTransaction? tx=null){await using var q=new SqlCommand("""
 SELECT CAST(CASE WHEN EXISTS
 (
  SELECT 1 FROM dbo.TDADEmployee E WHERE E.CompanyID=@C AND E.EmployeeID=@E AND E.IsActive=1
  AND(EXISTS(SELECT 1 FROM dbo.TDADUser U WHERE U.CompanyID=@C AND U.UserID=@U AND U.IsActive=1 AND U.IsCompanyAdmin=1)
  OR EXISTS(SELECT 1 FROM dbo.TDTMEmployeeDataScopeGrant G WHERE G.CompanyID=@C AND G.IsActive=1 AND(G.UserID=@U OR G.RoleGroupID IN(SELECT ERG.RoleGroupID FROM dbo.TDADUserEmployee UE JOIN dbo.TDADEmployeeRoleGroup ERG ON ERG.EmployeeID=UE.EmployeeID AND ERG.IsActive=1 AND ERG.EffectiveFrom<=CONVERT(date,SYSDATETIME()) AND(ERG.EffectiveTo IS NULL OR ERG.EffectiveTo>=CONVERT(date,SYSDATETIME())) WHERE UE.CompanyID=@C AND UE.UserID=@U AND UE.IsActive=1)) AND G.EffectiveFrom<=SYSDATETIME() AND(G.EffectiveTo IS NULL OR G.EffectiveTo>SYSDATETIME()) AND(G.ScopeTypeCode='ALL' OR G.ScopeTypeCode='SELF' AND EXISTS(SELECT 1 FROM dbo.TDADUserEmployee UE WHERE UE.CompanyID=@C AND UE.UserID=@U AND UE.EmployeeID=@E AND UE.IsActive=1) OR G.ScopeTypeCode='DIVISION' AND G.ScopeReferenceID=E.DivisionOrgUnitID OR G.ScopeTypeCode='DEPARTMENT' AND G.ScopeReferenceID=E.DepartmentOrgUnitID)))
 ) THEN 1 ELSE 0 END AS bit)
-""",c);Add(q,"@C",SqlDbType.BigInt,company);Add(q,"@U",SqlDbType.BigInt,user);Add(q,"@E",SqlDbType.BigInt,employee);return Convert.ToBoolean(await q.ExecuteScalarAsync(t));}
+""",c,tx);Add(q,"@C",SqlDbType.BigInt,company);Add(q,"@U",SqlDbType.BigInt,user);Add(q,"@E",SqlDbType.BigInt,employee);return Convert.ToBoolean(await q.ExecuteScalarAsync(t));}
     private static async Task<Policy?> RequestPolicy(SqlConnection c,SqlTransaction tx,long company,DateOnly d,CancellationToken t){await using var q=new SqlCommand("SELECT TOP(1) RequestPolicyVersionID,PolicyCode FROM dbo.TDTMEmployeeRequestPolicyVersion WHERE CompanyID=@C AND ProcessCode='LEAVE_REQUEST' AND IsActive=1 AND EffectiveFrom<=@D AND(EffectiveTo IS NULL OR EffectiveTo>=@D) ORDER BY EffectiveFrom DESC",c,tx);Add(q,"@C",SqlDbType.BigInt,company);Add(q,"@D",SqlDbType.Date,d.ToDateTime(TimeOnly.MinValue));await using var r=await q.ExecuteReaderAsync(t);return await r.ReadAsync(t)?new Policy(r.GetInt64(0),r.GetString(1)):null;}
     private static async Task<Profile?> ApprovalProfile(SqlConnection c,SqlTransaction tx,long company,DateOnly d,CancellationToken t){await using var q=new SqlCommand("SELECT TOP(1) B.ApprovalProfileVersionID,P.ProcessApprovalPolicyVersionID,COALESCE(P.ProfileCode,B.ProfileCode) FROM dbo.TDTMApprovalProfileVersion B OUTER APPLY(SELECT TOP(1) ProcessApprovalPolicyVersionID,ProfileCode FROM dbo.TDTMProcessApprovalPolicyVersion WHERE CompanyID=B.CompanyID AND ProcessCode='LEAVE' AND IsActive=1 AND EffectiveFrom<=@D AND(EffectiveTo IS NULL OR EffectiveTo>=@D) ORDER BY EffectiveFrom DESC)P WHERE B.CompanyID=@C AND B.IsActive=1 AND B.EffectiveFrom<=@D AND(B.EffectiveTo IS NULL OR B.EffectiveTo>=@D) ORDER BY B.EffectiveFrom DESC",c,tx);Add(q,"@C",SqlDbType.BigInt,company);Add(q,"@D",SqlDbType.Date,d.ToDateTime(TimeOnly.MinValue));await using var r=await q.ExecuteReaderAsync(t);return await r.ReadAsync(t)?new Profile(r.GetInt64(0),r.IsDBNull(1)?null:r.GetInt64(1),r.GetString(2)):null;}
     private static async Task<Type?> LeaveType(SqlConnection c,SqlTransaction tx,long company,long id,CancellationToken t){await using var q=new SqlCommand("SELECT LeaveTypeID,UnitCode,RequireRemark,RequireEvidence FROM dbo.TDTMLeaveType WHERE CompanyID=@C AND LeaveTypeID=@ID AND IsActive=1",c,tx);Add(q,"@C",SqlDbType.BigInt,company);Add(q,"@ID",SqlDbType.BigInt,id);await using var r=await q.ExecuteReaderAsync(t);return await r.ReadAsync(t)?new Type(r.GetInt64(0),r.GetString(1),r.GetBoolean(2),r.GetBoolean(3)):null;}
