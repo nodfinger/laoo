@@ -2,6 +2,8 @@ import 'package:laoo_gate_pass/gate_pass_feature.dart'
     show GatePassMenuCodes, GatePassRouteNames, GatePassRoutePaths;
 import 'package:laoo_five_s/five_s_feature.dart'
     show FiveSMenuCodes, FiveSRouteNames, FiveSRoutePaths;
+import 'package:laoo_survey/survey_feature.dart'
+    show SurveyMenuCodes, SurveyRouteNames, SurveyRoutePaths;
 import 'package:laoo_meeting/meeting_feature.dart'
     show MeetingMenuCodes, MeetingRoutes;
 import 'package:laoo_service/service_feature.dart' show ServiceRoutes;
@@ -738,6 +740,48 @@ abstract final class AppMenuRouteRegistry {
       databaseRouteName: FiveSRouteNames.reports,
       goRouteName: FiveSRouteNames.reports,
       path: FiveSRoutePaths.reports,
+      scope: AppMenuScope.company,
+    ),
+    SurveyMenuCodes.settings: AppMenuRouteSpec(
+      menuCode: SurveyMenuCodes.settings,
+      databaseRouteName: SurveyRouteNames.settings,
+      goRouteName: SurveyRouteNames.settings,
+      path: SurveyRoutePaths.settings,
+      scope: AppMenuScope.company,
+    ),
+    SurveyMenuCodes.questionnaires: AppMenuRouteSpec(
+      menuCode: SurveyMenuCodes.questionnaires,
+      databaseRouteName: SurveyRouteNames.questionnaires,
+      goRouteName: SurveyRouteNames.questionnaires,
+      path: SurveyRoutePaths.questionnaires,
+      scope: AppMenuScope.company,
+    ),
+    SurveyMenuCodes.approvalInbox: AppMenuRouteSpec(
+      menuCode: SurveyMenuCodes.approvalInbox,
+      databaseRouteName: SurveyRouteNames.approvalInbox,
+      goRouteName: SurveyRouteNames.approvalInbox,
+      path: SurveyRoutePaths.approvalInbox,
+      scope: AppMenuScope.company,
+    ),
+    SurveyMenuCodes.delivery: AppMenuRouteSpec(
+      menuCode: SurveyMenuCodes.delivery,
+      databaseRouteName: SurveyRouteNames.delivery,
+      goRouteName: SurveyRouteNames.delivery,
+      path: SurveyRoutePaths.delivery,
+      scope: AppMenuScope.company,
+    ),
+    SurveyMenuCodes.results: AppMenuRouteSpec(
+      menuCode: SurveyMenuCodes.results,
+      databaseRouteName: SurveyRouteNames.results,
+      goRouteName: SurveyRouteNames.results,
+      path: SurveyRoutePaths.results,
+      scope: AppMenuScope.company,
+    ),
+    SurveyMenuCodes.reports: AppMenuRouteSpec(
+      menuCode: SurveyMenuCodes.reports,
+      databaseRouteName: SurveyRouteNames.reports,
+      goRouteName: SurveyRouteNames.reports,
+      path: SurveyRoutePaths.reports,
       scope: AppMenuScope.company,
     ),
     '29001': AppMenuRouteSpec(

@@ -6,6 +6,7 @@ using Laoo.Service.Api.Endpoints;
 using Laoo.Service.Api.Infrastructure.Database;
 using LaooFiveSModule;
 using LaooGatePassModule;
+using LaooSurveyModule;
 using LaooTrainingModule;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.DataProtection;
@@ -41,6 +42,7 @@ builder.Services
     .AddApplicationPart(typeof(LaooTimeModule.TimeModuleMarker).Assembly)
     .AddApplicationPart(typeof(FiveSModuleMarker).Assembly)
     .AddApplicationPart(typeof(GatePassModuleMarker).Assembly)
+    .AddApplicationPart(typeof(SurveyModuleMarker).Assembly)
     .AddApplicationPart(typeof(TrainingModuleMarker).Assembly);
 builder.Services.AddProblemDetails(options =>
 {

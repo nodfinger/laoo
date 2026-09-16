@@ -34,6 +34,8 @@ dependencies:
     path: projects/gate_pass
   laoo_five_s:
     path: projects/five_s
+  laoo_survey:
+    path: projects/survey
 
   cupertino_icons: ^1.0.8
   flutter_riverpod: ^3.4.2
