@@ -3823,17 +3823,19 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
     final startDateTime = DateTime.tryParse('${item['startDateTime'] ?? ''}');
     final hasStarted =
         startDateTime != null && !startDateTime.isAfter(DateTime.now());
-    final trainingTestAction = isTraining && status == 'APPROVED'
-        ? IconButton(
-            tooltip: 'แบบทดสอบก่อนและหลังอบรม',
-            onPressed: () => _openTrainingTests(item),
-            icon: Icon(Icons.quiz_outlined, color: preset.primary),
-          )
-        : null;
+    final trainingTestActions = isTraining && status == 'APPROVED'
+        ? <Widget>[
+            IconButton(
+              tooltip: 'แบบทดสอบก่อนและหลังอบรม',
+              onPressed: () => _openTrainingTests(item),
+              icon: Icon(Icons.quiz_outlined, color: preset.primary),
+            ),
+          ]
+        : const <Widget>[];
     if (hasStarted) {
       return Wrap(
         children: [
-          if (trainingTestAction case final action?) action,
+          ...trainingTestActions,
           Tooltip(
             message: 'ถึงเวลาเริ่มประชุมแล้ว ไม่สามารถทำรายการอื่นได้',
             child: Icon(
@@ -3849,7 +3851,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
     final canCancelBooking = item['canCancelBooking'] == true && editable;
     return Wrap(
       children: [
-        if (trainingTestAction case final action?) action,
+        ...trainingTestActions,
         if (includeApproval &&
             status == 'PENDING' &&
             item['canApprove'] == true &&
