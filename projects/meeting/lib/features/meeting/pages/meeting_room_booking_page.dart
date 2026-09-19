@@ -3833,7 +3833,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
     if (hasStarted) {
       return Wrap(
         children: [
-          if (trainingTestAction != null) trainingTestAction,
+          if (trainingTestAction case final action?) action,
           Tooltip(
             message: 'ถึงเวลาเริ่มประชุมแล้ว ไม่สามารถทำรายการอื่นได้',
             child: Icon(
@@ -3849,7 +3849,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
     final canCancelBooking = item['canCancelBooking'] == true && editable;
     return Wrap(
       children: [
-        if (trainingTestAction != null) trainingTestAction,
+        if (trainingTestAction case final action?) action,
         if (includeApproval &&
             status == 'PENDING' &&
             item['canApprove'] == true &&
