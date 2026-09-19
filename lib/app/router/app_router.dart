@@ -8,6 +8,7 @@ import 'package:laoo_meeting/meeting_feature.dart';
 import 'package:laoo_five_s/five_s_feature.dart';
 import 'package:laoo_survey/survey_feature.dart';
 import 'package:laoo_expense/expense_feature.dart';
+import 'package:laoo_project/project_feature.dart';
 import 'package:laoo_service/service_feature.dart';
 import 'package:laoo_time/time_feature.dart';
 import 'package:laoo_training/training_feature.dart';
@@ -180,6 +181,7 @@ final GoRouter appRouter = GoRouter(
     ...buildFiveSFeatureRoutes(),
     ...buildSurveyFeatureRoutes(),
     ...buildExpenseFeatureRoutes(),
+    ...buildProjectFeatureRoutes(),
     GoRoute(
       path: RoutePaths.companyBranches,
       name: RouteNames.companyBranches,

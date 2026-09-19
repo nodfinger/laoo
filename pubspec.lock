@@ -345,6 +345,13 @@ packages:
       relative: true
     source: path
     version: "1.0.0+1"
+  laoo_project:
+    dependency: "direct main"
+    description:
+      path: "projects/project"
+      relative: true
+    source: path
+    version: "1.0.0+1"
   laoo_service:
     dependency: "direct main"
     description:

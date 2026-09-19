@@ -1,9 +1,9 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('service', 'meeting', 'visitor', 'time', 'training')]
+    [ValidateSet('service', 'meeting', 'visitor', 'time', 'training', 'project')]
     [string]$Module,
 
-    [ValidateSet('center-service', 'meeting', 'visitor', 'time', 'training')]
+    [ValidateSet('center-service', 'meeting', 'visitor', 'time', 'training', 'project')]
     [string]$Role
 )
 
@@ -84,6 +84,7 @@ try {
         'visitor' { 'projects\visitor\packages\dotnet\Laoo.Visitor.Module\Laoo.Visitor.Module.csproj' }
         'time' { 'projects\time\packages\dotnet\Laoo.Time.Module\Laoo.Time.Module.csproj' }
         'training' { 'projects\training\packages\dotnet\Laoo.Training.Module\Laoo.Training.Module.csproj' }
+        'project' { 'projects\project\packages\dotnet\Laoo.Project.Module\Laoo.Project.Module.csproj' }
     }
     Invoke-Checked "$Module API module Release build" { dotnet build $apiModule -c Release }
 }
