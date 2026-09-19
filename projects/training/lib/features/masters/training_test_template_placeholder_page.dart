@@ -50,7 +50,12 @@ class _TrainingTestTemplatePlaceholderPageState
       );
       await _load();
     } catch (error) {
-      if (mounted) setState(() => _error = trainingErrorText(error));
+      if (mounted) {
+        setState(() {
+          _error = trainingErrorText(error);
+          _loading = false;
+        });
+      }
     }
   }
 
