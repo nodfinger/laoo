@@ -956,6 +956,27 @@ abstract final class AppMenuRouteRegistry {
       path: RoutePaths.timeLeaveBalances,
       scope: AppMenuScope.company,
     ),
+    '28013': AppMenuRouteSpec(
+      menuCode: '28013',
+      databaseRouteName: RouteNames.timePayrollExportProfiles,
+      goRouteName: RouteNames.timePayrollExportProfiles,
+      path: RoutePaths.timePayrollExportProfiles,
+      scope: AppMenuScope.company,
+    ),
+    '25003': AppMenuRouteSpec(
+      menuCode: '25003',
+      databaseRouteName: RouteNames.timePayrollExport,
+      goRouteName: RouteNames.timePayrollExport,
+      path: RoutePaths.timePayrollExport,
+      scope: AppMenuScope.company,
+    ),
+    '25004': AppMenuRouteSpec(
+      menuCode: '25004',
+      databaseRouteName: RouteNames.timePayrollExportHistory,
+      goRouteName: RouteNames.timePayrollExportHistory,
+      path: RoutePaths.timePayrollExportHistory,
+      scope: AppMenuScope.company,
+    ),
     '28012': AppMenuRouteSpec(
       menuCode: '28012',
       databaseRouteName: 'timeLeaveReport',

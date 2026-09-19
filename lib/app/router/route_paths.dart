@@ -95,6 +95,11 @@ abstract final class RoutePaths {
   static const String timeLeaveEntitlementPolicies =
       '/company/time-leave-entitlement-policies';
   static const String timeLeaveBalances = '/company/time-leave-balances';
+  static const String timePayrollExportProfiles =
+      '/company/time-payroll-export-profiles';
+  static const String timePayrollExport = '/company/time-payroll-export';
+  static const String timePayrollExportHistory =
+      '/company/time-payroll-export-history';
   static const String timeLeaveRequests = '/company/time-leave-requests';
   static const String timeLeaveApprovalInbox =
       '/company/time-leave-approval-inbox';
