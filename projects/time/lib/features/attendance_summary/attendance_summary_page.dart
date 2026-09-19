@@ -20,6 +20,8 @@ class _AttendanceSummaryPageState extends State<AttendanceSummaryPage> {
   late DateTime _fromDate;
   late DateTime _toDate;
   List<Map<String, dynamic>> _organizationUnits = const [];
+  List<Map<String, dynamic>> _branches = const [];
+  int? _branchId;
   int? _divisionOrgUnitId;
   int? _departmentOrgUnitId;
   Map<String, dynamic>? _actions;
@@ -49,11 +51,13 @@ class _AttendanceSummaryPageState extends State<AttendanceSummaryPage> {
     try {
       final actions = await _repository.actions();
       final organizationUnits = await _repository.organizationUnits();
+      final branches = await _repository.branches();
       if (actions['view'] != true) throw StateError('ไม่มีสิทธิ์ดูรายงานนี้');
       if (mounted) {
         setState(() {
           _actions = actions;
           _organizationUnits = organizationUnits;
+          _branches = branches;
         });
       }
       await _load();
@@ -70,6 +74,7 @@ class _AttendanceSummaryPageState extends State<AttendanceSummaryPage> {
         fromWorkDate: _fromDate,
         toWorkDate: _toDate,
         employee: _employee.text,
+        branchId: _branchId,
         divisionOrgUnitId: _divisionOrgUnitId,
         departmentOrgUnitId: _departmentOrgUnitId,
       );
@@ -133,6 +138,23 @@ class _AttendanceSummaryPageState extends State<AttendanceSummaryPage> {
                       labelText: 'พนักงาน',
                       prefixIcon: Icon(Icons.search),
                     ),
+                  ),
+                ),
+                SizedBox(
+                  width: 220,
+                  child: DropdownButtonFormField<int?>(
+                    value: _branchId,
+                    isExpanded: true,
+                    decoration: const InputDecoration(labelText: 'สาขา'),
+                    items: [
+                      const DropdownMenuItem<int?>(value: null, child: Text('ทั้งหมด')),
+                      for (final branch in _branches)
+                        DropdownMenuItem<int?>(
+                          value: (branch['branchId'] as num).toInt(),
+                          child: Text('${branch['branchCode']} - ${branch['branchName']}'),
+                        ),
+                    ],
+                    onChanged: (value) => setState(() => _branchId = value),
                   ),
                 ),
                 SizedBox(

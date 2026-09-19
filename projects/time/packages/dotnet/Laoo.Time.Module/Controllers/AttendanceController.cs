@@ -218,6 +218,7 @@ JOIN dbo.TDADEmployee E ON E.EmployeeID=R.EmployeeID AND E.CompanyID=R.CompanyID
         [FromQuery] DateOnly? fromWorkDate,
         [FromQuery] DateOnly? toWorkDate,
         [FromQuery] string? employee,
+        [FromQuery] long? branchId,
         [FromQuery] long? divisionOrgUnitId,
         [FromQuery] long? departmentOrgUnitId,
         CancellationToken token = default)
@@ -251,6 +252,7 @@ JOIN dbo.TDTMAttendancePeriod P ON P.CompanyID=R.CompanyID AND P.AttendancePerio
 WHERE R.CompanyID=@CompanyID AND R.IsCurrent=1
   AND R.WorkDate BETWEEN @FromWorkDate AND @ToWorkDate
   AND (@Employee IS NULL OR E.EmployeeCode LIKE N'%'+@Employee+'%' OR E.FullName LIKE N'%'+@Employee+'%')
+  AND (@BranchID IS NULL OR E.BranchID=@BranchID)
   AND (@DivisionOrgUnitID IS NULL OR E.DivisionOrgUnitID=@DivisionOrgUnitID)
   AND (@DepartmentOrgUnitID IS NULL OR E.DepartmentOrgUnitID=@DepartmentOrgUnitID)
   AND
@@ -281,6 +283,7 @@ ORDER BY E.EmployeeCode,E.EmployeeID;
         Add(command, "@FromWorkDate", SqlDbType.Date, from.ToDateTime(TimeOnly.MinValue));
         Add(command, "@ToWorkDate", SqlDbType.Date, to.ToDateTime(TimeOnly.MinValue));
         Add(command, "@Employee", SqlDbType.NVarChar, Clean(employee), 150);
+        Add(command, "@BranchID", SqlDbType.BigInt, branchId);
         Add(command, "@DivisionOrgUnitID", SqlDbType.BigInt, divisionOrgUnitId);
         Add(command, "@DepartmentOrgUnitID", SqlDbType.BigInt, departmentOrgUnitId);
         Add(command, "@BusinessNow", SqlDbType.DateTime2, ThailandNow());
@@ -325,6 +328,26 @@ ORDER BY UnitType,UnitCode,OrgUnitID;
         var items = new List<object>();
         while (await reader.ReadAsync(token))
             items.Add(new { orgUnitId = reader.GetInt64(0), unitType = reader.GetString(1), unitCode = reader.GetString(2), name = reader.GetString(3) });
+        return Ok(new { items });
+    }
+
+    [HttpGet("summary/branches")]
+    public async Task<IActionResult> SummaryBranches(CancellationToken token)
+    {
+        if (!Scope(out var companyId, out _)) return Forbid();
+        await using var connection = await Open(token);
+        if (!await Can(connection, SummaryReportMenuCode, "VIEW", token)) return Forbid();
+        await using var command = new SqlCommand("""
+SELECT BranchID,BranchCode,BranchNameTH
+FROM dbo.TDADBranch
+WHERE CompanyID=@CompanyID AND IsActive=1
+ORDER BY BranchCode,BranchID;
+""", connection);
+        Add(command, "@CompanyID", SqlDbType.BigInt, companyId);
+        await using var reader = await command.ExecuteReaderAsync(token);
+        var items = new List<object>();
+        while (await reader.ReadAsync(token))
+            items.Add(new { branchId = reader.GetInt64(0), branchCode = reader.GetString(1), branchName = reader.GetString(2) });
         return Ok(new { items });
     }
 
