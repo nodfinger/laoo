@@ -12,6 +12,7 @@ import 'package:laoo_intranet/intranet_feature.dart'
     show IntranetMenuCodes, IntranetRouteNames, IntranetRoutePaths;
 import 'package:laoo_vote/vote_feature.dart'
     show VoteMenuCodes, VoteRouteNames, VoteRoutePaths;
+import 'package:laoo_sales/sales_feature.dart' show SalesRoutes;
 import 'package:laoo_meeting/meeting_feature.dart'
     show MeetingMenuCodes, MeetingRoutes;
 import 'package:laoo_service/service_feature.dart' show ServiceRoutes;
@@ -861,7 +862,8 @@ abstract final class AppMenuRouteRegistry {
       goRouteName: VoteRouteNames.results,
       path: VoteRoutePaths.results,
       scope: AppMenuScope.company,
-    ),    ExpenseMenuCodes.settings: AppMenuRouteSpec(
+    ),
+    ExpenseMenuCodes.settings: AppMenuRouteSpec(
       menuCode: ExpenseMenuCodes.settings,
       databaseRouteName: ExpenseRouteNames.settings,
       goRouteName: ExpenseRouteNames.settings,
@@ -1125,6 +1127,14 @@ abstract final class AppMenuRouteRegistry {
         scope: AppMenuScope.company,
       ),
     for (final route in TrainingRoutes.all)
+      route.menuCode: AppMenuRouteSpec(
+        menuCode: route.menuCode,
+        databaseRouteName: route.routeName,
+        goRouteName: route.effectiveGoRouteName,
+        path: route.routePath,
+        scope: AppMenuScope.company,
+      ),
+    for (final route in SalesRoutes.all)
       route.menuCode: AppMenuRouteSpec(
         menuCode: route.menuCode,
         databaseRouteName: route.routeName,
