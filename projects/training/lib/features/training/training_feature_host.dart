@@ -76,6 +76,7 @@ JsonApiClient createTrainingApiClient() {
 
 void disposeTrainingApiClient(JsonApiClient client) =>
     _apiDisposer?.call(client);
+
 String trainingErrorText(Object error) =>
     _errorText?.call(error) ?? error.toString();
 int get trainingPageSize => math.max(1, _pageSize?.call() ?? 30);

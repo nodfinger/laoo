@@ -12,11 +12,13 @@ abstract final class TrainingMenuCodes {
 abstract final class TrainingRouteNames {
   static const types = 'trainingTypes';
   static const instructors = 'trainingInstructors';
+  static const tests = 'trainingTests';
 }
 
 abstract final class TrainingRoutePaths {
   static const types = '/company/training-types';
   static const instructors = '/company/training-instructors';
+  static const tests = '/company/training-tests/:bookingId';
 }
 
 abstract final class TrainingRoutes {
