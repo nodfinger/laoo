@@ -12,6 +12,7 @@ import 'package:laoo_project/project_feature.dart';
 import 'package:laoo_intranet/intranet_feature.dart';
 import 'package:laoo_vote/vote_feature.dart';
 import 'package:laoo_pos/pos_feature.dart';
+import 'package:laoo_sales/sales_feature.dart';
 import 'package:laoo_service/service_feature.dart';
 import 'package:laoo_time/time_feature.dart';
 import 'package:laoo_training/training_feature.dart';
@@ -188,6 +189,7 @@ final GoRouter appRouter = GoRouter(
     ...buildIntranetFeatureRoutes(),
     ...buildVoteFeatureRoutes(),
     ...buildPosFeatureRoutes(),
+    ...buildSalesFeatureRoutes(),
     GoRoute(
       path: RoutePaths.companyBranches,
       name: RouteNames.companyBranches,
