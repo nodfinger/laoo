@@ -136,6 +136,7 @@ class _LeaveRequestPageState extends State<LeaveRequestPage> {
         row['requestId'] as int,
         rowVersion: row['rowVersion'] as String,
         reason: reason,
+        approved: row['statusCode'] == 'APPROVED',
       );
       await _load(page: _page);
       _show('ยกเลิกคำขอเรียบร้อย', false);
@@ -284,7 +285,7 @@ class _LeaveRequestPageState extends State<LeaveRequestPage> {
                                     IconButton(tooltip: 'ไม่อนุมัติ', onPressed: () => _decide(row, 'REJECTED'), icon: const Icon(Icons.cancel_outlined, color: Colors.red)),
                                   ]))
                                 else if (widget.mode == 'self' && _actions?['cancel'] == true)
-                                  DataCell(row['statusCode'] == 'PENDING'
+                                  DataCell(row['statusCode'] == 'PENDING' || row['statusCode'] == 'APPROVED'
                                       ? TextButton.icon(onPressed: () => _cancel(row), icon: const Icon(Icons.cancel_outlined), label: const Text('ยกเลิก'))
                                       : const SizedBox.shrink()),
                               ]);

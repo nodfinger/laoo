@@ -58,7 +58,8 @@ class LeaveRequestRepository {
   Future<void> cancel(int requestId, {
     required String rowVersion,
     String? reason,
-  }) => api.post('$_path/$requestId/cancel', body: {
+    bool approved = false,
+  }) => api.post('$_path/$requestId/${approved ? 'cancel-approved' : 'cancel'}', body: {
         'rowVersion': rowVersion,
         'reason': reason,
       });
