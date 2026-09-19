@@ -44,6 +44,9 @@ abstract final class TimeMenuCodes {
   static const attendancePeriodAssignments = '29002';
   static const attendancePeriods = '29003';
   static const attendanceSummaryReport = '29004';
+  static const payrollExportProfiles = '28013';
+  static const payrollExport = '25003';
+  static const payrollExportHistory = '25004';
 }
 
 abstract final class TimeRouteNames {
@@ -77,6 +80,9 @@ abstract final class TimeRouteNames {
   static const attendancePeriodAssignments = 'timeAttendancePeriodAssignments';
   static const attendancePeriods = 'timeAttendancePeriods';
   static const attendanceSummaryReport = 'timeAttendanceSummaryReport';
+  static const payrollExportProfiles = 'timePayrollExportProfiles';
+  static const payrollExport = 'timePayrollExport';
+  static const payrollExportHistory = 'timePayrollExportHistory';
 }
 
 abstract final class TimeRoutePaths {
@@ -116,6 +122,11 @@ abstract final class TimeRoutePaths {
   static const attendancePeriods = '/company/time-attendance-periods';
   static const attendanceSummaryReport =
       '/company/time-attendance-summary-report';
+  static const payrollExportProfiles =
+      '/company/time-payroll-export-profiles';
+  static const payrollExport = '/company/time-payroll-export';
+  static const payrollExportHistory =
+      '/company/time-payroll-export-history';
 }
 
 abstract final class TimeRoutes {
@@ -366,6 +377,30 @@ abstract final class TimeRoutes {
     routePath: TimeRoutePaths.attendanceSummaryReport,
     isImplemented: true,
   );
+  static const payrollExportProfiles = FeatureRouteContract(
+    projectCode: TimeProject.code,
+    menuCode: TimeMenuCodes.payrollExportProfiles,
+    screenType: 1,
+    routeName: TimeRouteNames.payrollExportProfiles,
+    routePath: TimeRoutePaths.payrollExportProfiles,
+    isImplemented: true,
+  );
+  static const payrollExport = FeatureRouteContract(
+    projectCode: TimeProject.code,
+    menuCode: TimeMenuCodes.payrollExport,
+    screenType: 4,
+    routeName: TimeRouteNames.payrollExport,
+    routePath: TimeRoutePaths.payrollExport,
+    isImplemented: true,
+  );
+  static const payrollExportHistory = FeatureRouteContract(
+    projectCode: TimeProject.code,
+    menuCode: TimeMenuCodes.payrollExportHistory,
+    screenType: 3,
+    routeName: TimeRouteNames.payrollExportHistory,
+    routePath: TimeRoutePaths.payrollExportHistory,
+    isImplemented: true,
+  );
 
   static const all = <FeatureRouteContract>[
     attendanceEvents,
@@ -398,6 +433,9 @@ abstract final class TimeRoutes {
     attendancePeriodAssignments,
     attendancePeriods,
     attendanceSummaryReport,
+    payrollExportProfiles,
+    payrollExport,
+    payrollExportHistory,
   ];
 
   static Iterable<FeatureRouteContract> get implemented =>

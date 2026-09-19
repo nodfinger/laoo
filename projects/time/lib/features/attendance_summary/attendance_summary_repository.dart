@@ -38,9 +38,14 @@ class AttendanceSummaryRepository {
           )
           as Map,
     );
-    return (value['items'] as List? ?? const [])
-        .map((item) => Map<String, dynamic>.from(item as Map))
-        .toList(growable: false);
+    return <String, dynamic>{
+      'total': (value['total'] as num?)?.toInt() ?? 0,
+      'page': (value['page'] as num?)?.toInt() ?? page,
+      'pageSize': (value['pageSize'] as num?)?.toInt() ?? pageSize,
+      'items': (value['items'] as List? ?? const [])
+          .map((item) => Map<String, dynamic>.from(item as Map))
+          .toList(growable: false),
+    };
   }
 
   Future<List<Map<String, dynamic>>> organizationUnits() async {
@@ -56,14 +61,9 @@ class AttendanceSummaryRepository {
     final value = Map<String, dynamic>.from(
       await api.get('$_path/branches') as Map,
     );
-    return <String, dynamic>{
-      'total': (value['total'] as num?)?.toInt() ?? 0,
-      'page': (value['page'] as num?)?.toInt() ?? page,
-      'pageSize': (value['pageSize'] as num?)?.toInt() ?? pageSize,
-      'items': (value['items'] as List? ?? const [])
-          .map((item) => Map<String, dynamic>.from(item as Map))
-          .toList(growable: false),
-    };
+    return (value['items'] as List? ?? const [])
+        .map((item) => Map<String, dynamic>.from(item as Map))
+        .toList(growable: false);
   }
 
   static String _date(DateTime value) =>

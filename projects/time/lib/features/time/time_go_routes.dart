@@ -23,6 +23,7 @@ import '../holiday_calendars/holiday_date_page.dart';
 import '../holiday_calendars/branch_holiday_calendar_page.dart';
 import '../holiday_calendars/branch_holiday_exception_page.dart';
 import '../my_attendance_history/my_attendance_history_page.dart';
+import '../payroll_exports/payroll_export_page.dart';
 import 'pages/time_preview_page.dart';
 
 List<GoRoute> buildTimeFeatureRoutes() => <GoRoute>[
@@ -128,7 +129,22 @@ List<GoRoute> buildTimeFeatureRoutes() => <GoRoute>[
   GoRoute(
     name: TimeRouteNames.attendanceSummaryReport,
     path: TimeRoutePaths.attendanceSummaryReport,
-    builder: (context, state) => const AttendanceSummaryPage(),
+      builder: (context, state) => const AttendanceSummaryPage(),
+  ),
+  GoRoute(
+    name: TimeRouteNames.payrollExportProfiles,
+    path: TimeRoutePaths.payrollExportProfiles,
+    builder: (context, state) => const PayrollExportPage(mode: PayrollExportMode.profiles),
+  ),
+  GoRoute(
+    name: TimeRouteNames.payrollExport,
+    path: TimeRoutePaths.payrollExport,
+    builder: (context, state) => const PayrollExportPage(mode: PayrollExportMode.generate),
+  ),
+  GoRoute(
+    name: TimeRouteNames.payrollExportHistory,
+    path: TimeRoutePaths.payrollExportHistory,
+    builder: (context, state) => const PayrollExportPage(mode: PayrollExportMode.history),
   ),
   GoRoute(
     name: TimeRouteNames.shiftTemplates,
