@@ -12,12 +12,12 @@ using Microsoft.Extensions.Configuration;
 
 namespace LaooTimeModule.Controllers;
 
-[ApiController]
-[Route("api/time/payroll-exports")]
-[Authorize]
 public sealed record PayrollExportGenerateRequest(long AttendancePeriodId, long ProfileId);
 public sealed record PayrollExportProfileRequest(string ProfileCode, string ProfileName, string FormatCode, string? DelimiterCode, string? EncodingCode, bool IncludeHeader, string? DateFormat, string? ColumnMapJson, string? RowVersion);
 
+[ApiController]
+[Route("api/time/payroll-exports")]
+[Authorize]
 public sealed class PayrollExportsController(IConfiguration configuration, IWebHostEnvironment environment) : ControllerBase
 {
     private const string ProfilesMenu = "28013";

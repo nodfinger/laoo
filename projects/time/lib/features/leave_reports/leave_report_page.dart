@@ -17,7 +17,8 @@ class _LeaveReportPageState extends State<LeaveReportPage> {
   DateTime _to = DateUtils.dateOnly(timeUiTokens.businessDate);
   List<Map<String, dynamic>> _items = const [], _employees = const [], _branches = const [], _units = const [], _leaveTypes = const [];
   String? _caption, _message, _status;
-  int? _branchId, _divisionId, _departmentId, _employeeId, _leaveTypeId, _page = 1, _total = 0;
+  int? _branchId, _divisionId, _departmentId, _employeeId, _leaveTypeId;
+  int _page = 1, _total = 0;
   bool _loading = true;
 
   @override
@@ -77,8 +78,8 @@ class _LeaveReportPageState extends State<LeaveReportPage> {
           FilledButton.icon(onPressed: _loading ? null : _load, icon: const Icon(Icons.search), label: const Text('ค้นหา')),
           OutlinedButton(onPressed: _loading ? null : _clear, child: const Text('ล้าง Filter')),
         ]),
-        table: _loading ? const Center(child: CircularProgressIndicator()) : _items.isEmpty ? const Center(child: Text('ไม่พบข้อมูลรายงาน')) : LayoutBuilder(builder: (context, constraints) => SingleChildScrollView(scrollDirection: Axis.horizontal, child: ConstrainedBox(constraints: BoxConstraints(minWidth: constraints.maxWidth), child: LaooWorkspaceDataTable(tokens: timeUiTokens.workspace, headingRowColor: WidgetStatePropertyAll(timeUiTokens.primaryColor.withValues(alpha: .10)), columns: const [LaooWorkspaceTableColumns.id, DataColumn(label: Text('พนักงาน')), DataColumn(label: Text('ประเภทการลา')), DataColumn(label: Text('ได้รับ')), DataColumn(label: Text('ใช้ไป')), DataColumn(label: Text('รออนุมัติ')), DataColumn(label: Text('คงเหลือ'))], rows: List.generate(_items.length, (index) { final x = _items[index]; return DataRow(cells: [DataCell(Text('${((_page ?? 1) - 1) * timePageSize + index + 1}')), DataCell(Text('${x['employeeCode']} — ${x['fullName']}')), DataCell(Text('${x['leaveTypeCode']} — ${x['leaveTypeName']}')), DataCell(Text('${x['granted']}')), DataCell(Text('${x['used']}')), DataCell(Text('${x['pending']}')), DataCell(Text('${x['balance']}'))]); }))))),
-        pagination: LaooPaginationCard(tokens: timeUiTokens.workspace, page: _page ?? 1, pageCount: pageCount, pageSize: timePageSize, total: _total ?? 0, onPrevious: (_page ?? 1) > 1 ? () => _load(page: (_page ?? 1) - 1) : null, onNext: (_page ?? 1) < pageCount ? () => _load(page: (_page ?? 1) + 1) : null),
+        table: _loading ? const Center(child: CircularProgressIndicator()) : _items.isEmpty ? const Center(child: Text('ไม่พบข้อมูลรายงาน')) : LayoutBuilder(builder: (context, constraints) => SingleChildScrollView(scrollDirection: Axis.horizontal, child: ConstrainedBox(constraints: BoxConstraints(minWidth: constraints.maxWidth), child: LaooWorkspaceDataTable(tokens: timeUiTokens.workspace, headingRowColor: WidgetStatePropertyAll(timeUiTokens.primaryColor.withValues(alpha: .10)), columns: const [LaooWorkspaceTableColumns.id, DataColumn(label: Text('พนักงาน')), DataColumn(label: Text('ประเภทการลา')), DataColumn(label: Text('ได้รับ')), DataColumn(label: Text('ใช้ไป')), DataColumn(label: Text('รออนุมัติ')), DataColumn(label: Text('คงเหลือ'))], rows: List.generate(_items.length, (index) { final x = _items[index]; return DataRow(cells: [DataCell(Text('${(_page - 1) * timePageSize + index + 1}')), DataCell(Text('${x['employeeCode']} — ${x['fullName']}')), DataCell(Text('${x['leaveTypeCode']} — ${x['leaveTypeName']}')), DataCell(Text('${x['granted']}')), DataCell(Text('${x['used']}')), DataCell(Text('${x['pending']}')), DataCell(Text('${x['balance']}'))]); }))))),
+        pagination: LaooPaginationCard(tokens: timeUiTokens.workspace, page: _page, pageCount: pageCount, pageSize: timePageSize, total: _total, onPrevious: _page > 1 ? () => _load(page: _page - 1) : null, onNext: _page < pageCount ? () => _load(page: _page + 1) : null),
       ),
       if (_message != null) Positioned(top: 16, right: 16, child: buildTimeMessage(message: _message!, error: true, onClose: () => setState(() => _message = null))),
     ]));
