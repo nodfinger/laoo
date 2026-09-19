@@ -6,6 +6,8 @@ import 'package:laoo_survey/survey_feature.dart'
     show SurveyMenuCodes, SurveyRouteNames, SurveyRoutePaths;
 import 'package:laoo_expense/expense_feature.dart'
     show ExpenseMenuCodes, ExpenseRouteNames, ExpenseRoutePaths;
+import 'package:laoo_project/project_feature.dart'
+    show ProjectMenuCodes, ProjectRouteNames, ProjectRoutePaths;
 import 'package:laoo_meeting/meeting_feature.dart'
     show MeetingMenuCodes, MeetingRoutes;
 import 'package:laoo_service/service_feature.dart' show ServiceRoutes;
@@ -840,6 +842,41 @@ abstract final class AppMenuRouteRegistry {
       databaseRouteName: ExpenseRouteNames.reports,
       goRouteName: ExpenseRouteNames.reports,
       path: ExpenseRoutePaths.reports,
+      scope: AppMenuScope.company,
+    ),
+    ProjectMenuCodes.settings: AppMenuRouteSpec(
+      menuCode: ProjectMenuCodes.settings,
+      databaseRouteName: ProjectRouteNames.settings,
+      goRouteName: ProjectRouteNames.settings,
+      path: ProjectRoutePaths.settings,
+      scope: AppMenuScope.company,
+    ),
+    ProjectMenuCodes.budgetCategories: AppMenuRouteSpec(
+      menuCode: ProjectMenuCodes.budgetCategories,
+      databaseRouteName: ProjectRouteNames.budgetCategories,
+      goRouteName: ProjectRouteNames.budgetCategories,
+      path: ProjectRoutePaths.budgetCategories,
+      scope: AppMenuScope.company,
+    ),
+    ProjectMenuCodes.projects: AppMenuRouteSpec(
+      menuCode: ProjectMenuCodes.projects,
+      databaseRouteName: ProjectRouteNames.projects,
+      goRouteName: ProjectRouteNames.projects,
+      path: ProjectRoutePaths.projects,
+      scope: AppMenuScope.company,
+    ),
+    ProjectMenuCodes.myTasks: AppMenuRouteSpec(
+      menuCode: ProjectMenuCodes.myTasks,
+      databaseRouteName: ProjectRouteNames.myTasks,
+      goRouteName: ProjectRouteNames.myTasks,
+      path: ProjectRoutePaths.myTasks,
+      scope: AppMenuScope.company,
+    ),
+    ProjectMenuCodes.reports: AppMenuRouteSpec(
+      menuCode: ProjectMenuCodes.reports,
+      databaseRouteName: ProjectRouteNames.reports,
+      goRouteName: ProjectRouteNames.reports,
+      path: ProjectRoutePaths.reports,
       scope: AppMenuScope.company,
     ),
     '29001': AppMenuRouteSpec(
