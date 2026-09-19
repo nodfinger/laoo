@@ -73,7 +73,7 @@ void main() {
     }
   });
 
-  test('Training feature replaces both Center placeholders', () {
+  test('Training menu and internal routes are composed separately', () {
     final routes = buildTrainingFeatureRoutes();
     final names = routes.map((route) => route.name).toSet();
     final paths = routes.map((route) => route.path).toSet();
@@ -81,28 +81,40 @@ void main() {
         .whereType<GoRoute>()
         .map((route) => route.path)
         .toSet();
+    final menuRouteNames = TrainingRoutes.all
+        .map((route) => route.routeName)
+        .toSet();
+    final menuRoutePaths = TrainingRoutes.all
+        .map((route) => route.routePath)
+        .toSet();
 
-    expect(routes, hasLength(2));
     expect(
-      names,
+      menuRouteNames,
       containsAll(<String>{
         TrainingRouteNames.types,
         TrainingRouteNames.instructors,
+        TrainingRouteNames.testTemplates,
       }),
     );
+    expect(menuRouteNames, isNot(contains(TrainingRouteNames.tests)));
     expect(
-      paths,
+      menuRoutePaths,
       containsAll(<String>{
         TrainingRoutePaths.types,
         TrainingRoutePaths.instructors,
+        TrainingRoutePaths.testTemplates,
       }),
     );
+    expect(menuRoutePaths, isNot(contains(TrainingRoutePaths.tests)));
+    expect(names, containsAll(menuRouteNames));
+    expect(paths, containsAll(menuRoutePaths));
+    expect(names, contains(TrainingRouteNames.tests));
+    expect(paths, contains(TrainingRoutePaths.tests));
     expect(centerPaths, containsAll(paths));
     for (final route in TrainingRoutes.all) {
       expect(AppMenuRouteRegistry.byMenuCode(route.menuCode), isNotNull);
     }
   });
-
   test('Time leave request routes replace Root placeholders exactly once', () {
     final centerRoutes = appRouter.configuration.routes.whereType<GoRoute>();
     const leavePaths = <String>{

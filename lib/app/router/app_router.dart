@@ -342,6 +342,10 @@ String? resolveAppRouteRedirect({
     return null;
   }
 
+  if (TrainingRoutePaths.isInternalTestRoute(path)) {
+    return null;
+  }
+
   final isKnownNonMenuRoute =
       path == RoutePaths.resetPassword ||
       path == RoutePaths.authenticatedHome ||

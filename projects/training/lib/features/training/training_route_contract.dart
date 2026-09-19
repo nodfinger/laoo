@@ -7,18 +7,28 @@ abstract final class TrainingProject {
 abstract final class TrainingMenuCodes {
   static const types = '37001';
   static const instructors = '37002';
+  static const testTemplates = '37003';
 }
 
 abstract final class TrainingRouteNames {
   static const types = 'trainingTypes';
   static const instructors = 'trainingInstructors';
+  static const testTemplates = 'trainingTestTemplates';
   static const tests = 'trainingTests';
 }
 
 abstract final class TrainingRoutePaths {
   static const types = '/company/training-types';
   static const instructors = '/company/training-instructors';
+  static const testTemplates = '/company/training-test-templates';
   static const tests = '/company/training-tests/:bookingId';
+
+  static bool isInternalTestRoute(String path) {
+    final basePath = tests.substring(0, tests.indexOf('/:bookingId'));
+    return path.startsWith('$basePath/') &&
+        path.length > basePath.length + 1 &&
+        !path.substring(basePath.length + 1).contains('/');
+  }
 }
 
 abstract final class TrainingRoutes {
@@ -36,6 +46,13 @@ abstract final class TrainingRoutes {
       screenType: 1,
       routeName: TrainingRouteNames.instructors,
       routePath: TrainingRoutePaths.instructors,
+    ),
+    FeatureRouteContract(
+      projectCode: TrainingProject.code,
+      menuCode: TrainingMenuCodes.testTemplates,
+      screenType: 1,
+      routeName: TrainingRouteNames.testTemplates,
+      routePath: TrainingRoutePaths.testTemplates,
     ),
   ];
 }
