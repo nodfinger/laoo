@@ -31,6 +31,7 @@
     <ProjectReference Include="..\projects\project\packages\dotnet\Laoo.Project.Module\Laoo.Project.Module.csproj" />
     <ProjectReference Include="..\projects\intranet\packages\dotnet\Laoo.Intranet.Module\Laoo.Intranet.Module.csproj" />
     <ProjectReference Include="..\projects\vote\packages\dotnet\Laoo.Vote.Module\Laoo.Vote.Module.csproj" />
+    <ProjectReference Include="..\projects\pos\packages\dotnet\Laoo.Pos.Module\Laoo.Pos.Module.csproj" />
     <ProjectReference Include="..\projects\training\packages\dotnet\Laoo.Training.Module\Laoo.Training.Module.csproj" />
     <ProjectReference Include="..\projects\gate_pass\packages\dotnet\Laoo.GatePass.Module\Laoo.GatePass.Module.csproj" />
   </ItemGroup>

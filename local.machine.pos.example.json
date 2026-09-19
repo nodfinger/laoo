@@ -1,0 +1,6 @@
+{
+  "role": "pos",
+  "allowedProjects": ["LAOO", "LAOO_POS"],
+  "webPort": 8080,
+  "apiPort": 5080
+}
