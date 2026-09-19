@@ -8,8 +8,10 @@
 | `meeting` | `projects/meeting` and `projects/training` |
 | `visitor` | `projects/visitor` |
 | `time` | `projects/time` |
-| 	raining | projects/training |
-| intranet | projects/intranet |
+| `training` | `projects/training` |
+| `intranet` | `projects/intranet` |
+| `vote` | `projects/vote` |
+| `sales` | `projects/sales` |
 
 Every machine clones `nodfinger/laoo` to `C:\laooplatform\laoo`. Never
 share a live working tree, `.git`, `.dart_tool`, `build`, `bin`, or `obj`.
@@ -205,3 +207,17 @@ Visitor is a package/module scaffold. Its 22 route contracts remain marked
 unimplemented and must not enter the active route registry until each screen
 and API is ready. Shared employee, branch, user, organization, permission,
 and theme code remains in Core/shared packages.
+
+Sales machine example:
+
+```json
+{
+  "role": "sales",
+  "allowedProjects": ["LAOO", "LAOO_SALES"],
+  "webPort": 8080,
+  "apiPort": 5080
+}
+```
+
+Copy `local.machine.sales.example.json` to ignored `local.machine.json` on that
+machine. Never commit a real `local.machine.json`.

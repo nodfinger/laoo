@@ -1,0 +1,7 @@
+{
+  "role": "sales",
+  "ownedModules": ["sales"],
+  "allowedProjects": ["LAOO", "LAOO_SALES"],
+  "webPort": 8080,
+  "apiPort": 5080
+}
