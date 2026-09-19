@@ -26,6 +26,9 @@ class _AttendanceSummaryPageState extends State<AttendanceSummaryPage> {
   int? _departmentOrgUnitId;
   Map<String, dynamic>? _actions;
   List<Map<String, dynamic>> _items = const [];
+  int _page = 1;
+  int _pageSize = 30;
+  int _total = 0;
   bool _loading = true;
   String? _message;
 
@@ -67,18 +70,27 @@ class _AttendanceSummaryPageState extends State<AttendanceSummaryPage> {
     }
   }
 
-  Future<void> _load() async {
+  Future<void> _load({int page = 1}) async {
     setState(() => _loading = true);
     try {
-      final items = await _repository.list(
+      final result = await _repository.list(
         fromWorkDate: _fromDate,
         toWorkDate: _toDate,
         employee: _employee.text,
         branchId: _branchId,
         divisionOrgUnitId: _divisionOrgUnitId,
         departmentOrgUnitId: _departmentOrgUnitId,
+        page: page,
+        pageSize: _pageSize,
       );
-      if (mounted) setState(() => _items = items);
+      if (mounted) {
+        setState(() {
+          _items = List<Map<String, dynamic>>.from(result['items'] as List);
+          _page = result['page'] as int;
+          _pageSize = result['pageSize'] as int;
+          _total = result['total'] as int;
+        });
+      }
     } catch (error) {
       _show(timeErrorText(error));
     } finally {
@@ -204,7 +216,7 @@ class _AttendanceSummaryPageState extends State<AttendanceSummaryPage> {
                   ),
                 ),
                 FilledButton.icon(
-                  onPressed: _loading ? null : _load,
+                  onPressed: _loading ? null : () => _load(),
                   icon: const Icon(Icons.search),
                   label: const Text('ค้นหา'),
                 ),
@@ -221,12 +233,12 @@ class _AttendanceSummaryPageState extends State<AttendanceSummaryPage> {
                       ),
             pagination: LaooPaginationCard(
               tokens: timeUiTokens.workspace,
-              page: 1,
-              pageCount: 1,
-              pageSize: _items.isEmpty ? 1 : _items.length,
-              total: _items.length,
-              onPrevious: null,
-              onNext: null,
+              page: _page,
+              pageCount: _total == 0 ? 1 : ((_total + _pageSize - 1) ~/ _pageSize),
+              pageSize: _pageSize,
+              total: _total,
+              onPrevious: _loading || _page <= 1 ? null : () => _load(page: _page - 1),
+              onNext: _loading || _page >= ((_total + _pageSize - 1) ~/ _pageSize) ? null : () => _load(page: _page + 1),
             ),
           ),
           if (_message != null)

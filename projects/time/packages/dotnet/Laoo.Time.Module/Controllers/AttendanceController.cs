@@ -221,6 +221,8 @@ JOIN dbo.TDADEmployee E ON E.EmployeeID=R.EmployeeID AND E.CompanyID=R.CompanyID
         [FromQuery] long? branchId,
         [FromQuery] long? divisionOrgUnitId,
         [FromQuery] long? departmentOrgUnitId,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 30,
         CancellationToken token = default)
     {
         if (!Scope(out var companyId, out var userId)) return Forbid();
@@ -229,6 +231,8 @@ JOIN dbo.TDADEmployee E ON E.EmployeeID=R.EmployeeID AND E.CompanyID=R.CompanyID
 
         var from = fromWorkDate ?? ThailandToday().AddDays(-30);
         var to = toWorkDate ?? ThailandToday();
+        if (page < 1 || pageSize is < 1 or > 100)
+            return BadRequest(new { message = "Invalid pagination" });
         if (from > to)
             return BadRequest(new { message = "วันที่เริ่มต้นต้องไม่เกินวันที่สิ้นสุด" });
 
@@ -242,7 +246,8 @@ SELECT E.EmployeeID,E.EmployeeCode,E.FullName,
        SUM(R.ScheduledWorkMinutes) ScheduledWorkMinutes,
        SUM(R.ActualWorkMinutes) ActualWorkMinutes,
        SUM(R.LateMinutes) LateMinutes,
-       SUM(R.EarlyMinutes) EarlyMinutes
+       SUM(R.EarlyMinutes) EarlyMinutes,
+       COUNT_BIG(1) OVER() TotalCount
 FROM dbo.TDTMAttendanceResult R
 JOIN dbo.TDADEmployee E ON E.EmployeeID=R.EmployeeID AND E.CompanyID=R.CompanyID
 JOIN dbo.TDTMEmployeeAttendancePeriodAssignment A ON A.CompanyID=R.CompanyID AND A.EmployeeID=R.EmployeeID
@@ -275,7 +280,8 @@ WHERE R.CompanyID=@CompanyID AND R.IsCurrent=1
     )
   )
 GROUP BY E.EmployeeID,E.EmployeeCode,E.FullName
-ORDER BY E.EmployeeCode,E.EmployeeID;
+ORDER BY E.EmployeeCode,E.EmployeeID
+OFFSET @Offset ROWS FETCH NEXT @Take ROWS ONLY;
 """;
         await using var command = new SqlCommand(sql, connection);
         Add(command, "@CompanyID", SqlDbType.BigInt, companyId);
@@ -288,10 +294,14 @@ ORDER BY E.EmployeeCode,E.EmployeeID;
         Add(command, "@DepartmentOrgUnitID", SqlDbType.BigInt, departmentOrgUnitId);
         Add(command, "@BusinessNow", SqlDbType.DateTime2, ThailandNow());
         Add(command, "@BusinessDate", SqlDbType.Date, ThailandToday().ToDateTime(TimeOnly.MinValue));
+        Add(command, "@Offset", SqlDbType.Int, (page - 1) * pageSize);
+        Add(command, "@Take", SqlDbType.Int, pageSize);
         await using var reader = await command.ExecuteReaderAsync(token);
         var items = new List<object>();
+        long total = 0;
         while (await reader.ReadAsync(token))
         {
+            total = reader.GetInt64(12);
             items.Add(new
             {
                 employeeId = reader.GetInt64(0),
@@ -308,7 +318,7 @@ ORDER BY E.EmployeeCode,E.EmployeeID;
                 earlyMinutes = reader.GetInt32(11),
             });
         }
-        return Ok(new { items });
+        return Ok(new { total, page, pageSize, items });
     }
 
     [HttpGet("summary/organization-units")]

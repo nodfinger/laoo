@@ -10,13 +10,15 @@ class AttendanceSummaryRepository {
     await api.get('$_path/actions') as Map,
   );
 
-  Future<List<Map<String, dynamic>>> list({
+  Future<Map<String, dynamic>> list({
     required DateTime fromWorkDate,
     required DateTime toWorkDate,
     String? employee,
     int? branchId,
     int? divisionOrgUnitId,
     int? departmentOrgUnitId,
+    int page = 1,
+    int pageSize = 30,
   }) async {
     final value = Map<String, dynamic>.from(
       await api.get(
@@ -30,6 +32,8 @@ class AttendanceSummaryRepository {
                 'divisionOrgUnitId': '$divisionOrgUnitId',
               if (departmentOrgUnitId != null)
                 'departmentOrgUnitId': '$departmentOrgUnitId',
+              'page': '$page',
+              'pageSize': '$pageSize',
             },
           )
           as Map,
@@ -52,9 +56,14 @@ class AttendanceSummaryRepository {
     final value = Map<String, dynamic>.from(
       await api.get('$_path/branches') as Map,
     );
-    return (value['items'] as List? ?? const [])
-        .map((item) => Map<String, dynamic>.from(item as Map))
-        .toList(growable: false);
+    return <String, dynamic>{
+      'total': (value['total'] as num?)?.toInt() ?? 0,
+      'page': (value['page'] as num?)?.toInt() ?? page,
+      'pageSize': (value['pageSize'] as num?)?.toInt() ?? pageSize,
+      'items': (value['items'] as List? ?? const [])
+          .map((item) => Map<String, dynamic>.from(item as Map))
+          .toList(growable: false),
+    };
   }
 
   static String _date(DateTime value) =>
