@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../widgets/meeting_popup.dart';
 import '../widgets/meeting_participant_dialog.dart';
@@ -3818,13 +3819,29 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
     bool includeApproval = true,
   }) {
     final status = item['status']?.toString();
+    final isTraining = item['activityTypeCode'] == 'TRAINING';
     final startDateTime = DateTime.tryParse('${item['startDateTime'] ?? ''}');
     final hasStarted =
         startDateTime != null && !startDateTime.isAfter(DateTime.now());
+    final trainingTestAction = isTraining && status == 'APPROVED'
+        ? IconButton(
+            tooltip: 'แบบทดสอบก่อนและหลังอบรม',
+            onPressed: () => _openTrainingTests(item),
+            icon: Icon(Icons.quiz_outlined, color: preset.primary),
+          )
+        : null;
     if (hasStarted) {
-      return Tooltip(
-        message: 'ถึงเวลาเริ่มประชุมแล้ว ไม่สามารถทำรายการได้',
-        child: Icon(Icons.lock_outline, color: Theme.of(context).disabledColor),
+      return Wrap(
+        children: [
+          if (trainingTestAction != null) trainingTestAction,
+          Tooltip(
+            message: 'ถึงเวลาเริ่มประชุมแล้ว ไม่สามารถทำรายการอื่นได้',
+            child: Icon(
+              Icons.lock_outline,
+              color: Theme.of(context).disabledColor,
+            ),
+          ),
+        ],
       );
     }
     final editable = status != 'CANCELLED' && status != 'REJECTED';
@@ -3832,6 +3849,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
     final canCancelBooking = item['canCancelBooking'] == true && editable;
     return Wrap(
       children: [
+        if (trainingTestAction != null) trainingTestAction,
         if (includeApproval &&
             status == 'PENDING' &&
             item['canApprove'] == true &&
@@ -3898,6 +3916,18 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
           ),
       ],
     );
+  }
+
+  void _openTrainingTests(Map<String, dynamic> item) {
+    final bookingId = _int(item['bookingId']);
+    if (bookingId == null || bookingId <= 0) {
+      _showMessage(
+        'ไม่สามารถเปิดแบบทดสอบได้\nรายละเอียดเพิ่มเติม: ไม่พบรหัสรายการจองอบรม',
+        error: true,
+      );
+      return;
+    }
+    context.go('/company/training-tests/$bookingId?section=PRE');
   }
 
   Widget _pagination(WorkspaceThemePreset preset) {
