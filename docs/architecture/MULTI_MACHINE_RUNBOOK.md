@@ -54,6 +54,20 @@ Intranet machine example:
 Copy `local.machine.intranet.example.json` to ignored `local.machine.json` on
 that machine. Never commit a real `local.machine.json`.
 
+Vote machine example:
+
+```json
+{
+  "role": "vote",
+  "allowedProjects": ["LAOO", "LAOO_VOTE"],
+  "webPort": 8080,
+  "apiPort": 5080
+}
+```
+
+Copy `local.machine.vote.example.json` to ignored `local.machine.json` on that
+machine. Never commit a real `local.machine.json`.
+
 Run `tools/scripts/check-machine-boundaries.ps1 -Module <module>` before full
 verification. On Meeting, Visitor, and Time machines it rejects changed files
 outside the owned Project directory. The Center machine may change Root, Core,

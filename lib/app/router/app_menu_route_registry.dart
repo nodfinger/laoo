@@ -10,6 +10,8 @@ import 'package:laoo_project/project_feature.dart'
     show ProjectMenuCodes, ProjectRouteNames, ProjectRoutePaths;
 import 'package:laoo_intranet/intranet_feature.dart'
     show IntranetMenuCodes, IntranetRouteNames, IntranetRoutePaths;
+import 'package:laoo_vote/vote_feature.dart'
+    show VoteMenuCodes, VoteRouteNames, VoteRoutePaths;
 import 'package:laoo_meeting/meeting_feature.dart'
     show MeetingMenuCodes, MeetingRoutes;
 import 'package:laoo_service/service_feature.dart' show ServiceRoutes;
@@ -823,6 +825,41 @@ abstract final class AppMenuRouteRegistry {
       databaseRouteName: IntranetRouteNames.reports,
       goRouteName: IntranetRouteNames.reports,
       path: IntranetRoutePaths.reports,
+      scope: AppMenuScope.company,
+    ),
+    VoteMenuCodes.settings: AppMenuRouteSpec(
+      menuCode: VoteMenuCodes.settings,
+      databaseRouteName: VoteRouteNames.settings,
+      goRouteName: VoteRouteNames.settings,
+      path: VoteRoutePaths.settings,
+      scope: AppMenuScope.company,
+    ),
+    VoteMenuCodes.topics: AppMenuRouteSpec(
+      menuCode: VoteMenuCodes.topics,
+      databaseRouteName: VoteRouteNames.topics,
+      goRouteName: VoteRouteNames.topics,
+      path: VoteRoutePaths.topics,
+      scope: AppMenuScope.company,
+    ),
+    VoteMenuCodes.approvalInbox: AppMenuRouteSpec(
+      menuCode: VoteMenuCodes.approvalInbox,
+      databaseRouteName: VoteRouteNames.approvalInbox,
+      goRouteName: VoteRouteNames.approvalInbox,
+      path: VoteRoutePaths.approvalInbox,
+      scope: AppMenuScope.company,
+    ),
+    VoteMenuCodes.myVotes: AppMenuRouteSpec(
+      menuCode: VoteMenuCodes.myVotes,
+      databaseRouteName: VoteRouteNames.myVotes,
+      goRouteName: VoteRouteNames.myVotes,
+      path: VoteRoutePaths.myVotes,
+      scope: AppMenuScope.company,
+    ),
+    VoteMenuCodes.results: AppMenuRouteSpec(
+      menuCode: VoteMenuCodes.results,
+      databaseRouteName: VoteRouteNames.results,
+      goRouteName: VoteRouteNames.results,
+      path: VoteRoutePaths.results,
       scope: AppMenuScope.company,
     ),    ExpenseMenuCodes.settings: AppMenuRouteSpec(
       menuCode: ExpenseMenuCodes.settings,

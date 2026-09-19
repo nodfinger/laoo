@@ -42,6 +42,8 @@ dependencies:
     path: projects/project
   laoo_intranet:
     path: projects/intranet
+  laoo_vote:
+    path: projects/vote
 
   cupertino_icons: ^1.0.8
   flutter_riverpod: ^3.4.2
