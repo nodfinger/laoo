@@ -919,6 +919,13 @@ abstract final class AppMenuRouteRegistry {
       path: RoutePaths.timeLeaveBalances,
       scope: AppMenuScope.company,
     ),
+    '28012': AppMenuRouteSpec(
+      menuCode: '28012',
+      databaseRouteName: 'timeLeaveReport',
+      goRouteName: 'timeLeaveReport',
+      path: '/company/time-leave-report',
+      scope: AppMenuScope.company,
+    ),
     '26003': AppMenuRouteSpec(
       menuCode: '26003',
       databaseRouteName: 'timeLeaveRequests',
