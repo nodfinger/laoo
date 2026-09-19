@@ -8,6 +8,8 @@ import 'package:laoo_expense/expense_feature.dart'
     show ExpenseMenuCodes, ExpenseRouteNames, ExpenseRoutePaths;
 import 'package:laoo_project/project_feature.dart'
     show ProjectMenuCodes, ProjectRouteNames, ProjectRoutePaths;
+import 'package:laoo_intranet/intranet_feature.dart'
+    show IntranetMenuCodes, IntranetRouteNames, IntranetRoutePaths;
 import 'package:laoo_meeting/meeting_feature.dart'
     show MeetingMenuCodes, MeetingRoutes;
 import 'package:laoo_service/service_feature.dart' show ServiceRoutes;
@@ -788,7 +790,41 @@ abstract final class AppMenuRouteRegistry {
       path: SurveyRoutePaths.reports,
       scope: AppMenuScope.company,
     ),
-    ExpenseMenuCodes.settings: AppMenuRouteSpec(
+    IntranetMenuCodes.settings: AppMenuRouteSpec(
+      menuCode: IntranetMenuCodes.settings,
+      databaseRouteName: IntranetRouteNames.settings,
+      goRouteName: IntranetRouteNames.settings,
+      path: IntranetRoutePaths.settings,
+      scope: AppMenuScope.company,
+    ),
+    IntranetMenuCodes.content: AppMenuRouteSpec(
+      menuCode: IntranetMenuCodes.content,
+      databaseRouteName: IntranetRouteNames.content,
+      goRouteName: IntranetRouteNames.content,
+      path: IntranetRoutePaths.content,
+      scope: AppMenuScope.company,
+    ),
+    IntranetMenuCodes.approvalInbox: AppMenuRouteSpec(
+      menuCode: IntranetMenuCodes.approvalInbox,
+      databaseRouteName: IntranetRouteNames.approvalInbox,
+      goRouteName: IntranetRouteNames.approvalInbox,
+      path: IntranetRoutePaths.approvalInbox,
+      scope: AppMenuScope.company,
+    ),
+    IntranetMenuCodes.myIntranet: AppMenuRouteSpec(
+      menuCode: IntranetMenuCodes.myIntranet,
+      databaseRouteName: IntranetRouteNames.myIntranet,
+      goRouteName: IntranetRouteNames.myIntranet,
+      path: IntranetRoutePaths.myIntranet,
+      scope: AppMenuScope.company,
+    ),
+    IntranetMenuCodes.reports: AppMenuRouteSpec(
+      menuCode: IntranetMenuCodes.reports,
+      databaseRouteName: IntranetRouteNames.reports,
+      goRouteName: IntranetRouteNames.reports,
+      path: IntranetRoutePaths.reports,
+      scope: AppMenuScope.company,
+    ),    ExpenseMenuCodes.settings: AppMenuRouteSpec(
       menuCode: ExpenseMenuCodes.settings,
       databaseRouteName: ExpenseRouteNames.settings,
       goRouteName: ExpenseRouteNames.settings,

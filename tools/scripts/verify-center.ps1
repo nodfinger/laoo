@@ -1,9 +1,9 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('service', 'meeting', 'visitor', 'time', 'training', 'project')]
+    [ValidateSet('service', 'meeting', 'visitor', 'time', 'training', 'project', 'intranet')]
     [string]$Module,
 
-    [ValidateSet('center-service', 'meeting', 'visitor', 'time', 'training', 'project')]
+    [ValidateSet('center-service', 'meeting', 'visitor', 'time', 'training', 'project', 'intranet')]
     [string]$Role
 )
 
@@ -55,7 +55,8 @@ try {
             'projects\meeting\lib\main.dart',
             'projects\visitor\lib\main.dart',
             'projects\time\lib\main.dart',
-            'projects\training\lib\main.dart'
+            'projects\training\lib\main.dart',
+            'projects\intranet\lib\main.dart'
         ) | Where-Object { Test-Path (Join-Path $repoRoot $_) }
         if ($legacyHosts.Count -gt 0) {
             throw "Standalone hosts are not allowed: $($legacyHosts -join ', ')"
@@ -85,6 +86,7 @@ try {
         'time' { 'projects\time\packages\dotnet\Laoo.Time.Module\Laoo.Time.Module.csproj' }
         'training' { 'projects\training\packages\dotnet\Laoo.Training.Module\Laoo.Training.Module.csproj' }
         'project' { 'projects\project\packages\dotnet\Laoo.Project.Module\Laoo.Project.Module.csproj' }
+        'intranet' { 'projects\intranet\packages\dotnet\Laoo.Intranet.Module\Laoo.Intranet.Module.csproj' }
     }
     Invoke-Checked "$Module API module Release build" { dotnet build $apiModule -c Release }
 }

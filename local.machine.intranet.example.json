@@ -1,0 +1,6 @@
+{
+  "role": "intranet",
+  "allowedProjects": ["LAOO", "LAOO_INTRANET"],
+  "webPort": 8080,
+  "apiPort": 5080
+}
