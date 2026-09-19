@@ -422,6 +422,13 @@ packages:
       relative: true
     source: path
     version: "1.0.0+1"
+  laoo_vote:
+    dependency: "direct main"
+    description:
+      path: "projects/vote"
+      relative: true
+    source: path
+    version: "1.0.0+1"
   leak_tracker:
     dependency: transitive
     description:

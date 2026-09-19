@@ -1,9 +1,9 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('service', 'meeting', 'visitor', 'time', 'training', 'project', 'intranet')]
+    [ValidateSet('service', 'meeting', 'visitor', 'time', 'training', 'project', 'intranet', 'vote')]
     [string]$Module,
 
-    [ValidateSet('center-service', 'meeting', 'visitor', 'time', 'training', 'project', 'intranet')]
+    [ValidateSet('center-service', 'meeting', 'visitor', 'time', 'training', 'project', 'intranet', 'vote')]
     [string]$Role
 )
 
@@ -56,7 +56,8 @@ try {
             'projects\visitor\lib\main.dart',
             'projects\time\lib\main.dart',
             'projects\training\lib\main.dart',
-            'projects\intranet\lib\main.dart'
+            'projects\intranet\lib\main.dart',
+            'projects\vote\lib\main.dart'
         ) | Where-Object { Test-Path (Join-Path $repoRoot $_) }
         if ($legacyHosts.Count -gt 0) {
             throw "Standalone hosts are not allowed: $($legacyHosts -join ', ')"
@@ -87,6 +88,7 @@ try {
         'training' { 'projects\training\packages\dotnet\Laoo.Training.Module\Laoo.Training.Module.csproj' }
         'project' { 'projects\project\packages\dotnet\Laoo.Project.Module\Laoo.Project.Module.csproj' }
         'intranet' { 'projects\intranet\packages\dotnet\Laoo.Intranet.Module\Laoo.Intranet.Module.csproj' }
+        'vote' { 'projects\vote\packages\dotnet\Laoo.Vote.Module\Laoo.Vote.Module.csproj' }
     }
     Invoke-Checked "$Module API module Release build" { dotnet build $apiModule -c Release }
 }

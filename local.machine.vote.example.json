@@ -1,0 +1,6 @@
+{
+  "role": "vote",
+  "allowedProjects": ["LAOO", "LAOO_VOTE"],
+  "webPort": 8080,
+  "apiPort": 5080
+}
