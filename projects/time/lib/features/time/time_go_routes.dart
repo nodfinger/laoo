@@ -13,6 +13,7 @@ import '../leave_types/leave_type_page.dart';
 import '../leave_entitlement_policies/leave_entitlement_policy_page.dart';
 import '../leave_requests/leave_request_page.dart';
 import '../leave_balances/leave_balance_page.dart';
+import '../leave_reports/leave_report_page.dart';
 import '../attendance_periods/attendance_period_pages.dart';
 import '../attendance_events/attendance_events_page.dart';
 import '../attendance_results/attendance_results_page.dart';
@@ -53,6 +54,11 @@ List<GoRoute> buildTimeFeatureRoutes() => <GoRoute>[
     name: TimeRouteNames.leaveBalances,
     path: TimeRoutePaths.leaveBalances,
     builder: (context, state) => const LeaveBalancePage(mine: false),
+  ),
+  GoRoute(
+    name: TimeRouteNames.leaveReport,
+    path: TimeRoutePaths.leaveReport,
+    builder: (context, state) => const LeaveReportPage(),
   ),
   GoRoute(
     name: TimeRouteNames.myLeaveBalance,

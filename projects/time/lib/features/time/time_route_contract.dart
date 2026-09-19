@@ -29,6 +29,7 @@ abstract final class TimeMenuCodes {
   static const leaveTypes = '28009';
   static const leaveEntitlementPolicies = '28010';
   static const leaveBalances = '28011';
+  static const leaveReport = '28012';
   static const leaveRequests = '26003';
   static const leaveApprovalInbox = '26004';
   static const holidayCalendars = '28005';
@@ -61,6 +62,7 @@ abstract final class TimeRouteNames {
   static const leaveTypes = 'timeLeaveTypes';
   static const leaveEntitlementPolicies = 'timeLeaveEntitlementPolicies';
   static const leaveBalances = 'timeLeaveBalances';
+  static const leaveReport = 'timeLeaveReport';
   static const leaveRequests = 'timeLeaveRequests';
   static const leaveApprovalInbox = 'timeLeaveApprovalInbox';
   static const holidayCalendars = 'timeHolidayCalendars';
@@ -94,6 +96,7 @@ abstract final class TimeRoutePaths {
   static const leaveEntitlementPolicies =
       '/company/time-leave-entitlement-policies';
   static const leaveBalances = '/company/time-leave-balances';
+  static const leaveReport = '/company/time-leave-report';
   static const leaveRequests = '/company/time-leave-requests';
   static const leaveApprovalInbox = '/company/time-leave-approval-inbox';
   static const holidayCalendars = '/company/time-holiday-calendars';
@@ -243,6 +246,14 @@ abstract final class TimeRoutes {
     routePath: TimeRoutePaths.leaveBalances,
     isImplemented: true,
   );
+  static const leaveReport = FeatureRouteContract(
+    projectCode: TimeProject.code,
+    menuCode: TimeMenuCodes.leaveReport,
+    screenType: 3,
+    routeName: TimeRouteNames.leaveReport,
+    routePath: TimeRoutePaths.leaveReport,
+    isImplemented: true,
+  );
   static const leaveRequests = FeatureRouteContract(
     projectCode: TimeProject.code,
     menuCode: TimeMenuCodes.leaveRequests,
@@ -372,6 +383,7 @@ abstract final class TimeRoutes {
     leaveTypes,
     leaveEntitlementPolicies,
     leaveBalances,
+    leaveReport,
     leaveRequests,
     leaveApprovalInbox,
     holidayCalendars,
