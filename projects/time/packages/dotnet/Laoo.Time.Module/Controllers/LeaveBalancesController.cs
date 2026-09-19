@@ -141,7 +141,40 @@ ORDER BY E.EmployeeCode,T.LeaveTypeCode
     private Task<bool> CanGenerate(SqlConnection c, CancellationToken token) => CompanyMenuAccess.IsAllowedAsync(c, User, "28011", "GENERATE", token);
     private static async Task<string> Caption(SqlConnection c, string menu, CancellationToken token) { await using var q = new SqlCommand("SELECT MenuName FROM dbo.TDADMainMenu WHERE MenuCode=@M", c); Add(q, "@M", SqlDbType.VarChar, menu, 10); return Convert.ToString(await q.ExecuteScalarAsync(token)) ?? menu; }
     private static async Task<long?> EmployeeForUser(SqlConnection c, long company, long user, CancellationToken token) { await using var q = new SqlCommand("SELECT TOP(1) EmployeeID FROM dbo.TDADUserEmployee WHERE CompanyID=@C AND UserID=@U AND IsActive=1", c); Add(q, "@C", SqlDbType.BigInt, company); Add(q, "@U", SqlDbType.BigInt, user); var result = await q.ExecuteScalarAsync(token); return result is null ? null : Convert.ToInt64(result); }
-    private static async Task<bool> InScope(SqlConnection c, long company, long user, long employee, CancellationToken token, SqlTransaction? transaction = null) { await using var q = transaction is null ? new SqlCommand("SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADUser U WHERE U.CompanyID=@C AND U.UserID=@U AND U.IsActive=1 AND U.IsCompanyAdmin=1) OR EXISTS(SELECT 1 FROM dbo.TDTMEmployeeDataScopeGrant G WHERE G.CompanyID=@C AND G.UserID=@U AND G.IsActive=1 AND G.ScopeTypeCode='ALL') THEN 1 ELSE 0 END", c) : new SqlCommand("SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADUser U WHERE U.CompanyID=@C AND U.UserID=@U AND U.IsActive=1 AND U.IsCompanyAdmin=1) OR EXISTS(SELECT 1 FROM dbo.TDTMEmployeeDataScopeGrant G WHERE G.CompanyID=@C AND G.UserID=@U AND G.IsActive=1 AND G.ScopeTypeCode='ALL') THEN 1 ELSE 0 END", c, transaction); Add(q, "@C", SqlDbType.BigInt, company); Add(q, "@U", SqlDbType.BigInt, user); return Convert.ToInt32(await q.ExecuteScalarAsync(token)) == 1; }
+    private static async Task<bool> InScope(SqlConnection c, long company, long user, long employee, CancellationToken token, SqlTransaction? transaction = null)
+    {
+        const string sql = """
+SELECT CAST(CASE WHEN EXISTS
+(
+    SELECT 1 FROM dbo.TDADEmployee E
+    WHERE E.CompanyID=@C AND E.EmployeeID=@E AND E.IsActive=1
+      AND (
+        EXISTS(SELECT 1 FROM dbo.TDADUser U WHERE U.CompanyID=@C AND U.UserID=@U AND U.IsActive=1 AND U.IsCompanyAdmin=1)
+        OR EXISTS
+        (
+            SELECT 1 FROM dbo.TDTMEmployeeDataScopeGrant G
+            WHERE G.CompanyID=@C AND G.IsActive=1
+              AND (G.UserID=@U OR G.RoleGroupID IN
+              (
+                  SELECT ERG.RoleGroupID FROM dbo.TDADUserEmployee UE
+                  JOIN dbo.TDADEmployeeRoleGroup ERG ON ERG.EmployeeID=UE.EmployeeID AND ERG.IsActive=1
+                    AND ERG.EffectiveFrom<=CONVERT(date,SYSDATETIME())
+                    AND (ERG.EffectiveTo IS NULL OR ERG.EffectiveTo>=CONVERT(date,SYSDATETIME()))
+                  WHERE UE.CompanyID=@C AND UE.UserID=@U AND UE.IsActive=1
+              ))
+              AND G.EffectiveFrom<=SYSDATETIME() AND (G.EffectiveTo IS NULL OR G.EffectiveTo>SYSDATETIME())
+              AND (G.ScopeTypeCode='ALL'
+                OR (G.ScopeTypeCode='SELF' AND EXISTS(SELECT 1 FROM dbo.TDADUserEmployee UE WHERE UE.CompanyID=@C AND UE.UserID=@U AND UE.EmployeeID=@E AND UE.IsActive=1))
+                OR (G.ScopeTypeCode='DIVISION' AND G.ScopeReferenceID=E.DivisionOrgUnitID)
+                OR (G.ScopeTypeCode='DEPARTMENT' AND G.ScopeReferenceID=E.DepartmentOrgUnitID))
+        )
+      )
+) THEN 1 ELSE 0 END AS bit)
+""";
+        await using var q = transaction is null ? new SqlCommand(sql, c) : new SqlCommand(sql, c, transaction);
+        Add(q, "@C", SqlDbType.BigInt, company); Add(q, "@U", SqlDbType.BigInt, user); Add(q, "@E", SqlDbType.BigInt, employee);
+        return Convert.ToBoolean(await q.ExecuteScalarAsync(token));
+    }
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     private static int MinimumServiceDays(string? json) { if (string.IsNullOrWhiteSpace(json)) return 0; try { using var doc = JsonDocument.Parse(json); return doc.RootElement.TryGetProperty("minimumServiceDays", out var value) && value.TryGetInt32(out var days) && days >= 0 ? days : 0; } catch (JsonException) { return 0; } }
     private static DateOnly ThailandToday() => DateOnly.FromDateTime(TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Asia/Bangkok")));
