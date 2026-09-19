@@ -1,6 +1,7 @@
 import 'package:go_router/go_router.dart';
 
 import '../masters/training_master_page.dart';
+import '../masters/training_test_template_placeholder_page.dart';
 import '../tests/training_test_page.dart';
 import 'training_route_contract.dart';
 
@@ -14,6 +15,11 @@ List<GoRoute> buildTrainingFeatureRoutes() => [
     path: TrainingRoutePaths.instructors,
     name: TrainingRouteNames.instructors,
     builder: (context, state) => const TrainingMasterPage.instructors(),
+  ),
+  GoRoute(
+    path: TrainingRoutePaths.testTemplates,
+    name: TrainingRouteNames.testTemplates,
+    builder: (context, state) => const TrainingTestTemplatePlaceholderPage(),
   ),
   GoRoute(
     path: TrainingRoutePaths.tests,

@@ -211,6 +211,25 @@ void main() {
       );
     });
 
+    test(
+      'allows the authenticated Company-only internal training test route',
+      () {
+        final path = Uri.parse('/company/training-tests/123?section=PRE').path;
+        expect(
+          redirect(path: path, isAuthenticated: true, isCompanyUser: true),
+          isNull,
+        );
+        expect(redirect(path: path), RoutePaths.login);
+        expect(
+          redirect(path: path, isAuthenticated: true, isPartnerUser: true),
+          RoutePaths.authenticatedHome,
+        );
+        expect(
+          redirect(path: path, isAuthenticated: true, isLaooSupport: true),
+          RoutePaths.authenticatedHome,
+        );
+      },
+    );
     test('keeps unknown authenticated routes protected', () {
       expect(
         redirect(
