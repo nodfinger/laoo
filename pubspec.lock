@@ -338,6 +338,13 @@ packages:
       relative: true
     source: path
     version: "1.0.0+1"
+  laoo_intranet:
+    dependency: "direct main"
+    description:
+      path: "projects/intranet"
+      relative: true
+    source: path
+    version: "1.0.0+1"
   laoo_meeting:
     dependency: "direct main"
     description:

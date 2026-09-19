@@ -8,7 +8,8 @@
 | `meeting` | `projects/meeting` and `projects/training` |
 | `visitor` | `projects/visitor` |
 | `time` | `projects/time` |
-| `training` | `projects/training` |
+| 	raining | projects/training |
+| intranet | projects/intranet |
 
 Every machine clones `nodfinger/laoo` to `C:\laooplatform\laoo`. Never
 share a live working tree, `.git`, `.dart_tool`, `build`, `bin`, or `obj`.
@@ -39,6 +40,19 @@ Meeting machine with Training example:
 
 Copy local.machine.meeting-training.example.json to the ignored
 local.machine.json on the Meeting machine. Never commit a machine local.machine.json.
+Intranet machine example:
+
+```json
+{
+  "role": "intranet",
+  "allowedProjects": ["LAOO", "LAOO_INTRANET"],
+  "webPort": 8080,
+  "apiPort": 5080
+}
+```
+
+Copy `local.machine.intranet.example.json` to ignored `local.machine.json` on
+that machine. Never commit a real `local.machine.json`.
 
 Run `tools/scripts/check-machine-boundaries.ps1 -Module <module>` before full
 verification. On Meeting, Visitor, and Time machines it rejects changed files

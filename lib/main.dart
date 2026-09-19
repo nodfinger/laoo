@@ -4,6 +4,7 @@ import 'package:laoo_five_s/five_s_feature.dart';
 import 'package:laoo_survey/survey_feature.dart';
 import 'package:laoo_expense/expense_feature.dart';
 import 'package:laoo_project/project_feature.dart';
+import 'package:laoo_intranet/intranet_feature.dart';
 import 'package:laoo_service/service_feature.dart';
 import 'package:laoo_time/time_feature.dart';
 import 'package:laoo_training/training_feature.dart';
@@ -26,6 +27,7 @@ void main() {
   configureSurveyFeatureHost(_buildMeetingWorkspaceShell);
   configureExpenseFeatureHost(_buildMeetingWorkspaceShell);
   configureProjectFeatureHost(_buildMeetingWorkspaceShell);
+  configureIntranetFeatureHost(_buildMeetingWorkspaceShell);
   configureMeetingFeatureHost(_buildMeetingWorkspaceShell);
   configureServiceWorkspaceShell(_buildMeetingWorkspaceShell);
   configureGatePassFeatureHost(_buildMeetingWorkspaceShell);
