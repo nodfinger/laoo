@@ -90,6 +90,9 @@ abstract final class RouteNames {
   static const String timeLeaveEntitlementPolicies =
       'timeLeaveEntitlementPolicies';
   static const String timeLeaveBalances = 'timeLeaveBalances';
+  static const String timePayrollExportProfiles = 'timePayrollExportProfiles';
+  static const String timePayrollExport = 'timePayrollExport';
+  static const String timePayrollExportHistory = 'timePayrollExportHistory';
   static const String timeLeaveRequests = 'timeLeaveRequests';
   static const String timeLeaveApprovalInbox = 'timeLeaveApprovalInbox';
   static const String myLeaveRequests = 'myLeaveRequests';
