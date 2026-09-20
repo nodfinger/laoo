@@ -81,6 +81,13 @@ abstract final class AppMenuRouteRegistry {
       path: RoutePaths.globalSettings,
       scope: AppMenuScope.support,
     ),
+    '01007': AppMenuRouteSpec(
+      menuCode: '01007',
+      databaseRouteName: 'laooMenuManagement',
+      goRouteName: RouteNames.laooMenuManagement,
+      path: RoutePaths.laooMenuManagement,
+      scope: AppMenuScope.support,
+    ),
     '01006': AppMenuRouteSpec(
       menuCode: '01006',
       databaseRouteName: 'globalPermissionSettings',

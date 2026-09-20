@@ -42,6 +42,7 @@ import '../../features/support/organization/pages/organization_structure_page.da
 import '../../features/support/employee/pages/employee_shared_page.dart';
 import '../../features/support/global_settings/pages/global_settings_page.dart';
 import '../../features/support/global_permission_settings/pages/global_permission_settings_page.dart';
+import '../../features/support/menu_management/pages/laoo_menu_management_page.dart';
 import '../../features/support/partner_user/pages/partner_user_page.dart';
 import '../../features/access/role_group/pages/role_group_page.dart';
 import '../../features/access/menu_permission/pages/menu_permission_page.dart';
@@ -531,6 +532,11 @@ final List<GoRoute> _placeholderRoutes = [
     path: RoutePaths.globalPermissionSettings,
     name: RouteNames.globalPermissionSettings,
     builder: (context, state) => const GlobalPermissionSettingsPage(),
+  ),
+  GoRoute(
+    path: RoutePaths.laooMenuManagement,
+    name: RouteNames.laooMenuManagement,
+    builder: (context, state) => const LaooMenuManagementPage(),
   ),
   GoRoute(
     path: RoutePaths.organizationStructure,
