@@ -101,18 +101,6 @@ public sealed class CompanySetupController : ControllerBase
                 });
             }
 
-            var currentBusinessType = await LoadBusinessTypeAsync(
-                connection, transaction, owner.Value.CompanyID!.Value, cancellationToken);
-            if (!string.Equals(currentBusinessType, requestedBusinessType, StringComparison.Ordinal)
-                && await HasBusinessDataAsync(
-                    connection, transaction, owner.Value.CompanyID!.Value, cancellationToken))
-            {
-                return BadRequest(new
-                {
-                    message = "ไม่สามารถเปลี่ยนประเภทธุรกิจได้",
-                    description = "Company มีข้อมูลพนักงานแล้ว จึงต้องคงประเภทธุรกิจเดิมเพื่อป้องกัน Flow ผู้แจ้งซ่อมไม่สอดคล้อง",
-                });
-            }
         }
 
         var businessTypeSet = hasBusinessTypeColumn
@@ -503,10 +491,7 @@ WHERE S.OwnerType = @OwnerType
 
         // Finish the lock lookup before opening the setup reader. The connection
         // must also work when MultipleActiveResultSets is disabled.
-        var isBusinessTypeLocked = owner.OwnerType != "C"
-            || owner.CompanyID is null
-            || await HasBusinessDataAsync(
-                connection, transaction: null, owner.CompanyID.Value, cancellationToken);
+        var isBusinessTypeLocked = false;
 
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         if (!await reader.ReadAsync(cancellationToken))
