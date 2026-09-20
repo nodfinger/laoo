@@ -340,7 +340,7 @@ class SupportWorkspaceShell extends StatelessWidget {
                           children: [
                             if (!compact && !buttonMenu)
                               SizedBox(
-                                width: 220,
+                                width: 248,
                                 child: _Sidebar(
                                   activeMenu: activeMenu,
                                   preset: preset,
@@ -2650,7 +2650,7 @@ class _ApiRoleScopedSidebarState extends State<_ApiRoleScopedSidebar> {
                   return _ProjectMenu(
                     code: project.code,
                     title: project.name,
-                    icon: _iconFor(project.iconName),
+                    icon: _projectIconFor(project.code, project.iconName),
                     accent: widget.preset.primary,
                     initiallyExpanded:
                         project.isExpandedDefault || projectActive,
@@ -2755,7 +2755,30 @@ class _ApiRoleScopedSidebarState extends State<_ApiRoleScopedSidebar> {
   }
 
   IconData _iconFor(String? name) =>
-      resolveNavigationIcon(name, fallback: Icons.menu_outlined);
+      resolveNavigationIcon(name, fallback: Icons.apps_outlined);
+
+  IconData _projectIconFor(String code, String? name) => resolveNavigationIcon(
+    name,
+    fallback: switch (code) {
+      'LAOO' => Icons.admin_panel_settings_outlined,
+      'LAOO_SERVICE' => Icons.support_agent_outlined,
+      'LAOO_TIME' => Icons.schedule_outlined,
+      'LAOO_MEETING' => Icons.meeting_room_outlined,
+      'LAOO_TRAINING' => Icons.school_outlined,
+      'LAOO_VISITOR' => Icons.badge_outlined,
+      'LAOO_GATE_PASS' => Icons.local_shipping_outlined,
+      'LAOO_5S' => Icons.fact_check_outlined,
+      'LAOO_SURVEY' => Icons.quiz_outlined,
+      'LAOO_EXPENSE' => Icons.receipt_long_outlined,
+      'LAOO_PROJECT' => Icons.account_tree_outlined,
+      'LAOO_INTRANET' => Icons.campaign_outlined,
+      'LAOO_VOTE' => Icons.how_to_vote_outlined,
+      'LAOO_SALES' => Icons.trending_up_outlined,
+      'LAOO_POS' => Icons.point_of_sale_outlined,
+      'LAOO_EVALUATION' => Icons.rate_review_outlined,
+      _ => Icons.apps_outlined,
+    },
+  );
 }
 
 class _MenuGroup extends StatelessWidget {

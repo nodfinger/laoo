@@ -106,6 +106,13 @@ IconData resolveNavigationIcon(
     'task_alt' || 'task_alt_outlined' => Icons.task_alt_outlined,
     'output' || 'output_outlined' => Icons.output_outlined,
     'analytics' || 'analytics_outlined' => Icons.analytics_outlined,
+    'schedule' || 'schedule_outlined' => Icons.schedule_outlined,
+    'school' || 'school_outlined' => Icons.school_outlined,
+    'quiz' || 'quiz_outlined' => Icons.quiz_outlined,
+    'campaign' || 'campaign_outlined' => Icons.campaign_outlined,
+    'how_to_vote' || 'how_to_vote_outlined' => Icons.how_to_vote_outlined,
+    'trending_up' || 'trending_up_outlined' => Icons.trending_up_outlined,
+    'rate_review' || 'rate_review_outlined' => Icons.rate_review_outlined,
     'history' || 'history_outlined' => Icons.history_outlined,
     'star' || 'star_outline' || 'star_rate' => Icons.star_outline,
     'sentiment_satisfied_alt' || 'sentiment_satisfied_alt_outlined' =>

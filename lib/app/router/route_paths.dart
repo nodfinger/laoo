@@ -59,6 +59,7 @@ abstract final class RoutePaths {
   static const String globalSettings = '/support/global-settings';
   static const String globalPermissionSettings =
       '/support/global-permission-settings';
+  static const String laooMenuManagement = '/support/menu-management';
   static const String masterData = '/master-data';
   static const String organizationStructure = '/organization-structure';
   static const String companyEmployees = '/company/employees';

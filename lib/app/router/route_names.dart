@@ -57,6 +57,7 @@ abstract final class RouteNames {
   static const String technicalInfo = 'technicalInfo';
   static const String globalSettings = 'globalSettings';
   static const String globalPermissionSettings = 'globalPermissionSettings';
+  static const String laooMenuManagement = 'laooMenuManagement';
   static const String masterData = 'masterData';
   static const String organizationStructure = 'organizationStructure';
   static const String companyEmployees = 'companyEmployees';

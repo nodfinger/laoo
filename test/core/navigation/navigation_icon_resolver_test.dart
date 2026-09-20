@@ -17,6 +17,18 @@ void main() {
         NavigationIconResolver.resolve('receipt_long_outlined'),
         Icons.receipt_long_outlined,
       );
+      expect(
+        NavigationIconResolver.resolve('rate_review_outlined'),
+        Icons.rate_review_outlined,
+      );
+      expect(
+        NavigationIconResolver.resolve('how_to_vote_outlined'),
+        Icons.how_to_vote_outlined,
+      );
+      expect(
+        NavigationIconResolver.resolve('trending_up_outlined'),
+        Icons.trending_up_outlined,
+      );
     });
 
     test('normalizes icon names without using menu codes or captions', () {
