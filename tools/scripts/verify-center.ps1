@@ -1,9 +1,9 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('service', 'meeting', 'visitor', 'time', 'training', 'project', 'intranet', 'vote', 'pos', 'sales', 'evaluation')]
+    [ValidateSet('service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense', 'project', 'intranet', 'vote', 'pos', 'sales', 'evaluation')]
     [string]$Module,
 
-    [ValidateSet('center-service', 'meeting', 'visitor', 'time', 'training', 'project', 'intranet', 'vote', 'pos', 'sales', 'evaluation')]
+    [ValidateSet('center-service', 'business', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense', 'project', 'intranet', 'vote', 'pos', 'sales', 'evaluation')]
     [string]$Role
 )
 
@@ -86,6 +86,10 @@ try {
         'visitor' { 'projects\visitor\packages\dotnet\Laoo.Visitor.Module\Laoo.Visitor.Module.csproj' }
         'time' { 'projects\time\packages\dotnet\Laoo.Time.Module\Laoo.Time.Module.csproj' }
         'training' { 'projects\training\packages\dotnet\Laoo.Training.Module\Laoo.Training.Module.csproj' }
+        'gate_pass' { 'projects\gate_pass\packages\dotnet\Laoo.GatePass.Module\Laoo.GatePass.Module.csproj' }
+        'five_s' { 'projects\five_s\packages\dotnet\Laoo.FiveS.Module\Laoo.FiveS.Module.csproj' }
+        'survey' { 'projects\survey\packages\dotnet\Laoo.Survey.Module\Laoo.Survey.Module.csproj' }
+        'expense' { 'projects\expense\packages\dotnet\Laoo.Expense.Module\Laoo.Expense.Module.csproj' }
         'project' { 'projects\project\packages\dotnet\Laoo.Project.Module\Laoo.Project.Module.csproj' }
         'intranet' { 'projects\intranet\packages\dotnet\Laoo.Intranet.Module\Laoo.Intranet.Module.csproj' }
         'vote' { 'projects\vote\packages\dotnet\Laoo.Vote.Module\Laoo.Vote.Module.csproj' }

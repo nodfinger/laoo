@@ -1,0 +1,7 @@
+{
+  "role": "business",
+  "ownedModules": ["meeting", "training", "evaluation", "survey", "vote", "five_s"],
+  "allowedProjects": ["LAOO", "LAOO_MEETING", "LAOO_TRAINING", "LAOO_EVALUATION", "LAOO_SURVEY", "LAOO_VOTE", "LAOO_5S"],
+  "webPort": 8080,
+  "apiPort": 5080
+}
