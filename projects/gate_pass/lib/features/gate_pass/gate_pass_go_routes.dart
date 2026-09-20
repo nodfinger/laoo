@@ -1,5 +1,21 @@
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-// Gate Pass menus remain disabled until their screen and API are implemented.
-// The owning Project machine adds routes here without editing the Root router.
-List<GoRoute> buildGatePassFeatureRoutes() => <GoRoute>[];
+import 'gate_pass_route_contract.dart';
+
+List<GoRoute> buildGatePassFeatureRoutes() => <GoRoute>[
+  GoRoute(
+    path: GatePassRoutePaths.settings,
+    name: GatePassRouteNames.settings,
+    builder: (context, state) => const _SettingsPreviewPage(),
+  ),
+];
+
+class _SettingsPreviewPage extends StatelessWidget {
+  const _SettingsPreviewPage();
+
+  @override
+  Widget build(BuildContext context) => const Scaffold(
+    body: Center(child: Text('กำลังเตรียมหน้าตั้งค่าระบบนำทรัพย์สินออก')),
+  );
+}

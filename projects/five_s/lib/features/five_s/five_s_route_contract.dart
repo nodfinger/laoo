@@ -5,6 +5,7 @@ abstract final class FiveSProject {
 }
 
 abstract final class FiveSMenuCodes {
+  static const settings = '39010';
   static const inspectionAreas = '39001';
   static const templates = '39002';
   static const inspectionTeams = '39003';
@@ -17,6 +18,7 @@ abstract final class FiveSMenuCodes {
 }
 
 abstract final class FiveSRouteNames {
+  static const settings = 'fiveSSettings';
   static const inspectionAreas = 'fiveSInspectionAreas';
   static const templates = 'fiveSTemplates';
   static const inspectionTeams = 'fiveSInspectionTeams';
@@ -29,6 +31,7 @@ abstract final class FiveSRouteNames {
 }
 
 abstract final class FiveSRoutePaths {
+  static const settings = '/company/five-s/settings';
   static const inspectionAreas = '/company/five-s/inspection-areas';
   static const templates = '/company/five-s/templates';
   static const inspectionTeams = '/company/five-s/inspection-teams';
@@ -43,6 +46,14 @@ abstract final class FiveSRoutePaths {
 
 abstract final class FiveSRoutes {
   static const all = <FeatureRouteContract>[
+    FeatureRouteContract(
+      projectCode: FiveSProject.code,
+      menuCode: FiveSMenuCodes.settings,
+      screenType: 2,
+      routeName: FiveSRouteNames.settings,
+      routePath: FiveSRoutePaths.settings,
+      isImplemented: true,
+    ),
     FeatureRouteContract(
       projectCode: FiveSProject.code,
       menuCode: FiveSMenuCodes.inspectionAreas,

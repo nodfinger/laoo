@@ -8,6 +8,14 @@ abstract final class VisitorRoutes {
   static const all = <FeatureRouteContract>[
     FeatureRouteContract(
       projectCode: VisitorProject.code,
+      menuCode: '36004',
+      screenType: 2,
+      routeName: 'visitorSystemSettings',
+      routePath: '/visitor/system-settings',
+      isImplemented: true,
+    ),
+    FeatureRouteContract(
+      projectCode: VisitorProject.code,
       menuCode: '31001',
       screenType: 3,
       routeName: 'gateDashboard',

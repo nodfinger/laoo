@@ -8,6 +8,14 @@ abstract final class ServiceRoutes {
   static const all = <FeatureRouteContract>[
     FeatureRouteContract(
       projectCode: ServiceProject.code,
+      menuCode: '18001',
+      screenType: 2,
+      routeName: 'serviceSettings',
+      routePath: '/company/service-settings',
+      isImplemented: true,
+    ),
+    FeatureRouteContract(
+      projectCode: ServiceProject.code,
       menuCode: '09001',
       screenType: 1,
       routeName: 'companyCustomers',

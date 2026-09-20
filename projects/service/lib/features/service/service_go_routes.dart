@@ -79,6 +79,10 @@ List<GoRoute> buildServiceFeatureRoutes({
     '14006',
     (state) => const ServicePersonPage(role: ServicePersonRole.resident),
   ),
+  _workspacePlaceholder(
+    ServiceRoutes.byMenuCode('18001'),
+    'System settings preview',
+  ),
   ..._workspacePlaceholders.entries.map(
     (entry) =>
         _workspacePlaceholder(ServiceRoutes.byMenuCode(entry.key), entry.value),

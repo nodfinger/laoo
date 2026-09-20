@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../masters/training_master_page.dart';
@@ -6,6 +7,13 @@ import '../tests/training_test_page.dart';
 import 'training_route_contract.dart';
 
 List<GoRoute> buildTrainingFeatureRoutes() => [
+  GoRoute(
+    path: TrainingRoutePaths.settings,
+    name: TrainingRouteNames.settings,
+    builder: (context, state) => const Scaffold(
+      body: Center(child: Text('??????????????????????????????')),
+    ),
+  ),
   GoRoute(
     path: TrainingRoutePaths.types,
     name: TrainingRouteNames.types,

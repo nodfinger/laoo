@@ -1,4 +1,21 @@
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-// Evaluation owner adds real routes here as each menu becomes ready.
-List<GoRoute> buildEvaluationFeatureRoutes() => <GoRoute>[];
+import 'evaluation_route_contract.dart';
+
+List<GoRoute> buildEvaluationFeatureRoutes() => <GoRoute>[
+  GoRoute(
+    path: EvaluationRoutePaths.settings,
+    name: EvaluationRouteNames.settings,
+    builder: (context, state) => const _SettingsPreviewPage(),
+  ),
+];
+
+class _SettingsPreviewPage extends StatelessWidget {
+  const _SettingsPreviewPage();
+
+  @override
+  Widget build(BuildContext context) => const Scaffold(
+    body: Center(child: Text('กำลังเตรียมหน้าตั้งค่าระบบประเมิน')),
+  );
+}

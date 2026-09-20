@@ -1,6 +1,19 @@
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-// Visitor menus remain disabled until their page and API are implemented.
-// Center already consumes this function, so Machine 3 can add routes here
-// without editing the Root router.
-List<GoRoute> buildVisitorFeatureRoutes() => <GoRoute>[];
+List<GoRoute> buildVisitorFeatureRoutes() => <GoRoute>[
+  GoRoute(
+    path: '/visitor/system-settings',
+    name: 'visitorSystemSettings',
+    builder: (context, state) => const _VisitorSettingsPreviewPage(),
+  ),
+];
+
+class _VisitorSettingsPreviewPage extends StatelessWidget {
+  const _VisitorSettingsPreviewPage();
+
+  @override
+  Widget build(BuildContext context) => const Scaffold(
+    body: Center(child: Text('?????????????????????????????????????')),
+  );
+}
