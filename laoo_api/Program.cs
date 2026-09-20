@@ -13,6 +13,7 @@ using LaooIntranetModule;
 using LaooVoteModule;
 using LaooPosModule;
 using LaooSalesModule;
+using LaooEvaluationModule;
 using LaooTrainingModule;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.DataProtection;
@@ -55,6 +56,7 @@ builder.Services
     .AddApplicationPart(typeof(VoteModuleMarker).Assembly)
     .AddApplicationPart(typeof(PosModuleMarker).Assembly)
     .AddApplicationPart(typeof(SalesModuleMarker).Assembly)
+    .AddApplicationPart(typeof(EvaluationModuleMarker).Assembly)
     .AddApplicationPart(typeof(TrainingModuleMarker).Assembly);
 builder.Services.AddProblemDetails(options =>
 {

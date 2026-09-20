@@ -49,6 +49,18 @@ void main() {
       }
     });
 
+    test('allows only Evaluation response tokens without login', () {
+      expect(redirect(path: '/evaluation/respond/hashed-token'), isNull);
+      expect(redirect(path: '/evaluation/respond/'), RoutePaths.login);
+      expect(
+        redirect(
+          path: '/evaluation/respond/hashed-token',
+          isAuthenticated: true,
+          isCompanyUser: true,
+        ),
+        isNull,
+      );
+    });
     test('sends authenticated users away from landing and login by role', () {
       for (final path in <String>[RoutePaths.landing, RoutePaths.login]) {
         expect(

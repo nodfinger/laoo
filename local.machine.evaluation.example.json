@@ -1,0 +1,7 @@
+﻿{
+  "role": "evaluation",
+  "ownedModules": ["evaluation"],
+  "allowedProjects": ["LAOO", "LAOO_EVALUATION"],
+  "webPort": 8080,
+  "apiPort": 5080
+}

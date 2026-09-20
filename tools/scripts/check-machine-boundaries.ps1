@@ -1,9 +1,9 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('service', 'meeting', 'visitor', 'time', 'training', 'project', 'intranet', 'vote', 'pos', 'sales')]
+    [ValidateSet('service', 'meeting', 'visitor', 'time', 'training', 'project', 'intranet', 'vote', 'pos', 'sales', 'evaluation')]
     [string]$Module,
 
-    [ValidateSet('center-service', 'meeting', 'visitor', 'time', 'training', 'project', 'intranet', 'vote', 'pos', 'sales')]
+    [ValidateSet('center-service', 'meeting', 'visitor', 'time', 'training', 'project', 'intranet', 'vote', 'pos', 'sales', 'evaluation')]
     [string]$Role,
 
     [string]$BaseRef = 'origin/main'
@@ -26,7 +26,7 @@ if ([string]::IsNullOrWhiteSpace($Role)) {
     $Role = [string]$machineConfig.role
 }
 
-$validRoles = @('center-service', 'meeting', 'visitor', 'time', 'training', 'project', 'intranet', 'vote', 'pos', 'sales')
+$validRoles = @('center-service', 'meeting', 'visitor', 'time', 'training', 'project', 'intranet', 'vote', 'pos', 'sales', 'evaluation')
 if ($Role -notin $validRoles) {
     throw "Invalid machine role '$Role'. Expected: $($validRoles -join ', ')."
 }
@@ -46,6 +46,7 @@ $ownedRoleByModule = @{
     vote = 'vote'
     pos = 'pos'
     sales = 'sales'
+    evaluation = 'evaluation'
 }
 
 if ($Role -ne $ownedRoleByModule[$Module]) {
