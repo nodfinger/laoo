@@ -75,11 +75,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(AlertDialog), findsOneWidget);
+    expect(find.text('สร้างบุคคลใหม่'), findsNothing);
+    expect(find.text('เลือกบุคคลเดิม'), findsNothing);
     expect(
       find.text(
         '\u0e1a\u0e17\u0e1a\u0e32\u0e17\u0e43\u0e19\u0e23\u0e30\u0e1a\u0e1a Service',
       ),
-      findsOneWidget,
+      findsNothing,
     );
     expect(tester.takeException(), isNull);
   });

@@ -10,6 +10,7 @@ class PersonRegistryApi {
   Future<Map<String, dynamic>> list({
     String search = '',
     bool? isActive,
+    String role = 'ANY',
     int page = 1,
     int pageSize = 20,
   }) async => Map<String, dynamic>.from(
@@ -19,6 +20,7 @@ class PersonRegistryApi {
             'search': search,
             'page': '$page',
             'pageSize': '$pageSize',
+            'role': role,
             if (isActive != null) 'isActive': '$isActive',
           },
         )

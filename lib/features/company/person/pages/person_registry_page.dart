@@ -55,6 +55,7 @@ class _PersonRegistryWorkspaceState extends State<PersonRegistryWorkspace> {
   Map<String, bool> _actions = {};
   String _query = '';
   bool? _active;
+  String _role = 'ANY';
   bool _loading = true, _cards = false, _opening = false;
   int _page = 1, _total = 0, _request = 0;
   int get _pageSize => companySetupController.pageSize.clamp(1, 200);
@@ -86,6 +87,7 @@ class _PersonRegistryWorkspaceState extends State<PersonRegistryWorkspace> {
           ? await _api.list(
               search: _query,
               isActive: _active,
+              role: _role,
               page: _page,
               pageSize: _pageSize,
             )
@@ -275,22 +277,6 @@ class _PersonRegistryWorkspaceState extends State<PersonRegistryWorkspace> {
                         },
                       ),
                     ),
-                    SizedBox(
-                      width: compact ? box.maxWidth - 40 : 180,
-                      child: DropdownButtonFormField<bool?>(
-                        initialValue: _active,
-                        decoration: registryInput(context, label: 'สถานะ'),
-                        items: const [
-                          DropdownMenuItem(value: null, child: Text('ทั้งหมด')),
-                          DropdownMenuItem(value: true, child: Text('ใช้งาน')),
-                          DropdownMenuItem(
-                            value: false,
-                            child: Text('ไม่ใช้งาน'),
-                          ),
-                        ],
-                        onChanged: (value) => setState(() => _active = value),
-                      ),
-                    ),
                     FilledButton(
                       style: registryButton(_primary, filled: true),
                       onPressed: _loading
@@ -310,10 +296,65 @@ class _PersonRegistryWorkspaceState extends State<PersonRegistryWorkspace> {
                               _search.clear();
                               _query = '';
                               _active = null;
+                              _role = 'ANY';
                               _page = 1;
                               _load();
                             },
                       child: const Text('ล้าง Filter'),
+                    ),
+                    SizedBox(
+                      width: compact ? box.maxWidth - 40 : 180,
+                      child: DropdownButtonFormField<bool?>(
+                        initialValue: _active,
+                        decoration: registryInput(context, label: 'สถานะ'),
+                        items: const [
+                          DropdownMenuItem(value: null, child: Text('ทั้งหมด')),
+                          DropdownMenuItem(value: true, child: Text('ใช้งาน')),
+                          DropdownMenuItem(
+                            value: false,
+                            child: Text('ไม่ใช้งาน'),
+                          ),
+                        ],
+                        onChanged: (value) {
+                          _active = value;
+                          _page = 1;
+                          _load();
+                        },
+                      ),
+                    ),
+                    SizedBox(
+                      width: compact ? box.maxWidth - 40 : 190,
+                      child: DropdownButtonFormField<String>(
+                        initialValue: _role,
+                        decoration: registryInput(context, label: 'บทบาท'),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'ANY',
+                            child: Text('ทั้งหมด'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'EMPLOYEE',
+                            child: Text('พนักงาน'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'USER',
+                            child: Text('ผู้ใช้ระบบ'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'RESIDENT',
+                            child: Text('ผู้พักอาศัย'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'CUSTOMER',
+                            child: Text('ผู้ใช้บริการ'),
+                          ),
+                        ],
+                        onChanged: (value) {
+                          _role = value ?? 'ANY';
+                          _page = 1;
+                          _load();
+                        },
+                      ),
                     ),
                   ],
                 ),
@@ -390,58 +431,65 @@ class _PersonRegistryWorkspaceState extends State<PersonRegistryWorkspace> {
       );
     }
     return registrySurface(
-      PinnedDataTable(
-        maxBodyHeight: double.infinity,
-        headingRowColor: WidgetStatePropertyAll(_primary.withValues(alpha: .1)),
-        headingTextStyle: TextStyle(
-          color: _primary,
-          fontSize: LaooTypography.tableHeader,
-          fontWeight: FontWeight.w700,
-        ),
-        dataTextStyle: const TextStyle(
-          fontSize: LaooTypography.tableBody,
-          color: LaooColors.textPrimary,
-        ),
-        columns: const [
-          LaooTableColumns.id,
-          DataColumn(
-            label: Center(child: Text('Action')),
-            columnWidth: FixedColumnWidth(112),
-            headingRowAlignment: MainAxisAlignment.center,
+      LayoutBuilder(
+        builder: (context, constraints) => PinnedDataTable(
+          maxBodyHeight: (constraints.maxHeight - 56).clamp(56.0, 420.0),
+          headingRowColor: WidgetStatePropertyAll(
+            _primary.withValues(alpha: .1),
           ),
-          DataColumn(label: Text('ชื่อบุคคล'), columnWidth: FlexColumnWidth()),
-          DataColumn(
-            label: Text('\u0e1a\u0e17\u0e1a\u0e32\u0e17'),
-            columnWidth: FlexColumnWidth(),
+          headingTextStyle: TextStyle(
+            color: _primary,
+            fontSize: LaooTypography.tableHeader,
+            fontWeight: FontWeight.w700,
           ),
-          DataColumn(label: Text('ชื่อเล่น')),
-          DataColumn(label: Text('โทรศัพท์')),
-          DataColumn(label: Text('อีเมล')),
-          DataColumn(label: Text('สถานะ')),
-        ],
-        rows: [
-          for (var i = 0; i < _rows.length; i++)
-            DataRow(
-              cells: [
-                DataCell(Text('${(_page - 1) * _pageSize + i + 1}')),
-                DataCell(Center(child: _actionsFor(_rows[i]))),
-                DataCell(Text('${_rows[i]['fullName']}')),
-                DataCell(
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 4,
-                    children: _roleChips(_rows[i]),
-                  ),
-                ),
-                DataCell(Text('${_rows[i]['nickName'] ?? '-'}')),
-                DataCell(Text('${_rows[i]['mobile'] ?? '-'}')),
-                DataCell(Text('${_rows[i]['email'] ?? '-'}')),
-                DataCell(
-                  Text(_rows[i]['isActive'] == true ? 'ใช้งาน' : 'ไม่ใช้งาน'),
-                ),
-              ],
+          dataTextStyle: const TextStyle(
+            fontSize: LaooTypography.tableBody,
+            color: LaooColors.textPrimary,
+          ),
+          columns: const [
+            LaooTableColumns.id,
+            DataColumn(
+              label: Center(child: Text('Action')),
+              columnWidth: FixedColumnWidth(112),
+              headingRowAlignment: MainAxisAlignment.center,
             ),
-        ],
+            DataColumn(
+              label: Text('ชื่อบุคคล'),
+              columnWidth: FlexColumnWidth(),
+            ),
+            DataColumn(
+              label: Text('\u0e1a\u0e17\u0e1a\u0e32\u0e17'),
+              columnWidth: FlexColumnWidth(),
+            ),
+            DataColumn(label: Text('ชื่อเล่น')),
+            DataColumn(label: Text('โทรศัพท์')),
+            DataColumn(label: Text('อีเมล')),
+            DataColumn(label: Text('สถานะ')),
+          ],
+          rows: [
+            for (var i = 0; i < _rows.length; i++)
+              DataRow(
+                cells: [
+                  DataCell(Text('${(_page - 1) * _pageSize + i + 1}')),
+                  DataCell(Center(child: _actionsFor(_rows[i]))),
+                  DataCell(Text('${_rows[i]['fullName']}')),
+                  DataCell(
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      children: _roleChips(_rows[i]),
+                    ),
+                  ),
+                  DataCell(Text('${_rows[i]['nickName'] ?? '-'}')),
+                  DataCell(Text('${_rows[i]['mobile'] ?? '-'}')),
+                  DataCell(Text('${_rows[i]['email'] ?? '-'}')),
+                  DataCell(
+                    Text(_rows[i]['isActive'] == true ? 'ใช้งาน' : 'ไม่ใช้งาน'),
+                  ),
+                ],
+              ),
+          ],
+        ),
       ),
       padding: EdgeInsets.zero,
     );

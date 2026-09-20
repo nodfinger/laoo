@@ -29,13 +29,18 @@ public sealed class PersonRegistryController(IConfiguration configuration) : Con
     }
 
     [HttpGet]
-    public async Task<IActionResult> List([FromQuery] string? search, [FromQuery] bool? isActive,
+    public async Task<IActionResult> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] string? role,
         [FromQuery] int page = 1, [FromQuery] int pageSize = 20, CancellationToken token = default)
     {
         await using var connection = await Open(token);
         if (!await ScopeValid(connection, token) || !await Can(connection, "VIEW", token)) return Forbid();
         page = Math.Max(1, page); pageSize = Math.Clamp(pageSize, 1, 200);
         var query = search?.Trim() ?? string.Empty;
+        var selectedRole = role?.Trim().ToUpperInvariant() switch
+        {
+            "EMPLOYEE" or "USER" or "RESIDENT" or "CUSTOMER" => role!.Trim().ToUpperInvariant(),
+            _ => "ANY",
+        };
         const string sql = """
 SELECT COUNT_BIG(1) OVER(),P.PersonID,P.FullName,P.NickName,P.Email,P.Mobile,P.IsActive,P.RowVersion,
        CAST(CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADEmployee E WHERE E.CompanyID=P.CompanyID AND E.PersonID=P.PersonID) THEN 1 ELSE 0 END AS bit),
@@ -44,12 +49,17 @@ SELECT COUNT_BIG(1) OVER(),P.PersonID,P.FullName,P.NickName,P.Email,P.Mobile,P.I
        CAST(CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADServiceCustomer S WHERE S.CompanyID=P.CompanyID AND S.PersonID=P.PersonID AND S.IsActive=1) THEN 1 ELSE 0 END AS bit)
 FROM dbo.TDADPerson P
 WHERE P.CompanyID=@company AND (@active IS NULL OR P.IsActive=@active)
+   AND (@role=N'ANY'
+        OR @role=N'EMPLOYEE' AND EXISTS (SELECT 1 FROM dbo.TDADEmployee E WHERE E.CompanyID=P.CompanyID AND E.PersonID=P.PersonID)
+        OR @role=N'USER' AND EXISTS (SELECT 1 FROM dbo.TDADUser U WHERE U.CompanyID=P.CompanyID AND U.PersonID=P.PersonID)
+        OR @role=N'RESIDENT' AND EXISTS (SELECT 1 FROM dbo.TDADResident R WHERE R.CompanyID=P.CompanyID AND R.PersonID=P.PersonID)
+        OR @role=N'CUSTOMER' AND EXISTS (SELECT 1 FROM dbo.TDADServiceCustomer S WHERE S.CompanyID=P.CompanyID AND S.PersonID=P.PersonID AND S.IsActive=1))
   AND (@search=N'' OR P.FullName LIKE @like OR P.NickName LIKE @like OR P.Email LIKE @like OR P.Mobile LIKE @like)
 ORDER BY P.FullName,P.PersonID
 OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY;
 """;
         await using var command = new SqlCommand(sql, connection);
-        Add(command,"@company",SqlDbType.BigInt,CompanyId); Add(command,"@active",SqlDbType.Bit,isActive);
+        Add(command,"@company",SqlDbType.BigInt,CompanyId); Add(command,"@active",SqlDbType.Bit,isActive); Add(command,"@role",SqlDbType.NVarChar,selectedRole,20);
         Add(command,"@search",SqlDbType.NVarChar,query,320); Add(command,"@like",SqlDbType.NVarChar,$"%{query}%",330);
         Add(command,"@offset",SqlDbType.Int,(page-1)*pageSize); Add(command,"@pageSize",SqlDbType.Int,pageSize);
         var items = new List<object>(); long total = 0;

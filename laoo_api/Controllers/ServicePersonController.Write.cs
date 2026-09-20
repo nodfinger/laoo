@@ -49,8 +49,12 @@ SELECT RoomID id,BuildingID buildingId,FloorID parentId,RoomCode code,RoomNameTH
 
     private async Task<IActionResult> Save(long? routePersonId, ServicePersonSaveRequest x, CancellationToken token)
     {
+        var customerEndpoint = Request.Path.StartsWithSegments("/api/service/customers");
+        var residentEndpoint = Request.Path.StartsWithSegments("/api/service/residents");
         if (routePersonId.HasValue && x.PersonId.HasValue && routePersonId != x.PersonId)
             return BadRequest(Issue("ข้อมูลบุคคลไม่ถูกต้อง", "PersonID ใน URL และข้อมูลบันทึกไม่ตรงกัน"));
+        if (customerEndpoint && !routePersonId.HasValue && x.PersonId.HasValue)
+            return BadRequest(Issue("เพิ่มผู้ใช้บริการไม่ได้", "กรุณาระบุข้อมูลผู้ใช้บริการใหม่"));
         var personId = routePersonId ?? x.PersonId;
         var name = x.FullName?.Trim() ?? string.Empty;
         if (!personId.HasValue && (name.Length is 0 or > 200))
@@ -64,8 +68,6 @@ SELECT RoomID id,BuildingID buildingId,FloorID parentId,RoomCode code,RoomNameTH
         if (!await InServiceScope(c, token) || !await Allowed(c, routePersonId.HasValue ? "EDIT" : "CREATE", token)) return Forbid();
         var businessType = await BusinessType(c, token);
         var dormitory = businessType == CompanyBusinessType.Dormitory;
-        var customerEndpoint = Request.Path.StartsWithSegments("/api/service/customers");
-        var residentEndpoint = Request.Path.StartsWithSegments("/api/service/residents");
         if (residentEndpoint && !dormitory) return Forbid();
         var serviceCustomer = customerEndpoint ? true : residentEndpoint ? false : dormitory ? x.IsServiceCustomer : true;
         var resident = residentEndpoint ? true : customerEndpoint ? false : dormitory && x.IsResident;
@@ -82,7 +84,7 @@ SELECT RoomID id,BuildingID buildingId,FloorID parentId,RoomCode code,RoomNameTH
         {
             if (!personId.HasValue)
             {
-                await using (var duplicate = new SqlCommand("SELECT COUNT(1) FROM dbo.TDADPerson WITH(UPDLOCK,HOLDLOCK) WHERE CompanyID=@company AND REPLACE(FullName,N'' '',N'''')=REPLACE(@name,N'' '',N'''')", c, tx))
+                await using (var duplicate = new SqlCommand("SELECT COUNT(1) FROM dbo.TDADPerson WITH(UPDLOCK,HOLDLOCK) WHERE CompanyID=@company AND REPLACE(FullName,N' ',N'')=REPLACE(@name,N' ',N'')", c, tx))
                 {
                     Add(duplicate, "@company", SqlDbType.BigInt, CompanyId);
                     Add(duplicate, "@name", SqlDbType.NVarChar, name, 200);
@@ -132,7 +134,7 @@ INSERT dbo.TDADServicePersonAudit(CompanyID,PersonID,ActionCode,BeforeData,After
         catch (ServicePersonException e) when (e.Code == "DUPLICATE_NAME")
         {
             await tx.RollbackAsync(token);
-            return Conflict(Issue("พบชื่อบุคคลซ้ำ", "กรุณาตรวจสอบทะเบียนบุคคลกลาง หรือใช้การผูกบุคคลเดิม"));
+            return Conflict(Issue("พบชื่อบุคคลซ้ำ", "ชื่อนี้มีอยู่แล้วใน Company กรุณาระบุชื่ออื่น"));
         }
         catch (ServicePersonException)
         {

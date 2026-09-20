@@ -566,23 +566,6 @@ class _ServicePersonDialogState extends State<_ServicePersonDialog> {
     }
   }
 
-  void _selectPerson(int? value) {
-    setState(() {
-      _personId = value;
-      final people = List<Map<String, dynamic>>.from(
-        _lookup['persons'] as List? ?? const [],
-      );
-      final match = people
-          .where((person) => (person['id'] as num).toInt() == value)
-          .firstOrNull;
-      _name.text = '${match?['name'] ?? ''}';
-      _nick.text = '${match?['nickName'] ?? ''}';
-      _mobile.text = '${match?['mobile'] ?? ''}';
-      _email.text = '${match?['email'] ?? ''}';
-      _active = match?['active'] != false;
-    });
-  }
-
   Future<void> _pickDate(bool start) async {
     final picked = await showDatePicker(
       context: context,
@@ -603,10 +586,6 @@ class _ServicePersonDialogState extends State<_ServicePersonDialog> {
 
   Future<void> _save() async {
     if (!_form.currentState!.validate() || _saving) return;
-    if (!_newPerson && _personId == null) {
-      _errorText('กรุณาเลือกบุคคลเดิม');
-      return;
-    }
     if (_dormitory && !_customer && !_resident) {
       _errorText('กรุณาเลือกอย่างน้อยหนึ่งบทบาท');
       return;
@@ -683,6 +662,22 @@ class _ServicePersonDialogState extends State<_ServicePersonDialog> {
   String _date(DateTime value) =>
       '${value.year.toString().padLeft(4, '0')}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
 
+  Widget _responsiveFieldPair({required Widget left, required Widget right}) =>
+      LayoutBuilder(
+        builder: (context, constraints) => constraints.maxWidth < 420
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [left, const SizedBox(height: 12), right],
+              )
+            : Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: left),
+                  const SizedBox(width: 12),
+                  Expanded(child: right),
+                ],
+              ),
+      );
   @override
   Widget build(BuildContext context) => AlertDialog(
     backgroundColor: Colors.white,
@@ -738,45 +733,6 @@ class _ServicePersonDialogState extends State<_ServicePersonDialog> {
                         ),
                       ],
                     ),
-                    if (!_editing &&
-                        widget.role == ServicePersonRole.customer) ...[
-                      SegmentedButton<bool>(
-                        segments: const [
-                          ButtonSegment(
-                            value: true,
-                            label: Text('สร้างบุคคลใหม่'),
-                          ),
-                          ButtonSegment(
-                            value: false,
-                            label: Text('เลือกบุคคลเดิม'),
-                          ),
-                        ],
-                        selected: {_newPerson},
-                        onSelectionChanged: (value) => setState(() {
-                          _newPerson = value.first;
-                          if (_newPerson) _selectPerson(null);
-                        }),
-                      ),
-                      const SizedBox(height: 12),
-                      if (!_newPerson)
-                        DropdownButtonFormField<int>(
-                          initialValue: _personId,
-                          isExpanded: true,
-                          decoration: _input('บุคคล *'),
-                          items: [
-                            for (final person
-                                in List<Map<String, dynamic>>.from(
-                                  _lookup['persons'] as List? ?? const [],
-                                ))
-                              DropdownMenuItem(
-                                value: (person['id'] as num).toInt(),
-                                child: Text('${person['name']}'),
-                              ),
-                          ],
-                          onChanged: _selectPerson,
-                        ),
-                      if (!_newPerson) const SizedBox(height: 12),
-                    ],
                     if (_editing && widget.canEditPerson)
                       Container(
                         padding: const EdgeInsets.all(10),
@@ -787,61 +743,53 @@ class _ServicePersonDialogState extends State<_ServicePersonDialog> {
                       ),
                     if (_editing && widget.canEditPerson)
                       const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _name,
-                      enabled: _newPerson || widget.canEditPerson,
-                      maxLength: 200,
-                      decoration: _input('ชื่อ-นามสกุล *'),
-                      validator: (value) =>
-                          value == null || value.trim().isEmpty
-                          ? 'กรุณาระบุชื่อ-นามสกุล'
-                          : null,
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _nick,
-                      enabled: _newPerson || widget.canEditPerson,
-                      maxLength: 100,
-                      decoration: _input('ชื่อเล่น'),
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _mobile,
-                      enabled: _newPerson || widget.canEditPerson,
-                      maxLength: 50,
-                      decoration: _input('โทรศัพท์'),
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _email,
-                      enabled: _newPerson || widget.canEditPerson,
-                      maxLength: 320,
-                      keyboardType: TextInputType.emailAddress,
-                      decoration: _input('อีเมล'),
-                    ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'บทบาทในระบบ Service',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
+                    _responsiveFieldPair(
+                      left: TextFormField(
+                        controller: _name,
+                        enabled: _newPerson || widget.canEditPerson,
+                        maxLength: 200,
+                        decoration: _input('ชื่อ-นามสกุล *'),
+                        validator: (value) =>
+                            value == null || value.trim().isEmpty
+                            ? 'กรุณาระบุชื่อ-นามสกุล'
+                            : null,
+                      ),
+                      right: TextFormField(
+                        controller: _nick,
+                        enabled: _newPerson || widget.canEditPerson,
+                        maxLength: 100,
+                        decoration: _input('ชื่อเล่น'),
                       ),
                     ),
-                    Container(
-                      margin: const EdgeInsets.only(top: 8),
-                      padding: const EdgeInsets.all(10),
-                      color: _primary.withValues(alpha: .08),
-                      child: Text(
-                        widget.role == ServicePersonRole.customer
-                            ? 'ผู้ใช้บริการ'
-                            : 'ผู้พักอาศัย',
-                        style: TextStyle(
-                          color: _primary,
-                          fontWeight: FontWeight.w700,
-                        ),
+                    const SizedBox(height: 12),
+                    _responsiveFieldPair(
+                      left: TextFormField(
+                        controller: _mobile,
+                        enabled: _newPerson || widget.canEditPerson,
+                        maxLength: 50,
+                        decoration: _input('โทรศัพท์'),
+                      ),
+                      right: TextFormField(
+                        controller: _email,
+                        enabled: _newPerson || widget.canEditPerson,
+                        maxLength: 320,
+                        keyboardType: TextInputType.emailAddress,
+                        decoration: _input('อีเมล'),
                       ),
                     ),
                     if (_resident) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        color: _primary.withValues(alpha: .08),
+                        child: Text(
+                          'ผู้พักอาศัย',
+                          style: TextStyle(
+                            color: _primary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<int>(
                         initialValue: _roomId,
