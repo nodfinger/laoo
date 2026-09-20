@@ -28,7 +28,7 @@ abstract final class VisitorRoutes {
       screenType: 1,
       routeName: 'visitorCheckIn',
       routePath: '/visitor/check-in',
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: VisitorProject.code,
@@ -84,7 +84,7 @@ abstract final class VisitorRoutes {
       screenType: 1,
       routeName: 'siteZoneGate',
       routePath: '/visitor/site-zone-gate',
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: VisitorProject.code,
