@@ -52,13 +52,19 @@ void main() {
   });
 
   test(
-    'Visitor catalog is reserved but not routable before implementation',
+    'Visitor settings route is routable while other catalog routes remain reserved',
     () {
-      expect(VisitorRoutes.all, hasLength(22));
-      expect(VisitorRoutes.implemented, isEmpty);
+      expect(VisitorRoutes.all, hasLength(23));
+      expect(VisitorRoutes.implemented.map((route) => route.menuCode), [
+        '36004',
+      ]);
       for (final route in VisitorRoutes.all) {
         expect(route.projectCode, VisitorProject.code);
-        expect(AppMenuRouteRegistry.byMenuCode(route.menuCode), isNull);
+        if (route.menuCode == '36004') {
+          expect(AppMenuRouteRegistry.byMenuCode(route.menuCode), isNotNull);
+        } else {
+          expect(AppMenuRouteRegistry.byMenuCode(route.menuCode), isNull);
+        }
       }
     },
   );

@@ -690,6 +690,13 @@ abstract final class AppMenuRouteRegistry {
       path: GatePassRoutePaths.reports,
       scope: AppMenuScope.company,
     ),
+    FiveSMenuCodes.settings: AppMenuRouteSpec(
+      menuCode: FiveSMenuCodes.settings,
+      databaseRouteName: FiveSRouteNames.settings,
+      goRouteName: FiveSRouteNames.settings,
+      path: FiveSRoutePaths.settings,
+      scope: AppMenuScope.company,
+    ),
     FiveSMenuCodes.inspectionAreas: AppMenuRouteSpec(
       menuCode: FiveSMenuCodes.inspectionAreas,
       databaseRouteName: FiveSRouteNames.inspectionAreas,
