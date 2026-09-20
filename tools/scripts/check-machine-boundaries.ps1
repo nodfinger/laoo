@@ -1,9 +1,9 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('service', 'meeting', 'visitor', 'time', 'training', 'project', 'intranet', 'vote', 'pos', 'sales', 'evaluation')]
+    [ValidateSet('service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense', 'project', 'intranet', 'vote', 'pos', 'sales', 'evaluation')]
     [string]$Module,
 
-    [ValidateSet('center-service', 'meeting', 'visitor', 'time', 'training', 'project', 'intranet', 'vote', 'pos', 'sales', 'evaluation')]
+    [ValidateSet('core', 'business', 'center-service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense', 'project', 'intranet', 'vote', 'pos', 'sales', 'evaluation')]
     [string]$Role,
 
     [string]$BaseRef = 'origin/main'
@@ -24,16 +24,22 @@ if ([string]::IsNullOrWhiteSpace($Role)) {
 
     $machineConfig = Get-Content $machineConfigPath -Raw | ConvertFrom-Json
     $Role = [string]$machineConfig.role
+    $ownedModules = @($machineConfig.ownedModules | ForEach-Object { [string]$_ } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
 }
 
-$validRoles = @('center-service', 'meeting', 'visitor', 'time', 'training', 'project', 'intranet', 'vote', 'pos', 'sales', 'evaluation')
+$validRoles = @('core', 'business', 'center-service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense', 'project', 'intranet', 'vote', 'pos', 'sales', 'evaluation')
 if ($Role -notin $validRoles) {
     throw "Invalid machine role '$Role'. Expected: $($validRoles -join ', ')."
 }
 
-if ($Role -eq 'center-service') {
+if ($Role -in @('core', 'center-service')) {
     Write-Host "MACHINE BOUNDARY PASSED: $Role may verify Core integration and module '$Module'."
     return
+}
+
+if ($Role -eq 'business') {
+    if ($ownedModules.Count -eq 0) { throw "Machine role 'business' requires non-empty ownedModules in local.machine.json." }
+    if ($Module -notin $ownedModules) { throw "Machine role 'business' cannot verify module '$Module'. Owned modules: $($ownedModules -join ', ')." }
 }
 
 $ownedRoleByModule = @{
@@ -41,6 +47,10 @@ $ownedRoleByModule = @{
     visitor = 'visitor'
     time = 'time'
     training = 'training'
+    gate_pass = 'gate_pass'
+    five_s = 'five_s'
+    survey = 'survey'
+    expense = 'expense'
     project = 'project'
     intranet = 'intranet'
     vote = 'vote'
@@ -49,7 +59,7 @@ $ownedRoleByModule = @{
     evaluation = 'evaluation'
 }
 
-if ($Role -ne $ownedRoleByModule[$Module]) {
+if ($Role -ne 'business' -and $Role -ne $ownedRoleByModule[$Module]) {
     throw "Machine role '$Role' cannot verify module '$Module'. Use the owned module or move integration work to the Center machine."
 }
 
