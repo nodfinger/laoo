@@ -35,6 +35,7 @@
     <ProjectReference Include="..\projects\training\packages\dotnet\Laoo.Training.Module\Laoo.Training.Module.csproj" />
     <ProjectReference Include="..\projects\gate_pass\packages\dotnet\Laoo.GatePass.Module\Laoo.GatePass.Module.csproj" />
     <ProjectReference Include="..\projects\sales\packages\dotnet\Laoo.Sales.Module\Laoo.Sales.Module.csproj" />
+    <ProjectReference Include="..\projects\evaluation\packages\dotnet\Laoo.Evaluation.Module\Laoo.Evaluation.Module.csproj" />
   </ItemGroup>
 
 </Project>

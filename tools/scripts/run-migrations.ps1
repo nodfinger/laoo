@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('core', 'service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense', 'project', 'intranet', 'vote', 'pos', 'sales')]
+    [ValidateSet('core', 'service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense', 'project', 'intranet', 'vote', 'pos', 'sales', 'evaluation')]
     [string]$Module,
     [switch]$DryRun
 )
@@ -23,6 +23,7 @@ $projectCodes = @{
     vote = 'LAOO_VOTE'
     pos = 'LAOO_POS'
     sales = 'LAOO_SALES'
+    evaluation = 'LAOO_EVALUATION'
 }
 $arguments = @(
     'run',

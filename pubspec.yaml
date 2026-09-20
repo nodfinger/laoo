@@ -48,6 +48,8 @@ dependencies:
     path: projects/pos
   laoo_sales:
     path: projects/sales
+  laoo_evaluation:
+    path: projects/evaluation
 
   cupertino_icons: ^1.0.8
   flutter_riverpod: ^3.4.2
