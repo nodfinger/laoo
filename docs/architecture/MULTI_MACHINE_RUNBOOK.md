@@ -4,77 +4,47 @@
 
 | Machine role | Owned source |
 | --- | --- |
-| `center-service` | Root Core, `laoo_api`, shared packages, `projects/service` |
-| `meeting` | `projects/meeting` and `projects/training` |
-| `visitor` | `projects/visitor` |
-| `time` | `projects/time` |
-| `training` | `projects/training` |
-| `intranet` | `projects/intranet` |
-| `vote` | `projects/vote` |
-| `sales` | `projects/sales` |
+| `core` | Root Core, `laoo_api`, shared packages, Stock, `projects/service`, `projects/sales`, `projects/pos`, `projects/expense`, `projects/intranet` |
+| `business` on `mhon` | `projects/time`, `projects/visitor`, `projects/gate_pass`, `projects/project` |
+| `business` on `mon` | `projects/meeting`, `projects/training`, `projects/evaluation`, `projects/survey`, `projects/vote`, `projects/five_s` |
 
 Every machine clones `nodfinger/laoo` to `C:\laooplatform\laoo`. Never
 share a live working tree, `.git`, `.dart_tool`, `build`, `bin`, or `obj`.
-Copy `local.machine.example.json` to ignored `local.machine.json` and set the
-role for that machine.
+Copy the matching `local.machine.*.example.json` to ignored
+`local.machine.json`. A `business` machine must declare every assigned Project
+package in `ownedModules`; the boundary script permits only that list.
 
-Time machine example:
+Mhon machine example:
 
 ```json
 {
-  "role": "time",
-  "allowedProjects": ["LAOO_TIME"],
+  "role": "business",
+  "ownedModules": ["time", "visitor", "gate_pass", "project"],
+  "allowedProjects": ["LAOO_TIME", "LAOO_VISITOR", "LAOO_GATE_PASS", "LAOO_PROJECT"],
   "webPort": 8080,
   "apiPort": 5080
 }
 ```
 
-Meeting machine with Training example:
+Mon machine example:
 
 ```json
 {
-  "role": "meeting",
-  "allowedProjects": ["LAOO", "LAOO_MEETING", "LAOO_TRAINING"],
+  "role": "business",
+  "ownedModules": ["meeting", "training", "evaluation", "survey", "vote", "five_s"],
+  "allowedProjects": ["LAOO_MEETING", "LAOO_TRAINING", "LAOO_EVALUATION", "LAOO_SURVEY", "LAOO_VOTE", "LAOO_5S"],
   "webPort": 8080,
   "apiPort": 5080
 }
 ```
 
-Copy local.machine.meeting-training.example.json to the ignored
-local.machine.json on the Meeting machine. Never commit a machine local.machine.json.
-Intranet machine example:
-
-```json
-{
-  "role": "intranet",
-  "allowedProjects": ["LAOO", "LAOO_INTRANET"],
-  "webPort": 8080,
-  "apiPort": 5080
-}
-```
-
-Copy `local.machine.intranet.example.json` to ignored `local.machine.json` on
-that machine. Never commit a real `local.machine.json`.
-
-Vote machine example:
-
-```json
-{
-  "role": "vote",
-  "allowedProjects": ["LAOO", "LAOO_VOTE"],
-  "webPort": 8080,
-  "apiPort": 5080
-}
-```
-
-Copy `local.machine.vote.example.json` to ignored `local.machine.json` on that
-machine. Never commit a real `local.machine.json`.
+Never commit a real `local.machine.json`.
 
 Run `tools/scripts/check-machine-boundaries.ps1 -Module <module>` before full
-verification. On Meeting, Visitor, and Time machines it rejects changed files
-outside the owned Project directory. The Center machine may change Root, Core,
-shared packages, and Service, and is responsible for integration verification.
-
+verification. A business machine may validate only a module named in its
+`ownedModules`, and the script rejects changed files outside that Project
+directory. The Core machine may change Root, Core, shared packages, and its
+owned Project modules, and is responsible for integration verification.
 ## New Project bootstrap
 
 Before assigning a new machine, the Center machine must merge a Bootstrap PR

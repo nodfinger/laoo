@@ -1,6 +1,7 @@
 {
-  "role": "center-service",
-  "allowedProjects": ["LAOO", "LAOO_SERVICE"],
+  "role": "core",
+  "ownedModules": ["service", "sales", "pos", "expense", "intranet"],
+  "allowedProjects": ["LAOO", "LAOO_SERVICE", "LAOO_SALES", "LAOO_POS", "LAOO_EXPENSE", "LAOO_INTRANET"],
   "webPort": 8080,
   "apiPort": 5080
 }
