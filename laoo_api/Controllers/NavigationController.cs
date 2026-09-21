@@ -240,7 +240,7 @@ SELECT CASE WHEN EXISTS
             return false;
 
         const string sql = """
-SELECT CASE WHEN EXISTS
+SELECT CAST(CASE WHEN EXISTS
 (
     SELECT 1
     FROM dbo.TDADUser U
@@ -265,7 +265,7 @@ SELECT CASE WHEN EXISTS
                 WHERE RC.RoomID=B.RoomID AND RC.IsActive=1
             ))
       )
-) THEN CAST(1 AS bit) ELSE CAST(0 AS bit) END;
+ ) THEN CAST(1 AS bit) ELSE CAST(0 AS bit) END AS bit);
 """;
         await using var command = new SqlCommand(sql, connection);
         command.Parameters.Add("@UserID", SqlDbType.BigInt).Value = userId;
