@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/laoo_design_tokens.dart';
 import '../../../app/theme/laoo_typography.dart';
@@ -97,9 +98,20 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
         (item['participantId'] as num).toInt(),
       );
       final invitation = Map<String, dynamic>.from(detail['invitation'] as Map);
+      Map<String, dynamic>? trainingTests;
+      if (invitation['activityTypeCode'] == 'TRAINING' &&
+          invitation['invitationStatus'] == 'ACCEPTED') {
+        try {
+          trainingTests = await _repository.trainingTestOverview(
+            (invitation['bookingId'] as num).toInt(),
+          );
+        } catch (_) {
+          // The invitation remains available if a training setup is not ready.
+        }
+      }
       if (!mounted) return;
       setState(() {
-        _detail = detail;
+        _detail = {...detail, 'trainingTests': trainingTests};
         _responseStatus = '${invitation['invitationStatus'] ?? 'PENDING'}';
         _remark.text = '${invitation['remark'] ?? ''}';
         _changeReason.clear();
@@ -1069,6 +1081,11 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
                     ),
                     const SizedBox(height: LaooLayout.cardSpacing),
                   ],
+                  if (_responseStatus == 'ACCEPTED' &&
+                      invitation['activityTypeCode'] == 'TRAINING') ...[
+                    const SizedBox(height: LaooLayout.cardSpacing),
+                    _trainingTests(invitation, detail, preset),
+                  ],
                   if (_responseStatus == 'ACCEPTED' && foodOrderingClosed) ...[
                     const SizedBox(height: LaooLayout.cardSpacing),
                     MeetingAttendancePanel(
@@ -1267,6 +1284,87 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _trainingTests(
+    Map<String, dynamic> invitation,
+    Map<String, dynamic> detail,
+    WorkspaceThemePreset preset,
+  ) {
+    final overview = detail['trainingTests'] as Map?;
+    final sections = List<Map<String, dynamic>>.from(
+      overview?['sections'] as List? ?? const [],
+    );
+    final bookingId = (invitation['bookingId'] as num).toInt();
+    return Container(
+      padding: const EdgeInsets.all(LaooLayout.cardPadding),
+      decoration: BoxDecoration(
+        color: preset.primary.withValues(alpha: .08),
+        borderRadius: BorderRadius.circular(LaooRadius.xs),
+        border: Border.all(color: preset.primary.withValues(alpha: .35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.quiz_outlined, color: preset.primary),
+              const SizedBox(width: 8),
+              const Text(
+                'แบบทดสอบอบรม',
+                style: TextStyle(
+                  fontSize: LaooTypography.sectionTitle,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (overview == null)
+            const Text('ยังไม่สามารถโหลดสถานะแบบทดสอบได้ กรุณาลองใหม่อีกครั้ง')
+          else if (sections.where((x) => x['configured'] == true).isEmpty)
+            const Text('ผู้จัดยังไม่ได้แนบแบบทดสอบสำหรับการอบรมรอบนี้')
+          else
+            ...sections.where((x) => x['configured'] == true).map((section) {
+              final code = '${section['section']}';
+              final label = code == 'PRE' ? 'ก่อนอบรม' : 'หลังอบรม';
+              final submitted = section['submitted'] == true;
+              final passed = section['passed'] == true;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  children: [
+                    Expanded(child: Text(label)),
+                    if (submitted)
+                      Text(
+                        'คะแนน ${section['score']}/${section['maxScore']} · ${passed ? 'ผ่าน' : 'ไม่ผ่าน'}',
+                        style: TextStyle(
+                          color: passed ? preset.primary : LaooColors.error,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      )
+                    else if (section['isOpen'] == true)
+                      FilledButton.icon(
+                        onPressed: () => GoRouter.of(context).go(
+                          '/company/training-tests/$bookingId?section=$code',
+                        ),
+                        icon: const Icon(Icons.play_arrow_outlined),
+                        label: Text('ทำแบบทดสอบ$label'),
+                      )
+                    else
+                      Text(
+                        code == 'PRE'
+                            ? 'เปิดให้ทำก่อนเริ่มอบรม'
+                            : 'เปิดให้ทำหลังจบอบรม',
+                        style: TextStyle(color: preset.textSecondary),
+                      ),
+                  ],
+                ),
+              );
+            }),
         ],
       ),
     );

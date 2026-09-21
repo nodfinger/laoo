@@ -24,16 +24,25 @@ public sealed class TrainingExamController(IConfiguration configuration, IWebHos
     public Task<IActionResult> Overview(long bookingId, CancellationToken token) => Run(bookingId, async () =>
     {
         var exams = await Rows("SELECT SectionCode,DefinitionJson,RowVersion FROM dbo.TDTRBookingExam WHERE CompanyID=@company AND BookingID=@booking", token);
+        var attempts = access.ParticipantId is null ? new List<Dictionary<string,object?>>() : await Rows("""
+SELECT E.SectionCode,A.Score,A.MaxScore,A.Passed,A.SubmittedDate
+FROM dbo.TDTRBookingExamAttempt A
+JOIN dbo.TDTRBookingExam E ON E.ExamID=A.ExamID AND E.CompanyID=A.CompanyID
+WHERE E.CompanyID=@company AND E.BookingID=@booking AND A.BookingParticipantID=@participant
+""", token, ("@participant",access.ParticipantId));
         return Ok(new {
             access.Subject, access.CanManage, access.ParticipantId, access.FirstStart, access.LastEnd,
             sections = new[] {"PRE","POST"}.Select(section => {
                 var row = exams.SingleOrDefault(x => (string)x["SectionCode"]! == section);
                 var definition = row is null ? null : Read<ExamDefinition>(row["DefinitionJson"]);
+                var attempt = attempts.SingleOrDefault(x => (string)x["SectionCode"]! == section);
                 return new { section, configured = definition is not null,
                     isActive = definition?.IsActive ?? false,
                     isOpen = Open(section) && definition?.IsActive == true,
                     questionCount = definition?.QuestionCount ?? 0,
-                    passingPercent = definition?.PassingPercent ?? 60 };
+                    passingPercent = definition?.PassingPercent ?? 60,
+                    submitted = attempt?["SubmittedDate"] is not null,
+                    score = attempt?["Score"], maxScore = attempt?["MaxScore"], passed = attempt?["Passed"] };
             })
         });
     }, token);
@@ -267,10 +276,13 @@ WHERE B.CompanyID=@company AND B.BookingID=@booking AND B.ActivityTypeCode='TRAI
 AND EXISTS (
  SELECT 1 FROM dbo.TDADProject PR
  JOIN dbo.TDADCompanyProject CP ON CP.ProjectID=PR.ProjectID AND CP.CompanyID=C.CompanyID AND CP.PartnerID=C.PartnerID AND CP.IsEnabled=1
- JOIN dbo.TDADUserProject UP ON UP.ProjectID=PR.ProjectID AND UP.CompanyID=C.CompanyID AND UP.UserID=@user AND UP.IsActive=1
+LEFT JOIN dbo.TDADUserProject UP ON UP.ProjectID=PR.ProjectID AND UP.CompanyID=C.CompanyID AND UP.UserID=@user AND UP.IsActive=1
  WHERE PR.ProjectCode='LAOO_TRAINING' AND PR.IsActive=1
- AND (CP.StartDate IS NULL OR CP.StartDate<=CONVERT(date,SYSUTCDATETIME()))
- AND (CP.ExpireDate IS NULL OR CP.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))
+AND (CP.StartDate IS NULL OR CP.StartDate<=CONVERT(date,SYSUTCDATETIME()))
+AND (CP.ExpireDate IS NULL OR CP.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))
+AND (UP.UserID IS NOT NULL OR U.IsCompanyAdmin=1 OR B.RequesterUserID=@user OR
+     EXISTS(SELECT 1 FROM dbo.TDADMeetingRoomContact RC JOIN dbo.TDADUserEmployee UE ON UE.CompanyID=B.CompanyID AND UE.EmployeeID=RC.EmployeeID AND UE.UserID=@user AND UE.IsActive=1 WHERE RC.RoomID=B.RoomID AND RC.IsActive=1) OR
+     P.BookingParticipantID IS NOT NULL)
 )
 """,token);
         var r=rows.SingleOrDefault();

@@ -29,6 +29,12 @@ class MeetingInvitationRepository {
         await _api.get('$_responsePath/$participantId') as Map,
       );
 
+  Future<Map<String, dynamic>> trainingTestOverview(int bookingId) async =>
+      Map<String, dynamic>.from(
+        await _api.get('/api/company/training/bookings/$bookingId/tests')
+            as Map,
+      );
+
   Future<Map<String, bool>> actions() async => Map<String, bool>.fromEntries(
     (await _api.get('$_path/actions') as Map).entries.map(
       (entry) => MapEntry('${entry.key}', entry.value == true),
