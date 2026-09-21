@@ -95,7 +95,7 @@ OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY;";
         if (!isAdmin && employee is null) return Forbid();
         var canEdit = await Allowed(connection, "EDIT", token);
         const string headerSql = @"
-SELECT P.BookingParticipantID,P.BookingID,B.BookingNo,B.Subject,B.Description,R.RoomCode,R.RoomNameTH,
+SELECT P.BookingParticipantID,P.BookingID,B.BookingNo,B.Subject,B.Description,B.ActivityTypeCode,R.RoomCode,R.RoomNameTH,
        MIN(S.StartDateTime),MAX(S.EndDateTime),P.InvitationStatus,P.Remark,RE.FullName,PE.FullName,FP.OrderCutoffDateTime,
        CASE WHEN P.EmployeeID=@employee THEN 1 ELSE 0 END,
        CASE WHEN P.EmployeeID=@employee AND P.InvitationStatus<>'DECLINED' AND FP.IsActive=1 AND FP.OrderCutoffDateTime>GETDATE() THEN 1 ELSE 0 END
@@ -107,22 +107,22 @@ LEFT JOIN dbo.TDADUserEmployee RUE ON RUE.UserID=B.RequesterUserID AND RUE.Compa
 LEFT JOIN dbo.TDADEmployee RE ON RE.EmployeeID=COALESCE(B.RequesterEmployeeID,RUE.EmployeeID) AND RE.CompanyID=B.CompanyID
 INNER JOIN dbo.TDADEmployee PE ON PE.EmployeeID=P.EmployeeID AND PE.CompanyID=P.CompanyID
 LEFT JOIN dbo.TDADMeetingBookingFoodPlan FP ON FP.BookingID=B.BookingID AND FP.CompanyID=B.CompanyID AND FP.IsActive=1
-WHERE P.BookingParticipantID=@participant AND P.CompanyID=@company AND (@admin=1 OR P.EmployeeID=@employee) AND S.EndDateTime>=GETDATE()
-GROUP BY P.BookingParticipantID,P.BookingID,B.BookingNo,B.Subject,B.Description,R.RoomCode,R.RoomNameTH,P.InvitationStatus,P.Remark,RE.FullName,PE.FullName,FP.OrderCutoffDateTime,FP.IsActive,P.EmployeeID;";
+WHERE P.BookingParticipantID=@participant AND P.CompanyID=@company AND (@admin=1 OR P.EmployeeID=@employee)
+GROUP BY P.BookingParticipantID,P.BookingID,B.BookingNo,B.Subject,B.Description,B.ActivityTypeCode,R.RoomCode,R.RoomNameTH,P.InvitationStatus,P.Remark,RE.FullName,PE.FullName,FP.OrderCutoffDateTime,FP.IsActive,P.EmployeeID;";
         await using var header = new SqlCommand(headerSql, connection); Add(header, "@participant", participantId); Add(header, "@company", company); Add(header, "@employee", employee); Add(header, "@admin", isAdmin ? 1 : 0);
         await using var reader = await header.ExecuteReaderAsync(token);
         if (!await reader.ReadAsync(token)) return NotFound(Error("ไม่พบคำเชิญ", $"คำเชิญ {participantId} ไม่อยู่ในขอบเขตของผู้ใช้งาน"));
         var bookingId = reader.GetInt64(1);
         var result = new
         {
-            participantId = reader.GetInt64(0), bookingId, bookingNo = Text(reader, 2), subject = reader.GetString(3), description = Text(reader, 4),
-            roomCode = reader.GetString(5), roomName = reader.GetString(6), startDateTime = reader.GetDateTime(7), endDateTime = reader.GetDateTime(8),
-            invitationStatus = reader.GetString(9), remark = Text(reader, 10), organizerName = Text(reader, 11), participantName = Text(reader, 12), orderCutoffDateTime = Date(reader, 13),
-            canRespond = canEdit && reader.GetInt32(14) == 1,
-            responseUnavailableReason = reader.GetInt32(14) != 1
+            participantId = reader.GetInt64(0), bookingId, bookingNo = Text(reader, 2), subject = reader.GetString(3), description = Text(reader, 4), activityTypeCode = reader.GetString(5),
+            roomCode = reader.GetString(6), roomName = reader.GetString(7), startDateTime = reader.GetDateTime(8), endDateTime = reader.GetDateTime(9),
+            invitationStatus = reader.GetString(10), remark = Text(reader, 11), organizerName = Text(reader, 12), participantName = Text(reader, 13), orderCutoffDateTime = Date(reader, 14),
+            canRespond = canEdit && reader.GetInt32(15) == 1,
+            responseUnavailableReason = reader.GetInt32(15) != 1
                 ? "ตอบรับได้เฉพาะคำเชิญของบัญชีที่เข้าสู่ระบบ"
                 : !canEdit ? "บัญชีนี้ไม่มีสิทธิ์แก้ไขการตอบรับ กรุณาติดต่อผู้ดูแลระบบ" : null,
-            canOrder = canEdit && reader.GetInt32(15) == 1,
+            canOrder = canEdit && reader.GetInt32(16) == 1,
         };
         await reader.CloseAsync();
         const string foodSql = @"

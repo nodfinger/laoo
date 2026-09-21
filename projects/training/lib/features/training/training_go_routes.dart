@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../masters/training_master_page.dart';
 import '../masters/training_test_template_placeholder_page.dart';
+import '../results/training_results_page.dart';
 import '../tests/training_test_page.dart';
 import 'training_route_contract.dart';
 
@@ -28,6 +29,11 @@ List<GoRoute> buildTrainingFeatureRoutes() => [
     path: TrainingRoutePaths.testTemplates,
     name: TrainingRouteNames.testTemplates,
     builder: (context, state) => const TrainingTestTemplatePlaceholderPage(),
+  ),
+  GoRoute(
+    path: TrainingRoutePaths.results,
+    name: TrainingRouteNames.results,
+    builder: (context, state) => const TrainingResultsPage(),
   ),
   GoRoute(
     path: TrainingRoutePaths.tests,
