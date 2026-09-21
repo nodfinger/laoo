@@ -1,5 +1,6 @@
 using System.Data;
 using System.Security.Claims;
+using LaooApi.Models;
 using LaooApi.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -28,11 +29,18 @@ public sealed class CoreLocationController(IConfiguration configuration) : Contr
         return Convert.ToInt32(await cmd.ExecuteScalarAsync(token)) == 1;
     }
 
+    private async Task<string> BusinessType(SqlConnection connection, CancellationToken token)
+    {
+        await using var command = new SqlCommand("SELECT BusinessTypeCode FROM dbo.TDSTCompanySetUp WHERE CompanyID=@company AND IsActive=1", connection);
+        command.Parameters.Add("@company", SqlDbType.BigInt).Value = Company;
+        return CompanyBusinessType.Normalize(Convert.ToString(await command.ExecuteScalarAsync(token)));
+    }
     [HttpGet]
     public async Task<IActionResult> List(CancellationToken token)
     {
         await using var c = await Open(token);
         if (!await Allowed(c, "VIEW", token)) return StatusCode(403, new { message="ไม่สามารถดูสถานที่ได้", description="บัญชีนี้ไม่มีสิทธิ์ดูทะเบียนสถานที่ของ Company" });
+        var businessType = await BusinessType(c, token);
         var actions = new { create=await Allowed(c,"CREATE",token), edit=await Allowed(c,"EDIT",token), delete=await Allowed(c,"DELETE",token) };
         const string sql = """
 SELECT BuildingID id,BuildingCode code,BuildingNameTH name,IsActive active FROM dbo.TDADBuilding WHERE CompanyID=@company ORDER BY BuildingCode,BuildingID;
@@ -106,6 +114,9 @@ DELETE FROM dbo.TDADRoom WHERE RoomID=@id AND CompanyID=@company;
             return BadRequest(new { message="ประเภทห้องไม่ถูกต้อง",description="กรุณาเลือกประเภทห้องจากรายการ" });
         await using var c=await Open(token);
         if(!await Allowed(c,id.HasValue?"EDIT":"CREATE",token)) return StatusCode(403,new { message="บันทึกสถานที่ไม่ได้",description="บัญชีนี้ไม่มีสิทธิ์ดำเนินการ" });
+        var businessType = await BusinessType(c, token);
+        if (businessType == CompanyBusinessType.Village) return BadRequest(new { message = "Company ประเภทหมู่บ้านต้องใช้ทะเบียนซอย/แยกและบ้านเลขที่" });
+        if (businessType == CompanyBusinessType.RentalOffice && kind == "rooms" && x.Type != "OFFICE") return BadRequest(new { message = "สำนักงานเช่าต้องใช้ห้องประเภท OFFICE" });
         await using var tx=(SqlTransaction)await c.BeginTransactionAsync(IsolationLevel.Serializable,token);
         var sql=kind switch
         {

@@ -58,7 +58,7 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
   int _orgStructureType = 1;
   String _businessTypeCode = 'COMPANY';
   String _requesterCaption = 'ผู้แจ้งซ่อม';
-  bool _isBusinessTypeLocked = true;
+  bool _isBusinessTypeLocked = false;
   List<Map<String, dynamic>> _businessTypeOptions = const [];
   int _passwordPolicyCode = 3;
   String? _runItem;

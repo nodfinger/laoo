@@ -59,11 +59,16 @@ class _ResidentRegistryWorkspaceState extends State<ResidentRegistryWorkspace> {
   List<Map<String, dynamic>> _rows = [];
   List<Map<String, dynamic>> _buildings = [];
   List<Map<String, dynamic>> _rooms = [];
+  List<Map<String, dynamic>> _lanes = [];
+  List<Map<String, dynamic>> _houses = [];
+  String _businessType = 'COMPANY';
   Map<String, bool> _actions = {};
   String _query = '';
   bool? _active;
   int? _building;
   int? _room;
+  int? _lane;
+  int? _house;
   bool _loading = true;
   bool _cards = false;
   bool _opening = false;
@@ -102,6 +107,8 @@ class _ResidentRegistryWorkspaceState extends State<ResidentRegistryWorkspace> {
           isActive: _active,
           buildingId: _building,
           roomId: _room,
+          laneId: _lane,
+          houseId: _house,
           page: _page,
           pageSize: _pageSize,
         ),
@@ -128,6 +135,15 @@ class _ResidentRegistryWorkspaceState extends State<ResidentRegistryWorkspace> {
           _rooms = List<Map<String, dynamic>>.from(
             lookup['rooms'] as List? ?? [],
           );
+          _lanes = List<Map<String, dynamic>>.from(
+            lookup['lanes'] as List? ?? [],
+          );
+          _houses = List<Map<String, dynamic>>.from(
+            lookup['houses'] as List? ?? [],
+          );
+          _businessType = (lookup['businessType'] ?? 'COMPANY')
+              .toString()
+              .toUpperCase();
         }
         _loading = false;
       });
@@ -140,6 +156,12 @@ class _ResidentRegistryWorkspaceState extends State<ResidentRegistryWorkspace> {
       showTimedSnackBar(context, message: _error(error), error: true);
     }
   }
+
+  List<Map<String, dynamic>> get _filterHouses => _houses
+      .where(
+        (row) => _lane == null || (row['parentId'] as num).toInt() == _lane,
+      )
+      .toList();
 
   List<Map<String, dynamic>> get _filterRooms => _rooms
       .where(
@@ -159,6 +181,7 @@ class _ResidentRegistryWorkspaceState extends State<ResidentRegistryWorkspace> {
       final lookup = await _api.lookup(
         includePersonId: (row?['personID'] as num?)?.toInt(),
         includeRoomId: (row?['roomID'] as num?)?.toInt(),
+        includeHouseId: (row?['houseID'] as num?)?.toInt(),
       );
       if (!mounted) return;
       await showDialog<void>(
@@ -319,50 +342,117 @@ class _ResidentRegistryWorkspaceState extends State<ResidentRegistryWorkspace> {
           },
         ),
       ),
-      SizedBox(
-        width: compact ? width - 40 : 190,
-        child: DropdownButtonFormField<int?>(
-          initialValue: _building,
-          isExpanded: true,
-          decoration: registryInput(context, label: 'อาคาร'),
-          items: [
-            const DropdownMenuItem(value: null, child: Text('ทั้งหมด')),
-            for (final row in _buildings)
-              DropdownMenuItem(
-                value: (row['id'] as num).toInt(),
-                child: Text(
-                  '${row['code']} | ${row['name']}',
-                  overflow: TextOverflow.ellipsis,
+      if (_businessType == 'VILLAGE') ...[
+        SizedBox(
+          width: compact ? width - 40 : 190,
+          child: DropdownButtonFormField<int?>(
+            initialValue: _lane,
+            isExpanded: true,
+            decoration: registryInput(context, label: 'ซอย / แยก'),
+            items: [
+              const DropdownMenuItem(value: null, child: Text('ทั้งหมด')),
+              for (final row in _lanes)
+                DropdownMenuItem(
+                  value: (row['id'] as num).toInt(),
+                  child: Text(
+                    '${row['code']} | ${row['name']}',
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-              ),
-          ],
-          onChanged: (value) => setState(() {
-            _building = value;
-            _room = null;
-          }),
+            ],
+            onChanged: (value) {
+              setState(() {
+                _lane = value;
+                _house = null;
+                _page = 1;
+              });
+              _load();
+            },
+          ),
         ),
-      ),
-      SizedBox(
-        width: compact ? width - 40 : 190,
-        child: DropdownButtonFormField<int?>(
-          key: ValueKey((_building, _room)),
-          initialValue: _room,
-          isExpanded: true,
-          decoration: registryInput(context, label: 'ห้อง'),
-          items: [
-            const DropdownMenuItem(value: null, child: Text('ทั้งหมด')),
-            for (final row in _filterRooms)
-              DropdownMenuItem(
-                value: (row['id'] as num).toInt(),
-                child: Text(
-                  '${row['code']} | ${row['name']}',
-                  overflow: TextOverflow.ellipsis,
+        SizedBox(
+          width: compact ? width - 40 : 190,
+          child: DropdownButtonFormField<int?>(
+            key: ValueKey((_lane, _house)),
+            initialValue: _house,
+            isExpanded: true,
+            decoration: registryInput(context, label: 'บ้านเลขที่'),
+            items: [
+              const DropdownMenuItem(value: null, child: Text('ทั้งหมด')),
+              for (final row in _filterHouses)
+                DropdownMenuItem(
+                  value: (row['id'] as num).toInt(),
+                  child: Text(
+                    '${row['code']} | ${row['name']}',
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-              ),
-          ],
-          onChanged: (value) => setState(() => _room = value),
+            ],
+            onChanged: (value) {
+              setState(() {
+                _house = value;
+                _page = 1;
+              });
+              _load();
+            },
+          ),
         ),
-      ),
+      ] else ...[
+        SizedBox(
+          width: compact ? width - 40 : 190,
+          child: DropdownButtonFormField<int?>(
+            initialValue: _building,
+            isExpanded: true,
+            decoration: registryInput(context, label: 'อาคาร'),
+            items: [
+              const DropdownMenuItem(value: null, child: Text('ทั้งหมด')),
+              for (final row in _buildings)
+                DropdownMenuItem(
+                  value: (row['id'] as num).toInt(),
+                  child: Text(
+                    '${row['code']} | ${row['name']}',
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+            ],
+            onChanged: (value) {
+              setState(() {
+                _building = value;
+                _room = null;
+                _page = 1;
+              });
+              _load();
+            },
+          ),
+        ),
+        SizedBox(
+          width: compact ? width - 40 : 190,
+          child: DropdownButtonFormField<int?>(
+            key: ValueKey((_building, _room)),
+            initialValue: _room,
+            isExpanded: true,
+            decoration: registryInput(context, label: 'ห้อง'),
+            items: [
+              const DropdownMenuItem(value: null, child: Text('ทั้งหมด')),
+              for (final row in _filterRooms)
+                DropdownMenuItem(
+                  value: (row['id'] as num).toInt(),
+                  child: Text(
+                    '${row['code']} | ${row['name']}',
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+            ],
+            onChanged: (value) {
+              setState(() {
+                _room = value;
+                _page = 1;
+              });
+              _load();
+            },
+          ),
+        ),
+      ],
       SizedBox(
         width: compact ? width - 40 : 170,
         child: DropdownButtonFormField<bool?>(
@@ -397,6 +487,8 @@ class _ResidentRegistryWorkspaceState extends State<ResidentRegistryWorkspace> {
                 _active = null;
                 _building = null;
                 _room = null;
+                _lane = null;
+                _house = null;
                 _page = 1;
                 _load();
               },
@@ -544,10 +636,19 @@ class _ResidentRegistryFormState extends State<ResidentRegistryForm> {
       List<Map<String, dynamic>>.from(widget.lookup['floors'] as List? ?? []);
   late final List<Map<String, dynamic>> _rooms =
       List<Map<String, dynamic>>.from(widget.lookup['rooms'] as List? ?? []);
+  late final List<Map<String, dynamic>> _lanes =
+      List<Map<String, dynamic>>.from(widget.lookup['lanes'] as List? ?? []);
+  late final List<Map<String, dynamic>> _houses =
+      List<Map<String, dynamic>>.from(widget.lookup['houses'] as List? ?? []);
+  late final String _businessType = (widget.lookup['businessType'] ?? 'COMPANY')
+      .toString()
+      .toUpperCase();
   late int? _person = (widget.initial?['personID'] as num?)?.toInt();
   late int? _building = (widget.initial?['buildingID'] as num?)?.toInt();
   late int? _floor = (widget.initial?['floorID'] as num?)?.toInt();
   late int? _room = (widget.initial?['roomID'] as num?)?.toInt();
+  late int? _lane = (widget.initial?['laneID'] as num?)?.toInt();
+  late int? _house = (widget.initial?['houseID'] as num?)?.toInt();
   late DateTime _start =
       DateTime.tryParse('${widget.initial?['startDate'] ?? ''}') ??
       DateTime.now();
@@ -624,7 +725,8 @@ class _ResidentRegistryFormState extends State<ResidentRegistryForm> {
     try {
       await widget.api.save({
         'personId': _person,
-        'roomId': _room,
+        'roomId': _businessType == 'VILLAGE' ? null : _room,
+        'houseId': _businessType == 'VILLAGE' ? _house : null,
         'startDate': _iso(_start),
         'endDate': _end == null ? null : _iso(_end!),
         'isActive': _active,
@@ -638,6 +740,8 @@ class _ResidentRegistryFormState extends State<ResidentRegistryForm> {
           _building = null;
           _floor = null;
           _room = null;
+          _lane = null;
+          _house = null;
           _start = DateTime.now();
           _end = null;
           _active = true;
@@ -798,33 +902,56 @@ class _ResidentRegistryFormState extends State<ResidentRegistryForm> {
 
   Widget _locationFields() => LayoutBuilder(
     builder: (_, constraints) {
-      final fields = [
-        _combo('อาคาร', _building, _buildings, (value) {
-          setState(() {
-            _building = value;
-            _floor = null;
-            _room = null;
-          });
-        }),
-        _combo('ชั้น', _floor, _availableFloors, (value) {
-          setState(() {
-            _floor = value;
-            _room = null;
-          });
-        }),
-        _combo(
-          'ห้อง',
-          _room,
-          _availableRooms,
-          (value) => setState(() => _room = value),
-        ),
-      ];
+      final village = _businessType == 'VILLAGE';
+      final fields = village
+          ? [
+              _combo('ซอย / แยก', _lane, _lanes, (value) {
+                setState(() {
+                  _lane = value;
+                  _house = null;
+                });
+              }),
+              _combo(
+                'บ้านเลขที่',
+                _house,
+                _houses
+                    .where(
+                      (row) =>
+                          _lane == null ||
+                          (row['parentId'] as num).toInt() == _lane,
+                    )
+                    .toList(),
+                (value) => setState(() => _house = value),
+                nameOnly: false,
+              ),
+            ]
+          : [
+              _combo('อาคาร', _building, _buildings, (value) {
+                setState(() {
+                  _building = value;
+                  _floor = null;
+                  _room = null;
+                });
+              }),
+              _combo('ชั้น', _floor, _availableFloors, (value) {
+                setState(() {
+                  _floor = value;
+                  _room = null;
+                });
+              }),
+              _combo(
+                'ห้อง',
+                _room,
+                _availableRooms,
+                (value) => setState(() => _room = value),
+              ),
+            ];
       if (constraints.maxWidth < 620) {
         return Column(
           children: [
-            for (var index = 0; index < fields.length; index++) ...[
-              fields[index],
-              if (index < fields.length - 1) const SizedBox(height: 12),
+            for (var i = 0; i < fields.length; i++) ...[
+              fields[i],
+              if (i < fields.length - 1) const SizedBox(height: 12),
             ],
           ],
         );
@@ -832,15 +959,14 @@ class _ResidentRegistryFormState extends State<ResidentRegistryForm> {
       return Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          for (var index = 0; index < fields.length; index++) ...[
-            Expanded(child: fields[index]),
-            if (index < fields.length - 1) const SizedBox(width: 12),
+          for (var i = 0; i < fields.length; i++) ...[
+            Expanded(child: fields[i]),
+            if (i < fields.length - 1) const SizedBox(width: 12),
           ],
         ],
       );
     },
   );
-
   Widget _dateFields() => LayoutBuilder(
     builder: (_, constraints) {
       final fields = [
