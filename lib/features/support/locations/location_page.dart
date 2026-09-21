@@ -34,15 +34,15 @@ class _LocationPageState extends State<LocationPage> {
       _cards = false,
       _error = false;
   static const _labels = {
-    'buildings': 'เธญเธฒเธเธฒเธฃ/เธ•เธถเธ',
-    'floors': 'เธเธฑเนเธ',
-    'rooms': 'เธซเนเธญเธ',
+    'buildings': 'อาคาร/ตึก',
+    'floors': 'ชั้น',
+    'rooms': 'ห้อง',
   };
   static const _types = {
-    'RESIDENTIAL': 'เธซเนเธญเธเธเธฑเธ',
-    'OFFICE': 'เธซเนเธญเธเธ—เธณเธเธฒเธ',
-    'COMMON': 'เธเธทเนเธเธ—เธตเนเธชเนเธงเธเธเธฅเธฒเธ',
-    'OTHER': 'เธญเธทเนเธ เน',
+    'RESIDENTIAL': 'ห้องพัก',
+    'OFFICE': 'ห้องทำงาน',
+    'COMMON': 'พื้นที่ส่วนกลาง',
+    'OTHER': 'อื่น ๆ',
   };
   List<Map<String, dynamic>> _rows(String kind) =>
       ((_data[kind] as List?) ?? [])
@@ -93,8 +93,8 @@ class _LocationPageState extends State<LocationPage> {
   void _fail(Object e) => setState(() {
     _error = true;
     _message = e is ApiException
-        ? '${e.message}\nเธฃเธฒเธขเธฅเธฐเน€เธญเธตเธขเธ”เน€เธเธดเนเธกเน€เธ•เธดเธก: ${e.description ?? 'เธเธฃเธธเธ“เธฒเนเธซเธฅเธ”เธเนเธญเธกเธนเธฅเนเธซเธกเนเนเธฅเนเธงเธฅเธญเธเธญเธตเธเธเธฃเธฑเนเธ'}'
-        : 'เธ”เธณเน€เธเธดเธเธเธฒเธฃเนเธกเนเธชเธณเน€เธฃเนเธ\nเธฃเธฒเธขเธฅเธฐเน€เธญเธตเธขเธ”เน€เธเธดเนเธกเน€เธ•เธดเธก: เธเธฃเธธเธ“เธฒเธ•เธฃเธงเธเธชเธญเธเธเธฒเธฃเน€เธเธทเนเธญเธกเธ•เนเธญเนเธฅเนเธงเธฅเธญเธเนเธซเธกเน';
+        ? '${e.message}\nรายละเอียดเพิ่มเติม: ${e.description ?? 'กรุณาโหลดข้อมูลใหม่แล้วลองอีกครั้ง'}'
+        : 'ดำเนินการไม่สำเร็จ\nรายละเอียดเพิ่มเติม: กรุณาตรวจสอบการเชื่อมต่อแล้วลองใหม่';
   });
   String? _description;
   Future<void> _edit([Map<String, dynamic>? r]) async {
@@ -139,7 +139,7 @@ class _LocationPageState extends State<LocationPage> {
       setState(() {
         _id = (result as Map)['id'] as int;
         _error = false;
-        _message = 'เธเธฑเธเธ—เธถเธเธเนเธญเธกเธนเธฅเน€เธฃเธตเธขเธเธฃเนเธญเธข';
+        _message = 'บันทึกข้อมูลเรียบร้อย';
       });
       await _load();
       return true;
@@ -192,34 +192,39 @@ class _LocationPageState extends State<LocationPage> {
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (_, setDialogState) => AlertDialog(
-          title: Text(tenant == null ? 'เธเธณเธซเธเธ”เธเธนเนเน€เธเนเธฒ' : 'เนเธเนเนเธเธเธนเนเน€เธเนเธฒ'),
+          title: Text(tenant == null ? 'กำหนดผู้เช่า' : 'แก้ไขผู้เช่า'),
           content: SizedBox(
             width: 480,
             child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Align(alignment: Alignment.centerLeft, child: Text('เธซเนเธญเธ: ' + room['code'].toString() + ' | ' + room['name'].toString())),
+              Align(alignment: Alignment.centerLeft, child: Text('ห้อง: ' + room['code'].toString() + ' | ' + room['name'].toString())),
               const SizedBox(height: 12),
-              TextField(controller: name, decoration: const InputDecoration(labelText: 'เธเธทเนเธญเธเธฃเธดเธฉเธฑเธ—เธเธนเนเน€เธเนเธฒ *')),
+              TextField(controller: name, decoration: const InputDecoration(labelText: 'ชื่อบริษัทผู้เช่า *')),
               const SizedBox(height: 12),
-              TextField(controller: start, readOnly: true, decoration: const InputDecoration(labelText: 'เธงเธฑเธเธ—เธตเนเน€เธฃเธดเนเธกเน€เธเนเธฒ *'), onTap: () async { final value = await _pickDate(start.text); if (value != null) setDialogState(() => start.text = value); }),
+              TextField(controller: start, readOnly: true, decoration: const InputDecoration(labelText: 'วันที่เริ่มเช่า *'), onTap: () async { final value = await _pickDate(start.text); if (value != null) setDialogState(() => start.text = value); }),
               const SizedBox(height: 12),
-              TextField(controller: end, readOnly: true, decoration: const InputDecoration(labelText: 'เธงเธฑเธเธ—เธตเนเธชเธดเนเธเธชเธธเธ”'), onTap: () async { final value = await _pickDate(end.text); if (value != null) setDialogState(() => end.text = value); }),
-              Row(children: [const Text('เธชเธ–เธฒเธเธฐ'), Switch(value: active, onChanged: (v) => setDialogState(() => active = v))]),
+              TextField(controller: end, readOnly: true, decoration: const InputDecoration(labelText: 'วันที่สิ้นสุด'), onTap: () async { final value = await _pickDate(end.text); if (value != null) setDialogState(() => end.text = value); }),
+              Row(children: [const Text('สถานะ'), Switch(value: active, onChanged: (v) => setDialogState(() => active = v))]),
             ]),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('เธขเธเน€เธฅเธดเธ')),
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('ยกเลิก')),
             FilledButton(onPressed: () async {
               if (name.text.trim().isEmpty || start.text.trim().isEmpty) return;
               final path = tenant == null ? '/api/company/business-locations/rental-office/tenants' : '/api/company/business-locations/rental-office/tenants/' + tenant['tenantId'].toString();
               final body = {'roomId': room['id'], 'name': name.text.trim(), 'customerId': null, 'startDate': start.text.trim(), 'endDate': end.text.trim().isEmpty ? null : end.text.trim(), 'active': active};
-              if (tenant == null) { await _api.post(path, body: body); } else { await _api.put(path, body: body); }
-              if (dialogContext.mounted) Navigator.pop(dialogContext, true);
-            }, child: const Text('เธเธฑเธเธ—เธถเธ')),
+              try {
+                if (tenant == null) { await _api.post(path, body: body); } else { await _api.put(path, body: body); }
+                if (dialogContext.mounted) Navigator.pop(dialogContext, true);
+              } catch (e) {
+                if (dialogContext.mounted) Navigator.pop(dialogContext, false);
+                if (mounted) _fail(e);
+              }
+            }, child: const Text('บันทึก')),
           ],
         ),
       ),
     );
-    if (saved == true) { await _reloadRental(); if (mounted) setState(() => _message = 'เธเธฑเธเธ—เธถเธเธเธนเนเน€เธเนเธฒเธชเธณเน€เธฃเนเธ'); }
+    if (saved == true) { await _reloadRental(); if (mounted) setState(() => _message = 'บันทึกผู้เช่าสำเร็จ'); }
   }
 
   Future<void> _editContact(Map<String, dynamic> tenant, [Map<String, dynamic>? contact]) async {
@@ -232,31 +237,36 @@ class _LocationPageState extends State<LocationPage> {
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (_, setDialogState) => AlertDialog(
-          title: Text(contact == null ? 'เน€เธเธดเนเธกเธเธนเนเธ•เธดเธ”เธ•เนเธญ' : 'เนเธเนเนเธเธเธนเนเธ•เธดเธ”เธ•เนเธญ'),
+          title: Text(contact == null ? 'เพิ่มผู้ติดต่อ' : 'แก้ไขผู้ติดต่อ'),
           content: SizedBox(width: 480, child: Column(mainAxisSize: MainAxisSize.min, children: [
-            TextField(controller: name, decoration: const InputDecoration(labelText: 'เธเธทเนเธญเธเธนเนเธ•เธดเธ”เธ•เนเธญ *')),
+            TextField(controller: name, decoration: const InputDecoration(labelText: 'ชื่อผู้ติดต่อ *')),
             const SizedBox(height: 12),
-            TextField(controller: phone, decoration: const InputDecoration(labelText: 'เนเธ—เธฃเธจเธฑเธเธ—เน')),
+            TextField(controller: phone, decoration: const InputDecoration(labelText: 'โทรศัพท์')),
             const SizedBox(height: 12),
-            TextField(controller: email, decoration: const InputDecoration(labelText: 'เธญเธตเน€เธกเธฅ')),
-            Row(children: [const Text('เธเธนเนเธ•เธดเธ”เธ•เนเธญเธซเธฅเธฑเธ'), Switch(value: primary, onChanged: (v) => setDialogState(() => primary = v))]),
-            Row(children: [const Text('เธชเธ–เธฒเธเธฐ'), Switch(value: active, onChanged: (v) => setDialogState(() => active = v))]),
+            TextField(controller: email, decoration: const InputDecoration(labelText: 'อีเมล')),
+            Row(children: [const Text('ผู้ติดต่อหลัก'), Switch(value: primary, onChanged: (v) => setDialogState(() => primary = v))]),
+            Row(children: [const Text('สถานะ'), Switch(value: active, onChanged: (v) => setDialogState(() => active = v))]),
           ])),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('เธขเธเน€เธฅเธดเธ')),
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('ยกเลิก')),
             FilledButton(onPressed: () async {
               if (name.text.trim().isEmpty) return;
               final id = contact?['contactId'];
               final path = id == null ? '/api/company/business-locations/rental-office/tenants/' + tenant['tenantId'].toString() + '/contacts' : '/api/company/business-locations/rental-office/contacts/' + id.toString();
               final body = {'tenantId': tenant['tenantId'], 'personId': contact?['personId'], 'name': name.text.trim(), 'phone': phone.text.trim().isEmpty ? null : phone.text.trim(), 'email': email.text.trim().isEmpty ? null : email.text.trim(), 'primary': primary, 'active': active};
-              if (id == null) { await _api.post(path, body: body); } else { await _api.put(path, body: body); }
-              if (dialogContext.mounted) Navigator.pop(dialogContext, true);
-            }, child: const Text('เธเธฑเธเธ—เธถเธ')),
+              try {
+                if (id == null) { await _api.post(path, body: body); } else { await _api.put(path, body: body); }
+                if (dialogContext.mounted) Navigator.pop(dialogContext, true);
+              } catch (e) {
+                if (dialogContext.mounted) Navigator.pop(dialogContext, false);
+                if (mounted) _fail(e);
+              }
+            }, child: const Text('บันทึก')),
           ],
         ),
       ),
     );
-    if (saved == true) { await _reloadRental(); if (mounted) setState(() => _message = 'เธเธฑเธเธ—เธถเธเธเธนเนเธ•เธดเธ”เธ•เนเธญเธชเธณเน€เธฃเนเธ'); }
+    if (saved == true) { await _reloadRental(); if (mounted) setState(() => _message = 'บันทึกผู้ติดต่อสำเร็จ'); }
   }
   Future<void> _showContacts(Map<String, dynamic> tenant) async {
     await showDialog<void>(
@@ -265,11 +275,11 @@ class _LocationPageState extends State<LocationPage> {
         builder: (dialogContext, setDialogState) {
           final contacts = _contactsForTenant(tenant['tenantId']);
           return AlertDialog(
-            title: Text('เธเธนเนเธ•เธดเธ”เธ•เนเธญ: ${tenant['tenantCompanyName']}'),
+            title: Text('ผู้ติดต่อ: ${tenant['tenantCompanyName']}'),
             content: SizedBox(
               width: 620,
               child: contacts.isEmpty
-                  ? const Text('เธขเธฑเธเนเธกเนเธกเธตเธเธนเนเธ•เธดเธ”เธ•เนเธญ')
+                  ? const Text('ยังไม่มีผู้ติดต่อ')
                   : ListView.separated(
                       shrinkWrap: true,
                       itemCount: contacts.length,
@@ -278,10 +288,10 @@ class _LocationPageState extends State<LocationPage> {
                         final contact = contacts[index];
                         return ListTile(
                           dense: true,
-                          title: Text('${contact['contactName'] ?? '-'}${contact['isPrimary'] == true ? ' (เธซเธฅเธฑเธ)' : ''}'),
+                          title: Text('${contact['contactName'] ?? '-'}${contact['isPrimary'] == true ? ' (หลัก)' : ''}'),
                           subtitle: Text('${contact['phone'] ?? '-'} | ${contact['email'] ?? '-'}'),
                           trailing: IconButton(
-                            tooltip: 'เนเธเนเนเธ',
+                            tooltip: 'แก้ไข',
                             icon: const Icon(Icons.edit_outlined),
                             onPressed: () async {
                               await _editContact(tenant, contact);
@@ -298,11 +308,11 @@ class _LocationPageState extends State<LocationPage> {
                   await _editContact(tenant);
                   setDialogState(() {});
                 },
-                child: const Text('เน€เธเธดเนเธกเธเธนเนเธ•เธดเธ”เธ•เนเธญ'),
+                child: const Text('เพิ่มผู้ติดต่อ'),
               ),
               TextButton(
                 onPressed: () => Navigator.pop(dialogContext),
-                child: const Text('เธเธดเธ”'),
+                child: const Text('ปิด'),
               ),
             ],
           );
@@ -318,7 +328,7 @@ class _LocationPageState extends State<LocationPage> {
             .clamp(0.0, 480.0)
             .toDouble();
     final title =
-        '$_caption > ${_id == null ? 'เน€เธเธดเนเธก' : 'เนเธเนเนเธ'}${_labels[_kind]}';
+        '$_caption > ${_id == null ? 'เพิ่ม' : 'แก้ไข'}${_labels[_kind]}';
     return AlertDialog(
       backgroundColor: Colors.white,
       surfaceTintColor: Colors.transparent,
@@ -361,7 +371,7 @@ class _LocationPageState extends State<LocationPage> {
                 Row(
                   children: [
                     const Text(
-                      'เธชเธ–เธฒเธเธฐ',
+                      'สถานะ',
                       style: TextStyle(fontSize: LaooTypography.inputLabel),
                     ),
                     const SizedBox(width: 8),
@@ -378,25 +388,25 @@ class _LocationPageState extends State<LocationPage> {
                   controller: _code,
                   maxLength: 20,
                   style: const TextStyle(fontSize: LaooTypography.inputText),
-                  decoration: _controlDecoration(labelText: 'เธฃเธซเธฑเธช *'),
+                  decoration: _controlDecoration(labelText: 'รหัส *'),
                   validator: (v) =>
-                      v == null || v.trim().isEmpty ? 'เธเธฃเธธเธ“เธฒเธฃเธฐเธเธธเธฃเธซเธฑเธช' : null,
+                      v == null || v.trim().isEmpty ? 'กรุณาระบุรหัส' : null,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _name,
                   maxLength: 200,
                   style: const TextStyle(fontSize: LaooTypography.inputText),
-                  decoration: _controlDecoration(labelText: 'เธเธทเนเธญ *'),
+                  decoration: _controlDecoration(labelText: 'ชื่อ *'),
                   validator: (v) =>
-                      v == null || v.trim().isEmpty ? 'เธเธฃเธธเธ“เธฒเธฃเธฐเธเธธเธเธทเนเธญ' : null,
+                      v == null || v.trim().isEmpty ? 'กรุณาระบุชื่อ' : null,
                 ),
                 if (_kind == 'rooms') ...[
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
                     initialValue: _type,
                     style: const TextStyle(fontSize: LaooTypography.comboBox),
-                    decoration: _controlDecoration(labelText: 'เธเธฃเธฐเน€เธ เธ—เธซเนเธญเธ *'),
+                    decoration: _controlDecoration(labelText: 'ประเภทห้อง *'),
                     items: _types.entries
                         .map(
                           (e) => DropdownMenuItem(
@@ -420,7 +430,7 @@ class _LocationPageState extends State<LocationPage> {
                     maxLength: 1000,
                     maxLines: 3,
                     style: const TextStyle(fontSize: LaooTypography.inputText),
-                    decoration: _controlDecoration(labelText: 'เธฃเธฒเธขเธฅเธฐเน€เธญเธตเธขเธ”'),
+                    decoration: _controlDecoration(labelText: 'รายละเอียด'),
                     onChanged: (v) => _description = v,
                   ),
                 ],
@@ -442,7 +452,7 @@ class _LocationPageState extends State<LocationPage> {
               ),
             ),
             onPressed: _saving ? null : () => Navigator.pop(dialogContext),
-            child: const Text('เธขเธเน€เธฅเธดเธ'),
+            child: const Text('ยกเลิก'),
           ),
         ),
         SizedBox(
@@ -463,7 +473,7 @@ class _LocationPageState extends State<LocationPage> {
                       Navigator.pop(dialogContext);
                     }
                   },
-            child: Text(_saving ? 'เธเธณเธฅเธฑเธเธเธฑเธเธ—เธถเธโ€ฆ' : 'เธเธฑเธเธ—เธถเธ'),
+            child: Text(_saving ? 'กำลังบันทึก…' : 'บันทึก'),
           ),
         ),
       ],
@@ -495,7 +505,7 @@ class _LocationPageState extends State<LocationPage> {
             const SizedBox(width: 8),
             const Expanded(
               child: Text(
-                'เธขเธทเธเธขเธฑเธเธเธฒเธฃเธฅเธเธเนเธญเธกเธนเธฅ',
+                'ยืนยันการลบข้อมูล',
                 style: TextStyle(
                   color: Colors.black,
                   fontSize: LaooTypography.workspaceCaption,
@@ -516,13 +526,13 @@ class _LocationPageState extends State<LocationPage> {
               child: Text('${row['code']} | ${row['name']}'),
             ),
             const SizedBox(height: 12),
-            const Text('เน€เธกเธทเนเธญเธฅเธเนเธฅเนเธงเธเธฐเนเธกเนเธชเธฒเธกเธฒเธฃเธ–เน€เธฃเธตเธขเธเธเธทเธเนเธ”เน'),
+            const Text('เมื่อลบแล้วจะไม่สามารถเรียกคืนได้'),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialog, false),
-            child: const Text('เธขเธเน€เธฅเธดเธ'),
+            child: const Text('ยกเลิก'),
           ),
           FilledButton.icon(
             style: FilledButton.styleFrom(
@@ -533,7 +543,7 @@ class _LocationPageState extends State<LocationPage> {
             ),
             onPressed: () => Navigator.pop(dialog, true),
             icon: const Icon(Icons.delete_outline),
-            label: const Text('เธฅเธ'),
+            label: const Text('ź'),
           ),
         ],
       ),
@@ -543,7 +553,7 @@ class _LocationPageState extends State<LocationPage> {
       await _api.delete('/api/company/locations/$_kind/${row['id']}');
       if (!mounted) return;
       setState(() {
-        _message = 'เธฅเธเธเนเธญเธกเธนเธฅเน€เธฃเธตเธขเธเธฃเนเธญเธข';
+        _message = 'ลบข้อมูลเรียบร้อย';
         _error = false;
       });
       await _load();
@@ -694,21 +704,21 @@ class _LocationPageState extends State<LocationPage> {
           children: [
             if (_can('edit'))
               IconButton(
-                tooltip: 'เนเธเนเนเธ',
+                tooltip: 'แก้ไข',
                 color: primary,
                 onPressed: () => _edit(r),
                 icon: const Icon(Icons.edit_outlined),
               ),
-            if (_kind == 'rooms' && _isRental)
+            if (_kind == 'rooms' && _isRental && r['type'] == 'OFFICE')
               IconButton(
-                tooltip: 'เธเธณเธซเธเธ”เธเธนเนเน€เธเนเธฒ',
+                tooltip: 'กำหนดผู้เช่า',
                 color: primary,
                 onPressed: () => _editTenant(r),
                 icon: const Icon(Icons.business_outlined),
               ),
             if (_can('delete'))
               IconButton(
-                tooltip: 'เธฅเธ',
+                tooltip: 'ź',
                 color: Theme.of(context).colorScheme.error,
                 onPressed: () => _delete(r),
                 icon: const Icon(Icons.delete_outline),
@@ -724,7 +734,7 @@ class _LocationPageState extends State<LocationPage> {
                   controller: _search,
                   style: const TextStyle(fontSize: LaooTypography.inputText),
                   decoration: _controlDecoration(
-                    hintText: 'เธเนเธเธซเธฒเธฃเธซเธฑเธชเธซเธฃเธทเธญเธเธทเนเธญ',
+                    hintText: 'ค้นหารหัสหรือชื่อ',
                     prefixIcon: Icons.search,
                   ),
                   onSubmitted: (_) => setState(() {
@@ -745,7 +755,7 @@ class _LocationPageState extends State<LocationPage> {
                     _query = _search.text.trim();
                     _page = 0;
                   }),
-                  child: const Text('เธเนเธเธซเธฒ'),
+                  child: const Text('ค้นหา'),
                 ),
               ),
               const SizedBox(width: 8),
@@ -761,7 +771,7 @@ class _LocationPageState extends State<LocationPage> {
                     _query = '';
                     _page = 0;
                   }),
-                  child: const Text('เธฅเนเธฒเธ Filter'),
+                  child: const Text('ล้าง Filter'),
                 ),
               ),
             ],
@@ -782,7 +792,7 @@ class _LocationPageState extends State<LocationPage> {
                       children: [
                         WorkspacePageTitle(
                           title: _editing
-                              ? '$_caption > ${_id == null ? 'เน€เธเธดเนเธก' : 'เนเธเนเนเธ'}${_labels[_kind]}'
+                              ? '$_caption > ${_id == null ? 'เพิ่ม' : 'แก้ไข'}${_labels[_kind]}'
                               : _caption,
                           favoriteKey: '14001',
                         ),
@@ -795,20 +805,20 @@ class _LocationPageState extends State<LocationPage> {
                                         ? null
                                         : () =>
                                               setState(() => _editing = false),
-                                    child: const Text('เธเธฅเธฑเธเธฃเธฒเธขเธเธฒเธฃ'),
+                                    child: const Text('กลับรายการ'),
                                   ),
                                   if (_can(_id == null ? 'create' : 'edit'))
                                     FilledButton(
                                       onPressed: _saving ? null : _save,
                                       child: Text(
-                                        _saving ? 'เธเธณเธฅเธฑเธเธเธฑเธเธ—เธถเธโ€ฆ' : 'เธเธฑเธเธ—เธถเธ',
+                                        _saving ? 'กำลังบันทึก…' : 'บันทึก',
                                       ),
                                     ),
                                 ]
                               : [
                                   if (!compact)
                                     IconButton(
-                                      tooltip: 'เธชเธฅเธฑเธ Card/List',
+                                      tooltip: 'สลับ Card/List',
                                       onPressed: () =>
                                           setState(() => _cards = !_cards),
                                       icon: Icon(
@@ -835,7 +845,7 @@ class _LocationPageState extends State<LocationPage> {
                                       ),
                                       onPressed: () => _edit(),
                                       icon: const Icon(Icons.add),
-                                      label: Text('เน€เธเธดเนเธก${_labels[_kind]}'),
+                                      label: Text('เพิ่ม${_labels[_kind]}'),
                                     ),
                                 ],
                         ),
@@ -865,7 +875,7 @@ class _LocationPageState extends State<LocationPage> {
                           if (_kind == 'rooms') searchControls,
                           if (_kind != 'buildings')
                             _select(
-                              'เธญเธฒเธเธฒเธฃ/เธ•เธถเธ',
+                              'อาคาร/ตึก',
                               _building,
                               _rows('buildings'),
                               (v) => setState(() {
@@ -877,7 +887,7 @@ class _LocationPageState extends State<LocationPage> {
                             ),
                           if (_kind == 'rooms')
                             _select(
-                              'เธเธฑเนเธ',
+                              'ชั้น',
                               _floor,
                               _rows('floors')
                                   .where((r) => r['parentId'] == _building)
@@ -906,7 +916,7 @@ class _LocationPageState extends State<LocationPage> {
                                   children: [
                                     Row(
                                       children: [
-                                        const Text('เธชเธ–เธฒเธเธฐ'),
+                                        const Text('สถานะ'),
                                         Switch(
                                           value: _active,
                                           onChanged: _saving
@@ -923,11 +933,11 @@ class _LocationPageState extends State<LocationPage> {
                                         fontSize: LaooTypography.inputText,
                                       ),
                                       decoration: _controlDecoration(
-                                        labelText: 'เธฃเธซเธฑเธช *',
+                                        labelText: 'รหัส *',
                                       ),
                                       validator: (v) =>
                                           v == null || v.trim().isEmpty
-                                          ? 'เธเธฃเธธเธ“เธฒเธฃเธฐเธเธธเธฃเธซเธฑเธช'
+                                          ? 'กรุณาระบุรหัส'
                                           : null,
                                     ),
                                     const SizedBox(height: 12),
@@ -938,11 +948,11 @@ class _LocationPageState extends State<LocationPage> {
                                         fontSize: LaooTypography.inputText,
                                       ),
                                       decoration: _controlDecoration(
-                                        labelText: 'เธเธทเนเธญ *',
+                                        labelText: 'ชื่อ *',
                                       ),
                                       validator: (v) =>
                                           v == null || v.trim().isEmpty
-                                          ? 'เธเธฃเธธเธ“เธฒเธฃเธฐเธเธธเธเธทเนเธญ'
+                                          ? 'กรุณาระบุชื่อ'
                                           : null,
                                     ),
                                     if (_kind == 'rooms') ...[
@@ -953,7 +963,7 @@ class _LocationPageState extends State<LocationPage> {
                                           fontSize: LaooTypography.comboBox,
                                         ),
                                         decoration: _controlDecoration(
-                                          labelText: 'เธเธฃเธฐเน€เธ เธ—เธซเนเธญเธ *',
+                                          labelText: 'ประเภทห้อง *',
                                         ),
                                         items: _types.entries
                                             .map(
@@ -981,7 +991,7 @@ class _LocationPageState extends State<LocationPage> {
                                           fontSize: LaooTypography.inputText,
                                         ),
                                         decoration: _controlDecoration(
-                                          labelText: 'เธฃเธฒเธขเธฅเธฐเน€เธญเธตเธขเธ”',
+                                          labelText: 'รายละเอียด',
                                         ),
                                         onChanged: (v) => _description = v,
                                       ),
@@ -1000,8 +1010,8 @@ class _LocationPageState extends State<LocationPage> {
                                                 ? _building
                                                 : _floor) ==
                                             null
-                                    ? 'เธเธฃเธธเธ“เธฒเน€เธฅเธทเธญเธเธญเธฒเธเธฒเธฃเนเธฅเธฐเธเธฑเนเธ'
-                                    : 'เนเธกเนเธเธเธเนเธญเธกเธนเธฅ',
+                                    ? 'กรุณาเลือกอาคารและชั้น'
+                                    : 'ไม่พบข้อมูล',
                               ),
                             ),
                           )
@@ -1018,8 +1028,8 @@ class _LocationPageState extends State<LocationPage> {
                                   title: Text('${r['code']} | ${r['name']}'),
                                   subtitle: Text(
                                     r['active'] == true
-                                        ? 'เนเธเนเธเธฒเธ'
-                                        : 'เนเธกเนเนเธเนเธเธฒเธ',
+                                        ? 'ใช้งาน'
+                                        : 'ไม่ใช้งาน',
                                   ),
                                   trailing: editButton(r),
                                 ),
@@ -1037,14 +1047,14 @@ class _LocationPageState extends State<LocationPage> {
                                   columns: [
                                     const DataColumn(label: Text('ID')),
                                     const DataColumn(label: Text('Action')),
-                                    const DataColumn(label: Text('เธฃเธซเธฑเธชเธซเนเธญเธ')),
-                                    const DataColumn(label: Text('เธเธทเนเธญเธซเนเธญเธ')),
+                                    const DataColumn(label: Text('รหัสห้อง')),
+                                    const DataColumn(label: Text('ชื่อห้อง')),
                                     if (rental) ...[
-                                      const DataColumn(label: Text('เธเธฃเธฐเน€เธ เธ—เธซเนเธญเธ')),
-                                      const DataColumn(label: Text('เธเธฃเธดเธฉเธฑเธ—เธเธนเนเน€เธเนเธฒ')),
-                                      const DataColumn(label: Text('เธเธนเนเธ•เธดเธ”เธ•เนเธญ')),
+                                      const DataColumn(label: Text('ประเภทห้อง')),
+                                      const DataColumn(label: Text('บริษัทผู้เช่า')),
+                                      const DataColumn(label: Text('ผู้ติดต่อ')),
                                     ],
-                                    const DataColumn(label: Text('เธชเธ–เธฒเธเธฐ')),
+                                    const DataColumn(label: Text('สถานะ')),
                                   ],
                                   rows: visible.asMap().entries.map((e) {
                                     final r = e.value;
@@ -1058,18 +1068,20 @@ class _LocationPageState extends State<LocationPage> {
                                         DataCell(Text('${r['name']}')),
                                         if (rental) ...[
                                           DataCell(Text('${r['type'] ?? 'OFFICE'}')),
-                                          DataCell(
+                                                                                    DataCell(
                                             tenant == null
-                                                ? TextButton(onPressed: () => _editTenant(r), child: const Text('เธเธณเธซเธเธ”เธเธนเนเน€เธเนเธฒ'))
+                                                ? r['type'] == 'OFFICE'
+                                                    ? TextButton(onPressed: () => _editTenant(r), child: const Text('กำหนดผู้เช่า'))
+                                                    : const Text('ต้องเป็นห้อง OFFICE')
                                                 : Text('${tenant['tenantCompanyName']}'),
                                           ),
                                           DataCell(
                                             tenant == null
                                                 ? const Text('-')
-                                                : TextButton(onPressed: () => _showContacts(tenant), child: Text('${contacts.length} เธเธ')),
+                                                : TextButton(onPressed: () => _showContacts(tenant), child: Text('${contacts.length} คน')),
                                           ),
                                         ],
-                                        DataCell(Text(r['active'] == true ? 'เนเธเนเธเธฒเธ' : 'เนเธกเนเนเธเนเธเธฒเธ')),
+                                        DataCell(Text(r['active'] == true ? 'ใช้งาน' : 'ไม่ใช้งาน')),
                                       ],
                                     );
                                   }).toList(),
@@ -1111,7 +1123,7 @@ class _LocationPageState extends State<LocationPage> {
                                   setState(() => _page = current + 1),
                             ),
                             Text(
-                              '${records.isEmpty ? 0 : current * 20 + 1}-${current * 20 + visible.length} เธเธฒเธ ${records.length}',
+                              '${records.isEmpty ? 0 : current * 20 + 1}-${current * 20 + visible.length} จาก ${records.length}',
                               style: const TextStyle(
                                 fontSize: LaooTypography.tableBody,
                               ),

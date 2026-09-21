@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import '../../../app/theme/laoo_design_tokens.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/api/api_exception.dart';
@@ -230,6 +229,92 @@ class _VillageLocationPageState extends State<VillageLocationPage> {
     }
   }
 
+  List<Map<String, dynamic>> _residents = [];
+
+  Future<void> _loadResidents(int houseId) async {
+    final data = await _api.get('/api/company/business-locations/village/residents', query: {'houseId': '$houseId'});
+    if (mounted) setState(() => _residents = List<Map<String, dynamic>>.from(data as List));
+  }
+
+  Future<String?> _pickDate(String current) async {
+    final initial = DateTime.tryParse(current) ?? DateTime.now();
+    final date = await showDatePicker(context: context, initialDate: initial, firstDate: DateTime(2000), lastDate: DateTime(2100));
+    return date?.toIso8601String().substring(0, 10);
+  }
+
+  Future<void> _editResident(Map<String, dynamic> house, [Map<String, dynamic>? row]) async {
+    final people = List<Map<String, dynamic>>.from(await _api.get('/api/company/persons/lookup') as List);
+    final start = TextEditingController(text: row?['startDate']?.toString().split('T').first ?? DateTime.now().toIso8601String().substring(0, 10));
+    final end = TextEditingController(text: row?['endDate']?.toString().split('T').first ?? '');
+    int? personId = row?['personId'] as int?;
+    var active = row?['active'] != false;
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (_, setDialogState) => AlertDialog(
+          title: Text(row == null ? 'เพิ่มผู้อาศัย' : 'แก้ไขผู้อาศัย'),
+          content: SizedBox(
+            width: 480,
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Align(alignment: Alignment.centerLeft, child: Text('บ้านเลขที่ ${house['houseNo']}')),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<int>(
+                value: personId,
+                decoration: const InputDecoration(labelText: 'บุคคล *'),
+                items: people.map((person) {
+                  final id = (person['personID'] as num).toInt();
+                  return DropdownMenuItem(value: id, child: Text('${person['fullName']}'));
+                }).toList(),
+                onChanged: (value) => setDialogState(() => personId = value),
+              ),
+              const SizedBox(height: 12),
+              TextField(controller: start, readOnly: true, decoration: const InputDecoration(labelText: 'วันที่เริ่มอยู่อาศัย *'), onTap: () async { final value = await _pickDate(start.text); if (value != null) setDialogState(() => start.text = value); }),
+              const SizedBox(height: 12),
+              TextField(controller: end, readOnly: true, decoration: const InputDecoration(labelText: 'วันที่สิ้นสุด'), onTap: () async { final value = await _pickDate(end.text); if (value != null) setDialogState(() => end.text = value); }),
+              Row(children: [const Text('สถานะ'), Switch(value: active, onChanged: (value) => setDialogState(() => active = value))]),
+            ]),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('ยกเลิก')),
+            FilledButton(onPressed: () async {
+              if (personId == null || start.text.isEmpty) return;
+              final path = row == null ? '/api/company/business-locations/village/residents' : '/api/company/business-locations/village/residents/${row['id']}';
+              final body = {'houseId': house['id'], 'personId': personId, 'startDate': start.text, 'endDate': end.text.isEmpty ? null : end.text, 'active': active};
+              try {
+                if (row == null) { await _api.post(path, body: body); } else { await _api.put(path, body: body); }
+                if (dialogContext.mounted) Navigator.pop(dialogContext, true);
+              } catch (e) {
+                if (dialogContext.mounted) Navigator.pop(dialogContext, false);
+                if (mounted) _fail(e);
+              }
+            }, child: const Text('บันทึก')),
+          ],
+        ),
+      ),
+    );
+    if (saved == true) { await _loadResidents((house['id'] as num).toInt()); _success('บันทึกผู้อาศัยสำเร็จ'); }
+  }
+
+  Future<void> _showResidents(Map<String, dynamic> house) async {
+    await _loadResidents((house['id'] as num).toInt());
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (_, setDialogState) => AlertDialog(
+          title: Text('ผู้อาศัยบ้านเลขที่ ${house['houseNo']}'),
+          content: SizedBox(width: 620, child: _residents.isEmpty ? const Text('ยังไม่มีผู้อาศัย') : ListView.separated(shrinkWrap: true, itemCount: _residents.length, separatorBuilder: (_, __) => const Divider(height: 1), itemBuilder: (_, index) {
+            final resident = _residents[index];
+            return ListTile(title: Text('${resident['personName']}'), subtitle: Text('${resident['startDate']?.toString().split('T').first ?? '-'} | ${resident['active'] == true ? 'ใช้งาน' : 'ไม่ใช้งาน'}'), trailing: IconButton(icon: const Icon(Icons.edit_outlined), onPressed: () async { await _editResident(house, resident); setDialogState(() {}); }));
+          })),
+          actions: [
+            TextButton(onPressed: () async { await _editResident(house); setDialogState(() {}); }, child: const Text('เพิ่มผู้อาศัย')),
+            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('ปิด')),
+          ],
+        ),
+      ),
+    );
+  }
   @override
   Widget build(BuildContext context) => SupportWorkspaceShell(
     pageTitle: widget.caption,
@@ -394,7 +479,7 @@ class _VillageLocationPageState extends State<VillageLocationPage> {
                     icon: const Icon(Icons.edit_outlined),
                   ),
                   TextButton(
-                    onPressed: () => context.go('/service/residents'),
+                    onPressed: () => _showResidents(r),
                     child: const Text('ดูผู้อาศัย'),
                   ),
                 ],
