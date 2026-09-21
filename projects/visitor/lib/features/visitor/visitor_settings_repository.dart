@@ -70,6 +70,30 @@ class VisitorSettingsRepository {
         .toList(growable: false);
   }
 
+  Future<List<Map<String, dynamic>>> businessLocationRows(
+    String path, {
+    Map<String, String>? query,
+  }) async {
+    final value = await api.get(path, query: query);
+    final rows = value is List ? value : const [];
+    return rows
+        .map((row) => Map<String, dynamic>.from(row as Map))
+        .toList(growable: false);
+  }
+
+  Future<VisitorRentalHosts> rentalHosts() async {
+    final value = await api.get('/api/company/business-locations/rental-office/tenants');
+    final sets = value is List ? value : const [];
+    return VisitorRentalHosts(
+      tenants: sets.isNotEmpty && sets[0] is List
+          ? (sets[0] as List).map((x) => Map<String, dynamic>.from(x as Map)).toList()
+          : const [],
+      contacts: sets.length > 1 && sets[1] is List
+          ? (sets[1] as List).map((x) => Map<String, dynamic>.from(x as Map)).toList()
+          : const [],
+    );
+  }
+
   Future<void> update(VisitorSettingsUpdate request) async =>
       api.put('/api/visitor/system-settings', body: request.toJson());
 }
@@ -153,6 +177,10 @@ class VisitorHostOption {
     this.room,
     this.building,
     this.floor,
+    this.tenantId,
+    this.contactId,
+    this.houseId,
+    this.laneId,
   });
   final int id;
   final String code;
@@ -161,17 +189,31 @@ class VisitorHostOption {
   final String? room;
   final String? building;
   final String? floor;
+  final int? tenantId;
+  final int? contactId;
+  final int? houseId;
+  final int? laneId;
 
   factory VisitorHostOption.fromJson(Map<String, dynamic> json) =>
       VisitorHostOption(
-        id: (json['id'] as num).toInt(),
-        code: json['code']?.toString() ?? '',
-        name: json['name']?.toString() ?? '',
+        id: ((json['id'] ?? json['hostId']) as num).toInt(),
+        code: (json['code'] ?? json['roomCode'] ?? json['houseNo'])?.toString() ?? '',
+        name: (json['name'] ?? json['contactName'] ?? json['displayName'] ?? json['personName'])?.toString() ?? '',
         phone: json['phone']?.toString(),
         room: json['room']?.toString(),
         building: json['building']?.toString(),
         floor: json['floor']?.toString(),
+        tenantId: (json['tenantId'] as num?)?.toInt(),
+        contactId: (json['contactId'] as num?)?.toInt(),
+        houseId: (json['houseId'] as num?)?.toInt(),
+        laneId: (json['laneId'] as num?)?.toInt(),
       );
+}
+
+class VisitorRentalHosts {
+  const VisitorRentalHosts({required this.tenants, required this.contacts});
+  final List<Map<String, dynamic>> tenants;
+  final List<Map<String, dynamic>> contacts;
 }
 
 class VisitorSettingsActions {

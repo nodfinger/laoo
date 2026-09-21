@@ -25,9 +25,17 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
   VisitorCheckInContext? _checkInContext;
   List<VisitorRoomOption> _roomOptions = const [];
   List<VisitorHostOption> _hostOptions = const [];
-  String _method = 'MANUAL_ENTRY';
+  List<Map<String, dynamic>> _rentalTenants = const [];
+  List<Map<String, dynamic>> _rentalContacts = const [];
+  List<Map<String, dynamic>> _villageLanes = const [];
+  List<Map<String, dynamic>> _villageHouses = const [];
+  List<Map<String, dynamic>> _villageResidents = const [];
   String _hostType = 'SERVICE_CUSTOMER';
   int? _roomId;
+  int? _tenantId;
+  int? _tenantContactId;
+  int? _laneId;
+  int? _houseId;
   DateTime? _expiry;
   XFile? _cardImage;
   bool _loading = true;
@@ -63,11 +71,13 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
         _companyContext = companyContext;
         _checkInContext = checkInContext;
         _hostType = companyContext.defaultHostType;
-        if (!settings.allowManualEntry && settings.allowCameraCapture)
-          _method = 'CAMERA_CAPTURE';
       });
       if (companyContext.isDormitory) {
         await _loadRooms();
+      } else if (companyContext.businessTypeCode == 'RENTAL_OFFICE') {
+        await _loadRental();
+      } else if (companyContext.businessTypeCode == 'VILLAGE') {
+        await _loadVillageLanes();
       } else {
         await _loadHostOptions();
       }
@@ -104,6 +114,26 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
     }
   }
 
+  Future<void> _loadRental() async {
+    final data = await VisitorSettingsRepository(_api).rentalHosts();
+    if (mounted) setState(() { _rentalTenants = data.tenants; _rentalContacts = data.contacts; });
+  }
+
+  Future<void> _loadVillageLanes() async {
+    final rows = await VisitorSettingsRepository(_api).businessLocationRows('/api/company/business-locations/village/lanes');
+    if (mounted) setState(() => _villageLanes = rows);
+  }
+
+  Future<void> _loadVillageHouses(int laneId) async {
+    final rows = await VisitorSettingsRepository(_api).businessLocationRows('/api/company/business-locations/village/houses', query: {'laneId': '$laneId'});
+    if (mounted) setState(() => _villageHouses = rows);
+  }
+
+  Future<void> _loadVillageResidents(int houseId) async {
+    final rows = await VisitorSettingsRepository(_api).businessLocationRows('/api/company/business-locations/village/residents', query: {'houseId': '$houseId'});
+    if (mounted) setState(() => _villageResidents = rows);
+  }
+
   Future<void> _capture() async {
     final image = await _picker.pickImage(
       source: ImageSource.camera,
@@ -125,6 +155,9 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
   Future<void> _save() async {
     final settings = _settings;
     if (settings == null || _saving) return;
+    final captureMethod = _cardImage == null
+        ? 'MANUAL_ENTRY'
+        : 'CAMERA_CAPTURE';
     if (_checkInContext == null || _name.text.trim().isEmpty) {
       _show('กรุณาระบุสาขาและชื่อผู้มาติดต่อ', error: true);
       return;
@@ -143,10 +176,12 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
       _show('กรุณากรอกข้อมูลบัตรประชาชนตามค่ากลางของระบบ', error: true);
       return;
     }
-    if (_method == 'CAMERA_CAPTURE' &&
-        settings.requireCardImage &&
-        _cardImage == null) {
-      _show('กรุณาถ่ายภาพบัตรอย่างน้อย 1 ด้าน', error: true);
+    if (captureMethod == 'MANUAL_ENTRY' && !settings.allowManualEntry) {
+      _show('กรุณาแนบภาพบัตร เนื่องจากปิดการคีย์อิสระไว้', error: true);
+      return;
+    }
+    if (captureMethod == 'CAMERA_CAPTURE' && !settings.allowCameraCapture) {
+      _show('การถ่ายบัตรจากกล้องถูกปิดจากกำหนดค่าระบบ Visitor', error: true);
       return;
     }
     if (_companyContext?.isDormitory == true && _roomId == null) {
@@ -170,7 +205,7 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
                 'hostType': _hostType,
                 'hostEmployeeId': null,
                 'hostResidentId':
-                    _hostType == 'RESIDENT' && _host.text.trim().isNotEmpty
+                    (_hostType == 'RESIDENT' || _hostType == 'VILLAGE') && _host.text.trim().isNotEmpty
                     ? int.tryParse(_host.text.trim())
                     : null,
                 'hostServiceCustomerId':
@@ -179,17 +214,23 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
                     ? int.tryParse(_host.text.trim())
                     : null,
                 'hostRoomId': _hostType == 'RESIDENT' ? _roomId : null,
+                'hostTenantId': _hostType == 'RENTAL_OFFICE'
+                    ? _tenantId
+                    : null,
+                'hostTenantContactId': _hostType == 'RENTAL_OFFICE'
+                    ? _tenantContactId
+                    : null,
                 'visitPurpose': _purpose.text.trim().isEmpty
                     ? null
                     : _purpose.text.trim(),
-                'captureMethod': _method,
+                'captureMethod': captureMethod,
                 'requestId': 'VIS-${DateTime.now().microsecondsSinceEpoch}',
               },
             )
             as Map,
       );
       final visitId = (response['visitorVisitId'] as num).toInt();
-      if (_method == 'CAMERA_CAPTURE' && _cardImage != null) {
+      if (captureMethod == 'CAMERA_CAPTURE' && _cardImage != null) {
         await _api.upload(
           '/api/visitor/check-ins/$visitId/images',
           bytes: await _cardImage!.readAsBytes(),
@@ -251,44 +292,9 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
           label: const Text('ลองใหม่'),
         ),
       );
-    final methods = <String>[
-      if (settings.allowManualEntry) 'MANUAL_ENTRY',
-      if (settings.allowCameraCapture) 'CAMERA_CAPTURE',
-    ];
-    if (!methods.contains(_method) && methods.isNotEmpty)
-      _method = methods.first;
     return ListView(
       padding: const EdgeInsets.all(10),
       children: [
-        _card(
-          context,
-          'วิธีบันทึก',
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              SegmentedButton<String>(
-                segments: [
-                  if (settings.allowManualEntry)
-                    const ButtonSegment(
-                      value: 'MANUAL_ENTRY',
-                      label: Text('คีย์อิสระ'),
-                      icon: Icon(Icons.edit_outlined),
-                    ),
-                  if (settings.allowCameraCapture)
-                    const ButtonSegment(
-                      value: 'CAMERA_CAPTURE',
-                      label: Text('ถ่ายบัตรจากกล้อง'),
-                      icon: Icon(Icons.camera_alt_outlined),
-                    ),
-                ],
-                selected: {_method},
-                onSelectionChanged: (value) =>
-                    setState(() => _method = value.first),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 6),
         _card(
           context,
           'ข้อมูลผู้มาติดต่อ',
@@ -304,29 +310,27 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
                 keyboard: TextInputType.phone,
               ),
               if (_companyContext != null) _hostSelector(context, settings),
-              if (_method == 'CAMERA_CAPTURE') ...[
-                _field(
-                  _nationalId,
-                  settings.requireNationalIdNumber
-                      ? 'เลขบัตรประชาชน *'
-                      : 'เลขบัตรประชาชน',
-                  keyboard: TextInputType.number,
-                ),
-                InkWell(
-                  onTap: _pickExpiry,
-                  child: InputDecorator(
-                    decoration: InputDecoration(
-                      labelText: settings.requireNationalIdExpiry
-                          ? 'วันหมดอายุบัตร *'
-                          : 'วันหมดอายุบัตร',
-                      suffixIcon: const Icon(Icons.calendar_month_outlined),
-                    ),
-                    child: Text(
-                      _expiry == null ? 'เลือกวันที่' : _dateOnly(_expiry!),
-                    ),
+              _field(
+                _nationalId,
+                settings.requireNationalIdNumber
+                    ? 'เลขบัตรประชาชน *'
+                    : 'เลขบัตรประชาชน',
+                keyboard: TextInputType.number,
+              ),
+              InkWell(
+                onTap: _pickExpiry,
+                child: InputDecorator(
+                  decoration: InputDecoration(
+                    labelText: settings.requireNationalIdExpiry
+                        ? 'วันหมดอายุบัตร *'
+                        : 'วันหมดอายุบัตร',
+                    suffixIcon: const Icon(Icons.calendar_month_outlined),
+                  ),
+                  child: Text(
+                    _expiry == null ? 'เลือกวันที่' : _dateOnly(_expiry!),
                   ),
                 ),
-              ],
+              ),
             ],
           ),
         ),
@@ -352,7 +356,7 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
             ],
           ),
         ),
-        if (_method == 'CAMERA_CAPTURE') ...[
+        if (settings.allowCameraCapture) ...[
           const SizedBox(height: 6),
           _card(
             context,
@@ -397,7 +401,27 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
   Widget _hostSelector(
     BuildContext context,
     VisitorSettings settings,
-  ) => Column(
+  ) {
+    if (_companyContext!.businessTypeCode == 'RENTAL_OFFICE') {
+      final contacts = _rentalContacts.where((x) => (x['tenantId'] as num?)?.toInt() == _tenantId).toList();
+      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        _mapSelect('บริษัทผู้เช่า', _tenantId, _rentalTenants, (x) => '${x['tenantCompanyName']} — ${x['roomCode']}', (v) => setState(() { _tenantId = v; _tenantContactId = null; })),
+        const SizedBox(height: 12),
+        _mapSelect('ผู้ติดต่อ', _tenantContactId, contacts, (x) => '${x['contactName']} — ${x['phone'] ?? ''}', (v) => setState(() { _tenantContactId = v; _host.text = v?.toString() ?? ''; })),
+      ]);
+    }
+    if (_companyContext!.businessTypeCode == 'VILLAGE') {
+      final houses = _villageHouses.where((x) => (x['laneId'] as num?)?.toInt() == _laneId).toList();
+      final residents = _villageResidents.where((x) => (x['houseId'] as num?)?.toInt() == _houseId).toList();
+      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        _mapSelect('ซอย/แยก', _laneId, _villageLanes, (x) => '${x['code']} — ${x['name']}', (v) { setState(() { _laneId = v; _houseId = null; _host.clear(); _villageHouses = const []; _villageResidents = const []; }); if (v != null) _loadVillageHouses(v); }),
+        const SizedBox(height: 12),
+        _mapSelect('บ้านเลขที่', _houseId, houses, (x) => '${x['houseNo']}', (v) { setState(() { _houseId = v; _host.clear(); _villageResidents = const []; }); if (v != null) _loadVillageResidents(v); }),
+        const SizedBox(height: 12),
+        _mapSelect('ผู้อาศัย', int.tryParse(_host.text), residents, (x) => '${x['personName']}', (v) => setState(() => _host.text = v?.toString() ?? '')),
+      ]);
+    }
+    return Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
       if (_companyContext!.isDormitory) ...[
@@ -491,7 +515,15 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
         ),
       ],
     ],
-  );
+    );
+  }
+
+  Widget _mapSelect(String label, int? value, List<Map<String, dynamic>> rows,
+      String Function(Map<String, dynamic>) text, ValueChanged<int?> changed) =>
+      DropdownButtonFormField<int>(
+        value: rows.any((x) => (x['id'] as num?)?.toInt() == value || (x['tenantId'] as num?)?.toInt() == value || (x['contactId'] as num?)?.toInt() == value) ? value : null,
+        decoration: InputDecoration(labelText: '$label *'), isExpanded: true,
+        items: rows.map((x) { final id = ((x['id'] ?? x['contactId'] ?? x['tenantId']) as num).toInt(); return DropdownMenuItem(value: id, child: Text(text(x))); }).toList(), onChanged: changed);
 
   VisitorHostOption? get _selectedHost {
     final id = int.tryParse(_host.text);

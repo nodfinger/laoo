@@ -49,6 +49,8 @@ public sealed class VisitorSystemController(
         long? HostResidentId,
         long? HostServiceCustomerId,
         long? HostRoomId,
+        long? HostTenantId,
+        long? HostTenantContactId,
         string? VisitPurpose,
         string CaptureMethod,
         string RequestId);
@@ -60,14 +62,20 @@ public sealed class VisitorSystemController(
         await using var connection = await Open(token);
         if (!await Can(connection, SettingsMenu, "VIEW", token) &&
             !await Can(connection, CheckInMenu, "VIEW", token)) return Forbid();
+        var businessType = await BusinessType(connection, companyId, token);
         return Ok(new
         {
-            businessTypeCode = await BusinessType(connection, companyId, token),
+            businessTypeCode = businessType,
             employeeAllowed = false,
-            residentAllowed = await IsDormitory(connection, companyId, token),
-            serviceCustomerAllowed = !await IsDormitory(connection, companyId, token),
-            defaultHostType = await IsDormitory(connection, companyId, token)
-                ? "RESIDENT" : "SERVICE_CUSTOMER",
+            residentAllowed = businessType is "DORMITORY" or "VILLAGE",
+            serviceCustomerAllowed = businessType is "COMPANY" or "SERVICE_CENTER",
+            defaultHostType = businessType switch
+            {
+                "DORMITORY" => "RESIDENT",
+                "RENTAL_OFFICE" => "RENTAL_OFFICE",
+                "VILLAGE" => "VILLAGE",
+                _ => "SERVICE_CUSTOMER",
+            },
         });
     }
 
@@ -125,10 +133,14 @@ ORDER BY B.BuildingNameTH,F.FloorNumber,RM.RoomCode,RM.RoomID;
         if (!await Can(connection, CheckInMenu, "VIEW", token)) return Forbid();
         var type = Clean(hostType)?.ToUpperInvariant();
         var businessType = await BusinessType(connection, companyId, token);
-        if (type is not ("RESIDENT" or "SERVICE_CUSTOMER") ||
+        if (type is not ("RESIDENT" or "SERVICE_CUSTOMER" or "RENTAL_OFFICE" or "VILLAGE") ||
             (businessType == "DORMITORY" && type != "RESIDENT") ||
-            (businessType != "DORMITORY" && type != "SERVICE_CUSTOMER"))
+            (businessType is "COMPANY" or "SERVICE_CENTER" && type != "SERVICE_CUSTOMER") ||
+            (businessType == "RENTAL_OFFICE" && type != "RENTAL_OFFICE") ||
+            (businessType == "VILLAGE" && type != "VILLAGE"))
             return BadRequest(new { message = "ประเภทผู้รับรองไม่ถูกต้องสำหรับ Company นี้" });
+        if (type is "RENTAL_OFFICE" or "VILLAGE")
+            return Ok(new { hostType = type, items = await SharedHostRows(type, Clean(search), token) });
         if (type == "RESIDENT" && roomId is null)
             return BadRequest(new { message = "กรุณาเลือกห้องพักก่อนค้นหาผู้รับรอง" });
 
@@ -199,7 +211,8 @@ ORDER BY P.FullName,R.ResidentID;
     {
         if (!TryScope(out var companyId, out _)) return Forbid();
         await using var connection = await Open(token);
-        if (!await Can(connection, SettingsMenu, "VIEW", token)) return Forbid();
+        if (!await Can(connection, SettingsMenu, "VIEW", token) &&
+            !await Can(connection, CheckInMenu, "VIEW", token)) return Forbid();
         var state = await LoadSettings(connection, null, companyId, ThailandDate(), token);
         return Ok(ToSettingsJson(state));
     }
@@ -410,22 +423,24 @@ ORDER BY CheckedInDate DESC,VisitorVisitID DESC;
         {
             var settings = await LoadSettings(connection, transaction, companyId,
                 ThailandDate(), token);
+            if (settings.VersionId is null)
+                return Conflict(new { message = "ยังไม่ได้กำหนดค่าระบบ Visitor กรุณาให้ผู้ดูแลบันทึกค่ากลางก่อนทำ Check-in" });
             var businessType = await BusinessType(connection, companyId, token, transaction);
-            if (hostType is not ("RESIDENT" or "SERVICE_CUSTOMER") ||
-                (businessType == "DORMITORY" &&
-                    (hostType != "RESIDENT" || request.HostResidentId is null || request.HostRoomId is null ||
-                     request.HostEmployeeId is not null || request.HostServiceCustomerId is not null)) ||
-                (businessType != "DORMITORY" &&
-                    (hostType != "SERVICE_CUSTOMER" || request.HostServiceCustomerId is null ||
-                     request.HostEmployeeId is not null || request.HostResidentId is not null || request.HostRoomId is not null)))
+            var validHost = businessType switch
+            {
+                "DORMITORY" => hostType == "RESIDENT" && request.HostResidentId is not null && request.HostRoomId is not null,
+                "RENTAL_OFFICE" => hostType == "RENTAL_OFFICE" && request.HostTenantId is not null && request.HostTenantContactId is not null,
+                "VILLAGE" => hostType == "VILLAGE" && request.HostResidentId is not null,
+                _ => hostType == "SERVICE_CUSTOMER" && request.HostServiceCustomerId is not null,
+            };
+            if (!validHost)
                 return BadRequest(new { message = "ประเภทผู้รับการติดต่อไม่ถูกต้องสำหรับ Company นี้" });
             if (method == "MANUAL_ENTRY" && !settings.AllowManualEntry ||
                 method == "CAMERA_CAPTURE" && !settings.AllowCameraCapture)
                 return BadRequest(new { message = "วิธีบันทึกนี้ถูกปิดจากกำหนดค่าระบบ Visitor" });
             if (settings.RequireVisitorPhone && phone is null)
                 return BadRequest(new { message = "กรุณาระบุเบอร์โทรศัพท์ผู้มาติดต่อ" });
-            if (settings.RequireHostEmployee &&
-                (hostType == "RESIDENT" ? request.HostResidentId is null : request.HostServiceCustomerId is null))
+            if (settings.RequireHostEmployee && !validHost)
                 return BadRequest(new { message = "กรุณาระบุผู้รับรอง" });
             if (settings.RequireVisitPurpose && purpose is null)
                 return BadRequest(new { message = "กรุณาระบุวัตถุประสงค์" });
@@ -433,8 +448,11 @@ ORDER BY CheckedInDate DESC,VisitorVisitID DESC;
                 return BadRequest(new { message = "กรุณาระบุเลขบัตรประชาชน" });
             if (settings.RequireNationalIdExpiry && request.NationalIdExpiryDate is null)
                 return BadRequest(new { message = "กรุณาระบุวันหมดอายุบัตรประชาชน" });
-            var hostSnapshot = await LoadHostSnapshot(connection, transaction, companyId,
-                hostType!, request.HostResidentId, request.HostServiceCustomerId, request.HostRoomId, token);
+            var hostSnapshot = hostType is "RENTAL_OFFICE" or "VILLAGE"
+                ? await LoadSharedHostSnapshot(hostType, request.HostTenantId,
+                    request.HostTenantContactId, request.HostResidentId, token)
+                : await LoadHostSnapshot(connection, transaction, companyId,
+                    hostType!, request.HostResidentId, request.HostServiceCustomerId, request.HostRoomId, token);
             if (hostSnapshot is null)
                 return BadRequest(new { message = "ไม่พบผู้รับการติดต่อ หรือข้อมูลไม่ Active" });
 
@@ -458,12 +476,12 @@ WHERE CompanyID=@CompanyID AND RequestId=@RequestId;
             await using var insert = new SqlCommand("""
 INSERT dbo.TDTMVisitorVisit
 (CompanyID,BranchID,VisitorName,Phone,NationalIdMasked,NationalIdHash,NationalIdExpiryDate,
- HostType,HostEmployeeID,HostResidentID,HostServiceCustomerID,HostRoomID,BusinessTypeCodeSnapshot,HostNameSnapshot,HostRoomSnapshot,
+ HostType,HostEmployeeID,HostResidentID,HostServiceCustomerID,HostRoomID,HostTenantID,HostTenantContactID,BusinessTypeCodeSnapshot,HostNameSnapshot,HostRoomSnapshot,HostLocationSnapshot,
  ResidentNameSnapshot,BuildingNameSnapshot,FloorNameSnapshot,RoomNameSnapshot,
  VisitorContactPointID,ContactPointNameSnapshot,
  VisitPurpose,CaptureMethod,StatusCode,CheckedInDate,SettingsVersionID,RequestId,SettingsSnapshotJson,CreateBy)
 VALUES(@CompanyID,@BranchID,@Name,@Phone,@NationalIdMasked,@NationalIdHash,@Expiry,@HostType,
- @HostEmployeeID,@HostResidentID,@HostServiceCustomerID,@HostRoomID,@BusinessType,@HostName,@HostRoom,
+ @HostEmployeeID,@HostResidentID,@HostServiceCustomerID,@HostRoomID,@HostTenantID,@HostTenantContactID,@BusinessType,@HostName,@HostRoom,@HostLocation,
  @ResidentName,@BuildingName,@FloorName,@RoomName,@ContactPointID,@ContactPointName,@Purpose,@Method,@Status,
  SYSUTCDATETIME(),@SettingsVersionID,@RequestId,@Snapshot,@UserID);
 SELECT CONVERT(bigint,SCOPE_IDENTITY());
@@ -482,9 +500,12 @@ SELECT CONVERT(bigint,SCOPE_IDENTITY());
             Add(insert, "@HostResidentID", SqlDbType.BigInt, request.HostResidentId);
             Add(insert, "@HostServiceCustomerID", SqlDbType.BigInt, request.HostServiceCustomerId);
             Add(insert, "@HostRoomID", SqlDbType.BigInt, request.HostRoomId);
+            Add(insert, "@HostTenantID", SqlDbType.BigInt, request.HostTenantId);
+            Add(insert, "@HostTenantContactID", SqlDbType.BigInt, request.HostTenantContactId);
             Add(insert, "@BusinessType", SqlDbType.VarChar, businessType, 20);
             Add(insert, "@HostName", SqlDbType.NVarChar, hostSnapshot.Name, 200);
             Add(insert, "@HostRoom", SqlDbType.NVarChar, hostSnapshot.Room, 100);
+            Add(insert, "@HostLocation", SqlDbType.NVarChar, hostSnapshot.Room, 500);
             Add(insert, "@ResidentName", SqlDbType.NVarChar, hostSnapshot.ResidentName, 200);
             Add(insert, "@BuildingName", SqlDbType.NVarChar, hostSnapshot.BuildingName, 200);
             Add(insert, "@FloorName", SqlDbType.NVarChar, hostSnapshot.FloorName, 200);
@@ -696,13 +717,60 @@ SELECT ISNULL(NULLIF(UPPER(LTRIM(RTRIM(BusinessTypeCode))),N''),N'COMPANY')
 FROM dbo.TDSTCompanySetUp WHERE CompanyID=@CompanyID;
 """, connection, transaction);
         Add(command, "@CompanyID", SqlDbType.BigInt, companyId);
-        return Convert.ToString(await command.ExecuteScalarAsync(token)) == "DORMITORY"
-            ? "DORMITORY" : "COMPANY";
+        var type = Convert.ToString(await command.ExecuteScalarAsync(token))?.Trim().ToUpperInvariant();
+        return type is "DORMITORY" or "RENTAL_OFFICE" or "VILLAGE" or "SERVICE_CENTER"
+            ? type : "COMPANY";
     }
 
     private static async Task<bool> IsDormitory(SqlConnection connection, long companyId,
         CancellationToken token, SqlTransaction? transaction = null) =>
         await BusinessType(connection, companyId, token, transaction) == "DORMITORY";
+
+    private async Task<JsonElement> SharedHostRows(string businessType, string? search,
+        CancellationToken token)
+    {
+        var path = $"/api/company/business-locations/hosts?businessTypeCode={Uri.EscapeDataString(businessType)}&search={Uri.EscapeDataString(search ?? string.Empty)}";
+        using var client = new HttpClient();
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"{Request.Scheme}://{Request.Host}{path}");
+        if (Request.Headers.TryGetValue("Authorization", out var authorization))
+            request.Headers.TryAddWithoutValidation("Authorization", authorization.ToString());
+        using var response = await client.SendAsync(request, token);
+        var body = await response.Content.ReadAsStringAsync(token);
+        if (!response.IsSuccessStatusCode)
+            throw new InvalidOperationException(string.IsNullOrWhiteSpace(body)
+                ? "Shared Host API request failed." : body);
+        using var document = JsonDocument.Parse(body);
+        return document.RootElement.Clone();
+    }
+
+    private async Task<HostSnapshot?> LoadSharedHostSnapshot(string hostType, long? tenantId,
+        long? contactId, long? residentId, CancellationToken token)
+    {
+        var rows = await SharedHostRows(hostType, null, token);
+        foreach (var row in rows.EnumerateArray())
+        {
+            var tenant = row.TryGetProperty("tenantId", out var tenantValue) ? tenantValue.GetInt64() : (long?)null;
+            var contact = row.TryGetProperty("contactId", out var contactValue) && contactValue.ValueKind != JsonValueKind.Null ? contactValue.GetInt64() : (long?)null;
+            var resident = row.TryGetProperty("hostId", out var residentValue) ? residentValue.GetInt64() : (long?)null;
+            if (hostType == "RENTAL_OFFICE" && tenant == tenantId && contact == contactId)
+            {
+                var name = row.GetProperty("contactName").GetString() ?? row.GetProperty("displayName").GetString()!;
+                var location = string.Join(" / ", new[] { "buildingName", "floorName", "roomCode" }
+                    .Select(key => row.TryGetProperty(key, out var value) ? value.GetString() : null)
+                    .Where(value => !string.IsNullOrWhiteSpace(value)));
+                return new HostSnapshot(name, location, null, null, null, null);
+            }
+            if (hostType == "VILLAGE" && resident == residentId)
+            {
+                var name = row.GetProperty("displayName").GetString()!;
+                var location = string.Join(" / ", new[] { "laneName", "houseNo" }
+                    .Select(key => row.TryGetProperty(key, out var value) ? value.GetString() : null)
+                    .Where(value => !string.IsNullOrWhiteSpace(value)));
+                return new HostSnapshot(name, location, name, null, null, null);
+            }
+        }
+        return null;
+    }
 
     private static async Task<HostSnapshot?> LoadHostSnapshot(SqlConnection connection,
         SqlTransaction transaction, long companyId, string hostType, long? residentId,
