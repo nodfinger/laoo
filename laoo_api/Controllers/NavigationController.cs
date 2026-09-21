@@ -62,7 +62,11 @@ public sealed class NavigationController : ControllerBase
         await using var connection = new SqlConnection(_configuration.GetConnectionString("LaooDatabase"));
         await connection.OpenAsync(cancellationToken);
         var admin = await IsAdminAsync(connection, userType, cancellationToken);
+        var canViewTrainingResults = userType == "COMPANY_USER" &&
+            await CanViewTrainingResultsAsync(connection, cancellationToken);
         var allowedFeatures = admin ? null : await LoadAllowedFeaturesAsync(connection, userType, cancellationToken);
+        if (canViewTrainingResults)
+            allowedFeatures?.Add("37005");
         var audienceType = userType == "PARTNER_USER" ? "P" : userType == "COMPANY_USER" ? "C" : "L";
         const string sql = """
 WITH AllowedProjects AS
@@ -81,6 +85,17 @@ WITH AllowedProjects AS
        AND (CP.ExpireDate IS NULL OR CP.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))
     WHERE @UserType=N'COMPANY_USER'
       AND UPR.UserID=@UserID AND UPR.CompanyID=@CompanyID AND UPR.IsActive=1
+    UNION
+    SELECT PR.ProjectID
+    FROM dbo.TDADProject PR
+    INNER JOIN dbo.TDSTCompanySetUp C ON C.CompanyID=@CompanyID AND C.IsActive=1
+    INNER JOIN dbo.TDADCompanyProject CP
+        ON CP.ProjectID=PR.ProjectID AND CP.CompanyID=C.CompanyID
+       AND CP.PartnerID=C.PartnerID AND CP.IsEnabled=1
+       AND (CP.StartDate IS NULL OR CP.StartDate<=CONVERT(date,SYSUTCDATETIME()))
+       AND (CP.ExpireDate IS NULL OR CP.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))
+    WHERE @UserType=N'COMPANY_USER' AND @CanViewTrainingResults=1
+      AND PR.ProjectCode=N'LAOO_TRAINING' AND PR.IsActive=1
 )
 SELECT PR.ProjectID,PR.ProjectCode,PR.ProjectNameTH,PR.ProjectType,PR.IconName,
        PR.SortOrder,PR.IsExpandedDefault,
@@ -133,6 +148,7 @@ ORDER BY PR.SortOrder,PG.SortOrder,PM.SortOrder,M.MenuCode;
         command.Parameters.Add("@ProjectID", SqlDbType.BigInt).Value = projectId;
         command.Parameters.Add("@CompanyID", SqlDbType.BigInt).Value = LongClaim("company_id") is long companyId ? companyId : DBNull.Value;
         command.Parameters.Add("@UserID", SqlDbType.BigInt).Value = LongClaim("user_id") is long userId ? userId : DBNull.Value;
+        command.Parameters.Add("@CanViewTrainingResults", SqlDbType.Bit).Value = canViewTrainingResults;
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         var all = new List<(NavigationProjectResponse Project, NavigationMenuGroupResponse Group, NavigationMenuItemResponse Item)>();
         while (await reader.ReadAsync(cancellationToken))
@@ -215,6 +231,45 @@ SELECT CASE WHEN EXISTS
             command.Parameters.Add("@ID", SqlDbType.BigInt).Value = userId;
             command.Parameters.Add("@OwnerID", SqlDbType.BigInt).Value = companyId;
         }
+        return Convert.ToBoolean(await command.ExecuteScalarAsync(token));
+    }
+
+    private async Task<bool> CanViewTrainingResultsAsync(SqlConnection connection, CancellationToken token)
+    {
+        if (LongClaim("user_id") is not long userId || LongClaim("company_id") is not long companyId)
+            return false;
+
+        const string sql = """
+SELECT CAST(CASE WHEN EXISTS
+(
+    SELECT 1
+    FROM dbo.TDADUser U
+    INNER JOIN dbo.TDSTCompanySetUp C ON C.CompanyID=U.CompanyID AND C.IsActive=1
+    INNER JOIN dbo.TDADProject PR ON PR.ProjectCode=N'LAOO_TRAINING' AND PR.IsActive=1
+    INNER JOIN dbo.TDADCompanyProject CP
+        ON CP.ProjectID=PR.ProjectID AND CP.CompanyID=C.CompanyID AND CP.PartnerID=C.PartnerID
+       AND CP.IsEnabled=1
+       AND (CP.StartDate IS NULL OR CP.StartDate<=CONVERT(date,SYSUTCDATETIME()))
+       AND (CP.ExpireDate IS NULL OR CP.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))
+    WHERE U.UserID=@UserID AND U.CompanyID=@CompanyID AND U.IsActive=1
+      AND EXISTS
+      (
+          SELECT 1 FROM dbo.TDADMeetingRoomBooking B
+          WHERE B.CompanyID=U.CompanyID AND B.ActivityTypeCode=N'TRAINING'
+            AND (U.IsCompanyAdmin=1 OR B.RequesterUserID=U.UserID OR EXISTS
+            (
+                SELECT 1 FROM dbo.TDADMeetingRoomContact RC
+                INNER JOIN dbo.TDADUserEmployee UE
+                    ON UE.CompanyID=B.CompanyID AND UE.EmployeeID=RC.EmployeeID
+                   AND UE.UserID=U.UserID AND UE.IsActive=1
+                WHERE RC.RoomID=B.RoomID AND RC.IsActive=1
+            ))
+      )
+) THEN CAST(1 AS bit) ELSE CAST(0 AS bit) END;
+""";
+        await using var command = new SqlCommand(sql, connection);
+        command.Parameters.Add("@UserID", SqlDbType.BigInt).Value = userId;
+        command.Parameters.Add("@CompanyID", SqlDbType.BigInt).Value = companyId;
         return Convert.ToBoolean(await command.ExecuteScalarAsync(token));
     }
 
