@@ -151,8 +151,15 @@ class _VisitorContactPointsPageState extends State<VisitorContactPointsPage> {
         for (final x in l.items)
           ListTile(
             title: Text('${x.code} — ${x.name}'),
-            subtitle: Text(
-              '${x.branchCode ?? ''} — ${x.branchName ?? ''} · พนักงาน ${x.employeeCount} คน',
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${x.branchCode ?? ''} — ${x.branchName ?? ''} · พนักงาน ${x.employeeCount} คน',
+                ),
+                if (x.employeeNames?.isNotEmpty == true)
+                  Text(x.employeeNames!),
+              ],
             ),
             trailing: Wrap(
               children: [
@@ -292,10 +299,24 @@ class _PointDialogState extends State<_PointDialog> {
 
   Future<void> _load() async {
     try {
-      final v = await VisitorContactPointsRepository(
-        widget.api,
-      ).lookups(contactPointId: widget.initial?.id);
-      if (mounted) setState(() => _lookups = v);
+      final repository = VisitorContactPointsRepository(widget.api);
+      final lookups = await repository.lookups(
+        contactPointId: widget.initial?.id,
+      );
+      final detail = widget.initial?.id == null
+          ? null
+          : await repository.get(widget.initial!.id!);
+      if (!mounted) return;
+      setState(() {
+        _lookups = lookups;
+        if (detail != null) {
+          _code.text = detail.code;
+          _name.text = detail.name;
+          _branch = detail.branchId;
+          _active = detail.isActive;
+          _employees = {...detail.employeeIds};
+        }
+      });
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
     }

@@ -38,19 +38,24 @@ public sealed class VisitorContactPointsController(IConfiguration configuration)
         var q = Clean(search) ?? string.Empty;
         await using var cmd = new SqlCommand("""
 SELECT COUNT_BIG(1) OVER(),P.VisitorContactPointID,P.ContactPointCode,P.ContactPointName,P.BranchID,
-       B.BranchCode,B.BranchNameTH,P.IsActive,COUNT(E.VisitorContactPointEmployeeID) EmployeeCount
+       B.BranchCode,B.BranchNameTH,P.IsActive,ISNULL(A.EmployeeCount,0) EmployeeCount,A.EmployeeNames
 FROM dbo.TDTMVisitorContactPoint P
 JOIN dbo.TDADBranch B ON B.CompanyID=P.CompanyID AND B.BranchID=P.BranchID
-LEFT JOIN dbo.TDTMVisitorContactPointEmployee E ON E.CompanyID=P.CompanyID AND E.VisitorContactPointID=P.VisitorContactPointID AND E.IsActive=1
+OUTER APPLY (
+    SELECT COUNT(*) EmployeeCount,
+           STRING_AGG(CAST(CONCAT(E.EmployeeCode,N' — ',E.FullName) AS nvarchar(max)),N' | ') EmployeeNames
+    FROM dbo.TDTMVisitorContactPointEmployee X
+    JOIN dbo.TDADEmployee E ON E.CompanyID=X.CompanyID AND E.EmployeeID=X.EmployeeID AND E.IsActive=1
+    WHERE X.CompanyID=P.CompanyID AND X.VisitorContactPointID=P.VisitorContactPointID AND X.IsActive=1
+) A
 WHERE P.CompanyID=@CompanyID AND (@Search=N'' OR P.ContactPointCode LIKE @Like OR P.ContactPointName LIKE @Like)
-GROUP BY P.VisitorContactPointID,P.ContactPointCode,P.ContactPointName,P.BranchID,B.BranchCode,B.BranchNameTH,P.IsActive
 ORDER BY P.ContactPointCode,P.VisitorContactPointID OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;
 """, c);
         Add(cmd, "@CompanyID", SqlDbType.BigInt, companyId); Add(cmd, "@Search", SqlDbType.NVarChar, q, 200);
         Add(cmd, "@Like", SqlDbType.NVarChar, $"%{q}%", 210); Add(cmd, "@Offset", SqlDbType.Int, (page - 1) * pageSize); Add(cmd, "@PageSize", SqlDbType.Int, pageSize);
         var items = new List<object>(); long total = 0;
         await using var r = await cmd.ExecuteReaderAsync(token);
-        while (await r.ReadAsync(token)) { total = r.GetInt64(0); items.Add(new { id=r.GetInt64(1), code=r.GetString(2), name=r.GetString(3), branchId=r.GetInt64(4), branchCode=r.GetString(5), branchName=r.GetString(6), isActive=r.GetBoolean(7), employeeCount=r.GetInt32(8) }); }
+        while (await r.ReadAsync(token)) { total = r.GetInt64(0); items.Add(new { id=r.GetInt64(1), code=r.GetString(2), name=r.GetString(3), branchId=r.GetInt64(4), branchCode=r.GetString(5), branchName=r.GetString(6), isActive=r.GetBoolean(7), employeeCount=r.GetInt32(8), employeeNames=r.IsDBNull(9) ? null : r.GetString(9) }); }
         return Ok(new { items, total, page, pageSize });
     }
 
@@ -79,7 +84,9 @@ ORDER BY E.EmployeeCode,E.EmployeeID;
     public async Task<IActionResult> Get(long id, CancellationToken token)
     {
         if (!Scope(out var companyId,out _)) return Forbid(); await using var c=await Open(token); if(!await Can(c,"VIEW",token)) return Forbid();
-        await using var cmd=new SqlCommand("SELECT VisitorContactPointID,ContactPointCode,ContactPointName,BranchID,IsActive FROM dbo.TDTMVisitorContactPoint WHERE CompanyID=@CompanyID AND VisitorContactPointID=@ID",c); Add(cmd,"@CompanyID",SqlDbType.BigInt,companyId);Add(cmd,"@ID",SqlDbType.BigInt,id); await using var r=await cmd.ExecuteReaderAsync(token); if(!await r.ReadAsync(token)) return NotFound(new{message="ไม่พบจุดติดต่อ"}); var employees=await EmployeeIds(c,companyId,id,token); return Ok(new{id=r.GetInt64(0),code=r.GetString(1),name=r.GetString(2),branchId=r.GetInt64(3),isActive=r.GetBoolean(4),employeeIds=employees});
+        await using var cmd=new SqlCommand("SELECT VisitorContactPointID,ContactPointCode,ContactPointName,BranchID,IsActive FROM dbo.TDTMVisitorContactPoint WHERE CompanyID=@CompanyID AND VisitorContactPointID=@ID",c); Add(cmd,"@CompanyID",SqlDbType.BigInt,companyId);Add(cmd,"@ID",SqlDbType.BigInt,id); long pointId; string code; string name; long branchId; bool isActive;
+        await using (var r=await cmd.ExecuteReaderAsync(token)){if(!await r.ReadAsync(token)) return NotFound(new{message="ไม่พบจุดติดต่อ"}); pointId=r.GetInt64(0);code=r.GetString(1);name=r.GetString(2);branchId=r.GetInt64(3);isActive=r.GetBoolean(4);}
+        var employees=await EmployeeIds(c,companyId,id,token); return Ok(new{id=pointId,code,name,branchId,isActive,employeeIds=employees});
     }
 
     [HttpPost]
