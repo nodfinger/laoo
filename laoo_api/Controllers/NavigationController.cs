@@ -240,7 +240,7 @@ SELECT CASE WHEN EXISTS
             return false;
 
         const string sql = """
-SELECT CAST(CASE WHEN EXISTS
+SELECT CASE WHEN EXISTS
 (
     SELECT 1
     FROM dbo.TDADUser U
