@@ -112,6 +112,7 @@ class VisitorContactPoint {
     this.branchName,
     this.isActive = true,
     this.employeeCount = 0,
+    this.employeeNames,
     this.employeeIds = const [],
   });
   final int? id, branchId;
@@ -119,6 +120,7 @@ class VisitorContactPoint {
   final String? branchCode, branchName;
   final bool isActive;
   final int employeeCount;
+  final String? employeeNames;
   final List<int> employeeIds;
   factory VisitorContactPoint.fromJson(Map<String, dynamic> json) =>
       VisitorContactPoint(
@@ -130,6 +132,7 @@ class VisitorContactPoint {
         branchName: json['branchName']?.toString(),
         isActive: json['isActive'] != false,
         employeeCount: (json['employeeCount'] as num?)?.toInt() ?? 0,
+        employeeNames: json['employeeNames']?.toString(),
         employeeIds: (json['employeeIds'] as List<dynamic>? ?? const [])
             .map((e) => (e as num).toInt())
             .toList(),
