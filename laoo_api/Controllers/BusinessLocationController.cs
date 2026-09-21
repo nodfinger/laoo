@@ -114,7 +114,20 @@ public sealed class BusinessLocationController(IConfiguration configuration) : C
         var rows = new List<Dictionary<string, object?>>();
         if (type == Models.CompanyBusinessType.RentalOffice)
         {
-            await using var command = new SqlCommand("SELECT T.TenantID hostId,T.TenantCompanyName displayName,N'RENTAL_OFFICE' hostType,R.RoomID roomId,R.RoomCode roomCode,R.RoomNameTH roomName,B.BuildingNameTH buildingName,F.FloorNameTH floorName FROM dbo.TDADRentalOfficeTenant T JOIN dbo.TDADRoom R ON R.CompanyID=T.CompanyID AND R.RoomID=T.RoomID JOIN dbo.TDADBuilding B ON B.CompanyID=R.CompanyID AND B.BuildingID=R.BuildingID JOIN dbo.TDADFloor F ON F.BuildingID=R.BuildingID AND F.FloorID=R.FloorID WHERE T.CompanyID=@company AND T.IsActive=1 AND (@search=N'' OR T.TenantCompanyName LIKE N'%'+@search+N'%' OR R.RoomCode LIKE N'%'+@search+N'%') ORDER BY displayName", connection);
+            await using var command = new SqlCommand("""
+                SELECT T.TenantID hostId,T.TenantID tenantId,C.TenantContactID contactId,
+                       T.TenantCompanyName displayName,C.ContactName contactName,
+                       N'RENTAL_OFFICE' hostType,R.RoomID roomId,R.RoomCode roomCode,
+                       R.RoomNameTH roomName,B.BuildingNameTH buildingName,F.FloorNameTH floorName
+                FROM dbo.TDADRentalOfficeTenant T
+                JOIN dbo.TDADRoom R ON R.CompanyID=T.CompanyID AND R.RoomID=T.RoomID
+                JOIN dbo.TDADBuilding B ON B.CompanyID=R.CompanyID AND B.BuildingID=R.BuildingID
+                JOIN dbo.TDADFloor F ON F.BuildingID=R.BuildingID AND F.FloorID=R.FloorID
+                LEFT JOIN dbo.TDADRentalOfficeTenantContact C ON C.CompanyID=T.CompanyID AND C.TenantID=T.TenantID AND C.IsActive=1
+                WHERE T.CompanyID=@company AND T.IsActive=1
+                  AND (@search=N'' OR T.TenantCompanyName LIKE N'%'+@search+N'%' OR R.RoomCode LIKE N'%'+@search+N'%' OR C.ContactName LIKE N'%'+@search+N'%')
+                ORDER BY displayName,C.IsPrimary DESC,C.ContactName
+                """, connection);
             Add(command, "@company", SqlDbType.BigInt, CompanyId); Add(command, "@search", SqlDbType.NVarChar, search?.Trim() ?? string.Empty, 200);
             rows = await ReadRows(command, token);
         }
@@ -154,7 +167,7 @@ public sealed class BusinessLocationController(IConfiguration configuration) : C
 
     private async Task<IActionResult> SaveTenant(long? id, RentalTenantRequest x, CancellationToken token)
     {
-        if (string.IsNullOrWhiteSpace(x.Name) || x.Name.Length > 200 || x.StartDate == default) return BadRequest(new { message = "กรุณาระบุบริษัทผู้เช่าและวันที่เริ่มเช่า" });
+        if (string.IsNullOrWhiteSpace(x.Name) || x.Name.Length > 200 || x.StartDate == default || (x.EndDate.HasValue && x.EndDate.Value < x.StartDate)) return BadRequest(new { message = "กรุณาระบุบริษัทผู้เช่าและช่วงวันที่เช่าให้ถูกต้อง" });
         await using var c = await Open(token); if (!await Allowed(c, id.HasValue ? "EDIT" : "CREATE", token)) return Forbid();
         if (!await IsBusinessType(c, Models.CompanyBusinessType.RentalOffice, token)) return BadRequest(new { message = "Company นี้ไม่ได้ตั้งเป็นสำนักงานเช่า" });
         const string sql = """
@@ -170,20 +183,30 @@ public sealed class BusinessLocationController(IConfiguration configuration) : C
 
     private async Task<IActionResult> SaveContact(long? id, long tenantId, RentalContactRequest x, CancellationToken token)
     {
-        if (string.IsNullOrWhiteSpace(x.Name) || x.Name.Length > 200) return BadRequest(new { message = "กรุณาระบุชื่อผู้ติดต่อ" });
-        await using var c = await Open(token); if (!await Allowed(c, id.HasValue ? "EDIT" : "CREATE", token)) return Forbid();
-        if (!await IsBusinessType(c, Models.CompanyBusinessType.RentalOffice, token)) return BadRequest(new { message = "Company นี้ไม่ได้ตั้งเป็นสำนักงานเช่า" });
+        if (string.IsNullOrWhiteSpace(x.Name) || x.Name.Length > 200)
+            return BadRequest(new { message = "กรุณาระบุชื่อผู้ติดต่อ" });
+        await using var c = await Open(token);
+        if (!await Allowed(c, id.HasValue ? "EDIT" : "CREATE", token)) return Forbid();
+        if (!await IsBusinessType(c, Models.CompanyBusinessType.RentalOffice, token))
+            return BadRequest(new { message = "Company นี้ไม่ได้ตั้งเป็นสำนักงานเช่า" });
+        await using var tx = (SqlTransaction)await c.BeginTransactionAsync(IsolationLevel.Serializable, token);
         const string sql = """
             IF NOT EXISTS(SELECT 1 FROM dbo.TDADRentalOfficeTenant WHERE CompanyID=@company AND TenantID=@tenant) THROW 52912,'TENANT_NOT_FOUND',1;
             IF @person IS NOT NULL AND NOT EXISTS(SELECT 1 FROM dbo.TDADPerson WHERE CompanyID=@company AND PersonID=@person AND IsActive=1) THROW 52913,'PERSON_NOT_FOUND',1;
-            IF @id IS NULL BEGIN INSERT dbo.TDADRentalOfficeTenantContact(CompanyID,TenantID,PersonID,ContactName,Phone,Email,IsPrimary,IsActive,CreateBy) VALUES(@company,@tenant,@person,@name,@phone,@email,@primary,@active,@actor); SET @id=SCOPE_IDENTITY(); END
+            IF @active=0 SET @primary=0;
+            IF @primary=1 UPDATE dbo.TDADRentalOfficeTenantContact SET IsPrimary=0,UpdateDate=SYSUTCDATETIME(),UpdateBy=@actor WHERE CompanyID=@company AND TenantID=@tenant AND (@id IS NULL OR TenantContactID<>@id);
+            IF @id IS NULL
+            BEGIN
+                INSERT dbo.TDADRentalOfficeTenantContact(CompanyID,TenantID,PersonID,ContactName,Phone,Email,IsPrimary,IsActive,CreateBy)
+                VALUES(@company,@tenant,@person,@name,@phone,@email,@primary,@active,@actor); SET @id=SCOPE_IDENTITY();
+            END
             ELSE UPDATE dbo.TDADRentalOfficeTenantContact SET TenantID=@tenant,PersonID=@person,ContactName=@name,Phone=@phone,Email=@email,IsPrimary=@primary,IsActive=@active,UpdateDate=SYSUTCDATETIME(),UpdateBy=@actor WHERE CompanyID=@company AND TenantContactID=@id;
             SELECT @id;
             """;
-        await using var cmd=new SqlCommand(sql,c); Add(cmd,"@id",SqlDbType.BigInt,id); Add(cmd,"@company",SqlDbType.BigInt,CompanyId); Add(cmd,"@tenant",SqlDbType.BigInt,tenantId); Add(cmd,"@person",SqlDbType.BigInt,x.PersonId); Add(cmd,"@name",SqlDbType.NVarChar,x.Name.Trim(),200); Add(cmd,"@phone",SqlDbType.NVarChar,x.Phone,50); Add(cmd,"@email",SqlDbType.NVarChar,x.Email,320); Add(cmd,"@primary",SqlDbType.Bit,x.Primary); Add(cmd,"@active",SqlDbType.Bit,x.Active); Add(cmd,"@actor",SqlDbType.BigInt,ActorId);
-        try { return Ok(new { id=Convert.ToInt64(await cmd.ExecuteScalarAsync(token)) }); } catch(SqlException e) when(e.Number is 52912 or 52913) { return NotFound(new { message="ไม่พบผู้เช่าหรือบุคคลใน Company นี้" }); }
+        await using var cmd=new SqlCommand(sql,c,tx); Add(cmd,"@id",SqlDbType.BigInt,id); Add(cmd,"@company",SqlDbType.BigInt,CompanyId); Add(cmd,"@tenant",SqlDbType.BigInt,tenantId); Add(cmd,"@person",SqlDbType.BigInt,x.PersonId); Add(cmd,"@name",SqlDbType.NVarChar,x.Name.Trim(),200); Add(cmd,"@phone",SqlDbType.NVarChar,x.Phone,50); Add(cmd,"@email",SqlDbType.NVarChar,x.Email,320); Add(cmd,"@primary",SqlDbType.Bit,x.Primary); Add(cmd,"@active",SqlDbType.Bit,x.Active); Add(cmd,"@actor",SqlDbType.BigInt,ActorId);
+        try { var saved=Convert.ToInt64(await cmd.ExecuteScalarAsync(token)); await tx.CommitAsync(token); return Ok(new { id=saved }); }
+        catch(SqlException e) when(e.Number is 52912 or 52913) { await tx.RollbackAsync(token); return NotFound(new { message="ไม่พบผู้เช่าหรือบุคคลใน Company นี้" }); }
     }
-
     private async Task<IActionResult> SaveLane(long? id, VillageLaneRequest x, CancellationToken token)
     {
         if (x.Type is not ("SOI" or "JUNCTION") || string.IsNullOrWhiteSpace(x.Code) || string.IsNullOrWhiteSpace(x.Name)) return BadRequest(new { message="ประเภทและข้อมูลซอย/แยกไม่ถูกต้อง" });

@@ -62,7 +62,7 @@ SELECT RoomID id,BuildingID buildingId,FloorID parentId,RoomCode code,RoomNameTH
             }
             sets.Add(rows);
         } while(await r.NextResultAsync(token));
-        return Ok(new { buildings=sets[0], floors=sets[1], rooms=sets[2], actions });
+        return Ok(new { businessType, buildings=sets[0], floors=sets[1], rooms=sets[2], actions });
     }
 
     [HttpPost("{kind}")]
