@@ -8,7 +8,7 @@ namespace LaooApi.Controllers;
 public sealed partial class ServicePersonController
 {
     [HttpGet("lookup")]
-    public async Task<IActionResult> Lookup([FromQuery] long? includePersonId, [FromQuery] long? includeRoomId, CancellationToken token)
+    public async Task<IActionResult> Lookup([FromQuery] long? includePersonId, [FromQuery] long? includeRoomId, [FromQuery] long? includeHouseId, CancellationToken token)
     {
         await using var c = await Open(token);
         if (!await InServiceScope(c, token) || !await Allowed(c, "VIEW", token)) return Forbid();
@@ -19,9 +19,11 @@ FROM dbo.TDADPerson WHERE CompanyID=@company AND (IsActive=1 OR PersonID=@person
 SELECT BuildingID id,BuildingCode code,BuildingNameTH name FROM dbo.TDADBuilding WHERE CompanyID=@company AND IsActive=1 ORDER BY BuildingCode;
 SELECT F.FloorID id,F.BuildingID parentId,F.FloorCode code,F.FloorNameTH name FROM dbo.TDADFloor F JOIN dbo.TDADBuilding B ON B.BuildingID=F.BuildingID WHERE B.CompanyID=@company AND F.IsActive=1 ORDER BY F.FloorNumber,F.FloorCode;
 SELECT RoomID id,BuildingID buildingId,FloorID parentId,RoomCode code,RoomNameTH name FROM dbo.TDADRoom WHERE CompanyID=@company AND (IsActive=1 OR RoomID=@room) AND RoomTypeCode=N'RESIDENTIAL' ORDER BY RoomCode;
+SELECT LaneID id,LaneType type,LaneCode code,LaneName name FROM dbo.TDADVillageLane WHERE CompanyID=@company AND IsActive=1 ORDER BY LaneCode;
+SELECT HouseID id,LaneID parentId,HouseNo code,AddressText name FROM dbo.TDADVillageHouse WHERE CompanyID=@company AND (IsActive=1 OR HouseID=@house) ORDER BY HouseNo;
 """;
         await using var cmd = new SqlCommand(sql, c);
-        Add(cmd, "@company", SqlDbType.BigInt, CompanyId); Add(cmd, "@person", SqlDbType.BigInt, includePersonId); Add(cmd, "@room", SqlDbType.BigInt, includeRoomId);
+        Add(cmd, "@company", SqlDbType.BigInt, CompanyId); Add(cmd, "@person", SqlDbType.BigInt, includePersonId); Add(cmd, "@room", SqlDbType.BigInt, includeRoomId); Add(cmd, "@house", SqlDbType.BigInt, includeHouseId);
         await using var reader = await cmd.ExecuteReaderAsync(token);
         var businessType = CompanyBusinessType.Company;
         if (await reader.ReadAsync(token)) businessType = CompanyBusinessType.Normalize(reader.GetString(0));
@@ -38,7 +40,7 @@ SELECT RoomID id,BuildingID buildingId,FloorID parentId,RoomCode code,RoomNameTH
             }
             sets.Add(rows);
         }
-        return Ok(new { businessTypeCode = businessType, persons = sets[0], buildings = sets[1], floors = sets[2], rooms = sets[3] });
+        return Ok(new { businessTypeCode = businessType, persons = sets[0], buildings = sets[1], floors = sets[2], rooms = sets[3], lanes = sets.ElementAtOrDefault(4) ?? [], houses = sets.ElementAtOrDefault(5) ?? [] });
     }
 
     [HttpPost]
@@ -64,14 +66,15 @@ SELECT RoomID id,BuildingID buildingId,FloorID parentId,RoomCode code,RoomNameTH
         if (!await InServiceScope(c, token) || !await Allowed(c, routePersonId.HasValue ? "EDIT" : "CREATE", token)) return Forbid();
         var businessType = await BusinessType(c, token);
         var dormitory = businessType == CompanyBusinessType.Dormitory;
+        var village = businessType == CompanyBusinessType.Village;
         var customerEndpoint = Request.Path.StartsWithSegments("/api/service/customers");
         var residentEndpoint = Request.Path.StartsWithSegments("/api/service/residents");
-        if (residentEndpoint && !dormitory) return Forbid();
+        if (residentEndpoint && !dormitory && !village) return Forbid();
         var serviceCustomer = customerEndpoint ? true : residentEndpoint ? false : dormitory ? x.IsServiceCustomer : true;
-        var resident = residentEndpoint ? true : customerEndpoint ? false : dormitory && x.IsResident;
+        var resident = residentEndpoint ? true : customerEndpoint ? false : (dormitory || village) && x.IsResident;
         if (!serviceCustomer && !resident)
             return BadRequest(Issue("กรุณาเลือกบทบาท", "บุคคลในระบบ Service ต้องมีอย่างน้อยหนึ่งบทบาท"));
-        if (resident && (!x.RoomId.HasValue || !x.StartDate.HasValue))
+        if (resident && ((!village && !x.RoomId.HasValue) || (village && !x.HouseId.HasValue) || !x.StartDate.HasValue))
             return BadRequest(Issue("ข้อมูลผู้พักอาศัยไม่ครบ", "กรุณาเลือกห้องและวันเริ่มพัก"));
 
         byte[]? personVersion = Version(x.PersonRowVersion);
@@ -160,14 +163,16 @@ END
         const string sql = """
 DECLARE @id bigint,@current varbinary(8); SELECT TOP(1) @id=ResidentID,@current=RowVersion FROM dbo.TDADResident WITH(UPDLOCK,HOLDLOCK) WHERE CompanyID=@company AND PersonID=@person ORDER BY IsActive DESC,StartDate DESC,ResidentID DESC;
 IF @selected=0 BEGIN IF @id IS NOT NULL UPDATE dbo.TDADResident SET IsActive=0,UpdateDate=SYSUTCDATETIME(),UpdateBy=@actor WHERE CompanyID=@company AND ResidentID=@id; RETURN; END
-IF NOT EXISTS(SELECT 1 FROM dbo.TDADRoom RM JOIN dbo.TDADBuilding B ON B.CompanyID=RM.CompanyID AND B.BuildingID=RM.BuildingID JOIN dbo.TDADFloor F ON F.BuildingID=RM.BuildingID AND F.FloorID=RM.FloorID WHERE RM.CompanyID=@company AND RM.RoomID=@room AND RM.RoomTypeCode=N'RESIDENTIAL' AND RM.IsActive=1 AND B.IsActive=1 AND F.IsActive=1) THROW 52954,'INVALID_ROOM',1;
-IF EXISTS(SELECT 1 FROM dbo.TDADResident R WHERE R.CompanyID=@company AND R.PersonID=@person AND R.ResidentID<>ISNULL(@id,0) AND R.IsActive=1 AND @start<=ISNULL(R.EndDate,CONVERT(date,'99991231')) AND ISNULL(@end,CONVERT(date,'99991231'))>=R.StartDate) THROW 52955,'RESIDENT_OVERLAP',1;
-IF @id IS NULL INSERT dbo.TDADResident(CompanyID,PersonID,RoomID,StartDate,EndDate,IsActive,CreateBy) VALUES(@company,@person,@room,@start,@end,@active,@actor);
-ELSE BEGIN IF @version IS NOT NULL AND @current<>@version THROW 52953,'RESIDENT_CONFLICT',1; UPDATE dbo.TDADResident SET RoomID=@room,StartDate=@start,EndDate=@end,IsActive=@active,UpdateDate=SYSUTCDATETIME(),UpdateBy=@actor WHERE CompanyID=@company AND ResidentID=@id; END
+IF @room IS NULL AND @house IS NULL THROW 52954,'INVALID_RESIDENCE',1;
+IF @room IS NOT NULL AND @house IS NOT NULL THROW 52954,'INVALID_RESIDENCE',1;
+IF @room IS NOT NULL AND NOT EXISTS(SELECT 1 FROM dbo.TDADRoom RM JOIN dbo.TDADBuilding B ON B.CompanyID=RM.CompanyID AND B.BuildingID=RM.BuildingID JOIN dbo.TDADFloor F ON F.CompanyID=RM.CompanyID AND F.BuildingID=RM.BuildingID AND F.FloorID=RM.FloorID WHERE RM.CompanyID=@company AND RM.RoomID=@room AND RM.RoomTypeCode=N'RESIDENTIAL' AND RM.IsActive=1 AND B.IsActive=1 AND F.IsActive=1) THROW 52954,'INVALID_ROOM',1;
+IF @house IS NOT NULL AND NOT EXISTS(SELECT 1 FROM dbo.TDADVillageHouse WHERE CompanyID=@company AND HouseID=@house AND IsActive=1) THROW 52954,'INVALID_HOUSE',1;
+IF EXISTS(SELECT 1 FROM dbo.TDADResident R WHERE R.CompanyID=@company AND R.PersonID=@person AND R.ResidentID<>ISNULL(@id,0) AND R.IsActive=1) THROW 52955,'RESIDENT_OVERLAP',1;
+IF @id IS NULL INSERT dbo.TDADResident(CompanyID,PersonID,RoomID,HouseID,StartDate,EndDate,IsActive,CreateBy) VALUES(@company,@person,@room,@house,@start,@end,@active,@actor);
+ELSE BEGIN IF @version IS NOT NULL AND @current<>@version THROW 52953,'RESIDENT_CONFLICT',1; UPDATE dbo.TDADResident SET RoomID=@room,HouseID=@house,StartDate=@start,EndDate=@end,IsActive=@active,UpdateDate=SYSUTCDATETIME(),UpdateBy=@actor WHERE CompanyID=@company AND ResidentID=@id; END
 """;
-        await using var cmd = new SqlCommand(sql, c, tx);Add(cmd,"@company",SqlDbType.BigInt,CompanyId);Add(cmd,"@person",SqlDbType.BigInt,personId);Add(cmd,"@selected",SqlDbType.Bit,selected);Add(cmd,"@room",SqlDbType.BigInt,x.RoomId);Add(cmd,"@start",SqlDbType.Date,x.StartDate);Add(cmd,"@end",SqlDbType.Date,x.EndDate);Add(cmd,"@active",SqlDbType.Bit,x.IsActive);Add(cmd,"@actor",SqlDbType.BigInt,ClaimLong("user_id"));Add(cmd,"@version",SqlDbType.Timestamp,version);await cmd.ExecuteNonQueryAsync(token);
+        await using var cmd = new SqlCommand(sql, c, tx); Add(cmd, "@company", SqlDbType.BigInt, CompanyId); Add(cmd, "@person", SqlDbType.BigInt, personId); Add(cmd, "@selected", SqlDbType.Bit, selected); Add(cmd, "@room", SqlDbType.BigInt, x.RoomId); Add(cmd, "@house", SqlDbType.BigInt, x.HouseId); Add(cmd, "@start", SqlDbType.Date, x.StartDate); Add(cmd, "@end", SqlDbType.Date, x.EndDate); Add(cmd, "@active", SqlDbType.Bit, x.IsActive); Add(cmd, "@actor", SqlDbType.BigInt, ClaimLong("user_id")); Add(cmd, "@version", SqlDbType.Timestamp, version); await cmd.ExecuteNonQueryAsync(token);
     }
-
     private async Task<string> BusinessType(SqlConnection c, CancellationToken token)
     {
         await using var cmd = new SqlCommand("SELECT ISNULL(NULLIF(UPPER(LTRIM(RTRIM(BusinessTypeCode))),N''),N'COMPANY') FROM dbo.TDSTCompanySetUp WHERE CompanyID=@company", c);Add(cmd,"@company",SqlDbType.BigInt,CompanyId);return CompanyBusinessType.Normalize(Convert.ToString(await cmd.ExecuteScalarAsync(token)));
@@ -191,7 +196,7 @@ SELECT CAST(CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADUser WHERE CompanyID=@company
     private static object Issue(string message,string description) => new { message,description };
 }
 
-public sealed record ServicePersonSaveRequest(long? PersonId,string? FullName,string? NickName,string? Email,string? Mobile,bool IsActive,bool IsServiceCustomer,bool IsResident,long? RoomId,DateOnly? StartDate,DateOnly? EndDate,bool UpdatePerson=false,string? PersonRowVersion=null,string? ServiceCustomerRowVersion=null,string? ResidentRowVersion=null);
+public sealed record ServicePersonSaveRequest(long? PersonId,string? FullName,string? NickName,string? Email,string? Mobile,bool IsActive,bool IsServiceCustomer,bool IsResident,long? RoomId,long? HouseId,DateOnly? StartDate,DateOnly? EndDate,bool UpdatePerson=false,string? PersonRowVersion=null,string? ServiceCustomerRowVersion=null,string? ResidentRowVersion=null);
 file sealed class ServicePersonException(string code) : Exception(code)
 {
     public string Code { get; } = code;

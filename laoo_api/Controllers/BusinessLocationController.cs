@@ -89,24 +89,21 @@ public sealed class BusinessLocationController(IConfiguration configuration) : C
     [HttpGet("village/residents")]
     public async Task<IActionResult> VillageResidents([FromQuery] long? houseId, [FromQuery] bool active = true, CancellationToken token = default)
     {
-        await using var connection = await Open(token);
-        if (!await Allowed(connection, "VIEW", token)) return Forbid();
+        await using var connection = await Open(token); if (!await Allowed(connection, "VIEW", token)) return Forbid();
         const string sql = """
-            SELECT V.VillageResidentID id,V.HouseID houseId,V.PersonID personId,P.FullName personName,
-                   V.StartDate startDate,V.EndDate endDate,V.IsActive active,H.HouseNo houseNo,
+            SELECT R.ResidentID id,R.HouseID houseId,R.PersonID personId,P.FullName personName,
+                   R.StartDate startDate,R.EndDate endDate,R.IsActive active,H.HouseNo houseNo,
                    L.LaneType laneType,L.LaneCode laneCode,L.LaneName laneName
-            FROM dbo.TDADVillageResident V
-            JOIN dbo.TDADPerson P ON P.CompanyID=V.CompanyID AND P.PersonID=V.PersonID
-            JOIN dbo.TDADVillageHouse H ON H.CompanyID=V.CompanyID AND H.HouseID=V.HouseID
+            FROM dbo.TDADResident R
+            JOIN dbo.TDADPerson P ON P.CompanyID=R.CompanyID AND P.PersonID=R.PersonID
+            JOIN dbo.TDADVillageHouse H ON H.CompanyID=R.CompanyID AND H.HouseID=R.HouseID
             JOIN dbo.TDADVillageLane L ON L.CompanyID=H.CompanyID AND L.LaneID=H.LaneID
-            WHERE V.CompanyID=@company AND (@houseId IS NULL OR V.HouseID=@houseId) AND V.IsActive=@active
-            ORDER BY L.LaneCode,H.HouseNo,P.FullName,V.VillageResidentID;
+            WHERE R.CompanyID=@company AND R.RoomID IS NULL AND (@houseId IS NULL OR R.HouseID=@houseId) AND R.IsActive=@active
+            ORDER BY L.LaneCode,H.HouseNo,P.FullName,R.ResidentID;
             """;
-        await using var command = new SqlCommand(sql, connection);
-        Add(command, "@company", SqlDbType.BigInt, CompanyId); Add(command, "@houseId", SqlDbType.BigInt, houseId); Add(command, "@active", SqlDbType.Bit, active);
+        await using var command = new SqlCommand(sql, connection); Add(command, "@company", SqlDbType.BigInt, CompanyId); Add(command, "@houseId", SqlDbType.BigInt, houseId); Add(command, "@active", SqlDbType.Bit, active);
         return Ok(await ReadRows(command, token));
     }
-
     [HttpGet("hosts")]
     public async Task<IActionResult> Hosts([FromQuery] string businessTypeCode, [FromQuery] string? search, CancellationToken token = default)
     {
@@ -123,7 +120,7 @@ public sealed class BusinessLocationController(IConfiguration configuration) : C
         }
         else
         {
-            await using var command = new SqlCommand("SELECT V.VillageResidentID hostId,P.FullName displayName,N'VILLAGE' hostType,H.HouseID houseId,H.HouseNo houseNo,L.LaneID laneId,L.LaneType laneType,L.LaneCode laneCode,L.LaneName laneName FROM dbo.TDADVillageResident V JOIN dbo.TDADPerson P ON P.CompanyID=V.CompanyID AND P.PersonID=V.PersonID JOIN dbo.TDADVillageHouse H ON H.CompanyID=V.CompanyID AND H.HouseID=V.HouseID JOIN dbo.TDADVillageLane L ON L.CompanyID=H.CompanyID AND L.LaneID=H.LaneID WHERE V.CompanyID=@company AND V.IsActive=1 AND P.IsActive=1 AND (@search=N'' OR P.FullName LIKE N'%'+@search+N'%' OR H.HouseNo LIKE N'%'+@search+N%' OR L.LaneName LIKE N'%'+@search+N'%') ORDER BY displayName", connection);
+            await using var command = new SqlCommand("SELECT R.ResidentID hostId,P.FullName displayName,N'VILLAGE' hostType,H.HouseID houseId,H.HouseNo houseNo,L.LaneID laneId,L.LaneType laneType,L.LaneCode laneCode,L.LaneName laneName FROM dbo.TDADResident R JOIN dbo.TDADPerson P ON P.CompanyID=R.CompanyID AND P.PersonID=R.PersonID JOIN dbo.TDADVillageHouse H ON H.CompanyID=R.CompanyID AND H.HouseID=R.HouseID JOIN dbo.TDADVillageLane L ON L.CompanyID=H.CompanyID AND L.LaneID=H.LaneID WHERE R.CompanyID=@company AND R.RoomID IS NULL AND R.IsActive=1 AND P.IsActive=1 AND (@search=N'' OR P.FullName LIKE N'%'+@search+N'%' OR H.HouseNo LIKE N'%'+@search+N%' OR L.LaneName LIKE N'%'+@search+N'%') ORDER BY displayName", connection);
             Add(command, "@company", SqlDbType.BigInt, CompanyId); Add(command, "@search", SqlDbType.NVarChar, search?.Trim() ?? string.Empty, 200);
             rows = await ReadRows(command, token);
         }
@@ -209,14 +206,29 @@ public sealed class BusinessLocationController(IConfiguration configuration) : C
 
     private async Task<IActionResult> SaveResident(long? id, VillageResidentRequest x, CancellationToken token)
     {
-        if (x.StartDate == default) return BadRequest(new { message="กรุณาระบุวันที่เริ่มอยู่อาศัย" });
-        await using var c=await Open(token); if(!await Allowed(c,id.HasValue?"EDIT":"CREATE",token)) return Forbid();
+        if (x.StartDate == default || x.EndDate < x.StartDate) return BadRequest(new { message = "กรุณาระบุช่วงวันที่อยู่อาศัยให้ถูกต้อง" });
+        await using var c = await Open(token); if (!await Allowed(c, id.HasValue ? "EDIT" : "CREATE", token)) return Forbid();
         if (!await IsBusinessType(c, Models.CompanyBusinessType.Village, token)) return BadRequest(new { message = "Company นี้ไม่ได้ตั้งเป็นหมู่บ้าน" });
-        const string sql="IF NOT EXISTS(SELECT 1 FROM dbo.TDADVillageHouse WHERE CompanyID=@company AND HouseID=@house AND IsActive=1) THROW 52915,'HOUSE_NOT_FOUND',1; IF NOT EXISTS(SELECT 1 FROM dbo.TDADPerson WHERE CompanyID=@company AND PersonID=@person AND IsActive=1) THROW 52913,'PERSON_NOT_FOUND',1; IF @id IS NULL BEGIN INSERT dbo.TDADVillageResident(CompanyID,HouseID,PersonID,StartDate,EndDate,IsActive,CreateBy) VALUES(@company,@house,@person,@start,@end,@active,@actor); SET @id=SCOPE_IDENTITY(); END ELSE UPDATE dbo.TDADVillageResident SET HouseID=@house,PersonID=@person,StartDate=@start,EndDate=@end,IsActive=@active,UpdateDate=SYSUTCDATETIME(),UpdateBy=@actor WHERE CompanyID=@company AND VillageResidentID=@id; SELECT @id;";
-        await using var cmd=new SqlCommand(sql,c); Add(cmd,"@id",SqlDbType.BigInt,id); Add(cmd,"@company",SqlDbType.BigInt,CompanyId); Add(cmd,"@house",SqlDbType.BigInt,x.HouseId); Add(cmd,"@person",SqlDbType.BigInt,x.PersonId); Add(cmd,"@start",SqlDbType.Date,x.StartDate); Add(cmd,"@end",SqlDbType.Date,x.EndDate); Add(cmd,"@active",SqlDbType.Bit,x.Active); Add(cmd,"@actor",SqlDbType.BigInt,ActorId);
-        try{return Ok(new{id=Convert.ToInt64(await cmd.ExecuteScalarAsync(token))});}catch(SqlException e)when(e.Number is 52913 or 52915 or 2601 or 2627){return Conflict(new{message="บันทึกผู้อยู่อาศัยไม่ได้ หรือข้อมูลซ้ำ"});}
+        await using var tx = (SqlTransaction)await c.BeginTransactionAsync(IsolationLevel.Serializable, token);
+        const string sql = """
+IF NOT EXISTS(SELECT 1 FROM dbo.TDADVillageHouse WHERE CompanyID=@company AND HouseID=@house AND IsActive=1) THROW 52915,'HOUSE_NOT_FOUND',1;
+IF NOT EXISTS(SELECT 1 FROM dbo.TDADPerson WHERE CompanyID=@company AND PersonID=@person AND IsActive=1) THROW 52913,'PERSON_NOT_FOUND',1;
+IF @id IS NULL
+BEGIN
+    INSERT dbo.TDADResident(CompanyID,HouseID,PersonID,StartDate,EndDate,IsActive,CreateBy) VALUES(@company,@house,@person,@start,@end,@active,@actor);
+    SET @id=SCOPE_IDENTITY();
+    INSERT dbo.TDADVillageResident(CompanyID,HouseID,PersonID,StartDate,EndDate,IsActive,CreateBy,ResidentID) VALUES(@company,@house,@person,@start,@end,@active,@actor,@id);
+END
+ELSE
+BEGIN
+    UPDATE dbo.TDADResident SET HouseID=@house,PersonID=@person,StartDate=@start,EndDate=@end,IsActive=@active,UpdateDate=SYSUTCDATETIME(),UpdateBy=@actor WHERE CompanyID=@company AND ResidentID=@id;
+    UPDATE dbo.TDADVillageResident SET HouseID=@house,PersonID=@person,StartDate=@start,EndDate=@end,IsActive=@active,UpdateDate=SYSUTCDATETIME(),UpdateBy=@actor,ResidentID=@id WHERE CompanyID=@company AND (ResidentID=@id OR VillageResidentID=@id);
+END
+SELECT @id;
+""";
+        try { await using var cmd = new SqlCommand(sql, c, tx); Add(cmd, "@id", SqlDbType.BigInt, id); Add(cmd, "@company", SqlDbType.BigInt, CompanyId); Add(cmd, "@house", SqlDbType.BigInt, x.HouseId); Add(cmd, "@person", SqlDbType.BigInt, x.PersonId); Add(cmd, "@start", SqlDbType.Date, x.StartDate); Add(cmd, "@end", SqlDbType.Date, x.EndDate); Add(cmd, "@active", SqlDbType.Bit, x.Active); Add(cmd, "@actor", SqlDbType.BigInt, ActorId); var saved = Convert.ToInt64(await cmd.ExecuteScalarAsync(token)); await tx.CommitAsync(token); return Ok(new { id = saved, residentID = saved }); }
+        catch (SqlException e) when (e.Number is 52913 or 52915 or 2601 or 2627) { await tx.RollbackAsync(token); return Conflict(new { message = "บันทึกผู้อาศัยหมู่บ้านไม่สำเร็จ", description = "บ้านหรือบุคคลไม่ถูกต้อง หรือบุคคลนี้มีที่อยู่อาศัย Active แล้ว" }); }
     }
-
     private async Task<bool> IsBusinessType(SqlConnection connection, string expected, CancellationToken token)
     {
         await using var command = new SqlCommand("SELECT BusinessTypeCode FROM dbo.TDSTCompanySetUp WHERE CompanyID=@company AND IsActive=1", connection);

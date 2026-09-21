@@ -41,7 +41,7 @@ public sealed partial class ServicePersonController(IConfiguration configuration
         const string sql = """
 SELECT COUNT_BIG(1) OVER(),P.PersonID,P.FullName,P.NickName,P.Email,P.Mobile,P.IsActive,P.RowVersion,
  CAST(CASE WHEN SC.ServiceCustomerID IS NULL THEN 0 ELSE 1 END AS bit),
- CAST(CASE WHEN R.ResidentID IS NULL THEN 0 ELSE 1 END AS bit),SC.RowVersion,R.ResidentID,R.RoomID,R.StartDate,R.EndDate,R.RowVersion
+ CAST(CASE WHEN R.ResidentID IS NULL THEN 0 ELSE 1 END AS bit),SC.RowVersion,R.ResidentID,R.RoomID,R.HouseID,R.StartDate,R.EndDate,R.RowVersion
 FROM dbo.TDADPerson P
 OUTER APPLY(SELECT TOP(1) ServiceCustomerID,RowVersion FROM dbo.TDADServiceCustomer WHERE CompanyID=P.CompanyID AND PersonID=P.PersonID AND IsActive=1) SC
 OUTER APPLY(SELECT TOP(1) ResidentID,RoomID,StartDate,EndDate,RowVersion FROM dbo.TDADResident WHERE CompanyID=P.CompanyID AND PersonID=P.PersonID AND IsActive=1 ORDER BY StartDate DESC,ResidentID DESC) R
@@ -71,7 +71,7 @@ ORDER BY P.FullName,P.PersonID OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONL
     private static object Row(SqlDataReader r)
     {
         var roles = new List<string>(); if (r.GetBoolean(8)) roles.Add("SERVICE_CUSTOMER"); if (r.GetBoolean(9)) roles.Add("RESIDENT");
-        return new { personID = r.GetInt64(1), fullName = r.GetString(2), nickName = Text(r, 3), email = Text(r, 4), mobile = Text(r, 5), isActive = r.GetBoolean(6), personRowVersion = Convert.ToBase64String((byte[])r[7]), serviceRoles = roles, serviceCustomerRowVersion = Bytes(r, 10), residentID = Long(r, 11), roomID = Long(r, 12), startDate = Date(r, 13), endDate = Date(r, 14), residentRowVersion = Bytes(r, 15) };
+        return new { personID = r.GetInt64(1), fullName = r.GetString(2), nickName = Text(r, 3), email = Text(r, 4), mobile = Text(r, 5), isActive = r.GetBoolean(6), personRowVersion = Convert.ToBase64String((byte[])r[7]), serviceRoles = roles, serviceCustomerRowVersion = Bytes(r, 10), residentID = Long(r, 11), roomID = Long(r, 12), houseID = Long(r, 13), startDate = Date(r, 14), endDate = Date(r, 15), residentRowVersion = Bytes(r, 16) };
     }
     private static string? Text(SqlDataReader r, int i) => r.IsDBNull(i) ? null : r.GetString(i);
     private static long? Long(SqlDataReader r, int i) => r.IsDBNull(i) ? null : r.GetInt64(i);

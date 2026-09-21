@@ -165,82 +165,104 @@ SELECT @id;
 [ApiController, Authorize, Route("api/company/residents")]
 public sealed class ResidentRegistryController(IConfiguration configuration) : ControllerBase
 {
-    private const string ScreenCode="14004";
-    private long CompanyId=>RegistryControllerSupport.ClaimLong(User,"company_id");
-    private long UserId=>RegistryControllerSupport.ClaimLong(User,"user_id");
+    private const string ScreenCode = "14004";
+    private long CompanyId => RegistryControllerSupport.ClaimLong(User, "company_id");
+    private long UserId => RegistryControllerSupport.ClaimLong(User, "user_id");
 
     [HttpGet("actions")]
-    public async Task<IActionResult> Actions(CancellationToken token){await using var c=await Open(token);if(!await ScopeValid(c,token))return Forbid();return Ok(new{view=await Can(c,"VIEW",token),create=await Can(c,"CREATE",token),edit=await Can(c,"EDIT",token),delete=await Can(c,"DELETE",token)});}
+    public async Task<IActionResult> Actions(CancellationToken token)
+    {
+        await using var c = await Open(token);
+        if (!await ScopeValid(c, token)) return Forbid();
+        return Ok(new { view = await Can(c, "VIEW", token), create = await Can(c, "CREATE", token), edit = await Can(c, "EDIT", token), delete = await Can(c, "DELETE", token) });
+    }
 
     [HttpGet]
-    public async Task<IActionResult> List([FromQuery]string? search,[FromQuery]bool? isActive,[FromQuery]long? buildingId,[FromQuery]long? roomId,[FromQuery]int page=1,[FromQuery]int pageSize=20,CancellationToken token=default)
+    public async Task<IActionResult> List([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] long? buildingId, [FromQuery] long? roomId, [FromQuery] long? laneId, [FromQuery] long? houseId, [FromQuery] int page = 1, [FromQuery] int pageSize = 20, CancellationToken token = default)
     {
-        await using var c=await Open(token);if(!await ScopeValid(c,token)||!await Can(c,"VIEW",token))return Forbid();page=Math.Max(1,page);pageSize=Math.Clamp(pageSize,1,200);var q=search?.Trim()??"";
-        const string sql="""
+        await using var c = await Open(token);
+        if (!await ScopeValid(c, token) || !await Can(c, "VIEW", token)) return Forbid();
+        page = Math.Max(1, page); pageSize = Math.Clamp(pageSize, 1, 200); var q = search?.Trim() ?? string.Empty;
+        const string sql = """
 SELECT COUNT_BIG(1) OVER(),R.ResidentID,R.PersonID,P.FullName,P.NickName,P.Mobile,R.RoomID,RM.RoomCode,RM.RoomNameTH,
- B.BuildingID,B.BuildingCode,B.BuildingNameTH,F.FloorID,F.FloorCode,F.FloorNameTH,R.StartDate,R.EndDate,R.IsActive,R.RowVersion
+ B.BuildingID,B.BuildingCode,B.BuildingNameTH,F.FloorID,F.FloorCode,F.FloorNameTH,
+ R.HouseID,H.HouseNo,L.LaneID,L.LaneCode,L.LaneName,R.StartDate,R.EndDate,R.IsActive,R.RowVersion,
+ CAST(CASE WHEN R.HouseID IS NULL THEN 0 ELSE 1 END AS bit) IsVillage
 FROM dbo.TDADResident R JOIN dbo.TDADPerson P ON P.CompanyID=R.CompanyID AND P.PersonID=R.PersonID
-JOIN dbo.TDADRoom RM ON RM.CompanyID=R.CompanyID AND RM.RoomID=R.RoomID
-JOIN dbo.TDADBuilding B ON B.CompanyID=R.CompanyID AND B.BuildingID=RM.BuildingID
-JOIN dbo.TDADFloor F ON F.BuildingID=RM.BuildingID AND F.FloorID=RM.FloorID
-WHERE R.CompanyID=@company AND (@active IS NULL OR R.IsActive=@active) AND (@building IS NULL OR B.BuildingID=@building)
- AND (@room IS NULL OR R.RoomID=@room) AND (@search=N'' OR P.FullName LIKE @like OR P.NickName LIKE @like OR P.Mobile LIKE @like OR RM.RoomCode LIKE @like OR RM.RoomNameTH LIKE @like)
+LEFT JOIN dbo.TDADRoom RM ON RM.CompanyID=R.CompanyID AND RM.RoomID=R.RoomID
+LEFT JOIN dbo.TDADBuilding B ON B.CompanyID=RM.CompanyID AND B.BuildingID=RM.BuildingID
+LEFT JOIN dbo.TDADFloor F ON F.BuildingID=RM.BuildingID AND F.FloorID=RM.FloorID
+LEFT JOIN dbo.TDADVillageHouse H ON H.CompanyID=R.CompanyID AND H.HouseID=R.HouseID
+LEFT JOIN dbo.TDADVillageLane L ON L.CompanyID=H.CompanyID AND L.LaneID=H.LaneID
+WHERE R.CompanyID=@company AND (@active IS NULL OR R.IsActive=@active)
+ AND (@building IS NULL OR B.BuildingID=@building) AND (@room IS NULL OR R.RoomID=@room)
+ AND (@lane IS NULL OR L.LaneID=@lane) AND (@house IS NULL OR R.HouseID=@house)
+ AND (@search=N'' OR P.FullName LIKE @like OR P.NickName LIKE @like OR P.Mobile LIKE @like OR RM.RoomCode LIKE @like OR H.HouseNo LIKE @like OR L.LaneName LIKE @like)
 ORDER BY R.IsActive DESC,P.FullName,R.ResidentID OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY;
 """;
-        await using var cmd=new SqlCommand(sql,c);Add(cmd,"@company",SqlDbType.BigInt,CompanyId);Add(cmd,"@active",SqlDbType.Bit,isActive);Add(cmd,"@building",SqlDbType.BigInt,buildingId);Add(cmd,"@room",SqlDbType.BigInt,roomId);Add(cmd,"@search",SqlDbType.NVarChar,q,200);Add(cmd,"@like",SqlDbType.NVarChar,$"%{q}%",210);Add(cmd,"@offset",SqlDbType.Int,(page-1)*pageSize);Add(cmd,"@pageSize",SqlDbType.Int,pageSize);
-        var items=new List<object>();long total=0;await using var r=await cmd.ExecuteReaderAsync(token);while(await r.ReadAsync(token)){total=r.GetInt64(0);items.Add(Row(r));}return Ok(new{items,total,page,pageSize});
+        await using var cmd = new SqlCommand(sql, c); Add(cmd, "@company", SqlDbType.BigInt, CompanyId); Add(cmd, "@active", SqlDbType.Bit, isActive); Add(cmd, "@building", SqlDbType.BigInt, buildingId); Add(cmd, "@room", SqlDbType.BigInt, roomId); Add(cmd, "@lane", SqlDbType.BigInt, laneId); Add(cmd, "@house", SqlDbType.BigInt, houseId); Add(cmd, "@search", SqlDbType.NVarChar, q, 200); Add(cmd, "@like", SqlDbType.NVarChar, $"%{q}%", 210); Add(cmd, "@offset", SqlDbType.Int, (page - 1) * pageSize); Add(cmd, "@pageSize", SqlDbType.Int, pageSize);
+        var items = new List<object>(); long total = 0; await using var r = await cmd.ExecuteReaderAsync(token); while (await r.ReadAsync(token)) { total = r.GetInt64(0); items.Add(Row(r)); }
+        return Ok(new { items, total, page, pageSize });
     }
 
     [HttpGet("lookup")]
-    public async Task<IActionResult> Lookup([FromQuery]long? includePersonId,[FromQuery]long? includeRoomId,CancellationToken token)
+    public async Task<IActionResult> Lookup([FromQuery] long? includePersonId, [FromQuery] long? includeRoomId, [FromQuery] long? includeHouseId, CancellationToken token)
     {
-        await using var c=await Open(token);if(!await ScopeValid(c,token)||!await Can(c,"VIEW",token))return Forbid();
-        const string sql="""
+        await using var c = await Open(token); if (!await ScopeValid(c, token) || !await Can(c, "VIEW", token)) return Forbid();
+        const string sql = """
+SELECT ISNULL(NULLIF(UPPER(LTRIM(RTRIM(BusinessTypeCode))),N''),N'COMPANY') businessType FROM dbo.TDSTCompanySetUp WHERE CompanyID=@company;
 SELECT PersonID id,FullName name,NickName nickName,Mobile mobile FROM dbo.TDADPerson WHERE CompanyID=@company AND (IsActive=1 OR PersonID=@person) ORDER BY FullName;
 SELECT BuildingID id,BuildingCode code,BuildingNameTH name FROM dbo.TDADBuilding WHERE CompanyID=@company AND IsActive=1 ORDER BY BuildingCode;
-SELECT F.FloorID id,F.BuildingID parentId,F.FloorCode code,F.FloorNameTH name FROM dbo.TDADFloor F JOIN dbo.TDADBuilding B ON B.BuildingID=F.BuildingID WHERE B.CompanyID=@company AND F.IsActive=1 ORDER BY F.FloorNumber,F.FloorCode;
+SELECT F.FloorID id,F.BuildingID parentId,F.FloorCode code,F.FloorNameTH name FROM dbo.TDADFloor F JOIN dbo.TDADBuilding B ON B.CompanyID=F.CompanyID AND B.BuildingID=F.BuildingID WHERE B.CompanyID=@company AND F.IsActive=1 ORDER BY F.FloorNumber,F.FloorCode;
 SELECT RoomID id,BuildingID buildingId,FloorID parentId,RoomCode code,RoomNameTH name FROM dbo.TDADRoom WHERE CompanyID=@company AND (IsActive=1 OR RoomID=@room) AND RoomTypeCode=N'RESIDENTIAL' ORDER BY RoomCode;
+SELECT LaneID id,LaneType type,LaneCode code,LaneName name FROM dbo.TDADVillageLane WHERE CompanyID=@company AND IsActive=1 ORDER BY LaneCode;
+SELECT HouseID id,LaneID parentId,HouseNo code,AddressText name FROM dbo.TDADVillageHouse WHERE CompanyID=@company AND (IsActive=1 OR HouseID=@house) ORDER BY HouseNo;
 """;
-        await using var cmd=new SqlCommand(sql,c);Add(cmd,"@company",SqlDbType.BigInt,CompanyId);Add(cmd,"@person",SqlDbType.BigInt,includePersonId);Add(cmd,"@room",SqlDbType.BigInt,includeRoomId);
-        await using var reader=await cmd.ExecuteReaderAsync(token);var sets=new List<List<Dictionary<string,object?>>>();do{var rows=new List<Dictionary<string,object?>>();while(await reader.ReadAsync(token)){var row=new Dictionary<string,object?>();for(var i=0;i<reader.FieldCount;i++)row[reader.GetName(i)]=reader.IsDBNull(i)?null:reader.GetValue(i);rows.Add(row);}sets.Add(rows);}while(await reader.NextResultAsync(token));
-        return Ok(new{persons=sets[0],buildings=sets[1],floors=sets[2],rooms=sets[3]});
+        await using var cmd = new SqlCommand(sql, c); Add(cmd, "@company", SqlDbType.BigInt, CompanyId); Add(cmd, "@person", SqlDbType.BigInt, includePersonId); Add(cmd, "@room", SqlDbType.BigInt, includeRoomId); Add(cmd, "@house", SqlDbType.BigInt, includeHouseId);
+        await using var reader = await cmd.ExecuteReaderAsync(token); var sets = new List<List<Dictionary<string, object?>>>(); do { var rows = new List<Dictionary<string, object?>>(); while (await reader.ReadAsync(token)) { var row = new Dictionary<string, object?>(); for (var i = 0; i < reader.FieldCount; i++) row[reader.GetName(i)] = reader.IsDBNull(i) ? null : reader.GetValue(i); rows.Add(row); } sets.Add(rows); } while (await reader.NextResultAsync(token));
+        return Ok(new { businessType = sets[0].FirstOrDefault()?.GetValueOrDefault("businessType")?.ToString() ?? "COMPANY", persons = sets[1], buildings = sets[2], floors = sets[3], rooms = sets[4], lanes = sets[5], houses = sets[6] });
     }
 
-    [HttpPost] public Task<IActionResult> Create(ResidentRegistryRequest request,CancellationToken token)=>Save(null,request,token);
-    [HttpPut("{id:long}")] public Task<IActionResult> Update(long id,ResidentRegistryRequest request,CancellationToken token)=>Save(id,request,token);
+    [HttpPost] public Task<IActionResult> Create(ResidentRegistryRequest request, CancellationToken token) => Save(null, request, token);
+    [HttpPut("{id:long}")] public Task<IActionResult> Update(long id, ResidentRegistryRequest request, CancellationToken token) => Save(id, request, token);
 
     [HttpDelete("{id:long}")]
-    public async Task<IActionResult> Delete(long id,[FromQuery]string rowVersion,CancellationToken token)
+    public async Task<IActionResult> Delete(long id, [FromQuery] string rowVersion, CancellationToken token)
     {
-        if(!RegistryControllerSupport.TryVersion(rowVersion,out var version))return BadRequest(Problem("ข้อมูลเวอร์ชันไม่ถูกต้อง","กรุณาโหลดรายการใหม่แล้วลองอีกครั้ง"));await using var c=await Open(token);if(!await ScopeValid(c,token)||!await Can(c,"DELETE",token))return Forbid();
-        await using var cmd=new SqlCommand("DELETE dbo.TDADResident WHERE CompanyID=@company AND ResidentID=@id AND RowVersion=@version",c);Add(cmd,"@company",SqlDbType.BigInt,CompanyId);Add(cmd,"@id",SqlDbType.BigInt,id);Add(cmd,"@version",SqlDbType.Timestamp,version);return await cmd.ExecuteNonQueryAsync(token)==0?Conflict(Problem("ข้อมูลถูกเปลี่ยนแล้ว","กรุณาโหลดรายการใหม่ก่อนลบ")):NoContent();
+        if (!RegistryControllerSupport.TryVersion(rowVersion, out var version)) return BadRequest(Problem("ข้อมูลเวอร์ชันไม่ถูกต้อง", "กรุณาโหลดรายการใหม่แล้วลองอีกครั้ง"));
+        await using var c = await Open(token); if (!await ScopeValid(c, token) || !await Can(c, "DELETE", token)) return Forbid();
+        const string sql = "UPDATE dbo.TDADResident SET IsActive=0,UpdateDate=SYSUTCDATETIME(),UpdateBy=@actor WHERE CompanyID=@company AND ResidentID=@id AND RowVersion=@version; SELECT @@ROWCOUNT;";
+        await using var cmd = new SqlCommand(sql, c); Add(cmd, "@company", SqlDbType.BigInt, CompanyId); Add(cmd, "@id", SqlDbType.BigInt, id); Add(cmd, "@version", SqlDbType.Timestamp, version); Add(cmd, "@actor", SqlDbType.BigInt, UserId);
+        return Convert.ToInt32(await cmd.ExecuteScalarAsync(token)) == 0 ? Conflict(Problem("ข้อมูลถูกเปลี่ยนแล้ว", "กรุณาโหลดรายการใหม่ก่อนปิดสถานะ")) : NoContent();
     }
 
-    private async Task<IActionResult> Save(long? id,ResidentRegistryRequest x,CancellationToken token)
+    private async Task<IActionResult> Save(long? id, ResidentRegistryRequest x, CancellationToken token)
     {
-        if(x.PersonId<=0||x.RoomId<=0||x.StartDate==default||x.EndDate<x.StartDate)return BadRequest(Problem("ข้อมูลผู้พักอาศัยไม่ถูกต้อง","กรุณาเลือกบุคคล ห้องพัก และตรวจสอบช่วงวันที่"));byte[]? version=null;if(id.HasValue&&!RegistryControllerSupport.TryVersion(x.RowVersion,out version))return BadRequest(Problem("ข้อมูลเวอร์ชันไม่ถูกต้อง","กรุณาโหลดรายการใหม่แล้วลองอีกครั้ง"));
-        await using var c=await Open(token);if(!await ScopeValid(c,token)||!await Can(c,id.HasValue?"EDIT":"CREATE",token))return Forbid();await using var tx=(SqlTransaction)await c.BeginTransactionAsync(IsolationLevel.Serializable,token);
-        const string sql="""
+        if (x.PersonId <= 0 || x.StartDate == default || x.EndDate < x.StartDate || (x.RoomId.HasValue == x.HouseId.HasValue)) return BadRequest(Problem("ข้อมูลผู้พักอาศัยไม่ถูกต้อง", "กรุณาเลือกห้องพักหรือบ้านเลขที่เพียงหนึ่งรายการ และตรวจสอบช่วงวันที่"));
+        byte[]? version = null; if (id.HasValue && !RegistryControllerSupport.TryVersion(x.RowVersion, out version)) return BadRequest(Problem("ข้อมูลเวอร์ชันไม่ถูกต้อง", "กรุณาโหลดรายการใหม่แล้วลองอีกครั้ง"));
+        await using var c = await Open(token); if (!await ScopeValid(c, token) || !await Can(c, id.HasValue ? "EDIT" : "CREATE", token)) return Forbid();
+        var businessType = await BusinessType(c, token); if (businessType == "VILLAGE" && !x.HouseId.HasValue || businessType != "VILLAGE" && !x.RoomId.HasValue) return BadRequest(Problem("สถานที่ไม่ตรงกับประเภทธุรกิจ", "กรุณาเลือกสถานที่ตาม Company Type"));
+        await using var tx = (SqlTransaction)await c.BeginTransactionAsync(IsolationLevel.Serializable, token);
+        const string sql = """
 IF NOT EXISTS(SELECT 1 FROM dbo.TDADPerson WHERE CompanyID=@company AND PersonID=@person AND (@active=0 OR IsActive=1)) THROW 52820,'INVALID_PERSON',1;
-IF NOT EXISTS(SELECT 1 FROM dbo.TDADRoom RM JOIN dbo.TDADBuilding B ON B.BuildingID=RM.BuildingID AND B.CompanyID=RM.CompanyID JOIN dbo.TDADFloor F ON F.FloorID=RM.FloorID AND F.BuildingID=RM.BuildingID WHERE RM.CompanyID=@company AND RM.RoomID=@room AND RM.RoomTypeCode=N'RESIDENTIAL' AND (@active=0 OR (RM.IsActive=1 AND B.IsActive=1 AND F.IsActive=1))) THROW 52821,'INVALID_ROOM',1;
-IF @id IS NULL
- INSERT dbo.TDADResident(CompanyID,PersonID,RoomID,StartDate,EndDate,IsActive,CreateBy) OUTPUT INSERTED.ResidentID VALUES(@company,@person,@room,@start,@end,@active,@actor);
-ELSE BEGIN
- UPDATE dbo.TDADResident SET PersonID=@person,RoomID=@room,StartDate=@start,EndDate=@end,IsActive=@active,UpdateDate=SYSUTCDATETIME(),UpdateBy=@actor WHERE CompanyID=@company AND ResidentID=@id AND RowVersion=@version;
- IF @@ROWCOUNT=0 THROW 52822,'RESIDENT_CONFLICT',1; SELECT @id;
-END
+IF @room IS NOT NULL AND NOT EXISTS(SELECT 1 FROM dbo.TDADRoom RM JOIN dbo.TDADBuilding B ON B.CompanyID=RM.CompanyID AND B.BuildingID=RM.BuildingID JOIN dbo.TDADFloor F ON F.CompanyID=RM.CompanyID AND F.BuildingID=RM.BuildingID AND F.FloorID=RM.FloorID WHERE RM.CompanyID=@company AND RM.RoomID=@room AND RM.RoomTypeCode=N'RESIDENTIAL' AND (@active=0 OR (RM.IsActive=1 AND B.IsActive=1 AND F.IsActive=1))) THROW 52821,'INVALID_ROOM',1;
+IF @house IS NOT NULL AND NOT EXISTS(SELECT 1 FROM dbo.TDADVillageHouse WHERE CompanyID=@company AND HouseID=@house AND (@active=0 OR IsActive=1)) THROW 52823,'INVALID_HOUSE',1;
+IF @id IS NULL INSERT dbo.TDADResident(CompanyID,PersonID,RoomID,HouseID,StartDate,EndDate,IsActive,CreateBy) OUTPUT INSERTED.ResidentID VALUES(@company,@person,@room,@house,@start,@end,@active,@actor);
+ELSE BEGIN UPDATE dbo.TDADResident SET PersonID=@person,RoomID=@room,HouseID=@house,StartDate=@start,EndDate=@end,IsActive=@active,UpdateDate=SYSUTCDATETIME(),UpdateBy=@actor WHERE CompanyID=@company AND ResidentID=@id AND RowVersion=@version; IF @@ROWCOUNT=0 THROW 52822,'RESIDENT_CONFLICT',1; SELECT @id; END
 """;
-        try{await using var cmd=new SqlCommand(sql,c,tx);Add(cmd,"@company",SqlDbType.BigInt,CompanyId);Add(cmd,"@id",SqlDbType.BigInt,id);Add(cmd,"@person",SqlDbType.BigInt,x.PersonId);Add(cmd,"@room",SqlDbType.BigInt,x.RoomId);Add(cmd,"@start",SqlDbType.Date,x.StartDate);Add(cmd,"@end",SqlDbType.Date,x.EndDate);Add(cmd,"@active",SqlDbType.Bit,x.IsActive);Add(cmd,"@actor",SqlDbType.BigInt,UserId);Add(cmd,"@version",SqlDbType.Timestamp,version);var saved=Convert.ToInt64(await cmd.ExecuteScalarAsync(token));await tx.CommitAsync(token);return Ok(new{residentID=saved});}
-        catch(SqlException e) when(e.Number is 52820 or 52821 or 52822 or 2601 or 2627){await tx.RollbackAsync(token);return Conflict(e.Number switch{52820=>Problem("เลือกบุคคลไม่ได้","บุคคลไม่อยู่ใน Company หรือถูกปิดใช้งาน"),52821=>Problem("เลือกห้องพักไม่ได้","ห้องต้องเป็นห้องพักที่เปิดใช้งานใน Company"),52822=>Problem("ข้อมูลถูกเปลี่ยนแล้ว","กรุณาโหลดรายการใหม่ก่อนบันทึก"),_=>Problem("พบข้อมูลผู้พักอาศัยซ้ำ","บุคคล ห้อง และวันที่เริ่มพักรายการนี้มีอยู่แล้ว")});}
+        try { await using var cmd = new SqlCommand(sql, c, tx); Add(cmd, "@company", SqlDbType.BigInt, CompanyId); Add(cmd, "@id", SqlDbType.BigInt, id); Add(cmd, "@person", SqlDbType.BigInt, x.PersonId); Add(cmd, "@room", SqlDbType.BigInt, x.RoomId); Add(cmd, "@house", SqlDbType.BigInt, x.HouseId); Add(cmd, "@start", SqlDbType.Date, x.StartDate); Add(cmd, "@end", SqlDbType.Date, x.EndDate); Add(cmd, "@active", SqlDbType.Bit, x.IsActive); Add(cmd, "@actor", SqlDbType.BigInt, UserId); Add(cmd, "@version", SqlDbType.Timestamp, version); var saved = Convert.ToInt64(await cmd.ExecuteScalarAsync(token)); await tx.CommitAsync(token); return Ok(new { residentID = saved }); }
+        catch (SqlException e) when (e.Number is 52820 or 52821 or 52822 or 52823 or 2601 or 2627) { await tx.RollbackAsync(token); return Conflict(Problem("บันทึกผู้พักอาศัยไม่สำเร็จ", e.Number == 52823 ? "บ้านเลขที่ไม่อยู่ใน Company หรือถูกปิดใช้งาน" : "บุคคลหรือสถานที่ไม่ถูกต้อง หรือบุคคลนี้มีที่อยู่อาศัย Active แล้ว")); }
     }
 
-    private static object Row(SqlDataReader r)=>new{residentID=r.GetInt64(1),personID=r.GetInt64(2),fullName=r.GetString(3),nickName=Text(r,4),mobile=Text(r,5),roomID=r.GetInt64(6),roomCode=r.GetString(7),roomName=r.GetString(8),buildingID=r.GetInt64(9),buildingCode=r.GetString(10),buildingName=r.GetString(11),floorID=r.GetInt64(12),floorCode=r.GetString(13),floorName=r.GetString(14),startDate=r.GetDateTime(15),endDate=r.IsDBNull(16)?null:(DateTime?)r.GetDateTime(16),isActive=r.GetBoolean(17),rowVersion=Convert.ToBase64String((byte[])r[18])};
-    private Task<SqlConnection> Open(CancellationToken t)=>RegistryControllerSupport.Open(configuration,t);private Task<bool> Can(SqlConnection c,string a,CancellationToken t)=>CompanyProjectPermission.IsAllowedAsync(c,User,ScreenCode,a,t);private Task<bool> ScopeValid(SqlConnection c,CancellationToken t)=>RegistryControllerSupport.ScopeValid(c,User,t);
-    private static string? Text(SqlDataReader r,int i)=>r.IsDBNull(i)?null:r.GetString(i);private static object Problem(string message,string description)=>new{message,description};private static void Add(SqlCommand c,string n,SqlDbType t,object? v,int size=0)=>RegistryControllerSupport.Add(c,n,t,v,size);
+    private async Task<string> BusinessType(SqlConnection c, CancellationToken token) { await using var cmd = new SqlCommand("SELECT ISNULL(NULLIF(UPPER(LTRIM(RTRIM(BusinessTypeCode))),N''),N'COMPANY') FROM dbo.TDSTCompanySetUp WHERE CompanyID=@company", c); Add(cmd, "@company", SqlDbType.BigInt, CompanyId); return Convert.ToString(await cmd.ExecuteScalarAsync(token)) ?? "COMPANY"; }
+    private static object Row(SqlDataReader r) => new { residentID = r.GetInt64(1), personID = r.GetInt64(2), fullName = r.GetString(3), nickName = Text(r, 4), mobile = Text(r, 5), roomID = NullableLong(r, 6), roomCode = Text(r, 7), roomName = Text(r, 8), buildingID = NullableLong(r, 9), buildingCode = Text(r, 10), buildingName = Text(r, 11), floorID = NullableLong(r, 12), floorCode = Text(r, 13), floorName = Text(r, 14), houseID = NullableLong(r, 15), houseNo = Text(r, 16), laneID = NullableLong(r, 17), laneCode = Text(r, 18), laneName = Text(r, 19), startDate = r.GetDateTime(20), endDate = r.IsDBNull(21) ? null : (DateTime?)r.GetDateTime(21), isActive = r.GetBoolean(22), rowVersion = Convert.ToBase64String((byte[])r[23]), isVillage = r.GetBoolean(24) };
+    private static long? NullableLong(SqlDataReader r, int i) => r.IsDBNull(i) ? null : r.GetInt64(i);
+    private static string? Text(SqlDataReader r, int i) => r.IsDBNull(i) ? null : r.GetString(i);
+    private Task<SqlConnection> Open(CancellationToken t) => RegistryControllerSupport.Open(configuration, t); private Task<bool> Can(SqlConnection c, string a, CancellationToken t) => CompanyProjectPermission.IsAllowedAsync(c, User, ScreenCode, a, t); private Task<bool> ScopeValid(SqlConnection c, CancellationToken t) => RegistryControllerSupport.ScopeValid(c, User, t); private static object Problem(string message, string description) => new { message, description }; private static void Add(SqlCommand c, string n, SqlDbType t, object? v, int size = 0) => RegistryControllerSupport.Add(c, n, t, v, size);
 }
 
+public sealed record ResidentRegistryRequest(long PersonId, long? RoomId, long? HouseId, DateOnly StartDate, DateOnly? EndDate, bool IsActive = true, string? RowVersion = null);
 public sealed record PersonRegistryRequest(string? FullName,string? NickName,string? Email,string? Mobile,bool IsActive=true,string? RowVersion=null);
-public sealed record ResidentRegistryRequest(long PersonId,long RoomId,DateOnly StartDate,DateOnly? EndDate,bool IsActive=true,string? RowVersion=null);
 
 internal static class RegistryControllerSupport
 {
