@@ -16,7 +16,7 @@ END;
 ALTER TABLE dbo.TDSTCompanySetUp WITH CHECK ADD CONSTRAINT CK_TDSTCompanySetUp_BusinessTypeCode
     CHECK (BusinessTypeCode IN (N'COMPANY',N'DORMITORY',N'SERVICE_CENTER',N'RENTAL_OFFICE',N'VILLAGE'));
 
-IF NOT EXISTS (SELECT 1 FROM dbo.TDSTMasterGroup WHERE GroupCode=N'012')
+IF NOT EXISTS (SELECT 1 FROM dbo.TDSTMasterGroup WHERE Code=N'012')
     THROW 52901, 'Master group 012 is required before extending company types.', 1;
 
 MERGE dbo.TDSTMasterCont AS target
@@ -25,8 +25,8 @@ USING (VALUES
     (N'012',N'VILLAGE',N'หมู่บ้าน',50)
 ) AS source(GroupCode,Code,Name,Seq)
 ON target.GroupCode=source.GroupCode AND target.Code=source.Code
-WHEN MATCHED THEN UPDATE SET Name=source.Name, Seq=source.Seq, IsActive=1
-WHEN NOT MATCHED THEN INSERT(GroupCode,Code,Name,Seq,IsActive) VALUES(source.GroupCode,source.Code,source.Name,source.Seq,1);
+WHEN MATCHED THEN UPDATE SET Name=source.Name, Seq=source.Seq
+WHEN NOT MATCHED THEN INSERT(GroupCode,Code,Name,Seq) VALUES(source.GroupCode,source.Code,source.Name,source.Seq);
 
 IF OBJECT_ID(N'dbo.TDADRentalOfficeTenant',N'U') IS NULL
 BEGIN
