@@ -1,4 +1,7 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../core/api/visitor_api_client.dart';
@@ -38,6 +41,7 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
   int? _houseId;
   DateTime? _expiry;
   XFile? _cardImage;
+  Uint8List? _cardImageBytes;
   bool _loading = true;
   bool _saving = false;
   String? _message;
@@ -139,7 +143,13 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
       source: ImageSource.camera,
       imageQuality: 85,
     );
-    if (image != null && mounted) setState(() => _cardImage = image);
+    if (image != null && mounted) {
+      final bytes = await image.readAsBytes();
+      if (mounted) setState(() {
+        _cardImage = image;
+        _cardImageBytes = bytes;
+      });
+    }
   }
 
   Future<void> _pickExpiry() async {
@@ -241,6 +251,7 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
       if (mounted) {
         _show('บันทึกผู้มาติดต่อเข้าเรียบร้อย', error: false);
         _clearForm();
+        context.go('/visitor/inside');
       }
     } catch (error) {
       if (mounted) _show(error.toString(), error: true);
@@ -258,6 +269,7 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
     setState(() {
       _expiry = null;
       _cardImage = null;
+      _cardImageBytes = null;
       _roomId = null;
       _hostOptions = const [];
     });
@@ -371,10 +383,21 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
                     _cardImage == null ? 'ถ่ายภาพบัตร' : 'ถ่ายภาพใหม่',
                   ),
                 ),
-                if (_cardImage != null)
+                if (_cardImageBytes != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
-                    child: Text('เลือกภาพแล้ว: ${_cardImage!.name}'),
+                    child: InkWell(
+                      onTap: _previewCardImage,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: Image.memory(
+                          _cardImageBytes!,
+                          height: 180,
+                          fit: BoxFit.cover,
+                          semanticLabel: 'ภาพบัตรที่เลือก',
+                        ),
+                      ),
+                    ),
                   ),
               ],
             ),
@@ -583,6 +606,35 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
       ),
     ),
   );
+
+  Future<void> _previewCardImage() async {
+    final bytes = _cardImageBytes;
+    if (bytes == null) return;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 480, maxHeight: 640),
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: Column(
+              children: [
+                Row(children: [
+                  const Icon(Icons.image_outlined),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text('ตัวอย่างภาพบัตร', style: Theme.of(context).textTheme.titleMedium)),
+                  IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
+                ]),
+                const Divider(),
+                Expanded(child: InteractiveViewer(child: Image.memory(bytes, fit: BoxFit.contain))),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
   Widget _messageCard(BuildContext context) => Material(
     elevation: 4,
