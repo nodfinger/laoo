@@ -7,9 +7,14 @@ class ServicePersonApi {
   final String path;
 
   Future<Map<String, bool>> actions() async => Map<String, bool>.fromEntries(
-    (await _client.get('$path/actions') as Map).entries.map(
-      (entry) => MapEntry('${entry.key}', entry.value == true),
-    ),
+    (await _client.get(
+              path == '/api/service/residents'
+                  ? '/api/company/residents/actions'
+                  : '$path/actions',
+            )
+            as Map)
+        .entries
+        .map((entry) => MapEntry('${entry.key}', entry.value == true)),
   );
 
   Future<Map<String, dynamic>> list({
@@ -48,6 +53,13 @@ class ServicePersonApi {
     } else {
       await _client.put('$path/$personId', body: body);
     }
+  }
+
+  Future<void> deleteResident(int residentId, String rowVersion) async {
+    await _client.delete(
+      '/api/company/residents/$residentId',
+      query: {'rowVersion': rowVersion},
+    );
   }
 
   void dispose() => _client.dispose();

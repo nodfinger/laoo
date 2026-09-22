@@ -146,6 +146,71 @@ class _ServicePersonWorkspaceState extends State<ServicePersonWorkspace> {
     showTimedSnackBar(context, message: message, error: !success);
   }
 
+  Future<void> _delete(Map<String, dynamic> row) async {
+    if (_actions['delete'] != true) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        final danger = Theme.of(dialogContext).colorScheme.error;
+        return AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.delete_outline, color: danger),
+              const SizedBox(width: 8),
+              const Expanded(child: Text('ยืนยันการลบผู้พักอาศัย')),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                color: danger.withValues(alpha: .1),
+                child: Text('${row['fullName'] ?? '-'}'),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'ระบบจะตรวจสอบความสัมพันธ์กับใบแจ้งซ่อมและประวัติผู้มาติดต่อก่อนปิดสถานะ',
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('ยกเลิก'),
+            ),
+            FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: danger,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () => Navigator.pop(dialogContext, true),
+              icon: const Icon(Icons.delete_outline),
+              label: const Text('ลบ'),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true || !mounted) return;
+    final residentId = (row['residentID'] as num?)?.toInt();
+    final rowVersion = row['residentRowVersion']?.toString();
+    if (residentId == null || rowVersion == null || rowVersion.isEmpty) {
+      _notify('ข้อมูลผู้พักอาศัยไม่ครบ กรุณาโหลดรายการใหม่');
+      return;
+    }
+    try {
+      await _api.deleteResident(residentId, rowVersion);
+      if (!mounted) return;
+      _notify('ปิดสถานะผู้พักอาศัยแล้ว', success: true);
+      await _load();
+    } catch (error) {
+      if (mounted) _notify(error);
+    }
+  }
+
   Future<void> _open([Map<String, dynamic>? row]) async {
     if ((row == null ? _actions['create'] : _actions['edit']) != true) return;
     final saved = await showDialog<bool>(
@@ -325,6 +390,13 @@ class _ServicePersonWorkspaceState extends State<ServicePersonWorkspace> {
                     onPressed: () => _open(row),
                     icon: const Icon(Icons.edit_outlined),
                   ),
+                if (_actions['delete'] == true)
+                  IconButton(
+                    tooltip: 'ลบ',
+                    color: Theme.of(context).colorScheme.error,
+                    onPressed: () => _delete(row),
+                    icon: const Icon(Icons.delete_outline),
+                  ),
               ],
             ),
           );
@@ -333,7 +405,7 @@ class _ServicePersonWorkspaceState extends State<ServicePersonWorkspace> {
     }
     return _surface(
       PinnedDataTable(
-        maxBodyHeight: double.infinity,
+        maxBodyHeight: 420,
         headingRowColor: WidgetStatePropertyAll(_primary.withValues(alpha: .1)),
         headingTextStyle: TextStyle(
           color: _primary,
@@ -366,15 +438,24 @@ class _ServicePersonWorkspaceState extends State<ServicePersonWorkspace> {
               cells: [
                 DataCell(Text('${(_page - 1) * _pageSize + i + 1}')),
                 DataCell(
-                  Center(
-                    child: _actions['edit'] == true
-                        ? IconButton(
-                            tooltip: 'แก้ไข',
-                            color: _primary,
-                            onPressed: () => _open(_rows[i]),
-                            icon: const Icon(Icons.edit_outlined),
-                          )
-                        : const SizedBox.shrink(),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_actions['edit'] == true)
+                        IconButton(
+                          tooltip: 'แก้ไข',
+                          color: _primary,
+                          onPressed: () => _open(_rows[i]),
+                          icon: const Icon(Icons.edit_outlined),
+                        ),
+                      if (_actions['delete'] == true)
+                        IconButton(
+                          tooltip: 'ลบ',
+                          color: Theme.of(context).colorScheme.error,
+                          onPressed: () => _delete(_rows[i]),
+                          icon: const Icon(Icons.delete_outline),
+                        ),
+                    ],
                   ),
                 ),
                 DataCell(Text('${_rows[i]['fullName']}')),

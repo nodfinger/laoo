@@ -231,9 +231,23 @@ SELECT HouseID id,LaneID parentId,HouseNo code,AddressText name FROM dbo.TDADVil
     {
         if (!RegistryControllerSupport.TryVersion(rowVersion, out var version)) return BadRequest(Problem("ข้อมูลเวอร์ชันไม่ถูกต้อง", "กรุณาโหลดรายการใหม่แล้วลองอีกครั้ง"));
         await using var c = await Open(token); if (!await ScopeValid(c, token) || !await Can(c, "DELETE", token)) return Forbid();
-        const string sql = "UPDATE dbo.TDADResident SET IsActive=0,UpdateDate=SYSUTCDATETIME(),UpdateBy=@actor WHERE CompanyID=@company AND ResidentID=@id AND RowVersion=@version; SELECT @@ROWCOUNT;";
+        const string sql = """
+IF (OBJECT_ID(N'dbo.TDADServiceRequest',N'U') IS NOT NULL AND EXISTS(SELECT 1 FROM dbo.TDADServiceRequest WHERE CompanyID=@company AND ResidentID=@id))
+ OR (OBJECT_ID(N'dbo.TDTMVisitorVisit',N'U') IS NOT NULL AND EXISTS(SELECT 1 FROM dbo.TDTMVisitorVisit WHERE CompanyID=@company AND HostResidentID=@id))
+ OR (OBJECT_ID(N'dbo.TDADVillageResident',N'U') IS NOT NULL AND EXISTS(SELECT 1 FROM dbo.TDADVillageResident WHERE CompanyID=@company AND ResidentID=@id))
+ THROW 52824,'RESIDENT_REFERENCED',1;
+UPDATE dbo.TDADResident SET IsActive=0,UpdateDate=SYSUTCDATETIME(),UpdateBy=@actor WHERE CompanyID=@company AND ResidentID=@id AND RowVersion=@version;
+SELECT @@ROWCOUNT;
+""";
         await using var cmd = new SqlCommand(sql, c); Add(cmd, "@company", SqlDbType.BigInt, CompanyId); Add(cmd, "@id", SqlDbType.BigInt, id); Add(cmd, "@version", SqlDbType.Timestamp, version); Add(cmd, "@actor", SqlDbType.BigInt, UserId);
-        return Convert.ToInt32(await cmd.ExecuteScalarAsync(token)) == 0 ? Conflict(Problem("ข้อมูลถูกเปลี่ยนแล้ว", "กรุณาโหลดรายการใหม่ก่อนปิดสถานะ")) : NoContent();
+        try
+        {
+            return Convert.ToInt32(await cmd.ExecuteScalarAsync(token)) == 0 ? Conflict(Problem("ข้อมูลถูกเปลี่ยนแล้ว", "กรุณาโหลดรายการใหม่ก่อนปิดสถานะ")) : NoContent();
+        }
+        catch (SqlException e) when (e.Number == 52824)
+        {
+            return Conflict(Problem("ลบผู้พักอาศัยไม่ได้", "รายการนี้ถูกอ้างอิงในใบแจ้งซ่อมหรือประวัติผู้มาติดต่อแล้ว ให้ปิดสถานะแทน"));
+        }
     }
 
     private async Task<IActionResult> Save(long? id, ResidentRegistryRequest x, CancellationToken token)
