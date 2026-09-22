@@ -1,0 +1,10 @@
+SET NOCOUNT ON;
+SET XACT_ABORT ON;
+BEGIN TRANSACTION;
+IF OBJECT_ID(N'dbo.TDADServiceRequest', N'U') IS NULL
+BEGIN
+CREATE TABLE dbo.TDADServiceRequest(RequestID bigint IDENTITY(1,1) NOT NULL CONSTRAINT PK_TDADServiceRequest PRIMARY KEY,CompanyID bigint NOT NULL,RequestNo nvarchar(30) NOT NULL,RequesterType nvarchar(30) NOT NULL,RequesterID bigint NULL,RequesterNameSnapshot nvarchar(200) NOT NULL,RequesterPhoneSnapshot nvarchar(50) NULL,RequesterEmailSnapshot nvarchar(320) NULL,ServiceCustomerID bigint NULL,ResidentID bigint NULL,TenantID bigint NULL,TenantContactID bigint NULL,RoomID bigint NULL,HouseID bigint NULL,LocationSnapshot nvarchar(500) NULL,Subject nvarchar(200) NOT NULL,Detail nvarchar(2000) NOT NULL,StatusCode nvarchar(30) NOT NULL CONSTRAINT DF_TDADServiceRequest_Status DEFAULT(N'NEW'),RequestDate datetime2(3) NOT NULL CONSTRAINT DF_TDADServiceRequest_Date DEFAULT(SYSUTCDATETIME()),IsActive bit NOT NULL CONSTRAINT DF_TDADServiceRequest_Active DEFAULT(1),CreateDate datetime2(3) NOT NULL CONSTRAINT DF_TDADServiceRequest_CreateDate DEFAULT(SYSUTCDATETIME()),CreateBy bigint NULL,UpdateDate datetime2(3) NULL,UpdateBy bigint NULL,RowVersion rowversion NOT NULL,CONSTRAINT UQ_TDADServiceRequest_Company_No UNIQUE(CompanyID,RequestNo),CONSTRAINT CK_TDADServiceRequest_RequesterType CHECK(RequesterType IN(N'EMPLOYEE',N'SERVICE_CUSTOMER',N'RESIDENT',N'TENANT_CONTACT')),CONSTRAINT CK_TDADServiceRequest_Status CHECK(StatusCode IN(N'NEW',N'RECEIVED',N'IN_PROGRESS',N'COMPLETED',N'CANCELLED')));
+END;
+IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.TDADServiceRequest') AND name=N'IX_TDADServiceRequest_Company_Status_Date') CREATE INDEX IX_TDADServiceRequest_Company_Status_Date ON dbo.TDADServiceRequest(CompanyID,StatusCode,RequestDate DESC);
+IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.TDADServiceRequest') AND name=N'IX_TDADServiceRequest_Company_Requester') CREATE INDEX IX_TDADServiceRequest_Company_Requester ON dbo.TDADServiceRequest(CompanyID,RequesterType,RequesterID);
+COMMIT TRANSACTION;

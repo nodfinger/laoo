@@ -4,6 +4,7 @@ import 'package:laoo_shared_core/laoo_shared_core.dart';
 
 import '../company/customer/pages/customer_page.dart';
 import '../company/person/pages/service_person_page.dart';
+import '../service_request/pages/service_request_page.dart';
 import '../company/delivery_note/pages/delivery_note_page.dart';
 import '../company/pre_order/pages/pre_order_page.dart';
 import '../company/quotation/pages/quotation_page.dart';
@@ -79,6 +80,8 @@ List<GoRoute> buildServiceFeatureRoutes({
     '14006',
     (state) => const ServicePersonPage(role: ServicePersonRole.resident),
   ),
+  _page('15001', (state) => const ServiceRequestPage()),
+  _page('20001', (state) => const ServiceRequestPage(selfService: true)),
   _workspacePlaceholder(
     ServiceRoutes.byMenuCode('18001'),
     'System settings preview',
@@ -127,7 +130,6 @@ const _workspacePlaceholders = <String, String>{
   '14001': 'ผังสถานที่และพื้นที่',
   '14002': 'ทะเบียนอุปกรณ์และ QR Code',
   '14003': 'ทะเบียนลูกค้าภายนอก',
-  '15001': 'รายการแจ้งซ่อมทั้งหมด',
   '15002': 'จัดการ QR Code แจ้งซ่อม',
   '16001': 'แผนและรอบเวลา PM',
   '16002': 'รายการตรวจเช็กมาตรฐาน',
@@ -141,7 +143,6 @@ const _workspacePlaceholders = <String, String>{
 };
 
 const _portalPlaceholders = <String, String>{
-  '20001': 'แจ้งซ่อม / ขอใช้บริการ',
   '20002': 'ติดตามสถานะงานซ่อม',
   '20003': 'ประวัติการซ่อมและค่าบริการ',
   '20004': 'รอบบำรุงรักษาของห้อง',
