@@ -196,7 +196,7 @@ DECLARE @id bigint,@current varbinary(8); SELECT TOP(1) @id=ResidentID,@current=
 IF @selected=0 BEGIN IF @id IS NOT NULL UPDATE dbo.TDADResident SET IsActive=0,UpdateDate=SYSUTCDATETIME(),UpdateBy=@actor WHERE CompanyID=@company AND ResidentID=@id; RETURN; END
 IF @room IS NULL AND @house IS NULL AND @allowUnassigned=0 THROW 52954,'INVALID_RESIDENCE',1;
 IF @room IS NOT NULL AND @house IS NOT NULL THROW 52954,'INVALID_RESIDENCE',1;
-IF @room IS NOT NULL AND NOT EXISTS(SELECT 1 FROM dbo.TDADRoom RM JOIN dbo.TDADBuilding B ON B.CompanyID=RM.CompanyID AND B.BuildingID=RM.BuildingID JOIN dbo.TDADFloor F ON F.CompanyID=RM.CompanyID AND F.BuildingID=RM.BuildingID AND F.FloorID=RM.FloorID WHERE RM.CompanyID=@company AND RM.RoomID=@room AND RM.RoomTypeCode=N'RESIDENTIAL' AND RM.IsActive=1 AND B.IsActive=1 AND F.IsActive=1) THROW 52954,'INVALID_ROOM',1;
+IF @room IS NOT NULL AND NOT EXISTS(SELECT 1 FROM dbo.TDADRoom RM JOIN dbo.TDADBuilding B ON B.CompanyID=RM.CompanyID AND B.BuildingID=RM.BuildingID JOIN dbo.TDADFloor F ON F.BuildingID=RM.BuildingID AND F.FloorID=RM.FloorID WHERE RM.CompanyID=@company AND RM.RoomID=@room AND RM.RoomTypeCode=N'RESIDENTIAL' AND RM.IsActive=1 AND B.IsActive=1 AND F.IsActive=1) THROW 52954,'INVALID_ROOM',1;
 IF @house IS NOT NULL AND NOT EXISTS(SELECT 1 FROM dbo.TDADVillageHouse WHERE CompanyID=@company AND HouseID=@house AND IsActive=1) THROW 52954,'INVALID_HOUSE',1;
 IF EXISTS(SELECT 1 FROM dbo.TDADResident R WHERE R.CompanyID=@company AND R.PersonID=@person AND R.ResidentID<>ISNULL(@id,0) AND R.IsActive=1) THROW 52955,'RESIDENT_OVERLAP',1;
 IF @id IS NULL INSERT dbo.TDADResident(CompanyID,PersonID,RoomID,HouseID,StartDate,EndDate,IsActive,CreateBy) VALUES(@company,@person,@room,@house,@start,@end,@active,@actor);
