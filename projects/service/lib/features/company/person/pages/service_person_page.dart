@@ -405,7 +405,7 @@ class _ServicePersonWorkspaceState extends State<ServicePersonWorkspace> {
     }
     return _surface(
       PinnedDataTable(
-        maxBodyHeight: 420,
+        maxBodyHeight: 320,
         headingRowColor: WidgetStatePropertyAll(_primary.withValues(alpha: .1)),
         headingTextStyle: TextStyle(
           color: _primary,

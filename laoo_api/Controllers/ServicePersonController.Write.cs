@@ -107,8 +107,6 @@ WHERE CompanyID=@company AND ResidentID=@id AND RowVersion=@version;
         var resident = residentEndpoint ? true : customerEndpoint ? false : (dormitory || village) && x.IsResident;
         if (!serviceCustomer && !resident)
             return BadRequest(Issue("กรุณาเลือกบทบาท", "บุคคลในระบบ Service ต้องมีอย่างน้อยหนึ่งบทบาท"));
-        if (resident && ((!village && !x.RoomId.HasValue) || (village && !x.HouseId.HasValue)))
-            return BadRequest(Issue("ข้อมูลผู้พักอาศัยไม่ครบ", "กรุณาเลือกห้องหรือบ้านเลขที่"));
 
         byte[]? personVersion = Version(x.PersonRowVersion);
         byte[]? customerVersion = Version(x.ServiceCustomerRowVersion);
@@ -151,7 +149,7 @@ INSERT dbo.TDADServicePersonAudit(CompanyID,PersonID,ActionCode,BeforeData,After
             }
 
             await UpsertServiceCustomer(c, tx, personId.Value, serviceCustomer, x.IsActive, customerVersion, token);
-            await UpsertResident(c, tx, personId.Value, resident, x, residentVersion, dormitory && resident, token);
+            await UpsertResident(c, tx, personId.Value, resident, x, residentVersion, resident, token);
             await tx.CommitAsync(token);
             return Ok(new { personID = personId });
         }
