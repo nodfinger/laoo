@@ -611,10 +611,6 @@ class _ServicePersonDialogState extends State<_ServicePersonDialog> {
       _errorText('กรุณาเลือกอย่างน้อยหนึ่งบทบาท');
       return;
     }
-    if (_resident && _roomId == null) {
-      _errorText('กรุณาเลือกห้องพัก');
-      return;
-    }
     setState(() => _saving = true);
     try {
       await widget.api.save({
@@ -846,7 +842,7 @@ class _ServicePersonDialogState extends State<_ServicePersonDialog> {
                       DropdownButtonFormField<int>(
                         initialValue: _roomId,
                         isExpanded: true,
-                        decoration: _input('ห้องพัก *'),
+                        decoration: _input('ห้องพัก (ถ้ามี)'),
                         items: [
                           for (final room in List<Map<String, dynamic>>.from(
                             _lookup['rooms'] as List? ?? const [],

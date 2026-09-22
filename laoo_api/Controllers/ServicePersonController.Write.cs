@@ -118,7 +118,7 @@ INSERT dbo.TDADServicePersonAudit(CompanyID,PersonID,ActionCode,BeforeData,After
             }
 
             await UpsertServiceCustomer(c, tx, personId.Value, serviceCustomer, x.IsActive, customerVersion, token);
-            await UpsertResident(c, tx, personId.Value, resident, x, residentVersion, token);
+            await UpsertResident(c, tx, personId.Value, resident, x, residentVersion, dormitory && resident, token);
             await tx.CommitAsync(token);
             return Ok(new { personID = personId });
         }
@@ -158,12 +158,12 @@ END
         await using var cmd = new SqlCommand(sql, c, tx); Add(cmd,"@company",SqlDbType.BigInt,CompanyId);Add(cmd,"@person",SqlDbType.BigInt,personId);Add(cmd,"@selected",SqlDbType.Bit,selected);Add(cmd,"@active",SqlDbType.Bit,active);Add(cmd,"@actor",SqlDbType.BigInt,ClaimLong("user_id"));Add(cmd,"@version",SqlDbType.Timestamp,version);await cmd.ExecuteNonQueryAsync(token);
     }
 
-    private async Task UpsertResident(SqlConnection c, SqlTransaction tx, long personId, bool selected, ServicePersonSaveRequest x, byte[]? version, CancellationToken token)
+    private async Task UpsertResident(SqlConnection c, SqlTransaction tx, long personId, bool selected, ServicePersonSaveRequest x, byte[]? version, bool allowUnassigned, CancellationToken token)
     {
         const string sql = """
 DECLARE @id bigint,@current varbinary(8); SELECT TOP(1) @id=ResidentID,@current=RowVersion FROM dbo.TDADResident WITH(UPDLOCK,HOLDLOCK) WHERE CompanyID=@company AND PersonID=@person ORDER BY IsActive DESC,StartDate DESC,ResidentID DESC;
 IF @selected=0 BEGIN IF @id IS NOT NULL UPDATE dbo.TDADResident SET IsActive=0,UpdateDate=SYSUTCDATETIME(),UpdateBy=@actor WHERE CompanyID=@company AND ResidentID=@id; RETURN; END
-IF @room IS NULL AND @house IS NULL THROW 52954,'INVALID_RESIDENCE',1;
+IF @room IS NULL AND @house IS NULL AND @allowUnassigned=0 THROW 52954,'INVALID_RESIDENCE',1;
 IF @room IS NOT NULL AND @house IS NOT NULL THROW 52954,'INVALID_RESIDENCE',1;
 IF @room IS NOT NULL AND NOT EXISTS(SELECT 1 FROM dbo.TDADRoom RM JOIN dbo.TDADBuilding B ON B.CompanyID=RM.CompanyID AND B.BuildingID=RM.BuildingID JOIN dbo.TDADFloor F ON F.CompanyID=RM.CompanyID AND F.BuildingID=RM.BuildingID AND F.FloorID=RM.FloorID WHERE RM.CompanyID=@company AND RM.RoomID=@room AND RM.RoomTypeCode=N'RESIDENTIAL' AND RM.IsActive=1 AND B.IsActive=1 AND F.IsActive=1) THROW 52954,'INVALID_ROOM',1;
 IF @house IS NOT NULL AND NOT EXISTS(SELECT 1 FROM dbo.TDADVillageHouse WHERE CompanyID=@company AND HouseID=@house AND IsActive=1) THROW 52954,'INVALID_HOUSE',1;
@@ -171,7 +171,7 @@ IF EXISTS(SELECT 1 FROM dbo.TDADResident R WHERE R.CompanyID=@company AND R.Pers
 IF @id IS NULL INSERT dbo.TDADResident(CompanyID,PersonID,RoomID,HouseID,StartDate,EndDate,IsActive,CreateBy) VALUES(@company,@person,@room,@house,@start,@end,@active,@actor);
 ELSE BEGIN IF @version IS NOT NULL AND @current<>@version THROW 52953,'RESIDENT_CONFLICT',1; UPDATE dbo.TDADResident SET RoomID=@room,HouseID=@house,StartDate=@start,EndDate=@end,IsActive=@active,UpdateDate=SYSUTCDATETIME(),UpdateBy=@actor WHERE CompanyID=@company AND ResidentID=@id; END
 """;
-        await using var cmd = new SqlCommand(sql, c, tx); Add(cmd, "@company", SqlDbType.BigInt, CompanyId); Add(cmd, "@person", SqlDbType.BigInt, personId); Add(cmd, "@selected", SqlDbType.Bit, selected); Add(cmd, "@room", SqlDbType.BigInt, x.RoomId); Add(cmd, "@house", SqlDbType.BigInt, x.HouseId); Add(cmd, "@start", SqlDbType.Date, x.StartDate); Add(cmd, "@end", SqlDbType.Date, x.EndDate); Add(cmd, "@active", SqlDbType.Bit, x.IsActive); Add(cmd, "@actor", SqlDbType.BigInt, ClaimLong("user_id")); Add(cmd, "@version", SqlDbType.Timestamp, version); await cmd.ExecuteNonQueryAsync(token);
+        await using var cmd = new SqlCommand(sql, c, tx); Add(cmd, "@company", SqlDbType.BigInt, CompanyId); Add(cmd, "@person", SqlDbType.BigInt, personId); Add(cmd, "@selected", SqlDbType.Bit, selected); Add(cmd, "@room", SqlDbType.BigInt, x.RoomId); Add(cmd, "@house", SqlDbType.BigInt, x.HouseId); Add(cmd, "@start", SqlDbType.Date, x.StartDate); Add(cmd, "@end", SqlDbType.Date, x.EndDate); Add(cmd, "@active", SqlDbType.Bit, x.IsActive); Add(cmd, "@actor", SqlDbType.BigInt, ClaimLong("user_id")); Add(cmd, "@allowUnassigned", SqlDbType.Bit, allowUnassigned); Add(cmd, "@version", SqlDbType.Timestamp, version); await cmd.ExecuteNonQueryAsync(token);
     }
     private async Task<string> BusinessType(SqlConnection c, CancellationToken token)
     {

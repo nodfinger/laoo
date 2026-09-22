@@ -238,10 +238,10 @@ SELECT HouseID id,LaneID parentId,HouseNo code,AddressText name FROM dbo.TDADVil
 
     private async Task<IActionResult> Save(long? id, ResidentRegistryRequest x, CancellationToken token)
     {
-        if (x.PersonId <= 0 || x.StartDate == default || x.EndDate < x.StartDate || (x.RoomId.HasValue == x.HouseId.HasValue)) return BadRequest(Problem("ข้อมูลผู้พักอาศัยไม่ถูกต้อง", "กรุณาเลือกห้องพักหรือบ้านเลขที่เพียงหนึ่งรายการ และตรวจสอบช่วงวันที่"));
+        if (x.PersonId <= 0 || x.StartDate == default || x.EndDate < x.StartDate || (x.RoomId.HasValue && x.HouseId.HasValue)) return BadRequest(Problem("ข้อมูลผู้พักอาศัยไม่ถูกต้อง", "กรุณาเลือกห้องพักหรือบ้านเลขที่เพียงหนึ่งรายการ และตรวจสอบช่วงวันที่"));
         byte[]? version = null; if (id.HasValue && !RegistryControllerSupport.TryVersion(x.RowVersion, out version)) return BadRequest(Problem("ข้อมูลเวอร์ชันไม่ถูกต้อง", "กรุณาโหลดรายการใหม่แล้วลองอีกครั้ง"));
         await using var c = await Open(token); if (!await ScopeValid(c, token) || !await Can(c, id.HasValue ? "EDIT" : "CREATE", token)) return Forbid();
-        var businessType = await BusinessType(c, token); if (businessType == "VILLAGE" && !x.HouseId.HasValue || businessType != "VILLAGE" && !x.RoomId.HasValue) return BadRequest(Problem("สถานที่ไม่ตรงกับประเภทธุรกิจ", "กรุณาเลือกสถานที่ตาม Company Type"));
+        var businessType = await BusinessType(c, token); if (businessType == "VILLAGE" && !x.HouseId.HasValue || businessType != "VILLAGE" && x.HouseId.HasValue) return BadRequest(Problem("สถานที่ไม่ตรงกับประเภทธุรกิจ", "กรุณาเลือกสถานที่ตาม Company Type"));
         await using var tx = (SqlTransaction)await c.BeginTransactionAsync(IsolationLevel.Serializable, token);
         const string sql = """
 IF NOT EXISTS(SELECT 1 FROM dbo.TDADPerson WHERE CompanyID=@company AND PersonID=@person AND (@active=0 OR IsActive=1)) THROW 52820,'INVALID_PERSON',1;

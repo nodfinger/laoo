@@ -68,7 +68,10 @@ class _LocationPageState extends State<LocationPage> {
       );
       if (data['businessType'] == 'RENTAL_OFFICE') {
         final rental = Map<String, dynamic>.from(
-          await _api.get('/api/company/business-locations/rental-office/tenants') as Map,
+          await _api.get(
+                '/api/company/business-locations/rental-office/tenants',
+              )
+              as Map,
         );
         data['rentalTenants'] = rental['tenants'];
         data['rentalContacts'] = rental['contacts'];
@@ -77,8 +80,12 @@ class _LocationPageState extends State<LocationPage> {
         setState(() {
           _caption = caption;
           _data = data;
-          _rentalTenants = List<Map<String, dynamic>>.from(data['rentalTenants'] as List? ?? const []);
-          _rentalContacts = List<Map<String, dynamic>>.from(data['rentalContacts'] as List? ?? const []);
+          _rentalTenants = List<Map<String, dynamic>>.from(
+            data['rentalTenants'] as List? ?? const [],
+          );
+          _rentalContacts = List<Map<String, dynamic>>.from(
+            data['rentalContacts'] as List? ?? const [],
+          );
           _loading = false;
         });
       }
@@ -166,27 +173,137 @@ class _LocationPageState extends State<LocationPage> {
 
   Future<void> _reloadRental() async {
     final rental = Map<String, dynamic>.from(
-      await _api.get('/api/company/business-locations/rental-office/tenants') as Map,
+      await _api.get('/api/company/business-locations/rental-office/tenants')
+          as Map,
     );
     if (mounted) {
       setState(() {
-        _rentalTenants = List<Map<String, dynamic>>.from(rental['tenants'] as List? ?? const []);
-        _rentalContacts = List<Map<String, dynamic>>.from(rental['contacts'] as List? ?? const []);
+        _rentalTenants = List<Map<String, dynamic>>.from(
+          rental['tenants'] as List? ?? const [],
+        );
+        _rentalContacts = List<Map<String, dynamic>>.from(
+          rental['contacts'] as List? ?? const [],
+        );
       });
     }
   }
 
   Future<String?> _pickDate(String current) async {
     final initial = DateTime.tryParse(current) ?? DateTime.now();
-    final date = await showDatePicker(context: context, initialDate: initial, firstDate: DateTime(2000), lastDate: DateTime(2100));
+    final date = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
     return date == null ? null : date.toIso8601String().substring(0, 10);
+  }
+
+  Future<void> _manageResidents(Map<String, dynamic> room) async {
+    try {
+      final data = Map<String, dynamic>.from(
+        await _api.get('/api/company/locations/rooms/${room['id']}/residents')
+            as Map,
+      );
+      final assigned = List<Map<String, dynamic>>.from(
+        data['assigned'] as List? ?? const [],
+      );
+      final available = List<Map<String, dynamic>>.from(
+        data['available'] as List? ?? const [],
+      );
+      final selected = <int>{
+        for (final row in assigned) (row['residentID'] as num).toInt(),
+      };
+      final saved = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (_, setDialogState) => AlertDialog(
+            title: Text(
+              'จัดผู้พักอาศัย: ${room['code']} ${room['name'] ?? ''}',
+            ),
+            content: SizedBox(
+              width: 560,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 480),
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('เลือกผู้พักอาศัยที่ต้องการจัดเข้าห้องนี้'),
+                      const SizedBox(height: 8),
+                      if (assigned.isEmpty && available.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.all(16),
+                          child: Text('ยังไม่มีผู้พักอาศัยที่พร้อมจัดห้อง'),
+                        ),
+                      for (final row in [...assigned, ...available])
+                        CheckboxListTile(
+                          dense: true,
+                          value: selected.contains(
+                            (row['residentID'] as num).toInt(),
+                          ),
+                          title: Text('${row['fullName'] ?? '-'}'),
+                          subtitle: Text('${row['mobile'] ?? '-'}'),
+                          onChanged: (value) => setDialogState(() {
+                            final id = (row['residentID'] as num).toInt();
+                            if (value == true) {
+                              selected.add(id);
+                            } else {
+                              selected.remove(id);
+                            }
+                          }),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('ยกเลิก'),
+              ),
+              FilledButton(
+                onPressed: () async {
+                  try {
+                    await _api.put(
+                      '/api/company/locations/rooms/${room['id']}/residents',
+                      body: {'residentIds': selected.toList()},
+                    );
+                    if (dialogContext.mounted)
+                      Navigator.pop(dialogContext, true);
+                  } catch (e) {
+                    if (dialogContext.mounted)
+                      Navigator.pop(dialogContext, false);
+                    if (mounted) _fail(e);
+                  }
+                },
+                child: const Text('บันทึก'),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (saved == true && mounted) {
+        setState(() => _message = 'บันทึกการจัดผู้พักอาศัยแล้ว');
+        await _load();
+      }
+    } catch (e) {
+      if (mounted) _fail(e);
+    }
   }
 
   Future<void> _editTenant(Map<String, dynamic> room) async {
     final tenant = _tenantForRoom(room['id']);
-    final name = TextEditingController(text: tenant?['tenantCompanyName']?.toString() ?? '');
-    final start = TextEditingController(text: tenant?['startDate']?.toString().split('T').first ?? '');
-    final end = TextEditingController(text: tenant?['endDate']?.toString().split('T').first ?? '');
+    final name = TextEditingController(
+      text: tenant?['tenantCompanyName']?.toString() ?? '',
+    );
+    final start = TextEditingController(
+      text: tenant?['startDate']?.toString().split('T').first ?? '',
+    );
+    final end = TextEditingController(
+      text: tenant?['endDate']?.toString().split('T').first ?? '',
+    );
     var active = tenant?['active'] != false;
     final saved = await showDialog<bool>(
       context: context,
@@ -195,42 +312,118 @@ class _LocationPageState extends State<LocationPage> {
           title: Text(tenant == null ? 'กำหนดผู้เช่า' : 'แก้ไขผู้เช่า'),
           content: SizedBox(
             width: 480,
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Align(alignment: Alignment.centerLeft, child: Text('ห้อง: ' + room['code'].toString() + ' | ' + room['name'].toString())),
-              const SizedBox(height: 12),
-              TextField(controller: name, decoration: const InputDecoration(labelText: 'ชื่อบริษัทผู้เช่า *')),
-              const SizedBox(height: 12),
-              TextField(controller: start, readOnly: true, decoration: const InputDecoration(labelText: 'วันที่เริ่มเช่า *'), onTap: () async { final value = await _pickDate(start.text); if (value != null) setDialogState(() => start.text = value); }),
-              const SizedBox(height: 12),
-              TextField(controller: end, readOnly: true, decoration: const InputDecoration(labelText: 'วันที่สิ้นสุด'), onTap: () async { final value = await _pickDate(end.text); if (value != null) setDialogState(() => end.text = value); }),
-              Row(children: [const Text('สถานะ'), Switch(value: active, onChanged: (v) => setDialogState(() => active = v))]),
-            ]),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'ห้อง: ' +
+                        room['code'].toString() +
+                        ' | ' +
+                        room['name'].toString(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: name,
+                  decoration: const InputDecoration(
+                    labelText: 'ชื่อบริษัทผู้เช่า *',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: start,
+                  readOnly: true,
+                  decoration: const InputDecoration(
+                    labelText: 'วันที่เริ่มเช่า *',
+                  ),
+                  onTap: () async {
+                    final value = await _pickDate(start.text);
+                    if (value != null) setDialogState(() => start.text = value);
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: end,
+                  readOnly: true,
+                  decoration: const InputDecoration(labelText: 'วันที่สิ้นสุด'),
+                  onTap: () async {
+                    final value = await _pickDate(end.text);
+                    if (value != null) setDialogState(() => end.text = value);
+                  },
+                ),
+                Row(
+                  children: [
+                    const Text('สถานะ'),
+                    Switch(
+                      value: active,
+                      onChanged: (v) => setDialogState(() => active = v),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('ยกเลิก')),
-            FilledButton(onPressed: () async {
-              if (name.text.trim().isEmpty || start.text.trim().isEmpty) return;
-              final path = tenant == null ? '/api/company/business-locations/rental-office/tenants' : '/api/company/business-locations/rental-office/tenants/' + tenant['tenantId'].toString();
-              final body = {'roomId': room['id'], 'name': name.text.trim(), 'customerId': null, 'startDate': start.text.trim(), 'endDate': end.text.trim().isEmpty ? null : end.text.trim(), 'active': active};
-              try {
-                if (tenant == null) { await _api.post(path, body: body); } else { await _api.put(path, body: body); }
-                if (dialogContext.mounted) Navigator.pop(dialogContext, true);
-              } catch (e) {
-                if (dialogContext.mounted) Navigator.pop(dialogContext, false);
-                if (mounted) _fail(e);
-              }
-            }, child: const Text('บันทึก')),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('ยกเลิก'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                if (name.text.trim().isEmpty || start.text.trim().isEmpty)
+                  return;
+                final path = tenant == null
+                    ? '/api/company/business-locations/rental-office/tenants'
+                    : '/api/company/business-locations/rental-office/tenants/' +
+                          tenant['tenantId'].toString();
+                final body = {
+                  'roomId': room['id'],
+                  'name': name.text.trim(),
+                  'customerId': null,
+                  'startDate': start.text.trim(),
+                  'endDate': end.text.trim().isEmpty ? null : end.text.trim(),
+                  'active': active,
+                };
+                try {
+                  if (tenant == null) {
+                    await _api.post(path, body: body);
+                  } else {
+                    await _api.put(path, body: body);
+                  }
+                  if (dialogContext.mounted) Navigator.pop(dialogContext, true);
+                } catch (e) {
+                  if (dialogContext.mounted)
+                    Navigator.pop(dialogContext, false);
+                  if (mounted) _fail(e);
+                }
+              },
+              child: const Text('บันทึก'),
+            ),
           ],
         ),
       ),
     );
-    if (saved == true) { await _reloadRental(); if (mounted) setState(() => _message = 'บันทึกผู้เช่าสำเร็จ'); }
+    if (saved == true) {
+      await _reloadRental();
+      if (mounted) setState(() => _message = 'บันทึกผู้เช่าสำเร็จ');
+    }
   }
 
-  Future<void> _editContact(Map<String, dynamic> tenant, [Map<String, dynamic>? contact]) async {
-    final name = TextEditingController(text: contact?['contactName']?.toString() ?? '');
-    final phone = TextEditingController(text: contact?['phone']?.toString() ?? '');
-    final email = TextEditingController(text: contact?['email']?.toString() ?? '');
+  Future<void> _editContact(
+    Map<String, dynamic> tenant, [
+    Map<String, dynamic>? contact,
+  ]) async {
+    final name = TextEditingController(
+      text: contact?['contactName']?.toString() ?? '',
+    );
+    final phone = TextEditingController(
+      text: contact?['phone']?.toString() ?? '',
+    );
+    final email = TextEditingController(
+      text: contact?['email']?.toString() ?? '',
+    );
     var primary = contact?['isPrimary'] == true;
     var active = contact?['active'] != false;
     final saved = await showDialog<bool>(
@@ -238,36 +431,97 @@ class _LocationPageState extends State<LocationPage> {
       builder: (dialogContext) => StatefulBuilder(
         builder: (_, setDialogState) => AlertDialog(
           title: Text(contact == null ? 'เพิ่มผู้ติดต่อ' : 'แก้ไขผู้ติดต่อ'),
-          content: SizedBox(width: 480, child: Column(mainAxisSize: MainAxisSize.min, children: [
-            TextField(controller: name, decoration: const InputDecoration(labelText: 'ชื่อผู้ติดต่อ *')),
-            const SizedBox(height: 12),
-            TextField(controller: phone, decoration: const InputDecoration(labelText: 'โทรศัพท์')),
-            const SizedBox(height: 12),
-            TextField(controller: email, decoration: const InputDecoration(labelText: 'อีเมล')),
-            Row(children: [const Text('ผู้ติดต่อหลัก'), Switch(value: primary, onChanged: (v) => setDialogState(() => primary = v))]),
-            Row(children: [const Text('สถานะ'), Switch(value: active, onChanged: (v) => setDialogState(() => active = v))]),
-          ])),
+          content: SizedBox(
+            width: 480,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: name,
+                  decoration: const InputDecoration(
+                    labelText: 'ชื่อผู้ติดต่อ *',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: phone,
+                  decoration: const InputDecoration(labelText: 'โทรศัพท์'),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: email,
+                  decoration: const InputDecoration(labelText: 'อีเมล'),
+                ),
+                Row(
+                  children: [
+                    const Text('ผู้ติดต่อหลัก'),
+                    Switch(
+                      value: primary,
+                      onChanged: (v) => setDialogState(() => primary = v),
+                    ),
+                  ],
+                ),
+                Row(
+                  children: [
+                    const Text('สถานะ'),
+                    Switch(
+                      value: active,
+                      onChanged: (v) => setDialogState(() => active = v),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('ยกเลิก')),
-            FilledButton(onPressed: () async {
-              if (name.text.trim().isEmpty) return;
-              final id = contact?['contactId'];
-              final path = id == null ? '/api/company/business-locations/rental-office/tenants/' + tenant['tenantId'].toString() + '/contacts' : '/api/company/business-locations/rental-office/contacts/' + id.toString();
-              final body = {'tenantId': tenant['tenantId'], 'personId': contact?['personId'], 'name': name.text.trim(), 'phone': phone.text.trim().isEmpty ? null : phone.text.trim(), 'email': email.text.trim().isEmpty ? null : email.text.trim(), 'primary': primary, 'active': active};
-              try {
-                if (id == null) { await _api.post(path, body: body); } else { await _api.put(path, body: body); }
-                if (dialogContext.mounted) Navigator.pop(dialogContext, true);
-              } catch (e) {
-                if (dialogContext.mounted) Navigator.pop(dialogContext, false);
-                if (mounted) _fail(e);
-              }
-            }, child: const Text('บันทึก')),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('ยกเลิก'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                if (name.text.trim().isEmpty) return;
+                final id = contact?['contactId'];
+                final path = id == null
+                    ? '/api/company/business-locations/rental-office/tenants/' +
+                          tenant['tenantId'].toString() +
+                          '/contacts'
+                    : '/api/company/business-locations/rental-office/contacts/' +
+                          id.toString();
+                final body = {
+                  'tenantId': tenant['tenantId'],
+                  'personId': contact?['personId'],
+                  'name': name.text.trim(),
+                  'phone': phone.text.trim().isEmpty ? null : phone.text.trim(),
+                  'email': email.text.trim().isEmpty ? null : email.text.trim(),
+                  'primary': primary,
+                  'active': active,
+                };
+                try {
+                  if (id == null) {
+                    await _api.post(path, body: body);
+                  } else {
+                    await _api.put(path, body: body);
+                  }
+                  if (dialogContext.mounted) Navigator.pop(dialogContext, true);
+                } catch (e) {
+                  if (dialogContext.mounted)
+                    Navigator.pop(dialogContext, false);
+                  if (mounted) _fail(e);
+                }
+              },
+              child: const Text('บันทึก'),
+            ),
           ],
         ),
       ),
     );
-    if (saved == true) { await _reloadRental(); if (mounted) setState(() => _message = 'บันทึกผู้ติดต่อสำเร็จ'); }
+    if (saved == true) {
+      await _reloadRental();
+      if (mounted) setState(() => _message = 'บันทึกผู้ติดต่อสำเร็จ');
+    }
   }
+
   Future<void> _showContacts(Map<String, dynamic> tenant) async {
     await showDialog<void>(
       context: context,
@@ -288,8 +542,12 @@ class _LocationPageState extends State<LocationPage> {
                         final contact = contacts[index];
                         return ListTile(
                           dense: true,
-                          title: Text('${contact['contactName'] ?? '-'}${contact['isPrimary'] == true ? ' (หลัก)' : ''}'),
-                          subtitle: Text('${contact['phone'] ?? '-'} | ${contact['email'] ?? '-'}'),
+                          title: Text(
+                            '${contact['contactName'] ?? '-'}${contact['isPrimary'] == true ? ' (หลัก)' : ''}',
+                          ),
+                          subtitle: Text(
+                            '${contact['phone'] ?? '-'} | ${contact['email'] ?? '-'}',
+                          ),
                           trailing: IconButton(
                             tooltip: 'แก้ไข',
                             icon: const Icon(Icons.edit_outlined),
@@ -320,6 +578,7 @@ class _LocationPageState extends State<LocationPage> {
       ),
     );
   }
+
   Widget _actionDialog(BuildContext dialogContext, StateSetter setDialogState) {
     final primary = Theme.of(dialogContext).colorScheme.primary;
     final popupWidth =
@@ -675,486 +934,533 @@ class _LocationPageState extends State<LocationPage> {
       return VillageLocationPage(caption: _caption);
     }
     return SupportWorkspaceShell(
-    pageTitle: _caption,
-    activeMenu: '14001',
-    menuScope: WorkspaceMenuScope.company,
-    child: LayoutBuilder(
-      builder: (context, box) {
-        final compact = box.maxWidth < 900;
-        final records = _rows(_kind)
-            .where(
-              (r) =>
-                  (_kind == 'buildings' ||
-                      r['parentId'] ==
-                          (_kind == 'floors' ? _building : _floor)) &&
-                  '${r['code']} ${r['name']}'.toLowerCase().contains(
-                    _query.toLowerCase(),
-                  ),
-            )
-            .toList();
-        final pages = (records.length / 20).ceil(),
-            current = records.isEmpty
-                ? 0
-                : _page.clamp(0, (records.length - 1) ~/ 20);
-        final visible = records.skip(current * 20).take(20).toList();
-        final rental = _isRental && _kind == 'rooms';
-        final primary = Theme.of(context).colorScheme.primary;
-        Widget editButton(Map<String, dynamic> r) => Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (_can('edit'))
-              IconButton(
-                tooltip: 'แก้ไข',
-                color: primary,
-                onPressed: () => _edit(r),
-                icon: const Icon(Icons.edit_outlined),
-              ),
-            if (_kind == 'rooms' && _isRental && r['type'] == 'OFFICE')
-              IconButton(
-                tooltip: 'กำหนดผู้เช่า',
-                color: primary,
-                onPressed: () => _editTenant(r),
-                icon: const Icon(Icons.business_outlined),
-              ),
-            if (_can('delete'))
-              IconButton(
-                tooltip: 'ź',
-                color: Theme.of(context).colorScheme.error,
-                onPressed: () => _delete(r),
-                icon: const Icon(Icons.delete_outline),
-              ),
-          ],
-        );
-        final searchControls = SizedBox(
-          width: compact ? double.infinity : 438,
-          child: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _search,
-                  style: const TextStyle(fontSize: LaooTypography.inputText),
-                  decoration: _controlDecoration(
-                    hintText: 'ค้นหารหัสหรือชื่อ',
-                    prefixIcon: Icons.search,
-                  ),
-                  onSubmitted: (_) => setState(() {
-                    _query = _search.text.trim();
-                    _page = 0;
-                  }),
-                ),
-              ),
-              const SizedBox(width: 8),
-              SizedBox(
-                height: 40,
-                child: FilledButton(
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size(0, 40),
-                    maximumSize: const Size(double.infinity, 40),
-                  ),
-                  onPressed: () => setState(() {
-                    _query = _search.text.trim();
-                    _page = 0;
-                  }),
-                  child: const Text('ค้นหา'),
-                ),
-              ),
-              const SizedBox(width: 8),
-              SizedBox(
-                height: 40,
-                child: OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size(0, 40),
-                    maximumSize: const Size(double.infinity, 40),
-                  ),
-                  onPressed: () => setState(() {
-                    _search.clear();
-                    _query = '';
-                    _page = 0;
-                  }),
-                  child: const Text('ล้าง Filter'),
-                ),
-              ),
-            ],
-          ),
-        );
-        return Stack(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(LaooLayout.cardMargin),
-              child: Column(
-                children: [
-                  _card(
-                    Wrap(
-                      alignment: WrapAlignment.spaceBetween,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      spacing: 12,
-                      runSpacing: 8,
-                      children: [
-                        WorkspacePageTitle(
-                          title: _editing
-                              ? '$_caption > ${_id == null ? 'เพิ่ม' : 'แก้ไข'}${_labels[_kind]}'
-                              : _caption,
-                          favoriteKey: '14001',
-                        ),
-                        Wrap(
-                          spacing: 8,
-                          children: _editing
-                              ? [
-                                  OutlinedButton(
-                                    onPressed: _saving
-                                        ? null
-                                        : () =>
-                                              setState(() => _editing = false),
-                                    child: const Text('กลับรายการ'),
-                                  ),
-                                  if (_can(_id == null ? 'create' : 'edit'))
-                                    FilledButton(
-                                      onPressed: _saving ? null : _save,
-                                      child: Text(
-                                        _saving ? 'กำลังบันทึก…' : 'บันทึก',
-                                      ),
-                                    ),
-                                ]
-                              : [
-                                  if (!compact)
-                                    IconButton(
-                                      tooltip: 'สลับ Card/List',
-                                      onPressed: () =>
-                                          setState(() => _cards = !_cards),
-                                      icon: Icon(
-                                        _cards
-                                            ? Icons.view_list
-                                            : Icons.grid_view,
-                                      ),
-                                    ),
-                                  if (_can('create') &&
-                                      (_kind == 'buildings' ||
-                                          (_kind == 'floors'
-                                                  ? _building
-                                                  : _floor) !=
-                                              null))
-                                    FilledButton.icon(
-                                      style: FilledButton.styleFrom(
-                                        minimumSize: const Size(
-                                          0,
-                                          LaooTypography.buttonHeight,
-                                        ),
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 16,
-                                        ),
-                                      ),
-                                      onPressed: () => _edit(),
-                                      icon: const Icon(Icons.add),
-                                      label: Text('เพิ่ม${_labels[_kind]}'),
-                                    ),
-                                ],
-                        ),
-                      ],
+      pageTitle: _caption,
+      activeMenu: '14001',
+      menuScope: WorkspaceMenuScope.company,
+      child: LayoutBuilder(
+        builder: (context, box) {
+          final compact = box.maxWidth < 900;
+          final records = _rows(_kind)
+              .where(
+                (r) =>
+                    (_kind == 'buildings' ||
+                        r['parentId'] ==
+                            (_kind == 'floors' ? _building : _floor)) &&
+                    '${r['code']} ${r['name']}'.toLowerCase().contains(
+                      _query.toLowerCase(),
                     ),
+              )
+              .toList();
+          final pages = (records.length / 20).ceil(),
+              current = records.isEmpty
+                  ? 0
+                  : _page.clamp(0, (records.length - 1) ~/ 20);
+          final visible = records.skip(current * 20).take(20).toList();
+          final rental = _isRental && _kind == 'rooms';
+          final primary = Theme.of(context).colorScheme.primary;
+          Widget editButton(Map<String, dynamic> r) => Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_can('edit'))
+                IconButton(
+                  tooltip: 'แก้ไข',
+                  color: primary,
+                  onPressed: () => _edit(r),
+                  icon: const Icon(Icons.edit_outlined),
+                ),
+              if (_kind == 'rooms' && _isRental && r['type'] == 'OFFICE')
+                IconButton(
+                  tooltip: 'กำหนดผู้เช่า',
+                  color: primary,
+                  onPressed: () => _editTenant(r),
+                  icon: const Icon(Icons.business_outlined),
+                ),
+              if (_kind == 'rooms' && !_isRental && r['type'] == 'RESIDENTIAL')
+                IconButton(
+                  tooltip: 'จัดผู้พักอาศัย',
+                  color: primary,
+                  onPressed: () => _manageResidents(r),
+                  icon: const Icon(Icons.people_outline),
+                ),
+              if (_can('delete'))
+                IconButton(
+                  tooltip: 'ź',
+                  color: Theme.of(context).colorScheme.error,
+                  onPressed: () => _delete(r),
+                  icon: const Icon(Icons.delete_outline),
+                ),
+            ],
+          );
+          final searchControls = SizedBox(
+            width: compact ? double.infinity : 438,
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _search,
+                    style: const TextStyle(fontSize: LaooTypography.inputText),
+                    decoration: _controlDecoration(
+                      hintText: 'ค้นหารหัสหรือชื่อ',
+                      prefixIcon: Icons.search,
+                    ),
+                    onSubmitted: (_) => setState(() {
+                      _query = _search.text.trim();
+                      _page = 0;
+                    }),
                   ),
-                  const SizedBox(height: 6),
-                  if (!_editing)
+                ),
+                const SizedBox(width: 8),
+                SizedBox(
+                  height: 40,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(0, 40),
+                      maximumSize: const Size(double.infinity, 40),
+                    ),
+                    onPressed: () => setState(() {
+                      _query = _search.text.trim();
+                      _page = 0;
+                    }),
+                    child: const Text('ค้นหา'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                SizedBox(
+                  height: 40,
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(0, 40),
+                      maximumSize: const Size(double.infinity, 40),
+                    ),
+                    onPressed: () => setState(() {
+                      _search.clear();
+                      _query = '';
+                      _page = 0;
+                    }),
+                    child: const Text('ล้าง Filter'),
+                  ),
+                ),
+              ],
+            ),
+          );
+          return Stack(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(LaooLayout.cardMargin),
+                child: Column(
+                  children: [
                     _card(
                       Wrap(
-                        spacing: 10,
-                        runSpacing: 10,
+                        alignment: WrapAlignment.spaceBetween,
                         crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 12,
+                        runSpacing: 8,
                         children: [
-                          ..._labels.entries.map(
-                            (e) => ChoiceChip(
-                              label: Text(e.value),
-                              selected: _kind == e.key,
-                              onSelected: (_) => setState(() {
-                                _kind = e.key;
-                                _query = '';
-                                _search.clear();
-                                _page = 0;
-                              }),
-                            ),
+                          WorkspacePageTitle(
+                            title: _editing
+                                ? '$_caption > ${_id == null ? 'เพิ่ม' : 'แก้ไข'}${_labels[_kind]}'
+                                : _caption,
+                            favoriteKey: '14001',
                           ),
-                          if (_kind == 'rooms') searchControls,
-                          if (_kind != 'buildings')
-                            _select(
-                              'อาคาร/ตึก',
-                              _building,
-                              _rows('buildings'),
-                              (v) => setState(() {
-                                _building = v;
-                                _floor = null;
-                                _page = 0;
-                              }),
-                              width: 220,
-                            ),
-                          if (_kind == 'rooms')
-                            _select(
-                              'ชั้น',
-                              _floor,
-                              _rows('floors')
-                                  .where((r) => r['parentId'] == _building)
-                                  .toList(),
-                              (v) => setState(() {
-                                _floor = v;
-                                _page = 0;
-                              }),
-                              width: 150,
-                            ),
-                          if (_kind != 'rooms') searchControls,
+                          Wrap(
+                            spacing: 8,
+                            children: _editing
+                                ? [
+                                    OutlinedButton(
+                                      onPressed: _saving
+                                          ? null
+                                          : () => setState(
+                                              () => _editing = false,
+                                            ),
+                                      child: const Text('กลับรายการ'),
+                                    ),
+                                    if (_can(_id == null ? 'create' : 'edit'))
+                                      FilledButton(
+                                        onPressed: _saving ? null : _save,
+                                        child: Text(
+                                          _saving ? 'กำลังบันทึก…' : 'บันทึก',
+                                        ),
+                                      ),
+                                  ]
+                                : [
+                                    if (!compact)
+                                      IconButton(
+                                        tooltip: 'สลับ Card/List',
+                                        onPressed: () =>
+                                            setState(() => _cards = !_cards),
+                                        icon: Icon(
+                                          _cards
+                                              ? Icons.view_list
+                                              : Icons.grid_view,
+                                        ),
+                                      ),
+                                    if (_can('create') &&
+                                        (_kind == 'buildings' ||
+                                            (_kind == 'floors'
+                                                    ? _building
+                                                    : _floor) !=
+                                                null))
+                                      FilledButton.icon(
+                                        style: FilledButton.styleFrom(
+                                          minimumSize: const Size(
+                                            0,
+                                            LaooTypography.buttonHeight,
+                                          ),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 16,
+                                          ),
+                                        ),
+                                        onPressed: () => _edit(),
+                                        icon: const Icon(Icons.add),
+                                        label: Text('เพิ่ม${_labels[_kind]}'),
+                                      ),
+                                  ],
+                          ),
                         ],
                       ),
                     ),
-                  const SizedBox(height: LaooLayout.cardSpacing),
-                  Expanded(
-                    child: _loading
-                        ? const Center(child: CircularProgressIndicator())
-                        : _editing
-                        ? SingleChildScrollView(
-                            child: _card(
-                              Form(
-                                key: _form,
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        const Text('สถานะ'),
-                                        Switch(
-                                          value: _active,
-                                          onChanged: _saving
-                                              ? null
-                                              : (v) =>
-                                                    setState(() => _active = v),
-                                        ),
-                                      ],
-                                    ),
-                                    TextFormField(
-                                      controller: _code,
-                                      maxLength: 20,
-                                      style: const TextStyle(
-                                        fontSize: LaooTypography.inputText,
-                                      ),
-                                      decoration: _controlDecoration(
-                                        labelText: 'รหัส *',
-                                      ),
-                                      validator: (v) =>
-                                          v == null || v.trim().isEmpty
-                                          ? 'กรุณาระบุรหัส'
-                                          : null,
-                                    ),
-                                    const SizedBox(height: 12),
-                                    TextFormField(
-                                      controller: _name,
-                                      maxLength: 200,
-                                      style: const TextStyle(
-                                        fontSize: LaooTypography.inputText,
-                                      ),
-                                      decoration: _controlDecoration(
-                                        labelText: 'ชื่อ *',
-                                      ),
-                                      validator: (v) =>
-                                          v == null || v.trim().isEmpty
-                                          ? 'กรุณาระบุชื่อ'
-                                          : null,
-                                    ),
-                                    if (_kind == 'rooms') ...[
-                                      const SizedBox(height: 12),
-                                      DropdownButtonFormField<String>(
-                                        initialValue: _type,
-                                        style: const TextStyle(
-                                          fontSize: LaooTypography.comboBox,
-                                        ),
-                                        decoration: _controlDecoration(
-                                          labelText: 'ประเภทห้อง *',
-                                        ),
-                                        items: _types.entries
-                                            .map(
-                                              (e) => DropdownMenuItem(
-                                                value: e.key,
-                                                child: Text(
-                                                  e.value,
-                                                  style: const TextStyle(
-                                                    fontSize:
-                                                        LaooTypography.comboBox,
+                    const SizedBox(height: 6),
+                    if (!_editing)
+                      _card(
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            ..._labels.entries.map(
+                              (e) => ChoiceChip(
+                                label: Text(e.value),
+                                selected: _kind == e.key,
+                                onSelected: (_) => setState(() {
+                                  _kind = e.key;
+                                  _query = '';
+                                  _search.clear();
+                                  _page = 0;
+                                }),
+                              ),
+                            ),
+                            if (_kind == 'rooms') searchControls,
+                            if (_kind != 'buildings')
+                              _select(
+                                'อาคาร/ตึก',
+                                _building,
+                                _rows('buildings'),
+                                (v) => setState(() {
+                                  _building = v;
+                                  _floor = null;
+                                  _page = 0;
+                                }),
+                                width: 220,
+                              ),
+                            if (_kind == 'rooms')
+                              _select(
+                                'ชั้น',
+                                _floor,
+                                _rows('floors')
+                                    .where((r) => r['parentId'] == _building)
+                                    .toList(),
+                                (v) => setState(() {
+                                  _floor = v;
+                                  _page = 0;
+                                }),
+                                width: 150,
+                              ),
+                            if (_kind != 'rooms') searchControls,
+                          ],
+                        ),
+                      ),
+                    const SizedBox(height: LaooLayout.cardSpacing),
+                    Expanded(
+                      child: _loading
+                          ? const Center(child: CircularProgressIndicator())
+                          : _editing
+                          ? SingleChildScrollView(
+                              child: _card(
+                                Form(
+                                  key: _form,
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          const Text('สถานะ'),
+                                          Switch(
+                                            value: _active,
+                                            onChanged: _saving
+                                                ? null
+                                                : (v) => setState(
+                                                    () => _active = v,
                                                   ),
-                                                ),
-                                              ),
-                                            )
-                                            .toList(),
-                                        onChanged: (v) =>
-                                            setState(() => _type = v!),
+                                          ),
+                                        ],
                                       ),
-                                      const SizedBox(height: 12),
                                       TextFormField(
-                                        initialValue: _description,
-                                        maxLength: 1000,
-                                        maxLines: 3,
+                                        controller: _code,
+                                        maxLength: 20,
                                         style: const TextStyle(
                                           fontSize: LaooTypography.inputText,
                                         ),
                                         decoration: _controlDecoration(
-                                          labelText: 'รายละเอียด',
+                                          labelText: 'รหัส *',
                                         ),
-                                        onChanged: (v) => _description = v,
+                                        validator: (v) =>
+                                            v == null || v.trim().isEmpty
+                                            ? 'กรุณาระบุรหัส'
+                                            : null,
                                       ),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                            ),
-                          )
-                        : visible.isEmpty
-                        ? _card(
-                            Center(
-                              child: Text(
-                                _kind != 'buildings' &&
-                                        (_kind == 'floors'
-                                                ? _building
-                                                : _floor) ==
-                                            null
-                                    ? 'กรุณาเลือกอาคารและชั้น'
-                                    : 'ไม่พบข้อมูล',
-                              ),
-                            ),
-                          )
-                        : compact || _cards
-                        ? ListView.separated(
-                            itemCount: visible.length,
-                            separatorBuilder: (_, i) =>
-                                const SizedBox(height: 6),
-                            itemBuilder: (_, i) {
-                              final r = visible[i];
-                              return _card(
-                                ListTile(
-                                  contentPadding: EdgeInsets.zero,
-                                  title: Text('${r['code']} | ${r['name']}'),
-                                  subtitle: Text(
-                                    r['active'] == true
-                                        ? 'ใช้งาน'
-                                        : 'ไม่ใช้งาน',
-                                  ),
-                                  trailing: editButton(r),
-                                ),
-                              );
-                            },
-                          )
-                        : _card(
-                            SingleChildScrollView(
-                              child: SizedBox(
-                                width: double.infinity,
-                                child: DataTable(
-                                  headingRowColor: WidgetStatePropertyAll(
-                                    primary.withValues(alpha: .1),
-                                  ),
-                                  columns: [
-                                    const DataColumn(label: Text('ID')),
-                                    const DataColumn(label: Text('Action')),
-                                    const DataColumn(label: Text('รหัสห้อง')),
-                                    const DataColumn(label: Text('ชื่อห้อง')),
-                                    if (rental) ...[
-                                      const DataColumn(label: Text('ประเภทห้อง')),
-                                      const DataColumn(label: Text('บริษัทผู้เช่า')),
-                                      const DataColumn(label: Text('ผู้ติดต่อ')),
-                                    ],
-                                    const DataColumn(label: Text('สถานะ')),
-                                  ],
-                                  rows: visible.asMap().entries.map((e) {
-                                    final r = e.value;
-                                    final tenant = rental ? _tenantForRoom(r['id']) : null;
-                                    final contacts = tenant == null ? <Map<String, dynamic>>[] : _contactsForTenant(tenant['tenantId']);
-                                    return DataRow(
-                                      cells: [
-                                        DataCell(Text('${current * 20 + e.key + 1}')),
-                                        DataCell(editButton(r)),
-                                        DataCell(Text('${r['code']}')),
-                                        DataCell(Text('${r['name']}')),
-                                        if (rental) ...[
-                                          DataCell(Text('${r['type'] ?? 'OFFICE'}')),
-                                                                                    DataCell(
-                                            tenant == null
-                                                ? r['type'] == 'OFFICE'
-                                                    ? TextButton(onPressed: () => _editTenant(r), child: const Text('กำหนดผู้เช่า'))
-                                                    : const Text('ต้องเป็นห้อง OFFICE')
-                                                : Text('${tenant['tenantCompanyName']}'),
+                                      const SizedBox(height: 12),
+                                      TextFormField(
+                                        controller: _name,
+                                        maxLength: 200,
+                                        style: const TextStyle(
+                                          fontSize: LaooTypography.inputText,
+                                        ),
+                                        decoration: _controlDecoration(
+                                          labelText: 'ชื่อ *',
+                                        ),
+                                        validator: (v) =>
+                                            v == null || v.trim().isEmpty
+                                            ? 'กรุณาระบุชื่อ'
+                                            : null,
+                                      ),
+                                      if (_kind == 'rooms') ...[
+                                        const SizedBox(height: 12),
+                                        DropdownButtonFormField<String>(
+                                          initialValue: _type,
+                                          style: const TextStyle(
+                                            fontSize: LaooTypography.comboBox,
                                           ),
+                                          decoration: _controlDecoration(
+                                            labelText: 'ประเภทห้อง *',
+                                          ),
+                                          items: _types.entries
+                                              .map(
+                                                (e) => DropdownMenuItem(
+                                                  value: e.key,
+                                                  child: Text(
+                                                    e.value,
+                                                    style: const TextStyle(
+                                                      fontSize: LaooTypography
+                                                          .comboBox,
+                                                    ),
+                                                  ),
+                                                ),
+                                              )
+                                              .toList(),
+                                          onChanged: (v) =>
+                                              setState(() => _type = v!),
+                                        ),
+                                        const SizedBox(height: 12),
+                                        TextFormField(
+                                          initialValue: _description,
+                                          maxLength: 1000,
+                                          maxLines: 3,
+                                          style: const TextStyle(
+                                            fontSize: LaooTypography.inputText,
+                                          ),
+                                          decoration: _controlDecoration(
+                                            labelText: 'รายละเอียด',
+                                          ),
+                                          onChanged: (v) => _description = v,
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            )
+                          : visible.isEmpty
+                          ? _card(
+                              Center(
+                                child: Text(
+                                  _kind != 'buildings' &&
+                                          (_kind == 'floors'
+                                                  ? _building
+                                                  : _floor) ==
+                                              null
+                                      ? 'กรุณาเลือกอาคารและชั้น'
+                                      : 'ไม่พบข้อมูล',
+                                ),
+                              ),
+                            )
+                          : compact || _cards
+                          ? ListView.separated(
+                              itemCount: visible.length,
+                              separatorBuilder: (_, i) =>
+                                  const SizedBox(height: 6),
+                              itemBuilder: (_, i) {
+                                final r = visible[i];
+                                return _card(
+                                  ListTile(
+                                    contentPadding: EdgeInsets.zero,
+                                    title: Text('${r['code']} | ${r['name']}'),
+                                    subtitle: Text(
+                                      r['active'] == true
+                                          ? 'ใช้งาน'
+                                          : 'ไม่ใช้งาน',
+                                    ),
+                                    trailing: editButton(r),
+                                  ),
+                                );
+                              },
+                            )
+                          : _card(
+                              SingleChildScrollView(
+                                child: SizedBox(
+                                  width: double.infinity,
+                                  child: DataTable(
+                                    headingRowColor: WidgetStatePropertyAll(
+                                      primary.withValues(alpha: .1),
+                                    ),
+                                    columns: [
+                                      const DataColumn(label: Text('ID')),
+                                      const DataColumn(label: Text('Action')),
+                                      const DataColumn(label: Text('รหัสห้อง')),
+                                      const DataColumn(label: Text('ชื่อห้อง')),
+                                      if (rental) ...[
+                                        const DataColumn(
+                                          label: Text('ประเภทห้อง'),
+                                        ),
+                                        const DataColumn(
+                                          label: Text('บริษัทผู้เช่า'),
+                                        ),
+                                        const DataColumn(
+                                          label: Text('ผู้ติดต่อ'),
+                                        ),
+                                      ],
+                                      const DataColumn(label: Text('สถานะ')),
+                                    ],
+                                    rows: visible.asMap().entries.map((e) {
+                                      final r = e.value;
+                                      final tenant = rental
+                                          ? _tenantForRoom(r['id'])
+                                          : null;
+                                      final contacts = tenant == null
+                                          ? <Map<String, dynamic>>[]
+                                          : _contactsForTenant(
+                                              tenant['tenantId'],
+                                            );
+                                      return DataRow(
+                                        cells: [
                                           DataCell(
-                                            tenant == null
-                                                ? const Text('-')
-                                                : TextButton(onPressed: () => _showContacts(tenant), child: Text('${contacts.length} คน')),
+                                            Text('${current * 20 + e.key + 1}'),
+                                          ),
+                                          DataCell(editButton(r)),
+                                          DataCell(Text('${r['code']}')),
+                                          DataCell(Text('${r['name']}')),
+                                          if (rental) ...[
+                                            DataCell(
+                                              Text('${r['type'] ?? 'OFFICE'}'),
+                                            ),
+                                            DataCell(
+                                              tenant == null
+                                                  ? r['type'] == 'OFFICE'
+                                                        ? TextButton(
+                                                            onPressed: () =>
+                                                                _editTenant(r),
+                                                            child: const Text(
+                                                              'กำหนดผู้เช่า',
+                                                            ),
+                                                          )
+                                                        : const Text(
+                                                            'ต้องเป็นห้อง OFFICE',
+                                                          )
+                                                  : Text(
+                                                      '${tenant['tenantCompanyName']}',
+                                                    ),
+                                            ),
+                                            DataCell(
+                                              tenant == null
+                                                  ? const Text('-')
+                                                  : TextButton(
+                                                      onPressed: () =>
+                                                          _showContacts(tenant),
+                                                      child: Text(
+                                                        '${contacts.length} คน',
+                                                      ),
+                                                    ),
+                                            ),
+                                          ],
+                                          DataCell(
+                                            Text(
+                                              r['active'] == true
+                                                  ? 'ใช้งาน'
+                                                  : 'ไม่ใช้งาน',
+                                            ),
                                           ),
                                         ],
-                                        DataCell(Text(r['active'] == true ? 'ใช้งาน' : 'ไม่ใช้งาน')),
-                                      ],
-                                    );
-                                  }).toList(),
+                                      );
+                                    }).toList(),
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                  ),
-                  if (!_editing) ...[
-                    const SizedBox(height: LaooLayout.cardSpacing),
-                    const Divider(height: 1, color: LaooColors.border),
-                    SizedBox(
-                      height: LaooLayout.paginationCardHeight,
-                      child: _card(
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 4,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          children: [
-                            _paginationButton(
-                              icon: Icons.chevron_left,
-                              primary: primary,
-                              enabled: current > 0,
-                              onPressed: () =>
-                                  setState(() => _page = current - 1),
-                            ),
-                            _paginationButton(
-                              label: '${pages == 0 ? 0 : current + 1}',
-                              primary: primary,
-                              current: true,
-                              enabled: pages > 0,
-                              onPressed: () {},
-                            ),
-                            _paginationButton(
-                              icon: Icons.chevron_right,
-                              primary: primary,
-                              enabled: current + 1 < pages,
-                              onPressed: () =>
-                                  setState(() => _page = current + 1),
-                            ),
-                            Text(
-                              '${records.isEmpty ? 0 : current * 20 + 1}-${current * 20 + visible.length} จาก ${records.length}',
-                              style: const TextStyle(
-                                fontSize: LaooTypography.tableBody,
+                    ),
+                    if (!_editing) ...[
+                      const SizedBox(height: LaooLayout.cardSpacing),
+                      const Divider(height: 1, color: LaooColors.border),
+                      SizedBox(
+                        height: LaooLayout.paginationCardHeight,
+                        child: _card(
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 4,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              _paginationButton(
+                                icon: Icons.chevron_left,
+                                primary: primary,
+                                enabled: current > 0,
+                                onPressed: () =>
+                                    setState(() => _page = current - 1),
                               ),
-                            ),
-                          ],
+                              _paginationButton(
+                                label: '${pages == 0 ? 0 : current + 1}',
+                                primary: primary,
+                                current: true,
+                                enabled: pages > 0,
+                                onPressed: () {},
+                              ),
+                              _paginationButton(
+                                icon: Icons.chevron_right,
+                                primary: primary,
+                                enabled: current + 1 < pages,
+                                onPressed: () =>
+                                    setState(() => _page = current + 1),
+                              ),
+                              Text(
+                                '${records.isEmpty ? 0 : current * 20 + 1}-${current * 20 + visible.length} จาก ${records.length}',
+                                style: const TextStyle(
+                                  fontSize: LaooTypography.tableBody,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
+                    ],
                   ],
-                ],
-              ),
-            ),
-            if (_message != null)
-              Positioned(
-                top: 10,
-                right: 10,
-                left: 10,
-                child: AutoDismissMessage(
-                  message: _message!,
-                  error: _error,
-                  onClose: () {
-                    if (mounted) setState(() => _message = null);
-                  },
                 ),
               ),
-          ],
-        );
-      },
-    ),
-  );
-
+              if (_message != null)
+                Positioned(
+                  top: 10,
+                  right: 10,
+                  left: 10,
+                  child: AutoDismissMessage(
+                    message: _message!,
+                    error: _error,
+                    onClose: () {
+                      if (mounted) setState(() => _message = null);
+                    },
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
+    );
   }
 
   Widget _paginationButton({

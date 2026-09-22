@@ -70,6 +70,86 @@ SELECT RoomID id,BuildingID buildingId,FloorID parentId,RoomCode code,RoomNameTH
     [HttpPut("{kind}/{id:long}")]
     public Task<IActionResult> Update(string kind,long id,LocationRequest request,CancellationToken token) => Save(kind,id,request,token);
 
+    [HttpGet("rooms/{roomId:long}/residents")]
+    public async Task<IActionResult> RoomResidents(long roomId, CancellationToken token)
+    {
+        await using var c = await Open(token);
+        if (!await Allowed(c, "VIEW", token)) return Forbid();
+        const string sql = """
+SELECT RoomID id, RoomCode code, RoomNameTH name, RoomTypeCode type
+FROM dbo.TDADRoom WHERE CompanyID=@company AND RoomID=@roomId AND IsActive=1;
+SELECT R.ResidentID residentID,R.PersonID personID,P.FullName fullName,P.NickName nickName,P.Mobile mobile,R.RoomID roomID,R.HouseID houseID,R.StartDate startDate,R.EndDate endDate,R.IsActive active
+FROM dbo.TDADResident R JOIN dbo.TDADPerson P ON P.CompanyID=R.CompanyID AND P.PersonID=R.PersonID
+WHERE R.CompanyID=@company AND R.RoomID=@roomId AND R.HouseID IS NULL AND R.IsActive=1 AND P.IsActive=1 ORDER BY P.FullName,R.ResidentID;
+SELECT R.ResidentID residentID,R.PersonID personID,P.FullName fullName,P.NickName nickName,P.Mobile mobile,R.RoomID roomID,R.HouseID houseID,R.StartDate startDate,R.EndDate endDate,R.IsActive active
+FROM dbo.TDADResident R JOIN dbo.TDADPerson P ON P.CompanyID=R.CompanyID AND P.PersonID=R.PersonID
+WHERE R.CompanyID=@company AND R.RoomID IS NULL AND R.HouseID IS NULL AND R.IsActive=1 AND P.IsActive=1 ORDER BY P.FullName,R.ResidentID;
+""";
+        await using var cmd = new SqlCommand(sql, c);
+        cmd.Parameters.AddWithValue("@company", Company); cmd.Parameters.AddWithValue("@roomId", roomId);
+        await using var reader = await cmd.ExecuteReaderAsync(token);
+        var sets = new List<List<Dictionary<string, object?>>>();
+        do
+        {
+            var rows = new List<Dictionary<string, object?>>();
+            while (await reader.ReadAsync(token))
+            {
+                var row = new Dictionary<string, object?>();
+                for (var i = 0; i < reader.FieldCount; i++) row[reader.GetName(i)] = reader.IsDBNull(i) ? null : reader.GetValue(i);
+                rows.Add(row);
+            }
+            sets.Add(rows);
+        } while (await reader.NextResultAsync(token));
+        if (sets[0].Count == 0 || Convert.ToString(sets[0][0]["type"]) != "RESIDENTIAL") return BadRequest(new { message = "ห้องนี้ไม่ใช่ห้องพักอาศัย" });
+        return Ok(new { room = sets[0][0], assigned = sets[1], available = sets[2] });
+    }
+
+    [HttpPut("rooms/{roomId:long}/residents")]
+    public async Task<IActionResult> AssignRoomResidents(long roomId, RoomResidentAssignmentRequest request, CancellationToken token)
+    {
+        await using var c = await Open(token);
+        if (!await Allowed(c, "EDIT", token)) return Forbid();
+        var residentIds = (request.ResidentIds ?? new List<long>()).Where(id => id > 0).Distinct().ToArray();
+        await using var tx = (SqlTransaction)await c.BeginTransactionAsync(IsolationLevel.Serializable, token);
+        try
+        {
+            const string roomSql = "SELECT COUNT(1) FROM dbo.TDADRoom WHERE CompanyID=@company AND RoomID=@roomId AND RoomTypeCode=N'RESIDENTIAL' AND IsActive=1;";
+            await using (var room = new SqlCommand(roomSql, c, tx))
+            {
+                room.Parameters.AddWithValue("@company", Company); room.Parameters.AddWithValue("@roomId", roomId);
+                if (Convert.ToInt32(await room.ExecuteScalarAsync(token)) != 1) return BadRequest(new { message = "ห้องนี้ไม่ใช่ห้องพักอาศัยหรือไม่อยู่ใน Company" });
+            }
+            var parameters = new List<string>();
+            await using var validate = new SqlCommand { Connection = c, Transaction = tx };
+            validate.Parameters.AddWithValue("@company", Company);
+            for (var i = 0; i < residentIds.Length; i++) { var name = "@r" + i; parameters.Add(name); validate.Parameters.Add(name, SqlDbType.BigInt).Value = residentIds[i]; }
+            if (residentIds.Length > 0)
+            {
+                validate.CommandText = $"SELECT COUNT(1) FROM dbo.TDADResident R JOIN dbo.TDADPerson P ON P.CompanyID=R.CompanyID AND P.PersonID=R.PersonID WHERE R.CompanyID=@company AND R.ResidentID IN ({string.Join(',', parameters)}) AND R.IsActive=1 AND P.IsActive=1 AND R.HouseID IS NULL AND (R.RoomID IS NULL OR R.RoomID=@roomId);";
+                validate.Parameters.AddWithValue("@roomId", roomId);
+                if (Convert.ToInt32(await validate.ExecuteScalarAsync(token)) != residentIds.Length) return Conflict(new { message = "เลือกผู้พักอาศัยได้เฉพาะรายการที่ยังไม่จัดห้องหรืออยู่ในห้องนี้" });
+            }
+            var clear = residentIds.Length == 0
+                ? "UPDATE dbo.TDADResident SET RoomID=NULL,UpdateDate=SYSUTCDATETIME(),UpdateBy=@actor WHERE CompanyID=@company AND RoomID=@roomId AND HouseID IS NULL;"
+                : $"UPDATE dbo.TDADResident SET RoomID=NULL,UpdateDate=SYSUTCDATETIME(),UpdateBy=@actor WHERE CompanyID=@company AND RoomID=@roomId AND HouseID IS NULL AND ResidentID NOT IN ({string.Join(',', parameters)});";
+            await using (var command = new SqlCommand(clear, c, tx))
+            {
+                command.Parameters.AddWithValue("@company", Company); command.Parameters.AddWithValue("@roomId", roomId); command.Parameters.AddWithValue("@actor", User.FindFirstValue("user_id") ?? "api");
+                await command.ExecuteNonQueryAsync(token);
+            }
+            if (residentIds.Length > 0)
+            {
+                var assign = $"UPDATE dbo.TDADResident SET RoomID=@roomId,HouseID=NULL,UpdateDate=SYSUTCDATETIME(),UpdateBy=@actor WHERE CompanyID=@company AND ResidentID IN ({string.Join(',', parameters)});";
+                await using var command = new SqlCommand(assign, c, tx);
+                command.Parameters.AddWithValue("@company", Company); command.Parameters.AddWithValue("@roomId", roomId); command.Parameters.AddWithValue("@actor", User.FindFirstValue("user_id") ?? "api");
+                for (var i = 0; i < residentIds.Length; i++) command.Parameters.Add(parameters[i], SqlDbType.BigInt).Value = residentIds[i];
+                await command.ExecuteNonQueryAsync(token);
+            }
+            await tx.CommitAsync(token);
+            return NoContent();
+        }
+        catch { await tx.RollbackAsync(token); throw; }
+    }
     [HttpDelete("{kind}/{id:long}")]
     public async Task<IActionResult> Delete(string kind,long id,CancellationToken token)
     {
@@ -170,3 +250,4 @@ SELECT @id;
 }
 
 public sealed record LocationRequest(string Code,string Name,long? ParentId,string? Type,string? Description,bool Active=true);
+public sealed record RoomResidentAssignmentRequest(List<long>? ResidentIds);
