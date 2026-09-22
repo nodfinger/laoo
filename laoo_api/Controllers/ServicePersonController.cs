@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 using System.Security.Claims;
 using LaooApi.Security;
 using Microsoft.AspNetCore.Authorization;
@@ -44,7 +44,7 @@ SELECT COUNT_BIG(1) OVER(),P.PersonID,P.FullName,P.NickName,P.Email,P.Mobile,P.I
  CAST(CASE WHEN R.ResidentID IS NULL THEN 0 ELSE 1 END AS bit),SC.RowVersion,R.ResidentID,R.RoomID,R.HouseID,R.StartDate,R.EndDate,R.RowVersion
 FROM dbo.TDADPerson P
 OUTER APPLY(SELECT TOP(1) ServiceCustomerID,RowVersion FROM dbo.TDADServiceCustomer WHERE CompanyID=P.CompanyID AND PersonID=P.PersonID AND IsActive=1) SC
-OUTER APPLY(SELECT TOP(1) ResidentID,RoomID,StartDate,EndDate,RowVersion FROM dbo.TDADResident WHERE CompanyID=P.CompanyID AND PersonID=P.PersonID AND IsActive=1 ORDER BY StartDate DESC,ResidentID DESC) R
+OUTER APPLY(SELECT TOP(1) ResidentID,RoomID,HouseID,StartDate,EndDate,RowVersion FROM dbo.TDADResident WHERE CompanyID=P.CompanyID AND PersonID=P.PersonID AND IsActive=1 ORDER BY StartDate DESC,ResidentID DESC) R
 WHERE P.CompanyID=@company AND (@role=N'CUSTOMER' AND SC.ServiceCustomerID IS NOT NULL OR @role=N'RESIDENT' AND R.ResidentID IS NOT NULL OR @role=N'ANY' AND (SC.ServiceCustomerID IS NOT NULL OR R.ResidentID IS NOT NULL))
  AND (@active IS NULL OR P.IsActive=@active)
  AND (@search=N'' OR P.FullName LIKE @like OR P.NickName LIKE @like OR P.Email LIKE @like OR P.Mobile LIKE @like)
@@ -79,3 +79,4 @@ ORDER BY P.FullName,P.PersonID OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONL
     private static string? Bytes(SqlDataReader r, int i) => r.IsDBNull(i) ? null : Convert.ToBase64String((byte[])r[i]);
     private static void Add(SqlCommand c, string n, SqlDbType t, object? v, int size = 0) { var p = size == 0 ? c.Parameters.Add(n, t) : c.Parameters.Add(n, t, size); p.Value = v ?? DBNull.Value; }
 }
+
