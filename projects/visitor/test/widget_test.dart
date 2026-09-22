@@ -10,6 +10,6 @@ void main() {
     expect(LaooOwnerScope.values, hasLength(3));
     expect(VisitorRoutes.all, hasLength(22));
     expect(VisitorRoutes.implemented, hasLength(2));
-    expect(buildVisitorFeatureRoutes(), hasLength(2));
+    expect(buildVisitorFeatureRoutes(), hasLength(6));
   });
 }

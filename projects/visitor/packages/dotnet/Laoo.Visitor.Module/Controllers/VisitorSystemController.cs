@@ -358,40 +358,74 @@ VALUES(@CompanyID,@VersionID,@BeforeJson,@AfterJson,@Reason,@UserID);
         });
     }
 
+    [HttpGet("check-ins/inside/actions")]
+    public async Task<IActionResult> InsideActions(CancellationToken token)
+    {
+        if (!TryScope(out _, out _)) return Forbid();
+        await using var connection = await Open(token);
+        return Ok(new
+        {
+            menuCode = CheckInMenu,
+            caption = await Caption(connection, CheckInMenu, token),
+            screenType = 1,
+            view = await Can(connection, CheckInMenu, "VIEW", token),
+            create = await Can(connection, CheckInMenu, "CREATE", token),
+            edit = await Can(connection, CheckInMenu, "EDIT", token),
+        });
+    }
+
     [HttpGet("check-ins/inside")]
     public async Task<IActionResult> Inside(
+        CancellationToken token,
         [FromQuery] long? branchId,
-        CancellationToken token)
+        [FromQuery] string? search,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
     {
         if (!TryScope(out var companyId, out _)) return Forbid();
         await using var connection = await Open(token);
         if (!await Can(connection, CheckInMenu, "VIEW", token)) return Forbid();
         var branch = ScopedBranch(branchId);
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 100);
+        var query = Clean(search) ?? string.Empty;
         await using var command = new SqlCommand("""
-SELECT VisitorVisitID,BranchID,VisitorName,Phone,NationalIdMasked,HostType,
+SELECT COUNT_BIG(1) OVER(),VisitorVisitID,BranchID,VisitorName,Phone,NationalIdMasked,HostType,
        HostEmployeeID,HostResidentID,HostNameSnapshot,HostRoomSnapshot,
-       VisitPurpose,CaptureMethod,CheckedInDate
+       VisitPurpose,CaptureMethod,CheckedInDate,ContactPointNameSnapshot
 FROM dbo.TDTMVisitorVisit
 WHERE CompanyID=@CompanyID AND StatusCode='CHECKED_IN'
   AND (@BranchID IS NULL OR BranchID=@BranchID)
-ORDER BY CheckedInDate DESC,VisitorVisitID DESC;
+  AND (@Search=N'' OR VisitorName LIKE @Like OR Phone LIKE @Like
+       OR HostNameSnapshot LIKE @Like OR ContactPointNameSnapshot LIKE @Like)
+ORDER BY CheckedInDate DESC,VisitorVisitID DESC
+OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;
 """, connection);
         Add(command, "@CompanyID", SqlDbType.BigInt, companyId);
         Add(command, "@BranchID", SqlDbType.BigInt, branch);
+        Add(command, "@Search", SqlDbType.NVarChar, query, 200);
+        Add(command, "@Like", SqlDbType.NVarChar, $"%{query}%", 210);
+        Add(command, "@Offset", SqlDbType.Int, (page - 1) * pageSize);
+        Add(command, "@PageSize", SqlDbType.Int, pageSize);
         await using var reader = await command.ExecuteReaderAsync(token);
         var items = new List<object>();
+        long total = 0;
         while (await reader.ReadAsync(token))
+        {
+            total = reader.GetInt64(0);
             items.Add(new
             {
-                visitorVisitId = reader.GetInt64(0), branchId = reader.GetInt64(1),
-                visitorName = reader.GetString(2), phone = Text(reader, 3),
-                nationalIdMasked = Text(reader, 4), hostType = reader.GetString(5),
-                hostEmployeeId = Long(reader, 6), hostResidentId = Long(reader, 7),
-                hostName = Text(reader, 8), hostRoom = Text(reader, 9),
-                visitPurpose = Text(reader, 10), captureMethod = reader.GetString(11),
-                checkedInDate = reader.GetDateTime(12),
+                visitorVisitId = reader.GetInt64(1), branchId = reader.GetInt64(2),
+                visitorName = reader.GetString(3), phone = Text(reader, 4),
+                nationalIdMasked = Text(reader, 5), hostType = reader.GetString(6),
+                hostEmployeeId = Long(reader, 7), hostResidentId = Long(reader, 8),
+                hostName = Text(reader, 9), hostRoom = Text(reader, 10),
+                visitPurpose = Text(reader, 11), captureMethod = reader.GetString(12),
+                checkedInDate = reader.GetDateTime(13),
+                contactPointName = Text(reader, 14),
             });
-        return Ok(new { items });
+        }
+        return Ok(new { items, total, page, pageSize });
     }
 
     [HttpPost("check-ins")]
