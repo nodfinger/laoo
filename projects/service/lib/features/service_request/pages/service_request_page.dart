@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:laoo_shared_core/laoo_shared_core.dart';
+
+import '../../../app/theme/laoo_design_tokens.dart';
 
 import '../../../core/api/api_exception.dart';
 import '../../../core/widgets/timed_snack_bar.dart';
@@ -53,12 +54,19 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
 
   Future<void> _create() async {
     if (widget.selfService) {
+      final lookup = await _api.lookup();
+      if (!mounted) return;
       final saved = await showDialog<bool>(
         context: context,
-        builder: (_) => _RequestDialog(api: _api, selfService: true),
+        builder: (_) =>
+            _RequestDialog(api: _api, lookup: lookup, selfService: true),
       );
       if (saved == true && mounted)
-        showTimedSnackBar(context, message: 'ส่งคำขอแจ้งซ่อมสำเร็จ');
+        showTimedSnackBar(
+          context,
+          message:
+              'เธชเนเธเธเธณเธเธญเนเธเนเธเธเนเธญเธกเธชเธณเน€เธฃเนเธ',
+        );
       return;
     }
     final lookup = await _api.lookup();
@@ -70,16 +78,22 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
     if (saved == true) {
       _page = 1;
       await _load();
-      if (mounted) showTimedSnackBar(context, message: 'บันทึกแจ้งซ่อมสำเร็จ');
+      if (mounted)
+        showTimedSnackBar(
+          context,
+          message:
+              'เธเธฑเธเธ—เธถเธเนเธเนเธเธเนเธญเธกเธชเธณเน€เธฃเนเธ',
+        );
     }
   }
 
   void _error(Object error) {
     final message = error is ApiException
         ? error.message +
-              '\nรายละเอียดเพิ่มเติม: ' +
-              (error.description ?? 'กรุณาตรวจสอบข้อมูล')
-        : 'ดำเนินการไม่สำเร็จ\nรายละเอียดเพิ่มเติม: กรุณาลองใหม่';
+              '\nเธฃเธฒเธขเธฅเธฐเน€เธญเธตเธขเธ”เน€เธเธดเนเธกเน€เธ•เธดเธก: ' +
+              (error.description ??
+                  'เธเธฃเธธเธ“เธฒเธ•เธฃเธงเธเธชเธญเธเธเนเธญเธกเธนเธฅ')
+        : 'เธ”เธณเน€เธเธดเธเธเธฒเธฃเนเธกเนเธชเธณเน€เธฃเนเธ\nเธฃเธฒเธขเธฅเธฐเน€เธญเธตเธขเธ”เน€เธเธดเนเธกเน€เธ•เธดเธก: เธเธฃเธธเธ“เธฒเธฅเธญเธเนเธซเธกเน';
     showTimedSnackBar(context, message: message, error: true);
   }
 
@@ -87,12 +101,16 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
   Widget build(BuildContext context) {
     if (widget.selfService) {
       return Scaffold(
-        appBar: AppBar(title: const Text('แจ้งซ่อม / ขอใช้บริการ')),
+        appBar: AppBar(
+          title: const Text(
+            'เนเธเนเธเธเนเธญเธก / เธเธญเนเธเนเธเธฃเธดเธเธฒเธฃ',
+          ),
+        ),
         body: Center(
           child: FilledButton.icon(
             onPressed: _create,
             icon: const Icon(Icons.build_outlined),
-            label: const Text('แจ้งซ่อม'),
+            label: const Text('เนเธเนเธเธเนเธญเธก'),
           ),
         ),
       );
@@ -104,7 +122,8 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
     );
     final total = (_data['total'] as num?)?.toInt() ?? 0;
     return SupportWorkspaceShell(
-      pageTitle: 'รายการแจ้งซ่อมทั้งหมด',
+      pageTitle:
+          'เธฃเธฒเธขเธเธฒเธฃเนเธเนเธเธเนเธญเธกเธ—เธฑเนเธเธซเธกเธ”',
       activeMenu: 'cmTickets',
       menuScope: WorkspaceMenuScope.company,
       child: Container(
@@ -120,14 +139,14 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
                 const SizedBox(width: 10),
                 const Expanded(
                   child: Text(
-                    'รายการแจ้งซ่อมทั้งหมด',
+                    'เธฃเธฒเธขเธเธฒเธฃเนเธเนเธเธเนเธญเธกเธ—เธฑเนเธเธซเธกเธ”',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                   ),
                 ),
                 FilledButton.icon(
                   onPressed: _create,
                   icon: const Icon(Icons.add),
-                  label: const Text('เพิ่มแจ้งซ่อม'),
+                  label: const Text('เน€เธเธดเนเธกเนเธเนเธเธเนเธญเธก'),
                 ),
               ],
             ),
@@ -145,7 +164,8 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
                       _load();
                     },
                     decoration: _input(
-                      hint: 'ค้นหาเลขที่ ผู้แจ้ง หรือหัวข้อ',
+                      hint:
+                          'เธเนเธเธซเธฒเน€เธฅเธเธ—เธตเน เธเธนเนเนเธเนเธ เธซเธฃเธทเธญเธซเธฑเธงเธเนเธญ',
                       icon: Icons.search,
                     ),
                   ),
@@ -154,25 +174,33 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
                   width: 170,
                   child: DropdownButtonFormField<String>(
                     initialValue: _status,
-                    decoration: _input(label: 'สถานะ'),
+                    decoration: _input(label: 'เธชเธ–เธฒเธเธฐ'),
                     items: const [
-                      DropdownMenuItem(value: '', child: Text('ทั้งหมด')),
-                      DropdownMenuItem(value: 'NEW', child: Text('ใหม่')),
+                      DropdownMenuItem(
+                        value: '',
+                        child: Text('เธ—เธฑเนเธเธซเธกเธ”'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'NEW',
+                        child: Text('เนเธซเธกเน'),
+                      ),
                       DropdownMenuItem(
                         value: 'RECEIVED',
-                        child: Text('รับเรื่อง'),
+                        child: Text('เธฃเธฑเธเน€เธฃเธทเนเธญเธ'),
                       ),
                       DropdownMenuItem(
                         value: 'IN_PROGRESS',
-                        child: Text('กำลังดำเนินการ'),
+                        child: Text(
+                          'เธเธณเธฅเธฑเธเธ”เธณเน€เธเธดเธเธเธฒเธฃ',
+                        ),
                       ),
                       DropdownMenuItem(
                         value: 'COMPLETED',
-                        child: Text('เสร็จสิ้น'),
+                        child: Text('เน€เธชเธฃเนเธเธชเธดเนเธ'),
                       ),
                       DropdownMenuItem(
                         value: 'CANCELLED',
-                        child: Text('ยกเลิก'),
+                        child: Text('เธขเธเน€เธฅเธดเธ'),
                       ),
                     ],
                     onChanged: (v) {
@@ -189,7 +217,7 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
                     _page = 1;
                     _load();
                   },
-                  child: const Text('ล้าง Filter'),
+                  child: const Text('เธฅเนเธฒเธ Filter'),
                 ),
               ],
             ),
@@ -199,12 +227,12 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
               scrollDirection: Axis.horizontal,
               child: DataTable(
                 columns: const [
-                  DataColumn(label: Text('เลขที่')),
-                  DataColumn(label: Text('ผู้แจ้ง')),
-                  DataColumn(label: Text('สถานที่')),
-                  DataColumn(label: Text('หัวข้อ')),
-                  DataColumn(label: Text('สถานะ')),
-                  DataColumn(label: Text('วันที่')),
+                  DataColumn(label: Text('เน€เธฅเธเธ—เธตเน')),
+                  DataColumn(label: Text('เธเธนเนเนเธเนเธ')),
+                  DataColumn(label: Text('เธชเธ–เธฒเธเธ—เธตเน')),
+                  DataColumn(label: Text('เธซเธฑเธงเธเนเธญ')),
+                  DataColumn(label: Text('เธชเธ–เธฒเธเธฐ')),
+                  DataColumn(label: Text('เธงเธฑเธเธ—เธตเน')),
                 ],
                 rows: [
                   for (final row in items)
@@ -268,12 +296,12 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
           const SizedBox(width: 12),
           Text(
             total == 0
-                ? '0-0 จาก 0'
+                ? '0-0 เธเธฒเธ 0'
                 : (_page == 1
                           ? '1-'
                           : (((_page - 1) * 20) + 1).toString() + '-') +
                       end.toString() +
-                      ' จาก ' +
+                      ' เธเธฒเธ ' +
                       total.toString(),
           ),
         ],
@@ -292,11 +320,11 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
       );
   String _statusText(String code) =>
       const {
-        'NEW': 'ใหม่',
-        'RECEIVED': 'รับเรื่อง',
-        'IN_PROGRESS': 'กำลังดำเนินการ',
-        'COMPLETED': 'เสร็จสิ้น',
-        'CANCELLED': 'ยกเลิก',
+        'NEW': 'เนเธซเธกเน',
+        'RECEIVED': 'เธฃเธฑเธเน€เธฃเธทเนเธญเธ',
+        'IN_PROGRESS': 'เธเธณเธฅเธฑเธเธ”เธณเน€เธเธดเธเธเธฒเธฃ',
+        'COMPLETED': 'เน€เธชเธฃเนเธเธชเธดเนเธ',
+        'CANCELLED': 'เธขเธเน€เธฅเธดเธ',
       }[code] ??
       code;
 }
@@ -319,6 +347,7 @@ class _RequestDialogState extends State<_RequestDialog> {
   final _subject = TextEditingController();
   final _detail = TextEditingController();
   Map<String, dynamic>? _requester;
+  Map<String, dynamic>? _equipment;
   bool _saving = false;
 
   @override
@@ -330,11 +359,20 @@ class _RequestDialogState extends State<_RequestDialog> {
 
   Future<void> _save() async {
     if (!_form.currentState!.validate() || _saving) return;
+    if (_equipment == null) {
+      showTimedSnackBar(
+        context,
+        message:
+            'เธเธฃเธธเธ“เธฒเน€เธฅเธทเธญเธเธญเธธเธเธเธฃเธ“เนเธ—เธตเนเนเธเนเธเธฑเธเธฃเธฐเธเธ Service',
+        error: true,
+      );
+      return;
+    }
     if (!widget.selfService && _requester == null) {
       showTimedSnackBar(
         context,
         message:
-            'กรุณาเลือกผู้แจ้ง\nรายละเอียดเพิ่มเติม: เลือกผู้พักอาศัย ผู้ติดต่อ หรือผู้ใช้บริการ',
+            'เธเธฃเธธเธ“เธฒเน€เธฅเธทเธญเธเธเธนเนเนเธเนเธ\nเธฃเธฒเธขเธฅเธฐเน€เธญเธตเธขเธ”เน€เธเธดเนเธกเน€เธ•เธดเธก: เน€เธฅเธทเธญเธเธเธนเนเธเธฑเธเธญเธฒเธจเธฑเธข เธเธนเนเธ•เธดเธ”เธ•เนเธญ เธซเธฃเธทเธญเธเธนเนเนเธเนเธเธฃเธดเธเธฒเธฃ',
         error: true,
       );
       return;
@@ -345,6 +383,7 @@ class _RequestDialogState extends State<_RequestDialog> {
         selfService: widget.selfService,
         requesterId: (_requester?['id'] as num?)?.toInt(),
         requesterType: _requester?['requesterType']?.toString(),
+        equipmentItemId: (_equipment?['itemID'] as num?)?.toInt(),
         subject: _subject.text.trim(),
         detail: _detail.text.trim(),
       );
@@ -355,9 +394,10 @@ class _RequestDialogState extends State<_RequestDialog> {
           context,
           message: error is ApiException
               ? error.message +
-                    '\nรายละเอียดเพิ่มเติม: ' +
-                    (error.description ?? 'กรุณาตรวจสอบข้อมูล')
-              : 'บันทึกไม่สำเร็จ\nรายละเอียดเพิ่มเติม: กรุณาลองใหม่',
+                    '\nเธฃเธฒเธขเธฅเธฐเน€เธญเธตเธขเธ”เน€เธเธดเนเธกเน€เธ•เธดเธก: ' +
+                    (error.description ??
+                        'เธเธฃเธธเธ“เธฒเธ•เธฃเธงเธเธชเธญเธเธเนเธญเธกเธนเธฅ')
+              : 'เธเธฑเธเธ—เธถเธเนเธกเนเธชเธณเน€เธฃเนเธ\nเธฃเธฒเธขเธฅเธฐเน€เธญเธตเธขเธ”เน€เธเธดเนเธกเน€เธ•เธดเธก: เธเธฃเธธเธ“เธฒเธฅเธญเธเนเธซเธกเน',
           error: true,
         );
     } finally {
@@ -376,6 +416,11 @@ class _RequestDialogState extends State<_RequestDialog> {
       for (final r in requesters)
         r['requesterType'].toString() + ':' + r['id'].toString(): r,
     };
+    final equipment = List<Map<String, dynamic>>.from(
+      ((widget.lookup?['equipment'] as List?) ?? const []).map(
+        (e) => Map<String, dynamic>.from(e as Map),
+      ),
+    );
     return AlertDialog(
       backgroundColor: Colors.white,
       surfaceTintColor: Colors.transparent,
@@ -389,8 +434,8 @@ class _RequestDialogState extends State<_RequestDialog> {
           const SizedBox(width: 10),
           Text(
             widget.selfService
-                ? 'แจ้งซ่อม / ขอใช้บริการ'
-                : 'รายการแจ้งซ่อม > เพิ่ม',
+                ? 'เนเธเนเธเธเนเธญเธก / เธเธญเนเธเนเธเธฃเธดเธเธฒเธฃ'
+                : 'เธฃเธฒเธขเธเธฒเธฃเนเธเนเธเธเนเธญเธก > เน€เธเธดเนเธก',
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
           ),
         ],
@@ -407,19 +452,20 @@ class _RequestDialogState extends State<_RequestDialog> {
                 const Divider(),
                 if (!widget.selfService) ...[
                   DropdownButtonFormField<String>(
-                    decoration: _input('ผู้แจ้ง *'),
+                    decoration: _input(label: ''),
                     items: [
                       for (final entry in keys.entries)
                         DropdownMenuItem(
                           value: entry.key,
-                          child: Text(entry.value['name'].toString()),
+                          child: Text(_requesterLabel(entry.value)),
                         ),
                     ],
                     onChanged: (key) => setState(
                       () => _requester = key == null ? null : keys[key],
                     ),
-                    validator: (_) =>
-                        _requester == null ? 'กรุณาเลือกผู้แจ้ง' : null,
+                    validator: (_) => _requester == null
+                        ? 'เธเธฃเธธเธ“เธฒเน€เธฅเธทเธญเธเธเธนเนเนเธเนเธ'
+                        : null,
                   ),
                   if (_requester != null) ...[
                     const SizedBox(height: 12),
@@ -429,9 +475,9 @@ class _RequestDialogState extends State<_RequestDialog> {
                         context,
                       ).colorScheme.primary.withValues(alpha: .08),
                       child: Text(
-                        'สถานที่: ' +
+                        'เธชเธ–เธฒเธเธ—เธตเน: ' +
                             ((_requester!['locationSnapshot'] ??
-                                    'ผู้ใช้บริการภายนอก')
+                                    'เธเธนเนเนเธเนเธเธฃเธดเธเธฒเธฃเธ เธฒเธขเธเธญเธ')
                                 .toString()),
                       ),
                     ),
@@ -443,15 +489,46 @@ class _RequestDialogState extends State<_RequestDialog> {
                       context,
                     ).colorScheme.primary.withValues(alpha: .08),
                     child: const Text(
-                      'ผู้แจ้ง: ผู้ใช้ปัจจุบัน\nสถานที่: ระบบตรวจสอบจากข้อมูลผู้ใช้',
+                      'เธเธนเนเนเธเนเธ: เธเธนเนเนเธเนเธเธฑเธเธเธธเธเธฑเธ\nเธชเธ–เธฒเธเธ—เธตเน: เธฃเธฐเธเธเธ•เธฃเธงเธเธชเธญเธเธเธฒเธเธเนเธญเธกเธนเธฅเธเธนเนเนเธเน',
                     ),
                   ),
                 const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: _equipment == null
+                      ? null
+                      : _equipment!['itemID'].toString(),
+                  decoration: _input(
+                    label:
+                        'เธญเธธเธเธเธฃเธ“เนเธ—เธตเนเนเธเนเธเธฑเธเธฃเธฐเธเธ Service *',
+                  ),
+                  items: [
+                    for (final item in equipment)
+                      DropdownMenuItem(
+                        value: item['itemID'].toString(),
+                        child: Text(
+                          '${item['itemCode']} | ${item['itemName']}',
+                        ),
+                      ),
+                  ],
+                  onChanged: (value) => setState(() {
+                    _equipment = value == null
+                        ? null
+                        : equipment.firstWhere(
+                            (item) => item['itemID'].toString() == value,
+                          );
+                  }),
+                  validator: (_) => _equipment == null
+                      ? 'เธเธฃเธธเธ“เธฒเน€เธฅเธทเธญเธเธญเธธเธเธเธฃเธ“เน'
+                      : null,
+                ),
+                const SizedBox(height: 12),
                 TextFormField(
                   controller: _subject,
-                  decoration: _input(label: 'หัวข้อแจ้งซ่อม *'),
+                  decoration: _input(
+                    label: 'เธซเธฑเธงเธเนเธญเนเธเนเธเธเนเธญเธก *',
+                  ),
                   validator: (v) => v == null || v.trim().isEmpty
-                      ? 'กรุณาระบุหัวข้อแจ้งซ่อม'
+                      ? 'เธเธฃเธธเธ“เธฒเธฃเธฐเธเธธเธซเธฑเธงเธเนเธญเนเธเนเธเธเนเธญเธก'
                       : null,
                 ),
                 const SizedBox(height: 12),
@@ -459,9 +536,9 @@ class _RequestDialogState extends State<_RequestDialog> {
                   controller: _detail,
                   minLines: 4,
                   maxLines: 7,
-                  decoration: _input(label: 'รายละเอียด *'),
+                  decoration: _input(label: 'เธฃเธฒเธขเธฅเธฐเน€เธญเธตเธขเธ” *'),
                   validator: (v) => v == null || v.trim().isEmpty
-                      ? 'กรุณาระบุรายละเอียด'
+                      ? 'เธเธฃเธธเธ“เธฒเธฃเธฐเธเธธเธฃเธฒเธขเธฅเธฐเน€เธญเธตเธขเธ”'
                       : null,
                 ),
                 const SizedBox(height: 14),
@@ -471,13 +548,13 @@ class _RequestDialogState extends State<_RequestDialog> {
                   children: [
                     TextButton(
                       onPressed: _saving ? null : () => Navigator.pop(context),
-                      child: const Text('ยกเลิก'),
+                      child: const Text('เธขเธเน€เธฅเธดเธ'),
                     ),
                     const SizedBox(width: 8),
                     FilledButton.icon(
                       onPressed: _saving ? null : _save,
                       icon: const Icon(Icons.save_outlined),
-                      label: const Text('บันทึก'),
+                      label: const Text('เธเธฑเธเธ—เธถเธ'),
                     ),
                   ],
                 ),
@@ -489,7 +566,15 @@ class _RequestDialogState extends State<_RequestDialog> {
     );
   }
 
-  InputDecoration _input(String label) => InputDecoration(
+  String _requesterLabel(Map<String, dynamic> value) {
+    final type = value['requesterType']?.toString();
+    final prefix = type == 'SERVICE_CUSTOMER'
+        ? 'เธฅเธนเธเธเนเธฒ Walk-in: '
+        : '';
+    return prefix + value['name'].toString();
+  }
+
+  InputDecoration _input({String? label}) => InputDecoration(
     labelText: label,
     border: OutlineInputBorder(
       borderRadius: BorderRadius.circular(LaooRadius.xs),

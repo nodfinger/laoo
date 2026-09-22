@@ -38,6 +38,7 @@ class ServiceRequestApi {
     required bool selfService,
     int? requesterId,
     String? requesterType,
+    required int? equipmentItemId,
     required String subject,
     required String detail,
   }) async => Map<String, dynamic>.from(
@@ -46,6 +47,7 @@ class ServiceRequestApi {
           body: {
             'requesterId': requesterId,
             'requesterType': requesterType,
+            'equipmentItemId': equipmentItemId,
             'subject': subject,
             'detail': detail,
           },

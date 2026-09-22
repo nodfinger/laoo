@@ -87,8 +87,20 @@ FROM dbo.TDADServiceCustomer S JOIN dbo.TDADPerson P ON P.CompanyID=S.CompanyID 
 WHERE S.CompanyID=@company AND S.IsActive=1 AND P.IsActive=1
 AND (@q=N'' OR P.FullName LIKE N'%'+@q+N'%' OR P.Mobile LIKE N'%'+@q+N'%') ORDER BY P.FullName;
 """;
-        rows.AddRange(await ReadRequesterRows(new SqlCommand(customerSql, c), q, token));
-        return Ok(new { businessTypeCode = type, requesters = rows });
+        if (type is CompanyBusinessType.Company or CompanyBusinessType.ServiceCenter)
+        {
+            const string employeeSql = "SELECT TOP(100) P.PersonID id,N'EMPLOYEE' requesterType,P.FullName name,P.Mobile phone,P.Email email,CONCAT(ISNULL(DV.NameTH,N'-'),N' / ',ISNULL(DP.NameTH,N'-')) locationSnapshot FROM dbo.TDADEmployee E JOIN dbo.TDADPerson P ON P.CompanyID=E.CompanyID AND P.PersonID=E.PersonID LEFT JOIN dbo.TDADOrganizationUnit DV ON DV.OrgUnitID=E.DivisionOrgUnitID AND DV.CompanyID=E.CompanyID LEFT JOIN dbo.TDADOrganizationUnit DP ON DP.OrgUnitID=E.DepartmentOrgUnitID AND DP.CompanyID=E.CompanyID WHERE E.CompanyID=@company AND E.IsActive=1 AND P.IsActive=1 AND (@q=N'' OR P.FullName LIKE N'%'+@q+N'%' OR E.EmployeeCode LIKE N'%'+@q+N'%' OR DP.NameTH LIKE N'%'+@q+N'%') ORDER BY P.FullName";
+            rows.AddRange(await ReadRequesterRows(new SqlCommand(employeeSql, c), q, token));
+        }        rows.AddRange(await ReadRequesterRows(new SqlCommand(customerSql, c), q, token));
+        var equipment = new List<object>();
+        const string equipmentSql = "SELECT TOP(100) I.ItemID,I.ItemCode,I.ItemName FROM dbo.TDIVItem I JOIN dbo.TDIVItemUsage U ON U.CompanyID=I.CompanyID AND U.ItemID=I.ItemID AND U.UsageCode=N'EQUIPMENT' WHERE I.CompanyID=@company AND I.IsActive=1 ORDER BY I.ItemCode";
+        await using (var equipmentCommand = new SqlCommand(equipmentSql, c))
+        {
+            Add(equipmentCommand, "@company", SqlDbType.BigInt, CompanyId);
+            await using var er = await equipmentCommand.ExecuteReaderAsync(token);
+            while (await er.ReadAsync(token)) equipment.Add(new { itemID = er.GetInt64(0), itemCode = er.GetString(1), itemName = er.GetString(2) });
+        }
+        return Ok(new { businessTypeCode = type, requesters = rows, equipment });
     }
 
     [HttpGet]
@@ -150,6 +162,19 @@ ORDER BY RequestDate DESC,RequestID DESC OFFSET @offset ROWS FETCH NEXT @take RO
             return BadRequest(new { message = "กรุณาระบุหัวข้อและรายละเอียด", description = "หัวข้อและรายละเอียดเป็นข้อมูลบังคับ" });
 
         var type = await BusinessType(c, token);
+        if (!x.EquipmentItemId.HasValue)
+            return BadRequest(new { message = "กรุณาเลือกอุปกรณ์", description = "รายการแจ้งซ่อมต้องระบุอุปกรณ์ที่ใช้กับระบบ Service" });
+        string? equipmentCode = null, equipmentName = null;
+        await using (var equipmentCheck = new SqlCommand("SELECT I.ItemCode,I.ItemName FROM dbo.TDIVItem I JOIN dbo.TDIVItemUsage U ON U.CompanyID=I.CompanyID AND U.ItemID=I.ItemID AND U.UsageCode=N'EQUIPMENT' WHERE I.CompanyID=@company AND I.ItemID=@id AND I.IsActive=1", c))
+        {
+            Add(equipmentCheck, "@company", SqlDbType.BigInt, CompanyId);
+            Add(equipmentCheck, "@id", SqlDbType.BigInt, x.EquipmentItemId);
+            await using var equipmentReader = await equipmentCheck.ExecuteReaderAsync(token);
+            if (!await equipmentReader.ReadAsync(token))
+                return BadRequest(new { message = "ข้อมูลอุปกรณ์ไม่ถูกต้อง", description = "ไม่พบอุปกรณ์ที่ใช้งานได้ในระบบ Service" });
+            equipmentCode = equipmentReader.GetString(0);
+            equipmentName = equipmentReader.GetString(1);
+        }
         await using var tx = (SqlTransaction)await c.BeginTransactionAsync(token);
         try
         {
@@ -169,16 +194,16 @@ WHERE CompanyID=@company AND RequestNo LIKE N'SR'+CONVERT(nvarchar(8),CONVERT(da
             const string insert = """
 INSERT dbo.TDADServiceRequest
 (CompanyID,RequestNo,RequesterType,RequesterID,RequesterNameSnapshot,RequesterPhoneSnapshot,RequesterEmailSnapshot,
- ServiceCustomerID,ResidentID,TenantID,TenantContactID,RoomID,HouseID,LocationSnapshot,Subject,Detail,CreateBy)
+ ServiceCustomerID,ResidentID,TenantID,TenantContactID,RoomID,HouseID,LocationSnapshot,EquipmentItemID,EquipmentCodeSnapshot,EquipmentNameSnapshot,Subject,Detail,CreateBy)
 OUTPUT INSERTED.RequestID
-VALUES(@company,@no,@rtype,@rid,@name,@phone,@email,@sc,@res,@tenant,@contact,@room,@house,@location,@subject,@detail,@user);
+VALUES(@company,@no,@rtype,@rid,@name,@phone,@email,@sc,@res,@tenant,@contact,@room,@house,@location,@equipment,@equipmentCode,@equipmentName,@subject,@detail,@user);
 """;
             await using var cmd = new SqlCommand(insert, c, tx);
             Add(cmd, "@company", SqlDbType.BigInt, CompanyId); Add(cmd, "@no", SqlDbType.NVarChar, requestNo, 30);
             Add(cmd, "@rtype", SqlDbType.NVarChar, resolved.Type, 30); Add(cmd, "@rid", SqlDbType.BigInt, resolved.PersonId);
             Add(cmd, "@name", SqlDbType.NVarChar, resolved.Name, 200); Add(cmd, "@phone", SqlDbType.NVarChar, resolved.Phone, 50); Add(cmd, "@email", SqlDbType.NVarChar, resolved.Email, 320);
             Add(cmd, "@sc", SqlDbType.BigInt, resolved.ServiceCustomerId); Add(cmd, "@res", SqlDbType.BigInt, resolved.ResidentId); Add(cmd, "@tenant", SqlDbType.BigInt, resolved.TenantId); Add(cmd, "@contact", SqlDbType.BigInt, resolved.ContactId);
-            Add(cmd, "@room", SqlDbType.BigInt, resolved.RoomId); Add(cmd, "@house", SqlDbType.BigInt, resolved.HouseId); Add(cmd, "@location", SqlDbType.NVarChar, resolved.Location, 500);
+            Add(cmd, "@room", SqlDbType.BigInt, resolved.RoomId); Add(cmd, "@house", SqlDbType.BigInt, resolved.HouseId); Add(cmd, "@location", SqlDbType.NVarChar, resolved.Location, 500); Add(cmd, "@equipment", SqlDbType.BigInt, x.EquipmentItemId); Add(cmd, "@equipmentCode", SqlDbType.NVarChar, equipmentCode, 50); Add(cmd, "@equipmentName", SqlDbType.NVarChar, equipmentName, 200);
             Add(cmd, "@subject", SqlDbType.NVarChar, x.Subject.Trim(), 200); Add(cmd, "@detail", SqlDbType.NVarChar, x.Detail.Trim(), 2000); Add(cmd, "@user", SqlDbType.BigInt, UserId);
             var id = Convert.ToInt64(await cmd.ExecuteScalarAsync(token));
             await tx.CommitAsync(token);
@@ -247,8 +272,13 @@ WHERE C.CompanyID=@company AND (C.TenantContactID=@id OR C.PersonID=@id) AND C.I
             return await r.ReadAsync(token) ? new("TENANT_CONTACT", Long(r, 0) ?? 0, r.GetString(1), Text(r, 2), Text(r, 3), null, null, r.GetInt64(5), r.GetInt64(4), Long(r, 6), null, Text(r, 7)) : null;
         }
 
-        if (requesterType == "EMPLOYEE" && self && PersonId.HasValue)
-            return new("EMPLOYEE", PersonId.Value, User.FindFirstValue("display_name") ?? User.Identity?.Name ?? "ผู้แจ้ง", null, null, null, null, null, null, null, null, null);
+        if (requesterType == "EMPLOYEE")
+        {
+            const string sql = "SELECT P.PersonID,P.FullName,P.Mobile,P.Email FROM dbo.TDADEmployee E JOIN dbo.TDADPerson P ON P.CompanyID=E.CompanyID AND P.PersonID=E.PersonID WHERE E.CompanyID=@company AND E.PersonID=@id AND E.IsActive=1 AND P.IsActive=1";
+            await using var q = new SqlCommand(sql, c, tx); Add(q, "@company", SqlDbType.BigInt, CompanyId); Add(q, "@id", SqlDbType.BigInt, id);
+            await using var r = await q.ExecuteReaderAsync(token);
+            if (await r.ReadAsync(token)) return new("EMPLOYEE", r.GetInt64(0), r.GetString(1), Text(r, 2), Text(r, 3), null, null, null, null, null, null, null);
+        }
         return null;
     }
 
@@ -287,6 +317,6 @@ WHERE C.CompanyID=@company AND (C.TenantContactID=@id OR C.PersonID=@id) AND C.I
     private static string? Text(SqlDataReader r, int index) => r.IsDBNull(index) ? null : r.GetString(index);
     private static void Add(SqlCommand c, string name, SqlDbType type, object? value, int size = 0) { var p = size == 0 ? c.Parameters.Add(name, type) : c.Parameters.Add(name, type, size); p.Value = value ?? DBNull.Value; }
 
-    public sealed record CreateRequest(string? RequesterType, long? RequesterId, string? Subject, string? Detail);
+    public sealed record CreateRequest(string? RequesterType, long? RequesterId, long? EquipmentItemId, string? Subject, string? Detail);
     private sealed record Resolved(string Type,long PersonId,string Name,string? Phone,string? Email,long? ServiceCustomerId,long? ResidentId,long? TenantId,long? ContactId,long? RoomId,long? HouseId,string? Location);
 }
