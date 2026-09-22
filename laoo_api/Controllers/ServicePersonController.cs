@@ -26,7 +26,7 @@ public sealed partial class ServicePersonController(IConfiguration configuration
             view = await Allowed(c, "VIEW", token),
             create = await Allowed(c, "CREATE", token),
             edit = await Allowed(c, "EDIT", token),
-            delete = false,
+            delete = await Allowed(c, "DELETE", token),
             personEdit = await CanEditPerson(c, null, token),
         });
     }

@@ -49,6 +49,39 @@ SELECT HouseID id,LaneID parentId,HouseNo code,AddressText name FROM dbo.TDADVil
     [HttpPut("{personId:long}")]
     public Task<IActionResult> Update(long personId, ServicePersonSaveRequest request, CancellationToken token) => Save(personId, request, token);
 
+    [HttpDelete("{residentId:long}")]
+    public async Task<IActionResult> DeleteResident(long residentId, [FromQuery] string rowVersion, CancellationToken token)
+    {
+        if (!Request.Path.StartsWithSegments("/api/service/residents")) return NotFound();
+        var version = Version(rowVersion);
+        if (version is null) return BadRequest(Issue("ข้อมูลไม่ครบ", "ไม่พบ RowVersion ของผู้พักอาศัย"));
+        await using var c = await Open(token);
+        if (!await InServiceScope(c, token) || !await Allowed(c, "DELETE", token)) return Forbid();
+        const string sql = """
+IF NOT EXISTS (SELECT 1 FROM dbo.TDADResident WHERE CompanyID=@company AND ResidentID=@id AND RowVersion=@version)
+    THROW 52956,'RESIDENT_CONFLICT',1;
+IF (OBJECT_ID(N'dbo.TDADServiceRequest',N'U') IS NOT NULL AND EXISTS
+    (SELECT 1 FROM dbo.TDADServiceRequest WHERE CompanyID=@company AND ResidentID=@id))
+ OR (OBJECT_ID(N'dbo.TDTMVisitorVisit',N'U') IS NOT NULL AND EXISTS
+    (SELECT 1 FROM dbo.TDTMVisitorVisit WHERE CompanyID=@company AND HostResidentID=@id))
+ OR (OBJECT_ID(N'dbo.TDADVillageResident',N'U') IS NOT NULL AND EXISTS
+    (SELECT 1 FROM dbo.TDADVillageResident WHERE CompanyID=@company AND ResidentID=@id))
+    THROW 52824,'RESIDENT_REFERENCED',1;
+UPDATE dbo.TDADResident SET IsActive=0,UpdateDate=SYSUTCDATETIME(),UpdateBy=@actor
+WHERE CompanyID=@company AND ResidentID=@id AND RowVersion=@version;
+""";
+        try
+        {
+            await using var cmd = new SqlCommand(sql, c);
+            Add(cmd, "@company", SqlDbType.BigInt, CompanyId); Add(cmd, "@id", SqlDbType.BigInt, residentId);
+            Add(cmd, "@version", SqlDbType.Timestamp, version); Add(cmd, "@actor", SqlDbType.BigInt, ClaimLong("user_id"));
+            await cmd.ExecuteNonQueryAsync(token);
+            return NoContent();
+        }
+        catch (SqlException e) when (e.Number == 52956) { return Conflict(Issue("ข้อมูลถูกเปลี่ยนแล้ว", "กรุณาโหลดรายการใหม่ก่อนลบ")); }
+        catch (SqlException e) when (e.Number == 52824) { return Conflict(Issue("ลบผู้พักอาศัยไม่ได้", "ข้อมูลนี้ถูกใช้อ้างอิงในระบบอื่นแล้ว")); }
+    }
+
     private async Task<IActionResult> Save(long? routePersonId, ServicePersonSaveRequest x, CancellationToken token)
     {
         if (routePersonId.HasValue && x.PersonId.HasValue && routePersonId != x.PersonId)
