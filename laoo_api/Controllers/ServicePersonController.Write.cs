@@ -92,7 +92,7 @@ WHERE CompanyID=@company AND ResidentID=@id AND RowVersion=@version;
             return BadRequest(Issue("ข้อมูลบุคคลไม่ถูกต้อง", "กรุณาระบุชื่อ-นามสกุลไม่เกิน 200 ตัวอักษร"));
         if (x.NickName?.Trim().Length > 100 || x.Email?.Trim().Length > 320 || x.Mobile?.Trim().Length > 50)
             return BadRequest(Issue("ข้อมูลบุคคลไม่ถูกต้อง", "ชื่อเล่น อีเมล หรือโทรศัพท์ยาวเกินกำหนด"));
-        if (x.EndDate.HasValue && (!x.StartDate.HasValue || x.EndDate < x.StartDate))
+        if (x.EndDate.HasValue && x.StartDate.HasValue && x.EndDate < x.StartDate)
             return BadRequest(Issue("ช่วงเวลาพักอาศัยไม่ถูกต้อง", "วันสิ้นสุดต้องไม่ก่อนวันเริ่มต้น"));
 
         await using var c = await Open(token);
@@ -107,8 +107,8 @@ WHERE CompanyID=@company AND ResidentID=@id AND RowVersion=@version;
         var resident = residentEndpoint ? true : customerEndpoint ? false : (dormitory || village) && x.IsResident;
         if (!serviceCustomer && !resident)
             return BadRequest(Issue("กรุณาเลือกบทบาท", "บุคคลในระบบ Service ต้องมีอย่างน้อยหนึ่งบทบาท"));
-        if (resident && ((!village && !x.RoomId.HasValue) || (village && !x.HouseId.HasValue) || !x.StartDate.HasValue))
-            return BadRequest(Issue("ข้อมูลผู้พักอาศัยไม่ครบ", "กรุณาเลือกห้องและวันเริ่มพัก"));
+        if (resident && ((!village && !x.RoomId.HasValue) || (village && !x.HouseId.HasValue)))
+            return BadRequest(Issue("ข้อมูลผู้พักอาศัยไม่ครบ", "กรุณาเลือกห้องหรือบ้านเลขที่"));
 
         byte[]? personVersion = Version(x.PersonRowVersion);
         byte[]? customerVersion = Version(x.ServiceCustomerRowVersion);

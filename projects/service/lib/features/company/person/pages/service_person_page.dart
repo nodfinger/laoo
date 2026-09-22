@@ -599,7 +599,7 @@ class _ServicePersonDialogState extends State<_ServicePersonDialog> {
   bool _loading = true;
   bool _saving = false;
   bool _saved = false;
-  DateTime _start = DateTime.now();
+  DateTime? _start;
   DateTime? _end;
   bool get _editing => widget.initial != null;
   bool get _dormitory => _lookup['businessTypeCode'] == 'DORMITORY';
@@ -667,7 +667,9 @@ class _ServicePersonDialogState extends State<_ServicePersonDialog> {
   Future<void> _pickDate(bool start) async {
     final picked = await showDatePicker(
       context: context,
-      initialDate: start ? _start : (_end ?? _start),
+      initialDate: start
+          ? (_start ?? DateTime.now())
+          : (_end ?? _start ?? DateTime.now()),
       firstDate: DateTime(1900),
       lastDate: DateTime(2100),
     );
@@ -704,7 +706,7 @@ class _ServicePersonDialogState extends State<_ServicePersonDialog> {
         'isServiceCustomer': _customer,
         'isResident': _resident,
         'roomId': _resident ? _roomId : null,
-        'startDate': _resident ? _date(_start) : null,
+        'startDate': _resident && _start != null ? _date(_start!) : null,
         'endDate': _resident && _end != null ? _date(_end!) : null,
         'updatePerson': _editing && widget.canEditPerson,
         'personRowVersion': widget.initial?['personRowVersion'],
@@ -734,7 +736,7 @@ class _ServicePersonDialogState extends State<_ServicePersonDialog> {
           _customer = widget.role == ServicePersonRole.customer;
           _resident = widget.role == ServicePersonRole.resident;
           _newPerson = true;
-          _start = DateTime.now();
+          _start = null;
           _end = null;
         });
       }
@@ -788,207 +790,216 @@ class _ServicePersonDialogState extends State<_ServicePersonDialog> {
     ),
     content: SizedBox(
       width: 480,
-      child: _loading
-          ? const Padding(
-              padding: EdgeInsets.all(40),
-              child: Center(child: CircularProgressIndicator()),
-            )
-          : Form(
-              key: _form,
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Divider(height: 1, color: LaooColors.border),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        const Text('สถานะ', style: TextStyle(fontSize: 16)),
-                        const SizedBox(width: 8),
-                        Switch(
-                          value: _active,
-                          onChanged: _saving
-                              ? null
-                              : (value) => setState(() => _active = value),
-                        ),
-                      ],
-                    ),
-                    if (!_editing &&
-                        widget.role == ServicePersonRole.customer) ...[
-                      SegmentedButton<bool>(
-                        segments: const [
-                          ButtonSegment(
-                            value: true,
-                            label: Text('สร้างบุคคลใหม่'),
-                          ),
-                          ButtonSegment(
-                            value: false,
-                            label: Text('เลือกบุคคลเดิม'),
-                          ),
-                        ],
-                        selected: {_newPerson},
-                        onSelectionChanged: (value) => setState(() {
-                          _newPerson = value.first;
-                          if (_newPerson) _selectPerson(null);
-                        }),
-                      ),
-                      const SizedBox(height: 12),
-                      if (!_newPerson)
-                        DropdownButtonFormField<int>(
-                          initialValue: _personId,
-                          isExpanded: true,
-                          decoration: _input('บุคคล *'),
-                          items: [
-                            for (final person
-                                in List<Map<String, dynamic>>.from(
-                                  _lookup['persons'] as List? ?? const [],
-                                ))
-                              DropdownMenuItem(
-                                value: (person['id'] as num).toInt(),
-                                child: Text('${person['name']}'),
-                              ),
-                          ],
-                          onChanged: _selectPerson,
-                        ),
-                      if (!_newPerson) const SizedBox(height: 12),
-                    ],
-                    if (_editing && widget.canEditPerson)
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        color: _primary.withValues(alpha: .08),
-                        child: const Text(
-                          'การแก้ชื่อ โทรศัพท์ หรืออีเมล จะมีผลกับข้อมูลบุคคลกลางและระบบอื่นที่อ้าง PersonID เดียวกัน',
-                        ),
-                      ),
-                    if (_editing && widget.canEditPerson)
-                      const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _name,
-                      enabled: _newPerson || widget.canEditPerson,
-                      maxLength: 200,
-                      decoration: _input('ชื่อ-นามสกุล *'),
-                      validator: (value) =>
-                          value == null || value.trim().isEmpty
-                          ? 'กรุณาระบุชื่อ-นามสกุล'
-                          : null,
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _nick,
-                      enabled: _newPerson || widget.canEditPerson,
-                      maxLength: 100,
-                      decoration: _input('ชื่อเล่น'),
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _mobile,
-                      enabled: _newPerson || widget.canEditPerson,
-                      maxLength: 50,
-                      decoration: _input('โทรศัพท์'),
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _email,
-                      enabled: _newPerson || widget.canEditPerson,
-                      maxLength: 320,
-                      keyboardType: TextInputType.emailAddress,
-                      decoration: _input('อีเมล'),
-                    ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'บทบาทในระบบ Service',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    Container(
-                      margin: const EdgeInsets.only(top: 8),
-                      padding: const EdgeInsets.all(10),
-                      color: _primary.withValues(alpha: .08),
-                      child: Text(
-                        widget.role == ServicePersonRole.customer
-                            ? 'ผู้ใช้บริการ'
-                            : 'ผู้พักอาศัย',
-                        style: TextStyle(
-                          color: _primary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    if (_resident) ...[
-                      const SizedBox(height: 12),
-                      DropdownButtonFormField<int>(
-                        initialValue: _roomId,
-                        isExpanded: true,
-                        decoration: _input('ห้องพัก (ถ้ามี)'),
-                        items: [
-                          for (final room in List<Map<String, dynamic>>.from(
-                            _lookup['rooms'] as List? ?? const [],
-                          ))
-                            DropdownMenuItem(
-                              value: (room['id'] as num).toInt(),
-                              child: Text(
-                                '${room['code']} ${room['name'] ?? ''}',
-                              ),
-                            ),
-                        ],
-                        onChanged: (value) => setState(() => _roomId = value),
-                      ),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * .78,
+        ),
+        child: _loading
+            ? const Padding(
+                padding: EdgeInsets.all(40),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            : Form(
+                key: _form,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const Divider(height: 1, color: LaooColors.border),
                       const SizedBox(height: 12),
                       Row(
                         children: [
-                          Expanded(
-                            child: InkWell(
-                              onTap: () => _pickDate(true),
-                              child: InputDecorator(
-                                decoration: _input('วันเริ่มพัก *'),
-                                child: Text(_date(_start)),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: InkWell(
-                              onTap: () => _pickDate(false),
-                              child: InputDecorator(
-                                decoration: _input('วันสิ้นสุด'),
-                                child: Text(_end == null ? '-' : _date(_end!)),
-                              ),
-                            ),
+                          const Text('สถานะ', style: TextStyle(fontSize: 16)),
+                          const SizedBox(width: 8),
+                          Switch(
+                            value: _active,
+                            onChanged: _saving
+                                ? null
+                                : (value) => setState(() => _active = value),
                           ),
                         ],
                       ),
-                    ],
-                    const SizedBox(height: 14),
-                    const Divider(height: 1, color: LaooColors.border),
-                    const SizedBox(height: 10),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton(
-                          style: _dialogButton(false),
-                          onPressed: _saving
-                              ? null
-                              : () => Navigator.pop(context, _saved),
-                          child: const Text('ยกเลิก'),
+                      if (!_editing &&
+                          widget.role == ServicePersonRole.customer) ...[
+                        SegmentedButton<bool>(
+                          segments: const [
+                            ButtonSegment(
+                              value: true,
+                              label: Text('สร้างบุคคลใหม่'),
+                            ),
+                            ButtonSegment(
+                              value: false,
+                              label: Text('เลือกบุคคลเดิม'),
+                            ),
+                          ],
+                          selected: {_newPerson},
+                          onSelectionChanged: (value) => setState(() {
+                            _newPerson = value.first;
+                            if (_newPerson) _selectPerson(null);
+                          }),
                         ),
-                        const SizedBox(width: 8),
-                        FilledButton.icon(
-                          style: _dialogButton(true),
-                          onPressed: _saving ? null : _save,
-                          icon: const Icon(Icons.save_outlined),
-                          label: const Text('บันทึก'),
+                        const SizedBox(height: 12),
+                        if (!_newPerson)
+                          DropdownButtonFormField<int>(
+                            initialValue: _personId,
+                            isExpanded: true,
+                            decoration: _input('บุคคล *'),
+                            items: [
+                              for (final person
+                                  in List<Map<String, dynamic>>.from(
+                                    _lookup['persons'] as List? ?? const [],
+                                  ))
+                                DropdownMenuItem(
+                                  value: (person['id'] as num).toInt(),
+                                  child: Text('${person['name']}'),
+                                ),
+                            ],
+                            onChanged: _selectPerson,
+                          ),
+                        if (!_newPerson) const SizedBox(height: 12),
+                      ],
+                      if (_editing && widget.canEditPerson)
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          color: _primary.withValues(alpha: .08),
+                          child: const Text(
+                            'การแก้ชื่อ โทรศัพท์ หรืออีเมล จะมีผลกับข้อมูลบุคคลกลางและระบบอื่นที่อ้าง PersonID เดียวกัน',
+                          ),
+                        ),
+                      if (_editing && widget.canEditPerson)
+                        const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _name,
+                        enabled: _newPerson || widget.canEditPerson,
+                        maxLength: 200,
+                        decoration: _input('ชื่อ-นามสกุล *'),
+                        validator: (value) =>
+                            value == null || value.trim().isEmpty
+                            ? 'กรุณาระบุชื่อ-นามสกุล'
+                            : null,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _nick,
+                        enabled: _newPerson || widget.canEditPerson,
+                        maxLength: 100,
+                        decoration: _input('ชื่อเล่น'),
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _mobile,
+                        enabled: _newPerson || widget.canEditPerson,
+                        maxLength: 50,
+                        decoration: _input('โทรศัพท์'),
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _email,
+                        enabled: _newPerson || widget.canEditPerson,
+                        maxLength: 320,
+                        keyboardType: TextInputType.emailAddress,
+                        decoration: _input('อีเมล'),
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'บทบาทในระบบ Service',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Container(
+                        margin: const EdgeInsets.only(top: 8),
+                        padding: const EdgeInsets.all(10),
+                        color: _primary.withValues(alpha: .08),
+                        child: Text(
+                          widget.role == ServicePersonRole.customer
+                              ? 'ผู้ใช้บริการ'
+                              : 'ผู้พักอาศัย',
+                          style: TextStyle(
+                            color: _primary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      if (_resident) ...[
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<int>(
+                          initialValue: _roomId,
+                          isExpanded: true,
+                          decoration: _input('ห้องพัก (ถ้ามี)'),
+                          items: [
+                            for (final room in List<Map<String, dynamic>>.from(
+                              _lookup['rooms'] as List? ?? const [],
+                            ))
+                              DropdownMenuItem(
+                                value: (room['id'] as num).toInt(),
+                                child: Text(
+                                  '${room['code']} ${room['name'] ?? ''}',
+                                ),
+                              ),
+                          ],
+                          onChanged: (value) => setState(() => _roomId = value),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: InkWell(
+                                onTap: () => _pickDate(true),
+                                child: InputDecorator(
+                                  decoration: _input('วันเริ่มพัก'),
+                                  child: Text(
+                                    _start == null ? '-' : _date(_start!),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: InkWell(
+                                onTap: () => _pickDate(false),
+                                child: InputDecorator(
+                                  decoration: _input('วันสิ้นสุด'),
+                                  child: Text(
+                                    _end == null ? '-' : _date(_end!),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
-                    ),
-                    const SizedBox(height: 12),
-                  ],
+                      const SizedBox(height: 14),
+                      const Divider(height: 1, color: LaooColors.border),
+                      const SizedBox(height: 10),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            style: _dialogButton(false),
+                            onPressed: _saving
+                                ? null
+                                : () => Navigator.pop(context, _saved),
+                            child: const Text('ยกเลิก'),
+                          ),
+                          const SizedBox(width: 8),
+                          FilledButton.icon(
+                            style: _dialogButton(true),
+                            onPressed: _saving ? null : _save,
+                            icon: const Icon(Icons.save_outlined),
+                            label: const Text('บันทึก'),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                  ),
                 ),
               ),
-            ),
+      ),
     ),
   );
 
