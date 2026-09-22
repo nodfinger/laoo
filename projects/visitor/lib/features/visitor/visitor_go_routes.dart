@@ -20,7 +20,9 @@ List<GoRoute> buildVisitorFeatureRoutes() => <GoRoute>[
   GoRoute(
     path: '/visitor/check-in',
     name: 'visitorCheckIn',
-    builder: (context, state) => const VisitorInsidePage(),
+    builder: (context, state) => state.uri.queryParameters['action'] == 'new'
+        ? const VisitorCheckInPage()
+        : const VisitorInsidePage(),
   ),
   GoRoute(
     path: '/visitor/check-in/new',

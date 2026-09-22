@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 
 import '../../core/api/visitor_api_client.dart';
@@ -16,6 +17,7 @@ class VisitorCheckInPage extends StatefulWidget {
 }
 
 class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
+  static const _maximumCardImageBytes = 1024 * 1024;
   final _name = TextEditingController();
   final _phone = TextEditingController();
   final _nationalId = TextEditingController();
@@ -120,36 +122,84 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
 
   Future<void> _loadRental() async {
     final data = await VisitorSettingsRepository(_api).rentalHosts();
-    if (mounted) setState(() { _rentalTenants = data.tenants; _rentalContacts = data.contacts; });
+    if (mounted)
+      setState(() {
+        _rentalTenants = data.tenants;
+        _rentalContacts = data.contacts;
+      });
   }
 
   Future<void> _loadVillageLanes() async {
-    final rows = await VisitorSettingsRepository(_api).businessLocationRows('/api/company/business-locations/village/lanes');
+    final rows = await VisitorSettingsRepository(
+      _api,
+    ).businessLocationRows('/api/company/business-locations/village/lanes');
     if (mounted) setState(() => _villageLanes = rows);
   }
 
   Future<void> _loadVillageHouses(int laneId) async {
-    final rows = await VisitorSettingsRepository(_api).businessLocationRows('/api/company/business-locations/village/houses', query: {'laneId': '$laneId'});
+    final rows = await VisitorSettingsRepository(_api).businessLocationRows(
+      '/api/company/business-locations/village/houses',
+      query: {'laneId': '$laneId'},
+    );
     if (mounted) setState(() => _villageHouses = rows);
   }
 
   Future<void> _loadVillageResidents(int houseId) async {
-    final rows = await VisitorSettingsRepository(_api).businessLocationRows('/api/company/business-locations/village/residents', query: {'houseId': '$houseId'});
+    final rows = await VisitorSettingsRepository(_api).businessLocationRows(
+      '/api/company/business-locations/village/residents',
+      query: {'houseId': '$houseId'},
+    );
     if (mounted) setState(() => _villageResidents = rows);
   }
 
   Future<void> _capture() async {
-    final image = await _picker.pickImage(
-      source: ImageSource.camera,
-      imageQuality: 85,
-    );
-    if (image != null && mounted) {
-      final bytes = await image.readAsBytes();
-      if (mounted) setState(() {
-        _cardImage = image;
-        _cardImageBytes = bytes;
-      });
+    try {
+      final image = await _picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 85,
+      );
+      if (image != null && mounted) {
+        final source = await image.readAsBytes();
+        final bytes = _prepareCardImage(source);
+        if (mounted)
+          setState(() {
+            _cardImage = image;
+            _cardImageBytes = bytes;
+          });
+      }
+    } catch (error) {
+      if (mounted) _show(error.toString(), error: true);
     }
+  }
+
+  Uint8List _prepareCardImage(Uint8List source) {
+    if (source.length <= _maximumCardImageBytes) return source;
+
+    var decoded = img.decodeImage(source);
+    if (decoded == null) {
+      throw const FormatException('ไม่สามารถอ่านไฟล์ภาพบัตรได้');
+    }
+    decoded = img.bakeOrientation(decoded);
+    if (decoded.width > 2048 || decoded.height > 2048) {
+      decoded = decoded.width >= decoded.height
+          ? img.copyResize(decoded, width: 2048)
+          : img.copyResize(decoded, height: 2048);
+    }
+
+    var working = decoded;
+    while (true) {
+      for (var quality = 90; quality >= 30; quality -= 10) {
+        final compressed = Uint8List.fromList(
+          img.encodeJpg(working, quality: quality),
+        );
+        if (compressed.length <= _maximumCardImageBytes) return compressed;
+      }
+      if (working.width <= 320 || working.height <= 320) break;
+      final width = (working.width * .8).round();
+      final height = (working.height * .8).round();
+      working = img.copyResize(working, width: width, height: height);
+    }
+    throw const FormatException('ไม่สามารถลดขนาดภาพให้ไม่เกิน 1 MB ได้');
   }
 
   Future<void> _pickExpiry() async {
@@ -215,7 +265,8 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
                 'hostType': _hostType,
                 'hostEmployeeId': null,
                 'hostResidentId':
-                    (_hostType == 'RESIDENT' || _hostType == 'VILLAGE') && _host.text.trim().isNotEmpty
+                    (_hostType == 'RESIDENT' || _hostType == 'VILLAGE') &&
+                        _host.text.trim().isNotEmpty
                     ? int.tryParse(_host.text.trim())
                     : null,
                 'hostServiceCustomerId':
@@ -224,9 +275,7 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
                     ? int.tryParse(_host.text.trim())
                     : null,
                 'hostRoomId': _hostType == 'RESIDENT' ? _roomId : null,
-                'hostTenantId': _hostType == 'RENTAL_OFFICE'
-                    ? _tenantId
-                    : null,
+                'hostTenantId': _hostType == 'RENTAL_OFFICE' ? _tenantId : null,
                 'hostTenantContactId': _hostType == 'RENTAL_OFFICE'
                     ? _tenantContactId
                     : null,
@@ -243,15 +292,15 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
       if (captureMethod == 'CAMERA_CAPTURE' && _cardImage != null) {
         await _api.upload(
           '/api/visitor/check-ins/$visitId/images',
-          bytes: await _cardImage!.readAsBytes(),
-          fileName: _cardImage!.name,
+          bytes: _cardImageBytes!,
+          fileName: 'visitor-card.jpg',
           fields: {'side': 'FRONT'},
         );
       }
       if (mounted) {
         _show('บันทึกผู้มาติดต่อเข้าเรียบร้อย', error: false);
         _clearForm();
-        context.go('/visitor/inside');
+        context.go('/visitor/check-in');
       }
     } catch (error) {
       if (mounted) _show(error.toString(), error: true);
@@ -384,20 +433,32 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
                   ),
                 ),
                 if (_cardImageBytes != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: InkWell(
-                      onTap: _previewCardImage,
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: Image.memory(
-                          _cardImageBytes!,
-                          height: 180,
-                          fit: BoxFit.cover,
-                          semanticLabel: 'ภาพบัตรที่เลือก',
+                  Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: InkWell(
+                          onTap: _previewCardImage,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: Image.memory(
+                              _cardImageBytes!,
+                              height: 180,
+                              fit: BoxFit.cover,
+                              semanticLabel: 'ภาพบัตรที่เลือก',
+                            ),
+                          ),
                         ),
                       ),
-                    ),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton.icon(
+                          onPressed: _removeCardImage,
+                          icon: const Icon(Icons.delete_outline),
+                          label: const Text('ลบรูปภาพ'),
+                        ),
+                      ),
+                    ],
                   ),
               ],
             ),
@@ -421,132 +482,211 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
     );
   }
 
-  Widget _hostSelector(
-    BuildContext context,
-    VisitorSettings settings,
-  ) {
+  Widget _hostSelector(BuildContext context, VisitorSettings settings) {
     if (_companyContext!.businessTypeCode == 'RENTAL_OFFICE') {
-      final contacts = _rentalContacts.where((x) => (x['tenantId'] as num?)?.toInt() == _tenantId).toList();
-      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        _mapSelect('บริษัทผู้เช่า', _tenantId, _rentalTenants, (x) => '${x['tenantCompanyName']} — ${x['roomCode']}', (v) => setState(() { _tenantId = v; _tenantContactId = null; })),
-        const SizedBox(height: 12),
-        _mapSelect('ผู้ติดต่อ', _tenantContactId, contacts, (x) => '${x['contactName']} — ${x['phone'] ?? ''}', (v) => setState(() { _tenantContactId = v; _host.text = v?.toString() ?? ''; })),
-      ]);
+      final contacts = _rentalContacts
+          .where((x) => (x['tenantId'] as num?)?.toInt() == _tenantId)
+          .toList();
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _mapSelect(
+            'บริษัทผู้เช่า',
+            _tenantId,
+            _rentalTenants,
+            (x) => '${x['tenantCompanyName']} — ${x['roomCode']}',
+            (v) => setState(() {
+              _tenantId = v;
+              _tenantContactId = null;
+            }),
+          ),
+          const SizedBox(height: 12),
+          _mapSelect(
+            'ผู้ติดต่อ',
+            _tenantContactId,
+            contacts,
+            (x) => '${x['contactName']} — ${x['phone'] ?? ''}',
+            (v) => setState(() {
+              _tenantContactId = v;
+              _host.text = v?.toString() ?? '';
+            }),
+          ),
+        ],
+      );
     }
     if (_companyContext!.businessTypeCode == 'VILLAGE') {
-      final houses = _villageHouses.where((x) => (x['laneId'] as num?)?.toInt() == _laneId).toList();
-      final residents = _villageResidents.where((x) => (x['houseId'] as num?)?.toInt() == _houseId).toList();
-      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        _mapSelect('ซอย/แยก', _laneId, _villageLanes, (x) => '${x['code']} — ${x['name']}', (v) { setState(() { _laneId = v; _houseId = null; _host.clear(); _villageHouses = const []; _villageResidents = const []; }); if (v != null) _loadVillageHouses(v); }),
-        const SizedBox(height: 12),
-        _mapSelect('บ้านเลขที่', _houseId, houses, (x) => '${x['houseNo']}', (v) { setState(() { _houseId = v; _host.clear(); _villageResidents = const []; }); if (v != null) _loadVillageResidents(v); }),
-        const SizedBox(height: 12),
-        _mapSelect('ผู้อาศัย', int.tryParse(_host.text), residents, (x) => '${x['personName']}', (v) => setState(() => _host.text = v?.toString() ?? '')),
-      ]);
+      final houses = _villageHouses
+          .where((x) => (x['laneId'] as num?)?.toInt() == _laneId)
+          .toList();
+      final residents = _villageResidents
+          .where((x) => (x['houseId'] as num?)?.toInt() == _houseId)
+          .toList();
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _mapSelect(
+            'ซอย/แยก',
+            _laneId,
+            _villageLanes,
+            (x) => '${x['code']} — ${x['name']}',
+            (v) {
+              setState(() {
+                _laneId = v;
+                _houseId = null;
+                _host.clear();
+                _villageHouses = const [];
+                _villageResidents = const [];
+              });
+              if (v != null) _loadVillageHouses(v);
+            },
+          ),
+          const SizedBox(height: 12),
+          _mapSelect('บ้านเลขที่', _houseId, houses, (x) => '${x['houseNo']}', (
+            v,
+          ) {
+            setState(() {
+              _houseId = v;
+              _host.clear();
+              _villageResidents = const [];
+            });
+            if (v != null) _loadVillageResidents(v);
+          }),
+          const SizedBox(height: 12),
+          _mapSelect(
+            'ผู้อาศัย',
+            int.tryParse(_host.text),
+            residents,
+            (x) => '${x['personName']}',
+            (v) => setState(() => _host.text = v?.toString() ?? ''),
+          ),
+        ],
+      );
     }
     return Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      if (_companyContext!.isDormitory) ...[
-        TextField(
-          decoration: const InputDecoration(
-            labelText: 'ค้นหาห้องพัก',
-            prefixIcon: Icon(Icons.meeting_room_outlined),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (_companyContext!.isDormitory) ...[
+          TextField(
+            decoration: const InputDecoration(
+              labelText: 'ค้นหาห้องพัก',
+              prefixIcon: Icon(Icons.meeting_room_outlined),
+            ),
+            onChanged: _loadRooms,
           ),
-          onChanged: _loadRooms,
+          const SizedBox(height: 8),
+          DropdownButtonFormField<int>(
+            value: _roomOptions.any((option) => option.id == _roomId)
+                ? _roomId
+                : null,
+            isExpanded: true,
+            decoration: const InputDecoration(labelText: 'ห้องพัก *'),
+            items: _roomOptions
+                .map(
+                  (option) => DropdownMenuItem<int>(
+                    value: option.id,
+                    child: Text(
+                      '${option.code} — ${option.building} / ${option.floor}',
+                    ),
+                  ),
+                )
+                .toList(growable: false),
+            onChanged: (value) {
+              setState(() {
+                _roomId = value;
+                _host.clear();
+                _hostOptions = const [];
+              });
+              _loadHostOptions();
+            },
+          ),
+          const SizedBox(height: 12),
+        ],
+        TextField(
+          enabled: !_companyContext!.isDormitory || _roomId != null,
+          decoration: InputDecoration(
+            labelText: _hostType == 'RESIDENT'
+                ? 'ค้นหาชื่อหรือเบอร์โทรผู้พักอาศัย'
+                : 'ค้นหาชื่อหรือเบอร์โทรผู้ใช้บริการ',
+            hintText: _companyContext!.isDormitory && _roomId == null
+                ? 'เลือกห้องพักก่อนค้นหา'
+                : null,
+            prefixIcon: const Icon(Icons.search),
+          ),
+          onChanged: _loadHostOptions,
         ),
         const SizedBox(height: 8),
         DropdownButtonFormField<int>(
-          value: _roomOptions.any((option) => option.id == _roomId)
-              ? _roomId
+          value:
+              _hostOptions.any(
+                (option) => option.id == int.tryParse(_host.text),
+              )
+              ? int.tryParse(_host.text)
               : null,
-          isExpanded: true,
-          decoration: const InputDecoration(labelText: 'ห้องพัก *'),
-          items: _roomOptions
+          decoration: InputDecoration(
+            labelText: settings.requireHostEmployee
+                ? 'ผู้รับรอง *'
+                : 'ผู้รับรอง',
+          ),
+          items: _hostOptions
               .map(
                 (option) => DropdownMenuItem<int>(
                   value: option.id,
                   child: Text(
-                    '${option.code} — ${option.building} / ${option.floor}',
+                    option.phone == null
+                        ? option.name
+                        : '${option.name} — ${option.phone}',
                   ),
                 ),
               )
               .toList(growable: false),
-          onChanged: (value) {
-            setState(() {
-              _roomId = value;
-              _host.clear();
-              _hostOptions = const [];
-            });
-            _loadHostOptions();
-          },
+          onChanged: (value) =>
+              setState(() => _host.text = value?.toString() ?? ''),
         ),
-        const SizedBox(height: 12),
-      ],
-      TextField(
-        enabled: !_companyContext!.isDormitory || _roomId != null,
-        decoration: InputDecoration(
-          labelText: _hostType == 'RESIDENT'
-              ? 'ค้นหาชื่อหรือเบอร์โทรผู้พักอาศัย'
-              : 'ค้นหาชื่อหรือเบอร์โทรผู้ใช้บริการ',
-          hintText: _companyContext!.isDormitory && _roomId == null
-              ? 'เลือกห้องพักก่อนค้นหา'
-              : null,
-          prefixIcon: const Icon(Icons.search),
-        ),
-        onChanged: _loadHostOptions,
-      ),
-      const SizedBox(height: 8),
-      DropdownButtonFormField<int>(
-        value:
-            _hostOptions.any((option) => option.id == int.tryParse(_host.text))
-            ? int.tryParse(_host.text)
-            : null,
-        decoration: InputDecoration(
-          labelText: settings.requireHostEmployee ? 'ผู้รับรอง *' : 'ผู้รับรอง',
-        ),
-        items: _hostOptions
-            .map(
-              (option) => DropdownMenuItem<int>(
-                value: option.id,
-                child: Text(
-                  option.phone == null
-                      ? option.name
-                      : '${option.name} — ${option.phone}',
-                ),
+        if (_selectedHost != null) ...[
+          const SizedBox(height: 8),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primaryContainer,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Text(
+                _hostType == 'RESIDENT'
+                    ? 'ผู้รับรอง: ${_selectedHost!.name}\nอาคาร: ${_selectedHost!.building}  ชั้น: ${_selectedHost!.floor}  ห้อง: ${_selectedHost!.room}'
+                    : 'ผู้รับรอง: ${_selectedHost!.name}${_selectedHost!.phone == null ? '' : '\nเบอร์โทร: ${_selectedHost!.phone}'}',
               ),
-            )
-            .toList(growable: false),
-        onChanged: (value) =>
-            setState(() => _host.text = value?.toString() ?? ''),
-      ),
-      if (_selectedHost != null) ...[
-        const SizedBox(height: 8),
-        DecoratedBox(
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.primaryContainer,
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Text(
-              _hostType == 'RESIDENT'
-                  ? 'ผู้รับรอง: ${_selectedHost!.name}\nอาคาร: ${_selectedHost!.building}  ชั้น: ${_selectedHost!.floor}  ห้อง: ${_selectedHost!.room}'
-                  : 'ผู้รับรอง: ${_selectedHost!.name}${_selectedHost!.phone == null ? '' : '\nเบอร์โทร: ${_selectedHost!.phone}'}',
             ),
           ),
-        ),
+        ],
       ],
-    ],
     );
   }
 
-  Widget _mapSelect(String label, int? value, List<Map<String, dynamic>> rows,
-      String Function(Map<String, dynamic>) text, ValueChanged<int?> changed) =>
-      DropdownButtonFormField<int>(
-        value: rows.any((x) => (x['id'] as num?)?.toInt() == value || (x['tenantId'] as num?)?.toInt() == value || (x['contactId'] as num?)?.toInt() == value) ? value : null,
-        decoration: InputDecoration(labelText: '$label *'), isExpanded: true,
-        items: rows.map((x) { final id = ((x['id'] ?? x['contactId'] ?? x['tenantId']) as num).toInt(); return DropdownMenuItem(value: id, child: Text(text(x))); }).toList(), onChanged: changed);
+  Widget _mapSelect(
+    String label,
+    int? value,
+    List<Map<String, dynamic>> rows,
+    String Function(Map<String, dynamic>) text,
+    ValueChanged<int?> changed,
+  ) => DropdownButtonFormField<int>(
+    value:
+        rows.any(
+          (x) =>
+              (x['id'] as num?)?.toInt() == value ||
+              (x['tenantId'] as num?)?.toInt() == value ||
+              (x['contactId'] as num?)?.toInt() == value,
+        )
+        ? value
+        : null,
+    decoration: InputDecoration(labelText: '$label *'),
+    isExpanded: true,
+    items: rows.map((x) {
+      final id = ((x['id'] ?? x['contactId'] ?? x['tenantId']) as num).toInt();
+      return DropdownMenuItem(value: id, child: Text(text(x)));
+    }).toList(),
+    onChanged: changed,
+  );
 
   VisitorHostOption? get _selectedHost {
     final id = int.tryParse(_host.text);
@@ -620,20 +760,41 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
             padding: const EdgeInsets.all(10),
             child: Column(
               children: [
-                Row(children: [
-                  const Icon(Icons.image_outlined),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text('ตัวอย่างภาพบัตร', style: Theme.of(context).textTheme.titleMedium)),
-                  IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
-                ]),
+                Row(
+                  children: [
+                    const Icon(Icons.image_outlined),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'ตัวอย่างภาพบัตร',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.close),
+                    ),
+                  ],
+                ),
                 const Divider(),
-                Expanded(child: InteractiveViewer(child: Image.memory(bytes, fit: BoxFit.contain))),
+                Expanded(
+                  child: InteractiveViewer(
+                    child: Image.memory(bytes, fit: BoxFit.contain),
+                  ),
+                ),
               ],
             ),
           ),
         ),
       ),
     );
+  }
+
+  void _removeCardImage() {
+    setState(() {
+      _cardImage = null;
+      _cardImageBytes = null;
+    });
   }
 
   Widget _messageCard(BuildContext context) => Material(

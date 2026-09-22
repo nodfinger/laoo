@@ -47,9 +47,18 @@ class _VisitorInsidePageState extends State<VisitorInsidePage> {
     });
     try {
       final actions = await _repository.actions();
-      if (!actions.canView) throw const VisitorApiException(403, 'ไม่มีสิทธิ์ดูผู้มาติดต่อภายใน');
-      final result = await _repository.list(search: _search.text.trim(), page: _page, pageSize: _pageSize);
-      if (mounted) setState(() { _actions = actions; _result = result; });
+      if (!actions.canView)
+        throw const VisitorApiException(403, 'ไม่มีสิทธิ์ดูผู้มาติดต่อภายใน');
+      final result = await _repository.list(
+        search: _search.text.trim(),
+        page: _page,
+        pageSize: _pageSize,
+      );
+      if (mounted)
+        setState(() {
+          _actions = actions;
+          _result = result;
+        });
     } catch (error) {
       if (mounted) setState(() => _error = error.toString());
     } finally {
@@ -64,8 +73,14 @@ class _VisitorInsidePageState extends State<VisitorInsidePage> {
         title: const Text('ยืนยันการ Check-out'),
         content: Text('ต้องการบันทึกให้ ${row.name} ออกจากระบบหรือไม่'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('ยกเลิก')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('ยืนยันออก')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('ยกเลิก'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('ยืนยันออก'),
+          ),
         ],
       ),
     );
@@ -88,36 +103,94 @@ class _VisitorInsidePageState extends State<VisitorInsidePage> {
     child: ListView(
       padding: const EdgeInsets.all(10),
       children: [
-        _card(Row(
-          children: [
-            const Icon(Icons.people_alt_outlined),
-            const SizedBox(width: 8),
-            Expanded(child: Text(_actions?.caption ?? 'ผู้มาติดต่อภายใน', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700))),
-            if (_actions?.canCreate == true)
-              FilledButton.icon(
-                onPressed: () => context.push('/visitor/check-in/new'),
-                icon: const Icon(Icons.person_add_alt_1),
-                label: const Text('รับผู้มาติดต่อ'),
+        _card(
+          Row(
+            children: [
+              const Icon(Icons.people_alt_outlined),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  _actions?.caption ?? 'ผู้มาติดต่อภายใน',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
-            const SizedBox(width: 8),
-            IconButton(onPressed: _loading ? null : () => _load(), icon: const Icon(Icons.refresh)),
-          ],
-        )),
+              if (_actions?.canCreate == true)
+                FilledButton.icon(
+                  onPressed: () => context.go('/visitor/check-in?action=new'),
+                  icon: const Icon(Icons.person_add_alt_1),
+                  label: const Text('รับผู้มาติดต่อ'),
+                ),
+              const SizedBox(width: 8),
+              IconButton(
+                onPressed: _loading ? null : () => _load(),
+                icon: const Icon(Icons.refresh),
+              ),
+            ],
+          ),
+        ),
         const SizedBox(height: 6),
-        _card(Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            SizedBox(width: 300, child: TextField(controller: _search, onSubmitted: (_) => _load(resetPage: true), decoration: const InputDecoration(prefixIcon: Icon(Icons.search), labelText: 'ค้นหาชื่อ / เบอร์โทร / เลขบัตร'))),
-            SizedBox(width: 180, child: DropdownButtonFormField<String>(initialValue: 'CHECKED_IN', decoration: const InputDecoration(labelText: 'สถานะ'), items: const [DropdownMenuItem(value: 'CHECKED_IN', child: Text('อยู่ภายใน'))], onChanged: null)),
-            FilledButton.icon(onPressed: _loading ? null : () => _load(resetPage: true), icon: const Icon(Icons.search), label: const Text('ค้นหา')),
-            OutlinedButton(onPressed: _loading ? null : () { _search.clear(); _load(resetPage: true); }, child: const Text('ล้าง Filter')),
-          ],
-        )),
+        _card(
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              SizedBox(
+                width: 300,
+                child: TextField(
+                  controller: _search,
+                  onSubmitted: (_) => _load(resetPage: true),
+                  decoration: const InputDecoration(
+                    prefixIcon: Icon(Icons.search),
+                    labelText: 'ค้นหาชื่อ / เบอร์โทร / เลขบัตร',
+                  ),
+                ),
+              ),
+              SizedBox(
+                width: 180,
+                child: DropdownButtonFormField<String>(
+                  initialValue: 'CHECKED_IN',
+                  decoration: const InputDecoration(labelText: 'สถานะ'),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'CHECKED_IN',
+                      child: Text('อยู่ภายใน'),
+                    ),
+                  ],
+                  onChanged: null,
+                ),
+              ),
+              FilledButton.icon(
+                onPressed: _loading ? null : () => _load(resetPage: true),
+                icon: const Icon(Icons.search),
+                label: const Text('ค้นหา'),
+              ),
+              OutlinedButton(
+                onPressed: _loading
+                    ? null
+                    : () {
+                        _search.clear();
+                        _load(resetPage: true);
+                      },
+                child: const Text('ล้าง Filter'),
+              ),
+            ],
+          ),
+        ),
         const SizedBox(height: 6),
-        if (_error != null) _card(Text(_error!, style: const TextStyle(color: Colors.red))),
+        if (_error != null)
+          _card(Text(_error!, style: const TextStyle(color: Colors.red))),
         if (_error != null) const SizedBox(height: 6),
-        _card(_loading ? const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator())) : _table()),
+        _card(
+          _loading
+              ? const Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              : _table(),
+        ),
         const SizedBox(height: 6),
         _pagination(),
       ],
@@ -126,47 +199,119 @@ class _VisitorInsidePageState extends State<VisitorInsidePage> {
 
   Widget _table() {
     final rows = _result?.items ?? const <VisitorInside>[];
-    return Column(children: [
-      _headerRow(),
-      ...rows.map((row) => _dataRow(row)),
-      if (rows.isEmpty) const Padding(padding: EdgeInsets.all(24), child: Text('ไม่พบผู้มาติดต่อที่อยู่ภายใน')),
-    ]);
+    return Column(
+      children: [
+        _headerRow(),
+        ...rows.map((row) => _dataRow(row)),
+        if (rows.isEmpty)
+          const Padding(
+            padding: EdgeInsets.all(24),
+            child: Text('ไม่พบผู้มาติดต่อที่อยู่ภายใน'),
+          ),
+      ],
+    );
   }
 
   Widget _headerRow() => const Padding(
     padding: EdgeInsets.symmetric(vertical: 10),
-    child: Row(children: [
-      Expanded(flex: 2, child: Text('ผู้มาติดต่อ', style: TextStyle(fontWeight: FontWeight.w700))),
-      Expanded(flex: 2, child: Text('ผู้รับรอง', style: TextStyle(fontWeight: FontWeight.w700))),
-      Expanded(child: Text('จุดติดต่อ', style: TextStyle(fontWeight: FontWeight.w700))),
-      Expanded(child: Text('เวลาเข้า', style: TextStyle(fontWeight: FontWeight.w700))),
-      SizedBox(width: 110, child: Text('การทำงาน', style: TextStyle(fontWeight: FontWeight.w700))),
-    ]),
+    child: Row(
+      children: [
+        Expanded(
+          flex: 2,
+          child: Text(
+            'ผู้มาติดต่อ',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
+        Expanded(
+          flex: 2,
+          child: Text(
+            'ผู้รับรอง',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            'จุดติดต่อ',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            'เวลาเข้า',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
+        SizedBox(
+          width: 110,
+          child: Text(
+            'การทำงาน',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
+      ],
+    ),
   );
 
   Widget _dataRow(VisitorInside row) => Container(
-    decoration: const BoxDecoration(border: Border(top: BorderSide(color: Color(0xFFD9DDE3)))),
+    decoration: const BoxDecoration(
+      border: Border(top: BorderSide(color: Color(0xFFD9DDE3))),
+    ),
     padding: const EdgeInsets.symmetric(vertical: 8),
-    child: Row(children: [
-      Expanded(flex: 2, child: Text('${row.name}\n#${row.id}')),
-      Expanded(flex: 2, child: Text(row.host)),
-      Expanded(child: Text(row.point)),
-      Expanded(child: Text(_displayDate(row.timeIn))),
-      SizedBox(width: 110, child: _actions?.canEdit == true ? OutlinedButton.icon(onPressed: _working ? null : () => _checkOut(row), icon: const Icon(Icons.logout, size: 16), label: const Text('ออก')) : const SizedBox.shrink()),
-    ]),
+    child: Row(
+      children: [
+        Expanded(flex: 2, child: Text('${row.name}\n#${row.id}')),
+        Expanded(flex: 2, child: Text(row.host)),
+        Expanded(child: Text(row.point)),
+        Expanded(child: Text(_displayDate(row.timeIn))),
+        SizedBox(
+          width: 110,
+          child: _actions?.canEdit == true
+              ? OutlinedButton.icon(
+                  onPressed: _working ? null : () => _checkOut(row),
+                  icon: const Icon(Icons.logout, size: 16),
+                  label: const Text('ออก'),
+                )
+              : const SizedBox.shrink(),
+        ),
+      ],
+    ),
   );
 
   Widget _pagination() {
     final result = _result;
     final total = result?.total ?? 0;
     final pageCount = total == 0 ? 1 : (total / _pageSize).ceil();
-    return SizedBox(height: 56, child: _card(Row(children: [
-      Text('แสดง ${result?.items.length ?? 0} รายการจากทั้งหมด $total'),
-      const Spacer(),
-      IconButton(onPressed: _page > 1 && !_loading ? () { _page--; _load(); } : null, icon: const Icon(Icons.chevron_left)),
-      Text('$_page / $pageCount'),
-      IconButton(onPressed: _page < pageCount && !_loading ? () { _page++; _load(); } : null, icon: const Icon(Icons.chevron_right)),
-    ])));
+    return SizedBox(
+      height: 56,
+      child: _card(
+        Row(
+          children: [
+            Text('แสดง ${result?.items.length ?? 0} รายการจากทั้งหมด $total'),
+            const Spacer(),
+            IconButton(
+              onPressed: _page > 1 && !_loading
+                  ? () {
+                      _page--;
+                      _load();
+                    }
+                  : null,
+              icon: const Icon(Icons.chevron_left),
+            ),
+            Text('$_page / $pageCount'),
+            IconButton(
+              onPressed: _page < pageCount && !_loading
+                  ? () {
+                      _page++;
+                      _load();
+                    }
+                  : null,
+              icon: const Icon(Icons.chevron_right),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   String _displayDate(String value) {
@@ -176,5 +321,8 @@ class _VisitorInsidePageState extends State<VisitorInsidePage> {
     return '${date.day}/${date.month}/${date.year} ${two(date.hour)}:${two(date.minute)}';
   }
 
-  Widget _card(Widget child) => Card(margin: EdgeInsets.zero, child: Padding(padding: const EdgeInsets.all(10), child: child));
+  Widget _card(Widget child) => Card(
+    margin: EdgeInsets.zero,
+    child: Padding(padding: const EdgeInsets.all(10), child: child),
+  );
 }
