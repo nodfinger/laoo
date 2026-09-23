@@ -1,4 +1,7 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 
 import '../../../app/theme/laoo_design_tokens.dart';
 import '../../../core/api/api_exception.dart';
@@ -19,12 +22,14 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
   String _status = '';
   int _page = 1;
   bool _loading = true;
+  bool _canEdit = false;
   Map<String, dynamic> _data = const {'items': <dynamic>[], 'total': 0};
 
   @override
   void initState() {
     super.initState();
     _load();
+    _loadActions();
   }
 
   @override
@@ -49,6 +54,13 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  Future<void> _loadActions() async {
+    try {
+      final actions = await _api.actions();
+      if (mounted) setState(() => _canEdit = actions['edit'] == true);
+    } catch (_) {}
   }
 
   void _message(Object error, {bool errorState = true}) {
@@ -77,6 +89,28 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
         await _load();
       }
       showTimedSnackBar(context, message: 'บันทึกใบแจ้งซ่อมเรียบร้อยแล้ว');
+    }
+  }
+
+  Future<void> _openDetail(Map<String, dynamic> row) async {
+    final id = (row['requestId'] as num?)?.toInt();
+    if (id == null) return;
+    try {
+      final detail = await _api.detail(id);
+      final attachments = await _api.attachments(id);
+      if (!mounted) return;
+      final changed = await showDialog<bool>(
+        context: context,
+        builder: (_) => _RequestDetailDialog(
+          api: _api,
+          data: detail,
+          attachments: attachments,
+          canEdit: _canEdit,
+        ),
+      );
+      if (changed == true) await _load();
+    } catch (error) {
+      if (mounted) _message(error);
     }
   }
 
@@ -219,7 +253,18 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
                   for (final row in items)
                     DataRow(
                       cells: [
-                        DataCell(Text(row['requestNo']?.toString() ?? '-')),
+                        DataCell(
+                          InkWell(
+                            onTap: () => _openDetail(row),
+                            child: Text(
+                              row['requestNo']?.toString() ?? '-',
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.primary,
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                          ),
+                        ),
                         DataCell(Text(row['requesterName']?.toString() ?? '-')),
                         DataCell(
                           Text(row['locationSnapshot']?.toString() ?? '-'),
@@ -325,6 +370,7 @@ class _RequestDialogState extends State<_RequestDialog> {
   final _detail = TextEditingController();
   Map<String, dynamic>? _requester;
   Map<String, dynamic>? _equipment;
+  final List<PlatformFile> _attachments = [];
   bool _saving = false;
 
   @override
@@ -338,7 +384,7 @@ class _RequestDialogState extends State<_RequestDialog> {
     if (!_form.currentState!.validate() || _saving) return;
     setState(() => _saving = true);
     try {
-      await widget.api.create(
+      final created = await widget.api.create(
         selfService: widget.selfService,
         requesterId: (_requester?['id'] as num?)?.toInt(),
         requesterType: _requester?['requesterType']?.toString(),
@@ -346,6 +392,34 @@ class _RequestDialogState extends State<_RequestDialog> {
         subject: _subject.text.trim(),
         detail: _detail.text.trim(),
       );
+      final requestId = (created['requestId'] as num?)?.toInt();
+      final uploadErrors = <String>[];
+      if (requestId != null) {
+        for (final file in _attachments) {
+          final bytes = file.bytes;
+          if (bytes == null) {
+            uploadErrors.add(file.name);
+            continue;
+          }
+          try {
+            await widget.api.uploadAttachment(
+              requestId,
+              fileName: file.name,
+              bytes: bytes,
+            );
+          } catch (_) {
+            uploadErrors.add(file.name);
+          }
+        }
+      }
+      if (uploadErrors.isNotEmpty && mounted) {
+        showTimedSnackBar(
+          context,
+          message:
+              'บันทึกใบแจ้งซ่อมแล้ว แต่แนบรูปไม่สำเร็จ: ${uploadErrors.join(', ')}',
+          error: true,
+        );
+      }
       if (mounted) Navigator.pop(context, true);
     } catch (error) {
       if (mounted) {
@@ -358,6 +432,28 @@ class _RequestDialogState extends State<_RequestDialog> {
       }
     } finally {
       if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _pickAttachments() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['jpg', 'jpeg', 'png', 'webp'],
+      allowMultiple: true,
+      withData: true,
+    );
+    if (!mounted || result == null) return;
+    final unsupported = result.files.where((file) => file.bytes == null);
+    setState(() {
+      _attachments.addAll(result.files.where((file) => file.bytes != null));
+    });
+    if (unsupported.isNotEmpty) {
+      showTimedSnackBar(
+        context,
+        message:
+            'ไม่สามารถอ่านไฟล์: ${unsupported.map((file) => file.name).join(', ')}',
+        error: true,
+      );
     }
   }
 
@@ -480,6 +576,13 @@ class _RequestDialogState extends State<_RequestDialog> {
                       : null,
                 ),
                 const SizedBox(height: 14),
+                _AttachmentPicker(
+                  files: _attachments,
+                  enabled: !_saving,
+                  onPick: _pickAttachments,
+                  onRemove: (file) => setState(() => _attachments.remove(file)),
+                ),
+                const SizedBox(height: 14),
                 const Divider(),
                 Wrap(
                   alignment: WrapAlignment.end,
@@ -528,5 +631,481 @@ class _RequestDialogState extends State<_RequestDialog> {
     border: OutlineInputBorder(
       borderRadius: BorderRadius.circular(LaooRadius.xs),
     ),
+  );
+}
+
+class _AttachmentPicker extends StatelessWidget {
+  const _AttachmentPicker({
+    required this.files,
+    required this.enabled,
+    required this.onPick,
+    required this.onRemove,
+  });
+  final List<PlatformFile> files;
+  final bool enabled;
+  final VoidCallback onPick;
+  final ValueChanged<PlatformFile> onRemove;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Row(
+        children: [
+          const Expanded(
+            child: Text(
+              'รูปภาพแนบ (ไม่บังคับ)',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+          OutlinedButton.icon(
+            onPressed: enabled ? onPick : null,
+            icon: const Icon(Icons.attach_file),
+            label: const Text('เลือกไฟล์'),
+          ),
+        ],
+      ),
+      const Text(
+        'รองรับ JPG, PNG, WEBP | ไม่จำกัดจำนวน | ระบบลดขนาดอัตโนมัติ',
+        softWrap: true,
+      ),
+      if (files.isNotEmpty) ...[
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final file in files)
+              _AttachmentPreview(file: file, onRemove: () => onRemove(file)),
+          ],
+        ),
+      ],
+    ],
+  );
+}
+
+class _AttachmentPreview extends StatelessWidget {
+  const _AttachmentPreview({required this.file, required this.onRemove});
+  final PlatformFile file;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: 104,
+    child: Stack(
+      children: [
+        Container(
+          width: 104,
+          height: 104,
+          decoration: BoxDecoration(
+            border: Border.all(color: Theme.of(context).dividerColor),
+            borderRadius: BorderRadius.circular(LaooRadius.xs),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: file.bytes == null
+              ? const Icon(Icons.image_not_supported_outlined)
+              : Image.memory(file.bytes!, fit: BoxFit.cover),
+        ),
+        Positioned(
+          right: 2,
+          top: 2,
+          child: IconButton.filledTonal(
+            onPressed: onRemove,
+            iconSize: 16,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints.tightFor(width: 28, height: 28),
+            icon: const Icon(Icons.close),
+          ),
+        ),
+        Positioned(
+          left: 4,
+          right: 4,
+          bottom: 4,
+          child: DecoratedBox(
+            decoration: const BoxDecoration(color: Colors.black54),
+            child: Text(
+              file.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Colors.white, fontSize: 11),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _RequestDetailDialog extends StatefulWidget {
+  const _RequestDetailDialog({
+    required this.api,
+    required this.data,
+    required this.attachments,
+    required this.canEdit,
+  });
+  final ServiceRequestApi api;
+  final Map<String, dynamic> data;
+  final List<Map<String, dynamic>> attachments;
+  final bool canEdit;
+
+  @override
+  State<_RequestDetailDialog> createState() => _RequestDetailDialogState();
+}
+
+class _RequestDetailDialogState extends State<_RequestDetailDialog> {
+  bool _busy = false;
+  late Map<String, dynamic> _data;
+
+  @override
+  void initState() {
+    super.initState();
+    _data = widget.data;
+    _attachments = List<Map<String, dynamic>>.from(widget.attachments);
+  }
+
+  late List<Map<String, dynamic>> _attachments;
+
+  Future<void> _run(Future<void> Function() action) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      await action();
+      if (mounted) Navigator.pop(context, true);
+    } catch (error) {
+      if (mounted)
+        showTimedSnackBar(context, message: error.toString(), error: true);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _receive() async {
+    final technicians = await widget.api.technicians();
+    if (!mounted) return;
+    final selected = await showDialog<int>(
+      context: context,
+      builder: (_) => _TechnicianDialog(items: technicians),
+    );
+    if (selected != null) await _run(() => widget.api.receive(_id, selected));
+  }
+
+  Future<void> _textAction({required bool complete}) async {
+    final controller = TextEditingController();
+    final value = await showDialog<String>(
+      context: context,
+      builder: (_) => _ReasonDialog(
+        title: complete ? 'ปิดงาน' : 'ยกเลิกใบแจ้งซ่อม',
+        label: complete ? 'รายละเอียดผลซ่อม *' : 'เหตุผลการยกเลิก *',
+        controller: controller,
+      ),
+    );
+    controller.dispose();
+    if (value == null || value.trim().isEmpty) return;
+    await _run(
+      () => complete
+          ? widget.api.complete(_id, value.trim())
+          : widget.api.cancel(_id, value.trim()),
+    );
+  }
+
+  Future<void> _deleteAttachment(Map<String, dynamic> item) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('ลบรูปแนบ'),
+        content: Text('ต้องการลบ ${item['fileName'] ?? 'รูปภาพ'} หรือไม่'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('ยกเลิก'),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(context, true),
+            icon: const Icon(Icons.delete_outline),
+            label: const Text('ลบ'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || _busy) return;
+    setState(() => _busy = true);
+    try {
+      await widget.api.deleteAttachment(
+        _id,
+        (item['attachmentId'] as num).toInt(),
+      );
+      if (mounted) setState(() => _attachments.remove(item));
+    } catch (error) {
+      if (mounted)
+        showTimedSnackBar(context, message: error.toString(), error: true);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  int get _id => (_data['requestId'] as num).toInt();
+  String get _status => _data['statusCode']?.toString() ?? '';
+
+  @override
+  Widget build(BuildContext context) {
+    final status = _status;
+    return AlertDialog(
+      insetPadding: const EdgeInsets.all(16),
+      title: Text(_data['requestNo']?.toString() ?? 'รายละเอียดใบแจ้งซ่อม'),
+      content: SizedBox(
+        width: (MediaQuery.sizeOf(context).width - 32).clamp(280.0, 620.0),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _line('สถานะ', status),
+              _line('ผู้แจ้ง', _data['requesterName']?.toString()),
+              _line('สถานที่', _data['locationSnapshot']?.toString()),
+              _line(
+                'อุปกรณ์',
+                '${_data['equipmentCode'] ?? '-'} | ${_data['equipmentName'] ?? '-'}',
+              ),
+              _line('หัวข้อ', _data['subject']?.toString()),
+              _line('รายละเอียด', _data['detail']?.toString()),
+              _line(
+                'ช่างผู้รับผิดชอบ',
+                _data['assignedEmployeeName']?.toString(),
+              ),
+              if (_data['resolutionDetail'] != null)
+                _line('ผลการซ่อม', _data['resolutionDetail']?.toString()),
+              if (_data['cancellationReason'] != null)
+                _line('เหตุผลยกเลิก', _data['cancellationReason']?.toString()),
+              if (_attachments.isNotEmpty) ...[
+                const Divider(height: 24),
+                const Text(
+                  'รูปภาพแนบ',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final item in _attachments)
+                      _RemoteAttachmentTile(
+                        api: widget.api,
+                        requestId: _id,
+                        item: item,
+                        canDelete:
+                            widget.canEdit &&
+                            status != 'COMPLETED' &&
+                            status != 'CANCELLED',
+                        onDelete: () => _deleteAttachment(item),
+                      ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        if (widget.canEdit && status == 'NEW')
+          FilledButton.icon(
+            onPressed: _busy ? null : _receive,
+            icon: const Icon(Icons.assignment_ind_outlined),
+            label: const Text('รับเรื่อง'),
+          ),
+        if (widget.canEdit && status == 'RECEIVED')
+          FilledButton.icon(
+            onPressed: _busy ? null : () => _run(() => widget.api.start(_id)),
+            icon: const Icon(Icons.play_arrow),
+            label: const Text('เริ่มดำเนินการ'),
+          ),
+        if (widget.canEdit && status == 'IN_PROGRESS')
+          FilledButton.icon(
+            onPressed: _busy ? null : () => _textAction(complete: true),
+            icon: const Icon(Icons.done),
+            label: const Text('ปิดงาน'),
+          ),
+        if (widget.canEdit &&
+            (status == 'NEW' ||
+                status == 'RECEIVED' ||
+                status == 'IN_PROGRESS'))
+          TextButton(
+            onPressed: _busy ? null : () => _textAction(complete: false),
+            child: const Text('ยกเลิก'),
+          ),
+        TextButton(
+          onPressed: _busy ? null : () => Navigator.pop(context),
+          child: const Text('ปิด'),
+        ),
+      ],
+    );
+  }
+
+  Widget _line(String label, String? value) => Padding(
+    padding: const EdgeInsets.only(bottom: 10),
+    child: Text(
+      '$label: ${value == null || value.isEmpty ? '-' : value}',
+      softWrap: true,
+    ),
+  );
+}
+
+class _RemoteAttachmentTile extends StatelessWidget {
+  const _RemoteAttachmentTile({
+    required this.api,
+    required this.requestId,
+    required this.item,
+    required this.canDelete,
+    required this.onDelete,
+  });
+  final ServiceRequestApi api;
+  final int requestId;
+  final Map<String, dynamic> item;
+  final bool canDelete;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final attachmentId = (item['attachmentId'] as num).toInt();
+    return SizedBox(
+      width: 120,
+      child: Column(
+        children: [
+          FutureBuilder<List<int>>(
+            future: api.downloadAttachment(requestId, attachmentId),
+            builder: (context, snapshot) => InkWell(
+              onTap: snapshot.hasData
+                  ? () => showDialog<void>(
+                      context: context,
+                      builder: (_) => Dialog(
+                        child: InteractiveViewer(
+                          child: Image.memory(
+                            Uint8List.fromList(snapshot.data!),
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                      ),
+                    )
+                  : null,
+              child: Container(
+                width: 120,
+                height: 96,
+                clipBehavior: Clip.antiAlias,
+                decoration: BoxDecoration(
+                  border: Border.all(color: Theme.of(context).dividerColor),
+                  borderRadius: BorderRadius.circular(LaooRadius.xs),
+                ),
+                child: snapshot.hasData
+                    ? Image.memory(
+                        Uint8List.fromList(snapshot.data!),
+                        fit: BoxFit.cover,
+                      )
+                    : snapshot.hasError
+                    ? const Icon(Icons.broken_image_outlined)
+                    : const Center(child: CircularProgressIndicator()),
+              ),
+            ),
+          ),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  item['fileName']?.toString() ?? '-',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (canDelete)
+                IconButton(
+                  onPressed: onDelete,
+                  icon: const Icon(Icons.delete_outline),
+                  color: Colors.red,
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TechnicianDialog extends StatefulWidget {
+  const _TechnicianDialog({required this.items});
+  final List<Map<String, dynamic>> items;
+  @override
+  State<_TechnicianDialog> createState() => _TechnicianDialogState();
+}
+
+class _TechnicianDialogState extends State<_TechnicianDialog> {
+  int? _selected;
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('เลือกช่างซ่อม'),
+    content: SizedBox(
+      width: 420,
+      child: widget.items.isEmpty
+          ? const Text('ไม่พบพนักงานที่เป็นช่างซ่อมและยังใช้งานอยู่')
+          : DropdownButtonFormField<int>(
+              decoration: const InputDecoration(labelText: 'ช่างซ่อม *'),
+              items: [
+                for (final item in widget.items)
+                  DropdownMenuItem(
+                    value: (item['employeeId'] as num).toInt(),
+                    child: Text(
+                      '${item['employeeCode']} | ${item['fullName']}',
+                    ),
+                  ),
+              ],
+              onChanged: (value) => setState(() => _selected = value),
+              validator: (_) => _selected == null ? 'กรุณาเลือกช่างซ่อม' : null,
+            ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('ยกเลิก'),
+      ),
+      FilledButton(
+        onPressed: _selected == null
+            ? null
+            : () => Navigator.pop(context, _selected),
+        child: const Text('บันทึก'),
+      ),
+    ],
+  );
+}
+
+class _ReasonDialog extends StatelessWidget {
+  const _ReasonDialog({
+    required this.title,
+    required this.label,
+    required this.controller,
+  });
+  final String title;
+  final String label;
+  final TextEditingController controller;
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: Text(title),
+    content: SizedBox(
+      width: 460,
+      child: TextField(
+        controller: controller,
+        minLines: 4,
+        maxLines: 8,
+        decoration: InputDecoration(
+          labelText: label,
+          border: const OutlineInputBorder(),
+        ),
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('ยกเลิก'),
+      ),
+      FilledButton(
+        onPressed: () => Navigator.pop(context, controller.text),
+        child: const Text('บันทึก'),
+      ),
+    ],
   );
 }
