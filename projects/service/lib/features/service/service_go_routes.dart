@@ -8,6 +8,7 @@ import '../service_request/pages/service_request_page.dart';
 import '../service_settings/pages/service_settings_page.dart';
 import '../job_dispatch/pages/job_dispatch_page.dart';
 import '../job_work_orders/pages/job_work_orders_page.dart';
+import '../job_closeout/pages/job_closeout_page.dart';
 import '../company/delivery_note/pages/delivery_note_page.dart';
 import '../company/pre_order/pages/pre_order_page.dart';
 import '../company/quotation/pages/quotation_page.dart';
@@ -88,6 +89,7 @@ List<GoRoute> buildServiceFeatureRoutes({
   _page('18001', (state) => const ServiceSettingsPage()),
   _page('17001', (state) => const JobDispatchPage()),
   _page('17002', (state) => const JobWorkOrdersPage()),
+  _page('17003', (state) => const JobCloseoutPage()),
   ..._workspacePlaceholders.entries.map(
     (entry) =>
         _workspacePlaceholder(ServiceRoutes.byMenuCode(entry.key), entry.value),
@@ -136,7 +138,6 @@ const _workspacePlaceholders = <String, String>{
   '16001': 'แผนและรอบเวลา PM',
   '16002': 'รายการตรวจเช็กมาตรฐาน',
   '16003': 'ปฏิทินงานบำรุงรักษา',
-  '17003': 'บันทึกปิดงานและตรวจรับ',
   '19001': 'แดชบอร์ดภาพรวมงานบริการ',
   '19002': 'ประวัติการซ่อมและค่าใช้จ่าย',
   '19003': 'รายงานผลประเมินความพึงพอใจ',
