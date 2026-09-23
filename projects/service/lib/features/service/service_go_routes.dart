@@ -5,6 +5,7 @@ import 'package:laoo_shared_core/laoo_shared_core.dart';
 import '../company/customer/pages/customer_page.dart';
 import '../company/person/pages/service_person_page.dart';
 import '../service_request/pages/service_request_page.dart';
+import '../service_settings/pages/service_settings_page.dart';
 import '../company/delivery_note/pages/delivery_note_page.dart';
 import '../company/pre_order/pages/pre_order_page.dart';
 import '../company/quotation/pages/quotation_page.dart';
@@ -82,10 +83,7 @@ List<GoRoute> buildServiceFeatureRoutes({
   ),
   _page('15001', (state) => const ServiceRequestPage()),
   _page('20001', (state) => const ServiceRequestPage(selfService: true)),
-  _workspacePlaceholder(
-    ServiceRoutes.byMenuCode('18001'),
-    'System settings preview',
-  ),
+  _page('18001', (state) => const ServiceSettingsPage()),
   ..._workspacePlaceholders.entries.map(
     (entry) =>
         _workspacePlaceholder(ServiceRoutes.byMenuCode(entry.key), entry.value),

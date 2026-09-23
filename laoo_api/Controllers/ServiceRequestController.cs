@@ -311,22 +311,23 @@ ORDER BY RequestDate DESC,RequestID DESC OFFSET @offset ROWS FETCH NEXT @take RO
         await using var c = await Open(token);
         var screen = self ? "20001" : "15001";
         if (!await InService(c, token) || !await Allowed(c, screen, "CREATE", token)) return Forbid();
+        var settings = await ReadSettings(c, token);
+        if (!settings.ServiceEnabled)
+            return BadRequest(new { message = "ระบบบริการปิดใช้งาน", description = "กรุณาติดต่อผู้ดูแลระบบเพื่อเปิดใช้งานระบบบริการ" });
         if (string.IsNullOrWhiteSpace(x.Subject) || string.IsNullOrWhiteSpace(x.Detail))
             return BadRequest(new { message = "กรุณาระบุหัวข้อและรายละเอียด", description = "หัวข้อและรายละเอียดเป็นข้อมูลบังคับ" });
 
         var type = await BusinessType(c, token);
-        if (!x.EquipmentItemId.HasValue)
+        if (settings.RequireEquipment && !x.EquipmentItemId.HasValue)
             return BadRequest(new { message = "กรุณาเลือกอุปกรณ์", description = "รายการแจ้งซ่อมต้องระบุอุปกรณ์ที่ใช้กับระบบ Service" });
         string? equipmentCode = null, equipmentName = null;
-        await using (var equipmentCheck = new SqlCommand("SELECT I.ItemCode,I.ItemName FROM dbo.TDIVItem I JOIN dbo.TDIVItemUsage U ON U.CompanyID=I.CompanyID AND U.ItemID=I.ItemID AND U.UsageCode=N'EQUIPMENT' WHERE I.CompanyID=@company AND I.ItemID=@id AND I.IsActive=1", c))
+        if (x.EquipmentItemId.HasValue)
         {
-            Add(equipmentCheck, "@company", SqlDbType.BigInt, CompanyId);
-            Add(equipmentCheck, "@id", SqlDbType.BigInt, x.EquipmentItemId);
+            await using var equipmentCheck = new SqlCommand("SELECT I.ItemCode,I.ItemName FROM dbo.TDIVItem I JOIN dbo.TDIVItemUsage U ON U.CompanyID=I.CompanyID AND U.ItemID=I.ItemID AND U.UsageCode=N'EQUIPMENT' WHERE I.CompanyID=@company AND I.ItemID=@id AND I.IsActive=1", c);
+            Add(equipmentCheck, "@company", SqlDbType.BigInt, CompanyId); Add(equipmentCheck, "@id", SqlDbType.BigInt, x.EquipmentItemId);
             await using var equipmentReader = await equipmentCheck.ExecuteReaderAsync(token);
-            if (!await equipmentReader.ReadAsync(token))
-                return BadRequest(new { message = "ข้อมูลอุปกรณ์ไม่ถูกต้อง", description = "ไม่พบอุปกรณ์ที่ใช้งานได้ในระบบ Service" });
-            equipmentCode = equipmentReader.GetString(0);
-            equipmentName = equipmentReader.GetString(1);
+            if (!await equipmentReader.ReadAsync(token)) return BadRequest(new { message = "ข้อมูลอุปกรณ์ไม่ถูกต้อง", description = "ไม่พบอุปกรณ์ที่ใช้งานได้ในระบบ Service" });
+            equipmentCode = equipmentReader.GetString(0); equipmentName = equipmentReader.GetString(1);
         }
         await using var tx = (SqlTransaction)await c.BeginTransactionAsync(token);
         try
@@ -334,6 +335,8 @@ ORDER BY RequestDate DESC,RequestID DESC OFFSET @offset ROWS FETCH NEXT @take RO
             var resolved = await Resolve(c, tx, x, type, self, token);
             if (resolved is null)
                 return BadRequest(new { message = "ผู้แจ้งไม่ถูกต้อง", description = "ไม่พบข้อมูลผู้แจ้งที่ใช้งานอยู่ใน Company นี้" });
+            if (!settings.AllowWalkIn && resolved.Type == "SERVICE_CUSTOMER")
+                return BadRequest(new { message = "ไม่อนุญาตผู้แจ้ง Walk-in", description = "ผู้ดูแลระบบปิดการรับแจ้งจากลูกค้าภายนอกไว้" });
 
             const string nextNo = """
 SELECT N'SR'+CONVERT(nvarchar(8),CONVERT(date,SYSUTCDATETIME()),112)
@@ -462,6 +465,16 @@ WHERE C.CompanyID=@company AND (C.TenantContactID=@id OR C.PersonID=@id) AND C.I
         await using var q = new SqlCommand("SELECT ISNULL(NULLIF(UPPER(LTRIM(RTRIM(BusinessTypeCode))),N''),N'COMPANY') FROM dbo.TDSTCompanySetUp WHERE CompanyID=@company", c);
         Add(q, "@company", SqlDbType.BigInt, CompanyId); return CompanyBusinessType.Normalize(Convert.ToString(await q.ExecuteScalarAsync(t)));
     }
+
+    private async Task<ServiceSettingsState> ReadSettings(SqlConnection c, CancellationToken token)
+    {
+        const string sql = "SELECT COALESCE(S.ServiceEnabled,1),COALESCE(S.AllowWalkIn,1),COALESCE(S.RequireEquipment,1),COALESCE(S.AttachmentRequired,0),COALESCE(S.WorkflowEnabled,1) FROM dbo.TDADProject P LEFT JOIN dbo.TDSTCompanySetupSystemService S ON S.ProjectID=P.ProjectID AND S.CompanyID=@company WHERE P.ProjectCode=N'LAOO_SERVICE' AND P.IsActive=1";
+        await using var q = new SqlCommand(sql, c); Add(q, "@company", SqlDbType.BigInt, CompanyId);
+        await using var r = await q.ExecuteReaderAsync(token);
+        return await r.ReadAsync(token) ? new(r.GetBoolean(0), r.GetBoolean(1), r.GetBoolean(2), r.GetBoolean(3), r.GetBoolean(4)) : new(true, true, true, false, true);
+    }
+
+    private sealed record ServiceSettingsState(bool ServiceEnabled, bool AllowWalkIn, bool RequireEquipment, bool AttachmentRequired, bool WorkflowEnabled);
 
     private async Task<RequestAccessInfo> RequestAccess(SqlConnection c, long id, CancellationToken token)
     {
