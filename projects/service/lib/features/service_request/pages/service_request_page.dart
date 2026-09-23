@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:image/image.dart' as img;
 
 import '../../../app/theme/laoo_design_tokens.dart';
 import '../../../core/api/api_exception.dart';
@@ -65,9 +66,7 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
 
   void _message(Object error, {bool errorState = true}) {
     final text = error is ApiException
-        ? error.message +
-              '\n' +
-              (error.description ?? 'กรุณาตรวจสอบข้อมูลแล้วลองใหม่อีกครั้ง')
+        ? '${error.message}\n${error.description ?? 'กรุณาตรวจสอบข้อมูลแล้วลองใหม่อีกครั้ง'}'
         : 'ไม่สามารถดำเนินการได้\nกรุณาลองใหม่อีกครั้ง';
     showTimedSnackBar(context, message: text, error: errorState);
   }
@@ -87,6 +86,7 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
       if (!widget.selfService) {
         _page = 1;
         await _load();
+        if (!mounted) return;
       }
       showTimedSnackBar(context, message: 'บันทึกใบแจ้งซ่อมเรียบร้อยแล้ว');
     }
@@ -97,6 +97,7 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
     if (id == null) return;
     try {
       final detail = await _api.detail(id);
+      if (!mounted) return;
       final attachments = await _api.attachments(id);
       if (!mounted) return;
       final changed = await showDialog<bool>(
@@ -294,10 +295,7 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
     final end = (_page * 20).clamp(0, total);
     final range = total == 0
         ? '0-0 จาก 0'
-        : (_page == 1 ? '1-' : (((_page - 1) * 20) + 1).toString() + '-') +
-              end.toString() +
-              ' จาก ' +
-              total.toString();
+        : '${_page == 1 ? '1-' : '${((_page - 1) * 20) + 1}-'}$end จาก $total';
     return SizedBox(
       height: LaooLayout.paginationCardHeight,
       child: Wrap(
@@ -424,9 +422,7 @@ class _RequestDialogState extends State<_RequestDialog> {
     } catch (error) {
       if (mounted) {
         final text = error is ApiException
-            ? error.message +
-                  '\n' +
-                  (error.description ?? 'กรุณาตรวจสอบข้อมูลแล้วลองใหม่อีกครั้ง')
+            ? '${error.message}\n${error.description ?? 'กรุณาตรวจสอบข้อมูลแล้วลองใหม่อีกครั้ง'}'
             : 'บันทึกไม่สำเร็จ\nกรุณาลองใหม่อีกครั้ง';
         showTimedSnackBar(context, message: text, error: true);
       }
@@ -443,18 +439,52 @@ class _RequestDialogState extends State<_RequestDialog> {
       withData: true,
     );
     if (!mounted || result == null) return;
-    final unsupported = result.files.where((file) => file.bytes == null);
-    setState(() {
-      _attachments.addAll(result.files.where((file) => file.bytes != null));
-    });
-    if (unsupported.isNotEmpty) {
+    final accepted = <PlatformFile>[];
+    final rejected = <String>[];
+    for (final file in result.files) {
+      try {
+        accepted.add(_compressAttachment(file));
+      } catch (_) {
+        rejected.add(file.name);
+      }
+    }
+    if (!mounted) return;
+    setState(() => _attachments.addAll(accepted));
+    if (rejected.isNotEmpty) {
       showTimedSnackBar(
         context,
-        message:
-            'ไม่สามารถอ่านไฟล์: ${unsupported.map((file) => file.name).join(', ')}',
+        message: 'ไฟล์ไม่ผ่านการประมวลผล: ${rejected.join(', ')}',
         error: true,
       );
     }
+  }
+
+  PlatformFile _compressAttachment(PlatformFile source) {
+    final bytes = source.bytes;
+    if (bytes == null) throw StateError('อ่านไฟล์ไม่ได้');
+    if (bytes.length <= 1048576) return source;
+    final decoded = img.decodeImage(bytes);
+    if (decoded == null) throw StateError('อ่านรูปภาพไม่ได้');
+    final widths = [2400, 2000, 1600, 1200, 900, 700, 500];
+    const qualities = [88, 78, 68, 58, 48, 38, 30];
+    for (var i = 0; i < widths.length; i++) {
+      var working = decoded;
+      if (working.width > widths[i]) {
+        working = img.copyResize(working, width: widths[i]);
+      }
+      final compressed = Uint8List.fromList(
+        img.encodeJpg(working, quality: qualities[i]),
+      );
+      if (compressed.length <= 1048576) {
+        final name = source.name.replaceFirst(RegExp(r'\.[^.]+$'), '.jpg');
+        return PlatformFile(
+          name: name,
+          size: compressed.length,
+          bytes: compressed,
+        );
+      }
+    }
+    throw StateError('ลดขนาดแล้วยังเกิน 1 MB');
   }
 
   @override
@@ -463,7 +493,7 @@ class _RequestDialogState extends State<_RequestDialog> {
     final equipment = _maps(widget.lookup?['equipment']);
     final byKey = {
       for (final item in requesters)
-        item['requesterType'].toString() + ':' + item['id'].toString(): item,
+        '${item['requesterType']}:${item['id']}': item,
     };
     final dialogWidth = (MediaQuery.sizeOf(context).width - 32).clamp(
       280.0,
@@ -524,8 +554,7 @@ class _RequestDialogState extends State<_RequestDialog> {
                 if (_requester != null) ...[
                   const SizedBox(height: 12),
                   _infoBox(
-                    'สถานที่: ' +
-                        (_requester!['locationSnapshot']?.toString() ?? '-'),
+                    'สถานที่: ${_requester!['locationSnapshot']?.toString() ?? '-'}',
                   ),
                 ],
                 const SizedBox(height: 12),
@@ -539,9 +568,7 @@ class _RequestDialogState extends State<_RequestDialog> {
                       DropdownMenuItem(
                         value: item['itemID'].toString(),
                         child: Text(
-                          item['itemCode'].toString() +
-                              ' | ' +
-                              item['itemName'].toString(),
+                          '${item['itemCode']} | ${item['itemName']}',
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -724,8 +751,8 @@ class _AttachmentPreview extends StatelessWidget {
           child: DecoratedBox(
             decoration: const BoxDecoration(color: Colors.black54),
             child: Text(
-              file.name,
-              maxLines: 1,
+              '${file.name}\n${_formatBytes(file.size)}',
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(color: Colors.white, fontSize: 11),
             ),
@@ -734,6 +761,12 @@ class _AttachmentPreview extends StatelessWidget {
       ],
     ),
   );
+}
+
+String _formatBytes(int bytes) {
+  if (bytes < 1024) return '$bytes B';
+  if (bytes < 1048576) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+  return '${(bytes / 1048576).toStringAsFixed(2)} MB';
 }
 
 class _RequestDetailDialog extends StatefulWidget {
@@ -772,8 +805,9 @@ class _RequestDetailDialogState extends State<_RequestDetailDialog> {
       await action();
       if (mounted) Navigator.pop(context, true);
     } catch (error) {
-      if (mounted)
+      if (mounted) {
         showTimedSnackBar(context, message: error.toString(), error: true);
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -836,8 +870,9 @@ class _RequestDetailDialogState extends State<_RequestDetailDialog> {
       );
       if (mounted) setState(() => _attachments.remove(item));
     } catch (error) {
-      if (mounted)
+      if (mounted) {
         showTimedSnackBar(context, message: error.toString(), error: true);
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
