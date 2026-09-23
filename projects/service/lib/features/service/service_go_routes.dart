@@ -6,6 +6,7 @@ import '../company/customer/pages/customer_page.dart';
 import '../company/person/pages/service_person_page.dart';
 import '../service_request/pages/service_request_page.dart';
 import '../service_settings/pages/service_settings_page.dart';
+import '../job_dispatch/pages/job_dispatch_page.dart';
 import '../company/delivery_note/pages/delivery_note_page.dart';
 import '../company/pre_order/pages/pre_order_page.dart';
 import '../company/quotation/pages/quotation_page.dart';
@@ -84,6 +85,7 @@ List<GoRoute> buildServiceFeatureRoutes({
   _page('15001', (state) => const ServiceRequestPage()),
   _page('20001', (state) => const ServiceRequestPage(selfService: true)),
   _page('18001', (state) => const ServiceSettingsPage()),
+  _page('17001', (state) => const JobDispatchPage()),
   ..._workspacePlaceholders.entries.map(
     (entry) =>
         _workspacePlaceholder(ServiceRoutes.byMenuCode(entry.key), entry.value),
