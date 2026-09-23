@@ -5,12 +5,18 @@ using LaooApi.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Jpeg;
+using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Processing;
 
 namespace LaooApi.Controllers;
 
 [ApiController, Authorize, Route("api/service/requests")]
-public sealed class ServiceRequestController(IConfiguration configuration) : ControllerBase
+public sealed class ServiceRequestController(IConfiguration configuration, IWebHostEnvironment environment) : ControllerBase
 {
+    private const long MaxAttachmentBytes = 1_048_576;
+    private const long MaxIncomingAttachmentBytes = 25_000_000;
     private long CompanyId => ClaimLong("company_id");
     private long UserId => ClaimLong("user_id");
     private long? PersonId => ClaimLongNullable("person_id");
@@ -143,6 +149,153 @@ ORDER BY RequestDate DESC,RequestID DESC OFFSET @offset ROWS FETCH NEXT @take RO
             });
         }
         return Ok(new { items, total, page, pageSize });
+    }
+
+    [HttpGet("{id:long}")]
+    public async Task<IActionResult> Detail(long id, CancellationToken token)
+    {
+        await using var c = await Open(token);
+        if (!await InService(c, token) || !await Allowed(c, "15001", "VIEW", token)) return Forbid();
+        const string sql = "SELECT RequestID,RequestNo,RequesterType,RequesterID,RequesterNameSnapshot,RequesterPhoneSnapshot,RequesterEmailSnapshot,LocationSnapshot,EquipmentItemID,EquipmentCodeSnapshot,EquipmentNameSnapshot,Subject,Detail,StatusCode,RequestDate,AssignedEmployeeID,AssignedEmployeeNameSnapshot,ReceivedDate,StartedDate,CompletedDate,ResolutionDetail,CancellationReason,RowVersion FROM dbo.TDADServiceRequest WHERE CompanyID=@company AND RequestID=@id AND IsActive=1";
+        await using var q = new SqlCommand(sql, c); Add(q, "@company", SqlDbType.BigInt, CompanyId); Add(q, "@id", SqlDbType.BigInt, id);
+        await using var r = await q.ExecuteReaderAsync(token);
+        if (!await r.ReadAsync(token)) return NotFound();
+        return Ok(new { requestId=r.GetInt64(0),requestNo=r.GetString(1),requesterType=r.GetString(2),requesterId=Long(r,3),requesterName=r.GetString(4),requesterPhone=Text(r,5),requesterEmail=Text(r,6),locationSnapshot=Text(r,7),equipmentItemId=Long(r,8),equipmentCode=Text(r,9),equipmentName=Text(r,10),subject=r.GetString(11),detail=r.GetString(12),statusCode=r.GetString(13),requestDate=r.GetDateTime(14),assignedEmployeeId=Long(r,15),assignedEmployeeName=Text(r,16),receivedDate=DateTimeValue(r,17),startedDate=DateTimeValue(r,18),completedDate=DateTimeValue(r,19),resolutionDetail=Text(r,20),cancellationReason=Text(r,21),rowVersion=Convert.ToBase64String((byte[])r[22]) });
+    }
+
+    [HttpGet("{id:long}/attachments")]
+    public async Task<IActionResult> Attachments(long id, CancellationToken token)
+    {
+        await using var c = await Open(token);
+        if (!await InService(c, token)) return Forbid();
+        var access = await RequestAccess(c, id, token);
+        if (!access.Found) return NotFound();
+        var canManage = await Allowed(c, "15001", "VIEW", token);
+        var canOwnerView = access.CreatedBy == UserId && await Allowed(c, "20001", "VIEW", token);
+        if (!canManage && !canOwnerView) return Forbid();
+        const string sql = "SELECT AttachmentID,FileName,ContentType,FileSize,ImageWidth,ImageHeight,CreateDate FROM dbo.TDADServiceRequestAttachment WHERE CompanyID=@company AND RequestID=@request AND IsActive=1 ORDER BY CreateDate,AttachmentID";
+        await using var q = new SqlCommand(sql, c); Add(q, "@company", SqlDbType.BigInt, CompanyId); Add(q, "@request", SqlDbType.BigInt, id);
+        var items = new List<object>(); await using var r = await q.ExecuteReaderAsync(token);
+        while (await r.ReadAsync(token)) items.Add(new { attachmentId=r.GetInt64(0),requestId=id,fileName=r.GetString(1),contentType=r.GetString(2),fileSize=r.GetInt64(3),imageWidth=LongInt(r,4),imageHeight=LongInt(r,5),createDate=r.GetDateTime(6),url=$"/api/service/requests/{id}/attachments/{r.GetInt64(0)}" });
+        return Ok(new { items });
+    }
+
+    [HttpGet("{id:long}/attachments/{attachmentId:long}")]
+    public async Task<IActionResult> Attachment(long id, long attachmentId, CancellationToken token)
+    {
+        await using var c = await Open(token);
+        if (!await InService(c, token)) return Forbid();
+        var access = await RequestAccess(c, id, token);
+        if (!access.Found) return NotFound();
+        var canManage = await Allowed(c, "15001", "VIEW", token);
+        var canOwnerView = access.CreatedBy == UserId && await Allowed(c, "20001", "VIEW", token);
+        if (!canManage && !canOwnerView) return Forbid();
+        const string sql = "SELECT FileName,StoredPath,ContentType FROM dbo.TDADServiceRequestAttachment WHERE CompanyID=@company AND RequestID=@request AND AttachmentID=@attachment AND IsActive=1";
+        await using var q = new SqlCommand(sql, c); Add(q, "@company", SqlDbType.BigInt, CompanyId); Add(q, "@request", SqlDbType.BigInt, id); Add(q, "@attachment", SqlDbType.BigInt, attachmentId);
+        await using var r = await q.ExecuteReaderAsync(token); if (!await r.ReadAsync(token)) return NotFound();
+        var fileName = r.GetString(0); var relative = r.GetString(1); var contentType = r.GetString(2); var fullPath = SafeFilePath(relative);
+        if (fullPath is null || !System.IO.File.Exists(fullPath)) return NotFound();
+        return PhysicalFile(fullPath, contentType, fileName, enableRangeProcessing:true);
+    }
+
+    [HttpPost("{id:long}/attachments"), RequestSizeLimit(MaxIncomingAttachmentBytes)]
+    public async Task<IActionResult> UploadAttachment(long id, IFormFile? file, CancellationToken token)
+    {
+        await using var c = await Open(token);
+        if (!await InService(c, token)) return Forbid();
+        var access = await RequestAccess(c, id, token);
+        if (!access.Found) return NotFound();
+        if (access.Status is "COMPLETED" or "CANCELLED") return Conflict(new { message="ไม่สามารถเพิ่มรูปในใบแจ้งซ่อมที่ปิดแล้ว" });
+        var canManage = await Allowed(c, "15001", "EDIT", token);
+        var canOwner = access.CreatedBy == UserId && await Allowed(c, "20001", "CREATE", token);
+        if (!canManage && !canOwner) return Forbid();
+        if (file is null || file.Length == 0) return BadRequest(new { message="กรุณาเลือกไฟล์รูปภาพ" });
+        if (file.Length > MaxIncomingAttachmentBytes) return BadRequest(new { message="ไฟล์ใหญ่เกินกำหนด", description="ไฟล์ต้นฉบับต้องไม่เกิน 25 MB" });
+        var processed = await ProcessImage(file, token);
+        if (processed.Error is not null) return BadRequest(new { message=processed.Error });
+        await using var tx = (SqlTransaction)await c.BeginTransactionAsync(token);
+        string? storedPath = null;
+        try
+        {
+            const string insert = "INSERT dbo.TDADServiceRequestAttachment(CompanyID,RequestID,FileName,StoredPath,ContentType,FileSize,ImageWidth,ImageHeight,CreateBy) OUTPUT INSERTED.AttachmentID VALUES(@company,@request,@name,N'',@type,@size,@width,@height,@user)";
+            await using var insertCommand = new SqlCommand(insert, c, tx); Add(insertCommand,"@company",SqlDbType.BigInt,CompanyId); Add(insertCommand,"@request",SqlDbType.BigInt,id); Add(insertCommand,"@name",SqlDbType.NVarChar,SafeOriginalName(file.FileName),255); Add(insertCommand,"@type",SqlDbType.NVarChar,processed.ContentType,100); Add(insertCommand,"@size",SqlDbType.BigInt,processed.Bytes.Length); Add(insertCommand,"@width",SqlDbType.Int,processed.Width); Add(insertCommand,"@height",SqlDbType.Int,processed.Height); Add(insertCommand,"@user",SqlDbType.BigInt,UserId);
+            var attachmentId = Convert.ToInt64(await insertCommand.ExecuteScalarAsync(token));
+            storedPath = $"uploads/service-requests/{CompanyId}/{id}/{attachmentId}{processed.Extension}";
+            var fullPath = SafeFilePath(storedPath) ?? throw new InvalidOperationException("Invalid attachment path");
+            Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+            await System.IO.File.WriteAllBytesAsync(fullPath, processed.Bytes, token);
+            await using var update = new SqlCommand("UPDATE dbo.TDADServiceRequestAttachment SET StoredPath=@path,UpdateDate=SYSUTCDATETIME(),UpdateBy=@user WHERE CompanyID=@company AND AttachmentID=@attachment", c, tx); Add(update,"@path",SqlDbType.NVarChar,storedPath,500); Add(update,"@user",SqlDbType.BigInt,UserId); Add(update,"@company",SqlDbType.BigInt,CompanyId); Add(update,"@attachment",SqlDbType.BigInt,attachmentId); await update.ExecuteNonQueryAsync(token);
+            await tx.CommitAsync(token);
+            return Ok(new { attachmentId,requestId=id,fileName=SafeOriginalName(file.FileName),contentType=processed.ContentType,fileSize=processed.Bytes.Length,imageWidth=processed.Width,imageHeight=processed.Height,url=$"/api/service/requests/{id}/attachments/{attachmentId}" });
+        }
+        catch
+        {
+            await tx.RollbackAsync(token); if (storedPath is not null) TryDelete(storedPath); throw;
+        }
+    }
+
+    [HttpDelete("{id:long}/attachments/{attachmentId:long}")]
+    public async Task<IActionResult> DeleteAttachment(long id, long attachmentId, CancellationToken token)
+    {
+        await using var c = await Open(token);
+        if (!await InService(c, token) || !await Allowed(c, "15001", "EDIT", token)) return Forbid();
+        var access = await RequestAccess(c, id, token); if (!access.Found) return NotFound();
+        if (access.Status is "COMPLETED" or "CANCELLED") return Conflict(new { message="ไม่สามารถลบรูปในใบแจ้งซ่อมที่ปิดแล้ว" });
+        const string sql = "SELECT StoredPath FROM dbo.TDADServiceRequestAttachment WHERE CompanyID=@company AND RequestID=@request AND AttachmentID=@attachment AND IsActive=1";
+        await using var q = new SqlCommand(sql,c); Add(q,"@company",SqlDbType.BigInt,CompanyId); Add(q,"@request",SqlDbType.BigInt,id); Add(q,"@attachment",SqlDbType.BigInt,attachmentId); var path=Convert.ToString(await q.ExecuteScalarAsync(token)); if (string.IsNullOrWhiteSpace(path)) return NotFound();
+        await using var update = new SqlCommand("UPDATE dbo.TDADServiceRequestAttachment SET IsActive=0,UpdateDate=SYSUTCDATETIME(),UpdateBy=@user WHERE CompanyID=@company AND RequestID=@request AND AttachmentID=@attachment AND IsActive=1",c); Add(update,"@user",SqlDbType.BigInt,UserId); Add(update,"@company",SqlDbType.BigInt,CompanyId); Add(update,"@request",SqlDbType.BigInt,id); Add(update,"@attachment",SqlDbType.BigInt,attachmentId); await update.ExecuteNonQueryAsync(token); TryDelete(path!); return Ok(new { attachmentId,deleted=true });
+    }
+
+    [HttpGet("technicians")]
+    public async Task<IActionResult> Technicians(CancellationToken token)
+    {
+        await using var c = await Open(token);
+        if (!await InService(c, token) || !await Allowed(c, "15001", "EDIT", token)) return Forbid();
+        const string sql = "SELECT EmployeeID,EmployeeCode,FullName FROM dbo.TDADEmployee WHERE CompanyID=@company AND IsActive=1 AND IsServiceTechnician=1 ORDER BY FullName,EmployeeCode";
+        await using var q = new SqlCommand(sql, c); Add(q, "@company", SqlDbType.BigInt, CompanyId); var rows=new List<object>(); await using var r=await q.ExecuteReaderAsync(token);
+        while(await r.ReadAsync(token)) rows.Add(new { employeeId=r.GetInt64(0),employeeCode=r.GetString(1),fullName=r.GetString(2) });
+        return Ok(new { items=rows });
+    }
+
+    [HttpPost("{id:long}/receive")]
+    public Task<IActionResult> Receive(long id, ActionRequest request, CancellationToken token) => Transition(id, "RECEIVED", request, token);
+    [HttpPost("{id:long}/start")]
+    public Task<IActionResult> Start(long id, ActionRequest request, CancellationToken token) => Transition(id, "IN_PROGRESS", request, token);
+    [HttpPost("{id:long}/complete")]
+    public Task<IActionResult> Complete(long id, ActionRequest request, CancellationToken token) => Transition(id, "COMPLETED", request, token);
+    [HttpPost("{id:long}/cancel")]
+    public Task<IActionResult> Cancel(long id, ActionRequest request, CancellationToken token) => Transition(id, "CANCELLED", request, token);
+
+    private async Task<IActionResult> Transition(long id, string next, ActionRequest x, CancellationToken token)
+    {
+        await using var c = await Open(token);
+        if (!await InService(c, token) || !await Allowed(c, "15001", "EDIT", token)) return Forbid();
+        await using var tx = (SqlTransaction)await c.BeginTransactionAsync(token);
+        try
+        {
+            string? current=null; byte[]? version=null;
+            await using (var q=new SqlCommand("SELECT StatusCode,RowVersion FROM dbo.TDADServiceRequest WITH(UPDLOCK,HOLDLOCK) WHERE CompanyID=@company AND RequestID=@id AND IsActive=1",c,tx))
+            { Add(q,"@company",SqlDbType.BigInt,CompanyId); Add(q,"@id",SqlDbType.BigInt,id); await using var r=await q.ExecuteReaderAsync(token); if(!await r.ReadAsync(token)) return NotFound(); current=r.GetString(0); version=(byte[])r[1]; }
+            var valid = next=="RECEIVED" && current=="NEW" || next=="IN_PROGRESS" && current=="RECEIVED" || next=="COMPLETED" && current=="IN_PROGRESS" || next=="CANCELLED" && current is "NEW" or "RECEIVED" or "IN_PROGRESS";
+            if (!valid) return Conflict(new { message="ไม่สามารถเปลี่ยนสถานะได้", description="สถานะปัจจุบันไม่อยู่ในลำดับที่อนุญาต" });
+            if (next=="RECEIVED")
+            {
+                if (!x.AssignedEmployeeId.HasValue) return BadRequest(new { message="กรุณาเลือกช่างซ่อม" });
+                await using var e=new SqlCommand("SELECT FullName FROM dbo.TDADEmployee WHERE CompanyID=@company AND EmployeeID=@employee AND IsActive=1 AND IsServiceTechnician=1",c,tx); Add(e,"@company",SqlDbType.BigInt,CompanyId); Add(e,"@employee",SqlDbType.BigInt,x.AssignedEmployeeId); var name=Convert.ToString(await e.ExecuteScalarAsync(token)); if(string.IsNullOrWhiteSpace(name)) return BadRequest(new { message="ไม่พบช่างซ่อมที่ใช้งานได้ใน Company นี้" });
+                await using var u=new SqlCommand("UPDATE dbo.TDADServiceRequest SET StatusCode=N'RECEIVED',AssignedEmployeeID=@employee,AssignedEmployeeNameSnapshot=@name,ReceivedDate=SYSUTCDATETIME(),ReceivedBy=@user,UpdateDate=SYSUTCDATETIME(),UpdateBy=@user WHERE CompanyID=@company AND RequestID=@id AND RowVersion=@version",c,tx); Add(u,"@employee",SqlDbType.BigInt,x.AssignedEmployeeId); Add(u,"@name",SqlDbType.NVarChar,name,200); Add(u,"@user",SqlDbType.BigInt,UserId); Add(u,"@company",SqlDbType.BigInt,CompanyId); Add(u,"@id",SqlDbType.BigInt,id); Add(u,"@version",SqlDbType.VarBinary,version); await u.ExecuteNonQueryAsync(token);
+            }
+            else if (next=="IN_PROGRESS") await UpdateStatus(c,tx,id,"IN_PROGRESS","StartedDate=SYSUTCDATETIME(),StartedBy=@user",token);
+            else if (next=="COMPLETED") { if(string.IsNullOrWhiteSpace(x.ResolutionDetail)) return BadRequest(new { message="กรุณาระบุผลการซ่อม" }); await UpdateStatus(c,tx,id,"COMPLETED","CompletedDate=SYSUTCDATETIME(),CompletedBy=@user,ResolutionDetail=@detail",token,x.ResolutionDetail); }
+            else { if(string.IsNullOrWhiteSpace(x.CancellationReason)) return BadRequest(new { message="กรุณาระบุเหตุผลการยกเลิก" }); await UpdateStatus(c,tx,id,"CANCELLED","CancellationReason=@reason",token,null,x.CancellationReason); }
+            await tx.CommitAsync(token); return Ok(new { requestId=id,statusCode=next });
+        }
+        catch { await tx.RollbackAsync(token); throw; }
+    }
+
+    private async Task UpdateStatus(SqlConnection c, SqlTransaction tx, long id, string status, string fields, CancellationToken token, string? detail=null, string? reason=null)
+    {
+        var sql=$"UPDATE dbo.TDADServiceRequest SET StatusCode=N'{status}',{fields},UpdateDate=SYSUTCDATETIME(),UpdateBy=@user WHERE CompanyID=@company AND RequestID=@id AND IsActive=1";
+        await using var q=new SqlCommand(sql,c,tx); Add(q,"@user",SqlDbType.BigInt,UserId); Add(q,"@company",SqlDbType.BigInt,CompanyId); Add(q,"@id",SqlDbType.BigInt,id); Add(q,"@detail",SqlDbType.NVarChar,detail,2000); Add(q,"@reason",SqlDbType.NVarChar,reason,1000); await q.ExecuteNonQueryAsync(token);
     }
 
     [HttpPost]
@@ -310,13 +463,68 @@ WHERE C.CompanyID=@company AND (C.TenantContactID=@id OR C.PersonID=@id) AND C.I
         Add(q, "@company", SqlDbType.BigInt, CompanyId); return CompanyBusinessType.Normalize(Convert.ToString(await q.ExecuteScalarAsync(t)));
     }
 
+    private async Task<RequestAccessInfo> RequestAccess(SqlConnection c, long id, CancellationToken token)
+    {
+        await using var q = new SqlCommand("SELECT StatusCode,CreateBy FROM dbo.TDADServiceRequest WHERE CompanyID=@company AND RequestID=@id AND IsActive=1", c);
+        Add(q,"@company",SqlDbType.BigInt,CompanyId); Add(q,"@id",SqlDbType.BigInt,id); await using var r=await q.ExecuteReaderAsync(token);
+        return await r.ReadAsync(token) ? new(true,r.GetString(0),r.IsDBNull(1)?null:r.GetInt64(1)) : new(false,string.Empty,null);
+    }
+
+    private async Task<ProcessedImage> ProcessImage(IFormFile file, CancellationToken token)
+    {
+        var contentType = (file.ContentType ?? string.Empty).Trim().ToLowerInvariant();
+        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+        var supported = contentType is "image/jpeg" or "image/png" or "image/webp" || extension is ".jpg" or ".jpeg" or ".png" or ".webp";
+        if (!supported) return ProcessedImage.Rejected("รองรับเฉพาะไฟล์ JPG, PNG และ WEBP");
+        await using var input = new MemoryStream(); await file.CopyToAsync(input, token); var original = input.ToArray(); input.Position=0;
+        try
+        {
+            using var image = await Image.LoadAsync(input, token);
+            if (original.Length <= MaxAttachmentBytes)
+                return new(original, NormalizeContentType(contentType, extension), NormalizeExtension(contentType, extension), image.Width, image.Height, null);
+            foreach (var maxDimension in new[] { 2400, 2000, 1600, 1200, 900, 700, 500 })
+            {
+                using var candidate = image.CloneAs<Rgba32>();
+                if (image.Width > maxDimension || image.Height > maxDimension)
+                    candidate.Mutate(ctx => ctx.Resize(new ResizeOptions { Mode=ResizeMode.Max, Size=new Size(maxDimension,maxDimension) }));
+                foreach (var quality in new[] { 88, 78, 68, 58, 48, 38, 30 })
+                {
+                    await using var output = new MemoryStream(); candidate.SaveAsJpeg(output, new JpegEncoder { Quality=quality });
+                    if (output.Length <= MaxAttachmentBytes) return new(output.ToArray(),"image/jpeg",".jpg",candidate.Width,candidate.Height,null);
+                }
+            }
+            return ProcessedImage.Rejected("ระบบลดขนาดรูปแล้ว แต่ไฟล์ยังเกิน 1 MB");
+        }
+        catch (Exception) { return ProcessedImage.Rejected("ไฟล์รูปภาพไม่ถูกต้องหรือไม่สามารถอ่านได้"); }
+    }
+
+    private string? SafeFilePath(string relative)
+    {
+        var root = environment.WebRootPath; if (string.IsNullOrWhiteSpace(root)) root=Path.Combine(environment.ContentRootPath,"wwwroot");
+        var rootPath=Path.GetFullPath(root)+Path.DirectorySeparatorChar; var full=Path.GetFullPath(Path.Combine(root,relative.Replace('/',Path.DirectorySeparatorChar)));
+        return full.StartsWith(rootPath,StringComparison.OrdinalIgnoreCase) ? full : null;
+    }
+
+    private void TryDelete(string relative) { var full=SafeFilePath(relative); if (full is not null) try { if(System.IO.File.Exists(full)) System.IO.File.Delete(full); } catch { } }
+    private static string SafeOriginalName(string value) => Path.GetFileName(value).Trim() is { Length: > 0 } name ? name[..Math.Min(name.Length,255)] : "attachment";
+    private static string NormalizeContentType(string contentType,string extension) => contentType switch { "image/jpeg" or "image/png" or "image/webp" => contentType, ".png" => "image/png", ".webp" => "image/webp", _ => "image/jpeg" };
+    private static string NormalizeExtension(string contentType,string extension) => contentType switch { "image/png" => ".png", "image/webp" => ".webp", _ => extension is ".png" or ".webp" ? extension : ".jpg" };
+
     private async Task<SqlConnection> Open(CancellationToken t) { var c = new SqlConnection(configuration.GetConnectionString("LaooDatabase")); await c.OpenAsync(t); return c; }
     private long ClaimLong(string name) => long.TryParse(User.FindFirstValue(name), out var value) ? value : 0;
     private long? ClaimLongNullable(string name) => long.TryParse(User.FindFirstValue(name), out var value) ? value : null;
     private static long? Long(SqlDataReader r, int index) => r.IsDBNull(index) ? null : r.GetInt64(index);
+    private static int? LongInt(SqlDataReader r, int index) => r.IsDBNull(index) ? null : r.GetInt32(index);
     private static string? Text(SqlDataReader r, int index) => r.IsDBNull(index) ? null : r.GetString(index);
+    private static DateTime? DateTimeValue(SqlDataReader r, int index) => r.IsDBNull(index) ? null : r.GetDateTime(index);
     private static void Add(SqlCommand c, string name, SqlDbType type, object? value, int size = 0) { var p = size == 0 ? c.Parameters.Add(name, type) : c.Parameters.Add(name, type, size); p.Value = value ?? DBNull.Value; }
 
     public sealed record CreateRequest(string? RequesterType, long? RequesterId, long? EquipmentItemId, string? Subject, string? Detail);
+    public sealed record ActionRequest(long? AssignedEmployeeId, string? ResolutionDetail, string? CancellationReason);
+    private sealed record RequestAccessInfo(bool Found,string Status,long? CreatedBy);
+    private sealed record ProcessedImage(byte[] Bytes,string ContentType,string Extension,int Width,int Height,string? Error)
+    {
+        public static ProcessedImage Rejected(string error) => new(Array.Empty<byte>(),string.Empty,string.Empty,0,0,error);
+    }
     private sealed record Resolved(string Type,long PersonId,string Name,string? Phone,string? Email,long? ServiceCustomerId,long? ResidentId,long? TenantId,long? ContactId,long? RoomId,long? HouseId,string? Location);
 }
