@@ -117,7 +117,7 @@ AND (@q=N'' OR P.FullName LIKE N'%'+@q+N'%' OR P.Mobile LIKE N'%'+@q+N'%') ORDER
         page = Math.Max(1, page); pageSize = Math.Clamp(pageSize, 1, 100);
         const string sql = """
 SELECT COUNT_BIG(1) OVER(),RequestID,RequestNo,RequesterType,RequesterNameSnapshot,LocationSnapshot,
-       Subject,StatusCode,RequestDate,RowVersion
+       EquipmentNameSnapshot,Subject,StatusCode,AssignedEmployeeNameSnapshot,ReceivedDate,StartedDate,RequestDate,RowVersion
 FROM dbo.TDADServiceRequest
 WHERE CompanyID=@company AND IsActive=1
   AND (@status=N'' OR StatusCode=@status)
@@ -142,10 +142,14 @@ ORDER BY RequestDate DESC,RequestID DESC OFFSET @offset ROWS FETCH NEXT @take RO
                 requesterType = r.GetString(3),
                 requesterName = r.GetString(4),
                 locationSnapshot = Text(r, 5),
-                subject = r.GetString(6),
-                statusCode = r.GetString(7),
-                requestDate = r.GetDateTime(8),
-                rowVersion = Convert.ToBase64String((byte[])r[9])
+                equipmentName = Text(r, 6),
+                subject = r.GetString(7),
+                statusCode = r.GetString(8),
+                assignedEmployeeName = Text(r, 9),
+                receivedDate = DateTimeValue(r, 10),
+                startedDate = DateTimeValue(r, 11),
+                requestDate = r.GetDateTime(12),
+                rowVersion = Convert.ToBase64String((byte[])r[13])
             });
         }
         return Ok(new { items, total, page, pageSize });
