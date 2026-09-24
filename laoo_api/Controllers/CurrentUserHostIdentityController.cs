@@ -1,5 +1,6 @@
 using System.Data;
 using System.Security.Claims;
+using Laoo.Shared.Contracts.Visitors;
 using LaooApi.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -21,7 +22,11 @@ public sealed class CurrentUserHostIdentityController(IConfiguration configurati
         await using var connection = new SqlConnection(configuration.GetConnectionString("LaooDatabase"));
         await connection.OpenAsync(token);
         if (!await HasActiveCompanyScope(connection, companyId, partnerId, userId, token)) return Forbid();
-        if (!await CompanyProjectPermission.IsAllowedAsync(connection, User, "32003", "VIEW", token))
+        var canReadHostIdentities =
+            await CompanyProjectPermission.IsAllowedAsync(connection, User, "32001", "CREATE", token)
+            || await CompanyProjectPermission.IsAllowedAsync(connection, User, "32002", "VIEW", token)
+            || await CompanyProjectPermission.IsAllowedAsync(connection, User, "32003", "VIEW", token);
+        if (!canReadHostIdentities)
             return Ok(EmptyResult());
         const string sql = """
 WITH IdentityPersons AS
@@ -30,12 +35,12 @@ WITH IdentityPersons AS
     UNION
     SELECT E.PersonID FROM dbo.TDADUserEmployee UE JOIN dbo.TDADEmployee E ON E.EmployeeID=UE.EmployeeID AND E.CompanyID=UE.CompanyID AND E.IsActive=1 WHERE UE.UserID=@user AND UE.CompanyID=@company AND UE.IsActive=1 AND E.PersonID IS NOT NULL
 )
-SELECT N'EMPLOYEE' IdentityType,E.EmployeeID IdentityId FROM dbo.TDADEmployee E WHERE E.CompanyID=@company AND E.IsActive=1 AND (E.PersonID IN (SELECT PersonID FROM IdentityPersons) OR EXISTS(SELECT 1 FROM dbo.TDADUserEmployee UE WHERE UE.UserID=@user AND UE.CompanyID=@company AND UE.EmployeeID=E.EmployeeID AND UE.IsActive=1))
-UNION ALL SELECT N'RESIDENT',R.ResidentID FROM dbo.TDADResident R WHERE R.CompanyID=@company AND R.IsActive=1 AND R.PersonID IN (SELECT PersonID FROM IdentityPersons)
-UNION ALL SELECT N'SERVICE_CUSTOMER',S.ServiceCustomerID FROM dbo.TDADServiceCustomer S WHERE S.CompanyID=@company AND S.IsActive=1 AND S.PersonID IN (SELECT PersonID FROM IdentityPersons)
-UNION ALL SELECT N'TENANT_CONTACT',TC.TenantContactID FROM dbo.TDADRentalOfficeTenantContact TC WHERE TC.CompanyID=@company AND TC.IsActive=1 AND TC.PersonID IN (SELECT PersonID FROM IdentityPersons);
+SELECT N'EMPLOYEE' IdentityType,E.EmployeeID IdentityId,CAST(NULL AS bigint) TenantId FROM dbo.TDADEmployee E WHERE E.CompanyID=@company AND E.IsActive=1 AND (E.PersonID IN (SELECT PersonID FROM IdentityPersons) OR EXISTS(SELECT 1 FROM dbo.TDADUserEmployee UE WHERE UE.UserID=@user AND UE.CompanyID=@company AND UE.EmployeeID=E.EmployeeID AND UE.IsActive=1))
+UNION ALL SELECT N'RESIDENT',R.ResidentID,CAST(NULL AS bigint) FROM dbo.TDADResident R WHERE R.CompanyID=@company AND R.IsActive=1 AND R.PersonID IN (SELECT PersonID FROM IdentityPersons)
+UNION ALL SELECT N'SERVICE_CUSTOMER',S.ServiceCustomerID,CAST(NULL AS bigint) FROM dbo.TDADServiceCustomer S WHERE S.CompanyID=@company AND S.IsActive=1 AND S.PersonID IN (SELECT PersonID FROM IdentityPersons)
+UNION ALL SELECT N'TENANT_CONTACT',TC.TenantContactID,T.TenantID FROM dbo.TDADRentalOfficeTenantContact TC JOIN dbo.TDADRentalOfficeTenant T ON T.CompanyID=TC.CompanyID AND T.TenantID=TC.TenantID AND T.IsActive=1 WHERE TC.CompanyID=@company AND TC.IsActive=1 AND TC.PersonID IN (SELECT PersonID FROM IdentityPersons);
 """;
-        var employeeIds = new List<long>(); var residentIds = new List<long>(); var serviceCustomerIds = new List<long>(); var tenantContactIds = new List<long>();
+        var employeeIds = new List<long>(); var residentIds = new List<long>(); var serviceCustomerIds = new List<long>(); var tenantContactIds = new List<long>(); var tenantContacts = new List<TenantContactIdentity>();
         await using var command = new SqlCommand(sql, connection);
         command.Parameters.Add("@company", SqlDbType.BigInt).Value = companyId;
         command.Parameters.Add("@user", SqlDbType.BigInt).Value = userId;
@@ -43,9 +48,18 @@ UNION ALL SELECT N'TENANT_CONTACT',TC.TenantContactID FROM dbo.TDADRentalOfficeT
         while (await reader.ReadAsync(token))
         {
             var id = reader.GetInt64(1);
-            switch (reader.GetString(0)) { case "EMPLOYEE": employeeIds.Add(id); break; case "RESIDENT": residentIds.Add(id); break; case "SERVICE_CUSTOMER": serviceCustomerIds.Add(id); break; case "TENANT_CONTACT": tenantContactIds.Add(id); break; }
+            switch (reader.GetString(0))
+            {
+                case "EMPLOYEE": employeeIds.Add(id); break;
+                case "RESIDENT": residentIds.Add(id); break;
+                case "SERVICE_CUSTOMER": serviceCustomerIds.Add(id); break;
+                case "TENANT_CONTACT":
+                    tenantContactIds.Add(id);
+                    tenantContacts.Add(new TenantContactIdentity(id, reader.GetInt64(2)));
+                    break;
+            }
         }
-        return Ok(new { employeeIds, residentIds, serviceCustomerIds, tenantContactIds });
+        return Ok(new HostIdentityResponse(employeeIds, residentIds, serviceCustomerIds, tenantContactIds, tenantContacts));
     }
     private async Task<bool> HasActiveCompanyScope(SqlConnection connection,long companyId,long partnerId,long userId,CancellationToken token)
     {
@@ -55,5 +69,5 @@ UNION ALL SELECT N'TENANT_CONTACT',TC.TenantContactID FROM dbo.TDADRentalOfficeT
         return Convert.ToBoolean(await command.ExecuteScalarAsync(token));
     }
     private long ClaimLong(string name) => long.TryParse(User.FindFirstValue(name),out var value) ? value : 0;
-    private static object EmptyResult() => new { employeeIds=Array.Empty<long>(),residentIds=Array.Empty<long>(),serviceCustomerIds=Array.Empty<long>(),tenantContactIds=Array.Empty<long>() };
+    private static HostIdentityResponse EmptyResult() => HostIdentityResponse.Empty;
 }
