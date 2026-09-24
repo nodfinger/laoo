@@ -1,4 +1,5 @@
 using System.Data;
+using LaooApi.Security;
 using LaooApi.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
@@ -7,6 +8,97 @@ namespace LaooApi.Controllers;
 
 public sealed partial class ServicePersonController
 {
+    [HttpGet("{personId:long}/login")]
+    public async Task<IActionResult> ResidentLogin(long personId, CancellationToken token)
+    {
+        if (!Request.Path.StartsWithSegments("/api/service/residents")) return NotFound();
+        await using var c = await Open(token);
+        if (!await InServiceScope(c, token) || !await Allowed(c, "EDIT", token)) return Forbid();
+        const string sql = """
+SELECT U.UserID,U.Username,U.IsActive
+FROM dbo.TDADResident R
+JOIN dbo.TDADPerson P ON P.CompanyID=R.CompanyID AND P.PersonID=R.PersonID AND P.IsActive=1
+LEFT JOIN dbo.TDADUser U ON U.CompanyID=R.CompanyID AND U.PersonID=R.PersonID
+WHERE R.CompanyID=@company AND R.PersonID=@person AND R.IsActive=1;
+""";
+        await using var cmd = new SqlCommand(sql, c); Add(cmd, "@company", SqlDbType.BigInt, CompanyId); Add(cmd, "@person", SqlDbType.BigInt, personId);
+        await using var r = await cmd.ExecuteReaderAsync(token);
+        if (!await r.ReadAsync(token)) return NotFound(Issue("ไม่พบผู้พักอาศัย", "ผู้พักอาศัยต้องอยู่ใน Company ปัจจุบันและมีสถานะใช้งาน"));
+        return Ok(new { hasUser = !r.IsDBNull(0), userId = Long(r, 0), username = Text(r, 1), isActive = r.IsDBNull(2) || r.GetBoolean(2) });
+    }
+
+    [HttpPost("{personId:long}/login")]
+    public async Task<IActionResult> SaveResidentLogin(long personId, ResidentLoginSaveRequest request, CancellationToken token)
+    {
+        if (!Request.Path.StartsWithSegments("/api/service/residents")) return NotFound();
+        var username = request.Username?.Trim() ?? string.Empty;
+        if (username.Length is 0 or > 100 || string.IsNullOrWhiteSpace(request.Password))
+            return BadRequest(Issue("ข้อมูลบัญชีไม่ครบ", "กรุณาระบุ Username และรหัสผ่าน"));
+        await using var c = await Open(token);
+        if (!await InServiceScope(c, token) || !await Allowed(c, "EDIT", token)) return Forbid();
+        var policy = await passwordService.GetPolicyAsync(c, "C", ClaimLong("partner_id"), CompanyId, token);
+        if (!PasswordService.MeetsPolicy(username, request.Password, policy))
+            return BadRequest(Issue("รหัสผ่านไม่เป็นไปตามนโยบาย", PasswordService.GetReadablePolicyMessage(policy)));
+        await using var tx = (SqlTransaction)await c.BeginTransactionAsync(IsolationLevel.Serializable, token);
+        try
+        {
+            const string sql = """
+DECLARE @name nvarchar(200),@user bigint,@currentUsername nvarchar(100),@project bigint;
+SELECT @name=P.FullName FROM dbo.TDADResident R WITH(UPDLOCK,HOLDLOCK)
+JOIN dbo.TDADPerson P ON P.CompanyID=R.CompanyID AND P.PersonID=R.PersonID AND P.IsActive=1
+WHERE R.CompanyID=@company AND R.PersonID=@person AND R.IsActive=1;
+IF @name IS NULL THROW 52958,'RESIDENT_NOT_ACTIVE',1;
+SELECT @project=P.ProjectID FROM dbo.TDADProject P
+JOIN dbo.TDADCompanyProject CP ON CP.ProjectID=P.ProjectID AND CP.CompanyID=@company AND CP.PartnerID=@partner AND CP.IsEnabled=1
+WHERE P.ProjectCode=N'LAOO_SERVICE' AND P.IsActive=1
+AND (CP.StartDate IS NULL OR CP.StartDate<=CONVERT(date,SYSUTCDATETIME()))
+AND (CP.ExpireDate IS NULL OR CP.ExpireDate>=CONVERT(date,SYSUTCDATETIME()));
+IF @project IS NULL THROW 52959,'SERVICE_NOT_ENABLED',1;
+SELECT @user=UserID,@currentUsername=Username FROM dbo.TDADUser WITH(UPDLOCK,HOLDLOCK) WHERE CompanyID=@company AND PersonID=@person;
+IF @user IS NOT NULL AND UPPER(@currentUsername)<>@normalized THROW 52960,'USERNAME_IMMUTABLE',1;
+IF @user IS NULL
+BEGIN
+ IF EXISTS(SELECT 1 FROM dbo.TDADLaooUser WHERE NormalizedUsername=@normalized)
+ OR EXISTS(SELECT 1 FROM dbo.TDADPartnerUser WHERE NormalizedUsername=@normalized)
+ OR EXISTS(SELECT 1 FROM dbo.TDADUser WHERE NormalizedUsername=@normalized)
+    THROW 50008,'USERNAME_EXISTS',1;
+ INSERT dbo.TDADUser(CompanyID,PersonID,Username,NormalizedUsername,PasswordHash,DisplayName,IsCompanyAdmin,IsActive,FailedLoginCount,LastPasswordChangeDate,CreateDate,CreateBy)
+ VALUES(@company,@person,@username,@normalized,@hash,@name,0,@active,0,SYSUTCDATETIME(),SYSUTCDATETIME(),@actor);
+ SET @user=CONVERT(bigint,SCOPE_IDENTITY());
+END
+ELSE UPDATE dbo.TDADUser SET PasswordHash=@hash,IsActive=@active,FailedLoginCount=0,LastPasswordChangeDate=SYSUTCDATETIME(),UpdateDate=SYSUTCDATETIME(),UpdateBy=@actor WHERE UserID=@user AND CompanyID=@company;
+INSERT dbo.TDADUserProject(CompanyID,UserID,ProjectID,IsDefault,IsActive,CreateDate)
+SELECT @company,@user,@project,1,1,SYSUTCDATETIME()
+WHERE NOT EXISTS(SELECT 1 FROM dbo.TDADUserProject WHERE CompanyID=@company AND UserID=@user AND ProjectID=@project);
+UPDATE dbo.TDADUserProject SET IsActive=1 WHERE CompanyID=@company AND UserID=@user AND ProjectID=@project;
+INSERT dbo.TDADUserPermission(UserID,ProjectID,PermissionID,IsAllowed,IsActive,Remark,CreatedDate,CreatedBy)
+SELECT @user,@project,P.PermissionID,1,1,N'Resident self-service',SYSUTCDATETIME(),@actor
+FROM dbo.TDADPermission P
+WHERE P.ProjectID=@project AND P.ScreenCode=N'20001' AND P.ActionCode IN(N'VIEW',N'CREATE') AND P.IsActive=1
+AND NOT EXISTS(SELECT 1 FROM dbo.TDADUserPermission X WHERE X.UserID=@user AND X.ProjectID=@project AND X.PermissionID=P.PermissionID);
+IF NOT EXISTS(SELECT 1 FROM dbo.TDADUserPermission UP JOIN dbo.TDADPermission P ON P.PermissionID=UP.PermissionID AND P.ProjectID=UP.ProjectID WHERE UP.UserID=@user AND UP.ProjectID=@project AND UP.IsActive=1 AND UP.IsAllowed=1 AND P.ScreenCode=N'20001' AND P.ActionCode=N'CREATE' AND P.IsActive=1) THROW 52961,'SELF_SERVICE_PERMISSION_MISSING',1;
+SELECT @user UserID,@username Username,@active IsActive;
+""";
+            await using var cmd = new SqlCommand(sql, c, tx);
+            Add(cmd, "@company", SqlDbType.BigInt, CompanyId); Add(cmd, "@partner", SqlDbType.BigInt, ClaimLong("partner_id")); Add(cmd, "@person", SqlDbType.BigInt, personId);
+            Add(cmd, "@username", SqlDbType.NVarChar, username, 100); Add(cmd, "@normalized", SqlDbType.NVarChar, username.ToUpperInvariant(), 100);
+            Add(cmd, "@hash", SqlDbType.NVarChar, passwordService.HashPassword(username, request.Password), 500); Add(cmd, "@active", SqlDbType.Bit, request.IsActive); Add(cmd, "@actor", SqlDbType.BigInt, ClaimLong("user_id"));
+            long userId; string savedUsername; bool isActive;
+            await using (var reader = await cmd.ExecuteReaderAsync(token))
+            {
+                if (!await reader.ReadAsync(token)) throw new InvalidOperationException("RESIDENT_LOGIN_SAVE_FAILED");
+                userId = reader.GetInt64(0); savedUsername = reader.GetString(1); isActive = reader.GetBoolean(2);
+            }
+            await tx.CommitAsync(token);
+            return Ok(new { userId, username = savedUsername, isActive });
+        }
+        catch (SqlException e) when (e.Number is 50008 or 2601 or 2627) { await tx.RollbackAsync(token); return Conflict(Issue("Username นี้ถูกใช้งานแล้ว", "กรุณาระบุ Username อื่น ระบบไม่อนุญาตให้ Username ซ้ำกันทั้งระบบ")); }
+        catch (SqlException e) when (e.Number == 52958) { await tx.RollbackAsync(token); return NotFound(Issue("ไม่พบผู้พักอาศัย", "ผู้พักอาศัยต้องอยู่ใน Company ปัจจุบันและมีสถานะใช้งาน")); }
+        catch (SqlException e) when (e.Number == 52959) { await tx.RollbackAsync(token); return BadRequest(Issue("ระบบ Service ยังไม่เปิดใช้งาน", "Company นี้ต้องเปิด Project LAOO_SERVICE ก่อนสร้างบัญชีผู้พักอาศัย")); }
+        catch (SqlException e) when (e.Number == 52960) { await tx.RollbackAsync(token); return BadRequest(Issue("ไม่สามารถเปลี่ยน Username ได้", "บัญชีนี้มี Username อยู่แล้ว ให้ตั้งรหัสผ่านใหม่โดยใช้ Username เดิม")); }
+        catch (SqlException e) when (e.Number == 52961) { await tx.RollbackAsync(token); return BadRequest(Issue("กำหนดสิทธิ์ Self-service ไม่สำเร็จ", "ไม่พบสิทธิ์ CREATE ของเมนู 20001 ใน Project LAOO_SERVICE")); }
+    }
+
     [HttpGet("lookup")]
     public async Task<IActionResult> Lookup([FromQuery] long? includePersonId, [FromQuery] long? includeRoomId, [FromQuery] long? includeHouseId, CancellationToken token)
     {
@@ -116,7 +208,7 @@ WHERE CompanyID=@company AND ResidentID=@id AND RowVersion=@version;
         {
             if (!personId.HasValue)
             {
-                await using (var duplicate = new SqlCommand("SELECT COUNT(1) FROM dbo.TDADPerson WITH(UPDLOCK,HOLDLOCK) WHERE CompanyID=@company AND REPLACE(FullName,N'' '',N'''')=REPLACE(@name,N'' '',N'''')", c, tx))
+                await using (var duplicate = new SqlCommand("SELECT COUNT(1) FROM dbo.TDADPerson WITH(UPDLOCK,HOLDLOCK) WHERE CompanyID=@company AND REPLACE(FullName,N' ',N'')=REPLACE(@name,N' ',N'')", c, tx))
                 {
                     Add(duplicate, "@company", SqlDbType.BigInt, CompanyId);
                     Add(duplicate, "@name", SqlDbType.NVarChar, name, 200);
@@ -228,6 +320,7 @@ SELECT CAST(CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADUser WHERE CompanyID=@company
 }
 
 public sealed record ServicePersonSaveRequest(long? PersonId,string? FullName,string? NickName,string? Email,string? Mobile,bool IsActive,bool IsServiceCustomer,bool IsResident,long? RoomId,long? HouseId,DateOnly? StartDate,DateOnly? EndDate,bool UpdatePerson=false,string? PersonRowVersion=null,string? ServiceCustomerRowVersion=null,string? ResidentRowVersion=null);
+public sealed record ResidentLoginSaveRequest(string? Username, string? Password, bool IsActive = true);
 file sealed class ServicePersonException(string code) : Exception(code)
 {
     public string Code { get; } = code;

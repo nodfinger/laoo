@@ -11,7 +11,7 @@ namespace LaooApi.Controllers;
 [Route("api/service/persons")]
 [Route("api/service/customers")]
 [Route("api/service/residents")]
-public sealed partial class ServicePersonController(IConfiguration configuration) : ControllerBase
+public sealed partial class ServicePersonController(IConfiguration configuration, PasswordService passwordService) : ControllerBase
 {
     private string ScreenCode => Request.Path.StartsWithSegments("/api/service/customers") ? "14005" : Request.Path.StartsWithSegments("/api/service/residents") ? "14006" : "14004";
     private long CompanyId => ClaimLong("company_id");

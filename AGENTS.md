@@ -45,6 +45,7 @@ Coding เลย แก้เท่าที่จำเป็น ทดสอ�
 - `ScreenType = 4` เป็นข้อกำหนดด้าน Flow ของหน้าจอ ไม่ได้แทนสิทธิ์ผู้ใช้ และต้องตรวจ Permission ของ Backend ซ้ำทุกครั้ง
 
 - สำหรับหน้าจอใหม่ พ่อจะแจ้ง `MenuCode` และค่า `ScreenType` ให้หม่อนก่อนเริ่มสร้างหน้าจอ
+- ก่อนเริ่มสร้างหน้าจอใหม่ทุกครั้ง หม่อนต้องถามพ่อให้ยืนยัน `ScreenType` โดยตรง แม้มี Feature Specification หรือ MenuCode แล้วก็ตาม; ห้ามเดา ScreenType หรือเริ่มสร้างหน้าจอจนกว่าจะได้รับคำตอบจากพ่อ
 - `TDADMainMenu.ScreenType` เป็น Source of Truth ของประเภทหน้าจอ และเป็นชนิดข้อมูล `int`
 - Mapping มาตรฐาน: `1 = CRUD`, `2 = UpdateOnly`, `3 = ShowOnly`
 - เมื่อได้รับ `MenuCode` แล้ว Agent ต้องอ่าน `MenuName` และ `ScreenType` จาก `dbo.TDADMainMenu` ก่อนออกแบบหรือ Coding ไม่ใช้ค่าที่เดาเอง

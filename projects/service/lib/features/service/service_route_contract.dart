@@ -101,7 +101,7 @@ abstract final class ServiceRoutes {
     FeatureRouteContract(
       projectCode: ServiceProject.code,
       menuCode: '15002',
-      screenType: 3,
+      screenType: 1,
       routeName: 'cmQrPortal',
       routePath: '/cm/qr-portal',
     ),

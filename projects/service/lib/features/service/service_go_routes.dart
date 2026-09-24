@@ -5,6 +5,10 @@ import 'package:laoo_shared_core/laoo_shared_core.dart';
 import '../company/customer/pages/customer_page.dart';
 import '../company/person/pages/service_person_page.dart';
 import '../service_request/pages/service_request_page.dart';
+import '../service_request_qr/pages/service_request_qr_page.dart';
+import '../service_settings/pages/service_settings_page.dart';
+import '../job_dispatch/pages/job_dispatch_page.dart';
+import '../job_work_orders/pages/job_work_orders_page.dart';
 import '../company/delivery_note/pages/delivery_note_page.dart';
 import '../company/pre_order/pages/pre_order_page.dart';
 import '../company/quotation/pages/quotation_page.dart';
@@ -81,11 +85,18 @@ List<GoRoute> buildServiceFeatureRoutes({
     (state) => const ServicePersonPage(role: ServicePersonRole.resident),
   ),
   _page('15001', (state) => const ServiceRequestPage()),
-  _page('20001', (state) => const ServiceRequestPage(selfService: true)),
-  _workspacePlaceholder(
-    ServiceRoutes.byMenuCode('18001'),
-    'System settings preview',
+  _page('15002', (state) => const ServiceRequestQrPage()),
+  _page(
+    '20001',
+    (state) => ServiceRequestPage(
+      selfService: true,
+      qrToken: state.uri.queryParameters['qr'],
+    ),
   ),
+  _page('18001', (state) => const ServiceSettingsPage()),
+  _page('17001', (state) => const JobDispatchPage()),
+  _page('17002', (state) => const JobWorkOrdersPage()),
+  _page('17003', (state) => const JobWorkOrdersPage()),
   ..._workspacePlaceholders.entries.map(
     (entry) =>
         _workspacePlaceholder(ServiceRoutes.byMenuCode(entry.key), entry.value),
@@ -130,13 +141,9 @@ const _workspacePlaceholders = <String, String>{
   '14001': 'ผังสถานที่และพื้นที่',
   '14002': 'ทะเบียนอุปกรณ์และ QR Code',
   '14003': 'ทะเบียนลูกค้าภายนอก',
-  '15002': 'จัดการ QR Code แจ้งซ่อม',
   '16001': 'แผนและรอบเวลา PM',
   '16002': 'รายการตรวจเช็กมาตรฐาน',
   '16003': 'ปฏิทินงานบำรุงรักษา',
-  '17001': 'กระดานจ่ายงานช่าง',
-  '17002': 'ทะเบียนใบงานทั้งหมด',
-  '17003': 'บันทึกปิดงานและตรวจรับ',
   '19001': 'แดชบอร์ดภาพรวมงานบริการ',
   '19002': 'ประวัติการซ่อมและค่าใช้จ่าย',
   '19003': 'รายงานผลประเมินความพึงพอใจ',

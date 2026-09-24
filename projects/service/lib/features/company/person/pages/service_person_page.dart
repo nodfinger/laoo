@@ -589,6 +589,9 @@ class _ServicePersonDialogState extends State<_ServicePersonDialog> {
   final _nick = TextEditingController();
   final _mobile = TextEditingController();
   final _email = TextEditingController();
+  final _username = TextEditingController();
+  final _password = TextEditingController();
+  final _confirmPassword = TextEditingController();
   Map<String, dynamic> _lookup = const {};
   int? _personId;
   int? _roomId;
@@ -599,6 +602,9 @@ class _ServicePersonDialogState extends State<_ServicePersonDialog> {
   bool _loading = true;
   bool _saving = false;
   bool _saved = false;
+  bool _hasAccount = false;
+  bool _accountActive = false;
+  bool _accountDirty = false;
   DateTime? _start;
   DateTime? _end;
   bool get _editing => widget.initial != null;
@@ -639,11 +645,29 @@ class _ServicePersonDialogState extends State<_ServicePersonDialog> {
         _resident = widget.role == ServicePersonRole.resident;
         _loading = false;
       });
+      if (_editing && widget.role == ServicePersonRole.resident) {
+        await _loadResidentLogin();
+      }
     } catch (error) {
       if (mounted) {
         setState(() => _loading = false);
         _error(error);
       }
+    }
+  }
+
+  Future<void> _loadResidentLogin() async {
+    if (_personId == null) return;
+    try {
+      final value = await widget.api.residentLogin(_personId!);
+      if (!mounted) return;
+      setState(() {
+        _hasAccount = value['hasUser'] == true;
+        _accountActive = value['isActive'] == true;
+        _username.text = '${value['username'] ?? ''}';
+      });
+    } catch (error) {
+      if (mounted) _error(error);
     }
   }
 
@@ -686,6 +710,16 @@ class _ServicePersonDialogState extends State<_ServicePersonDialog> {
 
   Future<void> _save() async {
     if (!_form.currentState!.validate() || _saving) return;
+    if (_accountDirty) {
+      if (_username.text.trim().isEmpty || _password.text.isEmpty) {
+        _errorText('กรุณาระบุ Username และรหัสผ่านสำหรับบัญชีผู้พักอาศัย');
+        return;
+      }
+      if (_password.text != _confirmPassword.text) {
+        _errorText('ยืนยันรหัสผ่านไม่ตรงกัน');
+        return;
+      }
+    }
     if (!_newPerson && _personId == null) {
       _errorText('กรุณาเลือกบุคคลเดิม');
       return;
@@ -714,6 +748,14 @@ class _ServicePersonDialogState extends State<_ServicePersonDialog> {
             widget.initial?['serviceCustomerRowVersion'],
         'residentRowVersion': widget.initial?['residentRowVersion'],
       }, personId: _editing ? _personId : null);
+      if (_editing && _resident && _accountDirty && _personId != null) {
+        await widget.api.saveResidentLogin(
+          _personId!,
+          username: _username.text.trim(),
+          password: _password.text,
+          isActive: _accountActive,
+        );
+      }
       if (!mounted) return;
       if (_editing) {
         Navigator.pop(context, true);
@@ -761,6 +803,18 @@ class _ServicePersonDialogState extends State<_ServicePersonDialog> {
   );
   String _date(DateTime value) =>
       '${value.year.toString().padLeft(4, '0')}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
+
+  Widget _twoFields(Widget first, Widget second) => LayoutBuilder(
+    builder: (context, constraints) => constraints.maxWidth < 400
+        ? Column(children: [first, const SizedBox(height: 12), second])
+        : Row(
+            children: [
+              Expanded(child: first),
+              const SizedBox(width: 12),
+              Expanded(child: second),
+            ],
+          ),
+  );
 
   @override
   Widget build(BuildContext context) => AlertDialog(
@@ -870,37 +924,39 @@ class _ServicePersonDialogState extends State<_ServicePersonDialog> {
                         ),
                       if (_editing && widget.canEditPerson)
                         const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _name,
-                        enabled: _newPerson || widget.canEditPerson,
-                        maxLength: 200,
-                        decoration: _input('ชื่อ-นามสกุล *'),
-                        validator: (value) =>
-                            value == null || value.trim().isEmpty
-                            ? 'กรุณาระบุชื่อ-นามสกุล'
-                            : null,
+                      _twoFields(
+                        TextFormField(
+                          controller: _name,
+                          enabled: _newPerson || widget.canEditPerson,
+                          maxLength: 200,
+                          decoration: _input('ชื่อ-นามสกุล *'),
+                          validator: (value) =>
+                              value == null || value.trim().isEmpty
+                              ? 'กรุณาระบุชื่อ-นามสกุล'
+                              : null,
+                        ),
+                        TextFormField(
+                          controller: _nick,
+                          enabled: _newPerson || widget.canEditPerson,
+                          maxLength: 100,
+                          decoration: _input('ชื่อเล่น'),
+                        ),
                       ),
                       const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _nick,
-                        enabled: _newPerson || widget.canEditPerson,
-                        maxLength: 100,
-                        decoration: _input('ชื่อเล่น'),
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _mobile,
-                        enabled: _newPerson || widget.canEditPerson,
-                        maxLength: 50,
-                        decoration: _input('โทรศัพท์'),
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _email,
-                        enabled: _newPerson || widget.canEditPerson,
-                        maxLength: 320,
-                        keyboardType: TextInputType.emailAddress,
-                        decoration: _input('อีเมล'),
+                      _twoFields(
+                        TextFormField(
+                          controller: _mobile,
+                          enabled: _newPerson || widget.canEditPerson,
+                          maxLength: 50,
+                          decoration: _input('โทรศัพท์'),
+                        ),
+                        TextFormField(
+                          controller: _email,
+                          enabled: _newPerson || widget.canEditPerson,
+                          maxLength: 320,
+                          keyboardType: TextInputType.emailAddress,
+                          decoration: _input('อีเมล'),
+                        ),
                       ),
                       const SizedBox(height: 12),
                       const Text(
@@ -924,6 +980,69 @@ class _ServicePersonDialogState extends State<_ServicePersonDialog> {
                           ),
                         ),
                       ),
+                      if (_editing &&
+                          widget.role == ServicePersonRole.resident) ...[
+                        const SizedBox(height: 12),
+                        const Text(
+                          'บัญชีเข้าใช้งานผู้พักอาศัย',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            const Text('สถานะบัญชี'),
+                            const SizedBox(width: 8),
+                            Switch(
+                              value: _accountActive,
+                              onChanged: _saving
+                                  ? null
+                                  : (value) => setState(() {
+                                      _accountActive = value;
+                                      _accountDirty = true;
+                                    }),
+                            ),
+                          ],
+                        ),
+                        if (_accountActive || _hasAccount) ...[
+                          const SizedBox(height: 4),
+                          TextFormField(
+                            controller: _username,
+                            enabled: !_hasAccount && !_saving,
+                            maxLength: 100,
+                            onChanged: (_) => _accountDirty = true,
+                            decoration: _input('Username *'),
+                          ),
+                          const SizedBox(height: 12),
+                          _twoFields(
+                            TextFormField(
+                              controller: _password,
+                              enabled: !_saving,
+                              obscureText: true,
+                              onChanged: (_) => _accountDirty = true,
+                              decoration: _input(
+                                _hasAccount ? 'รหัสผ่านใหม่ *' : 'รหัสผ่าน *',
+                              ),
+                            ),
+                            TextFormField(
+                              controller: _confirmPassword,
+                              enabled: !_saving,
+                              obscureText: true,
+                              onChanged: (_) => _accountDirty = true,
+                              decoration: _input('ยืนยันรหัสผ่าน *'),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'ระบบไม่แสดงรหัสผ่านเดิม ผู้พักอาศัยใช้บัญชีนี้เข้าแจ้งซ่อมด้วยตนเอง',
+                            style: TextStyle(
+                              fontSize: LaooTypography.bodySmall,
+                            ),
+                          ),
+                        ],
+                      ],
                       if (_resident) ...[
                         const SizedBox(height: 12),
                         DropdownButtonFormField<int>(
@@ -1019,4 +1138,251 @@ class _ServicePersonDialogState extends State<_ServicePersonDialog> {
           ),
         ),
       );
+}
+
+class _ResidentLoginDialog extends StatefulWidget {
+  const _ResidentLoginDialog({
+    required this.api,
+    required this.personId,
+    required this.fullName,
+  });
+
+  final ServicePersonApi api;
+  final int personId;
+  final String fullName;
+
+  @override
+  State<_ResidentLoginDialog> createState() => _ResidentLoginDialogState();
+}
+
+class _ResidentLoginDialogState extends State<_ResidentLoginDialog> {
+  final _form = GlobalKey<FormState>();
+  final _username = TextEditingController();
+  final _password = TextEditingController();
+  final _confirmPassword = TextEditingController();
+  bool _loading = true;
+  bool _saving = false;
+  bool _hasUser = false;
+  bool _active = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _username.dispose();
+    _password.dispose();
+    _confirmPassword.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    try {
+      final data = await widget.api.residentLogin(widget.personId);
+      if (!mounted) return;
+      setState(() {
+        _hasUser = data['hasUser'] == true;
+        _username.text = '${data['username'] ?? ''}';
+        _active = data['isActive'] != false;
+        _loading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      _showError(error);
+    }
+  }
+
+  Future<void> _save() async {
+    if (!_form.currentState!.validate() || _saving) return;
+    setState(() => _saving = true);
+    try {
+      await widget.api.saveResidentLogin(
+        widget.personId,
+        username: _username.text.trim(),
+        password: _password.text,
+        isActive: _active,
+      );
+      if (!mounted) return;
+      showTimedSnackBar(
+        context,
+        message: _hasUser
+            ? 'ตั้งรหัสผ่านผู้พักอาศัยใหม่สำเร็จ'
+            : 'สร้างบัญชีผู้พักอาศัยสำเร็จ',
+      );
+      Navigator.pop(context);
+    } catch (error) {
+      if (mounted) _showError(error);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  void _showError(Object error) => showTimedSnackBar(
+    context,
+    message: error is ApiException
+        ? '${error.message}\nรายละเอียดเพิ่มเติม: ${error.description ?? 'กรุณาตรวจสอบข้อมูลแล้วลองใหม่'}'
+        : 'บันทึกบัญชีไม่สำเร็จ\nรายละเอียดเพิ่มเติม: กรุณาลองใหม่',
+    error: true,
+  );
+
+  InputDecoration _input(String label) => InputDecoration(
+    labelText: label,
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(LaooRadius.xs),
+    ),
+  );
+
+  ButtonStyle _button(bool filled) =>
+      (filled ? FilledButton.styleFrom() : TextButton.styleFrom()).copyWith(
+        minimumSize: const WidgetStatePropertyAll(Size(0, 48)),
+        shape: WidgetStatePropertyAll(
+          RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(LaooRadius.xs),
+          ),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
+    return AlertDialog(
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      insetPadding: const EdgeInsets.all(20),
+      contentPadding: EdgeInsets.zero,
+      titlePadding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(LaooRadius.xs),
+      ),
+      title: Row(
+        children: [
+          Icon(Icons.key_outlined, color: primary),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Text(
+              'บัญชีเข้าใช้งานผู้พักอาศัย',
+              style: TextStyle(
+                color: Colors.black,
+                fontSize: LaooTypography.workspaceCaption,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+      content: SizedBox(
+        width: 440,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * .75,
+          ),
+          child: _loading
+              ? const Padding(
+                  padding: EdgeInsets.all(40),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              : SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Form(
+                    key: _form,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const Divider(height: 1, color: LaooColors.border),
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          color: primary.withValues(alpha: .08),
+                          child: Text(widget.fullName),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            const Text(
+                              'สถานะบัญชี',
+                              style: TextStyle(
+                                fontSize: LaooTypography.inputLabel,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Switch(
+                              value: _active,
+                              onChanged: _saving
+                                  ? null
+                                  : (value) => setState(() => _active = value),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: _username,
+                          enabled: !_hasUser && !_saving,
+                          maxLength: 100,
+                          decoration: _input('Username *'),
+                          validator: (value) =>
+                              value == null || value.trim().isEmpty
+                              ? 'กรุณาระบุ Username'
+                              : null,
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: _password,
+                          enabled: !_saving,
+                          obscureText: true,
+                          decoration: _input(
+                            _hasUser ? 'รหัสผ่านใหม่ *' : 'รหัสผ่าน *',
+                          ),
+                          validator: (value) => value == null || value.isEmpty
+                              ? 'กรุณาระบุรหัสผ่าน'
+                              : null,
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: _confirmPassword,
+                          enabled: !_saving,
+                          obscureText: true,
+                          decoration: _input('ยืนยันรหัสผ่าน *'),
+                          validator: (value) => value != _password.text
+                              ? 'รหัสผ่านไม่ตรงกัน'
+                              : null,
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'ระบบไม่แสดงรหัสผ่านเดิม ผู้พักอาศัยใช้บัญชีนี้เข้าแจ้งซ่อมด้วยตนเอง',
+                          style: TextStyle(fontSize: LaooTypography.bodySmall),
+                        ),
+                        const SizedBox(height: 12),
+                        const Divider(height: 1, color: LaooColors.border),
+                      ],
+                    ),
+                  ),
+                ),
+        ),
+      ),
+      actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      actions: [
+        TextButton(
+          style: _button(false),
+          onPressed: _saving ? null : () => Navigator.pop(context),
+          child: const Text('ยกเลิก'),
+        ),
+        FilledButton.icon(
+          style: _button(true),
+          onPressed: _loading || _saving ? null : _save,
+          icon: const Icon(Icons.save_outlined),
+          label: Text(
+            _saving
+                ? 'กำลังบันทึก…'
+                : _hasUser
+                ? 'ตั้งรหัสผ่านใหม่'
+                : 'สร้างบัญชี',
+          ),
+        ),
+      ],
+    );
+  }
 }
