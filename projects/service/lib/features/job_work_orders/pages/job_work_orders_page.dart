@@ -332,7 +332,14 @@ class _WorkOrderDialog extends StatefulWidget {
 
 class _WorkOrderDialogState extends State<_WorkOrderDialog> {
   bool _busy = false;
+  final _resolution = TextEditingController();
   String get status => widget.data['statusCode']?.toString() ?? '';
+
+  @override
+  void dispose() {
+    _resolution.dispose();
+    super.dispose();
+  }
 
   Future<void> _start() async {
     if (_busy) return;
@@ -345,6 +352,37 @@ class _WorkOrderDialogState extends State<_WorkOrderDialog> {
         final message = error is ApiException
             ? '${error.message}\n${error.description ?? 'กรุณาโหลดใบงานใหม่'}'
             : error.toString();
+        showTimedSnackBar(context, message: message, error: true);
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _complete() async {
+    final resolution = _resolution.text.trim();
+    if (resolution.isEmpty) {
+      showTimedSnackBar(
+        context,
+        message:
+            'กรุณาระบุผลการซ่อม\nรายละเอียดเพิ่มเติม: ผลการซ่อมเป็นข้อมูลบังคับก่อนปิดงาน',
+        error: true,
+      );
+      return;
+    }
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      await widget.api.complete(
+        (widget.data['requestId'] as num).toInt(),
+        resolution,
+      );
+      if (mounted) Navigator.pop(context, true);
+    } catch (error) {
+      if (mounted) {
+        final message = error is ApiException
+            ? '${error.message}\n${error.description ?? 'กรุณาโหลดใบงานใหม่'}'
+            : 'ปิดงานไม่สำเร็จ\nรายละเอียดเพิ่มเติม: กรุณาลองใหม่';
         showTimedSnackBar(context, message: message, error: true);
       }
     } finally {
@@ -390,6 +428,20 @@ class _WorkOrderDialogState extends State<_WorkOrderDialog> {
                 ],
               ),
             ],
+            if (status == 'IN_PROGRESS') ...[
+              const SizedBox(height: 16),
+              TextField(
+                controller: _resolution,
+                enabled: !_busy,
+                minLines: 4,
+                maxLines: 8,
+                maxLength: 2000,
+                decoration: const InputDecoration(
+                  labelText: 'ผลการซ่อม *',
+                  alignLabelWithHint: true,
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -404,6 +456,12 @@ class _WorkOrderDialogState extends State<_WorkOrderDialog> {
           onPressed: _busy ? null : _start,
           icon: const Icon(Icons.play_arrow),
           label: const Text('เริ่มดำเนินการ'),
+        ),
+      if (status == 'IN_PROGRESS')
+        FilledButton.icon(
+          onPressed: _busy ? null : _complete,
+          icon: const Icon(Icons.task_alt),
+          label: const Text('บันทึกปิดงาน'),
         ),
     ],
   );
