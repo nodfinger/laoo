@@ -34,6 +34,7 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
   @override
   void initState() {
     super.initState();
+    if (widget.selfService) _menuName = 'แจ้งซ่อม / ขอใช้บริการ';
     _load();
     _loadActions();
     _loadMenuName();
@@ -48,13 +49,12 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final value = widget.selfService
-          ? <String, dynamic>{}
-          : await _api.list(
-              search: _search.text.trim(),
-              status: _status,
-              page: _page,
-            );
+      final value = await _api.list(
+        search: _search.text.trim(),
+        status: _status,
+        selfService: widget.selfService,
+        page: _page,
+      );
       if (mounted) setState(() => _data = value);
     } catch (error) {
       if (mounted) _message(error);
@@ -68,8 +68,10 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
       final actions = await _api.actions();
       if (mounted) {
         setState(() {
-          _canCreate = actions['create'] == true;
-          _canEdit = actions['edit'] == true;
+          _canCreate = widget.selfService
+              ? actions['selfCreate'] == true
+              : actions['create'] == true;
+          _canEdit = !widget.selfService && actions['edit'] == true;
         });
       }
     } catch (_) {}
@@ -78,8 +80,8 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
   Future<void> _loadMenuName() async {
     try {
       final name = await NavigationMenuRepository().resolveMenuName(
-        menuCode: '15001',
-        routeName: 'cmTickets',
+        menuCode: widget.selfService ? '20001' : '15001',
+        routeName: widget.selfService ? 'portalRequest' : 'cmTickets',
         fallback: _menuName,
       );
       if (mounted) setState(() => _menuName = name);
@@ -106,11 +108,9 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
       ),
     );
     if (saved == true && mounted) {
-      if (!widget.selfService) {
-        _page = 1;
-        await _load();
-        if (!mounted) return;
-      }
+      _page = 1;
+      await _load();
+      if (!mounted) return;
       showTimedSnackBar(context, message: 'บันทึกใบแจ้งซ่อมเรียบร้อยแล้ว');
     }
   }
@@ -140,18 +140,6 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.selfService) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('แจ้งซ่อมด้วยตนเอง')),
-        body: Center(
-          child: FilledButton.icon(
-            onPressed: _create,
-            icon: const Icon(Icons.build_outlined),
-            label: const Text('แจ้งซ่อม'),
-          ),
-        ),
-      );
-    }
     final items = List<Map<String, dynamic>>.from(
       (_data['items'] as List? ?? const []).map(
         (e) => Map<String, dynamic>.from(e as Map),
@@ -160,7 +148,7 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
     final total = (_data['total'] as num?)?.toInt() ?? 0;
     return SupportWorkspaceShell(
       pageTitle: _menuName,
-      activeMenu: 'cmTickets',
+      activeMenu: widget.selfService ? 'portalRequest' : 'cmTickets',
       menuScope: WorkspaceMenuScope.company,
       child: Container(
         width: double.infinity,
@@ -192,7 +180,9 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
                   FilledButton.icon(
                     onPressed: _create,
                     icon: const Icon(Icons.add),
-                    label: const Text('เพิ่มใบแจ้งซ่อม'),
+                    label: Text(
+                      widget.selfService ? 'แจ้งซ่อม' : 'เพิ่มใบแจ้งซ่อม',
+                    ),
                   ),
               ],
             ),

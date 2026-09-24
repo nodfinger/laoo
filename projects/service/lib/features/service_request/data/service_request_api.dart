@@ -20,6 +20,7 @@ class ServiceRequestApi {
   Future<Map<String, dynamic>> list({
     String search = '',
     String status = '',
+    bool selfService = false,
     int page = 1,
   }) async => Map<String, dynamic>.from(
     await _client.get(
@@ -27,6 +28,7 @@ class ServiceRequestApi {
           query: {
             'search': search,
             'status': status,
+            'self': '$selfService',
             'page': '$page',
             'pageSize': '20',
           },
