@@ -517,8 +517,14 @@ WHERE Q.CompanyID=@company AND Q.QrToken=@token AND Q.IsActive=1;
         const string sql = "SELECT COALESCE(S.ServiceEnabled,1),COALESCE(S.AllowWalkIn,1),COALESCE(S.RequireEquipment,1),COALESCE(S.AttachmentRequired,0),COALESCE(S.WorkflowEnabled,1) FROM dbo.TDADProject P LEFT JOIN dbo.TDSTCompanySetupSystemService S ON S.ProjectID=P.ProjectID AND S.CompanyID=@company WHERE P.ProjectCode=N'LAOO_SERVICE' AND P.IsActive=1";
         await using var q = new SqlCommand(sql, c); Add(q, "@company", SqlDbType.BigInt, CompanyId);
         await using var r = await q.ExecuteReaderAsync(token);
-        return await r.ReadAsync(token) ? new(r.GetBoolean(0), r.GetBoolean(1), r.GetBoolean(2), r.GetBoolean(3), r.GetBoolean(4)) : new(true, true, true, false, true);
+        return await r.ReadAsync(token)
+            ? new(Flag(r, 0), Flag(r, 1), Flag(r, 2), Flag(r, 3), Flag(r, 4))
+            : new(true, true, true, false, true);
     }
+
+    // Existing Company Setup databases may store these flags as either bit or int.
+    private static bool Flag(SqlDataReader reader, int ordinal) =>
+        !reader.IsDBNull(ordinal) && Convert.ToInt32(reader.GetValue(ordinal)) != 0;
 
     private sealed record ServiceSettingsState(bool ServiceEnabled, bool AllowWalkIn, bool RequireEquipment, bool AttachmentRequired, bool WorkflowEnabled);
 
