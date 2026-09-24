@@ -228,8 +228,17 @@ class _WorkOrderTable extends StatelessWidget {
         rows: [
           for (final row in items)
             DataRow(
+              onSelectChanged: (_) => onOpen(row),
               cells: [
-                DataCell(Text(row['requestNo']?.toString() ?? '-')),
+                DataCell(
+                  Tooltip(
+                    message: 'เปิดรายละเอียดใบงาน',
+                    child: TextButton(
+                      onPressed: () => onOpen(row),
+                      child: Text(row['requestNo']?.toString() ?? '-'),
+                    ),
+                  ),
+                ),
                 DataCell(Text(row['requestNo']?.toString() ?? '-')),
                 DataCell(Text(row['requesterName']?.toString() ?? '-')),
                 DataCell(

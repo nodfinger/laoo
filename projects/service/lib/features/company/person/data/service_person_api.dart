@@ -57,5 +57,27 @@ class ServicePersonApi {
     );
   }
 
+  Future<Map<String, dynamic>> residentLogin(int personId) async =>
+      Map<String, dynamic>.from(
+        await _client.get('$path/$personId/login') as Map,
+      );
+
+  Future<Map<String, dynamic>> saveResidentLogin(
+    int personId, {
+    required String username,
+    required String password,
+    required bool isActive,
+  }) async => Map<String, dynamic>.from(
+    await _client.post(
+          '$path/$personId/login',
+          body: {
+            'username': username,
+            'password': password,
+            'isActive': isActive,
+          },
+        )
+        as Map,
+  );
+
   void dispose() => _client.dispose();
 }
