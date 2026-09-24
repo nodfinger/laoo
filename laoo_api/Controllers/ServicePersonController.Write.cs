@@ -72,7 +72,7 @@ SELECT @company,@user,@project,1,1,SYSUTCDATETIME()
 WHERE NOT EXISTS(SELECT 1 FROM dbo.TDADUserProject WHERE CompanyID=@company AND UserID=@user AND ProjectID=@project);
 UPDATE dbo.TDADUserProject SET IsActive=1 WHERE CompanyID=@company AND UserID=@user AND ProjectID=@project;
 INSERT dbo.TDADUserPermission(UserID,ProjectID,PermissionID,IsAllowed,IsActive,Remark,CreatedDate,CreatedBy)
-SELECT @user,@project,P.PermissionID,1,1,N'Resident self-service',SYSUTCDATETIME(),N'resident-self-service'
+SELECT @user,@project,P.PermissionID,1,1,N'Resident self-service',SYSUTCDATETIME(),@actor
 FROM dbo.TDADPermission P
 WHERE P.ProjectID=@project AND P.ScreenCode=N'20001' AND P.ActionCode IN(N'VIEW',N'CREATE') AND P.IsActive=1
 AND NOT EXISTS(SELECT 1 FROM dbo.TDADUserPermission X WHERE X.UserID=@user AND X.ProjectID=@project AND X.PermissionID=P.PermissionID);
