@@ -128,16 +128,19 @@ ORDER BY CASE WHEN OwnerType=N'L' THEN 0 ELSE 1 END,Seq,Name,MasterCode;
     }
 
     [HttpGet]
-    public async Task<IActionResult> List([FromQuery] string? search, [FromQuery] string? status, [FromQuery] int page = 1, [FromQuery] int pageSize = 20, CancellationToken token = default)
+    public async Task<IActionResult> List([FromQuery] string? search, [FromQuery] string? status, [FromQuery] bool self = false, [FromQuery] int page = 1, [FromQuery] int pageSize = 20, CancellationToken token = default)
     {
         await using var c = await Open(token);
-        if (!await InService(c, token) || !await Allowed(c, "15001", "VIEW", token)) return Forbid();
+        var canManage = await Allowed(c, "15001", "VIEW", token);
+        var canSelfView = await Allowed(c, "20001", "VIEW", token);
+        if (!await InService(c, token) || (self ? !canManage && !canSelfView : !canManage)) return Forbid();
         page = Math.Max(1, page); pageSize = Math.Clamp(pageSize, 1, 100);
         const string sql = """
 SELECT COUNT_BIG(1) OVER(),RequestID,RequestNo,RequesterType,RequesterNameSnapshot,LocationSnapshot,
        EquipmentNameSnapshot,Subject,StatusCode,AssignedEmployeeNameSnapshot,ReceivedDate,StartedDate,RequestDate,RowVersion
 FROM dbo.TDADServiceRequest
 WHERE CompanyID=@company AND IsActive=1
+  AND (@self=0 OR CreateBy=@user)
   AND (@status IN(N'',N'ALL')
        OR (@status=N'OPEN' AND StatusCode IN(N'RECEIVED',N'IN_PROGRESS'))
        OR (@status NOT IN(N'',N'ALL',N'OPEN') AND StatusCode=@status))
@@ -146,6 +149,7 @@ ORDER BY RequestDate DESC,RequestID DESC OFFSET @offset ROWS FETCH NEXT @take RO
 """;
         await using var cmd = new SqlCommand(sql, c);
         Add(cmd, "@company", SqlDbType.BigInt, CompanyId);
+        Add(cmd, "@self", SqlDbType.Bit, self); Add(cmd, "@user", SqlDbType.BigInt, UserId);
         Add(cmd, "@status", SqlDbType.NVarChar, status?.Trim() ?? string.Empty, 30);
         Add(cmd, "@q", SqlDbType.NVarChar, search?.Trim() ?? string.Empty, 200);
         Add(cmd, "@offset", SqlDbType.Int, (page - 1) * pageSize);
@@ -179,9 +183,11 @@ ORDER BY RequestDate DESC,RequestID DESC OFFSET @offset ROWS FETCH NEXT @take RO
     public async Task<IActionResult> Detail(long id, CancellationToken token)
     {
         await using var c = await Open(token);
-        if (!await InService(c, token) || (!await Allowed(c, "15001", "VIEW", token) && !await Allowed(c, "20001", "VIEW", token))) return Forbid();
-        const string sql = "SELECT RequestID,RequestNo,RequesterType,RequesterID,RequesterNameSnapshot,RequesterPhoneSnapshot,RequesterEmailSnapshot,LocationSnapshot,EquipmentItemID,EquipmentCodeSnapshot,EquipmentNameSnapshot,Subject,Detail,StatusCode,RequestDate,AssignedEmployeeID,AssignedEmployeeNameSnapshot,ReceivedDate,StartedDate,CompletedDate,ResolutionDetail,CancellationReason,RowVersion FROM dbo.TDADServiceRequest WHERE CompanyID=@company AND RequestID=@id AND IsActive=1";
-        await using var q = new SqlCommand(sql, c); Add(q, "@company", SqlDbType.BigInt, CompanyId); Add(q, "@id", SqlDbType.BigInt, id);
+        var canManage = await Allowed(c, "15001", "VIEW", token);
+        var canSelfView = await Allowed(c, "20001", "VIEW", token);
+        if (!await InService(c, token) || (!canManage && !canSelfView)) return Forbid();
+        const string sql = "SELECT RequestID,RequestNo,RequesterType,RequesterID,RequesterNameSnapshot,RequesterPhoneSnapshot,RequesterEmailSnapshot,LocationSnapshot,EquipmentItemID,EquipmentCodeSnapshot,EquipmentNameSnapshot,Subject,Detail,StatusCode,RequestDate,AssignedEmployeeID,AssignedEmployeeNameSnapshot,ReceivedDate,StartedDate,CompletedDate,ResolutionDetail,CancellationReason,RowVersion FROM dbo.TDADServiceRequest WHERE CompanyID=@company AND RequestID=@id AND IsActive=1 AND (@manage=1 OR CreateBy=@user)";
+        await using var q = new SqlCommand(sql, c); Add(q, "@company", SqlDbType.BigInt, CompanyId); Add(q, "@id", SqlDbType.BigInt, id); Add(q, "@manage", SqlDbType.Bit, canManage); Add(q, "@user", SqlDbType.BigInt, UserId);
         await using var r = await q.ExecuteReaderAsync(token);
         if (!await r.ReadAsync(token)) return NotFound();
         return Ok(new { requestId=r.GetInt64(0),requestNo=r.GetString(1),requesterType=r.GetString(2),requesterId=Long(r,3),requesterName=r.GetString(4),requesterPhone=Text(r,5),requesterEmail=Text(r,6),locationSnapshot=Text(r,7),equipmentItemId=Long(r,8),equipmentCode=Text(r,9),equipmentName=Text(r,10),subject=r.GetString(11),detail=r.GetString(12),statusCode=r.GetString(13),requestDate=r.GetDateTime(14),assignedEmployeeId=Long(r,15),assignedEmployeeName=Text(r,16),receivedDate=DateTimeValue(r,17),startedDate=DateTimeValue(r,18),completedDate=DateTimeValue(r,19),resolutionDetail=Text(r,20),cancellationReason=Text(r,21),rowVersion=Convert.ToBase64String((byte[])r[22]) });
