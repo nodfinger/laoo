@@ -138,7 +138,9 @@ SELECT COUNT_BIG(1) OVER(),RequestID,RequestNo,RequesterType,RequesterNameSnapsh
        EquipmentNameSnapshot,Subject,StatusCode,AssignedEmployeeNameSnapshot,ReceivedDate,StartedDate,RequestDate,RowVersion
 FROM dbo.TDADServiceRequest
 WHERE CompanyID=@company AND IsActive=1
-  AND (@status=N'' OR StatusCode=@status)
+  AND (@status IN(N'',N'ALL')
+       OR (@status=N'OPEN' AND StatusCode IN(N'RECEIVED',N'IN_PROGRESS'))
+       OR (@status NOT IN(N'',N'ALL',N'OPEN') AND StatusCode=@status))
   AND (@q=N'' OR RequestNo LIKE N'%'+@q+N'%' OR RequesterNameSnapshot LIKE N'%'+@q+N'%' OR Subject LIKE N'%'+@q+N'%')
 ORDER BY RequestDate DESC,RequestID DESC OFFSET @offset ROWS FETCH NEXT @take ROWS ONLY;
 """;
