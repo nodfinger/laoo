@@ -6,6 +6,7 @@ import 'package:image/image.dart' as img;
 
 import '../../../app/theme/laoo_design_tokens.dart';
 import '../../../core/api/api_exception.dart';
+import '../../../core/navigation/navigation_menu_repository.dart';
 import '../../../core/widgets/timed_snack_bar.dart';
 import '../../support/presentation/widgets/support_workspace_shell.dart';
 import '../data/service_request_api.dart';
@@ -25,7 +26,9 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
   String _status = '';
   int _page = 1;
   bool _loading = true;
+  bool _canCreate = false;
   bool _canEdit = false;
+  String _menuName = 'รายการแจ้งซ่อมทั้งหมด';
   Map<String, dynamic> _data = const {'items': <dynamic>[], 'total': 0};
 
   @override
@@ -33,6 +36,7 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
     super.initState();
     _load();
     _loadActions();
+    _loadMenuName();
   }
 
   @override
@@ -62,7 +66,23 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
   Future<void> _loadActions() async {
     try {
       final actions = await _api.actions();
-      if (mounted) setState(() => _canEdit = actions['edit'] == true);
+      if (mounted) {
+        setState(() {
+          _canCreate = actions['create'] == true;
+          _canEdit = actions['edit'] == true;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _loadMenuName() async {
+    try {
+      final name = await NavigationMenuRepository().resolveMenuName(
+        menuCode: '15001',
+        routeName: 'cmTickets',
+        fallback: _menuName,
+      );
+      if (mounted) setState(() => _menuName = name);
     } catch (_) {}
   }
 
@@ -139,7 +159,7 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
     );
     final total = (_data['total'] as num?)?.toInt() ?? 0;
     return SupportWorkspaceShell(
-      pageTitle: 'รับแจ้งซ่อม',
+      pageTitle: _menuName,
       activeMenu: 'cmTickets',
       menuScope: WorkspaceMenuScope.company,
       child: Container(
@@ -153,30 +173,28 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
               alignment: WrapAlignment.spaceBetween,
               crossAxisAlignment: WrapCrossAlignment.center,
               runSpacing: 10,
-              children: const [
+              children: [
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.build_outlined),
-                    SizedBox(width: 10),
+                    const Icon(Icons.build_outlined),
+                    const SizedBox(width: 10),
                     Text(
-                      'รับแจ้งซ่อม',
-                      style: TextStyle(
+                      _menuName,
+                      style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                   ],
                 ),
+                if (_canCreate)
+                  FilledButton.icon(
+                    onPressed: _create,
+                    icon: const Icon(Icons.add),
+                    label: const Text('เพิ่มใบแจ้งซ่อม'),
+                  ),
               ],
-            ),
-            Align(
-              alignment: Alignment.centerRight,
-              child: FilledButton.icon(
-                onPressed: _create,
-                icon: const Icon(Icons.add),
-                label: const Text('เพิ่มใบแจ้งซ่อม'),
-              ),
             ),
             const Divider(height: 24),
             Wrap(
@@ -228,6 +246,14 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
                       _load();
                     },
                   ),
+                ),
+                FilledButton.icon(
+                  onPressed: () {
+                    _page = 1;
+                    _load();
+                  },
+                  icon: const Icon(Icons.search),
+                  label: const Text('ค้นหา'),
                 ),
                 OutlinedButton(
                   onPressed: () {
