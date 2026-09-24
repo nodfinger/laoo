@@ -17,6 +17,7 @@ public sealed class ServiceRequestController(IConfiguration configuration, IWebH
 {
     private const long MaxAttachmentBytes = 1_048_576;
     private const long MaxIncomingAttachmentBytes = 25_000_000;
+    private const string ServiceRequestSubjectMasterGroup = "014";
     private long CompanyId => ClaimLong("company_id");
     private long UserId => ClaimLong("user_id");
     private long? PersonId => ClaimLongNullable("person_id");
@@ -106,7 +107,24 @@ AND (@q=N'' OR P.FullName LIKE N'%'+@q+N'%' OR P.Mobile LIKE N'%'+@q+N'%') ORDER
             await using var er = await equipmentCommand.ExecuteReaderAsync(token);
             while (await er.ReadAsync(token)) equipment.Add(new { itemID = er.GetInt64(0), itemCode = er.GetString(1), itemName = er.GetString(2) });
         }
-        return Ok(new { businessTypeCode = type, requesters = rows, equipment });
+        var subjects = new List<object>();
+        const string subjectSql = """
+SELECT MasterCode,Name,NULLIF(ShortCode,N'') ShortCode
+FROM dbo.TDSTMaster
+WHERE MasterGroupCode=@group AND IsActive=1
+  AND ((OwnerType=N'L' AND ISNULL(OwnerPartnerID,0)=0 AND ISNULL(OwnerCompanyID,0)=0)
+       OR (OwnerType=N'C' AND ISNULL(OwnerCompanyID,0)=@company))
+ORDER BY CASE WHEN OwnerType=N'L' THEN 0 ELSE 1 END,Seq,Name,MasterCode;
+""";
+        await using (var subjectCommand = new SqlCommand(subjectSql, c))
+        {
+            Add(subjectCommand, "@company", SqlDbType.BigInt, CompanyId);
+            Add(subjectCommand, "@group", SqlDbType.NVarChar, ServiceRequestSubjectMasterGroup, 10);
+            await using var sr = await subjectCommand.ExecuteReaderAsync(token);
+            while (await sr.ReadAsync(token))
+                subjects.Add(new { code = sr.GetString(0), name = sr.GetString(1), shortCode = Text(sr, 2) });
+        }
+        return Ok(new { businessTypeCode = type, requesters = rows, equipment, subjects });
     }
 
     [HttpGet]
@@ -159,7 +177,7 @@ ORDER BY RequestDate DESC,RequestID DESC OFFSET @offset ROWS FETCH NEXT @take RO
     public async Task<IActionResult> Detail(long id, CancellationToken token)
     {
         await using var c = await Open(token);
-        if (!await InService(c, token) || !await Allowed(c, "15001", "VIEW", token)) return Forbid();
+        if (!await InService(c, token) || (!await Allowed(c, "15001", "VIEW", token) && !await Allowed(c, "20001", "VIEW", token))) return Forbid();
         const string sql = "SELECT RequestID,RequestNo,RequesterType,RequesterID,RequesterNameSnapshot,RequesterPhoneSnapshot,RequesterEmailSnapshot,LocationSnapshot,EquipmentItemID,EquipmentCodeSnapshot,EquipmentNameSnapshot,Subject,Detail,StatusCode,RequestDate,AssignedEmployeeID,AssignedEmployeeNameSnapshot,ReceivedDate,StartedDate,CompletedDate,ResolutionDetail,CancellationReason,RowVersion FROM dbo.TDADServiceRequest WHERE CompanyID=@company AND RequestID=@id AND IsActive=1";
         await using var q = new SqlCommand(sql, c); Add(q, "@company", SqlDbType.BigInt, CompanyId); Add(q, "@id", SqlDbType.BigInt, id);
         await using var r = await q.ExecuteReaderAsync(token);
@@ -322,13 +340,17 @@ ORDER BY RequestDate DESC,RequestID DESC OFFSET @offset ROWS FETCH NEXT @take RO
             return BadRequest(new { message = "กรุณาระบุหัวข้อและรายละเอียด", description = "หัวข้อและรายละเอียดเป็นข้อมูลบังคับ" });
 
         var type = await BusinessType(c, token);
-        if (settings.RequireEquipment && !x.EquipmentItemId.HasValue)
+        var qr = string.IsNullOrWhiteSpace(x.QrToken) ? null : await ResolveQrContext(c, x.QrToken, token);
+        if (!string.IsNullOrWhiteSpace(x.QrToken) && qr is null)
+            return BadRequest(new { message = "QR Code ไม่ถูกต้อง", description = "QR นี้ปิดใช้งาน ไม่พบข้อมูล หรือไม่ได้อยู่ใน Company ปัจจุบัน" });
+        var equipmentItemId = qr?.ItemId ?? x.EquipmentItemId;
+        if (settings.RequireEquipment && !equipmentItemId.HasValue)
             return BadRequest(new { message = "กรุณาเลือกอุปกรณ์", description = "รายการแจ้งซ่อมต้องระบุอุปกรณ์ที่ใช้กับระบบ Service" });
         string? equipmentCode = null, equipmentName = null;
-        if (x.EquipmentItemId.HasValue)
+        if (equipmentItemId.HasValue)
         {
             await using var equipmentCheck = new SqlCommand("SELECT I.ItemCode,I.ItemName FROM dbo.TDIVItem I JOIN dbo.TDIVItemUsage U ON U.CompanyID=I.CompanyID AND U.ItemID=I.ItemID AND U.UsageCode=N'EQUIPMENT' WHERE I.CompanyID=@company AND I.ItemID=@id AND I.IsActive=1", c);
-            Add(equipmentCheck, "@company", SqlDbType.BigInt, CompanyId); Add(equipmentCheck, "@id", SqlDbType.BigInt, x.EquipmentItemId);
+            Add(equipmentCheck, "@company", SqlDbType.BigInt, CompanyId); Add(equipmentCheck, "@id", SqlDbType.BigInt, equipmentItemId);
             await using var equipmentReader = await equipmentCheck.ExecuteReaderAsync(token);
             if (!await equipmentReader.ReadAsync(token)) return BadRequest(new { message = "ข้อมูลอุปกรณ์ไม่ถูกต้อง", description = "ไม่พบอุปกรณ์ที่ใช้งานได้ในระบบ Service" });
             equipmentCode = equipmentReader.GetString(0); equipmentName = equipmentReader.GetString(1);
@@ -363,7 +385,7 @@ VALUES(@company,@no,@rtype,@rid,@name,@phone,@email,@sc,@res,@tenant,@contact,@r
             Add(cmd, "@rtype", SqlDbType.NVarChar, resolved.Type, 30); Add(cmd, "@rid", SqlDbType.BigInt, resolved.PersonId);
             Add(cmd, "@name", SqlDbType.NVarChar, resolved.Name, 200); Add(cmd, "@phone", SqlDbType.NVarChar, resolved.Phone, 50); Add(cmd, "@email", SqlDbType.NVarChar, resolved.Email, 320);
             Add(cmd, "@sc", SqlDbType.BigInt, resolved.ServiceCustomerId); Add(cmd, "@res", SqlDbType.BigInt, resolved.ResidentId); Add(cmd, "@tenant", SqlDbType.BigInt, resolved.TenantId); Add(cmd, "@contact", SqlDbType.BigInt, resolved.ContactId);
-            Add(cmd, "@room", SqlDbType.BigInt, resolved.RoomId); Add(cmd, "@house", SqlDbType.BigInt, resolved.HouseId); Add(cmd, "@location", SqlDbType.NVarChar, resolved.Location, 500); Add(cmd, "@equipment", SqlDbType.BigInt, x.EquipmentItemId); Add(cmd, "@equipmentCode", SqlDbType.NVarChar, equipmentCode, 50); Add(cmd, "@equipmentName", SqlDbType.NVarChar, equipmentName, 200);
+            Add(cmd, "@room", SqlDbType.BigInt, resolved.RoomId); Add(cmd, "@house", SqlDbType.BigInt, resolved.HouseId); Add(cmd, "@location", SqlDbType.NVarChar, qr?.LocationSnapshot ?? resolved.Location, 500); Add(cmd, "@equipment", SqlDbType.BigInt, equipmentItemId); Add(cmd, "@equipmentCode", SqlDbType.NVarChar, equipmentCode, 50); Add(cmd, "@equipmentName", SqlDbType.NVarChar, equipmentName, 200);
             Add(cmd, "@subject", SqlDbType.NVarChar, x.Subject.Trim(), 200); Add(cmd, "@detail", SqlDbType.NVarChar, x.Detail.Trim(), 2000); Add(cmd, "@user", SqlDbType.BigInt, UserId);
             var id = Convert.ToInt64(await cmd.ExecuteScalarAsync(token));
             await tx.CommitAsync(token);
@@ -470,6 +492,24 @@ WHERE C.CompanyID=@company AND (C.TenantContactID=@id OR C.PersonID=@id) AND C.I
         Add(q, "@company", SqlDbType.BigInt, CompanyId); return CompanyBusinessType.Normalize(Convert.ToString(await q.ExecuteScalarAsync(t)));
     }
 
+    private async Task<QrContext?> ResolveQrContext(SqlConnection c, string tokenValue, CancellationToken token)
+    {
+        const string sql = """
+SELECT X.ItemID,CONCAT_WS(N' / ',NULLIF(B.BuildingNameTH,N''),NULLIF(F.FloorNameTH,N''),NULLIF(R.RoomCode,N''))
+FROM dbo.TDADServiceRequestQrPortal Q
+JOIN dbo.TDIVItemInstance X ON X.ItemInstanceID=Q.ItemInstanceID AND X.CompanyID=Q.CompanyID AND X.StatusCode IN(N'INSTALLED',N'REPAIR')
+JOIN dbo.TDIVItem I ON I.ItemID=X.ItemID AND I.CompanyID=X.CompanyID AND I.IsActive=1
+JOIN dbo.TDIVItemUsage U ON U.ItemID=I.ItemID AND U.CompanyID=I.CompanyID AND U.UsageCode=N'EQUIPMENT'
+JOIN dbo.TDADBuilding B ON B.BuildingID=X.BuildingID AND B.CompanyID=X.CompanyID AND B.IsActive=1
+JOIN dbo.TDADFloor F ON F.FloorID=X.FloorID AND F.BuildingID=X.BuildingID AND F.IsActive=1
+JOIN dbo.TDADRoom R ON R.RoomID=X.RoomID AND R.CompanyID=X.CompanyID AND R.IsActive=1
+WHERE Q.CompanyID=@company AND Q.QrToken=@token AND Q.IsActive=1;
+""";
+        await using var q = new SqlCommand(sql, c); Add(q, "@company", SqlDbType.BigInt, CompanyId); Add(q, "@token", SqlDbType.NVarChar, tokenValue.Trim(), 100);
+        await using var r = await q.ExecuteReaderAsync(token);
+        return await r.ReadAsync(token) ? new(r.GetInt64(0), Text(r, 1)) : null;
+    }
+
     private async Task<ServiceSettingsState> ReadSettings(SqlConnection c, CancellationToken token)
     {
         const string sql = "SELECT COALESCE(S.ServiceEnabled,1),COALESCE(S.AllowWalkIn,1),COALESCE(S.RequireEquipment,1),COALESCE(S.AttachmentRequired,0),COALESCE(S.WorkflowEnabled,1) FROM dbo.TDADProject P LEFT JOIN dbo.TDSTCompanySetupSystemService S ON S.ProjectID=P.ProjectID AND S.CompanyID=@company WHERE P.ProjectCode=N'LAOO_SERVICE' AND P.IsActive=1";
@@ -536,7 +576,7 @@ WHERE C.CompanyID=@company AND (C.TenantContactID=@id OR C.PersonID=@id) AND C.I
     private static DateTime? DateTimeValue(SqlDataReader r, int index) => r.IsDBNull(index) ? null : r.GetDateTime(index);
     private static void Add(SqlCommand c, string name, SqlDbType type, object? value, int size = 0) { var p = size == 0 ? c.Parameters.Add(name, type) : c.Parameters.Add(name, type, size); p.Value = value ?? DBNull.Value; }
 
-    public sealed record CreateRequest(string? RequesterType, long? RequesterId, long? EquipmentItemId, string? Subject, string? Detail);
+    public sealed record CreateRequest(string? RequesterType, long? RequesterId, long? EquipmentItemId, string? Subject, string? Detail, string? QrToken = null);
     public sealed record ActionRequest(long? AssignedEmployeeId, string? ResolutionDetail, string? CancellationReason);
     private sealed record RequestAccessInfo(bool Found,string Status,long? CreatedBy);
     private sealed record ProcessedImage(byte[] Bytes,string ContentType,string Extension,int Width,int Height,string? Error)
@@ -544,4 +584,5 @@ WHERE C.CompanyID=@company AND (C.TenantContactID=@id OR C.PersonID=@id) AND C.I
         public static ProcessedImage Rejected(string error) => new(Array.Empty<byte>(),string.Empty,string.Empty,0,0,error);
     }
     private sealed record Resolved(string Type,long PersonId,string Name,string? Phone,string? Email,long? ServiceCustomerId,long? ResidentId,long? TenantId,long? ContactId,long? RoomId,long? HouseId,string? Location);
+    private sealed record QrContext(long ItemId, string? LocationSnapshot);
 }
