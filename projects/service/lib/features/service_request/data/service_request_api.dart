@@ -41,6 +41,7 @@ class ServiceRequestApi {
     required int? equipmentItemId,
     required String subject,
     required String detail,
+    String? qrToken,
   }) async => Map<String, dynamic>.from(
     await _client.post(
           selfService ? '/api/service/requests/self' : '/api/service/requests',
@@ -50,6 +51,7 @@ class ServiceRequestApi {
             'equipmentItemId': equipmentItemId,
             'subject': subject,
             'detail': detail,
+            'qrToken': qrToken,
           },
         )
         as Map,

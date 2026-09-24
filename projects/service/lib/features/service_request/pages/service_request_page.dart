@@ -9,10 +9,12 @@ import '../../../core/api/api_exception.dart';
 import '../../../core/widgets/timed_snack_bar.dart';
 import '../../support/presentation/widgets/support_workspace_shell.dart';
 import '../data/service_request_api.dart';
+import '../../service_request_qr/data/service_request_qr_api.dart';
 
 class ServiceRequestPage extends StatefulWidget {
-  const ServiceRequestPage({super.key, this.selfService = false});
+  const ServiceRequestPage({super.key, this.selfService = false, this.qrToken});
   final bool selfService;
+  final String? qrToken;
   @override
   State<ServiceRequestPage> createState() => _ServiceRequestPageState();
 }
@@ -80,6 +82,7 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
         api: _api,
         lookup: lookup,
         selfService: widget.selfService,
+        qrToken: widget.qrToken,
       ),
     );
     if (saved == true && mounted) {
@@ -354,10 +357,12 @@ class _RequestDialog extends StatefulWidget {
     required this.api,
     this.lookup,
     this.selfService = false,
+    this.qrToken,
   });
   final ServiceRequestApi api;
   final Map<String, dynamic>? lookup;
   final bool selfService;
+  final String? qrToken;
   @override
   State<_RequestDialog> createState() => _RequestDialogState();
 }
@@ -368,8 +373,42 @@ class _RequestDialogState extends State<_RequestDialog> {
   final _detail = TextEditingController();
   Map<String, dynamic>? _requester;
   Map<String, dynamic>? _equipment;
+  Map<String, dynamic>? _qrContext;
+  String? _subjectCode;
   final List<PlatformFile> _attachments = [];
   bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadQrContext();
+  }
+
+  Future<void> _loadQrContext() async {
+    final token = widget.qrToken?.trim();
+    if (token == null || token.isEmpty) return;
+    try {
+      final value = await ServiceRequestQrApi().scan(token);
+      if (!mounted) return;
+      setState(() {
+        _qrContext = value;
+        _equipment = {
+          'itemID': value['itemId'],
+          'itemCode': value['itemCode'],
+          'itemName': value['itemName'],
+        };
+      });
+    } catch (error) {
+      if (mounted)
+        showTimedSnackBar(
+          context,
+          message: error is ApiException
+              ? '${error.message}\n${error.description ?? 'กรุณาลองใหม่'}'
+              : 'ไม่สามารถอ่าน QR Code ได้',
+          error: true,
+        );
+    }
+  }
 
   @override
   void dispose() {
@@ -389,6 +428,7 @@ class _RequestDialogState extends State<_RequestDialog> {
         equipmentItemId: (_equipment?['itemID'] as num?)?.toInt(),
         subject: _subject.text.trim(),
         detail: _detail.text.trim(),
+        qrToken: widget.qrToken,
       );
       final requestId = (created['requestId'] as num?)?.toInt();
       final uploadErrors = <String>[];
@@ -491,6 +531,7 @@ class _RequestDialogState extends State<_RequestDialog> {
   Widget build(BuildContext context) {
     final requesters = _maps(widget.lookup?['requesters']);
     final equipment = _maps(widget.lookup?['equipment']);
+    final subjects = _maps(widget.lookup?['subjects']);
     final byKey = {
       for (final item in requesters)
         '${item['requesterType']}:${item['id']}': item,
@@ -557,9 +598,15 @@ class _RequestDialogState extends State<_RequestDialog> {
                     'สถานที่: ${_requester!['locationSnapshot']?.toString() ?? '-'}',
                   ),
                 ],
+                if (_qrContext != null) ...[
+                  const SizedBox(height: 12),
+                  _infoBox(
+                    'สถานที่จาก QR: ${_qrContext!['locationSnapshot'] ?? '-'}',
+                  ),
+                ],
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  initialValue: _equipment == null
+                  value: _equipment == null
                       ? null
                       : _equipment!['itemID'].toString(),
                   decoration: _input(label: 'อุปกรณ์ที่แจ้งซ่อม *'),
@@ -573,25 +620,64 @@ class _RequestDialogState extends State<_RequestDialog> {
                         ),
                       ),
                   ],
-                  onChanged: (value) => setState(
-                    () => _equipment = value == null
-                        ? null
-                        : equipment.firstWhere(
-                            (item) => item['itemID'].toString() == value,
-                          ),
-                  ),
+                  onChanged: _qrContext == null
+                      ? (value) => setState(
+                          () => _equipment = value == null
+                              ? null
+                              : equipment.firstWhere(
+                                  (item) => item['itemID'].toString() == value,
+                                ),
+                        )
+                      : null,
                   validator: (_) => _equipment == null
                       ? 'กรุณาเลือกอุปกรณ์ที่แจ้งซ่อม'
                       : null,
                 ),
                 const SizedBox(height: 12),
-                TextFormField(
-                  controller: _subject,
+                DropdownButtonFormField<String>(
+                  initialValue: _subjectCode,
                   decoration: _input(label: 'หัวข้อ *'),
-                  validator: (value) => value == null || value.trim().isEmpty
-                      ? 'กรุณาระบุหัวข้อ'
-                      : null,
+                  items: [
+                    for (final item in subjects)
+                      DropdownMenuItem(
+                        value: item['code']?.toString(),
+                        child: Text(
+                          item['name']?.toString() ?? '-',
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                  onChanged: (code) {
+                    final item = subjects
+                        .cast<Map<String, dynamic>>()
+                        .firstWhere(
+                          (row) => row['code']?.toString() == code,
+                          orElse: () => <String, dynamic>{},
+                        );
+                    setState(() {
+                      _subjectCode = code;
+                      _subject.text = item['shortCode']?.toString() == 'OTHER'
+                          ? ''
+                          : item['name']?.toString() ?? '';
+                    });
+                  },
+                  validator: (value) =>
+                      value == null ? 'กรุณาเลือกหัวข้อ' : null,
                 ),
+                if (subjects.any(
+                  (item) =>
+                      item['code']?.toString() == _subjectCode &&
+                      item['shortCode']?.toString() == 'OTHER',
+                )) ...[
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _subject,
+                    decoration: _input(label: 'ระบุหัวข้อ *'),
+                    validator: (value) => value == null || value.trim().isEmpty
+                        ? 'กรุณาระบุหัวข้อ'
+                        : null,
+                  ),
+                ],
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _detail,
@@ -813,33 +899,19 @@ class _RequestDetailDialogState extends State<_RequestDetailDialog> {
     }
   }
 
-  Future<void> _receive() async {
-    final technicians = await widget.api.technicians();
-    if (!mounted) return;
-    final selected = await showDialog<int>(
-      context: context,
-      builder: (_) => _TechnicianDialog(items: technicians),
-    );
-    if (selected != null) await _run(() => widget.api.receive(_id, selected));
-  }
-
-  Future<void> _textAction({required bool complete}) async {
+  Future<void> _cancel() async {
     final controller = TextEditingController();
     final value = await showDialog<String>(
       context: context,
       builder: (_) => _ReasonDialog(
-        title: complete ? 'ปิดงาน' : 'ยกเลิกใบแจ้งซ่อม',
-        label: complete ? 'รายละเอียดผลซ่อม *' : 'เหตุผลการยกเลิก *',
+        title: 'ยกเลิกใบแจ้งซ่อม',
+        label: 'เหตุผลการยกเลิก *',
         controller: controller,
       ),
     );
     controller.dispose();
-    if (value == null || value.trim().isEmpty) return;
-    await _run(
-      () => complete
-          ? widget.api.complete(_id, value.trim())
-          : widget.api.cancel(_id, value.trim()),
-    );
+    if (value == null || value.trim().isEmpty || !mounted) return;
+    await _run(() => widget.api.cancel(_id, value.trim()));
   }
 
   Future<void> _deleteAttachment(Map<String, dynamic> item) async {
@@ -940,30 +1012,12 @@ class _RequestDetailDialogState extends State<_RequestDetailDialog> {
         ),
       ),
       actions: [
-        if (widget.canEdit && status == 'NEW')
-          FilledButton.icon(
-            onPressed: _busy ? null : _receive,
-            icon: const Icon(Icons.assignment_ind_outlined),
-            label: const Text('รับเรื่อง'),
-          ),
-        if (widget.canEdit && status == 'RECEIVED')
-          FilledButton.icon(
-            onPressed: _busy ? null : () => _run(() => widget.api.start(_id)),
-            icon: const Icon(Icons.play_arrow),
-            label: const Text('เริ่มดำเนินการ'),
-          ),
-        if (widget.canEdit && status == 'IN_PROGRESS')
-          FilledButton.icon(
-            onPressed: _busy ? null : () => _textAction(complete: true),
-            icon: const Icon(Icons.done),
-            label: const Text('ปิดงาน'),
-          ),
         if (widget.canEdit &&
             (status == 'NEW' ||
                 status == 'RECEIVED' ||
                 status == 'IN_PROGRESS'))
           TextButton(
-            onPressed: _busy ? null : () => _textAction(complete: false),
+            onPressed: _busy ? null : _cancel,
             child: const Text('ยกเลิก'),
           ),
         TextButton(
@@ -1060,52 +1114,6 @@ class _RemoteAttachmentTile extends StatelessWidget {
       ),
     );
   }
-}
-
-class _TechnicianDialog extends StatefulWidget {
-  const _TechnicianDialog({required this.items});
-  final List<Map<String, dynamic>> items;
-  @override
-  State<_TechnicianDialog> createState() => _TechnicianDialogState();
-}
-
-class _TechnicianDialogState extends State<_TechnicianDialog> {
-  int? _selected;
-  @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: const Text('เลือกช่างซ่อม'),
-    content: SizedBox(
-      width: 420,
-      child: widget.items.isEmpty
-          ? const Text('ไม่พบพนักงานที่เป็นช่างซ่อมและยังใช้งานอยู่')
-          : DropdownButtonFormField<int>(
-              decoration: const InputDecoration(labelText: 'ช่างซ่อม *'),
-              items: [
-                for (final item in widget.items)
-                  DropdownMenuItem(
-                    value: (item['employeeId'] as num).toInt(),
-                    child: Text(
-                      '${item['employeeCode']} | ${item['fullName']}',
-                    ),
-                  ),
-              ],
-              onChanged: (value) => setState(() => _selected = value),
-              validator: (_) => _selected == null ? 'กรุณาเลือกช่างซ่อม' : null,
-            ),
-    ),
-    actions: [
-      TextButton(
-        onPressed: () => Navigator.pop(context),
-        child: const Text('ยกเลิก'),
-      ),
-      FilledButton(
-        onPressed: _selected == null
-            ? null
-            : () => Navigator.pop(context, _selected),
-        child: const Text('บันทึก'),
-      ),
-    ],
-  );
 }
 
 class _ReasonDialog extends StatelessWidget {
