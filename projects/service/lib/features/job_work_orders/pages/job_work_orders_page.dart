@@ -18,7 +18,7 @@ class JobWorkOrdersPage extends StatefulWidget {
 class _JobWorkOrdersPageState extends State<JobWorkOrdersPage> {
   final _api = ServiceRequestApi();
   final _search = TextEditingController();
-  String _status = 'RECEIVED';
+  String _status = 'OPEN';
   bool _loading = true;
   int _page = 1;
   int _total = 0;
@@ -144,11 +144,15 @@ class _JobWorkOrdersPageState extends State<JobWorkOrdersPage> {
           DropdownButton<String>(
             value: _status,
             items: const [
+              DropdownMenuItem(value: 'OPEN', child: Text('งานที่ยังไม่เสร็จ')),
               DropdownMenuItem(value: 'RECEIVED', child: Text('รับเรื่องแล้ว')),
               DropdownMenuItem(
                 value: 'IN_PROGRESS',
                 child: Text('กำลังดำเนินการ'),
               ),
+              DropdownMenuItem(value: 'COMPLETED', child: Text('เสร็จสิ้น')),
+              DropdownMenuItem(value: 'CANCELLED', child: Text('ยกเลิก')),
+              DropdownMenuItem(value: 'ALL', child: Text('ทั้งหมด')),
             ],
             onChanged: (value) {
               if (value != null) {
@@ -407,6 +411,12 @@ class _WorkOrderDialogState extends State<_WorkOrderDialog> {
             _line('ช่าง', widget.data['assignedEmployeeName']),
             _line('วันที่รับเรื่อง', _date(widget.data['receivedDate'])),
             _line('วันที่เริ่มงาน', _date(widget.data['startedDate'])),
+            if (status == 'COMPLETED') ...[
+              _line('วันที่ปิดงาน', _date(widget.data['completedDate'])),
+              _line('ผลการซ่อม', widget.data['resolutionDetail']),
+            ],
+            if (status == 'CANCELLED')
+              _line('เหตุผลการยกเลิก', widget.data['cancellationReason']),
             _line('สถานะ', _status(status)),
             if (widget.attachments.isNotEmpty) ...[
               const SizedBox(height: 12),
@@ -506,4 +516,8 @@ String _status(Object? value) => value == 'RECEIVED'
     ? 'รับเรื่องแล้ว'
     : value == 'IN_PROGRESS'
     ? 'กำลังดำเนินการ'
+    : value == 'COMPLETED'
+    ? 'เสร็จสิ้น'
+    : value == 'CANCELLED'
+    ? 'ยกเลิก'
     : value?.toString() ?? '-';
