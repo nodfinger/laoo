@@ -9,7 +9,8 @@ import '../../service_request/data/service_request_api.dart';
 import '../../support/presentation/widgets/support_workspace_shell.dart';
 
 class JobWorkOrdersPage extends StatefulWidget {
-  const JobWorkOrdersPage({super.key});
+  const JobWorkOrdersPage({super.key, this.initialStatus = 'OPEN'});
+  final String initialStatus;
 
   @override
   State<JobWorkOrdersPage> createState() => _JobWorkOrdersPageState();
@@ -27,6 +28,7 @@ class _JobWorkOrdersPageState extends State<JobWorkOrdersPage> {
   @override
   void initState() {
     super.initState();
+    _status = widget.initialStatus;
     _load();
   }
 
