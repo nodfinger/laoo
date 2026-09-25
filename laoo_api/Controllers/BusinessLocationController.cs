@@ -1,6 +1,7 @@
 using System.Data;
 using System.Security.Claims;
 using LaooApi.Security;
+using Laoo.Shared.Contracts.Visitors;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
@@ -116,8 +117,10 @@ public sealed class BusinessLocationController(IConfiguration configuration) : C
         {
             await using var command = new SqlCommand("SELECT TOP(50) N'EMPLOYEE' hostType,E.EmployeeID employeeId,E.PersonID personId,E.FullName displayName,E.Phone phone,E.BranchID branchId,B.BranchName branchName FROM dbo.TDADEmployee E LEFT JOIN dbo.TDADBranch B ON B.CompanyID=E.CompanyID AND B.BranchID=E.BranchID WHERE E.CompanyID=@company AND E.IsActive=1 AND (@search=N'' OR E.FullName LIKE N'%'+@search+N'%' OR E.Phone LIKE N'%'+@search+N'%') AND (E.BranchID IS NULL OR EXISTS(SELECT 1 FROM dbo.TDADUser U WHERE U.UserID=@user AND U.CompanyID=@company AND U.IsActive=1 AND U.IsCompanyAdmin=1) OR EXISTS(SELECT 1 FROM dbo.TDADUserBranch UB WHERE UB.UserID=@user AND UB.CompanyID=@company AND UB.BranchID=E.BranchID AND UB.IsActive=1)) ORDER BY E.FullName,E.EmployeeID", connection);
             Add(command,"@company",SqlDbType.BigInt,CompanyId); Add(command,"@user",SqlDbType.BigInt,ActorId); Add(command,"@search",SqlDbType.NVarChar,search?.Trim()??string.Empty,200);
-            rows=await ReadRows(command,token);
-            return Ok(new { businessTypeCode = "COMPANY", items = rows });
+            await using var reader=await command.ExecuteReaderAsync(token);
+            var items=new List<BusinessLocationHostItem>();
+            while(await reader.ReadAsync(token)) items.Add(new BusinessLocationHostItem("EMPLOYEE",reader.GetInt64(1),reader.IsDBNull(2)?null:reader.GetInt64(2),reader.GetString(3),reader.IsDBNull(4)?null:reader.GetString(4),reader.IsDBNull(5)?null:reader.GetInt64(5),reader.IsDBNull(6)?null:reader.GetString(6)));
+            return Ok(new BusinessLocationHostResponse("COMPANY",items));
         }
         if (type == Models.CompanyBusinessType.RentalOffice)
         {
