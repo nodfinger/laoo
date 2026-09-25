@@ -11,6 +11,14 @@ class PmApi {
       '/api/service/pm/assets?itemTypeCode=${Uri.encodeQueryComponent(type)}',
     ),
   );
+  Future<Map<String, dynamic>> planAssets(int id) async =>
+      _object(await _client.get('/api/service/pm/plans/$id/assets'));
+  Future<void> setPlanAssets(int id, List<int> ids) =>
+      _client.put('/api/service/pm/plans/$id/assets', body: {'ids': ids});
+  Future<Map<String, dynamic>> planChecklists(int id) async =>
+      _object(await _client.get('/api/service/pm/plans/$id/checklists'));
+  Future<void> setPlanChecklists(int id, List<int> ids) =>
+      _client.put('/api/service/pm/plans/$id/checklists', body: {'ids': ids});
   Future<void> savePlan(Map<String, dynamic> body, {int? id}) async {
     if (id == null) {
       await _client.post('/api/service/pm/plans', body: body);
