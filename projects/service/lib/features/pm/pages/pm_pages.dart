@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../../../app/theme/laoo_design_tokens.dart';
 import '../../support/presentation/widgets/support_workspace_shell.dart';
 import '../data/pm_api.dart';
@@ -45,7 +46,50 @@ class _PmPlansState extends State<PmPlansPage> {
           ),
           const SizedBox(height: 12),
           Expanded(
-            child: _Rows(future: data, name: 'planName'),
+            child: FutureBuilder<Map<String, dynamic>>(
+              future: data,
+              builder: (c, s) {
+                if (!s.hasData)
+                  return const Center(child: CircularProgressIndicator());
+                final rows = ((s.data!['items'] as List?) ?? []).cast<Map>();
+                if (rows.isEmpty)
+                  return const Center(child: Text('ยังไม่มีแผน PM'));
+                return ListView.separated(
+                  itemCount: rows.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  itemBuilder: (_, i) {
+                    final r = rows[i];
+                    return Card(
+                      child: ListTile(
+                        onTap: () async {
+                          final ok = await showDialog<bool>(
+                            context: c,
+                            builder: (_) => _AssetAssignmentDialog(api, r),
+                          );
+                          if (ok == true) refresh();
+                        },
+                        leading: const Icon(Icons.settings_suggest),
+                        title: Text(r['planName']?.toString() ?? '-'),
+                        subtitle: Text(
+                          'ประเภท ${r['itemTypeCode'] ?? '-'} • Asset ${r['assetCount'] ?? 0}',
+                        ),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.checklist),
+                          tooltip: 'ผูก Checklist',
+                          onPressed: () async {
+                            final ok = await showDialog<bool>(
+                              context: c,
+                              builder: (_) => _PlanChecklistDialog(api, r),
+                            );
+                            if (ok == true) refresh();
+                          },
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
           ),
         ],
       ),
@@ -361,6 +405,157 @@ class _Rows extends StatelessWidget {
         },
       );
     },
+  );
+}
+
+class _AssetAssignmentDialog extends StatefulWidget {
+  const _AssetAssignmentDialog(this.api, this.plan);
+  final PmApi api;
+  final Map plan;
+  @override
+  State<_AssetAssignmentDialog> createState() => _AssetAssignmentDialogState();
+}
+
+class _PlanChecklistDialog extends StatefulWidget {
+  const _PlanChecklistDialog(this.api, this.plan);
+  final PmApi api;
+  final Map plan;
+  @override
+  State<_PlanChecklistDialog> createState() => _PlanChecklistDialogState();
+}
+
+class _PlanChecklistDialogState extends State<_PlanChecklistDialog> {
+  late Future<Map<String, dynamic>> all;
+  final ids = <int>{};
+  @override
+  void initState() {
+    super.initState();
+    all = widget.api.checklists;
+    widget.api.planChecklists((widget.plan['pmPlanId'] as num).toInt()).then((
+      x,
+    ) {
+      for (final r in ((x['items'] as List?) ?? []).cast<Map>()) {
+        ids.add((r['pmChecklistId'] as num).toInt());
+      }
+      if (mounted) setState(() {});
+    });
+  }
+
+  Future<void> save() async {
+    await widget.api.setPlanChecklists(
+      (widget.plan['pmPlanId'] as num).toInt(),
+      ids.toList(),
+    );
+    if (mounted) Navigator.pop(context, true);
+  }
+
+  @override
+  Widget build(BuildContext c) => AlertDialog(
+    title: const Text('ผูก Checklist กับแผน PM'),
+    content: SizedBox(
+      width: 560,
+      child: FutureBuilder<Map<String, dynamic>>(
+        future: all,
+        builder: (c, s) {
+          if (!s.hasData)
+            return const SizedBox(
+              height: 120,
+              child: Center(child: CircularProgressIndicator()),
+            );
+          final rows = ((s.data!['items'] as List?) ?? []).cast<Map>();
+          return SingleChildScrollView(
+            child: Column(
+              children: rows.map((r) {
+                final id = (r['pmChecklistId'] as num).toInt();
+                return CheckboxListTile(
+                  value: ids.contains(id),
+                  onChanged: (v) =>
+                      setState(() => v == true ? ids.add(id) : ids.remove(id)),
+                  title: Text(r['checklistName']?.toString() ?? '-'),
+                  subtitle: Text('${r['itemCount'] ?? 0} รายการตรวจ'),
+                );
+              }).toList(),
+            ),
+          );
+        },
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(c),
+        child: const Text('ยกเลิก'),
+      ),
+      FilledButton(onPressed: save, child: const Text('บันทึก Checklist')),
+    ],
+  );
+}
+
+class _AssetAssignmentDialogState extends State<_AssetAssignmentDialog> {
+  late Future<Map<String, dynamic>> candidates;
+  late Future<Map<String, dynamic>> assigned;
+  final ids = <int>{};
+  @override
+  void initState() {
+    super.initState();
+    candidates = widget.api.assets(widget.plan['itemTypeCode'].toString());
+    assigned = widget.api.planAssets((widget.plan['pmPlanId'] as num).toInt());
+    assigned.then((x) {
+      for (final a in ((x['items'] as List?) ?? []).cast<Map>()) {
+        if (a['isActive'] == true)
+          ids.add((a['itemInstanceId'] as num).toInt());
+      }
+      if (mounted) setState(() {});
+    });
+  }
+
+  Future<void> save() async {
+    await widget.api.setPlanAssets(
+      (widget.plan['pmPlanId'] as num).toInt(),
+      ids.toList(),
+    );
+    if (mounted) Navigator.pop(context, true);
+  }
+
+  @override
+  Widget build(BuildContext c) => AlertDialog(
+    title: Text('ผูก Asset: ${widget.plan['planName']}'),
+    content: SizedBox(
+      width: 700,
+      child: FutureBuilder<Map<String, dynamic>>(
+        future: candidates,
+        builder: (c, s) {
+          if (!s.hasData)
+            return const SizedBox(
+              height: 150,
+              child: Center(child: CircularProgressIndicator()),
+            );
+          final rows = ((s.data!['items'] as List?) ?? []).cast<Map>();
+          return SingleChildScrollView(
+            child: Column(
+              children: rows.map((a) {
+                final id = (a['itemInstanceId'] as num).toInt();
+                return CheckboxListTile(
+                  value: ids.contains(id),
+                  onChanged: (v) =>
+                      setState(() => v == true ? ids.add(id) : ids.remove(id)),
+                  title: Text(
+                    '${a['itemName'] ?? '-'} / ${a['serialNo'] ?? '-'}',
+                  ),
+                  subtitle: Text(a['locationSnapshot']?.toString() ?? '-'),
+                );
+              }).toList(),
+            ),
+          );
+        },
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(c),
+        child: const Text('ยกเลิก'),
+      ),
+      FilledButton(onPressed: save, child: const Text('บันทึก Asset')),
+    ],
   );
 }
 
