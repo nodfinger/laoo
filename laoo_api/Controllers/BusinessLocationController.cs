@@ -34,6 +34,17 @@ public sealed class BusinessLocationController(IConfiguration configuration) : C
         Add(command, "@partner", SqlDbType.BigInt, partnerId);
         return Convert.ToInt32(await command.ExecuteScalarAsync(token)) == 1;
     }
+    private async Task<bool> AllowedHost(SqlConnection connection, CancellationToken token)
+    {
+        if (CompanyId<=0 || !string.Equals(User.FindFirstValue("user_type"),"COMPANY_USER",StringComparison.OrdinalIgnoreCase)) return false;
+        var permitted=await CompanyProjectPermission.IsAllowedAsync(connection,User,"32001","CREATE",token)
+            || await CompanyProjectPermission.IsAllowedAsync(connection,User,"32002","VIEW",token)
+            || await CompanyProjectPermission.IsAllowedAsync(connection,User,"32003","VIEW",token);
+        if(!permitted || !long.TryParse(User.FindFirstValue("partner_id"),out var partnerId)) return false;
+        await using var command=new SqlCommand("SELECT COUNT(*) FROM dbo.TDSTCompanySetUp WHERE CompanyID=@company AND PartnerID=@partner AND IsActive=1",connection);
+        Add(command,"@company",SqlDbType.BigInt,CompanyId);Add(command,"@partner",SqlDbType.BigInt,partnerId);
+        return Convert.ToInt32(await command.ExecuteScalarAsync(token))==1;
+    }
 
     [HttpGet("rental-office/tenants")]
     public async Task<IActionResult> RentalTenants([FromQuery] long? roomId, [FromQuery] string? search, [FromQuery] bool active = true, CancellationToken token = default)
@@ -111,7 +122,9 @@ public sealed class BusinessLocationController(IConfiguration configuration) : C
         var type = Models.CompanyBusinessType.Normalize(businessTypeCode);
         if (type is not (Models.CompanyBusinessType.RentalOffice or Models.CompanyBusinessType.Village or Models.CompanyBusinessType.Company)) return BadRequest(new { message = "ไม่รองรับประเภทธุรกิจนี้" });
         await using var connection = await Open(token);
-        if (!await Allowed(connection, "VIEW", token)) return Forbid();
+        if (type == Models.CompanyBusinessType.Company
+            ? !await AllowedHost(connection, token)
+            : !await Allowed(connection, "VIEW", token)) return Forbid();
         var rows = new List<Dictionary<string, object?>>();
         if (type == Models.CompanyBusinessType.Company)
         {
