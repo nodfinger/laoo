@@ -156,13 +156,14 @@ class PmCalendarPage extends StatefulWidget {
 class _CalendarState extends State<PmCalendarPage> {
   final api = PmApi();
   late Future<Map<String, dynamic>> data;
+  String status = '';
   @override
   void initState() {
     super.initState();
-    data = api.workOrders('');
+    data = api.workOrders(status: status);
   }
 
-  void refresh() => setState(() => data = api.workOrders(''));
+  void refresh() => setState(() => data = api.workOrders(status: status));
   Future<void> open(Map row) async {
     final id = (row['pmWorkOrderId'] as num).toInt();
     final changed = await showDialog<bool>(
@@ -182,16 +183,48 @@ class _CalendarState extends State<PmCalendarPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Align(
-            alignment: Alignment.centerRight,
-            child: FilledButton.icon(
-              onPressed: () async {
-                await api.generate();
-                refresh();
-              },
-              icon: const Icon(Icons.event_available),
-              label: const Text('สร้างงานตามรอบ'),
-            ),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              SizedBox(
+                width: 240,
+                child: DropdownButtonFormField<String>(
+                  value: status,
+                  decoration: const InputDecoration(labelText: 'สถานะ'),
+                  items: const [
+                    DropdownMenuItem(value: '', child: Text('ทั้งหมด')),
+                    DropdownMenuItem(
+                      value: 'PENDING',
+                      child: Text('รอดำเนินการ'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'IN_PROGRESS',
+                      child: Text('กำลังดำเนินการ'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'COMPLETED',
+                      child: Text('เสร็จสิ้น'),
+                    ),
+                    DropdownMenuItem(value: 'SKIPPED', child: Text('ข้าม')),
+                  ],
+                  onChanged: (value) {
+                    status = value ?? '';
+                    refresh();
+                  },
+                ),
+              ),
+              FilledButton.icon(
+                onPressed: () async {
+                  await api.generate();
+                  refresh();
+                },
+                icon: const Icon(Icons.event_available),
+                label: const Text('สร้างงานตามรอบ'),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           Expanded(
@@ -213,7 +246,10 @@ class _CalendarState extends State<PmCalendarPage> {
                         onTap: () => open(r),
                         leading: const Icon(Icons.build_circle_outlined),
                         title: Text(r['planNameSnapshot']?.toString() ?? '-'),
-                        subtitle: Text(r['itemSnapshot']?.toString() ?? '-'),
+                        subtitle: Text(
+                          '${r['itemSnapshot'] ?? '-'}\n${r['locationSnapshot'] ?? '-'}\nกำหนด ${r['dueDate'] ?? '-'}',
+                        ),
+                        isThreeLine: true,
                         trailing: Text(r['statusCode']?.toString() ?? '-'),
                       ),
                     );
@@ -283,6 +319,7 @@ class _PmWorkDialogState extends State<_PmWorkDialog> {
                 ),
                 Text(work['itemSnapshot']?.toString() ?? '-'),
                 Text(work['locationSnapshot']?.toString() ?? '-'),
+                Text('กำหนด: ${work['dueDate'] ?? '-'}'),
                 const Divider(),
                 ...checks.map(
                   (x) => CheckboxListTile(
@@ -310,13 +347,21 @@ class _PmWorkDialogState extends State<_PmWorkDialog> {
                     title: Text(x['checkItemSnapshot']?.toString() ?? '-'),
                   ),
                 ),
-                if (status == 'IN_PROGRESS')
+                if (status == 'IN_PROGRESS' || status == 'PENDING')
                   TextField(
                     controller: result,
                     minLines: 3,
                     maxLines: 5,
-                    decoration: const InputDecoration(labelText: 'ผลการตรวจ *'),
+                    decoration: InputDecoration(
+                      labelText: status == 'PENDING'
+                          ? 'เหตุผลการข้ามงาน (กรอกเมื่อข้าม)'
+                          : 'ผลการตรวจ *',
+                    ),
                   ),
+                if (status == 'COMPLETED' && work['resultDetail'] != null)
+                  Text('ผลการตรวจ: ${work['resultDetail']}'),
+                if (status == 'SKIPPED' && work['skipReason'] != null)
+                  Text('เหตุผลการข้าม: ${work['skipReason']}'),
               ],
             ),
           );
@@ -334,9 +379,19 @@ class _PmWorkDialogState extends State<_PmWorkDialog> {
           if (!s.hasData) return const SizedBox();
           final st = (s.data!['workOrder'] as Map)['statusCode'];
           if (st == 'PENDING')
-            return FilledButton(
-              onPressed: saving ? null : () => action('start'),
-              child: const Text('เริ่มงาน'),
+            return Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextButton(
+                  onPressed: saving ? null : () => action('skip'),
+                  child: const Text('ข้ามงาน'),
+                ),
+                const SizedBox(width: 8),
+                FilledButton(
+                  onPressed: saving ? null : () => action('start'),
+                  child: const Text('เริ่มงาน'),
+                ),
+              ],
             );
           if (st == 'IN_PROGRESS')
             return FilledButton(

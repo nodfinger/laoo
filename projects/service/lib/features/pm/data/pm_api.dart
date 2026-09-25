@@ -31,8 +31,21 @@ class PmApi {
       _object(await _client.get('/api/service/pm/checklists'));
   Future<void> createChecklist(Map<String, dynamic> body) =>
       _client.post('/api/service/pm/checklists', body: body);
-  Future<Map<String, dynamic>> workOrders(String status) async =>
-      _object(await _client.get('/api/service/pm/work-orders?status=$status'));
+  Future<Map<String, dynamic>> workOrders({
+    String status = '',
+    DateTime? from,
+    DateTime? to,
+  }) async {
+    final query = <String, String>{'status': status};
+    if (from != null) query['from'] = from.toIso8601String().substring(0, 10);
+    if (to != null) query['to'] = to.toIso8601String().substring(0, 10);
+    return _object(
+      await _client.get(
+        '/api/service/pm/work-orders?${Uri(queryParameters: query).query}',
+      ),
+    );
+  }
+
   Future<Map<String, dynamic>> workOrder(int id) async =>
       _object(await _client.get('/api/service/pm/work-orders/$id'));
   Future<void> saveChecks(int id, List<Map<String, dynamic>> items) => _client
