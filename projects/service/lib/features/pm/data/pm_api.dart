@@ -25,6 +25,10 @@ class PmApi {
       _client.post('/api/service/pm/checklists', body: body);
   Future<Map<String, dynamic>> workOrders(String status) async =>
       _object(await _client.get('/api/service/pm/work-orders?status=$status'));
+  Future<Map<String, dynamic>> workOrder(int id) async =>
+      _object(await _client.get('/api/service/pm/work-orders/$id'));
+  Future<void> saveChecks(int id, List<Map<String, dynamic>> items) => _client
+      .put('/api/service/pm/work-orders/$id/checks', body: {'items': items});
   Future<void> generate() =>
       _client.post('/api/service/pm/work-orders/generate', body: {});
   Future<void> action(int id, String action, [String? detail]) => _client.post(
