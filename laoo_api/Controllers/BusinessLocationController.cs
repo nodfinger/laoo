@@ -108,10 +108,17 @@ public sealed class BusinessLocationController(IConfiguration configuration) : C
     public async Task<IActionResult> Hosts([FromQuery] string businessTypeCode, [FromQuery] string? search, CancellationToken token = default)
     {
         var type = Models.CompanyBusinessType.Normalize(businessTypeCode);
-        if (type is not (Models.CompanyBusinessType.RentalOffice or Models.CompanyBusinessType.Village)) return BadRequest(new { message = "รองรับเฉพาะสำนักงานเช่าหรือหมู่บ้าน" });
+        if (type is not (Models.CompanyBusinessType.RentalOffice or Models.CompanyBusinessType.Village or Models.CompanyBusinessType.Company)) return BadRequest(new { message = "ไม่รองรับประเภทธุรกิจนี้" });
         await using var connection = await Open(token);
         if (!await Allowed(connection, "VIEW", token)) return Forbid();
         var rows = new List<Dictionary<string, object?>>();
+        if (type == Models.CompanyBusinessType.Company)
+        {
+            await using var command = new SqlCommand("SELECT TOP(50) N'EMPLOYEE' hostType,E.EmployeeID employeeId,E.PersonID personId,E.FullName displayName,E.Phone phone,E.BranchID branchId,B.BranchName branchName FROM dbo.TDADEmployee E LEFT JOIN dbo.TDADBranch B ON B.CompanyID=E.CompanyID AND B.BranchID=E.BranchID WHERE E.CompanyID=@company AND E.IsActive=1 AND (@search=N'' OR E.FullName LIKE N'%'+@search+N'%' OR E.Phone LIKE N'%'+@search+N'%') ORDER BY E.FullName,E.EmployeeID", connection);
+            Add(command,"@company",SqlDbType.BigInt,CompanyId); Add(command,"@search",SqlDbType.NVarChar,search?.Trim()??string.Empty,200);
+            rows=await ReadRows(command,token);
+            return Ok(new { businessTypeCode = "COMPANY", items = rows });
+        }
         if (type == Models.CompanyBusinessType.RentalOffice)
         {
             await using var command = new SqlCommand("""
