@@ -114,8 +114,8 @@ public sealed class BusinessLocationController(IConfiguration configuration) : C
         var rows = new List<Dictionary<string, object?>>();
         if (type == Models.CompanyBusinessType.Company)
         {
-            await using var command = new SqlCommand("SELECT TOP(50) N'EMPLOYEE' hostType,E.EmployeeID employeeId,E.PersonID personId,E.FullName displayName,E.Phone phone,E.BranchID branchId,B.BranchName branchName FROM dbo.TDADEmployee E LEFT JOIN dbo.TDADBranch B ON B.CompanyID=E.CompanyID AND B.BranchID=E.BranchID WHERE E.CompanyID=@company AND E.IsActive=1 AND (@search=N'' OR E.FullName LIKE N'%'+@search+N'%' OR E.Phone LIKE N'%'+@search+N'%') ORDER BY E.FullName,E.EmployeeID", connection);
-            Add(command,"@company",SqlDbType.BigInt,CompanyId); Add(command,"@search",SqlDbType.NVarChar,search?.Trim()??string.Empty,200);
+            await using var command = new SqlCommand("SELECT TOP(50) N'EMPLOYEE' hostType,E.EmployeeID employeeId,E.PersonID personId,E.FullName displayName,E.Phone phone,E.BranchID branchId,B.BranchName branchName FROM dbo.TDADEmployee E LEFT JOIN dbo.TDADBranch B ON B.CompanyID=E.CompanyID AND B.BranchID=E.BranchID WHERE E.CompanyID=@company AND E.IsActive=1 AND (@search=N'' OR E.FullName LIKE N'%'+@search+N'%' OR E.Phone LIKE N'%'+@search+N'%') AND (E.BranchID IS NULL OR EXISTS(SELECT 1 FROM dbo.TDADUser U WHERE U.UserID=@user AND U.CompanyID=@company AND U.IsActive=1 AND U.IsCompanyAdmin=1) OR EXISTS(SELECT 1 FROM dbo.TDADUserBranch UB WHERE UB.UserID=@user AND UB.CompanyID=@company AND UB.BranchID=E.BranchID AND UB.IsActive=1)) ORDER BY E.FullName,E.EmployeeID", connection);
+            Add(command,"@company",SqlDbType.BigInt,CompanyId); Add(command,"@user",SqlDbType.BigInt,ActorId); Add(command,"@search",SqlDbType.NVarChar,search?.Trim()??string.Empty,200);
             rows=await ReadRows(command,token);
             return Ok(new { businessTypeCode = "COMPANY", items = rows });
         }
