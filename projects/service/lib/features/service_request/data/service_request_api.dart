@@ -35,6 +35,16 @@ class ServiceRequestApi {
         )
         as Map,
   );
+  Future<Map<String, dynamic>> repairHistory({
+    String search = '',
+    int page = 1,
+  }) async => Map<String, dynamic>.from(
+    await _client.get(
+          '/api/service/requests/repair-history',
+          query: {'search': search, 'page': '$page', 'pageSize': '20'},
+        )
+        as Map,
+  );
 
   Future<Map<String, dynamic>> create({
     required bool selfService,

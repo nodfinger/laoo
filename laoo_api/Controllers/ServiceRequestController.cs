@@ -182,15 +182,59 @@ ORDER BY RequestDate DESC,RequestID DESC OFFSET @offset ROWS FETCH NEXT @take RO
         return Ok(new { items, total, page, pageSize });
     }
 
+    [HttpGet("repair-history")]
+    public async Task<IActionResult> RepairHistory([FromQuery] string? search, [FromQuery] int page = 1, [FromQuery] int pageSize = 20, CancellationToken token = default)
+    {
+        await using var c = await Open(token);
+        if (!await InService(c, token) || !await Allowed(c, "19002", "VIEW", token)) return Forbid();
+
+        page = Math.Max(1, page); pageSize = Math.Clamp(pageSize, 1, 100);
+        const string sql = """
+SELECT COUNT_BIG(1) OVER(),R.RequestID,R.RequestNo,R.RequesterNameSnapshot,R.LocationSnapshot,
+       R.EquipmentNameSnapshot,R.Subject,R.AssignedEmployeeNameSnapshot,R.CompletedDate,
+       ISNULL(P.PartCount,0),ISNULL(P.PartsTotal,0)
+FROM dbo.TDADServiceRequest R
+OUTER APPLY
+(
+    SELECT COUNT_BIG(1) PartCount,ISNULL(SUM(TotalCost),0) PartsTotal
+    FROM dbo.TDADServiceRequestPart
+    WHERE CompanyID=R.CompanyID AND RequestID=R.RequestID AND IsActive=1
+) P
+WHERE R.CompanyID=@company AND R.IsActive=1 AND R.StatusCode=N'COMPLETED'
+  AND (@q=N'' OR R.RequestNo LIKE N'%'+@q+N'%' OR R.RequesterNameSnapshot LIKE N'%'+@q+N'%'
+       OR R.Subject LIKE N'%'+@q+N'%' OR R.AssignedEmployeeNameSnapshot LIKE N'%'+@q+N'%')
+ORDER BY R.CompletedDate DESC,R.RequestID DESC OFFSET @offset ROWS FETCH NEXT @take ROWS ONLY;
+""";
+        await using var cmd = new SqlCommand(sql, c);
+        Add(cmd, "@company", SqlDbType.BigInt, CompanyId);
+        Add(cmd, "@q", SqlDbType.NVarChar, search?.Trim() ?? string.Empty, 200);
+        Add(cmd, "@offset", SqlDbType.Int, (page - 1) * pageSize);
+        Add(cmd, "@take", SqlDbType.Int, pageSize);
+        var items = new List<object>(); long total = 0;
+        await using var r = await cmd.ExecuteReaderAsync(token);
+        while (await r.ReadAsync(token))
+        {
+            total = r.GetInt64(0);
+            items.Add(new
+            {
+                requestId = r.GetInt64(1), requestNo = r.GetString(2), requesterName = r.GetString(3),
+                locationSnapshot = Text(r, 4), equipmentName = Text(r, 5), subject = r.GetString(6),
+                assignedEmployeeName = Text(r, 7), completedDate = DateTimeValue(r, 8),
+                partsCount = r.GetInt64(9), partsTotal = r.GetDecimal(10)
+            });
+        }
+        return Ok(new { items, total, page, pageSize });
+    }
     [HttpGet("{id:long}")]
     public async Task<IActionResult> Detail(long id, CancellationToken token)
     {
         await using var c = await Open(token);
         var canManage = await Allowed(c, "15001", "VIEW", token);
         var canSelfView = await Allowed(c, "20001", "VIEW", token);
-        if (!await InService(c, token) || (!canManage && !canSelfView)) return Forbid();
-        const string sql = "SELECT RequestID,RequestNo,RequesterType,RequesterID,RequesterNameSnapshot,RequesterPhoneSnapshot,RequesterEmailSnapshot,LocationSnapshot,EquipmentItemID,EquipmentCodeSnapshot,EquipmentNameSnapshot,Subject,Detail,StatusCode,RequestDate,AssignedEmployeeID,AssignedEmployeeNameSnapshot,ReceivedDate,StartedDate,CompletedDate,ResolutionDetail,CancellationReason,RowVersion FROM dbo.TDADServiceRequest WHERE CompanyID=@company AND RequestID=@id AND IsActive=1 AND (@manage=1 OR CreateBy=@user)";
-        await using var q = new SqlCommand(sql, c); Add(q, "@company", SqlDbType.BigInt, CompanyId); Add(q, "@id", SqlDbType.BigInt, id); Add(q, "@manage", SqlDbType.Bit, canManage); Add(q, "@user", SqlDbType.BigInt, UserId);
+        var canHistoryView = await Allowed(c, "19002", "VIEW", token);
+        if (!await InService(c, token) || (!canManage && !canSelfView && !canHistoryView)) return Forbid();
+        const string sql = "SELECT RequestID,RequestNo,RequesterType,RequesterID,RequesterNameSnapshot,RequesterPhoneSnapshot,RequesterEmailSnapshot,LocationSnapshot,EquipmentItemID,EquipmentCodeSnapshot,EquipmentNameSnapshot,Subject,Detail,StatusCode,RequestDate,AssignedEmployeeID,AssignedEmployeeNameSnapshot,ReceivedDate,StartedDate,CompletedDate,ResolutionDetail,CancellationReason,RowVersion FROM dbo.TDADServiceRequest WHERE CompanyID=@company AND RequestID=@id AND IsActive=1 AND (@manage=1 OR (@history=1 AND StatusCode=N'COMPLETED') OR CreateBy=@user)";
+        await using var q = new SqlCommand(sql, c); Add(q, "@company", SqlDbType.BigInt, CompanyId); Add(q, "@id", SqlDbType.BigInt, id); Add(q, "@manage", SqlDbType.Bit, canManage); Add(q, "@history", SqlDbType.Bit, canHistoryView); Add(q, "@user", SqlDbType.BigInt, UserId);
         await using var r = await q.ExecuteReaderAsync(token);
         if (!await r.ReadAsync(token)) return NotFound();
         var response = new Dictionary<string, object?>
@@ -259,7 +303,8 @@ ORDER BY RequestDate DESC,RequestID DESC OFFSET @offset ROWS FETCH NEXT @take RO
         if (!access.Found) return NotFound();
         var canManage = await Allowed(c, "15001", "VIEW", token);
         var canOwnerView = access.CreatedBy == UserId && await Allowed(c, "20001", "VIEW", token);
-        if (!canManage && !canOwnerView) return Forbid();
+        var canHistoryView = access.Status == "COMPLETED" && await Allowed(c, "19002", "VIEW", token);
+        if (!canManage && !canOwnerView && !canHistoryView) return Forbid();
         const string sql = "SELECT AttachmentID,FileName,ContentType,FileSize,ImageWidth,ImageHeight,CreateDate FROM dbo.TDADServiceRequestAttachment WHERE CompanyID=@company AND RequestID=@request AND IsActive=1 ORDER BY CreateDate,AttachmentID";
         await using var q = new SqlCommand(sql, c); Add(q, "@company", SqlDbType.BigInt, CompanyId); Add(q, "@request", SqlDbType.BigInt, id);
         var items = new List<object>(); await using var r = await q.ExecuteReaderAsync(token);
@@ -276,7 +321,8 @@ ORDER BY RequestDate DESC,RequestID DESC OFFSET @offset ROWS FETCH NEXT @take RO
         if (!access.Found) return NotFound();
         var canManage = await Allowed(c, "15001", "VIEW", token);
         var canOwnerView = access.CreatedBy == UserId && await Allowed(c, "20001", "VIEW", token);
-        if (!canManage && !canOwnerView) return Forbid();
+        var canHistoryView = access.Status == "COMPLETED" && await Allowed(c, "19002", "VIEW", token);
+        if (!canManage && !canOwnerView && !canHistoryView) return Forbid();
         const string sql = "SELECT FileName,StoredPath,ContentType FROM dbo.TDADServiceRequestAttachment WHERE CompanyID=@company AND RequestID=@request AND AttachmentID=@attachment AND IsActive=1";
         await using var q = new SqlCommand(sql, c); Add(q, "@company", SqlDbType.BigInt, CompanyId); Add(q, "@request", SqlDbType.BigInt, id); Add(q, "@attachment", SqlDbType.BigInt, attachmentId);
         await using var r = await q.ExecuteReaderAsync(token); if (!await r.ReadAsync(token)) return NotFound();

@@ -11,6 +11,7 @@ import '../job_dispatch/pages/job_dispatch_page.dart';
 import '../job_work_orders/pages/job_work_orders_page.dart';
 import '../pm/pages/pm_pages.dart';
 import '../service_dashboard/pages/service_dashboard_page.dart';
+import '../repair_history/pages/repair_history_page.dart';
 import '../company/delivery_note/pages/delivery_note_page.dart';
 import '../company/pre_order/pages/pre_order_page.dart';
 import '../company/quotation/pages/quotation_page.dart';
@@ -134,6 +135,7 @@ List<GoRoute> buildServiceFeatureRoutes({
     ),
   ),
   _page('19001', (state) => const ServiceDashboardPage()),
+  _page('19002', (state) => const RepairHistoryPage()),
   _page('16001', (state) => const PmPlansPage()),
   _page('16002', (state) => const PmChecklistsPage()),
   _page('16003', (state) => const PmCalendarPage()),
@@ -180,7 +182,6 @@ GoRoute _portalPlaceholder(FeatureRouteContract route, String title) => GoRoute(
 const _workspacePlaceholders = <String, String>{
   '14001': 'ผังสถานที่และพื้นที่',
   '14003': 'ทะเบียนลูกค้าภายนอก',
-  '19002': 'ประวัติการซ่อมและค่าใช้จ่าย',
   '19003': 'รายงานผลประเมินความพึงพอใจ',
 };
 
