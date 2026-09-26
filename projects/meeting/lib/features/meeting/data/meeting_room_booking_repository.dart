@@ -23,6 +23,22 @@ class MeetingRoomBookingRepository {
   Future<Map<String, dynamic>> options() async =>
       Map<String, dynamic>.from(await _api.get('$_path/options') as Map);
 
+  Future<Map<String, dynamic>> evaluationTemplates(int bookingId) async {
+    final data =
+        await _api.get('$_path/$bookingId/evaluation-templates') as Map;
+    return Map<String, dynamic>.from(data);
+  }
+
+  Future<void> assignEvaluationTemplates(
+    int bookingId,
+    List<Map<String, dynamic>> items,
+  ) async {
+    await _api.put(
+      '$_path/$bookingId/evaluation-templates',
+      body: {'items': items},
+    );
+  }
+
   Future<List<Map<String, dynamic>>> trainingTypes() async {
     final data = await _api.get('$_path/training-types') as Map;
     return List<Map<String, dynamic>>.from(data['items'] as List? ?? const []);

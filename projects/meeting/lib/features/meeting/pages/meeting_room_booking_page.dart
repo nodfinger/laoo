@@ -3834,6 +3834,17 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
         : const <Widget>[];
     if (hasStarted) {
       return Wrap(
+    final canConfigureEvaluations =
+        !hasStarted && (status == 'PENDING' || status == 'APPROVED');
+    final evaluationActions = canConfigureEvaluations
+        ? <Widget>[
+            IconButton(
+              tooltip: '???????????????',
+              onPressed: () => _openBookingEvaluations(item),
+              icon: Icon(Icons.rate_review_outlined, color: preset.primary),
+            ),
+          ]
+        : const <Widget>[];
         children: [
           ...trainingTestActions,
           Tooltip(
@@ -3852,6 +3863,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
     return Wrap(
       children: [
         ...trainingTestActions,
+        ...evaluationActions,
         if (includeApproval &&
             status == 'PENDING' &&
             item['canApprove'] == true &&
@@ -3933,6 +3945,113 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
   }
 
   Widget _pagination(WorkspaceThemePreset preset) {
+  Future<void> _openBookingEvaluations(Map<String, dynamic> item) async {
+    final bookingId = _int(item['bookingId']);
+    if (bookingId == null || bookingId <= 0) {
+      _showMessage(
+        '??????????????????????????????????\n???????????????????: ??????????????????',
+        error: true,
+      );
+      return;
+    }
+    try {
+      final response = await _repository.evaluationTemplates(bookingId);
+      final templates = List<Map<String, dynamic>>.from(
+        response['items'] as List? ?? const [],
+      );
+      final isTraining = response['activityTypeCode'] == 'TRAINING';
+      final sources = <String>[
+        'MEETING_ROOM',
+        if (isTraining) 'TRAINING_COURSE',
+        if (isTraining) 'TRAINING_INSTRUCTOR',
+      ];
+      final selected = <String, int?>{for (final source in sources) source: null};
+      for (final value in response['selections'] as List? ?? const []) {
+        final row = Map<String, dynamic>.from(value as Map);
+        final source = row['sourceType']?.toString();
+        if (source != null && selected.containsKey(source)) {
+          selected[source] = _int(row['templateId']);
+        }
+      }
+      if (!mounted) return;
+      String label(String source) => switch (source) {
+        'TRAINING_COURSE' => '???????????????',
+        'TRAINING_INSTRUCTOR' => '??????????????',
+        _ => '?????????????????',
+      };
+      final saved = await showDialog<List<Map<String, dynamic>>>(
+        context: context,
+        builder: (context) => StatefulBuilder(
+          builder: (context, setDialogState) => MeetingPopup(
+            title: const MeetingPopupTitle(
+              icon: Icons.rate_review_outlined,
+              text: '???????????????????????????',
+            ),
+            content: SizedBox(
+              width: 500,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text('????????????????????????????????? ??????????? ????????????????????????'),
+                    const SizedBox(height: 16),
+                    for (final source in sources)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: DropdownButtonFormField<int?>(
+                          initialValue: selected[source],
+                          decoration: InputDecoration(labelText: label(source)),
+                          items: [
+                            const DropdownMenuItem(value: null, child: Text('??????????')),
+                            ...templates
+                                .where((template) => template['sourceType'] == source)
+                                .map((template) => DropdownMenuItem(
+                                      value: _int(template['id']),
+                                      child: Text('${template['code']} | ${template['name']}'),
+                                    )),
+                          ],
+                          onChanged: (value) =>
+                              setDialogState(() => selected[source] = value),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('??????'),
+              ),
+              FilledButton.icon(
+                onPressed: () => Navigator.pop(
+                  context,
+                  sources
+                      .where((source) => selected[source] != null)
+                      .map((source) => <String, dynamic>{
+                            'sourceType': source,
+                            'templateId': selected[source],
+                          })
+                      .toList(),
+                ),
+                icon: const Icon(Icons.save_outlined),
+                label: const Text('??????'),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (saved == null) return;
+      await _repository.assignEvaluationTemplates(bookingId, saved);
+      _showMessage('????????????????????????????');
+    } catch (error) {
+      _showMessage(
+        '????????????????????????????????????\n???????????????????: $error',
+        error: true,
+      );
+    }
+  }
     final pages = (_total / _pageSize).ceil().clamp(1, 999999);
     final start = _total == 0 ? 0 : (_page - 1) * _pageSize + 1;
     final end = (_page * _pageSize).clamp(0, _total);

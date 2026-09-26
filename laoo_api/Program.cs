@@ -14,6 +14,9 @@ using LaooVoteModule;
 using LaooPosModule;
 using LaooSalesModule;
 using LaooEvaluationModule;
+using LaooEvaluationModule.Services;
+using LaooMeetingApi.Services;
+using Laoo.Shared.Contracts.Evaluations;
 using LaooTrainingModule;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.DataProtection;
@@ -87,6 +90,9 @@ else if (builder.Environment.IsProduction())
 
 builder.Services.AddSwaggerGen(options =>
 {
+    options.CustomSchemaIds(type =>
+        (type.FullName ?? type.Name).Replace('+', '.'));
+
     options.AddSecurityDefinition(
         "Bearer",
         new OpenApiSecurityScheme
@@ -128,6 +134,8 @@ builder.Services.AddScoped<DatabaseSeeder>();
 builder.Services.AddScoped<AuthenticationService>();
 builder.Services.AddScoped<PasswordResetService>();
 builder.Services.AddScoped<CompanyPersonService>();
+builder.Services.AddScoped<IEvaluationSourceCompletedPublisher, EvaluationSourceCompletedPublisher>();
+builder.Services.AddHostedService<MeetingEvaluationCompletionWorker>();
 
 var jwtOptions = builder.Configuration
     .GetSection(JwtOptions.SectionName)

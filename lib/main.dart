@@ -35,7 +35,11 @@ void main() {
   configureVoteFeatureHost(_buildMeetingWorkspaceShell);
   configurePosFeatureHost(_buildMeetingWorkspaceShell);
   configureSalesFeatureHost(_buildMeetingWorkspaceShell);
-  configureEvaluationFeatureHost(_buildMeetingWorkspaceShell);
+  configureEvaluationFeatureHost(
+    _buildMeetingWorkspaceShell,
+    apiClientFactory: ApiClient.new,
+    apiClientDisposer: (client) => (client as ApiClient).dispose(),
+  );
   configureMeetingFeatureHost(_buildMeetingWorkspaceShell);
   configureServiceWorkspaceShell(_buildMeetingWorkspaceShell);
   configureGatePassFeatureHost(_buildMeetingWorkspaceShell);
