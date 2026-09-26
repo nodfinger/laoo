@@ -104,7 +104,8 @@ public sealed class HostNotificationRecipientController(IConfiguration configura
         long.TryParse(User.FindFirstValue(name), out var value) ? value : 0;
 
     private async Task<bool> HasVisitorPermission(SqlConnection connection, CancellationToken token) =>
-        await CompanyProjectPermission.IsAllowedAsync(connection, User, "32001", "CREATE", token)
+        await CompanyProjectPermission.IsAllowedAsync(connection, User, "31002", "EDIT", token)
+        || await CompanyProjectPermission.IsAllowedAsync(connection, User, "32001", "CREATE", token)
         || await CompanyProjectPermission.IsAllowedAsync(connection, User, "32002", "VIEW", token)
         || await CompanyProjectPermission.IsAllowedAsync(connection, User, "32003", "VIEW", token);
 
