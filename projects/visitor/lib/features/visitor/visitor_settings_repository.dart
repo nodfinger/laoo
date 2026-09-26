@@ -82,14 +82,20 @@ class VisitorSettingsRepository {
   }
 
   Future<VisitorRentalHosts> rentalHosts() async {
-    final value = await api.get('/api/company/business-locations/rental-office/tenants');
+    final value = await api.get(
+      '/api/company/business-locations/rental-office/tenants',
+    );
     final sets = value is List ? value : const [];
     return VisitorRentalHosts(
       tenants: sets.isNotEmpty && sets[0] is List
-          ? (sets[0] as List).map((x) => Map<String, dynamic>.from(x as Map)).toList()
+          ? (sets[0] as List)
+                .map((x) => Map<String, dynamic>.from(x as Map))
+                .toList()
           : const [],
       contacts: sets.length > 1 && sets[1] is List
-          ? (sets[1] as List).map((x) => Map<String, dynamic>.from(x as Map)).toList()
+          ? (sets[1] as List)
+                .map((x) => Map<String, dynamic>.from(x as Map))
+                .toList()
           : const [],
     );
   }
@@ -196,12 +202,25 @@ class VisitorHostOption {
 
   factory VisitorHostOption.fromJson(Map<String, dynamic> json) =>
       VisitorHostOption(
-        id: ((json['id'] ?? json['hostId']) as num).toInt(),
-        code: (json['code'] ?? json['roomCode'] ?? json['houseNo'])?.toString() ?? '',
-        name: (json['name'] ?? json['contactName'] ?? json['displayName'] ?? json['personName'])?.toString() ?? '',
+        id: ((json['id'] ?? json['hostId'] ?? json['employeeId']) as num)
+            .toInt(),
+        code:
+            (json['code'] ??
+                    json['roomCode'] ??
+                    json['houseNo'] ??
+                    json['branchName'])
+                ?.toString() ??
+            '',
+        name:
+            (json['name'] ??
+                    json['contactName'] ??
+                    json['displayName'] ??
+                    json['personName'])
+                ?.toString() ??
+            '',
         phone: json['phone']?.toString(),
         room: json['room']?.toString(),
-        building: json['building']?.toString(),
+        building: (json['building'] ?? json['branchName'])?.toString(),
         floor: json['floor']?.toString(),
         tenantId: (json['tenantId'] as num?)?.toInt(),
         contactId: (json['contactId'] as num?)?.toInt(),

@@ -1,4 +1,5 @@
 using System.Data;
+using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
@@ -21,6 +22,8 @@ public sealed class VisitorSystemController(
 {
     private const string SettingsMenu = "36004";
     private const string CheckInMenu = "31002";
+    private const string HistoryMenu = "31005";
+    private const string HostConfirmMenu = "32003";
     private static readonly TimeSpan ThailandOffset = TimeSpan.FromHours(7);
 
     public sealed record VisitorSettingsUpdateRequest(
@@ -53,7 +56,98 @@ public sealed class VisitorSystemController(
         long? HostTenantContactId,
         string? VisitPurpose,
         string CaptureMethod,
-        string RequestId);
+        string RequestId,
+        long? VisitorAppointmentId = null);
+
+    public sealed record CheckOutRequest(
+        string VisitOutcomeCode,
+        string CheckoutReasonCode,
+        string? CheckoutNote);
+
+    public sealed record VisitNoteRequest(string NoteStageCode, string NoteText);
+    public sealed record HostConfirmationRequest(string ConfirmationResultCode, string? ConfirmationNote);
+
+    [HttpGet("host-confirm/actions")]
+    public async Task<IActionResult> HostConfirmActions(CancellationToken token)
+    {
+        if (!TryScope(out _, out _)) return Forbid();
+        await using var connection = await Open(token);
+        return Ok(new { caption = await Caption(connection, HostConfirmMenu, token),
+            view = await Can(connection, HostConfirmMenu, "VIEW", token),
+            edit = await Can(connection, HostConfirmMenu, "EDIT", token) });
+    }
+
+    [HttpGet("host-confirm/pending")]
+    public async Task<IActionResult> HostConfirmPending(CancellationToken token)
+    {
+        if (!TryScope(out var companyId, out _)) return Forbid();
+        await using var connection = await Open(token);
+        if (!await Can(connection, HostConfirmMenu, "VIEW", token)) return Forbid();
+        var identities = await CurrentHostIdentities(token);
+        var rows = await HostPendingRows(connection, companyId, identities, token);
+        return Ok(new { items = rows });
+    }
+
+    [HttpGet("host-confirm/visits/{visitId:long}")]
+    public async Task<IActionResult> HostConfirmDetail(long visitId, CancellationToken token)
+    {
+        if (!TryScope(out var companyId, out _)) return Forbid();
+        await using var connection = await Open(token);
+        if (!await Can(connection, HostConfirmMenu, "VIEW", token)) return Forbid();
+        var visit = await HostVisit(connection, companyId, visitId, await CurrentHostIdentities(token), token);
+        if (visit is null) return NotFound(new { message = "ไม่พบรายการรอเข้าพบของคุณ" });
+        var images = await ReadRows(connection, """
+SELECT VisitorVisitImageID,EvidenceType,CaptureStage,SideCode,OriginalFileName,ContentType,ContentLength,CreateDate,CreateBy
+FROM dbo.TDTMVisitorVisitImage WHERE CompanyID=@CompanyID AND VisitorVisitID=@VisitID ORDER BY CreateDate,VisitorVisitImageID;
+""", companyId, visitId, token);
+        return Ok(new { visit, images });
+    }
+
+    [HttpGet("host-confirm/visits/{visitId:long}/images/{imageId:long}")]
+    public async Task<IActionResult> HostConfirmImage(long visitId, long imageId, CancellationToken token)
+    {
+        if (!TryScope(out var companyId, out _)) return Forbid();
+        await using var connection = await Open(token);
+        if (!await Can(connection, HostConfirmMenu, "VIEW", token) ||
+            await HostVisit(connection, companyId, visitId, await CurrentHostIdentities(token), token) is null) return Forbid();
+        await using var command = new SqlCommand("SELECT FileRelativePath,ContentType FROM dbo.TDTMVisitorVisitImage WHERE CompanyID=@CompanyID AND VisitorVisitID=@VisitID AND VisitorVisitImageID=@ImageID", connection);
+        Add(command, "@CompanyID", SqlDbType.BigInt, companyId); Add(command, "@VisitID", SqlDbType.BigInt, visitId); Add(command, "@ImageID", SqlDbType.BigInt, imageId);
+        await using var reader = await command.ExecuteReaderAsync(token);
+        if (!await reader.ReadAsync(token)) return NotFound();
+        var relative = reader.GetString(0); var contentType = reader.GetString(1);
+        var root = Path.GetFullPath(environment.WebRootPath ?? Path.Combine(environment.ContentRootPath, "wwwroot"));
+        var file = Path.GetFullPath(Path.Combine(root, relative));
+        if (!IsWithinRoot(root, file) || !System.IO.File.Exists(file)) return NotFound();
+        return PhysicalFile(file, contentType);
+    }
+
+    [HttpPost("host-confirm/visits/{visitId:long}")]
+    public async Task<IActionResult> ConfirmHostVisit(long visitId, HostConfirmationRequest request, CancellationToken token)
+    {
+        if (!TryScope(out var companyId, out var userId)) return Forbid();
+        var result = Clean(request.ConfirmationResultCode)?.ToUpperInvariant();
+        if (result is not ("MET" or "NOT_MET")) return BadRequest(new { message = "ผลการเข้าพบไม่ถูกต้อง" });
+        if (request.ConfirmationNote?.Length > 1000) return BadRequest(new { message = "หมายเหตุต้องไม่เกิน 1,000 ตัวอักษร" });
+        await using var connection = await Open(token);
+        if (!await Can(connection, HostConfirmMenu, "EDIT", token)) return Forbid();
+        await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(IsolationLevel.Serializable, token);
+        try
+        {
+            if (await HostVisit(connection, companyId, visitId, await CurrentHostIdentities(token), token, transaction) is null)
+                return NotFound(new { message = "ไม่พบรายการรอเข้าพบของคุณ" });
+            var name = User.FindFirstValue(ClaimTypes.Name) ?? User.FindFirstValue("name") ?? userId.ToString();
+            await using var insert = new SqlCommand("""
+INSERT dbo.TDTMVisitorHostConfirmation(CompanyID,VisitorVisitID,ConfirmationResultCode,ConfirmationNote,ConfirmedByUserID,ConfirmedByNameSnapshot)
+VALUES(@CompanyID,@VisitID,@Result,@Note,@UserID,@Name);
+""", connection, transaction);
+            Add(insert, "@CompanyID", SqlDbType.BigInt, companyId); Add(insert, "@VisitID", SqlDbType.BigInt, visitId); Add(insert, "@Result", SqlDbType.VarChar, result, 20); Add(insert, "@Note", SqlDbType.NVarChar, Clean(request.ConfirmationNote), 1000); Add(insert, "@UserID", SqlDbType.BigInt, userId); Add(insert, "@Name", SqlDbType.NVarChar, name, 200);
+            try { await insert.ExecuteNonQueryAsync(token); }
+            catch (SqlException exception) when (exception.Number is 2601 or 2627) { return Conflict(new { message = "รายการนี้ได้รับการยืนยันแล้ว" }); }
+            await transaction.CommitAsync(token);
+            return Ok(new { visitorVisitId = visitId, confirmationResultCode = result });
+        }
+        catch { await transaction.RollbackAsync(token); throw; }
+    }
 
     [HttpGet("company-context")]
     public async Task<IActionResult> CompanyContext(CancellationToken token)
@@ -66,14 +160,15 @@ public sealed class VisitorSystemController(
         return Ok(new
         {
             businessTypeCode = businessType,
-            employeeAllowed = false,
+            employeeAllowed = businessType == "COMPANY",
             residentAllowed = businessType is "DORMITORY" or "VILLAGE",
-            serviceCustomerAllowed = businessType is "COMPANY" or "SERVICE_CENTER",
+            serviceCustomerAllowed = businessType == "SERVICE_CENTER",
             defaultHostType = businessType switch
             {
                 "DORMITORY" => "RESIDENT",
                 "RENTAL_OFFICE" => "RENTAL_OFFICE",
                 "VILLAGE" => "VILLAGE",
+                "COMPANY" => "EMPLOYEE",
                 _ => "SERVICE_CUSTOMER",
             },
         });
@@ -133,14 +228,18 @@ ORDER BY B.BuildingNameTH,F.FloorNumber,RM.RoomCode,RM.RoomID;
         if (!await Can(connection, CheckInMenu, "VIEW", token)) return Forbid();
         var type = Clean(hostType)?.ToUpperInvariant();
         var businessType = await BusinessType(connection, companyId, token);
-        if (type is not ("RESIDENT" or "SERVICE_CUSTOMER" or "RENTAL_OFFICE" or "VILLAGE") ||
+        if (type is not ("EMPLOYEE" or "RESIDENT" or "SERVICE_CUSTOMER" or "RENTAL_OFFICE" or "VILLAGE") ||
             (businessType == "DORMITORY" && type != "RESIDENT") ||
-            (businessType is "COMPANY" or "SERVICE_CENTER" && type != "SERVICE_CUSTOMER") ||
+            (businessType == "COMPANY" && type != "EMPLOYEE") ||
+            (businessType == "SERVICE_CENTER" && type != "SERVICE_CUSTOMER") ||
             (businessType == "RENTAL_OFFICE" && type != "RENTAL_OFFICE") ||
             (businessType == "VILLAGE" && type != "VILLAGE"))
             return BadRequest(new { message = "ประเภทผู้รับรองไม่ถูกต้องสำหรับ Company นี้" });
-        if (type is "RENTAL_OFFICE" or "VILLAGE")
-            return Ok(new { hostType = type, items = await SharedHostRows(type, Clean(search), token) });
+        if (type is "EMPLOYEE" or "RENTAL_OFFICE" or "VILLAGE")
+        {
+            var sharedType = type == "EMPLOYEE" ? "COMPANY" : type;
+            return Ok(new { hostType = type, items = await SharedHostRows(sharedType, Clean(search), token) });
+        }
         if (type == "RESIDENT" && roomId is null)
             return BadRequest(new { message = "กรุณาเลือกห้องพักก่อนค้นหาผู้รับรอง" });
 
@@ -382,10 +481,11 @@ VALUES(@CompanyID,@VersionID,@BeforeJson,@AfterJson,@Reason,@UserID);
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
-        if (!TryScope(out var companyId, out _)) return Forbid();
+        if (!TryScope(out var companyId, out var userId)) return Forbid();
         await using var connection = await Open(token);
         if (!await Can(connection, CheckInMenu, "VIEW", token)) return Forbid();
-        var branch = ScopedBranch(branchId);
+        var contactPoint = await ActiveContactPoint(connection, null, companyId, userId, token);
+        if (contactPoint is null) return NotFound(new { message = "No active contact point is assigned to this account." });
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 100);
         var query = Clean(search) ?? string.Empty;
@@ -395,14 +495,14 @@ SELECT COUNT_BIG(1) OVER(),VisitorVisitID,BranchID,VisitorName,Phone,NationalIdM
        VisitPurpose,CaptureMethod,CheckedInDate,ContactPointNameSnapshot
 FROM dbo.TDTMVisitorVisit
 WHERE CompanyID=@CompanyID AND StatusCode='CHECKED_IN'
-  AND (@BranchID IS NULL OR BranchID=@BranchID)
+  AND VisitorContactPointID=@ContactPointID
   AND (@Search=N'' OR VisitorName LIKE @Like OR Phone LIKE @Like
        OR HostNameSnapshot LIKE @Like OR ContactPointNameSnapshot LIKE @Like)
 ORDER BY CheckedInDate DESC,VisitorVisitID DESC
 OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;
 """, connection);
         Add(command, "@CompanyID", SqlDbType.BigInt, companyId);
-        Add(command, "@BranchID", SqlDbType.BigInt, branch);
+        Add(command, "@ContactPointID", SqlDbType.BigInt, contactPoint.Id);
         Add(command, "@Search", SqlDbType.NVarChar, query, 200);
         Add(command, "@Like", SqlDbType.NVarChar, $"%{query}%", 210);
         Add(command, "@Offset", SqlDbType.Int, (page - 1) * pageSize);
@@ -428,6 +528,233 @@ OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;
         return Ok(new { items, total, page, pageSize });
     }
 
+    [HttpGet("check-ins/history/actions")]
+    public async Task<IActionResult> HistoryActions(CancellationToken token)
+    {
+        if (!TryScope(out _, out _)) return Forbid();
+        await using var connection = await Open(token);
+        return Ok(new
+        {
+            menuCode = HistoryMenu,
+            caption = await Caption(connection, HistoryMenu, token),
+            screenType = 3,
+            view = await Can(connection, HistoryMenu, "VIEW", token),
+        });
+    }
+
+    [HttpGet("check-ins/history")]
+    public async Task<IActionResult> History(
+        CancellationToken token,
+        [FromQuery] string? search,
+        [FromQuery] string? outcomeCode,
+        [FromQuery] DateOnly? dateFrom,
+        [FromQuery] DateOnly? dateTo,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
+    {
+        if (!TryScope(out var companyId, out var userId)) return Forbid();
+        await using var connection = await Open(token);
+        if (!await Can(connection, HistoryMenu, "VIEW", token)) return Forbid();
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 100);
+        var contactPoint = await ActiveContactPoint(connection, null, companyId, userId, token);
+        if (contactPoint is null) return NotFound(new { message = "No active contact point is assigned to this account." });
+        var query = Clean(search) ?? string.Empty;
+        var outcome = Clean(outcomeCode)?.ToUpperInvariant();
+        if (outcome is not null && outcome is not ("MET" or "NOT_MET" or "CANCELLED"))
+            return BadRequest(new { message = "Invalid visit outcome." });
+        if (dateFrom.HasValue && dateTo.HasValue && dateFrom > dateTo)
+            return BadRequest(new { message = "Start date must not be after end date." });
+        await using var command = new SqlCommand("""
+SELECT COUNT_BIG(1) OVER(),VisitorVisitID,VisitorName,HostNameSnapshot,ContactPointNameSnapshot,
+       VisitPurpose,CheckedInDate,CheckedOutDate,VisitOutcomeCode,CheckoutReasonCode,
+       CheckedOutByNameSnapshot
+FROM dbo.TDTMVisitorVisit
+WHERE CompanyID=@CompanyID AND StatusCode='CHECKED_OUT'
+  AND VisitorContactPointID=@ContactPointID
+  AND (@Search=N'' OR VisitorName LIKE @Like OR HostNameSnapshot LIKE @Like
+       OR ContactPointNameSnapshot LIKE @Like OR VisitPurpose LIKE @Like)
+  AND (@Outcome IS NULL OR VisitOutcomeCode=@Outcome)
+  AND (@DateFrom IS NULL OR CheckedOutDate>=@DateFrom)
+  AND (@DateTo IS NULL OR CheckedOutDate<DATEADD(DAY,1,@DateTo))
+ORDER BY CheckedOutDate DESC,VisitorVisitID DESC
+OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;
+""", connection);
+        Add(command, "@CompanyID", SqlDbType.BigInt, companyId);
+        Add(command, "@ContactPointID", SqlDbType.BigInt, contactPoint.Id);
+        Add(command, "@Search", SqlDbType.NVarChar, query, 200);
+        Add(command, "@Like", SqlDbType.NVarChar, $"%{query}%", 210);
+        Add(command, "@Outcome", SqlDbType.VarChar, outcome, 20);
+        Add(command, "@DateFrom", SqlDbType.Date, dateFrom?.ToDateTime(TimeOnly.MinValue));
+        Add(command, "@DateTo", SqlDbType.Date, dateTo?.ToDateTime(TimeOnly.MinValue));
+        Add(command, "@Offset", SqlDbType.Int, (page - 1) * pageSize);
+        Add(command, "@PageSize", SqlDbType.Int, pageSize);
+        await using var reader = await command.ExecuteReaderAsync(token);
+        var items = new List<object>();
+        long total = 0;
+        while (await reader.ReadAsync(token))
+        {
+            total = reader.GetInt64(0);
+            items.Add(new
+            {
+                visitorVisitId = reader.GetInt64(1), visitorName = reader.GetString(2),
+                hostName = Text(reader, 3), contactPointName = Text(reader, 4),
+                visitPurpose = Text(reader, 5), checkedInDate = reader.GetDateTime(6),
+                checkedOutDate = reader.GetDateTime(7), visitOutcomeCode = Text(reader, 8),
+                checkoutReasonCode = Text(reader, 9), checkedOutByName = Text(reader, 10),
+            });
+        }
+        return Ok(new { items, total, page, pageSize });
+    }
+
+    [HttpGet("check-ins/{visitId:long}")]
+    public async Task<IActionResult> Detail(long visitId, CancellationToken token)
+    {
+        if (!TryScope(out var companyId, out var userId)) return Forbid();
+        await using var connection = await Open(token);
+        if (!await Can(connection, CheckInMenu, "VIEW", token) &&
+            !await Can(connection, HistoryMenu, "VIEW", token)) return Forbid();
+        var contactPoint = await ActiveContactPoint(connection, null, companyId, userId, token);
+        if (contactPoint is null) return NotFound(new { message = "No active contact point is assigned to this account." });
+        await using var visit = new SqlCommand("""
+SELECT V.VisitorVisitID,V.VisitorName,V.Phone,V.HostType,V.HostNameSnapshot,V.HostRoomSnapshot,
+       V.ContactPointNameSnapshot,V.VisitPurpose,V.CaptureMethod,V.StatusCode,V.CheckedInDate,
+       V.CheckedOutDate,V.VisitOutcomeCode,V.CheckoutReasonCode,V.CheckoutNote,
+       V.CheckedOutByUserID,V.CheckedOutByNameSnapshot,V.ResultRecordedDate,
+       C.ConfirmationResultCode,C.ConfirmationNote,C.ConfirmedByNameSnapshot,C.CreateDate
+FROM dbo.TDTMVisitorVisit V
+LEFT JOIN dbo.TDTMVisitorHostConfirmation C
+  ON C.CompanyID=V.CompanyID AND C.VisitorVisitID=V.VisitorVisitID
+WHERE V.CompanyID=@CompanyID AND V.VisitorVisitID=@VisitID
+  AND V.VisitorContactPointID=@ContactPointID;
+""", connection);
+        Add(visit, "@CompanyID", SqlDbType.BigInt, companyId);
+        Add(visit, "@VisitID", SqlDbType.BigInt, visitId);
+        Add(visit, "@ContactPointID", SqlDbType.BigInt, contactPoint.Id);
+        await using var reader = await visit.ExecuteReaderAsync(token);
+        if (!await reader.ReadAsync(token)) return NotFound(new { message = "ไม่พบรายการผู้มาติดต่อ" });
+        var detail = new
+        {
+            visitorVisitId = reader.GetInt64(0), visitorName = reader.GetString(1), phone = Text(reader, 2),
+            hostType = reader.GetString(3), hostName = Text(reader, 4), hostRoom = Text(reader, 5),
+            contactPointName = Text(reader, 6), visitPurpose = Text(reader, 7), captureMethod = reader.GetString(8),
+            statusCode = reader.GetString(9), checkedInDate = reader.GetDateTime(10),
+            checkedOutDate = reader.IsDBNull(11) ? (DateTime?)null : reader.GetDateTime(11),
+            visitOutcomeCode = Text(reader, 12), checkoutReasonCode = Text(reader, 13), checkoutNote = Text(reader, 14),
+            checkedOutByUserId = Long(reader, 15), checkedOutByName = Text(reader, 16),
+            resultRecordedDate = reader.IsDBNull(17) ? (DateTime?)null : reader.GetDateTime(17),
+            hostConfirmationResultCode = Text(reader, 18), hostConfirmationNote = Text(reader, 19),
+            hostConfirmedByName = Text(reader, 20), hostConfirmedDate = Date(reader, 21)
+        };
+        await reader.CloseAsync();
+        var images = await ReadRows(connection, """
+SELECT VisitorVisitImageID,EvidenceType,CaptureStage,SideCode,FileRelativePath,OriginalFileName,ContentType,ContentLength,CreateDate,CreateBy
+FROM dbo.TDTMVisitorVisitImage WHERE CompanyID=@CompanyID AND VisitorVisitID=@VisitID ORDER BY CreateDate,VisitorVisitImageID;
+""", companyId, visitId, token);
+        var notes = await ReadRows(connection, """
+SELECT VisitorVisitNoteID,NoteStageCode,NoteText,CreateDate,CreateBy
+FROM dbo.TDTMVisitorVisitNote WHERE CompanyID=@CompanyID AND VisitorVisitID=@VisitID ORDER BY CreateDate,VisitorVisitNoteID;
+""", companyId, visitId, token);
+        var notifications = await ReadRows(connection, """
+SELECT VisitorNotificationOutboxID,ChannelCode,StatusCode,NotificationID,LastErrorMessage,
+       AttemptCount,FirstAttemptDate,CompletedDate,CreateDate
+FROM dbo.TDTMVisitorNotificationOutbox
+WHERE CompanyID=@CompanyID AND VisitorVisitID=@VisitID
+ORDER BY VisitorNotificationOutboxID;
+""", companyId, visitId, token);
+        return Ok(new { visit = detail, images, notes, notifications });
+    }
+
+    [HttpGet("check-ins/{visitId:long}/images/{imageId:long}")]
+    public async Task<IActionResult> CheckInImage(long visitId, long imageId, CancellationToken token)
+    {
+        if (!TryScope(out var companyId, out var userId)) return Forbid();
+        await using var connection = await Open(token);
+        if (!await Can(connection, CheckInMenu, "VIEW", token) &&
+            !await Can(connection, HistoryMenu, "VIEW", token)) return Forbid();
+        var contactPoint = await ActiveContactPoint(connection, null, companyId, userId, token);
+        if (contactPoint is null) return NotFound(new { message = "No active contact point is assigned to this account." });
+        await using var command = new SqlCommand("""
+SELECT I.FileRelativePath,I.ContentType
+FROM dbo.TDTMVisitorVisitImage I
+JOIN dbo.TDTMVisitorVisit V ON V.CompanyID=I.CompanyID AND V.VisitorVisitID=I.VisitorVisitID
+WHERE I.CompanyID=@CompanyID AND I.VisitorVisitID=@VisitID AND I.VisitorVisitImageID=@ImageID
+  AND V.VisitorContactPointID=@ContactPointID;
+""", connection);
+        Add(command, "@CompanyID", SqlDbType.BigInt, companyId); Add(command, "@VisitID", SqlDbType.BigInt, visitId);
+        Add(command, "@ImageID", SqlDbType.BigInt, imageId); Add(command, "@ContactPointID", SqlDbType.BigInt, contactPoint.Id);
+        await using var reader = await command.ExecuteReaderAsync(token);
+        if (!await reader.ReadAsync(token)) return NotFound();
+        var root = Path.GetFullPath(environment.WebRootPath ?? Path.Combine(environment.ContentRootPath, "wwwroot"));
+        var file = Path.GetFullPath(Path.Combine(root, reader.GetString(0)));
+        if (!IsWithinRoot(root, file) || !System.IO.File.Exists(file)) return NotFound();
+        return PhysicalFile(file, reader.GetString(1));
+    }
+
+    [HttpPost("check-ins/{visitId:long}/notification/retry")]
+    public async Task<IActionResult> RetryNotification(long visitId, CancellationToken token)
+    {
+        if (!TryScope(out var companyId, out var userId)) return Forbid();
+        await using var connection = await Open(token);
+        if (!await Can(connection, CheckInMenu, "EDIT", token)) return Forbid();
+        var contactPoint = await ActiveContactPoint(connection, null, companyId, userId, token);
+        if (contactPoint is null) return Forbid();
+        await using var command = new SqlCommand("""
+SELECT COUNT_BIG(1) FROM dbo.TDTMVisitorVisit
+WHERE CompanyID=@CompanyID AND VisitorVisitID=@VisitID AND VisitorContactPointID=@ContactPointID;
+""", connection);
+        Add(command, "@CompanyID", SqlDbType.BigInt, companyId);
+        Add(command, "@VisitID", SqlDbType.BigInt, visitId);
+        Add(command, "@ContactPointID", SqlDbType.BigInt, contactPoint.Id);
+        if (Convert.ToInt64(await command.ExecuteScalarAsync(token)) != 1) return NotFound();
+        await QueueHostNotificationAsync(companyId, visitId, userId, token, retryFailed: true);
+        return Ok(new { visitorVisitId = visitId, retried = true });
+    }
+
+    [HttpPost("check-ins/{visitId:long}/notes")]
+    public async Task<IActionResult> AddNote(long visitId, VisitNoteRequest request, CancellationToken token)
+    {
+        if (!TryScope(out var companyId, out var userId)) return Forbid();
+        if (string.IsNullOrWhiteSpace(request.NoteText) || request.NoteText.Trim().Length > 2000)
+            return BadRequest(new { message = "กรุณาระบุข้อความไม่เกิน 2,000 ตัวอักษร" });
+        var stage = Clean(request.NoteStageCode)?.ToUpperInvariant();
+        if (stage is not ("CHECKIN" or "CHECKOUT" or "GENERAL"))
+            return BadRequest(new { message = "ประเภทข้อความไม่ถูกต้อง" });
+        await using var connection = await Open(token);
+        if (!await Can(connection, CheckInMenu, "EDIT", token)) return Forbid();
+        await using var command = new SqlCommand("""
+INSERT dbo.TDTMVisitorVisitNote(CompanyID,VisitorVisitID,NoteStageCode,NoteText,CreateBy)
+SELECT @CompanyID,VisitorVisitID,@Stage,@Text,@UserID FROM dbo.TDTMVisitorVisit
+WHERE CompanyID=@CompanyID AND VisitorVisitID=@VisitID AND StatusCode IN('CHECKED_IN','CHECKED_OUT');
+""", connection);
+        Add(command, "@CompanyID", SqlDbType.BigInt, companyId); Add(command, "@VisitID", SqlDbType.BigInt, visitId);
+        Add(command, "@Stage", SqlDbType.VarChar, stage, 20); Add(command, "@Text", SqlDbType.NVarChar, request.NoteText.Trim(), 2000);
+        Add(command, "@UserID", SqlDbType.BigInt, userId);
+        return await command.ExecuteNonQueryAsync(token) == 1 ? Ok() : NotFound(new { message = "ไม่พบรายการที่สามารถเพิ่มข้อความได้" });
+    }
+
+    [HttpGet("check-ins/{visitId:long}/audit")]
+    public async Task<IActionResult> Audit(long visitId, CancellationToken token)
+    {
+        if (!TryScope(out var companyId, out var userId)) return Forbid();
+        await using var connection = await Open(token);
+        if (!await Can(connection, CheckInMenu, "VIEW", token)) return Forbid();
+        var contactPoint = await ActiveContactPoint(connection, null, companyId, userId, token);
+        if (contactPoint is null) return Forbid();
+        await using var scope = new SqlCommand("""
+SELECT COUNT_BIG(1) FROM dbo.TDTMVisitorVisit
+WHERE CompanyID=@CompanyID AND VisitorVisitID=@VisitID AND VisitorContactPointID=@ContactPointID;
+""", connection);
+        Add(scope, "@CompanyID", SqlDbType.BigInt, companyId);
+        Add(scope, "@VisitID", SqlDbType.BigInt, visitId);
+        Add(scope, "@ContactPointID", SqlDbType.BigInt, contactPoint.Id);
+        if (Convert.ToInt64(await scope.ExecuteScalarAsync(token)) != 1) return NotFound();
+        return Ok(new { items = await ReadRows(connection, """
+SELECT VisitorVisitAuditID,FromStatusCode,ToStatusCode,OutcomeCode,ReasonCode,NoteText,ActorUserID,ActorNameSnapshot,OccurredDate
+FROM dbo.TDTMVisitorVisitAudit WHERE CompanyID=@CompanyID AND VisitorVisitID=@VisitID ORDER BY OccurredDate,VisitorVisitAuditID;
+""", companyId, visitId, token) });
+    }
+
     [HttpPost("check-ins")]
     public async Task<IActionResult> CheckIn(
         CheckInRequest request,
@@ -446,8 +773,9 @@ OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;
             return BadRequest(new { message = "กรุณาระบุชื่อผู้มาติดต่อและ Request ID" });
 
         await using var connection = await Open(token);
-        if (!await Can(connection, CheckInMenu, "CREATE", token)) return Forbid();
+        if (!await Can(connection, CheckInMenu, "EDIT", token)) return Forbid();
         var contactPoint = await ActiveContactPoint(connection, null, companyId, userId, token);
+        if (contactPoint is null) return Forbid();
         var branch = contactPoint?.BranchId;
         if (branch is null || !await BranchExists(connection, companyId, branch.Value, token))
             return BadRequest(new { message = "สาขาไม่ถูกต้องหรืออยู่นอก Company" });
@@ -465,7 +793,9 @@ OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;
                 "DORMITORY" => hostType == "RESIDENT" && request.HostResidentId is not null && request.HostRoomId is not null,
                 "RENTAL_OFFICE" => hostType == "RENTAL_OFFICE" && request.HostTenantId is not null && request.HostTenantContactId is not null,
                 "VILLAGE" => hostType == "VILLAGE" && request.HostResidentId is not null,
-                _ => hostType == "SERVICE_CUSTOMER" && request.HostServiceCustomerId is not null,
+                "COMPANY" => hostType == "EMPLOYEE" && request.HostEmployeeId is not null,
+                "SERVICE_CENTER" => hostType == "SERVICE_CUSTOMER" && request.HostServiceCustomerId is not null,
+                _ => false,
             };
             if (!validHost)
                 return BadRequest(new { message = "ประเภทผู้รับการติดต่อไม่ถูกต้องสำหรับ Company นี้" });
@@ -482,13 +812,19 @@ OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;
                 return BadRequest(new { message = "กรุณาระบุเลขบัตรประชาชน" });
             if (settings.RequireNationalIdExpiry && request.NationalIdExpiryDate is null)
                 return BadRequest(new { message = "กรุณาระบุวันหมดอายุบัตรประชาชน" });
-            var hostSnapshot = hostType is "RENTAL_OFFICE" or "VILLAGE"
+            var hostSnapshot = hostType is "EMPLOYEE" or "RENTAL_OFFICE" or "VILLAGE"
                 ? await LoadSharedHostSnapshot(hostType, request.HostTenantId,
-                    request.HostTenantContactId, request.HostResidentId, token)
+                    request.HostTenantContactId, request.HostResidentId, request.HostEmployeeId, token)
                 : await LoadHostSnapshot(connection, transaction, companyId,
                     hostType!, request.HostResidentId, request.HostServiceCustomerId, request.HostRoomId, token);
             if (hostSnapshot is null)
                 return BadRequest(new { message = "ไม่พบผู้รับการติดต่อ หรือข้อมูลไม่ Active" });
+
+            if (request.VisitorAppointmentId is not null && !await IsApprovedAppointment(
+                    connection, transaction, companyId, request.VisitorAppointmentId.Value,
+                    name!, phone, hostType!, request.HostEmployeeId, request.HostResidentId,
+                    request.HostServiceCustomerId, request.HostTenantId, request.HostTenantContactId, token))
+                return Conflict(new { message = "นัดหมายนี้ใช้ไม่ได้ ถูกใช้แล้ว หรือข้อมูลผู้มาติดต่อไม่ตรงกับนัดหมาย" });
 
             await using var duplicate = new SqlCommand("""
 SELECT VisitorVisitID FROM dbo.TDTMVisitorVisit WITH (UPDLOCK,HOLDLOCK)
@@ -555,7 +891,31 @@ SELECT CONVERT(bigint,SCOPE_IDENTITY());
                 JsonSerializer.Serialize(ToSettingsJson(settings)), -1);
             Add(insert, "@UserID", SqlDbType.BigInt, userId);
             var visitId = Convert.ToInt64(await insert.ExecuteScalarAsync(token));
+            if (request.VisitorAppointmentId is not null)
+            {
+                await using var useAppointment = new SqlCommand("""
+UPDATE dbo.TDTMVisitorAppointment SET StatusCode='USED',UsedVisitorVisitID=@VisitID,
+ UpdateDate=SYSUTCDATETIME(),UpdateBy=@UserID
+WHERE CompanyID=@CompanyID AND VisitorAppointmentID=@AppointmentID AND StatusCode='APPROVED';
+""", connection, transaction);
+                Add(useAppointment, "@VisitID", SqlDbType.BigInt, visitId);
+                Add(useAppointment, "@UserID", SqlDbType.BigInt, userId);
+                Add(useAppointment, "@CompanyID", SqlDbType.BigInt, companyId);
+                Add(useAppointment, "@AppointmentID", SqlDbType.BigInt, request.VisitorAppointmentId.Value);
+                if (await useAppointment.ExecuteNonQueryAsync(token) != 1)
+                    return Conflict(new { message = "นัดหมายนี้ถูกใช้ไปแล้ว" });
+            }
+            await using var audit = new SqlCommand("""
+INSERT dbo.TDTMVisitorVisitAudit(CompanyID,VisitorVisitID,FromStatusCode,ToStatusCode,ActorUserID,ActorNameSnapshot)
+VALUES(@CompanyID,@VisitID,NULL,@Status,@UserID,COALESCE(NULLIF(LTRIM(RTRIM(@ActorName)),N''),CONVERT(nvarchar(30),@UserID)));
+""", connection, transaction);
+            Add(audit, "@CompanyID", SqlDbType.BigInt, companyId); Add(audit, "@VisitID", SqlDbType.BigInt, visitId);
+            Add(audit, "@Status", SqlDbType.VarChar, status, 30); Add(audit, "@UserID", SqlDbType.BigInt, userId);
+            Add(audit, "@ActorName", SqlDbType.NVarChar, User.FindFirstValue(ClaimTypes.Name) ?? User.FindFirstValue("name"), 200);
+            await audit.ExecuteNonQueryAsync(token);
             await transaction.CommitAsync(token);
+            if (status == "CHECKED_IN")
+                await QueueHostNotificationAsync(companyId, visitId, userId, token);
             return Ok(new { visitorVisitId = visitId, statusCode = status });
         }
         catch (SqlException exception) when (exception.Number is 2601 or 2627)
@@ -566,18 +926,25 @@ SELECT CONVERT(bigint,SCOPE_IDENTITY());
     }
 
     [HttpPost("check-ins/{visitId:long}/images")]
-    [RequestSizeLimit(10_000_000)]
+    [RequestSizeLimit(2_000_000)]
     public async Task<IActionResult> UploadImage(long visitId, CancellationToken token)
     {
         if (!TryScope(out var companyId, out var userId)) return Forbid();
         await using var connection = await Open(token);
-        if (!await Can(connection, CheckInMenu, "CREATE", token)) return Forbid();
+        if (!await Can(connection, CheckInMenu, "EDIT", token)) return Forbid();
+        var contactPoint = await ActiveContactPoint(connection, null, companyId, userId, token);
+        if (contactPoint is null) return Forbid();
         var form = await Request.ReadFormAsync(token);
         var file = form.Files.GetFile("file");
+        var evidenceType = Clean(form["evidenceType"].ToString())?.ToUpperInvariant() ?? "DOCUMENT";
+        var captureStage = Clean(form["captureStage"].ToString())?.ToUpperInvariant() ?? "CHECKIN";
         var side = Clean(form["side"].ToString())?.ToUpperInvariant();
-        if (file is null || file.Length == 0 || side is not ("FRONT" or "BACK"))
+        if (file is null || file.Length == 0 || evidenceType is not ("DOCUMENT" or "VEHICLE" or "OTHER") ||
+            captureStage is not ("CHECKIN" or "CHECKOUT") ||
+            (evidenceType == "DOCUMENT" && side is not ("FRONT" or "BACK")) ||
+            (evidenceType != "DOCUMENT" && side is not null))
             return BadRequest(new { message = "กรุณาระบุภาพบัตรและด้าน FRONT หรือ BACK" });
-        if (file.Length > 10_000_000 || !new[] { "image/jpeg", "image/png" }.Contains(file.ContentType))
+        if (file.Length > 1_000_000 || !new[] { "image/jpeg", "image/png" }.Contains(file.ContentType))
             return BadRequest(new { message = "รองรับเฉพาะภาพ JPG หรือ PNG ขนาดไม่เกิน 10 MB" });
 
         await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(
@@ -585,16 +952,25 @@ SELECT CONVERT(bigint,SCOPE_IDENTITY());
         try
         {
             await using var visit = new SqlCommand("""
-SELECT StatusCode FROM dbo.TDTMVisitorVisit WITH (UPDLOCK,HOLDLOCK)
-WHERE VisitorVisitID=@VisitID AND CompanyID=@CompanyID AND CaptureMethod='CAMERA_CAPTURE';
+SELECT BranchID,VisitorContactPointID,StatusCode FROM dbo.TDTMVisitorVisit WITH (UPDLOCK,HOLDLOCK)
+WHERE VisitorVisitID=@VisitID AND CompanyID=@CompanyID;
 """, connection, transaction);
             Add(visit, "@VisitID", SqlDbType.BigInt, visitId);
             Add(visit, "@CompanyID", SqlDbType.BigInt, companyId);
-            var status = Convert.ToString(await visit.ExecuteScalarAsync(token));
+            await using var visitReader = await visit.ExecuteReaderAsync(token);
+            if (!await visitReader.ReadAsync(token)) return NotFound(new { message = "ไม่พบรายการ Check-in" });
+            var branchId = visitReader.GetInt64(0);
+            var pointId = visitReader.GetInt64(1);
+            var status = visitReader.GetString(2);
+            await visitReader.CloseAsync();
+            if (branchId != contactPoint.BranchId || pointId != contactPoint.Id) return Forbid();
             if (status is null) return NotFound(new { message = "ไม่พบรายการ Check-in" });
 
+            if (status is not ("CHECKED_IN" or "PENDING_EVIDENCE") || (captureStage == "CHECKOUT" && status != "CHECKED_IN"))
+                return BadRequest(new { message = "รายการนี้ไม่อยู่ในสถานะที่แนบหลักฐานได้" });
+            var prefix = side?.ToLowerInvariant() ?? evidenceType.ToLowerInvariant();
             var relative = Path.Combine("uploads", "visitor", companyId.ToString(),
-                visitId.ToString(), $"{side.ToLowerInvariant()}-{Guid.NewGuid():N}.jpg");
+                visitId.ToString(), captureStage.ToLowerInvariant(), $"{prefix}-{Guid.NewGuid():N}{Path.GetExtension(file.FileName).ToLowerInvariant()}");
             var absolute = Path.Combine(environment.ContentRootPath, "wwwroot",
                 relative.Replace('/', Path.DirectorySeparatorChar));
             Directory.CreateDirectory(Path.GetDirectoryName(absolute)!);
@@ -603,11 +979,13 @@ WHERE VisitorVisitID=@VisitID AND CompanyID=@CompanyID AND CaptureMethod='CAMERA
 
             await using var insert = new SqlCommand("""
 INSERT dbo.TDTMVisitorVisitImage
-(CompanyID,VisitorVisitID,SideCode,FileRelativePath,OriginalFileName,ContentType,ContentLength,CreateBy)
-VALUES(@CompanyID,@VisitID,@Side,@Path,@Original,@ContentType,@Length,@UserID);
+ (CompanyID,VisitorVisitID,EvidenceType,CaptureStage,SideCode,FileRelativePath,OriginalFileName,ContentType,ContentLength,CreateBy)
+VALUES(@CompanyID,@VisitID,@EvidenceType,@CaptureStage,@Side,@Path,@Original,@ContentType,@Length,@UserID);
 """, connection, transaction);
             Add(insert, "@CompanyID", SqlDbType.BigInt, companyId);
             Add(insert, "@VisitID", SqlDbType.BigInt, visitId);
+            Add(insert, "@EvidenceType", SqlDbType.VarChar, evidenceType, 20);
+            Add(insert, "@CaptureStage", SqlDbType.VarChar, captureStage, 20);
             Add(insert, "@Side", SqlDbType.VarChar, side, 10);
             Add(insert, "@Path", SqlDbType.NVarChar, relative.Replace('\\', '/'), 500);
             Add(insert, "@Original", SqlDbType.NVarChar, file.FileName, 260);
@@ -624,7 +1002,9 @@ WHERE VisitorVisitID=@VisitID AND CompanyID=@CompanyID AND StatusCode='PENDING_E
             Add(finalize, "@UserID", SqlDbType.BigInt, userId);
             await finalize.ExecuteNonQueryAsync(token);
             await transaction.CommitAsync(token);
-            return Ok(new { visitorVisitId = visitId, side, statusCode = "CHECKED_IN" });
+            if (status == "PENDING_EVIDENCE")
+                await QueueHostNotificationAsync(companyId, visitId, userId, token);
+            return Ok(new { visitorVisitId = visitId, evidenceType, captureStage, side, statusCode = "CHECKED_IN" });
         }
         catch
         {
@@ -634,9 +1014,12 @@ WHERE VisitorVisitID=@VisitID AND CompanyID=@CompanyID AND StatusCode='PENDING_E
     }
 
     [HttpPost("check-ins/{visitId:long}/check-out")]
-    public async Task<IActionResult> CheckOut(long visitId, CancellationToken token)
+    public async Task<IActionResult> CheckOut(long visitId, CheckOutRequest? request, CancellationToken token)
     {
         if (!TryScope(out var companyId, out var userId)) return Forbid();
+        if (User.Identity?.IsAuthenticated == true)
+            return await CheckOutWithResult(visitId, companyId, userId,
+                request ?? new CheckOutRequest("MET", "NORMAL", null), token);
         await using var connection = await Open(token);
         if (!await Can(connection, CheckInMenu, "EDIT", token)) return Forbid();
         await using var command = new SqlCommand("""
@@ -650,6 +1033,63 @@ WHERE VisitorVisitID=@VisitID AND CompanyID=@CompanyID AND StatusCode='CHECKED_I
         return await command.ExecuteNonQueryAsync(token) == 1
             ? NoContent()
             : NotFound(new { message = "ไม่พบผู้มาติดต่อที่อยู่ภายใน" });
+    }
+
+    private async Task<IActionResult> CheckOutWithResult(long visitId, long companyId, long userId,
+        CheckOutRequest request, CancellationToken token)
+    {
+        var outcome = Clean(request.VisitOutcomeCode)?.ToUpperInvariant();
+        var reason = Clean(request.CheckoutReasonCode)?.ToUpperInvariant();
+        var note = Clean(request.CheckoutNote);
+        if (outcome is not ("MET" or "NOT_MET" or "CANCELLED") ||
+            reason is not ("NORMAL" or "HOST_ABSENT" or "VISITOR_LEFT" or "FORGOT_MEETING_CONFIRMATION" or "OTHER"))
+            return BadRequest(new { message = "ผลการเข้าพบหรือประเภท Check-out ไม่ถูกต้อง" });
+        var validPair = (outcome == "MET" && (reason is "NORMAL" or "FORGOT_MEETING_CONFIRMATION")) ||
+                        (outcome == "NOT_MET" && (reason is "HOST_ABSENT" or "VISITOR_LEFT")) || reason == "OTHER";
+        if (!validPair || (reason == "OTHER" && string.IsNullOrWhiteSpace(note)))
+            return BadRequest(new { message = "ผลการเข้าพบและประเภท Check-out ไม่สัมพันธ์กัน หรือยังไม่กรอกหมายเหตุ" });
+        await using var connection = await Open(token);
+        if (!await Can(connection, CheckInMenu, "EDIT", token)) return Forbid();
+        var point = await ActiveContactPoint(connection, null, companyId, userId, token);
+        if (point is null) return Forbid();
+        await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(IsolationLevel.Serializable, token);
+        try
+        {
+            await using var current = new SqlCommand("""
+SELECT BranchID,VisitorContactPointID,StatusCode FROM dbo.TDTMVisitorVisit WITH (UPDLOCK,HOLDLOCK)
+WHERE VisitorVisitID=@VisitID AND CompanyID=@CompanyID;
+""", connection, transaction);
+            Add(current, "@VisitID", SqlDbType.BigInt, visitId); Add(current, "@CompanyID", SqlDbType.BigInt, companyId);
+            await using var reader = await current.ExecuteReaderAsync(token);
+            if (!await reader.ReadAsync(token)) return NotFound(new { message = "ไม่พบผู้มาติดต่อ" });
+            if (reader.GetString(2) != "CHECKED_IN") return Conflict(new { message = "รายการนี้ถูก Check-out แล้วหรือไม่อยู่ภายใน" });
+            if (reader.GetInt64(0) != point.BranchId || reader.GetInt64(1) != point.Id) return Forbid();
+            await reader.CloseAsync();
+            var actorName = User.FindFirstValue(ClaimTypes.Name) ?? User.FindFirstValue("name");
+            await using var update = new SqlCommand("""
+UPDATE dbo.TDTMVisitorVisit SET StatusCode='CHECKED_OUT',CheckedOutDate=SYSUTCDATETIME(),
+VisitOutcomeCode=@Outcome,CheckoutReasonCode=@Reason,CheckoutNote=@Note,
+CheckedOutByUserID=@UserID,CheckedOutByNameSnapshot=COALESCE(NULLIF(LTRIM(RTRIM(@ActorName)),N''),CONVERT(nvarchar(30),@UserID)),
+ResultRecordedDate=SYSUTCDATETIME(),UpdateDate=SYSUTCDATETIME(),UpdateBy=@UserID
+WHERE VisitorVisitID=@VisitID AND CompanyID=@CompanyID AND StatusCode='CHECKED_IN';
+""", connection, transaction);
+            Add(update, "@VisitID", SqlDbType.BigInt, visitId); Add(update, "@CompanyID", SqlDbType.BigInt, companyId);
+            Add(update, "@Outcome", SqlDbType.VarChar, outcome, 20); Add(update, "@Reason", SqlDbType.VarChar, reason, 40);
+            Add(update, "@Note", SqlDbType.NVarChar, note, 1000); Add(update, "@UserID", SqlDbType.BigInt, userId);
+            Add(update, "@ActorName", SqlDbType.NVarChar, actorName, 200);
+            if (await update.ExecuteNonQueryAsync(token) != 1) return Conflict(new { message = "ไม่สามารถ Check-out รายการนี้ซ้ำได้" });
+            await using var audit = new SqlCommand("""
+INSERT dbo.TDTMVisitorVisitAudit(CompanyID,VisitorVisitID,FromStatusCode,ToStatusCode,OutcomeCode,ReasonCode,NoteText,ActorUserID,ActorNameSnapshot)
+VALUES(@CompanyID,@VisitID,'CHECKED_IN','CHECKED_OUT',@Outcome,@Reason,@Note,@UserID,@ActorName);
+""", connection, transaction);
+            Add(audit, "@CompanyID", SqlDbType.BigInt, companyId); Add(audit, "@VisitID", SqlDbType.BigInt, visitId);
+            Add(audit, "@Outcome", SqlDbType.VarChar, outcome, 20); Add(audit, "@Reason", SqlDbType.VarChar, reason, 40);
+            Add(audit, "@Note", SqlDbType.NVarChar, note, 1000); Add(audit, "@UserID", SqlDbType.BigInt, userId);
+            Add(audit, "@ActorName", SqlDbType.NVarChar, actorName, 200);
+            await audit.ExecuteNonQueryAsync(token); await transaction.CommitAsync(token);
+            return Ok(new { visitorVisitId = visitId, statusCode = "CHECKED_OUT", outcomeCode = outcome, reasonCode = reason });
+        }
+        catch { await transaction.RollbackAsync(token); throw; }
     }
 
     private static async Task<ContactPointContext?> ActiveContactPoint(SqlConnection connection,
@@ -672,6 +1112,256 @@ ORDER BY P.VisitorContactPointID;
             ? new ContactPointContext(reader.GetInt64(0), reader.GetInt64(1), reader.GetString(2),
                 reader.GetString(3), reader.GetString(4))
             : null;
+    }
+
+    private async Task QueueHostNotificationAsync(long companyId, long visitId, long actorUserId,
+        CancellationToken token, bool retryFailed = false)
+    {
+        // Notification is deliberately best-effort: a successful check-in must never be rolled back
+        // because the recipient has no channel or the notification service is temporarily unavailable.
+        try
+        {
+            await using var connection = await Open(token);
+            await using var visit = new SqlCommand("""
+SELECT HostType,HostEmployeeID,HostResidentID,HostServiceCustomerID,HostTenantID,HostTenantContactID,
+       VisitorName,VisitPurpose,CheckedInDate,ContactPointNameSnapshot,HostNameSnapshot
+FROM dbo.TDTMVisitorVisit
+WHERE CompanyID=@CompanyID AND VisitorVisitID=@VisitID AND StatusCode='CHECKED_IN';
+""", connection);
+            Add(visit, "@CompanyID", SqlDbType.BigInt, companyId);
+            Add(visit, "@VisitID", SqlDbType.BigInt, visitId);
+            await using var reader = await visit.ExecuteReaderAsync(token);
+            if (!await reader.ReadAsync(token)) return;
+            var hostType = reader.GetString(0);
+            var employeeId = Long(reader, 1); var residentId = Long(reader, 2);
+            var serviceCustomerId = Long(reader, 3); var tenantId = Long(reader, 4);
+            var contactId = Long(reader, 5); var visitorName = reader.GetString(6);
+            var purpose = Text(reader, 7); var checkedIn = reader.GetDateTime(8);
+            var contactPoint = Text(reader, 9); var hostName = Text(reader, 10);
+            await reader.CloseAsync();
+
+            var idempotencyKey = $"VISITOR_CHECKIN:{visitId}:IN_APP";
+            var recipient = await ResolveNotificationRecipientAsync(hostType, employeeId, residentId,
+                serviceCustomerId, tenantId, contactId, token);
+            var payload = JsonSerializer.Serialize(new
+            {
+                visitorVisitId = visitId,
+                visitorName,
+                visitPurpose = purpose,
+                checkedInDate = checkedIn,
+                contactPoint,
+                hostName,
+                hostType
+            });
+            var initialStatus = recipient is { CanNotify: true, UserId: not null }
+                ? "PENDING" : "NO_CHANNEL";
+            var outboxId = await InsertNotificationOutboxAsync(connection, companyId, visitId,
+                hostType, recipient?.UserId, recipient?.PersonId, initialStatus, idempotencyKey,
+                payload, actorUserId, token);
+            if (outboxId is null && retryFailed)
+                outboxId = await ResetFailedNotificationOutboxAsync(connection, companyId, idempotencyKey,
+                    recipient?.UserId, recipient?.PersonId, actorUserId, token);
+            if (outboxId is null || initialStatus == "NO_CHANNEL") return;
+
+            var message = $"มีผู้มาติดต่อรอพบคุณ\n\nผู้มาติดต่อ: {visitorName}\n" +
+                $"วัตถุประสงค์: {purpose ?? "-"}\nจุดติดต่อ: {contactPoint ?? "-"}\n" +
+                $"เวลาเข้า: {checkedIn.Add(ThailandOffset):HH:mm} น.";
+            using var client = new HttpClient();
+            using var request = new HttpRequestMessage(HttpMethod.Post,
+                $"{Request.Scheme}://{Request.Host}/api/notifications")
+            {
+                Content = JsonContent.Create(new
+                {
+                    companyId,
+                    recipientUserId = recipient!.UserId,
+                    sourceProject = "LAOO_VISITOR",
+                    sourceType = "VISITOR_CHECKIN",
+                    sourceId = visitId,
+                    title = "มีผู้มาติดต่อรอพบคุณ",
+                    message,
+                    payloadJson = payload,
+                    idempotencyKey
+                })
+            };
+            if (Request.Headers.TryGetValue("Authorization", out var authorization))
+                request.Headers.TryAddWithoutValidation("Authorization", authorization.ToString());
+            using var response = await client.SendAsync(request, token);
+            var responseBody = await response.Content.ReadAsStringAsync(token);
+            if (!response.IsSuccessStatusCode)
+            {
+                await UpdateNotificationOutboxAsync(connection, companyId, outboxId.Value, "FAILED",
+                    null, responseBody, actorUserId, token);
+                return;
+            }
+            using var document = JsonDocument.Parse(responseBody);
+            var root = document.RootElement;
+            var notificationId = root.TryGetProperty("notificationId", out var id) && id.TryGetInt64(out var value)
+                ? value : (long?)null;
+            var status = root.TryGetProperty("status", out var statusValue)
+                ? statusValue.GetString()?.ToUpperInvariant() : "SENT";
+            await UpdateNotificationOutboxAsync(connection, companyId, outboxId.Value,
+                status is "NO_CHANNEL" ? "NO_CHANNEL" : "SENT", notificationId, null, actorUserId, token);
+        }
+        catch
+        {
+            // A database/schema or network fault here must not alter the already committed Visit.
+        }
+    }
+
+    private async Task<NotificationRecipient?> ResolveNotificationRecipientAsync(string hostType,
+        long? employeeId, long? residentId, long? serviceCustomerId, long? tenantId, long? contactId,
+        CancellationToken token)
+    {
+        var query = $"hostType={Uri.EscapeDataString(hostType)}" +
+            $"&employeeId={employeeId}&residentId={residentId}&serviceCustomerId={serviceCustomerId}" +
+            $"&tenantId={tenantId}&contactId={contactId}";
+        using var client = new HttpClient();
+        using var request = new HttpRequestMessage(HttpMethod.Get,
+            $"{Request.Scheme}://{Request.Host}/api/company/host-notification-recipient?{query}");
+        if (Request.Headers.TryGetValue("Authorization", out var authorization))
+            request.Headers.TryAddWithoutValidation("Authorization", authorization.ToString());
+        using var response = await client.SendAsync(request, token);
+        if (!response.IsSuccessStatusCode) return null;
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(token));
+        var root = document.RootElement;
+        return new NotificationRecipient(
+            root.TryGetProperty("personId", out var person) && person.TryGetInt64(out var personId) ? personId : null,
+            root.TryGetProperty("userId", out var user) && user.ValueKind != JsonValueKind.Null && user.TryGetInt64(out var userId) ? userId : null,
+            root.TryGetProperty("canNotify", out var allowed) && allowed.GetBoolean());
+    }
+
+    private static async Task<long?> InsertNotificationOutboxAsync(SqlConnection connection,
+        long companyId, long visitId, string hostType, long? userId, long? personId, string status,
+        string idempotencyKey, string payload, long actorUserId, CancellationToken token)
+    {
+        await using var command = new SqlCommand("""
+INSERT dbo.TDTMVisitorNotificationOutbox
+ (CompanyID,VisitorVisitID,RecipientHostType,RecipientUserID,RecipientPersonID,ChannelCode,StatusCode,IdempotencyKey,PayloadSnapshotJson,CreateBy)
+OUTPUT INSERTED.VisitorNotificationOutboxID
+VALUES(@CompanyID,@VisitID,@HostType,@UserID,@PersonID,'IN_APP',@Status,@Key,@Payload,@ActorUserID);
+""", connection);
+        Add(command, "@CompanyID", SqlDbType.BigInt, companyId); Add(command, "@VisitID", SqlDbType.BigInt, visitId);
+        Add(command, "@HostType", SqlDbType.VarChar, hostType, 30); Add(command, "@UserID", SqlDbType.BigInt, userId);
+        Add(command, "@PersonID", SqlDbType.BigInt, personId); Add(command, "@Status", SqlDbType.VarChar, status, 20);
+        Add(command, "@Key", SqlDbType.NVarChar, idempotencyKey, 200); Add(command, "@Payload", SqlDbType.NVarChar, payload, -1);
+        Add(command, "@ActorUserID", SqlDbType.BigInt, actorUserId);
+        try { return Convert.ToInt64(await command.ExecuteScalarAsync(token)); }
+        catch (SqlException exception) when (exception.Number is 2601 or 2627) { return null; }
+    }
+
+    private static async Task UpdateNotificationOutboxAsync(SqlConnection connection, long companyId,
+        long outboxId, string status, long? notificationId, string? error, long actorUserId,
+        CancellationToken token)
+    {
+        await using var command = new SqlCommand("""
+UPDATE dbo.TDTMVisitorNotificationOutbox
+SET StatusCode=@Status,NotificationID=@NotificationID,LastErrorMessage=@Error,
+    AttemptCount=AttemptCount+1,FirstAttemptDate=COALESCE(FirstAttemptDate,SYSUTCDATETIME()),
+    CompletedDate=CASE WHEN @Status IN('SENT','NO_CHANNEL') THEN SYSUTCDATETIME() END,
+    UpdateDate=SYSUTCDATETIME(),UpdateBy=@ActorUserID
+WHERE CompanyID=@CompanyID AND VisitorNotificationOutboxID=@OutboxID;
+INSERT dbo.TDTMVisitorNotificationOutboxAudit
+ (CompanyID,VisitorNotificationOutboxID,FromStatusCode,ToStatusCode,DetailText,ActorUserID)
+VALUES(@CompanyID,@OutboxID,'PENDING',@Status,@Error,@ActorUserID);
+""", connection);
+        Add(command, "@CompanyID", SqlDbType.BigInt, companyId); Add(command, "@OutboxID", SqlDbType.BigInt, outboxId);
+        Add(command, "@Status", SqlDbType.VarChar, status, 20); Add(command, "@NotificationID", SqlDbType.BigInt, notificationId);
+        Add(command, "@Error", SqlDbType.NVarChar, error, 2000); Add(command, "@ActorUserID", SqlDbType.BigInt, actorUserId);
+        await command.ExecuteNonQueryAsync(token);
+    }
+
+    private static async Task<long?> ResetFailedNotificationOutboxAsync(SqlConnection connection,
+        long companyId, string idempotencyKey, long? userId, long? personId, long actorUserId,
+        CancellationToken token)
+    {
+        await using var command = new SqlCommand("""
+UPDATE dbo.TDTMVisitorNotificationOutbox
+SET RecipientUserID=@UserID,RecipientPersonID=@PersonID,StatusCode='PENDING',
+    LastErrorMessage=NULL,UpdateDate=SYSUTCDATETIME(),UpdateBy=@ActorUserID
+OUTPUT INSERTED.VisitorNotificationOutboxID
+WHERE CompanyID=@CompanyID AND IdempotencyKey=@Key AND StatusCode='FAILED';
+""", connection);
+        Add(command, "@CompanyID", SqlDbType.BigInt, companyId);
+        Add(command, "@Key", SqlDbType.NVarChar, idempotencyKey, 200);
+        Add(command, "@UserID", SqlDbType.BigInt, userId);
+        Add(command, "@PersonID", SqlDbType.BigInt, personId);
+        Add(command, "@ActorUserID", SqlDbType.BigInt, actorUserId);
+        var id = await command.ExecuteScalarAsync(token);
+        if (id is null) return null;
+        var outboxId = Convert.ToInt64(id);
+        await using var audit = new SqlCommand("""
+INSERT dbo.TDTMVisitorNotificationOutboxAudit
+ (CompanyID,VisitorNotificationOutboxID,FromStatusCode,ToStatusCode,DetailText,ActorUserID)
+VALUES(@CompanyID,@OutboxID,'FAILED','PENDING',N'ผู้ใช้สั่งลองส่งใหม่',@ActorUserID);
+""", connection);
+        Add(audit, "@CompanyID", SqlDbType.BigInt, companyId);
+        Add(audit, "@OutboxID", SqlDbType.BigInt, outboxId);
+        Add(audit, "@ActorUserID", SqlDbType.BigInt, actorUserId);
+        await audit.ExecuteNonQueryAsync(token);
+        return outboxId;
+    }
+
+    private async Task<HostIdentitySet> CurrentHostIdentities(CancellationToken token)
+    {
+        using var client = new HttpClient();
+        using var request = new HttpRequestMessage(HttpMethod.Get,
+            $"{Request.Scheme}://{Request.Host}/api/company/current-user/host-identities");
+        if (Request.Headers.TryGetValue("Authorization", out var authorization))
+            request.Headers.TryAddWithoutValidation("Authorization", authorization.ToString());
+        using var response = await client.SendAsync(request, token);
+        var body = await response.Content.ReadAsStringAsync(token);
+        if (!response.IsSuccessStatusCode)
+            throw new InvalidOperationException("ไม่สามารถตรวจสอบสิทธิ์ผู้รับรองได้ กรุณาเข้าสู่ระบบใหม่");
+        using var document = JsonDocument.Parse(body);
+        static HashSet<long> Values(JsonElement root, string name) => root.TryGetProperty(name, out var array) && array.ValueKind == JsonValueKind.Array
+            ? array.EnumerateArray().Where(value => value.TryGetInt64(out _)).Select(value => value.GetInt64()).ToHashSet() : [];
+        var root = document.RootElement;
+        return new HostIdentitySet(Values(root, "employeeIds"), Values(root, "residentIds"),
+            Values(root, "serviceCustomerIds"), Values(root, "tenantContactIds"));
+    }
+
+    private static async Task<List<object>> HostPendingRows(SqlConnection connection, long companyId,
+        HostIdentitySet identities, CancellationToken token)
+    {
+        await using var command = new SqlCommand("""
+SELECT V.VisitorVisitID,V.VisitorName,V.HostType,V.HostEmployeeID,V.HostResidentID,V.HostServiceCustomerID,V.HostTenantContactID,
+       V.HostNameSnapshot,V.ContactPointNameSnapshot,V.VisitPurpose,V.CheckedInDate
+FROM dbo.TDTMVisitorVisit V
+WHERE V.CompanyID=@CompanyID AND V.StatusCode='CHECKED_IN'
+  AND NOT EXISTS(SELECT 1 FROM dbo.TDTMVisitorHostConfirmation C WHERE C.CompanyID=V.CompanyID AND C.VisitorVisitID=V.VisitorVisitID)
+ORDER BY V.CheckedInDate,V.VisitorVisitID;
+""", connection);
+        Add(command, "@CompanyID", SqlDbType.BigInt, companyId);
+        await using var reader = await command.ExecuteReaderAsync(token);
+        var items = new List<object>();
+        while (await reader.ReadAsync(token))
+        {
+            var hostType = reader.GetString(2); var employee = Long(reader, 3); var resident = Long(reader, 4);
+            var customer = Long(reader, 5); var contact = Long(reader, 6);
+            if (!identities.Matches(hostType, employee, resident, customer, contact)) continue;
+            items.Add(new { visitorVisitId = reader.GetInt64(0), visitorName = reader.GetString(1), hostName = Text(reader, 7),
+                contactPointName = Text(reader, 8), visitPurpose = Text(reader, 9), checkedInDate = reader.GetDateTime(10) });
+        }
+        return items;
+    }
+
+    private static async Task<object?> HostVisit(SqlConnection connection, long companyId, long visitId,
+        HostIdentitySet identities, CancellationToken token, SqlTransaction? transaction = null)
+    {
+        await using var command = new SqlCommand("""
+SELECT V.VisitorVisitID,V.VisitorName,V.Phone,V.HostType,V.HostEmployeeID,V.HostResidentID,V.HostServiceCustomerID,V.HostTenantContactID,
+       V.HostNameSnapshot,V.HostLocationSnapshot,V.ContactPointNameSnapshot,V.VisitPurpose,V.CheckedInDate
+FROM dbo.TDTMVisitorVisit V WHERE V.CompanyID=@CompanyID AND V.VisitorVisitID=@VisitID AND V.StatusCode='CHECKED_IN'
+  AND NOT EXISTS(SELECT 1 FROM dbo.TDTMVisitorHostConfirmation C WHERE C.CompanyID=V.CompanyID AND C.VisitorVisitID=V.VisitorVisitID);
+""", connection, transaction);
+        Add(command, "@CompanyID", SqlDbType.BigInt, companyId); Add(command, "@VisitID", SqlDbType.BigInt, visitId);
+        await using var reader = await command.ExecuteReaderAsync(token);
+        if (!await reader.ReadAsync(token)) return null;
+        var hostType = reader.GetString(3);
+        if (!identities.Matches(hostType, Long(reader, 4), Long(reader, 5), Long(reader, 6), Long(reader, 7))) return null;
+        return new { visitorVisitId = reader.GetInt64(0), visitorName = reader.GetString(1), phone = Text(reader, 2), hostType,
+            hostName = Text(reader, 8), hostLocation = Text(reader, 9), contactPointName = Text(reader, 10),
+            visitPurpose = Text(reader, 11), checkedInDate = reader.GetDateTime(12) };
     }
 
     private async Task<SettingsState> LoadSettings(
@@ -733,6 +1423,24 @@ ORDER BY EffectiveFrom DESC,VersionNo DESC;
     private async Task<bool> Can(SqlConnection connection, string menu, string action, CancellationToken token) =>
         await CompanyMenuAccess.IsAllowedAsync(connection, User, menu, action, token);
 
+    private static async Task<List<Dictionary<string, object?>>> ReadRows(
+        SqlConnection connection, string sql, long companyId, long visitId, CancellationToken token)
+    {
+        await using var command = new SqlCommand(sql, connection);
+        Add(command, "@CompanyID", SqlDbType.BigInt, companyId);
+        Add(command, "@VisitID", SqlDbType.BigInt, visitId);
+        await using var reader = await command.ExecuteReaderAsync(token);
+        var rows = new List<Dictionary<string, object?>>();
+        while (await reader.ReadAsync(token))
+        {
+            var row = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+            for (var i = 0; i < reader.FieldCount; i++)
+                row[reader.GetName(i)] = reader.IsDBNull(i) ? null : reader.GetValue(i);
+            rows.Add(row);
+        }
+        return rows;
+    }
+
     private async Task<bool> BranchExists(SqlConnection connection, long companyId, long branchId, CancellationToken token)
     {
         await using var command = new SqlCommand(
@@ -741,6 +1449,36 @@ ORDER BY EffectiveFrom DESC,VersionNo DESC;
         Add(command, "@CompanyID", SqlDbType.BigInt, companyId);
         Add(command, "@BranchID", SqlDbType.BigInt, branchId);
         return Convert.ToInt64(await command.ExecuteScalarAsync(token)) > 0;
+    }
+
+    private static async Task<bool> IsApprovedAppointment(SqlConnection connection, SqlTransaction transaction,
+        long companyId, long appointmentId, string visitorName, string? phone, string hostType,
+        long? employeeId, long? residentId, long? serviceCustomerId, long? tenantId, long? tenantContactId,
+        CancellationToken token)
+    {
+        await using var command = new SqlCommand("""
+SELECT COUNT_BIG(1)
+FROM dbo.TDTMVisitorAppointment WITH (UPDLOCK,HOLDLOCK)
+WHERE CompanyID=@CompanyID AND VisitorAppointmentID=@AppointmentID AND StatusCode='APPROVED'
+  AND VisitorName=@VisitorName AND (Phone=@Phone OR (Phone IS NULL AND @Phone IS NULL))
+  AND HostType=@HostType
+  AND (HostEmployeeID=@EmployeeID OR (HostEmployeeID IS NULL AND @EmployeeID IS NULL))
+  AND (HostResidentID=@ResidentID OR (HostResidentID IS NULL AND @ResidentID IS NULL))
+  AND (HostServiceCustomerID=@ServiceCustomerID OR (HostServiceCustomerID IS NULL AND @ServiceCustomerID IS NULL))
+  AND (HostTenantID=@TenantID OR (HostTenantID IS NULL AND @TenantID IS NULL))
+  AND (HostTenantContactID=@TenantContactID OR (HostTenantContactID IS NULL AND @TenantContactID IS NULL));
+""", connection, transaction);
+        Add(command, "@CompanyID", SqlDbType.BigInt, companyId);
+        Add(command, "@AppointmentID", SqlDbType.BigInt, appointmentId);
+        Add(command, "@VisitorName", SqlDbType.NVarChar, visitorName, 200);
+        Add(command, "@Phone", SqlDbType.NVarChar, phone, 50);
+        Add(command, "@HostType", SqlDbType.VarChar, hostType, 20);
+        Add(command, "@EmployeeID", SqlDbType.BigInt, employeeId);
+        Add(command, "@ResidentID", SqlDbType.BigInt, residentId);
+        Add(command, "@ServiceCustomerID", SqlDbType.BigInt, serviceCustomerId);
+        Add(command, "@TenantID", SqlDbType.BigInt, tenantId);
+        Add(command, "@TenantContactID", SqlDbType.BigInt, tenantContactId);
+        return Convert.ToInt64(await command.ExecuteScalarAsync(token)) == 1;
     }
 
     private static async Task<string> BusinessType(SqlConnection connection, long companyId,
@@ -774,13 +1512,17 @@ FROM dbo.TDSTCompanySetUp WHERE CompanyID=@CompanyID;
             throw new InvalidOperationException(string.IsNullOrWhiteSpace(body)
                 ? "Shared Host API request failed." : body);
         using var document = JsonDocument.Parse(body);
-        return document.RootElement.Clone();
+        var root = document.RootElement;
+        return root.ValueKind == JsonValueKind.Object && root.TryGetProperty("items", out var items)
+            ? items.Clone()
+            : root.Clone();
     }
 
     private async Task<HostSnapshot?> LoadSharedHostSnapshot(string hostType, long? tenantId,
-        long? contactId, long? residentId, CancellationToken token)
+        long? contactId, long? residentId, long? employeeId, CancellationToken token)
     {
-        var rows = await SharedHostRows(hostType, null, token);
+        var sharedType = hostType == "EMPLOYEE" ? "COMPANY" : hostType;
+        var rows = await SharedHostRows(sharedType, null, token);
         foreach (var row in rows.EnumerateArray())
         {
             var tenant = row.TryGetProperty("tenantId", out var tenantValue) ? tenantValue.GetInt64() : (long?)null;
@@ -801,6 +1543,15 @@ FROM dbo.TDSTCompanySetUp WHERE CompanyID=@CompanyID;
                     .Select(key => row.TryGetProperty(key, out var value) ? value.GetString() : null)
                     .Where(value => !string.IsNullOrWhiteSpace(value)));
                 return new HostSnapshot(name, location, name, null, null, null);
+            }
+            if (hostType == "EMPLOYEE" &&
+                row.TryGetProperty("employeeId", out var employeeValue) &&
+                employeeValue.ValueKind != JsonValueKind.Null && employeeValue.GetInt64() == employeeId)
+            {
+                var name = row.GetProperty("displayName").GetString()!;
+                var branch = row.TryGetProperty("branchName", out var branchValue)
+                    ? branchValue.GetString() : null;
+                return new HostSnapshot(name, branch, null, null, null, null);
             }
         }
         return null;
@@ -864,7 +1615,15 @@ WHERE SC.CompanyID=@CompanyID AND SC.ServiceCustomerID=@ID AND SC.IsActive=1;
     private static DateOnly ThailandDate() => DateOnly.FromDateTime(DateTime.UtcNow.Add(ThailandOffset));
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     private static string? Text(SqlDataReader reader, int index) => reader.IsDBNull(index) ? null : reader.GetString(index);
+    private static DateTime? Date(SqlDataReader reader, int index) => reader.IsDBNull(index) ? null : reader.GetDateTime(index);
     private static long? Long(SqlDataReader reader, int index) => reader.IsDBNull(index) ? null : reader.GetInt64(index);
+    private static bool IsWithinRoot(string root, string file)
+    {
+        var relative = Path.GetRelativePath(root, file);
+        return relative != ".." &&
+            !relative.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal) &&
+            !Path.IsPathRooted(relative);
+    }
     private static string? MaskNationalId(string? value) =>
         value is null ? null : new string('*', Math.Max(0, value.Length - 4)) + value[^Math.Min(4, value.Length)..];
 
@@ -911,4 +1670,20 @@ WHERE SC.CompanyID=@CompanyID AND SC.ServiceCustomerID=@ID AND SC.IsActive=1;
 
     private sealed record ContactPointContext(long Id, long BranchId, string Code, string Name,
         string BranchName);
+
+    private sealed record NotificationRecipient(long? PersonId, long? UserId, bool CanNotify);
+
+    private sealed record HostIdentitySet(HashSet<long> EmployeeIds, HashSet<long> ResidentIds,
+        HashSet<long> ServiceCustomerIds, HashSet<long> TenantContactIds)
+    {
+        public bool Matches(string hostType, long? employeeId, long? residentId, long? serviceCustomerId,
+            long? tenantContactId) => hostType switch
+        {
+            "EMPLOYEE" => employeeId is not null && EmployeeIds.Contains(employeeId.Value),
+            "RESIDENT" or "VILLAGE" => residentId is not null && ResidentIds.Contains(residentId.Value),
+            "SERVICE_CUSTOMER" => serviceCustomerId is not null && ServiceCustomerIds.Contains(serviceCustomerId.Value),
+            "RENTAL_OFFICE" => tenantContactId is not null && TenantContactIds.Contains(tenantContactId.Value),
+            _ => false,
+        };
+    }
 }

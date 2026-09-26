@@ -40,15 +40,20 @@ class _VisitorContactPointsPageState extends State<VisitorContactPointsPage> {
       final r = VisitorContactPointsRepository(_api);
       final a = await r.actions();
       final l = await r.list(search: _search.text.trim(), page: page);
-      if (mounted)
+      if (mounted) {
         setState(() {
           _actions = a;
           _list = l;
         });
+      }
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString());
+      if (mounted) {
+        setState(() => _error = e.toString());
+      }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -65,8 +70,9 @@ class _VisitorContactPointsPageState extends State<VisitorContactPointsPage> {
   );
   Widget _body(BuildContext c) {
     final l = _list;
-    if (_loading && l == null)
+    if (_loading && l == null) {
       return const Center(child: CircularProgressIndicator());
+    }
     return ListView(
       padding: const EdgeInsets.all(10),
       children: [
@@ -141,11 +147,12 @@ class _VisitorContactPointsPageState extends State<VisitorContactPointsPage> {
     ),
   );
   Widget _table(BuildContext c, VisitorContactPointList? l) {
-    if (l == null)
+    if (l == null) {
       return const SizedBox(
         height: 120,
         child: Center(child: Text('ไม่พบข้อมูล')),
       );
+    }
     return Column(
       children: [
         for (final x in l.items)
@@ -157,8 +164,7 @@ class _VisitorContactPointsPageState extends State<VisitorContactPointsPage> {
                 Text(
                   '${x.branchCode ?? ''} — ${x.branchName ?? ''} · พนักงาน ${x.employeeCount} คน',
                 ),
-                if (x.employeeNames?.isNotEmpty == true)
-                  Text(x.employeeNames!),
+                if (x.employeeNames?.isNotEmpty == true) Text(x.employeeNames!),
               ],
             ),
             trailing: Wrap(
@@ -375,7 +381,8 @@ class _PointDialogState extends State<_PointDialog> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<int>(
-              value: _branch,
+              key: ValueKey(_branch),
+              initialValue: _branch,
               decoration: const InputDecoration(labelText: 'สาขา *'),
               items: _lookups?.branches
                   .map(
@@ -400,10 +407,11 @@ class _PointDialogState extends State<_PointDialog> {
                   title: Text('${e.code} — ${e.name}'),
                   subtitle: e.available ? null : const Text('ประจำจุดอื่นแล้ว'),
                   onChanged: (v) => setState(() {
-                    if (v == true)
+                    if (v == true) {
                       _employees.add(e.id);
-                    else
+                    } else {
                       _employees.remove(e.id);
+                    }
                   }),
                 ),
             if (_error != null)

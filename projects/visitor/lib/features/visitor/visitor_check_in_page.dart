@@ -23,6 +23,7 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
   final _nationalId = TextEditingController();
   final _host = TextEditingController();
   final _purpose = TextEditingController();
+  final _appointmentSearch = TextEditingController();
   final _picker = ImagePicker();
   late final VisitorApiClient _api;
   VisitorSettings? _settings;
@@ -30,6 +31,8 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
   VisitorCheckInContext? _checkInContext;
   List<VisitorRoomOption> _roomOptions = const [];
   List<VisitorHostOption> _hostOptions = const [];
+  List<dynamic> _appointmentOptions = const [];
+  int? _appointmentId;
   List<Map<String, dynamic>> _rentalTenants = const [];
   List<Map<String, dynamic>> _rentalContacts = const [];
   List<Map<String, dynamic>> _villageLanes = const [];
@@ -44,6 +47,8 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
   DateTime? _expiry;
   XFile? _cardImage;
   Uint8List? _cardImageBytes;
+  final _vehicleImages = <Uint8List>[];
+  final _otherImages = <Uint8List>[];
   bool _loading = true;
   bool _saving = false;
   String? _message;
@@ -58,7 +63,14 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
 
   @override
   void dispose() {
-    for (final controller in [_name, _phone, _nationalId, _host, _purpose]) {
+    for (final controller in [
+      _name,
+      _phone,
+      _nationalId,
+      _host,
+      _purpose,
+      _appointmentSearch,
+    ]) {
       controller.dispose();
     }
     _api.dispose();
@@ -120,13 +132,63 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
     }
   }
 
+  Future<void> _findAppointments() async {
+    final term = _appointmentSearch.text.trim();
+    if (term.isEmpty) {
+      _show('กรุณาระบุชื่อหรือเบอร์โทรศัพท์เพื่อตรวจนัดหมาย', error: true);
+      return;
+    }
+    try {
+      final root = Map<String, dynamic>.from(
+        await _api.get(
+              '/api/visitor/appointments/approved-lookup',
+              query: {'search': term},
+            )
+            as Map,
+      );
+      if (mounted) {
+        setState(
+          () => _appointmentOptions = root['items'] as List? ?? const [],
+        );
+      }
+    } catch (error) {
+      if (mounted) _show(error.toString(), error: true);
+    }
+  }
+
+  void _applyAppointment(Map<dynamic, dynamic> item) {
+    final type = item['hostType']?.toString() ?? '';
+    setState(() {
+      _appointmentId = (item['visitorAppointmentId'] as num?)?.toInt();
+      _name.text = item['visitorName']?.toString() ?? '';
+      _phone.text = item['phone']?.toString() ?? '';
+      _purpose.text = item['visitPurpose']?.toString() ?? '';
+      _hostType = type;
+      if (type == 'EMPLOYEE') {
+        _host.text = item['hostEmployeeId']?.toString() ?? '';
+      }
+      if (type == 'RESIDENT' || type == 'VILLAGE') {
+        _host.text = item['hostResidentId']?.toString() ?? '';
+      }
+      if (type == 'SERVICE_CUSTOMER') {
+        _host.text = item['hostServiceCustomerId']?.toString() ?? '';
+      }
+      if (type == 'RENTAL_OFFICE') {
+        _tenantId = (item['hostTenantId'] as num?)?.toInt();
+        _tenantContactId = (item['hostTenantContactId'] as num?)?.toInt();
+      }
+    });
+    _loadHostOptions();
+  }
+
   Future<void> _loadRental() async {
     final data = await VisitorSettingsRepository(_api).rentalHosts();
-    if (mounted)
+    if (mounted) {
       setState(() {
         _rentalTenants = data.tenants;
         _rentalContacts = data.contacts;
       });
+    }
   }
 
   Future<void> _loadVillageLanes() async {
@@ -161,20 +223,50 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
       if (image != null && mounted) {
         final source = await image.readAsBytes();
         final bytes = _prepareCardImage(source);
-        if (mounted)
+        if (mounted) {
           setState(() {
             _cardImage = image;
             _cardImageBytes = bytes;
           });
+        }
       }
     } catch (error) {
       if (mounted) _show(error.toString(), error: true);
     }
   }
 
-  Uint8List _prepareCardImage(Uint8List source) {
-    if (source.length <= _maximumCardImageBytes) return source;
+  Future<void> _pickEvidenceImages(List<Uint8List> target) async {
+    try {
+      final files = await _picker.pickMultiImage(imageQuality: 85);
+      if (files.isEmpty) return;
+      final images = <Uint8List>[];
+      for (final file in files) {
+        images.add(_prepareCardImage(await file.readAsBytes()));
+      }
+      if (mounted) setState(() => target.addAll(images));
+    } catch (error) {
+      if (mounted) _show(error.toString(), error: true);
+    }
+  }
 
+  Future<void> _takeEvidenceImage(List<Uint8List> target) async {
+    try {
+      final file = await _picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 85,
+      );
+      if (file == null) return;
+      final bytes = _prepareCardImage(await file.readAsBytes());
+      if (mounted) setState(() => target.add(bytes));
+    } catch (error) {
+      if (mounted) _show(error.toString(), error: true);
+    }
+  }
+
+  Uint8List _prepareCardImage(Uint8List source) {
+    // Always decode and re-encode. Web camera/file pickers can return WEBP
+    // bytes even when the selected file is presented as JPG/PNG. The API
+    // upload contract requires an actual JPEG payload, not only a .jpg name.
     var decoded = img.decodeImage(source);
     if (decoded == null) {
       throw const FormatException('ไม่สามารถอ่านไฟล์ภาพบัตรได้');
@@ -188,7 +280,7 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
 
     var working = decoded;
     while (true) {
-      for (var quality = 90; quality >= 30; quality -= 10) {
+      for (var quality = 95; quality >= 30; quality -= 5) {
         final compressed = Uint8List.fromList(
           img.encodeJpg(working, quality: quality),
         );
@@ -263,7 +355,10 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
                     ? null
                     : _dateOnly(_expiry!),
                 'hostType': _hostType,
-                'hostEmployeeId': null,
+                'hostEmployeeId':
+                    _hostType == 'EMPLOYEE' && _host.text.trim().isNotEmpty
+                    ? int.tryParse(_host.text.trim())
+                    : null,
                 'hostResidentId':
                     (_hostType == 'RESIDENT' || _hostType == 'VILLAGE') &&
                         _host.text.trim().isNotEmpty
@@ -284,6 +379,7 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
                     : _purpose.text.trim(),
                 'captureMethod': captureMethod,
                 'requestId': 'VIS-${DateTime.now().microsecondsSinceEpoch}',
+                'visitorAppointmentId': _appointmentId,
               },
             )
             as Map,
@@ -294,7 +390,27 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
           '/api/visitor/check-ins/$visitId/images',
           bytes: _cardImageBytes!,
           fileName: 'visitor-card.jpg',
-          fields: {'side': 'FRONT'},
+          fields: {
+            'evidenceType': 'DOCUMENT',
+            'captureStage': 'CHECKIN',
+            'side': 'FRONT',
+          },
+        );
+      }
+      for (final bytes in _vehicleImages) {
+        await _api.upload(
+          '/api/visitor/check-ins/$visitId/images',
+          bytes: bytes,
+          fileName: 'checkin-vehicle.jpg',
+          fields: {'evidenceType': 'VEHICLE', 'captureStage': 'CHECKIN'},
+        );
+      }
+      for (final bytes in _otherImages) {
+        await _api.upload(
+          '/api/visitor/check-ins/$visitId/images',
+          bytes: bytes,
+          fileName: 'checkin-other.jpg',
+          fields: {'evidenceType': 'OTHER', 'captureStage': 'CHECKIN'},
         );
       }
       if (mounted) {
@@ -315,12 +431,17 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
     _nationalId.clear();
     _host.clear();
     _purpose.clear();
+    _appointmentSearch.clear();
     setState(() {
       _expiry = null;
       _cardImage = null;
       _cardImageBytes = null;
+      _vehicleImages.clear();
+      _otherImages.clear();
       _roomId = null;
       _hostOptions = const [];
+      _appointmentOptions = const [];
+      _appointmentId = null;
     });
   }
 
@@ -345,7 +466,7 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
   Widget _content(BuildContext context) {
     if (_loading) return const Center(child: CircularProgressIndicator());
     final settings = _settings;
-    if (settings == null)
+    if (settings == null) {
       return Center(
         child: FilledButton.icon(
           onPressed: _load,
@@ -353,6 +474,7 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
           label: const Text('ลองใหม่'),
         ),
       );
+    }
     return ListView(
       padding: const EdgeInsets.all(10),
       children: [
@@ -362,15 +484,29 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
           Column(
             children: [
               _contactPointField(context),
-              _field(_name, 'ชื่อผู้มาติดต่อ *'),
+              _appointmentLookup(context),
+              const SizedBox(height: 12),
+              _field(
+                _name,
+                'ชื่อผู้มาติดต่อ *',
+                enabled: _appointmentId == null,
+              ),
               _field(
                 _phone,
                 settings.requireVisitorPhone
                     ? 'เบอร์โทรศัพท์ *'
                     : 'เบอร์โทรศัพท์',
                 keyboard: TextInputType.phone,
+                enabled: _appointmentId == null,
               ),
-              if (_companyContext != null) _hostSelector(context, settings),
+              if (_companyContext != null)
+                IgnorePointer(
+                  ignoring: _appointmentId != null,
+                  child: Opacity(
+                    opacity: _appointmentId == null ? 1 : .62,
+                    child: _hostSelector(context, settings),
+                  ),
+                ),
               _field(
                 _nationalId,
                 settings.requireNationalIdNumber
@@ -413,6 +549,7 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
                 settings.requireVisitPurpose
                     ? 'วัตถุประสงค์ *'
                     : 'วัตถุประสงค์',
+                enabled: _appointmentId == null,
               ),
             ],
           ),
@@ -464,6 +601,10 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
             ),
           ),
         ],
+        const SizedBox(height: 6),
+        _card(context, 'รูปรถขาเข้า', _evidenceImagesField(_vehicleImages)),
+        const SizedBox(height: 6),
+        _card(context, 'รูปอื่นขาเข้า', _evidenceImagesField(_otherImages)),
         const SizedBox(height: 12),
         Align(
           alignment: Alignment.centerRight,
@@ -480,6 +621,91 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
         ),
       ],
     );
+  }
+
+  Widget _appointmentLookup(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _appointmentSearch,
+              decoration: const InputDecoration(
+                prefixIcon: Icon(Icons.event_available_outlined),
+                hintText: 'ค้นหานัดหมายที่อนุมัติแล้ว',
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          FilledButton(
+            onPressed: _findAppointments,
+            child: const Text('ค้นหา'),
+          ),
+        ],
+      ),
+      if (_appointmentOptions.isNotEmpty) ...[
+        const SizedBox(height: 8),
+        DropdownButtonFormField<int>(
+          initialValue: _appointmentId,
+          isExpanded: true,
+          decoration: const InputDecoration(labelText: 'เลือกนัดหมาย'),
+          items: _appointmentOptions.map((raw) {
+            final item = Map<dynamic, dynamic>.from(raw as Map);
+            return DropdownMenuItem<int>(
+              value: (item['visitorAppointmentId'] as num).toInt(),
+              child: Text(
+                '${item['visitorName']} — ${item['appointmentDate']}',
+                overflow: TextOverflow.ellipsis,
+              ),
+            );
+          }).toList(),
+          onChanged: (value) {
+            if (value == null) return;
+            final item = _appointmentOptions
+                .map((raw) => Map<dynamic, dynamic>.from(raw as Map))
+                .firstWhere(
+                  (row) =>
+                      (row['visitorAppointmentId'] as num).toInt() == value,
+                );
+            _applyAppointment(item);
+          },
+        ),
+      ],
+      if (_appointmentId != null) ...[
+        const SizedBox(height: 8),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.primaryContainer,
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            child: Row(
+              children: [
+                const Icon(Icons.lock_outline, size: 18),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text('กำลังใช้ข้อมูลจากนัดหมายที่อนุมัติแล้ว'),
+                ),
+                TextButton(
+                  onPressed: _clearAppointment,
+                  child: const Text('ไม่ใช้นัดนี้'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    ],
+  );
+
+  void _clearAppointment() {
+    setState(() {
+      _appointmentId = null;
+      _appointmentOptions = const [];
+      _appointmentSearch.clear();
+    });
   }
 
   Widget _hostSelector(BuildContext context, VisitorSettings settings) {
@@ -575,7 +801,8 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
           ),
           const SizedBox(height: 8),
           DropdownButtonFormField<int>(
-            value: _roomOptions.any((option) => option.id == _roomId)
+            key: ValueKey('room:$_roomId:${_roomOptions.length}'),
+            initialValue: _roomOptions.any((option) => option.id == _roomId)
                 ? _roomId
                 : null,
             isExpanded: true,
@@ -606,6 +833,8 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
           decoration: InputDecoration(
             labelText: _hostType == 'RESIDENT'
                 ? 'ค้นหาชื่อหรือเบอร์โทรผู้พักอาศัย'
+                : _hostType == 'EMPLOYEE'
+                ? 'ค้นหาชื่อหรือเบอร์โทรพนักงาน'
                 : 'ค้นหาชื่อหรือเบอร์โทรผู้ใช้บริการ',
             hintText: _companyContext!.isDormitory && _roomId == null
                 ? 'เลือกห้องพักก่อนค้นหา'
@@ -616,7 +845,8 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
         ),
         const SizedBox(height: 8),
         DropdownButtonFormField<int>(
-          value:
+          key: ValueKey('host:${_host.text}:${_hostOptions.length}'),
+          initialValue:
               _hostOptions.any(
                 (option) => option.id == int.tryParse(_host.text),
               )
@@ -654,6 +884,8 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
               child: Text(
                 _hostType == 'RESIDENT'
                     ? 'ผู้รับรอง: ${_selectedHost!.name}\nอาคาร: ${_selectedHost!.building}  ชั้น: ${_selectedHost!.floor}  ห้อง: ${_selectedHost!.room}'
+                    : _hostType == 'EMPLOYEE'
+                    ? 'ผู้รับรอง: ${_selectedHost!.name}${_selectedHost!.building == null ? '' : '\nสาขา: ${_selectedHost!.building}'}${_selectedHost!.phone == null ? '' : '\nเบอร์โทร: ${_selectedHost!.phone}'}'
                     : 'ผู้รับรอง: ${_selectedHost!.name}${_selectedHost!.phone == null ? '' : '\nเบอร์โทร: ${_selectedHost!.phone}'}',
               ),
             ),
@@ -670,7 +902,8 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
     String Function(Map<String, dynamic>) text,
     ValueChanged<int?> changed,
   ) => DropdownButtonFormField<int>(
-    value:
+    key: ValueKey('$label:$value:${rows.length}'),
+    initialValue:
         rows.any(
           (x) =>
               (x['id'] as num?)?.toInt() == value ||
@@ -719,6 +952,7 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
     TextEditingController controller,
     String label, {
     TextInputType? keyboard,
+    bool enabled = true,
   }) {
     if (identical(controller, _host)) return const SizedBox.shrink();
     return Padding(
@@ -726,6 +960,7 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
       child: TextField(
         controller: controller,
         keyboardType: keyboard,
+        enabled: enabled,
         decoration: InputDecoration(labelText: label),
       ),
     );
@@ -743,6 +978,93 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
           const SizedBox(height: 12),
           child,
         ],
+      ),
+    ),
+  );
+
+  Widget _evidenceImagesField(List<Uint8List> images) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          OutlinedButton.icon(
+            onPressed: _saving ? null : () => _pickEvidenceImages(images),
+            icon: const Icon(Icons.photo_library_outlined),
+            label: const Text('เลือกรูป'),
+          ),
+          OutlinedButton.icon(
+            onPressed: _saving ? null : () => _takeEvidenceImage(images),
+            icon: const Icon(Icons.photo_camera_outlined),
+            label: const Text('ถ่ายรูป'),
+          ),
+        ],
+      ),
+      if (images.isNotEmpty) ...[
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: List.generate(
+            images.length,
+            (index) => Stack(
+              children: [
+                InkWell(
+                  onTap: () => _previewImage(images[index]),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: Image.memory(
+                      images[index],
+                      width: 112,
+                      height: 84,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: 0,
+                  right: 0,
+                  child: IconButton(
+                    tooltip: 'ลบรูปก่อนบันทึก',
+                    onPressed: _saving
+                        ? null
+                        : () => setState(() => images.removeAt(index)),
+                    icon: const Icon(Icons.cancel_outlined),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    ],
+  );
+
+  Future<void> _previewImage(Uint8List bytes) => showDialog<void>(
+    context: context,
+    builder: (context) => Dialog(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 640, maxHeight: 720),
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Column(
+            children: [
+              Align(
+                alignment: Alignment.centerRight,
+                child: IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close),
+                ),
+              ),
+              Expanded(
+                child: InteractiveViewer(
+                  child: Image.memory(bytes, fit: BoxFit.contain),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     ),
   );

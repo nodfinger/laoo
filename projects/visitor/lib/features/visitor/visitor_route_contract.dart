@@ -52,7 +52,7 @@ abstract final class VisitorRoutes {
       screenType: 3,
       routeName: 'visitorHistory',
       routePath: '/visitor/history',
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: VisitorProject.code,
@@ -60,7 +60,7 @@ abstract final class VisitorRoutes {
       screenType: 1,
       routeName: 'preRegister',
       routePath: '/visitor/pre-register',
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: VisitorProject.code,
@@ -68,7 +68,7 @@ abstract final class VisitorRoutes {
       screenType: 3,
       routeName: 'approvalStatus',
       routePath: '/visitor/approval-status',
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: VisitorProject.code,
@@ -76,7 +76,7 @@ abstract final class VisitorRoutes {
       screenType: 2,
       routeName: 'hostConfirm',
       routePath: '/visitor/host-confirm',
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: VisitorProject.code,
