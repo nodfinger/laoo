@@ -13,9 +13,19 @@ import '../data/service_request_api.dart';
 import '../../service_request_qr/data/service_request_qr_api.dart';
 
 class ServiceRequestPage extends StatefulWidget {
-  const ServiceRequestPage({super.key, this.selfService = false, this.qrToken});
+  const ServiceRequestPage({
+    super.key,
+    this.selfService = false,
+    this.qrToken,
+    this.readOnly = false,
+    this.menuCode,
+    this.routeName,
+  });
   final bool selfService;
   final String? qrToken;
+  final bool readOnly;
+  final String? menuCode;
+  final String? routeName;
   @override
   State<ServiceRequestPage> createState() => _ServiceRequestPageState();
 }
@@ -68,10 +78,13 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
       final actions = await _api.actions();
       if (mounted) {
         setState(() {
-          _canCreate = widget.selfService
+          _canCreate = !widget.readOnly && widget.selfService
               ? actions['selfCreate'] == true
-              : actions['create'] == true;
-          _canEdit = !widget.selfService && actions['edit'] == true;
+              : !widget.readOnly && actions['create'] == true;
+          _canEdit =
+              !widget.readOnly &&
+              !widget.selfService &&
+              actions['edit'] == true;
         });
       }
     } catch (_) {}
@@ -80,8 +93,10 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
   Future<void> _loadMenuName() async {
     try {
       final name = await NavigationMenuRepository().resolveMenuName(
-        menuCode: widget.selfService ? '20001' : '15001',
-        routeName: widget.selfService ? 'portalRequest' : 'cmTickets',
+        menuCode: widget.menuCode ?? (widget.selfService ? '20001' : '15001'),
+        routeName:
+            widget.routeName ??
+            (widget.selfService ? 'portalRequest' : 'cmTickets'),
         fallback: _menuName,
       );
       if (mounted) setState(() => _menuName = name);
@@ -148,7 +163,9 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
     final total = (_data['total'] as num?)?.toInt() ?? 0;
     return SupportWorkspaceShell(
       pageTitle: _menuName,
-      activeMenu: widget.selfService ? 'portalRequest' : 'cmTickets',
+      activeMenu:
+          widget.routeName ??
+          (widget.selfService ? 'portalRequest' : 'cmTickets'),
       menuScope: WorkspaceMenuScope.company,
       child: Container(
         width: double.infinity,
