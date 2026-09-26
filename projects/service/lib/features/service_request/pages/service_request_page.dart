@@ -20,12 +20,14 @@ class ServiceRequestPage extends StatefulWidget {
     this.readOnly = false,
     this.menuCode,
     this.routeName,
+    this.fixedStatus,
   });
   final bool selfService;
   final String? qrToken;
   final bool readOnly;
   final String? menuCode;
   final String? routeName;
+  final String? fixedStatus;
   @override
   State<ServiceRequestPage> createState() => _ServiceRequestPageState();
 }
@@ -44,6 +46,7 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
   @override
   void initState() {
     super.initState();
+    _status = widget.fixedStatus ?? '';
     if (widget.selfService) _menuName = 'แจ้งซ่อม / ขอใช้บริการ';
     _load();
     _loadActions();
@@ -222,38 +225,44 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
                     ),
                   ),
                 ),
-                SizedBox(
-                  width: 180,
-                  child: DropdownButtonFormField<String>(
-                    initialValue: _status,
-                    decoration: _input(label: 'สถานะ'),
-                    items: const [
-                      DropdownMenuItem(value: '', child: Text('ทั้งหมด')),
-                      DropdownMenuItem(value: 'NEW', child: Text('สร้างใหม่')),
-                      DropdownMenuItem(
-                        value: 'RECEIVED',
-                        child: Text('รับเรื่องแล้ว'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'IN_PROGRESS',
-                        child: Text('กำลังดำเนินการ'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'COMPLETED',
-                        child: Text('เสร็จสิ้น'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'CANCELLED',
-                        child: Text('ยกเลิก'),
-                      ),
-                    ],
-                    onChanged: (value) {
-                      _status = value ?? '';
-                      _page = 1;
-                      _load();
-                    },
-                  ),
-                ),
+                if (widget.fixedStatus == null)
+                  SizedBox(
+                    width: 180,
+                    child: DropdownButtonFormField<String>(
+                      initialValue: _status,
+                      decoration: _input(label: 'สถานะ'),
+                      items: const [
+                        DropdownMenuItem(value: '', child: Text('ทั้งหมด')),
+                        DropdownMenuItem(
+                          value: 'NEW',
+                          child: Text('สร้างใหม่'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'RECEIVED',
+                          child: Text('รับเรื่องแล้ว'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'IN_PROGRESS',
+                          child: Text('กำลังดำเนินการ'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'COMPLETED',
+                          child: Text('เสร็จสิ้น'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'CANCELLED',
+                          child: Text('ยกเลิก'),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        _status = value ?? '';
+                        _page = 1;
+                        _load();
+                      },
+                    ),
+                  )
+                else
+                  Chip(label: Text(_statusText(widget.fixedStatus!))),
                 FilledButton.icon(
                   onPressed: () {
                     _page = 1;
@@ -265,7 +274,7 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
                 OutlinedButton(
                   onPressed: () {
                     _search.clear();
-                    _status = '';
+                    _status = widget.fixedStatus ?? '';
                     _page = 1;
                     _load();
                   },
