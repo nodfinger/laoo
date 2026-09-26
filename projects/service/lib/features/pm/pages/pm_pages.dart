@@ -148,7 +148,17 @@ class _PmChecklistsState extends State<PmChecklistsPage> {
 }
 
 class PmCalendarPage extends StatefulWidget {
-  const PmCalendarPage({super.key});
+  const PmCalendarPage({
+    super.key,
+    this.menuCode = '16003',
+    this.routeName = 'pmCalendar',
+    this.pageTitle = 'ปฏิทินงานบำรุงรักษา',
+    this.portalSchedule = false,
+  });
+  final String menuCode;
+  final String routeName;
+  final String pageTitle;
+  final bool portalSchedule;
   @override
   State<PmCalendarPage> createState() => _CalendarState();
 }
@@ -160,23 +170,32 @@ class _CalendarState extends State<PmCalendarPage> {
   @override
   void initState() {
     super.initState();
-    data = api.workOrders(status: status);
+    data = api.workOrders(
+      status: status,
+      portalSchedule: widget.portalSchedule,
+    );
   }
 
-  void refresh() => setState(() => data = api.workOrders(status: status));
+  void refresh() => setState(
+    () => data = api.workOrders(
+      status: status,
+      portalSchedule: widget.portalSchedule,
+    ),
+  );
   Future<void> open(Map row) async {
     final id = (row['pmWorkOrderId'] as num).toInt();
     final changed = await showDialog<bool>(
       context: context,
-      builder: (_) => _PmWorkDialog(api, id),
+      builder: (_) =>
+          _PmWorkDialog(api, id, portalSchedule: widget.portalSchedule),
     );
     if (changed == true) refresh();
   }
 
   @override
   Widget build(BuildContext c) => SupportWorkspaceShell(
-    pageTitle: 'ปฏิทินงานบำรุงรักษา',
-    activeMenu: 'pmCalendar',
+    pageTitle: widget.pageTitle,
+    activeMenu: widget.routeName,
     menuScope: WorkspaceMenuScope.company,
     child: Padding(
       padding: const EdgeInsets.all(LaooLayout.cardMargin),
@@ -218,7 +237,7 @@ class _CalendarState extends State<PmCalendarPage> {
               ),
               FilledButton.icon(
                 onPressed: () async {
-                  await api.generate();
+                  await api.generate(portalSchedule: widget.portalSchedule);
                   refresh();
                 },
                 icon: const Icon(Icons.event_available),
@@ -247,7 +266,7 @@ class _CalendarState extends State<PmCalendarPage> {
                         leading: const Icon(Icons.build_circle_outlined),
                         title: Text(r['planNameSnapshot']?.toString() ?? '-'),
                         subtitle: Text(
-                          '${r['itemSnapshot'] ?? '-'}\n${r['locationSnapshot'] ?? '-'}\nกำหนด ${r['dueDate'] ?? '-'}',
+                          '${r['itemSnapshot'] ?? '-'}\n${r['locationSnapshot'] ?? '-'}${r['residentNames'] == null ? '' : '\nผู้พักอาศัย: ${r['residentNames']}'}\nกำหนด ${r['dueDate'] ?? '-'}',
                         ),
                         isThreeLine: true,
                         trailing: Text(r['statusCode']?.toString() ?? '-'),
@@ -265,9 +284,10 @@ class _CalendarState extends State<PmCalendarPage> {
 }
 
 class _PmWorkDialog extends StatefulWidget {
-  const _PmWorkDialog(this.api, this.id);
+  const _PmWorkDialog(this.api, this.id, {this.portalSchedule = false});
   final PmApi api;
   final int id;
+  final bool portalSchedule;
   @override
   State<_PmWorkDialog> createState() => _PmWorkDialogState();
 }
@@ -279,7 +299,10 @@ class _PmWorkDialogState extends State<_PmWorkDialog> {
   @override
   void initState() {
     super.initState();
-    data = widget.api.workOrder(widget.id);
+    data = widget.api.workOrder(
+      widget.id,
+      portalSchedule: widget.portalSchedule,
+    );
   }
 
   Future<void> action(String value) async {
@@ -289,6 +312,7 @@ class _PmWorkDialogState extends State<_PmWorkDialog> {
       widget.id,
       value,
       value == 'start' ? null : result.text.trim(),
+      widget.portalSchedule,
     );
     if (mounted) Navigator.pop(context, true);
   }
@@ -319,6 +343,8 @@ class _PmWorkDialogState extends State<_PmWorkDialog> {
                 ),
                 Text(work['itemSnapshot']?.toString() ?? '-'),
                 Text(work['locationSnapshot']?.toString() ?? '-'),
+                if (work['residentNames'] != null)
+                  Text('ผู้พักอาศัย: ${work['residentNames']}'),
                 Text('กำหนด: ${work['dueDate'] ?? '-'}'),
                 const Divider(),
                 ...checks.map(
@@ -340,6 +366,7 @@ class _PmWorkDialogState extends State<_PmWorkDialog> {
                                     },
                                   )
                                   .toList(),
+                              portalSchedule: widget.portalSchedule,
                             );
                             if (mounted) setState(() {});
                           }

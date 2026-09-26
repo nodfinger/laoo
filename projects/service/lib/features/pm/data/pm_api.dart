@@ -31,12 +31,24 @@ class PmApi {
       _object(await _client.get('/api/service/pm/checklists'));
   Future<void> createChecklist(Map<String, dynamic> body) =>
       _client.post('/api/service/pm/checklists', body: body);
+  Future<Map<String, dynamic>> workOrderActions({
+    bool portalSchedule = false,
+  }) async => _object(
+    await _client.get(
+      '/api/service/pm/work-orders/actions?portal=$portalSchedule',
+    ),
+  );
+
   Future<Map<String, dynamic>> workOrders({
     String status = '',
     DateTime? from,
     DateTime? to,
+    bool portalSchedule = false,
   }) async {
-    final query = <String, String>{'status': status};
+    final query = <String, String>{
+      'status': status,
+      'portal': '$portalSchedule',
+    };
     if (from != null) query['from'] = from.toIso8601String().substring(0, 10);
     if (to != null) query['to'] = to.toIso8601String().substring(0, 10);
     return _object(
@@ -46,14 +58,31 @@ class PmApi {
     );
   }
 
-  Future<Map<String, dynamic>> workOrder(int id) async =>
-      _object(await _client.get('/api/service/pm/work-orders/$id'));
-  Future<void> saveChecks(int id, List<Map<String, dynamic>> items) => _client
-      .put('/api/service/pm/work-orders/$id/checks', body: {'items': items});
-  Future<void> generate() =>
-      _client.post('/api/service/pm/work-orders/generate', body: {});
-  Future<void> action(int id, String action, [String? detail]) => _client.post(
-    '/api/service/pm/work-orders/$id/$action',
+  Future<Map<String, dynamic>> workOrder(
+    int id, {
+    bool portalSchedule = false,
+  }) async => _object(
+    await _client.get('/api/service/pm/work-orders/$id?portal=$portalSchedule'),
+  );
+  Future<void> saveChecks(
+    int id,
+    List<Map<String, dynamic>> items, {
+    bool portalSchedule = false,
+  }) => _client.put(
+    '/api/service/pm/work-orders/$id/checks?portal=$portalSchedule',
+    body: {'items': items},
+  );
+  Future<void> generate({bool portalSchedule = false}) => _client.post(
+    '/api/service/pm/work-orders/generate?portal=$portalSchedule',
+    body: {},
+  );
+  Future<void> action(
+    int id,
+    String action, [
+    String? detail,
+    bool portalSchedule = false,
+  ]) => _client.post(
+    '/api/service/pm/work-orders/$id/$action?portal=$portalSchedule',
     body: detail == null ? {} : {'resultDetail': detail},
   );
   Map<String, dynamic> _object(dynamic value) =>
