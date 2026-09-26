@@ -109,6 +109,16 @@ List<GoRoute> buildServiceFeatureRoutes({
       routeName: 'portalTracking',
     ),
   ),
+  _page(
+    '20003',
+    (state) => const ServiceRequestPage(
+      selfService: true,
+      readOnly: true,
+      menuCode: '20003',
+      routeName: 'portalHistory',
+      fixedStatus: 'COMPLETED',
+    ),
+  ),
   _page('18001', (state) => const ServiceSettingsPage()),
   _page('17001', (state) => const JobDispatchPage()),
   _page(
@@ -175,7 +185,6 @@ const _workspacePlaceholders = <String, String>{
 };
 
 const _portalPlaceholders = <String, String>{
-  '20003': 'ประวัติการซ่อมและค่าบริการ',
   '20004': 'รอบบำรุงรักษาของห้อง',
   '20005': 'ประเมินความพึงพอใจ',
   '20006': 'แจ้งเรื่องร้องเรียน',
