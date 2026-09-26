@@ -3,9 +3,9 @@ using Microsoft.Data.SqlClient;
 
 namespace LaooServiceModule.Infrastructure;
 
-internal static class WarehouseAccessService
+public static class WarehouseAccessService
 {
-    internal const string WarehouseAliasPredicate = """
+    public const string WarehouseAliasPredicate = """
 (
     EXISTS
     (
@@ -33,7 +33,7 @@ internal static class WarehouseAccessService
 )
 """;
 
-    internal static async Task<bool> CanAccessAsync(
+    public static async Task<bool> CanAccessAsync(
         SqlConnection connection,
         SqlTransaction? transaction,
         long companyId,
@@ -58,7 +58,7 @@ SELECT CASE WHEN EXISTS
         return Convert.ToInt32(await command.ExecuteScalarAsync(token)) == 1;
     }
 
-    internal static async Task<bool> IsCompanyAdminAsync(
+    public static async Task<bool> IsCompanyAdminAsync(
         SqlConnection connection,
         long companyId,
         long userId,

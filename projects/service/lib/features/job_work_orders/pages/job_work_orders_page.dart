@@ -338,13 +338,72 @@ class _WorkOrderDialog extends StatefulWidget {
 
 class _WorkOrderDialogState extends State<_WorkOrderDialog> {
   bool _busy = false;
+  bool _partsLoading = false;
+  Map<String, dynamic>? _partsLookup;
+  final List<Map<String, dynamic>> _parts = [];
   final _resolution = TextEditingController();
   String get status => widget.data['statusCode']?.toString() ?? '';
+
+  @override
+  void initState() {
+    super.initState();
+    _parts.addAll(
+      ((widget.data['parts'] as List?) ?? const []).map(
+        (item) => Map<String, dynamic>.from(item as Map),
+      ),
+    );
+    if (status == 'IN_PROGRESS') _loadPartsLookup();
+  }
 
   @override
   void dispose() {
     _resolution.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadPartsLookup() async {
+    setState(() => _partsLoading = true);
+    try {
+      final value = await widget.api.partsLookup();
+      if (mounted) setState(() => _partsLookup = value);
+    } catch (error) {
+      if (mounted) {
+        final message = error is ApiException
+            ? '${error.message}\n${error.description ?? 'กรุณาลองโหลดข้อมูลอะไหล่อีกครั้ง'}'
+            : 'โหลดข้อมูลอะไหล่ไม่สำเร็จ';
+        showTimedSnackBar(context, message: message, error: true);
+      }
+    } finally {
+      if (mounted) setState(() => _partsLoading = false);
+    }
+  }
+
+  Future<void> _addPart() async {
+    final lookup = _partsLookup;
+    if (lookup == null) {
+      await _loadPartsLookup();
+      return;
+    }
+    final value = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (_) => _PartPickerDialog(lookup: lookup),
+    );
+    if (value == null || !mounted) return;
+    final duplicate = _parts.any(
+      (part) =>
+          part['warehouseId'] == value['warehouseId'] &&
+          part['itemId'] == value['itemId'],
+    );
+    if (duplicate) {
+      showTimedSnackBar(
+        context,
+        message:
+            'มีอะไหล่นี้ในรายการแล้ว\nรายละเอียดเพิ่มเติม: กรุณาลบรายการเดิมแล้วระบุจำนวนใหม่',
+        error: true,
+      );
+      return;
+    }
+    setState(() => _parts.add(value));
   }
 
   Future<void> _start() async {
@@ -382,6 +441,16 @@ class _WorkOrderDialogState extends State<_WorkOrderDialog> {
       await widget.api.complete(
         (widget.data['requestId'] as num).toInt(),
         resolution,
+        parts: _parts
+            .map(
+              (part) => <String, dynamic>{
+                'warehouseId': part['warehouseId'],
+                'itemId': part['itemId'],
+                'quantity': part['quantity'],
+                'serialInstanceIds': part['serialInstanceIds'] ?? const [],
+              },
+            )
+            .toList(),
       );
       if (mounted) Navigator.pop(context, true);
     } catch (error) {
@@ -396,11 +465,20 @@ class _WorkOrderDialogState extends State<_WorkOrderDialog> {
     }
   }
 
+  double get _partsTotal => _parts.fold<double>(
+    0,
+    (sum, part) =>
+        sum +
+        ((part['totalCost'] as num?)?.toDouble() ??
+            ((part['quantity'] as num?)?.toDouble() ?? 0) *
+                ((part['unitCost'] as num?)?.toDouble() ?? 0)),
+  );
+
   @override
   Widget build(BuildContext context) => AlertDialog(
     title: Text(widget.data['requestNo']?.toString() ?? 'รายละเอียดใบงาน'),
     content: SizedBox(
-      width: 520,
+      width: (MediaQuery.sizeOf(context).width - 32).clamp(280.0, 620.0),
       child: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -439,6 +517,63 @@ class _WorkOrderDialogState extends State<_WorkOrderDialog> {
                     ),
                 ],
               ),
+            ],
+            if (_parts.isNotEmpty || status == 'IN_PROGRESS') ...[
+              const Divider(height: 28),
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'อะไหล่ที่ใช้ซ่อม',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  if (status == 'IN_PROGRESS')
+                    OutlinedButton.icon(
+                      onPressed: _busy || _partsLoading ? null : _addPart,
+                      icon: const Icon(Icons.add),
+                      label: const Text('เพิ่มอะไหล่'),
+                    ),
+                ],
+              ),
+              if (_partsLoading) const LinearProgressIndicator(),
+              if (_parts.isEmpty && !_partsLoading)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Text('ไม่ใช้อะไหล่ในการซ่อม'),
+                ),
+              for (final part in _parts)
+                Card(
+                  margin: const EdgeInsets.only(top: 8),
+                  child: ListTile(
+                    dense: true,
+                    title: Text(
+                      '${part['itemCode'] ?? '-'} | ${part['itemName'] ?? '-'}',
+                    ),
+                    subtitle: Text(
+                      '${part['warehouseName'] ?? ''}  จำนวน ${_quantity(part['quantity'])} ${part['unitCode'] ?? ''}\nต้นทุน ${_money(part['unitCost'])} บาท / รวม ${_money(part['totalCost'] ?? ((part['quantity'] as num?)?.toDouble() ?? 0) * ((part['unitCost'] as num?)?.toDouble() ?? 0))} บาท${((part['serialNos'] as List?) ?? const []).isEmpty ? '' : '\nSerial: ${(part['serialNos'] as List).join(', ')}'}',
+                    ),
+                    isThreeLine: true,
+                    trailing: status == 'IN_PROGRESS'
+                        ? IconButton(
+                            tooltip: 'ลบรายการ',
+                            onPressed: _busy
+                                ? null
+                                : () => setState(() => _parts.remove(part)),
+                            icon: const Icon(Icons.delete_outline),
+                          )
+                        : null,
+                  ),
+                ),
+              if (_parts.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Text(
+                    'ต้นทุนอะไหล่รวม ${_money(_partsTotal)} บาท',
+                    textAlign: TextAlign.right,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
             ],
             if (status == 'IN_PROGRESS') ...[
               const SizedBox(height: 16),
@@ -486,6 +621,254 @@ class _WorkOrderDialogState extends State<_WorkOrderDialog> {
     ),
   );
 }
+
+class _PartPickerDialog extends StatefulWidget {
+  const _PartPickerDialog({required this.lookup});
+  final Map<String, dynamic> lookup;
+
+  @override
+  State<_PartPickerDialog> createState() => _PartPickerDialogState();
+}
+
+class _PartPickerDialogState extends State<_PartPickerDialog> {
+  final _quantityController = TextEditingController(text: '1');
+  final Set<int> _selectedSerials = {};
+  int? _warehouseId;
+  int? _itemId;
+  String? _error;
+
+  List<Map<String, dynamic>> get _warehouses =>
+      ((widget.lookup['warehouses'] as List?) ?? const [])
+          .map((item) => Map<String, dynamic>.from(item as Map))
+          .toList();
+  List<Map<String, dynamic>> get _items =>
+      ((widget.lookup['items'] as List?) ?? const [])
+          .map((item) => Map<String, dynamic>.from(item as Map))
+          .where(
+            (item) =>
+                _warehouseId == null || item['warehouseId'] == _warehouseId,
+          )
+          .toList();
+  Map<String, dynamic>? get _selectedItem {
+    for (final item in _items) {
+      if (item['itemId'] == _itemId) return item;
+    }
+    return null;
+  }
+
+  List<Map<String, dynamic>> get _serials =>
+      ((widget.lookup['serials'] as List?) ?? const [])
+          .map((item) => Map<String, dynamic>.from(item as Map))
+          .where(
+            (item) =>
+                item['warehouseId'] == _warehouseId &&
+                item['itemId'] == _itemId,
+          )
+          .toList();
+
+  @override
+  void initState() {
+    super.initState();
+    if (_warehouses.isNotEmpty) {
+      final selected = _warehouses.cast<Map<String, dynamic>>().firstWhere(
+        (item) => item['isDefault'] == true,
+        orElse: () => _warehouses.first,
+      );
+      _warehouseId = (selected['warehouseId'] as num).toInt();
+    }
+  }
+
+  @override
+  void dispose() {
+    _quantityController.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    final item = _selectedItem;
+    if (_warehouseId == null || item == null) {
+      setState(() => _error = 'กรุณาเลือกคลังและอะไหล่');
+      return;
+    }
+    final serial = item['stockTrackingCode'] == 'SERIAL';
+    final quantity = serial
+        ? _selectedSerials.length.toDouble()
+        : double.tryParse(_quantityController.text.trim()) ?? 0;
+    final available = (item['availableQuantity'] as num?)?.toDouble() ?? 0;
+    if (quantity <= 0 || quantity > available) {
+      setState(
+        () => _error =
+            'จำนวนต้องมากกว่า 0 และไม่เกินสต๊อก ${_quantity(available)}',
+      );
+      return;
+    }
+    if (serial && _selectedSerials.isEmpty) {
+      setState(() => _error = 'กรุณาเลือก Serial อย่างน้อย 1 รายการ');
+      return;
+    }
+    final warehouse = _warehouses.firstWhere(
+      (row) => row['warehouseId'] == _warehouseId,
+    );
+    final selectedSerialRows = _serials
+        .where(
+          (row) =>
+              _selectedSerials.contains((row['itemInstanceId'] as num).toInt()),
+        )
+        .toList();
+    final unitCost = (item['unitCost'] as num?)?.toDouble() ?? 0;
+    Navigator.pop(context, <String, dynamic>{
+      'warehouseId': _warehouseId,
+      'warehouseName': warehouse['warehouseName'],
+      'itemId': item['itemId'],
+      'itemCode': item['itemCode'],
+      'itemName': item['itemName'],
+      'unitCode': item['unitCode'],
+      'quantity': quantity,
+      'unitCost': unitCost,
+      'totalCost': quantity * unitCost,
+      'serialInstanceIds': _selectedSerials.toList(),
+      'serialNos': selectedSerialRows.map((row) => row['serialNo']).toList(),
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final item = _selectedItem;
+    final serial = item?['stockTrackingCode'] == 'SERIAL';
+    return AlertDialog(
+      title: const Text('เพิ่มอะไหล่ที่ใช้ซ่อม'),
+      content: SizedBox(
+        width: (MediaQuery.sizeOf(context).width - 32).clamp(280.0, 520.0),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              DropdownButtonFormField<int>(
+                initialValue: _warehouseId,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'คลัง *'),
+                items: _warehouses
+                    .map(
+                      (row) => DropdownMenuItem<int>(
+                        value: (row['warehouseId'] as num).toInt(),
+                        child: Text(
+                          '${row['warehouseCode']} | ${row['warehouseName']}',
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) => setState(() {
+                  _warehouseId = value;
+                  _itemId = null;
+                  _selectedSerials.clear();
+                  _error = null;
+                }),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<int>(
+                key: ValueKey(_warehouseId),
+                initialValue: _itemId,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'อะไหล่ *'),
+                items: _items
+                    .map(
+                      (row) => DropdownMenuItem<int>(
+                        value: (row['itemId'] as num).toInt(),
+                        child: Text(
+                          '${row['itemCode']} | ${row['itemName']} (คงเหลือ ${_quantity(row['availableQuantity'])})',
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) => setState(() {
+                  _itemId = value;
+                  _selectedSerials.clear();
+                  _quantityController.text = '1';
+                  _error = null;
+                }),
+              ),
+              const SizedBox(height: 12),
+              if (!serial)
+                TextField(
+                  controller: _quantityController,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: InputDecoration(
+                    labelText: 'จำนวน *',
+                    helperText: item == null
+                        ? null
+                        : 'คงเหลือ ${_quantity(item['availableQuantity'])} ${item['unitCode'] ?? ''}',
+                  ),
+                ),
+              if (serial) ...[
+                const Text(
+                  'เลือก Serial *',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 8),
+                if (_serials.isEmpty)
+                  const Text('ไม่มี Serial พร้อมเบิกในคลังนี้'),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final row in _serials)
+                      FilterChip(
+                        label: Text(row['serialNo']?.toString() ?? '-'),
+                        selected: _selectedSerials.contains(
+                          (row['itemInstanceId'] as num).toInt(),
+                        ),
+                        onSelected: (selected) => setState(() {
+                          final id = (row['itemInstanceId'] as num).toInt();
+                          selected
+                              ? _selectedSerials.add(id)
+                              : _selectedSerials.remove(id);
+                          _error = null;
+                        }),
+                      ),
+                  ],
+                ),
+              ],
+              if (item != null) ...[
+                const SizedBox(height: 12),
+                Text('ต้นทุนต่อหน่วย ${_money(item['unitCost'])} บาท'),
+              ],
+              if (_error != null) ...[
+                const SizedBox(height: 8),
+                Text(_error!, style: const TextStyle(color: Colors.red)),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('ยกเลิก'),
+        ),
+        FilledButton.icon(
+          onPressed: _save,
+          icon: const Icon(Icons.add),
+          label: const Text('เพิ่มรายการ'),
+        ),
+      ],
+    );
+  }
+}
+
+String _quantity(Object? value) {
+  final number = (value as num?)?.toDouble() ?? 0;
+  return number == number.truncateToDouble()
+      ? number.toStringAsFixed(0)
+      : number.toStringAsFixed(4).replaceFirst(RegExp(r'0+$'), '');
+}
+
+String _money(Object? value) =>
+    ((value as num?)?.toDouble() ?? 0).toStringAsFixed(2);
 
 class _AttachmentPreview extends StatelessWidget {
   const _AttachmentPreview({

@@ -994,6 +994,10 @@ class _RequestDetailDialogState extends State<_RequestDetailDialog> {
 
   int get _id => (_data['requestId'] as num).toInt();
   String get _status => _data['statusCode']?.toString() ?? '';
+  List<Map<String, dynamic>> get _parts =>
+      ((_data['parts'] as List?) ?? const [])
+          .map((item) => Map<String, dynamic>.from(item as Map))
+          .toList();
 
   @override
   Widget build(BuildContext context) {
@@ -1024,6 +1028,27 @@ class _RequestDetailDialogState extends State<_RequestDetailDialog> {
                 _line('ผลการซ่อม', _data['resolutionDetail']?.toString()),
               if (_data['cancellationReason'] != null)
                 _line('เหตุผลยกเลิก', _data['cancellationReason']?.toString()),
+              if (_parts.isNotEmpty) ...[
+                const Divider(height: 24),
+                const Text(
+                  'อะไหล่ที่ใช้ซ่อม',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 8),
+                for (final part in _parts)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      '${part['itemCode'] ?? '-'} | ${part['itemName'] ?? '-'}\nจำนวน ${part['quantity'] ?? 0} ${part['unitCode'] ?? ''} · ต้นทุนรวม ${((part['totalCost'] as num?)?.toDouble() ?? 0).toStringAsFixed(2)} บาท',
+                      softWrap: true,
+                    ),
+                  ),
+                Text(
+                  'ต้นทุนอะไหล่รวม ${((_data['partsTotal'] as num?)?.toDouble() ?? 0).toStringAsFixed(2)} บาท',
+                  textAlign: TextAlign.right,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ],
               if (_attachments.isNotEmpty) ...[
                 const Divider(height: 24),
                 const Text(
