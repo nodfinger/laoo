@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'dart:math' as math;
 
 import '../../../app/theme/laoo_design_tokens.dart';
@@ -1279,7 +1280,15 @@ class _WarehousePageState extends State<WarehousePage> {
 }
 
 class SerialRegistryPage extends StatefulWidget {
-  const SerialRegistryPage({super.key});
+  const SerialRegistryPage({
+    super.key,
+    this.menuCode = '08006',
+    this.routeName = 'itemInstances',
+  });
+
+  final String menuCode;
+  final String routeName;
+
   @override
   State<SerialRegistryPage> createState() => _SerialRegistryPageState();
 }
@@ -1292,6 +1301,9 @@ class _SerialRegistryPageState extends State<SerialRegistryPage> {
   bool _loading = true;
   String? _usageFilter, _projectFilter;
   Map<String, dynamic>? _selected;
+  String _menuName = 'ทะเบียน Serial/อุปกรณ์';
+  String _qrMenuName = 'จัดการ QR Code แจ้งซ่อม';
+  bool _canManageQr = false;
 
   List<Map<String, dynamic>> get _visibleRows => _rows
       .where((row) {
@@ -1323,6 +1335,8 @@ class _SerialRegistryPageState extends State<SerialRegistryPage> {
   @override
   void initState() {
     super.initState();
+    _resolveMenuName();
+    _resolveQrMenu();
     _load();
   }
 
@@ -1331,6 +1345,30 @@ class _SerialRegistryPageState extends State<SerialRegistryPage> {
     _api.dispose();
     _search.dispose();
     super.dispose();
+  }
+
+  Future<void> _resolveMenuName() async {
+    try {
+      final value = await NavigationMenuRepository().resolveMenuName(
+        menuCode: widget.menuCode,
+        routeName: widget.routeName,
+        fallback: _menuName,
+      );
+      if (mounted && value.trim().isNotEmpty) {
+        setState(() => _menuName = value.trim());
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _resolveQrMenu() async {
+    try {
+      final menu = await NavigationMenuRepository().findMenu(menuCode: '15002');
+      if (!mounted || menu == null) return;
+      setState(() {
+        _canManageQr = true;
+        if (menu.name.trim().isNotEmpty) _qrMenuName = menu.name.trim();
+      });
+    } catch (_) {}
   }
 
   Future<void> _load() async {
@@ -1381,8 +1419,8 @@ class _SerialRegistryPageState extends State<SerialRegistryPage> {
 
   @override
   Widget build(BuildContext context) => SupportWorkspaceShell(
-    pageTitle: 'ทะเบียน Serial/อุปกรณ์',
-    activeMenu: 'itemInstances',
+    pageTitle: _menuName,
+    activeMenu: widget.routeName,
     menuScope: WorkspaceMenuScope.company,
     child: Padding(
       padding: const EdgeInsets.all(LaooLayout.cardMargin),
@@ -1390,6 +1428,9 @@ class _SerialRegistryPageState extends State<SerialRegistryPage> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _SerialRegistryToolbar(
+            title: _menuName,
+            qrMenuName: _qrMenuName,
+            canManageQr: _canManageQr,
             controller: _search,
             count: _visibleRows.length,
             usageFilter: _usageFilter,
@@ -1402,6 +1443,7 @@ class _SerialRegistryPageState extends State<SerialRegistryPage> {
               _selected = null;
             }),
             onSearch: _load,
+            onManageQr: () => context.go('/cm/qr-portal'),
           ),
           const SizedBox(height: LaooLayout.cardSpacing),
           Expanded(
@@ -1710,6 +1752,9 @@ String _serialRegistryDate(Object? value) {
 
 class _SerialRegistryToolbar extends StatelessWidget {
   const _SerialRegistryToolbar({
+    required this.title,
+    required this.qrMenuName,
+    required this.canManageQr,
     required this.controller,
     required this.count,
     required this.usageFilter,
@@ -1718,14 +1763,19 @@ class _SerialRegistryToolbar extends StatelessWidget {
     required this.projectOptions,
     required this.onFilterChanged,
     required this.onSearch,
+    required this.onManageQr,
   });
 
+  final String title;
+  final String qrMenuName;
+  final bool canManageQr;
   final TextEditingController controller;
   final int count;
   final String? usageFilter, projectFilter;
   final List<Map<String, String>> usageOptions, projectOptions;
   final void Function(String?, String?) onFilterChanged;
   final VoidCallback onSearch;
+  final VoidCallback onManageQr;
 
   @override
   Widget build(BuildContext context) {
@@ -1779,7 +1829,7 @@ class _SerialRegistryToolbar extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'ทะเบียน SN/อุปกรณ์',
+                  title,
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     color: Colors.black,
                     fontWeight: FontWeight.w700,
@@ -1820,6 +1870,12 @@ class _SerialRegistryToolbar extends StatelessWidget {
                   icon: const Icon(Icons.search),
                   label: const Text('ค้นหา'),
                 ),
+                if (canManageQr)
+                  OutlinedButton.icon(
+                    onPressed: onManageQr,
+                    icon: const Icon(Icons.qr_code_2_outlined),
+                    label: Text(qrMenuName),
+                  ),
                 filter(
                   'วัตถุประสงค์',
                   usageFilter,

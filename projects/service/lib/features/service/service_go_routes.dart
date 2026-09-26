@@ -79,6 +79,11 @@ List<GoRoute> buildServiceFeatureRoutes({
   ),
   _page('08006', (state) => const SerialRegistryPage()),
   _page(
+    '14002',
+    (state) =>
+        const SerialRegistryPage(menuCode: '14002', routeName: 'assetItems'),
+  ),
+  _page(
     '14005',
     (state) => const ServicePersonPage(role: ServicePersonRole.customer),
   ),
@@ -155,7 +160,6 @@ GoRoute _portalPlaceholder(FeatureRouteContract route, String title) => GoRoute(
 
 const _workspacePlaceholders = <String, String>{
   '14001': 'ผังสถานที่และพื้นที่',
-  '14002': 'ทะเบียนอุปกรณ์และ QR Code',
   '14003': 'ทะเบียนลูกค้าภายนอก',
   '19002': 'ประวัติการซ่อมและค่าใช้จ่าย',
   '19003': 'รายงานผลประเมินความพึงพอใจ',
