@@ -139,6 +139,15 @@ List<GoRoute> buildServiceFeatureRoutes({
   _page('16001', (state) => const PmPlansPage()),
   _page('16002', (state) => const PmChecklistsPage()),
   _page('16003', (state) => const PmCalendarPage()),
+  _page(
+    '20004',
+    (state) => const PmCalendarPage(
+      menuCode: '20004',
+      routeName: 'portalPmSchedule',
+      pageTitle: 'รอบบำรุงรักษาของห้อง',
+      portalSchedule: true,
+    ),
+  ),
   ..._workspacePlaceholders.entries.map(
     (entry) =>
         _workspacePlaceholder(ServiceRoutes.byMenuCode(entry.key), entry.value),
@@ -186,7 +195,6 @@ const _workspacePlaceholders = <String, String>{
 };
 
 const _portalPlaceholders = <String, String>{
-  '20004': 'รอบบำรุงรักษาของห้อง',
   '20005': 'ประเมินความพึงพอใจ',
   '20006': 'แจ้งเรื่องร้องเรียน',
 };

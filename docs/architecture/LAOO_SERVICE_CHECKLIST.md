@@ -87,7 +87,7 @@ NEW / RECEIVED / IN_PROGRESS
 | ⬜ | รายงานผลประเมินความพึงพอใจ | `19003` `/reports/satisfaction` |
 | 🟡 | ติดตามสถานะงานซ่อม | `20002` `/portal/tracking` | ShowOnly; เห็นเฉพาะใบแจ้งของผู้ Login; รอทดสอบรับมอบ |
 | 🟡 | ประวัติซ่อมและค่าบริการ | `20003` `/portal/history` | ShowOnly; แสดงเฉพาะงานเสร็จสิ้นของผู้ Login; รอทดสอบรับมอบ |
-| ⬜ | รอบบำรุงรักษาของห้อง | `20004` `/portal/pm-schedule` |
+| 🟡 | รอบบำรุงรักษาของห้อง | `20004` `/portal/pm-schedule` | ScreenType 1; ดูและจัดการงาน PM ทั้ง Company, แสดงผู้พักอาศัยตามห้อง/Asset; รอทดสอบรับมอบ |
 | ⬜ | ประเมินความพึงพอใจ | `20005` `/portal/evaluation` |
 | ⬜ | แจ้งเรื่องร้องเรียน | `20006` `/portal/complaint` |
 
