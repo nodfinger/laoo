@@ -2,6 +2,9 @@ using System.Data;
 using System.Security.Claims;
 using LaooApi.Models;
 using LaooApi.Security;
+using InventoryItemProjectAccess = LaooServiceModule.Infrastructure.ItemProjectAccess;
+using InventoryWarehouseAccess = LaooServiceModule.Infrastructure.WarehouseAccessService;
+using InventoryItemProjectDeniedException = LaooServiceModule.Infrastructure.ItemProjectDeniedException;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
@@ -190,9 +193,63 @@ ORDER BY RequestDate DESC,RequestID DESC OFFSET @offset ROWS FETCH NEXT @take RO
         await using var q = new SqlCommand(sql, c); Add(q, "@company", SqlDbType.BigInt, CompanyId); Add(q, "@id", SqlDbType.BigInt, id); Add(q, "@manage", SqlDbType.Bit, canManage); Add(q, "@user", SqlDbType.BigInt, UserId);
         await using var r = await q.ExecuteReaderAsync(token);
         if (!await r.ReadAsync(token)) return NotFound();
-        return Ok(new { requestId=r.GetInt64(0),requestNo=r.GetString(1),requesterType=r.GetString(2),requesterId=Long(r,3),requesterName=r.GetString(4),requesterPhone=Text(r,5),requesterEmail=Text(r,6),locationSnapshot=Text(r,7),equipmentItemId=Long(r,8),equipmentCode=Text(r,9),equipmentName=Text(r,10),subject=r.GetString(11),detail=r.GetString(12),statusCode=r.GetString(13),requestDate=r.GetDateTime(14),assignedEmployeeId=Long(r,15),assignedEmployeeName=Text(r,16),receivedDate=DateTimeValue(r,17),startedDate=DateTimeValue(r,18),completedDate=DateTimeValue(r,19),resolutionDetail=Text(r,20),cancellationReason=Text(r,21),rowVersion=Convert.ToBase64String((byte[])r[22]) });
+        var response = new Dictionary<string, object?>
+        {
+            ["requestId"] = r.GetInt64(0), ["requestNo"] = r.GetString(1), ["requesterType"] = r.GetString(2),
+            ["requesterId"] = Long(r,3), ["requesterName"] = r.GetString(4), ["requesterPhone"] = Text(r,5),
+            ["requesterEmail"] = Text(r,6), ["locationSnapshot"] = Text(r,7), ["equipmentItemId"] = Long(r,8),
+            ["equipmentCode"] = Text(r,9), ["equipmentName"] = Text(r,10), ["subject"] = r.GetString(11),
+            ["detail"] = r.GetString(12), ["statusCode"] = r.GetString(13), ["requestDate"] = r.GetDateTime(14),
+            ["assignedEmployeeId"] = Long(r,15), ["assignedEmployeeName"] = Text(r,16), ["receivedDate"] = DateTimeValue(r,17),
+            ["startedDate"] = DateTimeValue(r,18), ["completedDate"] = DateTimeValue(r,19), ["resolutionDetail"] = Text(r,20),
+            ["cancellationReason"] = Text(r,21), ["rowVersion"] = Convert.ToBase64String((byte[])r[22])
+        };
+        await r.DisposeAsync();
+        var parts = new List<object>(); decimal partsTotal = 0;
+        const string partSql = "SELECT P.ServiceRequestPartID,P.WarehouseID,P.ItemID,P.ItemCodeSnapshot,P.ItemNameSnapshot,P.UnitCodeSnapshot,P.Quantity,P.UnitCostSnapshot,P.TotalCost,W.WarehouseName,(SELECT STRING_AGG(X.SerialNo,N', ') FROM dbo.TDIVStockIssueSerial S JOIN dbo.TDIVItemInstance X ON X.ItemInstanceID=S.ItemInstanceID WHERE S.StockIssueDetailID=P.StockIssueDetailID) SerialNos FROM dbo.TDADServiceRequestPart P JOIN dbo.TDIVWarehouse W ON W.CompanyID=P.CompanyID AND W.WarehouseID=P.WarehouseID WHERE P.CompanyID=@company AND P.RequestID=@request AND P.IsActive=1 ORDER BY P.ServiceRequestPartID";
+        await using (var partCommand = new SqlCommand(partSql, c))
+        {
+            Add(partCommand,"@company",SqlDbType.BigInt,CompanyId); Add(partCommand,"@request",SqlDbType.BigInt,id);
+            await using var partReader = await partCommand.ExecuteReaderAsync(token);
+            while (await partReader.ReadAsync(token))
+            {
+                var total = partReader.GetDecimal(8); partsTotal += total;
+                parts.Add(new { serviceRequestPartId=partReader.GetInt64(0),warehouseId=partReader.GetInt64(1),itemId=partReader.GetInt64(2),itemCode=partReader.GetString(3),itemName=partReader.GetString(4),unitCode=Text(partReader,5),quantity=partReader.GetDecimal(6),unitCost=partReader.GetDecimal(7),totalCost=total,warehouseName=partReader.GetString(9),serialNos=(Text(partReader,10)?.Split(", ",StringSplitOptions.RemoveEmptyEntries)??[]) });
+            }
+        }
+        response["parts"] = parts; response["partsTotal"] = partsTotal;
+        return Ok(response);
     }
 
+    [HttpGet("parts/lookup")]
+    public async Task<IActionResult> PartsLookup(CancellationToken token)
+    {
+        await using var c = await Open(token);
+        if (!await InService(c, token) || !await Allowed(c, "15001", "EDIT", token)) return Forbid();
+        var warehouses = new List<object>(); var items = new List<object>(); var serials = new List<object>();
+        var warehouseSql = $"SELECT W.WarehouseID,W.WarehouseCode,W.WarehouseName,W.IsDefault FROM dbo.TDIVWarehouse W INNER JOIN dbo.TDADBranch B ON B.BranchID=W.BranchID AND B.CompanyID=W.CompanyID AND B.IsActive=1 WHERE W.CompanyID=@company AND W.IsActive=1 AND {InventoryWarehouseAccess.WarehouseAliasPredicate} ORDER BY W.IsDefault DESC,W.WarehouseCode";
+        await using (var command = new SqlCommand(warehouseSql,c))
+        {
+            Add(command,"@company",SqlDbType.BigInt,CompanyId); Add(command,"@user",SqlDbType.BigInt,UserId);
+            await using var reader=await command.ExecuteReaderAsync(token);
+            while(await reader.ReadAsync(token)) warehouses.Add(new { warehouseId=reader.GetInt64(0),warehouseCode=reader.GetString(1),warehouseName=reader.GetString(2),isDefault=reader.GetBoolean(3) });
+        }
+        var itemSql = $"SELECT SB.WarehouseID,I.ItemID,I.ItemCode,I.ItemName,I.UnitCode,I.CostPrice,I.StockTrackingCode,SB.Quantity FROM dbo.TDIVStockBalance SB INNER JOIN dbo.TDIVItem I ON I.CompanyID=SB.CompanyID AND I.ItemID=SB.ItemID INNER JOIN dbo.TDIVWarehouse W ON W.CompanyID=SB.CompanyID AND W.WarehouseID=SB.WarehouseID AND W.IsActive=1 INNER JOIN dbo.TDADBranch B ON B.BranchID=W.BranchID AND B.CompanyID=W.CompanyID AND B.IsActive=1 WHERE SB.CompanyID=@company AND SB.Quantity>0 AND I.IsActive=1 AND I.ItemKindCode=N'GOODS' AND I.StockTrackingCode<>N'NONE' AND EXISTS(SELECT 1 FROM dbo.TDIVItemUsage U WHERE U.CompanyID=I.CompanyID AND U.ItemID=I.ItemID AND U.UsageCode IN(N'MATERIAL',N'SPARE_PART')) AND {InventoryWarehouseAccess.WarehouseAliasPredicate} AND {InventoryItemProjectAccess.ItemAliasPredicate} ORDER BY W.IsDefault DESC,I.ItemCode";
+        await using (var command = new SqlCommand(itemSql,c))
+        {
+            Add(command,"@company",SqlDbType.BigInt,CompanyId); Add(command,"@user",SqlDbType.BigInt,UserId);
+            await using var reader=await command.ExecuteReaderAsync(token);
+            while(await reader.ReadAsync(token)) items.Add(new { warehouseId=reader.GetInt64(0),itemId=reader.GetInt64(1),itemCode=reader.GetString(2),itemName=reader.GetString(3),unitCode=Text(reader,4),unitCost=reader.GetDecimal(5),stockTrackingCode=reader.GetString(6),availableQuantity=reader.GetDecimal(7) });
+        }
+        var serialSql = $"SELECT X.ItemInstanceID,X.ItemID,X.WarehouseID,X.SerialNo FROM dbo.TDIVItemInstance X INNER JOIN dbo.TDIVItem I ON I.ItemID=X.ItemID AND I.CompanyID=X.CompanyID INNER JOIN dbo.TDIVWarehouse W ON W.WarehouseID=X.WarehouseID AND W.CompanyID=X.CompanyID INNER JOIN dbo.TDADBranch B ON B.BranchID=W.BranchID AND B.CompanyID=W.CompanyID AND B.IsActive=1 WHERE X.CompanyID=@company AND X.StatusCode=N'IN_STOCK' AND {InventoryWarehouseAccess.WarehouseAliasPredicate} AND {InventoryItemProjectAccess.ItemAliasPredicate} ORDER BY X.SerialNo";
+        await using (var command = new SqlCommand(serialSql,c))
+        {
+            Add(command,"@company",SqlDbType.BigInt,CompanyId); Add(command,"@user",SqlDbType.BigInt,UserId);
+            await using var reader=await command.ExecuteReaderAsync(token);
+            while(await reader.ReadAsync(token)) serials.Add(new { itemInstanceId=reader.GetInt64(0),itemId=reader.GetInt64(1),warehouseId=reader.GetInt64(2),serialNo=reader.GetString(3) });
+        }
+        return Ok(new { warehouses,items,serials });
+    }
     [HttpGet("{id:long}/attachments")]
     public async Task<IActionResult> Attachments(long id, CancellationToken token)
     {
@@ -303,9 +360,9 @@ ORDER BY RequestDate DESC,RequestID DESC OFFSET @offset ROWS FETCH NEXT @take RO
         await using var tx = (SqlTransaction)await c.BeginTransactionAsync(token);
         try
         {
-            string? current=null; byte[]? version=null;
-            await using (var q=new SqlCommand("SELECT StatusCode,RowVersion FROM dbo.TDADServiceRequest WITH(UPDLOCK,HOLDLOCK) WHERE CompanyID=@company AND RequestID=@id AND IsActive=1",c,tx))
-            { Add(q,"@company",SqlDbType.BigInt,CompanyId); Add(q,"@id",SqlDbType.BigInt,id); await using var r=await q.ExecuteReaderAsync(token); if(!await r.ReadAsync(token)) return NotFound(); current=r.GetString(0); version=(byte[])r[1]; }
+            string? current=null; string? requestNo=null; byte[]? version=null;
+            await using (var q=new SqlCommand("SELECT StatusCode,RequestNo,RowVersion FROM dbo.TDADServiceRequest WITH(UPDLOCK,HOLDLOCK) WHERE CompanyID=@company AND RequestID=@id AND IsActive=1",c,tx))
+            { Add(q,"@company",SqlDbType.BigInt,CompanyId); Add(q,"@id",SqlDbType.BigInt,id); await using var r=await q.ExecuteReaderAsync(token); if(!await r.ReadAsync(token)) return NotFound(); current=r.GetString(0); requestNo=r.GetString(1); version=(byte[])r[2]; }
             var valid = next=="RECEIVED" && current=="NEW" || next=="IN_PROGRESS" && current=="RECEIVED" || next=="COMPLETED" && current=="IN_PROGRESS" || next=="CANCELLED" && current is "NEW" or "RECEIVED" or "IN_PROGRESS";
             if (!valid) return Conflict(new { message="ไม่สามารถเปลี่ยนสถานะได้", description="สถานะปัจจุบันไม่อยู่ในลำดับที่อนุญาต" });
             if (next=="RECEIVED")
@@ -315,13 +372,71 @@ ORDER BY RequestDate DESC,RequestID DESC OFFSET @offset ROWS FETCH NEXT @take RO
                 await using var u=new SqlCommand("UPDATE dbo.TDADServiceRequest SET StatusCode=N'RECEIVED',AssignedEmployeeID=@employee,AssignedEmployeeNameSnapshot=@name,ReceivedDate=SYSUTCDATETIME(),ReceivedBy=@user,UpdateDate=SYSUTCDATETIME(),UpdateBy=@user WHERE CompanyID=@company AND RequestID=@id AND RowVersion=@version",c,tx); Add(u,"@employee",SqlDbType.BigInt,x.AssignedEmployeeId); Add(u,"@name",SqlDbType.NVarChar,name,200); Add(u,"@user",SqlDbType.BigInt,UserId); Add(u,"@company",SqlDbType.BigInt,CompanyId); Add(u,"@id",SqlDbType.BigInt,id); Add(u,"@version",SqlDbType.VarBinary,version); await u.ExecuteNonQueryAsync(token);
             }
             else if (next=="IN_PROGRESS") await UpdateStatus(c,tx,id,"IN_PROGRESS","StartedDate=SYSUTCDATETIME(),StartedBy=@user",token);
-            else if (next=="COMPLETED") { if(string.IsNullOrWhiteSpace(x.ResolutionDetail)) return BadRequest(new { message="กรุณาระบุผลการซ่อม" }); await UpdateStatus(c,tx,id,"COMPLETED","CompletedDate=SYSUTCDATETIME(),CompletedBy=@user,ResolutionDetail=@detail",token,x.ResolutionDetail); }
+            else if (next=="COMPLETED")
+            {
+                if(string.IsNullOrWhiteSpace(x.ResolutionDetail)) return BadRequest(new { message="กรุณาระบุผลการซ่อม" });
+                var parts=x.Parts??[];
+                if(parts.Any(p=>p.WarehouseId<=0||p.ItemId<=0||p.Quantity<=0)) return BadRequest(new { message="ข้อมูลอะไหล่ไม่ถูกต้อง",description="กรุณาเลือกคลัง อะไหล่ และระบุจำนวนมากกว่า 0" });
+                if(parts.GroupBy(p=>new{p.WarehouseId,p.ItemId}).Any(g=>g.Count()>1)) return BadRequest(new { message="รายการอะไหล่ซ้ำ",description="อะไหล่เดียวกันในคลังเดียวกันต้องรวมเป็นหนึ่งรายการ" });
+                await IssueRepairParts(c,tx,id,requestNo!,parts,token);
+                await UpdateStatus(c,tx,id,"COMPLETED","CompletedDate=SYSUTCDATETIME(),CompletedBy=@user,ResolutionDetail=@detail",token,x.ResolutionDetail);
+            }
             else { if(string.IsNullOrWhiteSpace(x.CancellationReason)) return BadRequest(new { message="กรุณาระบุเหตุผลการยกเลิก" }); await UpdateStatus(c,tx,id,"CANCELLED","CancellationReason=@reason",token,null,x.CancellationReason); }
             await tx.CommitAsync(token); return Ok(new { requestId=id,statusCode=next });
         }
+        catch (SqlException ex) when (ex.Number is 52330 or 52331)
+        { await tx.RollbackAsync(token); return Conflict(new { message="ตัดสต๊อกอะไหล่ไม่สำเร็จ",description=ex.Number==52331?"จำนวนอะไหล่ในคลังไม่เพียงพอ กรุณาโหลดข้อมูลใหม่":"Serial อะไหล่ไม่พร้อมใช้งานหรือไม่อยู่ในคลังที่เลือก" }); }
+        catch (InventoryItemProjectDeniedException)
+        { await tx.RollbackAsync(token); return StatusCode(403,new { message="ไม่มีสิทธิ์ใช้อะไหล่",description="อะไหล่ไม่ได้เปิดใช้งานสำหรับ Project ของ Company นี้" }); }
+        catch (InvalidOperationException ex)
+        { await tx.RollbackAsync(token); return BadRequest(new { message="ข้อมูลอะไหล่ไม่ถูกต้อง",description=ex.Message }); }
         catch { await tx.RollbackAsync(token); throw; }
     }
 
+    private async Task IssueRepairParts(SqlConnection c,SqlTransaction tx,long requestId,string requestNo,IReadOnlyList<ServicePartRequest> parts,CancellationToken token)
+    {
+        foreach(var warehouseGroup in parts.GroupBy(p=>p.WarehouseId))
+        {
+            if(!await InventoryWarehouseAccess.CanAccessAsync(c,tx,CompanyId,UserId,warehouseGroup.Key,token)) throw new InvalidOperationException("ไม่มีสิทธิ์เข้าถึงคลังที่เลือก");
+            var issueCode=$"IS{DateTime.UtcNow:yyyyMMddHHmmssfff}{warehouseGroup.Key%1000:000}";
+            await using var header=new SqlCommand("INSERT dbo.TDIVStockIssue(CompanyID,WarehouseID,IssueCode,IssueDate,WorkOrderID,WorkOrderCode,StatusCode,Remark,CreatedBy,ConfirmDate,ConfirmedBy) OUTPUT INSERTED.StockIssueID VALUES(@company,@warehouse,@code,CONVERT(date,SYSUTCDATETIME()),@request,@requestNo,N'CONFIRMED',N'เบิกอะไหล่จากงานซ่อม',@user,SYSUTCDATETIME(),@user)",c,tx);
+            Add(header,"@company",SqlDbType.BigInt,CompanyId); Add(header,"@warehouse",SqlDbType.BigInt,warehouseGroup.Key); Add(header,"@code",SqlDbType.NVarChar,issueCode,30); Add(header,"@request",SqlDbType.BigInt,requestId); Add(header,"@requestNo",SqlDbType.NVarChar,requestNo,50); Add(header,"@user",SqlDbType.BigInt,UserId);
+            var issueId=Convert.ToInt64(await header.ExecuteScalarAsync(token)); var lineNo=0;
+            foreach(var line in warehouseGroup)
+            {
+                await InventoryItemProjectAccess.EnsureAsync(c,tx,CompanyId,line.ItemId,token);
+                string? itemCode=null,itemName=null,unitCode=null,tracking=null; decimal unitCost=0;
+                await using(var item=new SqlCommand("SELECT ItemCode,ItemName,UnitCode,CostPrice,StockTrackingCode FROM dbo.TDIVItem I WITH(UPDLOCK,HOLDLOCK) WHERE I.CompanyID=@company AND I.ItemID=@item AND I.IsActive=1 AND I.ItemKindCode=N'GOODS' AND I.StockTrackingCode<>N'NONE' AND EXISTS(SELECT 1 FROM dbo.TDIVItemUsage U WHERE U.CompanyID=I.CompanyID AND U.ItemID=I.ItemID AND U.UsageCode IN(N'MATERIAL',N'SPARE_PART'))",c,tx))
+                {
+                    Add(item,"@company",SqlDbType.BigInt,CompanyId); Add(item,"@item",SqlDbType.BigInt,line.ItemId); await using var reader=await item.ExecuteReaderAsync(token);
+                    if(await reader.ReadAsync(token)){itemCode=reader.GetString(0);itemName=reader.GetString(1);unitCode=Text(reader,2);unitCost=reader.GetDecimal(3);tracking=reader.GetString(4);}
+                }
+                if(itemCode is null) throw new InvalidOperationException($"ไม่พบอะไหล่ ItemID {line.ItemId} ใน Company นี้");
+                var serials=(line.SerialInstanceIds??[]).Distinct().ToArray();
+                if(tracking=="SERIAL"&&(line.Quantity!=decimal.Truncate(line.Quantity)||serials.Length!=(int)line.Quantity)) throw new InvalidOperationException($"อะไหล่ {itemCode} ต้องเลือก Serial ให้ครบตามจำนวน");
+                if(tracking!="SERIAL"&&serials.Length>0) throw new InvalidOperationException($"อะไหล่ {itemCode} ไม่ได้ควบคุมแบบ Serial");
+                lineNo++;
+                await using var detail=new SqlCommand("INSERT dbo.TDIVStockIssueDetail(StockIssueID,[LineNo],ItemID,Quantity,Remark) OUTPUT INSERTED.StockIssueDetailID VALUES(@issue,@line,@item,@qty,N'เบิกใช้ในงานซ่อม')",c,tx);
+                Add(detail,"@issue",SqlDbType.BigInt,issueId); Add(detail,"@line",SqlDbType.Int,lineNo); Add(detail,"@item",SqlDbType.BigInt,line.ItemId); Add(detail,"@qty",SqlDbType.Decimal,line.Quantity); var detailId=Convert.ToInt64(await detail.ExecuteScalarAsync(token));
+                foreach(var serialId in serials)
+                {
+                    await using var serial=new SqlCommand("INSERT dbo.TDIVStockIssueSerial(StockIssueDetailID,ItemInstanceID) SELECT @detail,X.ItemInstanceID FROM dbo.TDIVItemInstance X WITH(UPDLOCK,HOLDLOCK) WHERE X.ItemInstanceID=@serial AND X.CompanyID=@company AND X.ItemID=@item AND X.WarehouseID=@warehouse AND X.StatusCode=N'IN_STOCK'; IF @@ROWCOUNT=0 THROW 52330,N'Invalid serial for service repair',1",c,tx);
+                    Add(serial,"@detail",SqlDbType.BigInt,detailId); Add(serial,"@serial",SqlDbType.BigInt,serialId); Add(serial,"@company",SqlDbType.BigInt,CompanyId); Add(serial,"@item",SqlDbType.BigInt,line.ItemId); Add(serial,"@warehouse",SqlDbType.BigInt,warehouseGroup.Key); await serial.ExecuteNonQueryAsync(token);
+                }
+                await using(var balance=new SqlCommand("UPDATE dbo.TDIVStockBalance WITH(UPDLOCK,HOLDLOCK) SET Quantity=Quantity-@qty,UpdateDate=SYSUTCDATETIME() WHERE CompanyID=@company AND WarehouseID=@warehouse AND ItemID=@item AND Quantity>=@qty; IF @@ROWCOUNT=0 THROW 52331,N'Insufficient warehouse stock',1; UPDATE dbo.TDIVItem SET StockBalance=StockBalance-@qty,UpdateDate=SYSUTCDATETIME() WHERE CompanyID=@company AND ItemID=@item AND StockBalance>=@qty",c,tx))
+                { Add(balance,"@qty",SqlDbType.Decimal,line.Quantity); Add(balance,"@company",SqlDbType.BigInt,CompanyId); Add(balance,"@warehouse",SqlDbType.BigInt,warehouseGroup.Key); Add(balance,"@item",SqlDbType.BigInt,line.ItemId); await balance.ExecuteNonQueryAsync(token); }
+                await using(var movement=new SqlCommand("INSERT dbo.TDIVStockMovement(CompanyID,WarehouseID,ItemID,DocumentType,DocumentID,DocumentDetailID,MovementType,Quantity,Remark,CreatedBy) VALUES(@company,@warehouse,@item,N'SERVICE_REQUEST',@request,@detail,N'ISSUE',-@qty,N'เบิกอะไหล่ใช้ในงานซ่อม',@user)",c,tx))
+                { Add(movement,"@company",SqlDbType.BigInt,CompanyId); Add(movement,"@warehouse",SqlDbType.BigInt,warehouseGroup.Key); Add(movement,"@item",SqlDbType.BigInt,line.ItemId); Add(movement,"@request",SqlDbType.BigInt,requestId); Add(movement,"@detail",SqlDbType.BigInt,detailId); Add(movement,"@qty",SqlDbType.Decimal,line.Quantity); Add(movement,"@user",SqlDbType.BigInt,UserId); await movement.ExecuteNonQueryAsync(token); }
+                if(serials.Length>0)
+                {
+                    await using var updateSerial=new SqlCommand("UPDATE X SET StatusCode=N'ISSUED',WarehouseID=NULL,UpdateDate=SYSUTCDATETIME(),UpdatedBy=@user FROM dbo.TDIVItemInstance X JOIN dbo.TDIVStockIssueSerial S ON S.ItemInstanceID=X.ItemInstanceID WHERE S.StockIssueDetailID=@detail AND X.CompanyID=@company AND X.StatusCode=N'IN_STOCK'; INSERT dbo.TDIVItemInstanceHistory(CompanyID,ItemInstanceID,FromStatusCode,ToStatusCode,DocumentType,DocumentID,DocumentDetailID,Remark,CreatedBy) SELECT @company,S.ItemInstanceID,N'IN_STOCK',N'ISSUED',N'SERVICE_REQUEST',@request,@detail,N'เบิกอะไหล่ใช้ในงานซ่อม',@user FROM dbo.TDIVStockIssueSerial S WHERE S.StockIssueDetailID=@detail",c,tx);
+                    Add(updateSerial,"@user",SqlDbType.BigInt,UserId); Add(updateSerial,"@detail",SqlDbType.BigInt,detailId); Add(updateSerial,"@company",SqlDbType.BigInt,CompanyId); Add(updateSerial,"@request",SqlDbType.BigInt,requestId); await updateSerial.ExecuteNonQueryAsync(token);
+                }
+                await using var part=new SqlCommand("INSERT dbo.TDADServiceRequestPart(CompanyID,RequestID,StockIssueID,StockIssueDetailID,WarehouseID,ItemID,ItemCodeSnapshot,ItemNameSnapshot,UnitCodeSnapshot,Quantity,UnitCostSnapshot,CreateBy) VALUES(@company,@request,@issue,@detail,@warehouse,@item,@code,@name,@unit,@qty,@cost,@user)",c,tx);
+                Add(part,"@company",SqlDbType.BigInt,CompanyId); Add(part,"@request",SqlDbType.BigInt,requestId); Add(part,"@issue",SqlDbType.BigInt,issueId); Add(part,"@detail",SqlDbType.BigInt,detailId); Add(part,"@warehouse",SqlDbType.BigInt,warehouseGroup.Key); Add(part,"@item",SqlDbType.BigInt,line.ItemId); Add(part,"@code",SqlDbType.NVarChar,itemCode,50); Add(part,"@name",SqlDbType.NVarChar,itemName,255); Add(part,"@unit",SqlDbType.NVarChar,unitCode,50); Add(part,"@qty",SqlDbType.Decimal,line.Quantity); Add(part,"@cost",SqlDbType.Decimal,unitCost); Add(part,"@user",SqlDbType.BigInt,UserId); await part.ExecuteNonQueryAsync(token);
+            }
+        }
+    }
     private async Task UpdateStatus(SqlConnection c, SqlTransaction tx, long id, string status, string fields, CancellationToken token, string? detail=null, string? reason=null)
     {
         var sql=$"UPDATE dbo.TDADServiceRequest SET StatusCode=N'{status}',{fields},UpdateDate=SYSUTCDATETIME(),UpdateBy=@user WHERE CompanyID=@company AND RequestID=@id AND IsActive=1";
@@ -591,7 +706,8 @@ WHERE Q.CompanyID=@company AND Q.QrToken=@token AND Q.IsActive=1;
     private static void Add(SqlCommand c, string name, SqlDbType type, object? value, int size = 0) { var p = size == 0 ? c.Parameters.Add(name, type) : c.Parameters.Add(name, type, size); p.Value = value ?? DBNull.Value; }
 
     public sealed record CreateRequest(string? RequesterType, long? RequesterId, long? EquipmentItemId, string? Subject, string? Detail, string? QrToken = null);
-    public sealed record ActionRequest(long? AssignedEmployeeId, string? ResolutionDetail, string? CancellationReason);
+    public sealed record ActionRequest(long? AssignedEmployeeId, string? ResolutionDetail, string? CancellationReason, IReadOnlyList<ServicePartRequest>? Parts = null);
+    public sealed record ServicePartRequest(long WarehouseId,long ItemId,decimal Quantity,IReadOnlyList<long>? SerialInstanceIds = null);
     private sealed record RequestAccessInfo(bool Found,string Status,long? CreatedBy);
     private sealed record ProcessedImage(byte[] Bytes,string ContentType,string Extension,int Width,int Height,string? Error)
     {
