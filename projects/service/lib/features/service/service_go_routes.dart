@@ -100,6 +100,15 @@ List<GoRoute> buildServiceFeatureRoutes({
       qrToken: state.uri.queryParameters['qr'],
     ),
   ),
+  _page(
+    '20002',
+    (state) => const ServiceRequestPage(
+      selfService: true,
+      readOnly: true,
+      menuCode: '20002',
+      routeName: 'portalTracking',
+    ),
+  ),
   _page('18001', (state) => const ServiceSettingsPage()),
   _page('17001', (state) => const JobDispatchPage()),
   _page(
@@ -166,7 +175,6 @@ const _workspacePlaceholders = <String, String>{
 };
 
 const _portalPlaceholders = <String, String>{
-  '20002': 'ติดตามสถานะงานซ่อม',
   '20003': 'ประวัติการซ่อมและค่าบริการ',
   '20004': 'รอบบำรุงรักษาของห้อง',
   '20005': 'ประเมินความพึงพอใจ',

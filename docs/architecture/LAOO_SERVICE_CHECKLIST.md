@@ -84,7 +84,7 @@ NEW / RECEIVED / IN_PROGRESS
 | 🟡 | Dashboard ภาพรวมงานบริการ | `19001` `/reports/dashboard` | KPI ตามสถานะ/สถานที่/ช่าง; รอทดสอบรับมอบ |
 | ⬜ | ประวัติการซ่อมและค่าใช้จ่าย | `19002` `/reports/history` |
 | ⬜ | รายงานผลประเมินความพึงพอใจ | `19003` `/reports/satisfaction` |
-| ⬜ | ติดตามสถานะงานซ่อม | `20002` `/portal/tracking` |
+| 🟡 | ติดตามสถานะงานซ่อม | `20002` `/portal/tracking` | ShowOnly; เห็นเฉพาะใบแจ้งของผู้ Login; รอทดสอบรับมอบ |
 | ⬜ | ประวัติซ่อมและค่าบริการ | `20003` `/portal/history` |
 | ⬜ | รอบบำรุงรักษาของห้อง | `20004` `/portal/pm-schedule` |
 | ⬜ | ประเมินความพึงพอใจ | `20005` `/portal/evaluation` |
