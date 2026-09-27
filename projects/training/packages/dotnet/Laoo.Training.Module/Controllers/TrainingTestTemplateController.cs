@@ -53,9 +53,13 @@ SELECT COUNT_BIG(*) FROM dbo.TDTRTrainingTestTemplate WHERE {where};
     {
         if(!Scope(out var company,out var user))return Forbid();await using var db=await Open(token);if(!await Allowed(db,"CREATE",token))return Forbid();
         await using var cmd=new SqlCommand("""
+DECLARE @new bigint;
 INSERT dbo.TDTRTrainingTestTemplate(CompanyID,TrainingTestTemplateCode,TrainingTestTemplateName,SectionCode,DefinitionJson,VersionNo,IsActive,CreateBy,UpdateBy)
-SELECT CompanyID,TrainingTestTemplateCode+N'-COPY-'+CONVERT(nvarchar(10),TrainingTestTemplateID),TrainingTestTemplateName+N' (สำเนา)',SectionCode,DefinitionJson,VersionNo+1,0,@user,@user
-FROM dbo.TDTRTrainingTestTemplate WHERE TrainingTestTemplateID=@id AND CompanyID=@company;SELECT SCOPE_IDENTITY();
+SELECT CompanyID,N'__COPY_'+CONVERT(nvarchar(36),NEWID()),TrainingTestTemplateName+N' (สำเนา)',SectionCode,DefinitionJson,VersionNo+1,0,@user,@user
+FROM dbo.TDTRTrainingTestTemplate WHERE TrainingTestTemplateID=@id AND CompanyID=@company;
+SET @new=SCOPE_IDENTITY();
+IF @new IS NOT NULL UPDATE dbo.TDTRTrainingTestTemplate SET TrainingTestTemplateCode=N'TST'+RIGHT(N'000000'+CONVERT(nvarchar(20),@new),6) WHERE TrainingTestTemplateID=@new;
+SELECT @new;
 """,db);
         Add(cmd,"@id",SqlDbType.BigInt,id);Add(cmd,"@company",SqlDbType.BigInt,company);Add(cmd,"@user",SqlDbType.BigInt,user);var result=await cmd.ExecuteScalarAsync(token);return result is null?NotFound():Ok(new{id=Convert.ToInt64(result)});
     }

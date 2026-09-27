@@ -6,7 +6,7 @@ namespace LaooTrainingModule.Assessments;
 // Persist this model server-side only. Never return IsCorrect to a participant.
 public sealed record ExamOption(Guid Id, string? Text, Guid? ImageId, bool IsCorrect);
 public sealed record ExamQuestion(Guid Id, string? Text, Guid? ImageId, List<ExamOption> Options);
-public sealed record ExamDefinition(int QuestionCount, decimal PassingPercent, bool IsActive, List<ExamQuestion> Questions);
+public sealed record ExamDefinition(int QuestionCount, decimal PassingPercent, bool IsActive, List<ExamQuestion> Questions, string? QuestionType = null);
 public sealed record ExamAnswer(Guid QuestionId, Guid OptionId);
 public sealed record ExamSnapshot(decimal PassingPercent, List<ExamQuestion> Questions);
 public sealed record ExamScore(int Score, int MaxScore, decimal Percent, bool Passed);
@@ -25,13 +25,14 @@ public static class ExamRules
             return "จำนวนข้อสุ่มต้องอยู่ระหว่าง 1 ถึงจำนวนข้อสอบที่สร้างไว้ (สูงสุด 200 ข้อ)";
         if (definition.PassingPercent is < 0 or > 100)
             return "เกณฑ์ผ่านต้องอยู่ระหว่าง 0 ถึง 100 เปอร์เซ็นต์";
+        var trueFalse = definition.QuestionType == "TRUE_FALSE";
         var ids = new HashSet<Guid>();
         foreach (var question in definition.Questions)
         {
             if (question is null || question.Id == Guid.Empty || !ids.Add(question.Id) ||
                 !Content(question.Text, question.ImageId, 2000))
                 return "คำถามต้องมีรหัสไม่ซ้ำและมีข้อความหรือรูปภาพ";
-            if (question.Options is null || question.Options.Count != 4 ||
+            if (question.Options is null || question.Options.Count != (trueFalse ? 2 : 4) ||
                 question.Options.Any(x => x is null) ||
                 question.Options.Count(x => x.IsCorrect) != 1)
                 return "แต่ละข้อต้องมี 4 ตัวเลือก และถูกต้องเพียง 1 ตัวเลือก";
