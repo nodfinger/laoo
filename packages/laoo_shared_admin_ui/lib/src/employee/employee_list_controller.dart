@@ -26,6 +26,7 @@ class EmployeeListController extends ChangeNotifier {
   int? departmentId;
   int? companyId;
   bool? isActive;
+  bool serviceEntitled = false;
   bool _disposed = false;
 
   int get totalPages =>
@@ -42,6 +43,7 @@ class EmployeeListController extends ChangeNotifier {
       // Permission loading is fail-closed.
     }
     canCreate = screenType == 1 && actions['create'] == true;
+    serviceEntitled = actions['serviceEnabled'] == true;
     canEdit = (screenType == 1 || screenType == 2) && actions['edit'] == true;
     canDelete = screenType == 1 && actions['delete'] == true;
     await load();

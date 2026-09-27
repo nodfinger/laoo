@@ -135,6 +135,7 @@ WHERE R.CompanyID=@company AND R.RoomID IS NULL AND R.HouseID IS NULL AND R.IsAc
             await using (var command = new SqlCommand(clear, c, tx))
             {
                 command.Parameters.AddWithValue("@company", Company); command.Parameters.AddWithValue("@roomId", roomId); command.Parameters.AddWithValue("@actor", User.FindFirstValue("user_id") ?? "api");
+                for (var i = 0; i < residentIds.Length; i++) command.Parameters.Add(parameters[i], SqlDbType.BigInt).Value = residentIds[i];
                 await command.ExecuteNonQueryAsync(token);
             }
             if (residentIds.Length > 0)

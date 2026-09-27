@@ -222,7 +222,7 @@ WHERE PersonID=@PersonID AND CompanyID=@company;
         Add(cmd, "@carId1", SqlDbType.NVarChar, x.CarID1, 50); Add(cmd, "@carColor1", SqlDbType.NVarChar, x.CarColor1, 100); Add(cmd, "@carType1", SqlDbType.NVarChar, x.CarTypeCode1, 50); Add(cmd, "@carOil1", SqlDbType.NVarChar, x.CarOilType1, 50);
         Add(cmd, "@carId2", SqlDbType.NVarChar, x.CarID2, 50); Add(cmd, "@carColor2", SqlDbType.NVarChar, x.CarColor2, 100); Add(cmd, "@carType2", SqlDbType.NVarChar, x.CarTypeCode2, 50); Add(cmd, "@carOil2", SqlDbType.NVarChar, x.CarOilType2, 50);
         cmd.Parameters.Add("@active", SqlDbType.Bit).Value = x.IsActive;
-        cmd.Parameters.Add(new SqlParameter { ParameterName = new string(new[] { '@', 't', 'e', 'c', 'h', 'n', 'i', 'c', 'i', 'a', 'n' }), SqlDbType = SqlDbType.Bit, Value = x.IsServiceTechnician && isCompanyEmployee && await ServiceEnabled(c, token) });
+        cmd.Parameters.Add(new SqlParameter { ParameterName = new string(new[] { '@', 't', 'e', 'c', 'h', 'n', 'i', 'c', 'i', 'a', 'n' }), SqlDbType = SqlDbType.Bit, Value = x.IsServiceTechnician && isCompanyEmployee && await ServiceEnabled(c, token, transaction) });
         cmd.Parameters.Add(new SqlParameter { ParameterName = new string(new[] { '@', 'n', 'o', 't', 'i', 'f', 'y' }), SqlDbType = SqlDbType.Bit, Value = x.NotifyInSystem });
         try
         {
@@ -633,11 +633,11 @@ WHERE P.ProjectID=@project AND P.IsActive=1
         command.Parameters.Add("@partner", SqlDbType.BigInt).Value = partnerId;
         return Convert.ToBoolean(await command.ExecuteScalarAsync(token));
     }
-    private async Task<bool> ServiceEnabled(SqlConnection c, CancellationToken token)
+    private async Task<bool> ServiceEnabled(SqlConnection c, CancellationToken token, SqlTransaction? transaction = null)
     {
         if (!long.TryParse(User.FindFirstValue("company_id"), out var company) || !long.TryParse(User.FindFirstValue("partner_id"), out var partner)) return false;
         const string sql = "SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADProject P JOIN dbo.TDADCompanyProject CP ON CP.ProjectID=P.ProjectID AND CP.CompanyID=@company AND CP.PartnerID=@partner AND CP.IsEnabled=1 WHERE P.ProjectCode=N'LAOO_SERVICE' AND P.IsActive=1 AND (CP.StartDate IS NULL OR CP.StartDate<=CONVERT(date,SYSUTCDATETIME())) AND (CP.ExpireDate IS NULL OR CP.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))) THEN 1 ELSE 0 END";
-        await using var cmd = new SqlCommand(sql, c); Add(cmd, "@company", SqlDbType.BigInt, company); Add(cmd, "@partner", SqlDbType.BigInt, partner);
+        await using var cmd = new SqlCommand(sql, c, transaction); Add(cmd, "@company", SqlDbType.BigInt, company); Add(cmd, "@partner", SqlDbType.BigInt, partner);
         return Convert.ToBoolean(await cmd.ExecuteScalarAsync(token));
     }
     private (long PartnerId, long? CompanyId)? ResolveScope(long? requestedCompany)

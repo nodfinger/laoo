@@ -24,7 +24,6 @@ import '../holiday_calendars/branch_holiday_calendar_page.dart';
 import '../holiday_calendars/branch_holiday_exception_page.dart';
 import '../my_attendance_history/my_attendance_history_page.dart';
 import '../payroll_exports/payroll_export_page.dart';
-import 'pages/time_preview_page.dart';
 
 List<GoRoute> buildTimeFeatureRoutes() => <GoRoute>[
   GoRoute(

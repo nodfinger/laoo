@@ -337,13 +337,15 @@ class _PolicyDialogState extends State<_PolicyDialog> {
       firstDate: DateTime(2000),
       lastDate: DateTime(2100),
     );
-    if (picked != null)
+    if (picked != null) {
       setState(() {
-        if (start)
+        if (start) {
           effectiveFrom = picked;
-        else
+        } else {
           effectiveTo = picked;
+        }
       });
+    }
   }
 
   @override

@@ -58,8 +58,9 @@ class _LaooMenuManagementPageState extends State<LaooMenuManagementPage> {
           .toList();
       _caption = '${result[0]}';
     } catch (error) {
-      if (mounted)
+      if (mounted) {
         showTimedSnackBar(context, message: error.toString(), error: true);
+      }
     }
     if (mounted) setState(() => _loading = false);
   }
@@ -77,8 +78,9 @@ class _LaooMenuManagementPageState extends State<LaooMenuManagementPage> {
       if (mounted) showTimedSnackBar(context, message: 'Saved successfully.');
       await _load();
     } catch (error) {
-      if (mounted)
+      if (mounted) {
         showTimedSnackBar(context, message: error.toString(), error: true);
+      }
     }
     if (mounted) setState(() => _saving = false);
   }
@@ -122,7 +124,7 @@ class _LaooMenuManagementPageState extends State<LaooMenuManagementPage> {
                         SizedBox(
                           width: 320,
                           child: DropdownButtonFormField<String?>(
-                            value: _projectCode,
+                            initialValue: _projectCode,
                             decoration: const InputDecoration(
                               labelText: 'System',
                             ),

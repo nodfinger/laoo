@@ -196,7 +196,7 @@ class _LocationPageState extends State<LocationPage> {
       firstDate: DateTime(2000),
       lastDate: DateTime(2100),
     );
-    return date == null ? null : date.toIso8601String().substring(0, 10);
+    return date?.toIso8601String().substring(0, 10);
   }
 
   Future<void> _manageResidents(Map<String, dynamic> room) async {
@@ -270,11 +270,13 @@ class _LocationPageState extends State<LocationPage> {
                       '/api/company/locations/rooms/${room['id']}/residents',
                       body: {'residentIds': selected.toList()},
                     );
-                    if (dialogContext.mounted)
+                    if (dialogContext.mounted) {
                       Navigator.pop(dialogContext, true);
+                    }
                   } catch (e) {
-                    if (dialogContext.mounted)
+                    if (dialogContext.mounted) {
                       Navigator.pop(dialogContext, false);
+                    }
                     if (mounted) _fail(e);
                   }
                 },
@@ -318,10 +320,7 @@ class _LocationPageState extends State<LocationPage> {
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    'ห้อง: ' +
-                        room['code'].toString() +
-                        ' | ' +
-                        room['name'].toString(),
+                    'ห้อง: ${room['code']} | ${room['name']}',
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -372,12 +371,12 @@ class _LocationPageState extends State<LocationPage> {
             ),
             FilledButton(
               onPressed: () async {
-                if (name.text.trim().isEmpty || start.text.trim().isEmpty)
+                if (name.text.trim().isEmpty || start.text.trim().isEmpty) {
                   return;
+                }
                 final path = tenant == null
                     ? '/api/company/business-locations/rental-office/tenants'
-                    : '/api/company/business-locations/rental-office/tenants/' +
-                          tenant['tenantId'].toString();
+                    : '/api/company/business-locations/rental-office/tenants/${tenant['tenantId']}';
                 final body = {
                   'roomId': room['id'],
                   'name': name.text.trim(),
@@ -394,8 +393,9 @@ class _LocationPageState extends State<LocationPage> {
                   }
                   if (dialogContext.mounted) Navigator.pop(dialogContext, true);
                 } catch (e) {
-                  if (dialogContext.mounted)
+                  if (dialogContext.mounted) {
                     Navigator.pop(dialogContext, false);
+                  }
                   if (mounted) _fail(e);
                 }
               },
@@ -483,11 +483,8 @@ class _LocationPageState extends State<LocationPage> {
                 if (name.text.trim().isEmpty) return;
                 final id = contact?['contactId'];
                 final path = id == null
-                    ? '/api/company/business-locations/rental-office/tenants/' +
-                          tenant['tenantId'].toString() +
-                          '/contacts'
-                    : '/api/company/business-locations/rental-office/contacts/' +
-                          id.toString();
+                    ? '/api/company/business-locations/rental-office/tenants/${tenant['tenantId']}/contacts'
+                    : '/api/company/business-locations/rental-office/contacts/$id';
                 final body = {
                   'tenantId': tenant['tenantId'],
                   'personId': contact?['personId'],
@@ -505,8 +502,9 @@ class _LocationPageState extends State<LocationPage> {
                   }
                   if (dialogContext.mounted) Navigator.pop(dialogContext, true);
                 } catch (e) {
-                  if (dialogContext.mounted)
+                  if (dialogContext.mounted) {
                     Navigator.pop(dialogContext, false);
+                  }
                   if (mounted) _fail(e);
                 }
               },
@@ -537,7 +535,7 @@ class _LocationPageState extends State<LocationPage> {
                   : ListView.separated(
                       shrinkWrap: true,
                       itemCount: contacts.length,
-                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      separatorBuilder: (_, _) => const Divider(height: 1),
                       itemBuilder: (_, index) {
                         final contact = contacts[index];
                         return ListTile(

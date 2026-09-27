@@ -155,7 +155,7 @@ class _AttendanceSummaryPageState extends State<AttendanceSummaryPage> {
                 SizedBox(
                   width: 220,
                   child: DropdownButtonFormField<int?>(
-                    value: _branchId,
+                    initialValue: _branchId,
                     isExpanded: true,
                     decoration: const InputDecoration(labelText: 'สาขา'),
                     items: [
@@ -172,7 +172,7 @@ class _AttendanceSummaryPageState extends State<AttendanceSummaryPage> {
                 SizedBox(
                   width: 220,
                   child: DropdownButtonFormField<int?>(
-                    value: _divisionOrgUnitId,
+                    initialValue: _divisionOrgUnitId,
                     isExpanded: true,
                     decoration: const InputDecoration(labelText: 'ฝ่าย'),
                     items: [
@@ -194,7 +194,7 @@ class _AttendanceSummaryPageState extends State<AttendanceSummaryPage> {
                 SizedBox(
                   width: 220,
                   child: DropdownButtonFormField<int?>(
-                    value: _departmentOrgUnitId,
+                    initialValue: _departmentOrgUnitId,
                     isExpanded: true,
                     decoration: const InputDecoration(labelText: 'แผนก'),
                     items: [
