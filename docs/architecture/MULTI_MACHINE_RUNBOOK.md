@@ -4,23 +4,24 @@
 
 | Machine role | Owned source |
 | --- | --- |
-| `core` | Root Core, `laoo_api`, shared packages, Stock, `projects/service`, `projects/sales`, `projects/pos`, `projects/expense`, `projects/intranet` |
-| `business` on `mhon` | `projects/time`, `projects/visitor`, `projects/gate_pass`, `projects/project` |
-| `business` on `mon` | `projects/meeting`, `projects/training`, `projects/evaluation`, `projects/survey`, `projects/vote`, `projects/five_s` |
+| `center-service` on `mon` | Root Core, `laoo_api`, shared packages, and every `projects/*` module |
+| `unassigned` on `pat` | None; sync `main` and wait for an explicit assignment |
+| `unassigned` on `mhon` | None; sync `main` and wait for an explicit assignment |
 
 Every machine clones `nodfinger/laoo` to `C:\laooplatform\laoo`. Never
 share a live working tree, `.git`, `.dart_tool`, `build`, `bin`, or `obj`.
 Copy the matching `local.machine.*.example.json` to ignored
-`local.machine.json`. A `business` machine must declare every assigned Project
-package in `ownedModules`; the boundary script permits only that list.
+`local.machine.json`. The `mon` machine is the temporary integration owner for
+all Projects. An `unassigned` machine cannot code or run Project verification
+until its role and ownership are explicitly assigned.
 
-Mhon machine example:
+Pat/Mhon waiting example:
 
 ```json
 {
-  "role": "business",
-  "ownedModules": ["time", "visitor", "gate_pass", "project"],
-  "allowedProjects": ["LAOO_TIME", "LAOO_VISITOR", "LAOO_GATE_PASS", "LAOO_PROJECT"],
+  "role": "unassigned",
+  "ownedModules": [],
+  "allowedProjects": [],
   "webPort": 8080,
   "apiPort": 5080
 }
@@ -30,9 +31,9 @@ Mon machine example:
 
 ```json
 {
-  "role": "business",
-  "ownedModules": ["meeting", "training", "evaluation", "survey", "vote", "five_s"],
-  "allowedProjects": ["LAOO_MEETING", "LAOO_TRAINING", "LAOO_EVALUATION", "LAOO_SURVEY", "LAOO_VOTE", "LAOO_5S"],
+  "role": "center-service",
+  "ownedModules": ["service", "meeting", "visitor", "time", "training", "gate_pass", "five_s", "survey", "expense", "project", "intranet", "vote", "pos", "sales", "evaluation"],
+  "allowedProjects": ["LAOO", "LAOO_SERVICE", "LAOO_MEETING", "LAOO_VISITOR", "LAOO_TIME", "LAOO_TRAINING", "LAOO_GATE_PASS", "LAOO_5S", "LAOO_SURVEY", "LAOO_EXPENSE", "LAOO_PROJECT", "LAOO_INTRANET", "LAOO_VOTE", "LAOO_POS", "LAOO_SALES", "LAOO_EVALUATION"],
   "webPort": 8080,
   "apiPort": 5080
 }
@@ -41,10 +42,10 @@ Mon machine example:
 Never commit a real `local.machine.json`.
 
 Run `tools/scripts/check-machine-boundaries.ps1 -Module <module>` before full
-verification. A business machine may validate only a module named in its
-`ownedModules`, and the script rejects changed files outside that Project
-directory. The Core machine may change Root, Core, shared packages, and its
-owned Project modules, and is responsible for integration verification.
+verification. The `center-service` machine may validate Core integration and
+every Project module. A machine with role `unassigned` is rejected immediately.
+Future business assignments remain limited to modules named in
+`ownedModules`.
 ## New Project bootstrap
 
 Before assigning a new machine, the Center machine must merge a Bootstrap PR

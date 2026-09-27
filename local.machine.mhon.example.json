@@ -1,7 +1,7 @@
 {
-  "role": "business",
-  "ownedModules": ["time", "visitor", "gate_pass", "project"],
-  "allowedProjects": ["LAOO_TIME", "LAOO_VISITOR", "LAOO_GATE_PASS", "LAOO_PROJECT"],
+  "role": "unassigned",
+  "ownedModules": [],
+  "allowedProjects": [],
   "webPort": 8080,
   "apiPort": 5080
 }

@@ -127,8 +127,8 @@ ScreenType: 1
 - ก่อน Commit/Push ขึ้น GitHub ให้ถามพ่อเพียงครั้งเดียวต่อชุดงาน โดยสรุปขอบเขตให้ครบถ้วน
 - หากพ่อตอบ `ok` หรือ `approve` ให้ถือว่าอนุมัติการ Commit/Push ของชุดงานที่สรุปไว้แล้ว และห้ามถามซ้ำในชุดงานเดียวกัน
 - หากพ่อสั่งตรง ๆ ว่า `หม่อน ขึ้น github` ให้ถือว่าเป็นคำสั่งอนุมัติให้ Commit/Push ได้ทันที โดยไม่ต้องถามซ้ำ
-- ทุกเครื่องต้องอ่านบทบาทจาก `local.machine.json`: `center-service`, `meeting`, `visitor` หรือ `time`; ไฟล์นี้เป็น Local config และห้าม Commit
-- แต่ละเครื่องแก้และ Merge ได้เฉพาะ Project ตามบทบาทของตน; การแก้ Root/Shared จากเครื่อง Meeting, Visitor หรือ Time ต้องแยก PR และตรวจ Center รวมก่อน Merge
+- ทุกเครื่องต้องอ่านบทบาทจาก `local.machine.json`: ปัจจุบัน `mon` ใช้ `center-service` ดูแลทุก Project ส่วน `pat` และ `mhon` ใช้ `unassigned` เพื่อรอมอบหมาย; ไฟล์นี้เป็น Local config และห้าม Commit
+- เครื่อง `center-service` แก้และ Merge Root/Shared/ทุก Project ได้; เครื่อง `unassigned` ห้าม Coding หรือ Verify Project จนกว่าจะได้รับมอบหมาย; บทบาท `business` หรือ Project-specific แก้ได้เฉพาะ Project ที่กำหนด
 - เมื่อพ่ออนุมัติ Commit/Push หรือสั่งให้ Commit/Push ให้ถือว่ารวมถึงการสร้าง Pull Request และ Merge เข้า `main` ต่อเนื่องได้ทันที โดยไม่ต้องถามอนุมัติซ้ำ
 - ก่อน Merge ต้องตรวจว่า Working Tree ถูกต้อง ไม่มี Secret หรือ Build Artifact, การทดสอบที่เกี่ยวข้องผ่าน และ Pull Request ไม่มี Conflict หรือ Check ที่ล้มเหลว; ห้ามข้าม Branch Protection หรือบังคับ Merge
 - หลัง Merge ให้สลับกลับ `main`, ดึง `origin/main` แบบ `--ff-only`, ตรวจว่า Working Tree สะอาด แล้วรายงาน Commit บน `main` ให้พ่อทราบ
