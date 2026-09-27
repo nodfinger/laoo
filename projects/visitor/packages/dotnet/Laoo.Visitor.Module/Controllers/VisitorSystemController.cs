@@ -655,7 +655,7 @@ WITH ExceptionRows AS
 (
     SELECT V.VisitorVisitID, V.VisitorName, V.HostNameSnapshot, V.ContactPointNameSnapshot,
            V.CheckedInDate AS OccurredDate, 'HOST_CONFIRMATION_PENDING' AS ExceptionType,
-           N'??????????????????????????????' AS ExceptionDescription
+           N'ผู้รับรองยังไม่ยืนยันการเข้าพบ' AS ExceptionDescription
     FROM dbo.TDTMVisitorVisit V
     LEFT JOIN dbo.TDTMVisitorHostConfirmation C
       ON C.CompanyID=V.CompanyID AND C.VisitorVisitID=V.VisitorVisitID
@@ -665,7 +665,7 @@ WITH ExceptionRows AS
     UNION ALL
 
     SELECT V.VisitorVisitID, V.VisitorName, V.HostNameSnapshot, V.ContactPointNameSnapshot,
-           V.CheckedOutDate, 'CHECKOUT_OTHER', N'Check-out ?????????????? ?'
+           V.CheckedOutDate, 'CHECKOUT_OTHER', N'Check-out ระบุเหตุผลอื่น ๆ'
     FROM dbo.TDTMVisitorVisit V
     WHERE V.CompanyID=@CompanyID AND V.VisitorContactPointID=@ContactPointID
       AND V.StatusCode='CHECKED_OUT' AND V.CheckoutReasonCode='OTHER'
@@ -673,7 +673,7 @@ WITH ExceptionRows AS
     UNION ALL
 
     SELECT V.VisitorVisitID, V.VisitorName, V.HostNameSnapshot, V.ContactPointNameSnapshot,
-           N.CreateDate, 'NOTIFICATION_FAILED', N'?????????????????????????????????'
+           N.CreateDate, 'NOTIFICATION_FAILED', N'ส่งการแจ้งเตือนผู้รับรองไม่สำเร็จ'
     FROM dbo.TDTMVisitorVisit V
     JOIN dbo.TDTMVisitorNotificationOutbox N
       ON N.CompanyID=V.CompanyID AND N.VisitorVisitID=V.VisitorVisitID
@@ -683,7 +683,7 @@ WITH ExceptionRows AS
     UNION ALL
 
     SELECT V.VisitorVisitID, V.VisitorName, V.HostNameSnapshot, V.ContactPointNameSnapshot,
-           N.CreateDate, 'NOTIFICATION_NO_CHANNEL', N'????????????????????????????????????'
+           N.CreateDate, 'NOTIFICATION_NO_CHANNEL', N'ผู้รับรองไม่มีช่องทางรับการแจ้งเตือน'
     FROM dbo.TDTMVisitorVisit V
     JOIN dbo.TDTMVisitorNotificationOutbox N
       ON N.CompanyID=V.CompanyID AND N.VisitorVisitID=V.VisitorVisitID
@@ -693,7 +693,7 @@ WITH ExceptionRows AS
     UNION ALL
 
     SELECT V.VisitorVisitID, V.VisitorName, V.HostNameSnapshot, V.ContactPointNameSnapshot,
-           V.CheckedOutDate, 'CHECKOUT_RULE_MISMATCH', N'???????????????????? Check-out ??????????????'
+           V.CheckedOutDate, 'CHECKOUT_RULE_MISMATCH', N'ผลการเข้าพบและเหตุผล Check-out ไม่สัมพันธ์กัน'
     FROM dbo.TDTMVisitorVisit V
     WHERE V.CompanyID=@CompanyID AND V.VisitorContactPointID=@ContactPointID
       AND V.StatusCode='CHECKED_OUT'
