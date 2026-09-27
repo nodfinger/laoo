@@ -113,7 +113,7 @@ class _VisitorExceptionsPageState extends State<VisitorExceptionsPage> {
                 ),
               ),
               IconButton(
-                tooltip: 'รีเฟรช',
+                tooltip: 'โหลดใหม่',
                 onPressed: _loading ? null : _load,
                 icon: const Icon(Icons.refresh),
               ),
@@ -161,12 +161,12 @@ class _VisitorExceptionsPageState extends State<VisitorExceptionsPage> {
           key: ValueKey(_type),
           initialValue: _type,
           isExpanded: true,
-          decoration: const InputDecoration(labelText: 'ประเภทความผิดปกติ'),
+          decoration: const InputDecoration(labelText: 'ประเภทผิดปกติ'),
           items: const [
             DropdownMenuItem(value: 'ALL', child: Text('ทั้งหมด')),
             DropdownMenuItem(
               value: 'HOST_CONFIRMATION_PENDING',
-              child: Text('ผู้รับรองยังไม่ยืนยัน'),
+              child: Text('รอยืนยันการเข้าพบ'),
             ),
             DropdownMenuItem(
               value: 'CHECKOUT_OTHER',
@@ -174,7 +174,7 @@ class _VisitorExceptionsPageState extends State<VisitorExceptionsPage> {
             ),
             DropdownMenuItem(
               value: 'NOTIFICATION_FAILED',
-              child: Text('ส่งการแจ้งเตือนไม่สำเร็จ'),
+              child: Text('แจ้งเตือนส่งไม่สำเร็จ'),
             ),
             DropdownMenuItem(
               value: 'NOTIFICATION_NO_CHANNEL',
@@ -182,7 +182,7 @@ class _VisitorExceptionsPageState extends State<VisitorExceptionsPage> {
             ),
             DropdownMenuItem(
               value: 'CHECKOUT_RULE_MISMATCH',
-              child: Text('ผลการเข้าพบไม่สัมพันธ์กับ Check-out'),
+              child: Text('ผลและเหตุผลไม่สัมพันธ์กัน'),
             ),
           ],
           onChanged: (value) => setState(() => _type = value ?? 'ALL'),
@@ -207,8 +207,8 @@ class _VisitorExceptionsPageState extends State<VisitorExceptionsPage> {
 
   String get _periodText {
     final value = _period;
-    if (value == null) return 'เลือกช่วงวันที่';
-    return '${_date(value.start)} ? ${_date(value.end)}';
+    if (value == null) return 'ทุกช่วงวันที่';
+    return '${_date(value.start)} — ${_date(value.end)}';
   }
 
   Widget _list() {
@@ -218,7 +218,7 @@ class _VisitorExceptionsPageState extends State<VisitorExceptionsPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'รายการผิดปกติ',
+            'รายการที่ต้องตรวจสอบ',
             style: Theme.of(context).textTheme.titleMedium
                 ?.copyWith(fontWeight: FontWeight.w700),
           ),
@@ -253,7 +253,7 @@ class _VisitorExceptionsPageState extends State<VisitorExceptionsPage> {
             Expanded(flex: 2, child: Text('ประเภท / รายละเอียด')),
             Expanded(child: Text('ผู้รับรอง')),
             Expanded(child: Text('จุดติดต่อ')),
-            Expanded(child: Text('เวลา')),
+            Expanded(child: Text('เวลาพบ')),
             SizedBox(width: 108),
           ],
         ),
@@ -315,7 +315,7 @@ class _VisitorExceptionsPageState extends State<VisitorExceptionsPage> {
         Text('${item.typeLabel}: ${item.description}'),
         Text('ผู้รับรอง: ${item.hostName}'),
         Text('จุดติดต่อ: ${item.contactPointName}'),
-        Text('เวลา: ${_dateTime(item.occurredDate)}'),
+        Text('เวลาพบ: ${_dateTime(item.occurredDate)}'),
       ],
     ),
   );

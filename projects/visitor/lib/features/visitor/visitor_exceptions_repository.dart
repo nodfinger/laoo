@@ -121,11 +121,11 @@ class VisitorExceptionItem {
   final String description;
 
   String get typeLabel => switch (exceptionType) {
-    'HOST_CONFIRMATION_PENDING' => 'ผู้รับรองยังไม่ยืนยัน',
+    'HOST_CONFIRMATION_PENDING' => 'รอยืนยันการเข้าพบ',
     'CHECKOUT_OTHER' => 'Check-out เหตุผลอื่น ๆ',
-    'NOTIFICATION_FAILED' => 'ส่งการแจ้งเตือนไม่สำเร็จ',
+    'NOTIFICATION_FAILED' => 'แจ้งเตือนส่งไม่สำเร็จ',
     'NOTIFICATION_NO_CHANNEL' => 'ไม่มีช่องทางแจ้งเตือน',
-    'CHECKOUT_RULE_MISMATCH' => 'ผลการเข้าพบไม่สัมพันธ์กับ Check-out',
+    'CHECKOUT_RULE_MISMATCH' => 'ผลและเหตุผลไม่สัมพันธ์กัน',
     _ => exceptionType,
   };
 }
