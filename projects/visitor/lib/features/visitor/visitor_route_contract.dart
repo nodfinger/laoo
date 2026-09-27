@@ -132,7 +132,7 @@ abstract final class VisitorRoutes {
       screenType: 3,
       routeName: 'visitorExceptions',
       routePath: '/visitor/exceptions',
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: VisitorProject.code,

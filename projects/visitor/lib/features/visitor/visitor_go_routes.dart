@@ -2,6 +2,7 @@ import 'package:go_router/go_router.dart';
 
 import 'visitor_check_in_page.dart';
 import 'visitor_contact_points_page.dart';
+import 'visitor_exceptions_page.dart';
 import 'visitor_history_page.dart';
 import 'visitor_appointments_page.dart';
 import 'visitor_host_confirm_page.dart';
@@ -9,8 +10,16 @@ import 'visitor_inside_page.dart';
 import 'visitor_system_settings_page.dart';
 
 List<GoRoute> buildVisitorFeatureRoutes() => <GoRoute>[
-  GoRoute(path: '/visitor/pre-register', name: 'preRegister', builder: (context, state) => const VisitorAppointmentsPage()),
-  GoRoute(path: '/visitor/approval-status', name: 'approvalStatus', builder: (context, state) => const VisitorAppointmentApprovalsPage()),
+  GoRoute(
+    path: '/visitor/pre-register',
+    name: 'preRegister',
+    builder: (context, state) => const VisitorAppointmentsPage(),
+  ),
+  GoRoute(
+    path: '/visitor/approval-status',
+    name: 'approvalStatus',
+    builder: (context, state) => const VisitorAppointmentApprovalsPage(),
+  ),
   GoRoute(
     path: '/visitor/host-confirm',
     name: 'hostConfirm',
@@ -52,5 +61,10 @@ List<GoRoute> buildVisitorFeatureRoutes() => <GoRoute>[
     path: '/visitor/history',
     name: 'visitorHistory',
     builder: (context, state) => const VisitorHistoryPage(),
+  ),
+  GoRoute(
+    path: '/visitor/exceptions',
+    name: 'visitorExceptions',
+    builder: (context, state) => const VisitorExceptionsPage(),
   ),
 ];
