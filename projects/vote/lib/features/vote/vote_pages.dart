@@ -88,6 +88,9 @@ class _VotePageState extends State<VotePage> {
               for (final item in items)
                 Card(
                   child: ListTile(
+                    onTap: '${item['status']}' == 'CLOSED'
+                        ? () => _viewResult(item['id'])
+                        : null,
                     title: Text('${item['voteNo']} | ${item['name']}'),
                     subtitle: Text(
                       '${item['status']} · โหวตแล้ว ${item['voted']}/${item['eligible']} คน',
@@ -162,25 +165,156 @@ class _VotePageState extends State<VotePage> {
   Widget _settings(Map x) => Padding(
     padding: const EdgeInsets.all(20),
     child: Card(
-      child: SwitchListTile(
-        title: const Text('เปิดใช้งานระบบโหวต'),
-        subtitle: Text(
-          'ระยะเวลาเริ่มต้น ${x['defaultOpenHours'] ?? 72} ชั่วโมง',
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'ตั้งค่าระบบโหวต',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const Divider(),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('เปิดใช้งานระบบโหวต'),
+              subtitle: Text(
+                (x['isEnabled'] ?? true)
+                    ? 'ผู้มีสิทธิ์สามารถโหวตในรอบที่เผยแพร่'
+                    : 'ปิดรับการใช้งานระบบโหวตชั่วคราว',
+              ),
+              value: x['isEnabled'] ?? true,
+              onChanged: (_) => _editSettings(x),
+            ),
+            Text(
+              'ระยะเวลาเปิดโหวตเริ่มต้น: ${x['defaultOpenHours'] ?? 72} ชั่วโมง',
+            ),
+            Text(
+              'ผู้อนุมัติเริ่มต้น: ${x['defaultApproverUserId'] ?? 'ไม่กำหนด'}',
+            ),
+            const SizedBox(height: 16),
+            Align(
+              alignment: Alignment.centerRight,
+              child: FilledButton.icon(
+                onPressed: () => _editSettings(x),
+                icon: const Icon(Icons.edit),
+                label: const Text('แก้ไขการตั้งค่า'),
+              ),
+            ),
+          ],
         ),
-        value: x['isEnabled'] ?? true,
-        onChanged: (v) async {
-          await api.put(
-            '/api/company/votes/settings',
-            body: {
-              'isEnabled': v,
-              'defaultOpenHours': x['defaultOpenHours'] ?? 72,
-            },
-          );
-          reload();
-        },
       ),
     ),
   );
+
+  Future<void> _editSettings(Map settings) async {
+    var enabled = settings['isEnabled'] ?? true;
+    final hours = TextEditingController(
+      text: '${settings['defaultOpenHours'] ?? 72}',
+    );
+    final approver = TextEditingController(
+      text: '${settings['defaultApproverUserId'] ?? ''}',
+    );
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('แก้ไขการตั้งค่าระบบโหวต'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SwitchListTile(
+                title: const Text('เปิดใช้งานระบบ'),
+                value: enabled,
+                onChanged: (v) => setDialogState(() => enabled = v),
+              ),
+              TextField(
+                controller: hours,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'ระยะเวลาเปิดโหวตเริ่มต้น (ชั่วโมง) *',
+                ),
+              ),
+              TextField(
+                controller: approver,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'รหัสผู้อนุมัติเริ่มต้น (ไม่บังคับ)',
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('ยกเลิก'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                final defaultHours = int.tryParse(hours.text.trim());
+                if (defaultHours == null || defaultHours < 1) return;
+                await api.put(
+                  '/api/company/votes/settings',
+                  body: {
+                    'isEnabled': enabled,
+                    'defaultOpenHours': defaultHours,
+                    'defaultApproverUserId': approver.text.trim().isEmpty
+                        ? null
+                        : int.tryParse(approver.text.trim()),
+                  },
+                );
+                if (dialogContext.mounted) Navigator.pop(dialogContext);
+                reload();
+              },
+              child: const Text('บันทึก'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _viewResult(Object id) async {
+    final value = Map<String, dynamic>.from(
+      await api.get('/api/company/votes/results/$id') as Map,
+    );
+    if (!mounted) return;
+    final topicGroup = Map<String, dynamic>.from(value['topic'] as Map);
+    final topic = Map<String, dynamic>.from(topicGroup['topic'] as Map);
+    final options = value['options'] as List? ?? const [];
+    final votes = options.fold<int>(
+      0,
+      (total, row) => total + ((row as Map)['votes'] as num).toInt(),
+    );
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('ผลโหวต: ${topic['name']}'),
+        content: SizedBox(
+          width: 480,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('จำนวนคะแนนทั้งหมด $votes เสียง'),
+              const Divider(),
+              for (final option in options)
+                ListTile(
+                  title: Text('${option['text']}'),
+                  trailing: Text('${option['votes']} เสียง'),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('ปิด'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _dashboard(Map x) => Padding(
     padding: const EdgeInsets.all(20),
     child: Wrap(
@@ -326,15 +460,24 @@ class _VotePageState extends State<VotePage> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              for (final option in options)
-                RadioListTile<Map<String, dynamic>>(
-                  value: option,
-                  groupValue: selected,
-                  title: Text('${option['text']}'),
-                  onChanged: (value) => setDialogState(() {
-                    if (value != null) selected = value;
-                  }),
+              RadioGroup<Map<String, dynamic>>(
+                groupValue: selected,
+                onChanged: (value) => setDialogState(() {
+                  if (value != null) {
+                    selected = value;
+                  }
+                }),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (final option in options)
+                      RadioListTile<Map<String, dynamic>>(
+                        value: Map<String, dynamic>.from(option as Map),
+                        title: Text('${option['text']}'),
+                      ),
+                  ],
                 ),
+              ),
             ],
           ),
           actions: [
@@ -363,55 +506,172 @@ class _VotePageState extends State<VotePage> {
     final name = TextEditingController();
     final a = TextEditingController();
     final b = TextEditingController();
+    var targetMode = 'ALL';
+    var targets = <Map<String, dynamic>>[];
     await showDialog(
       context: context,
-      builder: (c) => AlertDialog(
-        title: const Text('เพิ่มหัวข้อโหวต'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: name,
-              decoration: const InputDecoration(labelText: 'ชื่อหัวข้อ'),
+      builder: (c) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('เพิ่มหัวข้อโหวต'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: name,
+                  decoration: const InputDecoration(labelText: 'ชื่อหัวข้อ'),
+                ),
+                TextField(
+                  controller: a,
+                  decoration: const InputDecoration(labelText: 'ตัวเลือก 1'),
+                ),
+                TextField(
+                  controller: b,
+                  decoration: const InputDecoration(labelText: 'ตัวเลือก 2'),
+                ),
+                DropdownButtonFormField<String>(
+                  initialValue: targetMode,
+                  decoration: const InputDecoration(
+                    labelText: 'ผู้มีสิทธิ์โหวต',
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'ALL',
+                      child: Text('พนักงาน active ทั้งหมด'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'CUSTOM',
+                      child: Text('กำหนดแผนก/พนักงาน'),
+                    ),
+                  ],
+                  onChanged: (v) =>
+                      setDialogState(() => targetMode = v ?? 'ALL'),
+                ),
+                if (targetMode == 'CUSTOM')
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: () async {
+                        final selected = await _pickTargets(targets);
+                        if (selected != null) {
+                          setDialogState(() => targets = selected);
+                        }
+                      },
+                      icon: const Icon(Icons.group_add),
+                      label: Text(
+                        targets.isEmpty
+                            ? 'เลือกแผนกหรือพนักงาน'
+                            : 'เลือกแล้ว ${targets.length} รายการ',
+                      ),
+                    ),
+                  ),
+              ],
             ),
-            TextField(
-              controller: a,
-              decoration: const InputDecoration(labelText: 'ตัวเลือก 1'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(c),
+              child: const Text('ยกเลิก'),
             ),
-            TextField(
-              controller: b,
-              decoration: const InputDecoration(labelText: 'ตัวเลือก 2'),
+            FilledButton(
+              onPressed: () async {
+                final now = DateTime.now().toUtc();
+                await api.post(
+                  '/api/company/votes',
+                  body: {
+                    'name': name.text,
+                    'targetMode': targetMode,
+                    'identityMode': 'ANONYMOUS',
+                    'openAt': now
+                        .add(const Duration(hours: 1))
+                        .toIso8601String(),
+                    'closeAt': now
+                        .add(const Duration(hours: 73))
+                        .toIso8601String(),
+                    'options': [a.text, b.text],
+                    'targets': targets,
+                  },
+                );
+                if (c.mounted) Navigator.pop(c);
+                reload();
+              },
+              child: const Text('บันทึก'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(c),
-            child: const Text('ยกเลิก'),
+      ),
+    );
+  }
+
+  Future<List<Map<String, dynamic>>?> _pickTargets(
+    List<Map<String, dynamic>> initial,
+  ) async {
+    final data = Map<String, dynamic>.from(
+      await api.get('/api/company/votes/target-options') as Map,
+    );
+    if (!mounted) return null;
+    final departments = data['departments'] as List? ?? const [];
+    final employees = data['employees'] as List? ?? const [];
+    final selected = <String, Map<String, dynamic>>{
+      for (final item in initial) '${item['type']}:${item['id']}': item,
+    };
+    return showDialog<List<Map<String, dynamic>>>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('เลือกผู้มีสิทธิ์โหวต'),
+          content: SizedBox(
+            width: 520,
+            height: 420,
+            child: ListView(
+              children: [
+                const Text('แผนก'),
+                for (final item in departments)
+                  CheckboxListTile(
+                    value: selected.containsKey('DEPARTMENT:${item['id']}'),
+                    title: Text('${item['name']}'),
+                    onChanged: (checked) => setDialogState(() {
+                      final key = 'DEPARTMENT:${item['id']}';
+                      if (checked == true) {
+                        selected[key] = {
+                          'type': 'DEPARTMENT',
+                          'id': item['id'],
+                        };
+                      } else {
+                        selected.remove(key);
+                      }
+                    }),
+                  ),
+                const Divider(),
+                const Text('พนักงาน'),
+                for (final item in employees)
+                  CheckboxListTile(
+                    value: selected.containsKey('EMPLOYEE:${item['id']}'),
+                    title: Text('${item['code']} | ${item['name']}'),
+                    onChanged: (checked) => setDialogState(() {
+                      final key = 'EMPLOYEE:${item['id']}';
+                      if (checked == true) {
+                        selected[key] = {'type': 'EMPLOYEE', 'id': item['id']};
+                      } else {
+                        selected.remove(key);
+                      }
+                    }),
+                  ),
+              ],
+            ),
           ),
-          FilledButton(
-            onPressed: () async {
-              final now = DateTime.now().toUtc();
-              await api.post(
-                '/api/company/votes',
-                body: {
-                  'name': name.text,
-                  'targetMode': 'ALL',
-                  'identityMode': 'ANONYMOUS',
-                  'openAt': now.add(const Duration(hours: 1)).toIso8601String(),
-                  'closeAt': now
-                      .add(const Duration(hours: 73))
-                      .toIso8601String(),
-                  'options': [a.text, b.text],
-                  'targets': [],
-                },
-              );
-              if (c.mounted) Navigator.pop(c);
-              reload();
-            },
-            child: const Text('บันทึก'),
-          ),
-        ],
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('ยกเลิก'),
+            ),
+            FilledButton(
+              onPressed: () =>
+                  Navigator.pop(dialogContext, selected.values.toList()),
+              child: const Text('ใช้รายชื่อที่เลือก'),
+            ),
+          ],
+        ),
       ),
     );
   }

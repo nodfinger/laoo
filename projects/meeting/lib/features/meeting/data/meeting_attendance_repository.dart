@@ -156,6 +156,42 @@ class MeetingAttendanceRepository {
         as Map,
   );
 
+  Future<Map<String, dynamic>> utilizationReport({
+    required DateTime dateFrom,
+    required DateTime dateTo,
+    int page = 1,
+    int pageSize = 20,
+  }) async => Map<String, dynamic>.from(
+    await _api.get(
+          '$path/utilization-report',
+          query: {
+            'dateFrom': _dateOnly(dateFrom),
+            'dateTo': _dateOnly(dateTo),
+            'page': '$page',
+            'pageSize': '$pageSize',
+          },
+        )
+        as Map,
+  );
+
+  Future<Map<String, dynamic>> noShowReport({
+    required DateTime dateFrom,
+    required DateTime dateTo,
+    int page = 1,
+    int pageSize = 20,
+  }) async => Map<String, dynamic>.from(
+    await _api.get(
+          '$path/no-show-report',
+          query: {
+            'dateFrom': _dateOnly(dateFrom),
+            'dateTo': _dateOnly(dateTo),
+            'page': '$page',
+            'pageSize': '$pageSize',
+          },
+        )
+        as Map,
+  );
+
   static String _dateOnly(DateTime value) =>
       '${value.year.toString().padLeft(4, '0')}-'
       '${value.month.toString().padLeft(2, '0')}-'
@@ -198,6 +234,13 @@ class MeetingAttendanceRepository {
           as Map,
     ),
   );
+
+  Future<void> returnRoom(int bookingId, int slotId, {String? remark}) async {
+    await _api.post(
+      '$path/$bookingId/$slotId/return-room',
+      body: {'remark': remark?.trim()},
+    );
+  }
 
   Future<MeetingFoodReceipt> receipt(
     int bookingId,
