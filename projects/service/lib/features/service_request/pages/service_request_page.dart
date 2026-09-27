@@ -13,9 +13,21 @@ import '../data/service_request_api.dart';
 import '../../service_request_qr/data/service_request_qr_api.dart';
 
 class ServiceRequestPage extends StatefulWidget {
-  const ServiceRequestPage({super.key, this.selfService = false, this.qrToken});
+  const ServiceRequestPage({
+    super.key,
+    this.selfService = false,
+    this.qrToken,
+    this.readOnly = false,
+    this.menuCode,
+    this.routeName,
+    this.fixedStatus,
+  });
   final bool selfService;
   final String? qrToken;
+  final bool readOnly;
+  final String? menuCode;
+  final String? routeName;
+  final String? fixedStatus;
   @override
   State<ServiceRequestPage> createState() => _ServiceRequestPageState();
 }
@@ -34,6 +46,7 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
   @override
   void initState() {
     super.initState();
+    _status = widget.fixedStatus ?? '';
     if (widget.selfService) _menuName = 'แจ้งซ่อม / ขอใช้บริการ';
     _load();
     _loadActions();
@@ -68,10 +81,13 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
       final actions = await _api.actions();
       if (mounted) {
         setState(() {
-          _canCreate = widget.selfService
+          _canCreate = !widget.readOnly && widget.selfService
               ? actions['selfCreate'] == true
-              : actions['create'] == true;
-          _canEdit = !widget.selfService && actions['edit'] == true;
+              : !widget.readOnly && actions['create'] == true;
+          _canEdit =
+              !widget.readOnly &&
+              !widget.selfService &&
+              actions['edit'] == true;
         });
       }
     } catch (_) {}
@@ -80,8 +96,10 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
   Future<void> _loadMenuName() async {
     try {
       final name = await NavigationMenuRepository().resolveMenuName(
-        menuCode: widget.selfService ? '20001' : '15001',
-        routeName: widget.selfService ? 'portalRequest' : 'cmTickets',
+        menuCode: widget.menuCode ?? (widget.selfService ? '20001' : '15001'),
+        routeName:
+            widget.routeName ??
+            (widget.selfService ? 'portalRequest' : 'cmTickets'),
         fallback: _menuName,
       );
       if (mounted) setState(() => _menuName = name);
@@ -148,7 +166,9 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
     final total = (_data['total'] as num?)?.toInt() ?? 0;
     return SupportWorkspaceShell(
       pageTitle: _menuName,
-      activeMenu: widget.selfService ? 'portalRequest' : 'cmTickets',
+      activeMenu:
+          widget.routeName ??
+          (widget.selfService ? 'portalRequest' : 'cmTickets'),
       menuScope: WorkspaceMenuScope.company,
       child: Container(
         width: double.infinity,
@@ -205,38 +225,44 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
                     ),
                   ),
                 ),
-                SizedBox(
-                  width: 180,
-                  child: DropdownButtonFormField<String>(
-                    initialValue: _status,
-                    decoration: _input(label: 'สถานะ'),
-                    items: const [
-                      DropdownMenuItem(value: '', child: Text('ทั้งหมด')),
-                      DropdownMenuItem(value: 'NEW', child: Text('สร้างใหม่')),
-                      DropdownMenuItem(
-                        value: 'RECEIVED',
-                        child: Text('รับเรื่องแล้ว'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'IN_PROGRESS',
-                        child: Text('กำลังดำเนินการ'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'COMPLETED',
-                        child: Text('เสร็จสิ้น'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'CANCELLED',
-                        child: Text('ยกเลิก'),
-                      ),
-                    ],
-                    onChanged: (value) {
-                      _status = value ?? '';
-                      _page = 1;
-                      _load();
-                    },
-                  ),
-                ),
+                if (widget.fixedStatus == null)
+                  SizedBox(
+                    width: 180,
+                    child: DropdownButtonFormField<String>(
+                      initialValue: _status,
+                      decoration: _input(label: 'สถานะ'),
+                      items: const [
+                        DropdownMenuItem(value: '', child: Text('ทั้งหมด')),
+                        DropdownMenuItem(
+                          value: 'NEW',
+                          child: Text('สร้างใหม่'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'RECEIVED',
+                          child: Text('รับเรื่องแล้ว'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'IN_PROGRESS',
+                          child: Text('กำลังดำเนินการ'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'COMPLETED',
+                          child: Text('เสร็จสิ้น'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'CANCELLED',
+                          child: Text('ยกเลิก'),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        _status = value ?? '';
+                        _page = 1;
+                        _load();
+                      },
+                    ),
+                  )
+                else
+                  Chip(label: Text(_statusText(widget.fixedStatus!))),
                 FilledButton.icon(
                   onPressed: () {
                     _page = 1;
@@ -248,7 +274,7 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
                 OutlinedButton(
                   onPressed: () {
                     _search.clear();
-                    _status = '';
+                    _status = widget.fixedStatus ?? '';
                     _page = 1;
                     _load();
                   },
@@ -415,7 +441,7 @@ class _RequestDialogState extends State<_RequestDialog> {
         };
       });
     } catch (error) {
-      if (mounted)
+      if (mounted) {
         showTimedSnackBar(
           context,
           message: error is ApiException
@@ -423,6 +449,7 @@ class _RequestDialogState extends State<_RequestDialog> {
               : 'ไม่สามารถอ่าน QR Code ได้',
           error: true,
         );
+      }
     }
   }
 
@@ -622,7 +649,7 @@ class _RequestDialogState extends State<_RequestDialog> {
                 ],
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  value: _equipment == null
+                  initialValue: _equipment == null
                       ? null
                       : _equipment!['itemID'].toString(),
                   decoration: _input(label: 'อุปกรณ์ที่แจ้งซ่อม *'),
@@ -968,6 +995,10 @@ class _RequestDetailDialogState extends State<_RequestDetailDialog> {
 
   int get _id => (_data['requestId'] as num).toInt();
   String get _status => _data['statusCode']?.toString() ?? '';
+  List<Map<String, dynamic>> get _parts =>
+      ((_data['parts'] as List?) ?? const [])
+          .map((item) => Map<String, dynamic>.from(item as Map))
+          .toList();
 
   @override
   Widget build(BuildContext context) {
@@ -998,6 +1029,27 @@ class _RequestDetailDialogState extends State<_RequestDetailDialog> {
                 _line('ผลการซ่อม', _data['resolutionDetail']?.toString()),
               if (_data['cancellationReason'] != null)
                 _line('เหตุผลยกเลิก', _data['cancellationReason']?.toString()),
+              if (_parts.isNotEmpty) ...[
+                const Divider(height: 24),
+                const Text(
+                  'อะไหล่ที่ใช้ซ่อม',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 8),
+                for (final part in _parts)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      '${part['itemCode'] ?? '-'} | ${part['itemName'] ?? '-'}\nจำนวน ${part['quantity'] ?? 0} ${part['unitCode'] ?? ''} · ต้นทุนรวม ${((part['totalCost'] as num?)?.toDouble() ?? 0).toStringAsFixed(2)} บาท',
+                      softWrap: true,
+                    ),
+                  ),
+                Text(
+                  'ต้นทุนอะไหล่รวม ${((_data['partsTotal'] as num?)?.toDouble() ?? 0).toStringAsFixed(2)} บาท',
+                  textAlign: TextAlign.right,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ],
               if (_attachments.isNotEmpty) ...[
                 const Divider(height: 24),
                 const Text(

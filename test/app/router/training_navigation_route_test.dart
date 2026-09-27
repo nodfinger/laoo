@@ -20,4 +20,13 @@ void main() {
     expect(trainingInstructors.path, RoutePaths.trainingInstructors);
     expect(trainingInstructors.scope, AppMenuScope.company);
   });
+
+  test('My training route is registered as a company show-only screen', () {
+    final route = AppMenuRouteRegistry.byMenuCode('37006');
+
+    expect(route, isNotNull);
+    expect(route!.databaseRouteName, 'myTraining');
+    expect(route.path, '/company/my-training');
+    expect(route.scope, AppMenuScope.company);
+  });
 }

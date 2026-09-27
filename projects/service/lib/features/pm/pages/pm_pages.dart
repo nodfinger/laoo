@@ -49,14 +49,16 @@ class _PmPlansState extends State<PmPlansPage> {
             child: FutureBuilder<Map<String, dynamic>>(
               future: data,
               builder: (c, s) {
-                if (!s.hasData)
+                if (!s.hasData) {
                   return const Center(child: CircularProgressIndicator());
+                }
                 final rows = ((s.data!['items'] as List?) ?? []).cast<Map>();
-                if (rows.isEmpty)
+                if (rows.isEmpty) {
                   return const Center(child: Text('ยังไม่มีแผน PM'));
+                }
                 return ListView.separated(
                   itemCount: rows.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  separatorBuilder: (_, _) => const SizedBox(height: 8),
                   itemBuilder: (_, i) {
                     final r = rows[i];
                     return Card(
@@ -148,7 +150,17 @@ class _PmChecklistsState extends State<PmChecklistsPage> {
 }
 
 class PmCalendarPage extends StatefulWidget {
-  const PmCalendarPage({super.key});
+  const PmCalendarPage({
+    super.key,
+    this.menuCode = '16003',
+    this.routeName = 'pmCalendar',
+    this.pageTitle = 'ปฏิทินงานบำรุงรักษา',
+    this.portalSchedule = false,
+  });
+  final String menuCode;
+  final String routeName;
+  final String pageTitle;
+  final bool portalSchedule;
   @override
   State<PmCalendarPage> createState() => _CalendarState();
 }
@@ -156,56 +168,100 @@ class PmCalendarPage extends StatefulWidget {
 class _CalendarState extends State<PmCalendarPage> {
   final api = PmApi();
   late Future<Map<String, dynamic>> data;
+  String status = '';
   @override
   void initState() {
     super.initState();
-    data = api.workOrders('');
+    data = api.workOrders(
+      status: status,
+      portalSchedule: widget.portalSchedule,
+    );
   }
 
-  void refresh() => setState(() => data = api.workOrders(''));
+  void refresh() => setState(
+    () => data = api.workOrders(
+      status: status,
+      portalSchedule: widget.portalSchedule,
+    ),
+  );
   Future<void> open(Map row) async {
     final id = (row['pmWorkOrderId'] as num).toInt();
     final changed = await showDialog<bool>(
       context: context,
-      builder: (_) => _PmWorkDialog(api, id),
+      builder: (_) =>
+          _PmWorkDialog(api, id, portalSchedule: widget.portalSchedule),
     );
     if (changed == true) refresh();
   }
 
   @override
   Widget build(BuildContext c) => SupportWorkspaceShell(
-    pageTitle: 'ปฏิทินงานบำรุงรักษา',
-    activeMenu: 'pmCalendar',
+    pageTitle: widget.pageTitle,
+    activeMenu: widget.routeName,
     menuScope: WorkspaceMenuScope.company,
     child: Padding(
       padding: const EdgeInsets.all(LaooLayout.cardMargin),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Align(
-            alignment: Alignment.centerRight,
-            child: FilledButton.icon(
-              onPressed: () async {
-                await api.generate();
-                refresh();
-              },
-              icon: const Icon(Icons.event_available),
-              label: const Text('สร้างงานตามรอบ'),
-            ),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              SizedBox(
+                width: 240,
+                child: DropdownButtonFormField<String>(
+                  initialValue: status,
+                  decoration: const InputDecoration(labelText: 'สถานะ'),
+                  items: const [
+                    DropdownMenuItem(value: '', child: Text('ทั้งหมด')),
+                    DropdownMenuItem(
+                      value: 'PENDING',
+                      child: Text('รอดำเนินการ'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'IN_PROGRESS',
+                      child: Text('กำลังดำเนินการ'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'COMPLETED',
+                      child: Text('เสร็จสิ้น'),
+                    ),
+                    DropdownMenuItem(value: 'SKIPPED', child: Text('ข้าม')),
+                  ],
+                  onChanged: (value) {
+                    status = value ?? '';
+                    refresh();
+                  },
+                ),
+              ),
+              FilledButton.icon(
+                onPressed: () async {
+                  await api.generate(portalSchedule: widget.portalSchedule);
+                  refresh();
+                },
+                icon: const Icon(Icons.event_available),
+                label: const Text('สร้างงานตามรอบ'),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           Expanded(
             child: FutureBuilder<Map<String, dynamic>>(
               future: data,
               builder: (c, s) {
-                if (!s.hasData)
+                if (!s.hasData) {
                   return const Center(child: CircularProgressIndicator());
+                }
                 final rows = ((s.data!['items'] as List?) ?? []).cast<Map>();
-                if (rows.isEmpty)
+                if (rows.isEmpty) {
                   return const Center(child: Text('ยังไม่มีงาน PM'));
+                }
                 return ListView.separated(
                   itemCount: rows.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  separatorBuilder: (_, _) => const SizedBox(height: 8),
                   itemBuilder: (_, i) {
                     final r = rows[i];
                     return Card(
@@ -213,7 +269,10 @@ class _CalendarState extends State<PmCalendarPage> {
                         onTap: () => open(r),
                         leading: const Icon(Icons.build_circle_outlined),
                         title: Text(r['planNameSnapshot']?.toString() ?? '-'),
-                        subtitle: Text(r['itemSnapshot']?.toString() ?? '-'),
+                        subtitle: Text(
+                          '${r['itemSnapshot'] ?? '-'}\n${r['locationSnapshot'] ?? '-'}${r['residentNames'] == null ? '' : '\nผู้พักอาศัย: ${r['residentNames']}'}\nกำหนด ${r['dueDate'] ?? '-'}',
+                        ),
+                        isThreeLine: true,
                         trailing: Text(r['statusCode']?.toString() ?? '-'),
                       ),
                     );
@@ -229,9 +288,10 @@ class _CalendarState extends State<PmCalendarPage> {
 }
 
 class _PmWorkDialog extends StatefulWidget {
-  const _PmWorkDialog(this.api, this.id);
+  const _PmWorkDialog(this.api, this.id, {this.portalSchedule = false});
   final PmApi api;
   final int id;
+  final bool portalSchedule;
   @override
   State<_PmWorkDialog> createState() => _PmWorkDialogState();
 }
@@ -243,7 +303,10 @@ class _PmWorkDialogState extends State<_PmWorkDialog> {
   @override
   void initState() {
     super.initState();
-    data = widget.api.workOrder(widget.id);
+    data = widget.api.workOrder(
+      widget.id,
+      portalSchedule: widget.portalSchedule,
+    );
   }
 
   Future<void> action(String value) async {
@@ -253,6 +316,7 @@ class _PmWorkDialogState extends State<_PmWorkDialog> {
       widget.id,
       value,
       value == 'start' ? null : result.text.trim(),
+      widget.portalSchedule,
     );
     if (mounted) Navigator.pop(context, true);
   }
@@ -265,11 +329,12 @@ class _PmWorkDialogState extends State<_PmWorkDialog> {
       child: FutureBuilder<Map<String, dynamic>>(
         future: data,
         builder: (c, s) {
-          if (!s.hasData)
+          if (!s.hasData) {
             return const SizedBox(
               height: 120,
               child: Center(child: CircularProgressIndicator()),
             );
+          }
           final work = Map<String, dynamic>.from(s.data!['workOrder'] as Map);
           final checks = ((s.data!['checks'] as List?) ?? []).cast<Map>();
           final status = work['statusCode']?.toString() ?? '';
@@ -283,6 +348,9 @@ class _PmWorkDialogState extends State<_PmWorkDialog> {
                 ),
                 Text(work['itemSnapshot']?.toString() ?? '-'),
                 Text(work['locationSnapshot']?.toString() ?? '-'),
+                if (work['residentNames'] != null)
+                  Text('ผู้พักอาศัย: ${work['residentNames']}'),
+                Text('กำหนด: ${work['dueDate'] ?? '-'}'),
                 const Divider(),
                 ...checks.map(
                   (x) => CheckboxListTile(
@@ -303,6 +371,7 @@ class _PmWorkDialogState extends State<_PmWorkDialog> {
                                     },
                                   )
                                   .toList(),
+                              portalSchedule: widget.portalSchedule,
                             );
                             if (mounted) setState(() {});
                           }
@@ -310,13 +379,21 @@ class _PmWorkDialogState extends State<_PmWorkDialog> {
                     title: Text(x['checkItemSnapshot']?.toString() ?? '-'),
                   ),
                 ),
-                if (status == 'IN_PROGRESS')
+                if (status == 'IN_PROGRESS' || status == 'PENDING')
                   TextField(
                     controller: result,
                     minLines: 3,
                     maxLines: 5,
-                    decoration: const InputDecoration(labelText: 'ผลการตรวจ *'),
+                    decoration: InputDecoration(
+                      labelText: status == 'PENDING'
+                          ? 'เหตุผลการข้ามงาน (กรอกเมื่อข้าม)'
+                          : 'ผลการตรวจ *',
+                    ),
                   ),
+                if (status == 'COMPLETED' && work['resultDetail'] != null)
+                  Text('ผลการตรวจ: ${work['resultDetail']}'),
+                if (status == 'SKIPPED' && work['skipReason'] != null)
+                  Text('เหตุผลการข้าม: ${work['skipReason']}'),
               ],
             ),
           );
@@ -333,41 +410,32 @@ class _PmWorkDialogState extends State<_PmWorkDialog> {
         builder: (c, s) {
           if (!s.hasData) return const SizedBox();
           final st = (s.data!['workOrder'] as Map)['statusCode'];
-          if (st == 'PENDING')
-            return FilledButton(
-              onPressed: saving ? null : () => action('start'),
-              child: const Text('เริ่มงาน'),
+          if (st == 'PENDING') {
+            return Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextButton(
+                  onPressed: saving ? null : () => action('skip'),
+                  child: const Text('ข้ามงาน'),
+                ),
+                const SizedBox(width: 8),
+                FilledButton(
+                  onPressed: saving ? null : () => action('start'),
+                  child: const Text('เริ่มงาน'),
+                ),
+              ],
             );
-          if (st == 'IN_PROGRESS')
+          }
+          if (st == 'IN_PROGRESS') {
             return FilledButton(
               onPressed: saving ? null : () => action('complete'),
               child: const Text('บันทึกปิดงาน'),
             );
+          }
           return const SizedBox();
         },
       ),
     ],
-  );
-}
-
-class _List extends StatelessWidget {
-  const _List({
-    required this.title,
-    required this.menu,
-    required this.future,
-    required this.name,
-  });
-  final String title, menu, name;
-  final Future<Map<String, dynamic>> future;
-  @override
-  Widget build(BuildContext c) => SupportWorkspaceShell(
-    pageTitle: title,
-    activeMenu: menu,
-    menuScope: WorkspaceMenuScope.company,
-    child: Padding(
-      padding: const EdgeInsets.all(LaooLayout.cardMargin),
-      child: _Rows(future: future, name: name),
-    ),
   );
 }
 
@@ -384,7 +452,7 @@ class _Rows extends StatelessWidget {
       if (rows.isEmpty) return const Center(child: Text('ยังไม่มีข้อมูล'));
       return ListView.separated(
         itemCount: rows.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 8),
+        separatorBuilder: (_, _) => const SizedBox(height: 8),
         itemBuilder: (_, i) {
           final r = rows[i];
           return Card(
@@ -457,11 +525,12 @@ class _PlanChecklistDialogState extends State<_PlanChecklistDialog> {
       child: FutureBuilder<Map<String, dynamic>>(
         future: all,
         builder: (c, s) {
-          if (!s.hasData)
+          if (!s.hasData) {
             return const SizedBox(
               height: 120,
               child: Center(child: CircularProgressIndicator()),
             );
+          }
           final rows = ((s.data!['items'] as List?) ?? []).cast<Map>();
           return SingleChildScrollView(
             child: Column(
@@ -501,8 +570,9 @@ class _AssetAssignmentDialogState extends State<_AssetAssignmentDialog> {
     assigned = widget.api.planAssets((widget.plan['pmPlanId'] as num).toInt());
     assigned.then((x) {
       for (final a in ((x['items'] as List?) ?? []).cast<Map>()) {
-        if (a['isActive'] == true)
+        if (a['isActive'] == true) {
           ids.add((a['itemInstanceId'] as num).toInt());
+        }
       }
       if (mounted) setState(() {});
     });
@@ -524,11 +594,12 @@ class _AssetAssignmentDialogState extends State<_AssetAssignmentDialog> {
       child: FutureBuilder<Map<String, dynamic>>(
         future: candidates,
         builder: (c, s) {
-          if (!s.hasData)
+          if (!s.hasData) {
             return const SizedBox(
               height: 150,
               child: Center(child: CircularProgressIndicator()),
             );
+          }
           final rows = ((s.data!['items'] as List?) ?? []).cast<Map>();
           return SingleChildScrollView(
             child: Column(
@@ -598,11 +669,12 @@ class _NewPlanDialogState extends State<_NewPlanDialog> {
     content: FutureBuilder<Map<String, dynamic>>(
       future: types,
       builder: (c, s) {
-        if (!s.hasData)
+        if (!s.hasData) {
           return const SizedBox(
             height: 90,
             child: Center(child: CircularProgressIndicator()),
           );
+        }
         final x = ((s.data!['items'] as List?) ?? []).cast<Map>();
         return SizedBox(
           width: 500,
@@ -626,7 +698,7 @@ class _NewPlanDialogState extends State<_NewPlanDialog> {
                 onChanged: (z) => setState(() => t = z),
               ),
               DropdownButtonFormField<String>(
-                value: u,
+                initialValue: u,
                 items: const [
                   DropdownMenuItem(value: 'DAY', child: Text('วัน')),
                   DropdownMenuItem(value: 'MONTH', child: Text('เดือน')),

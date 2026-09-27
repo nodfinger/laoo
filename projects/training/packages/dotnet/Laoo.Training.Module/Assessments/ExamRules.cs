@@ -6,9 +6,9 @@ namespace LaooTrainingModule.Assessments;
 // Persist this model server-side only. Never return IsCorrect to a participant.
 public sealed record ExamOption(Guid Id, string? Text, Guid? ImageId, bool IsCorrect);
 public sealed record ExamQuestion(Guid Id, string? Text, Guid? ImageId, List<ExamOption> Options);
-public sealed record ExamDefinition(int QuestionCount, decimal PassingPercent, bool IsActive, List<ExamQuestion> Questions, string? QuestionType = null);
+public sealed record ExamDefinition(int QuestionCount, decimal PassingPercent, bool IsActive, List<ExamQuestion> Questions, string QuestionType = "SINGLE_CHOICE");
 public sealed record ExamAnswer(Guid QuestionId, Guid OptionId);
-public sealed record ExamSnapshot(decimal PassingPercent, List<ExamQuestion> Questions);
+public sealed record ExamSnapshot(decimal PassingPercent, List<ExamQuestion> Questions, string QuestionType = "SINGLE_CHOICE");
 public sealed record ExamScore(int Score, int MaxScore, decimal Percent, bool Passed);
 
 public static class ExamRules
@@ -25,21 +25,33 @@ public static class ExamRules
             return "จำนวนข้อสุ่มต้องอยู่ระหว่าง 1 ถึงจำนวนข้อสอบที่สร้างไว้ (สูงสุด 200 ข้อ)";
         if (definition.PassingPercent is < 0 or > 100)
             return "เกณฑ์ผ่านต้องอยู่ระหว่าง 0 ถึง 100 เปอร์เซ็นต์";
-        var trueFalse = definition.QuestionType == "TRUE_FALSE";
+        var questionType = NormalizeType(definition.QuestionType);
+        if (questionType is null)
+            return "ประเภทข้อสอบไม่ถูกต้อง กรุณาเลือก 4 ตัวเลือก หรือ ถูก/ผิด";
         var ids = new HashSet<Guid>();
         foreach (var question in definition.Questions)
         {
             if (question is null || question.Id == Guid.Empty || !ids.Add(question.Id) ||
                 !Content(question.Text, question.ImageId, 2000))
                 return "คำถามต้องมีรหัสไม่ซ้ำและมีข้อความหรือรูปภาพ";
-            if (question.Options is null || question.Options.Count != (trueFalse ? 2 : 4) ||
+            var expectedOptions = questionType == "TRUE_FALSE" ? 2 : 4;
+            if (question.Options is null || question.Options.Count != expectedOptions ||
                 question.Options.Any(x => x is null) ||
                 question.Options.Count(x => x.IsCorrect) != 1)
-                return "แต่ละข้อต้องมี 4 ตัวเลือก และถูกต้องเพียง 1 ตัวเลือก";
+                return questionType == "TRUE_FALSE"
+                    ? "ข้อสอบถูก/ผิดต้องมีตัวเลือก ถูก และ ผิด และถูกต้องเพียง 1 ค่า"
+                    : "แต่ละข้อต้องมี 4 ตัวเลือก และถูกต้องเพียง 1 ตัวเลือก";
             foreach (var option in question.Options)
+            {
                 if (option.Id == Guid.Empty || !ids.Add(option.Id) ||
-                    !Content(option.Text, option.ImageId, 1000))
+                    !Content(option.Text, questionType == "TRUE_FALSE" ? null : option.ImageId, 1000))
                     return "ตัวเลือกต้องมีรหัสไม่ซ้ำและมีข้อความหรือรูปภาพ";
+                if (questionType == "TRUE_FALSE" && option.ImageId is not null)
+                    return "ข้อสอบถูก/ผิดไม่รองรับรูปภาพในตัวเลือก";
+            }
+            if (questionType == "TRUE_FALSE" &&
+                (question.Options[0].Text != "ถูก" || question.Options[1].Text != "ผิด"))
+                return "ตัวเลือกข้อสอบถูก/ผิดต้องเป็น ถูก และ ผิด ตามลำดับ";
         }
         return null;
     }
@@ -54,8 +66,13 @@ public static class ExamRules
         if (error is not null) throw new ArgumentException(error);
         var questions = Shuffle(definition.Questions).Take(definition.QuestionCount)
             .Select(q => q with { Options = Shuffle(q.Options) }).ToList();
-        return new(definition.PassingPercent, questions);
+        return new(definition.PassingPercent, questions, NormalizeType(definition.QuestionType)!);
     }
+
+    public static string? NormalizeType(string? value) =>
+        string.IsNullOrWhiteSpace(value) || value.Equals("SINGLE_CHOICE", StringComparison.OrdinalIgnoreCase)
+            ? "SINGLE_CHOICE"
+            : value.Equals("TRUE_FALSE", StringComparison.OrdinalIgnoreCase) ? "TRUE_FALSE" : null;
 
     private static List<T> Shuffle<T>(IEnumerable<T> source)
     {

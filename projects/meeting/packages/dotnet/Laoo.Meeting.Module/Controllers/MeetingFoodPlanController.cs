@@ -154,12 +154,20 @@ ORDER BY SortOrder,RequirementQuestionID;
     public async Task<IActionResult> Save(long bookingId, FoodPlanRequest request, CancellationToken token)
     {
         if (!Scope(out var company, out var user)) return Forbid();
-        var foodIds = (request.FoodIds ?? []).Where(id => id > 0).Distinct().ToList();
         var groups = (request.Groups ?? []).Where(group => !string.IsNullOrWhiteSpace(group.FoodTypeCode)).ToList();
+        var foodIds = groups.SelectMany(group => group.FoodIds ?? []).Where(id => id > 0).Distinct().ToList();
         var questions = (request.Questions ?? []).Where(question => !string.IsNullOrWhiteSpace(question.QuestionText)).ToList();
+        if (request.IsActive && (request.Groups is null || groups.Count == 0))
+            return BadRequest(Error("รูปแบบรายการอาหารไม่ถูกต้อง", "กรุณากำหนดกลุ่มอาหารอย่างน้อย 1 กลุ่ม"));
+        if (groups.Any(group => (group.FoodIds ?? []).Count == 0))
+            return BadRequest(Error("รายการอาหารไม่ถูกต้อง", "ทุกกลุ่มอาหารต้องมีรายการอาหารอย่างน้อย 1 รายการ"));
+        if (groups.GroupBy(group => group.FoodTypeCode.Trim(), StringComparer.OrdinalIgnoreCase).Any(group => group.Count() > 1))
+            return BadRequest(Error("กลุ่มอาหารซ้ำ", "ประเภทกลุ่มอาหารต้องไม่ซ้ำกัน"));
+        if (groups.SelectMany(group => group.FoodIds ?? []).GroupBy(id => id).Any(group => group.Count() > 1))
+            return BadRequest(Error("รายการอาหารซ้ำ", "อาหารหนึ่งรายการเลือกได้เพียงกลุ่มเดียว"));
         if ((request.Questions ?? []).Any(question => string.IsNullOrWhiteSpace(question.QuestionText) || question.QuestionText.Trim().Length > 300 || question.SortOrder < 1 || question.AnswerType is not ("TEXT" or "BOOLEAN" or "SINGLE" or "MULTIPLE" or "NUMBER")))
             return BadRequest(Error("คำถามเพิ่มเติมไม่ถูกต้อง", "กรุณาระบุคำถาม ประเภทคำตอบ และลำดับให้ถูกต้อง"));
-        if (questions.Any(question => question.AnswerType is "SINGLE" or "MULTIPLE" && !(question.Options ?? []).Any(option => !string.IsNullOrWhiteSpace(option))))
+        if (questions.Any(question => question.AnswerType is "SINGLE" or "MULTIPLE" && (question.Options ?? []).Count(option => !string.IsNullOrWhiteSpace(option)) < 2))
             return BadRequest(Error("ตัวเลือกคำถามไม่ถูกต้อง", "คำถามแบบเลือกต้องมีตัวเลือกอย่างน้อย 1 รายการ"));
         if (groups.Any(group => group.MaxQuantity < 1 || group.MaxQuantity > 99)) return BadRequest(Error("จำนวนรวมต่อกลุ่มไม่ถูกต้อง", "จำนวนต้องอยู่ระหว่าง 1 ถึง 99"));
         if (request.IsActive && foodIds.Count == 0) return BadRequest(Error("ยังไม่ได้เลือกอาหาร", "กรุณาเลือกอย่างน้อย 1 รายการ"));

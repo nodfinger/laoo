@@ -55,8 +55,15 @@ JOIN dbo.TDADEmployee E ON E.EmployeeID=P.EmployeeID AND E.CompanyID=P.CompanyID
     { cmd.Parameters.AddWithValue("@company",company);cmd.Parameters.AddWithValue("@user",user);cmd.Parameters.AddWithValue("@booking",booking); }
     private ObjectResult Denied()=>StatusCode(403,new {message="ไม่มีสิทธิ์เช็กอินรายการนี้",description="กรุณาใช้บัญชีผู้ได้รับคำเชิญหรือผู้ดูแลการประชุมในบริษัทเดียวกัน"});
     private ObjectResult Unavailable()=>StatusCode(503,new {message="ระบบเช็กอินยังไม่พร้อม",description="ยังไม่ได้ติดตั้งโครงสร้างเช็กอิน กรุณาติดต่อผู้ดูแลระบบ"});
+    private static async Task<bool> HasManagerScope(SqlConnection db,long company,long user,CancellationToken token)
+    {
+        const string sql="SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADUser WHERE CompanyID=@company AND UserID=@user AND IsCompanyAdmin=1 AND IsActive=1) OR EXISTS(SELECT 1 FROM dbo.TDADMeetingRoomBooking WHERE CompanyID=@company AND RequesterUserID=@user) OR EXISTS(SELECT 1 FROM dbo.TDADMeetingRoomContact C JOIN dbo.TDADUserEmployee UE ON UE.CompanyID=@company AND UE.EmployeeID=C.EmployeeID AND UE.UserID=@user AND UE.IsActive=1 JOIN dbo.TDADEmployee E ON E.CompanyID=UE.CompanyID AND E.EmployeeID=UE.EmployeeID AND E.IsActive=1 WHERE C.IsActive=1) THEN 1 ELSE 0 END";
+        await using var cmd=new SqlCommand(sql,db); Bind(cmd,company,user,0);
+        return Convert.ToInt32(await cmd.ExecuteScalarAsync(token))==1;
+    }
     private async Task<bool> Allowed(SqlConnection db,long company,long user,string action,CancellationToken token,string screen="21003")
     {
+        if(screen==ManagerScreenCode && await HasManagerScope(db,company,user,token)) return true;
         if(!long.TryParse(User.FindFirstValue("project_id"),out var project) || project<=0) return false;
         await using var cmd=new SqlCommand("""
 SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADMainMenu WHERE MenuCode=@screen AND IsActive=1
@@ -213,7 +220,7 @@ SELECT P.BookingParticipantID,E.FullName,S.BookingSlotID,S.StartDateTime,S.EndDa
  CASE WHEN @qrReady=1 AND B.BookingStatus='APPROVED' AND S.StartDateTime<=GETDATE() AND S.EndDateTime>GETDATE()
  AND P.InvitationStatus='ACCEPTED' AND C.ParticipantCheckInID IS NULL
  AND @selfEdit=1 AND {SelfSql} THEN 1 ELSE 0 END,
- P.IsLateResponse,P.LateResponseReason,P.LateResponseAtUtc
+ P.IsLateResponse,P.LateResponseReason,P.LateResponseAtUtc,B.BookingStatus
 {SourceSql}
 LEFT JOIN dbo.TDADMeetingParticipantCheckIn C ON C.CompanyID=P.CompanyID AND C.BookingParticipantID=P.BookingParticipantID AND C.BookingSlotID=S.BookingSlotID
 WHERE B.CompanyID=@company AND B.BookingID=@booking AND (@slot IS NULL OR S.BookingSlotID=@slot)
@@ -236,7 +243,8 @@ ORDER BY S.StartDateTime,E.FullName,P.BookingParticipantID;
             canIssueRoomQr=reader.GetInt32(9)==1,canIssuePersonalQr=reader.GetInt32(10)==1,
             canManualCheckIn=reader.GetInt32(8)==1,canScanRoomQr=reader.GetInt32(12)==1,canScanPersonalQr=reader.GetInt32(11)==1,
             isLateResponse=reader.GetBoolean(13),lateResponseReason=reader.IsDBNull(14)?null:reader.GetString(14),
-            lateResponseAtUtc=reader.IsDBNull(15)?(DateTime?)null:DateTime.SpecifyKind(reader.GetDateTime(15),DateTimeKind.Utc) });
+            lateResponseAtUtc=reader.IsDBNull(15)?(DateTime?)null:DateTime.SpecifyKind(reader.GetDateTime(15),DateTimeKind.Utc),
+            bookingStatus=reader.GetString(16) });
         return Ok(new {available=true,items});
     }
 

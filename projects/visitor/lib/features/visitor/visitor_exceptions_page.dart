@@ -52,7 +52,7 @@ class _VisitorExceptionsPageState extends State<VisitorExceptionsPage> {
     try {
       final actions = await _repository.actions();
       if (!actions.canView) {
-        throw const VisitorApiException(403, '??????????????????????????');
+        throw const VisitorApiException(403, 'ไม่มีสิทธิ์ดูรายการผิดปกติ');
       }
       final result = await _repository.list(
         search: _search.text.trim(),
@@ -108,13 +108,12 @@ class _VisitorExceptionsPageState extends State<VisitorExceptionsPage> {
               Expanded(
                 child: Text(
                   _actions?.caption ?? '',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                  style: Theme.of(context).textTheme.titleLarge
+                      ?.copyWith(fontWeight: FontWeight.w700),
                 ),
               ),
               IconButton(
-                tooltip: '????????',
+                tooltip: 'โหลดใหม่',
                 onPressed: _loading ? null : _load,
                 icon: const Icon(Icons.refresh),
               ),
@@ -151,7 +150,7 @@ class _VisitorExceptionsPageState extends State<VisitorExceptionsPage> {
           controller: _search,
           onSubmitted: (_) => _load(resetPage: true),
           decoration: const InputDecoration(
-            labelText: '????????? / ????????? / ?????????',
+            labelText: 'ค้นหาชื่อ / ผู้รับรอง / จุดติดต่อ',
             prefixIcon: Icon(Icons.search),
           ),
         ),
@@ -162,28 +161,28 @@ class _VisitorExceptionsPageState extends State<VisitorExceptionsPage> {
           key: ValueKey(_type),
           initialValue: _type,
           isExpanded: true,
-          decoration: const InputDecoration(labelText: '?????????????'),
+          decoration: const InputDecoration(labelText: 'ประเภทผิดปกติ'),
           items: const [
-            DropdownMenuItem(value: 'ALL', child: Text('???????')),
+            DropdownMenuItem(value: 'ALL', child: Text('ทั้งหมด')),
             DropdownMenuItem(
               value: 'HOST_CONFIRMATION_PENDING',
-              child: Text('?????????????????'),
+              child: Text('รอยืนยันการเข้าพบ'),
             ),
             DropdownMenuItem(
               value: 'CHECKOUT_OTHER',
-              child: Text('Check-out ?????????? ?'),
+              child: Text('Check-out เหตุผลอื่น ๆ'),
             ),
             DropdownMenuItem(
               value: 'NOTIFICATION_FAILED',
-              child: Text('?????????????????????'),
+              child: Text('แจ้งเตือนส่งไม่สำเร็จ'),
             ),
             DropdownMenuItem(
               value: 'NOTIFICATION_NO_CHANNEL',
-              child: Text('?????????????????????'),
+              child: Text('ไม่มีช่องทางแจ้งเตือน'),
             ),
             DropdownMenuItem(
               value: 'CHECKOUT_RULE_MISMATCH',
-              child: Text('?????????????????????????'),
+              child: Text('ผลและเหตุผลไม่สัมพันธ์กัน'),
             ),
           ],
           onChanged: (value) => setState(() => _type = value ?? 'ALL'),
@@ -197,19 +196,19 @@ class _VisitorExceptionsPageState extends State<VisitorExceptionsPage> {
       FilledButton.icon(
         onPressed: _loading ? null : () => _load(resetPage: true),
         icon: const Icon(Icons.search),
-        label: const Text('?????'),
+        label: const Text('ค้นหา'),
       ),
       OutlinedButton(
         onPressed: _loading ? null : _clear,
-        child: const Text('???? Filter'),
+        child: const Text('ล้าง Filter'),
       ),
     ],
   );
 
   String get _periodText {
     final value = _period;
-    if (value == null) return '?????????????';
-    return '${_date(value.start)} ? ${_date(value.end)}';
+    if (value == null) return 'ทุกช่วงวันที่';
+    return '${_date(value.start)} — ${_date(value.end)}';
   }
 
   Widget _list() {
@@ -219,10 +218,9 @@ class _VisitorExceptionsPageState extends State<VisitorExceptionsPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '????????????????????',
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+            'รายการที่ต้องตรวจสอบ',
+            style: Theme.of(context).textTheme.titleMedium
+                ?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 10),
           if (_loading)
@@ -233,7 +231,7 @@ class _VisitorExceptionsPageState extends State<VisitorExceptionsPage> {
           else if (items.isEmpty)
             const Padding(
               padding: EdgeInsets.all(28),
-              child: Center(child: Text('??????????????????')),
+              child: Center(child: Text('ไม่พบรายการผิดปกติ')),
             )
           else if (constraints.maxWidth < 900)
             ...items.map(_compactItem)
@@ -251,11 +249,11 @@ class _VisitorExceptionsPageState extends State<VisitorExceptionsPage> {
         child: Row(
           children: [
             SizedBox(width: 56, child: Text('ID')),
-            Expanded(flex: 2, child: Text('???????????')),
-            Expanded(flex: 2, child: Text('?????? / ??????????')),
-            Expanded(child: Text('?????????')),
-            Expanded(child: Text('?????????')),
-            Expanded(child: Text('??????')),
+            Expanded(flex: 2, child: Text('ผู้มาติดต่อ')),
+            Expanded(flex: 2, child: Text('ประเภท / รายละเอียด')),
+            Expanded(child: Text('ผู้รับรอง')),
+            Expanded(child: Text('จุดติดต่อ')),
+            Expanded(child: Text('เวลาพบ')),
             SizedBox(width: 108),
           ],
         ),
@@ -281,7 +279,7 @@ class _VisitorExceptionsPageState extends State<VisitorExceptionsPage> {
                 width: 108,
                 child: OutlinedButton(
                   onPressed: () => _showDetail(item),
-                  child: const Text('????????????'),
+                  child: const Text('ดูรายละเอียด'),
                 ),
               ),
             ],
@@ -309,15 +307,15 @@ class _VisitorExceptionsPageState extends State<VisitorExceptionsPage> {
             ),
             OutlinedButton(
               onPressed: () => _showDetail(item),
-              child: const Text('????????????'),
+              child: const Text('ดูรายละเอียด'),
             ),
           ],
         ),
         const SizedBox(height: 6),
         Text('${item.typeLabel}: ${item.description}'),
-        Text('?????????: ${item.hostName}'),
-        Text('?????????: ${item.contactPointName}'),
-        Text('??????: ${_dateTime(item.occurredDate)}'),
+        Text('ผู้รับรอง: ${item.hostName}'),
+        Text('จุดติดต่อ: ${item.contactPointName}'),
+        Text('เวลาพบ: ${_dateTime(item.occurredDate)}'),
       ],
     ),
   );
@@ -334,7 +332,7 @@ class _VisitorExceptionsPageState extends State<VisitorExceptionsPage> {
         crossAxisAlignment: WrapCrossAlignment.center,
         spacing: 12,
         children: [
-          Text('$from-$to ??? $total ??????'),
+          Text('$from-$to จาก $total รายการ'),
           OutlinedButton(
             onPressed: _loading || _page <= 1
                 ? null

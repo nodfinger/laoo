@@ -35,6 +35,16 @@ class ServiceRequestApi {
         )
         as Map,
   );
+  Future<Map<String, dynamic>> repairHistory({
+    String search = '',
+    int page = 1,
+  }) async => Map<String, dynamic>.from(
+    await _client.get(
+          '/api/service/requests/repair-history',
+          query: {'search': search, 'page': '$page', 'pageSize': '20'},
+        )
+        as Map,
+  );
 
   Future<Map<String, dynamic>> create({
     required bool selfService,
@@ -115,10 +125,17 @@ class ServiceRequestApi {
     await _client.post('/api/service/requests/$id/start', body: {});
   }
 
-  Future<void> complete(int id, String resolutionDetail) async {
+  Future<Map<String, dynamic>> partsLookup() async => Map<String, dynamic>.from(
+    await _client.get('/api/service/requests/parts/lookup') as Map,
+  );
+  Future<void> complete(
+    int id,
+    String resolutionDetail, {
+    List<Map<String, dynamic>> parts = const [],
+  }) async {
     await _client.post(
       '/api/service/requests/$id/complete',
-      body: {'resolutionDetail': resolutionDetail},
+      body: {'resolutionDetail': resolutionDetail, 'parts': parts},
     );
   }
 

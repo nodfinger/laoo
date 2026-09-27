@@ -52,19 +52,32 @@ void main() {
   });
 
   test(
-    'Visitor settings route is routable while other catalog routes remain reserved',
+    'Visitor implemented routes are composed while reserved routes stay hidden',
     () {
+      final implementedCodes = VisitorRoutes.implemented
+          .map((route) => route.menuCode)
+          .toList();
+
       expect(VisitorRoutes.all, hasLength(23));
-      expect(VisitorRoutes.implemented.map((route) => route.menuCode), [
-        '36004',
-      ]);
+      expect(
+        implementedCodes,
+        unorderedEquals([
+          '31002',
+          '31005',
+          '32001',
+          '32002',
+          '32003',
+          '33001',
+          '34003',
+          '36004',
+        ]),
+      );
       for (final route in VisitorRoutes.all) {
         expect(route.projectCode, VisitorProject.code);
-        if (route.menuCode == '36004') {
-          expect(AppMenuRouteRegistry.byMenuCode(route.menuCode), isNotNull);
-        } else {
-          expect(AppMenuRouteRegistry.byMenuCode(route.menuCode), isNull);
-        }
+        expect(
+          AppMenuRouteRegistry.byMenuCode(route.menuCode),
+          implementedCodes.contains(route.menuCode) ? isNotNull : isNull,
+        );
       }
     },
   );

@@ -102,7 +102,8 @@ foreach (var (user, admin, rooms, expected) in new[] {
     cmd.Parameters.AddWithValue("@user",user);
     Check(Convert.ToInt32(await cmd.ExecuteScalarAsync()) == (expected?1:0), "approval role restriction " + user);
 }
-var listSql = Regex.Match(source, @"var sql = \$""""""([\s\S]*?)""""""").Groups[1].Value
+var listSource = source[source.IndexOf("public async Task<IActionResult> List", StringComparison.Ordinal)..];
+var listSql = Regex.Match(listSource, @"var sql = \$""""""([\s\S]*?)""""""").Groups[1].Value
     .Replace("{MeetingRoomAdminAccess.BookingRoomSql}",roomSql);
 await using (var cmd = new SqlCommand(listSql,db)) {
     foreach(var name in new[]{"@company","@user","@room","@department","@requester"})
@@ -114,6 +115,105 @@ await using (var cmd = new SqlCommand(listSql,db)) {
     cmd.Parameters.AddWithValue("@edit",false);
     await using var r = await cmd.ExecuteReaderAsync();
     Check(!await r.ReadAsync(),"equipment queue compiles and rejects foreign scope");
+}
+var taskSource = source[source.IndexOf("public async Task<IActionResult> DepartmentTasks", StringComparison.Ordinal)..source.IndexOf(@"[HttpGet(""department-tasks/rooms"")]", StringComparison.Ordinal)];
+var taskFrom = Regex.Match(taskSource, @"var from = \$""""""([\s\S]*?)""""""").Groups[1].Value
+    .Replace("{MeetingRoomAdminAccess.BookingRoomSql}",roomSql);
+Check(taskFrom.Length > 100 && !taskFrom.Contains("{"), "department task scope expanded");
+var taskQueries = new[] {
+    "SELECT COUNT_BIG(*) " + taskFrom,
+    Regex.Match(taskSource, @"new SqlCommand\(\$""""""([\s\S]*?)""""""").Groups[1].Value.Replace("{from}",taskFrom),
+    Regex.Matches(taskSource, @"new SqlCommand\(\$""""""([\s\S]*?)""""""")[1].Groups[1].Value.Replace("{from}",taskFrom)
+};
+foreach (var query in taskQueries) {
+    await using var cmd = new SqlCommand(query,db);
+    foreach(var name in new[]{"@company","@user"}) cmd.Parameters.AddWithValue(name,-1L);
+    foreach(var name in new[]{"@status","@fromDate","@toDate","@room","@search"}) cmd.Parameters.AddWithValue(name,DBNull.Value);
+    cmd.Parameters.AddWithValue("@admin",false);
+    cmd.Parameters.AddWithValue("@offset",0);
+    cmd.Parameters.AddWithValue("@pageSize",20);
+    await using var r = await cmd.ExecuteReaderAsync();
+    Check(r.FieldCount > 0,"department count/summary/page compiles against real schema");
+}
+
+// Execute the production transition predicate against SELECT-only fixtures.
+var statusSource = source[source.IndexOf("public async Task<IActionResult> Status", StringComparison.Ordinal)..];
+var updateSql = Regex.Match(statusSource,@"const string sql=""""""([\s\S]*?)""""""").Groups[1].Value;
+Check(updateSql.Length>100,"status SQL located");
+var predicate = updateSql[updateSql.IndexOf("WHERE D.CompanyID",StringComparison.Ordinal)..].TrimEnd(';');
+predicate = Regex.Replace(predicate,@"dbo\.(TD\w+)","$1");
+var stateFixture = """
+WITH TDADMeetingBookingEquipmentRequestDetail AS (
+ SELECT 1 CompanyID,10 EquipmentRequestDetailID,@current StatusCode,100 ResponsibleDepartmentOrgUnitID),
+TDADUserEmployee AS (SELECT 1 CompanyID,2 UserID,20 EmployeeID,1 IsActive),
+TDADEmployee AS (SELECT 1 CompanyID,20 EmployeeID,1 IsActive,@department DepartmentOrgUnitID),
+TDADMeetingRoomBooking AS (SELECT 1 CompanyID,101 BookingID,@bookingStatus BookingStatus),
+TDADMeetingRoomBookingSlot AS (
+ SELECT 1 CompanyID,101 BookingID,DATEADD(day,@days,GETDATE()) EndDateTime)
+SELECT COUNT(*) FROM TDADMeetingBookingEquipmentRequestDetail D
+""";
+foreach (var test in new[] {
+    ("PENDING","IN_PROGRESS",true,true,100,1,"APPROVED",1L,1),
+    ("PENDING","COMPLETED",true,true,100,1,"APPROVED",1L,0),
+    ("IN_PROGRESS","COMPLETED",false,true,100,1,"APPROVED",1L,1),
+    ("PENDING","DEPARTMENT_REJECTED",false,true,100,1,"APPROVED",1L,1),
+    ("IN_PROGRESS","DEPARTMENT_REJECTED",false,true,100,1,"APPROVED",1L,1),
+    ("COMPLETED","IN_PROGRESS",true,true,100,1,"APPROVED",1L,0),
+    ("CANCELLED","IN_PROGRESS",true,true,100,1,"APPROVED",1L,0),
+    ("DEPARTMENT_REJECTED","IN_PROGRESS",true,true,100,1,"APPROVED",1L,0),
+    ("PENDING","IN_PROGRESS",false,true,200,1,"APPROVED",1L,0),
+    ("PENDING","IN_PROGRESS",false,false,100,1,"APPROVED",1L,0),
+    ("PENDING","IN_PROGRESS",true,true,100,-1,"APPROVED",1L,0),
+    ("PENDING","IN_PROGRESS",true,true,100,1,"CANCELLED",1L,0),
+    ("PENDING","IN_PROGRESS",true,true,100,1,"APPROVED",2L,0)
+}) {
+    await using var cmd=new SqlCommand(stateFixture+"\n"+predicate,db);
+    cmd.Parameters.AddWithValue("@current",test.Item1);cmd.Parameters.AddWithValue("@status",test.Item2);
+    cmd.Parameters.AddWithValue("@manager",test.Item3);cmd.Parameters.AddWithValue("@edit",test.Item4);
+    cmd.Parameters.AddWithValue("@department",test.Item5);cmd.Parameters.AddWithValue("@days",test.Item6);
+    cmd.Parameters.AddWithValue("@bookingStatus",test.Item7);cmd.Parameters.AddWithValue("@company",test.Item8);
+    cmd.Parameters.AddWithValue("@booking",101);cmd.Parameters.AddWithValue("@detail",10);cmd.Parameters.AddWithValue("@user",2);
+    Check(Convert.ToInt32(await cmd.ExecuteScalarAsync())==test.Item9,"transition/scope "+test);
+}
+// Real controller read-only smoke: exercises SQL parameter binding, paging and reader lifetime.
+await using (var candidate = new SqlCommand("""
+SELECT TOP(1) U.CompanyID,U.UserID,P.ProjectID
+FROM dbo.TDADUser U
+JOIN dbo.TDADUserProject UP ON UP.UserID=U.UserID AND UP.CompanyID=U.CompanyID AND UP.IsActive=1
+JOIN dbo.TDADProject P ON P.ProjectID=UP.ProjectID AND P.ProjectCode='LAOO_MEETING' AND P.IsActive=1
+WHERE U.IsActive=1 AND U.IsCompanyAdmin=1 ORDER BY U.CompanyID,U.UserID;
+""",db)) {
+    long company=0,user=0,project=0;
+    await using(var r=await candidate.ExecuteReaderAsync()) {
+        if(await r.ReadAsync()) { company=r.GetInt64(0);user=r.GetInt64(1);project=r.GetInt64(2); }
+    }
+    Check(user>0,"company admin fixture exists for read-only controller smoke");
+    var identity=new System.Security.Claims.ClaimsIdentity(new[] {
+        new System.Security.Claims.Claim("user_type","COMPANY_USER"),
+        new System.Security.Claims.Claim("company_id",company.ToString()),
+        new System.Security.Claims.Claim("user_id",user.ToString()),
+        new System.Security.Claims.Claim("project_id",project.ToString())
+    },"Test");
+    var controller=new MeetingEquipmentRequestController(config) {
+        ControllerContext=new Microsoft.AspNetCore.Mvc.ControllerContext {
+            HttpContext=new Microsoft.AspNetCore.Http.DefaultHttpContext {
+                User=new System.Security.Claims.ClaimsPrincipal(identity)
+            }
+        }
+    };
+    var tasks=await controller.DepartmentTasks(null,null,null,null,null,1,1);
+    Check(tasks is Microsoft.AspNetCore.Mvc.OkObjectResult,"department tasks controller returns 200");
+    var json=System.Text.Json.JsonSerializer.SerializeToElement(((Microsoft.AspNetCore.Mvc.OkObjectResult)tasks).Value);
+    Check(json.GetProperty("items").GetArrayLength()<=1,"page size honored");
+    Check(json.GetProperty("total").GetInt64()>=json.GetProperty("items").GetArrayLength(),"total covers current page");
+    var requests=await controller.List(null,null,null,null,null,null,default);
+    Check(requests is Microsoft.AspNetCore.Mvc.OkObjectResult,"request controller returns 200");
+    var rooms=await controller.DepartmentTaskRooms(default);
+    Check(rooms is Microsoft.AspNetCore.Mvc.OkObjectResult,"scoped room query returns 200");
+    foreach(var item in json.GetProperty("items").EnumerateArray()) {
+        var history=await controller.Timeline(item.GetProperty("requestId").GetInt64(),item.GetProperty("detailId").GetInt64(),default);
+        Check(history is Microsoft.AspNetCore.Mvc.OkObjectResult,"detail history controller returns 200");
+    }
 }
 Console.WriteLine("All permission and read-only schema checks passed.");
 static void Bind(SqlCommand cmd, long company, long user, long booking) {

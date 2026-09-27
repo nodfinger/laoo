@@ -10,6 +10,26 @@ ExamQuestion Question() => new(Guid.NewGuid(),"คำถาม",null,Enumerable.
     .Select(i=>new ExamOption(Guid.NewGuid(),"ตัวเลือก "+(i+1),null,i==0)).ToList());
 var definition=new ExamDefinition(3,60,true,Enumerable.Range(0,8).Select(_=>Question()).ToList());
 Check(ExamRules.Validate(definition) is null,"valid four-choice definition");
+ExamQuestion TrueFalseQuestion() => new(Guid.NewGuid(),"ถูกหรือผิด",null,[
+    new(Guid.NewGuid(),"ถูก",null,true),
+    new(Guid.NewGuid(),"ผิด",null,false)
+]);
+var trueFalse = new ExamDefinition(2,60,true,
+    Enumerable.Range(0,3).Select(_ => TrueFalseQuestion()).ToList(),"TRUE_FALSE");
+Check(ExamRules.Validate(trueFalse) is null,"valid true-false definition");
+var invalidTrueFalse = TrueFalseQuestion();
+invalidTrueFalse.Options.Add(new(Guid.NewGuid(),"ตัวเลือก 3",null,false));
+Check(ExamRules.Validate(trueFalse with { Questions=[invalidTrueFalse],QuestionCount=1 }) is not null,"true-false rejects extra option");
+invalidTrueFalse = TrueFalseQuestion();
+invalidTrueFalse.Options[0]=invalidTrueFalse.Options[0] with { Text="ใช่" };
+Check(ExamRules.Validate(trueFalse with { Questions=[invalidTrueFalse],QuestionCount=1 }) is not null,"true-false requires standard labels");
+invalidTrueFalse = TrueFalseQuestion();
+invalidTrueFalse.Options[0]=invalidTrueFalse.Options[0] with { ImageId=Guid.NewGuid() };
+Check(ExamRules.Validate(trueFalse with { Questions=[invalidTrueFalse],QuestionCount=1 }) is not null,"true-false rejects option image");
+var trueFalseSample = ExamRules.Sample(trueFalse);
+Check(trueFalseSample.QuestionType=="TRUE_FALSE" && trueFalseSample.Questions.All(q=>q.Options.Count==2),"true-false snapshot keeps type");
+var trueFalseAnswers = trueFalseSample.Questions.Select(q=>new ExamAnswer(q.Id,q.Options.Single(o=>o.IsCorrect).Id)).ToList();
+Check(ExamRules.Score(trueFalseSample,trueFalseAnswers).Score==2,"true-false scores correctly");
 Check(ExamRules.Validate(definition with { QuestionCount=9 }) is not null,"sample cannot exceed bank");
 Check(ExamRules.Validate(definition with { QuestionCount=0 }) is not null,"empty sample rejected");
 Check(ExamRules.Validate(definition with { PassingPercent=101 }) is not null,"threshold cannot exceed 100");

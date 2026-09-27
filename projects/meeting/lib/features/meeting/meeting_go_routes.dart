@@ -1,23 +1,22 @@
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import 'meeting_feature_host.dart';
 import 'meeting_route_contract.dart';
 import 'pages/meeting_building_page.dart';
 import 'pages/meeting_food_page.dart';
 import 'pages/meeting_food_plan_page.dart';
 import 'pages/meeting_food_order_summary_page.dart';
+import 'pages/meeting_food_distribution_page.dart';
 import 'pages/meeting_attendance_page.dart';
-import 'pages/meeting_no_show_report_page.dart';
 import 'pages/meeting_invitation_page.dart';
 import 'pages/meeting_room_approval_page.dart';
 import 'pages/meeting_room_booking_page.dart';
 import 'pages/meeting_room_page.dart';
 import 'pages/meeting_room_issue_page.dart';
 import 'pages/meeting_equipment_request_page.dart';
-import 'pages/meeting_room_support_tasks_page.dart';
 import 'pages/meeting_system_settings_page.dart';
-import 'pages/meeting_utilization_report_page.dart';
+import 'pages/meeting_room_support_tasks_clean_page.dart';
+import 'pages/meeting_room_usage_pages.dart';
+import 'pages/meeting_feedback_report_page.dart';
 
 List<GoRoute> buildMeetingFeatureRoutes() => [
   GoRoute(
@@ -39,6 +38,11 @@ List<GoRoute> buildMeetingFeatureRoutes() => [
     path: MeetingRoutePaths.foodOrderSummary,
     name: MeetingRouteNames.foodOrderSummary,
     builder: (context, state) => const MeetingFoodOrderSummaryPage(),
+  ),
+  GoRoute(
+    path: MeetingRoutePaths.foodDistribution,
+    name: MeetingRouteNames.foodDistribution,
+    builder: (context, state) => const MeetingFoodDistributionPage(),
   ),
   GoRoute(
     path: MeetingRoutePaths.attendance,
@@ -69,17 +73,14 @@ List<GoRoute> buildMeetingFeatureRoutes() => [
     builder: (context, state) => const MeetingFoodPlanPage(),
   ),
   GoRoute(
-    path: MeetingRoutes.roomCheckIn.path,
-    name: MeetingRoutes.roomCheckIn.name,
-    builder: (context, state) => const MeetingAttendancePage(
-      menuCode: MeetingMenuCodes.roomCheckIn,
-      routeName: MeetingRouteNames.roomCheckIn,
-    ),
+    path: MeetingRoutePaths.roomCheckIn,
+    name: MeetingRouteNames.roomCheckIn,
+    builder: (context, state) => const MeetingRoomUsagePage(),
   ),
   GoRoute(
     path: MeetingRoutePaths.roomSupportTasks,
     name: MeetingRouteNames.roomSupportTasks,
-    builder: (context, state) => const MeetingRoomSupportTasksPage(),
+    builder: (context, state) => const MeetingRoomSupportTasksCleanPage(),
   ),
   GoRoute(
     path: MeetingRoutePaths.roomIssues,
@@ -102,24 +103,18 @@ List<GoRoute> buildMeetingFeatureRoutes() => [
     builder: (context, state) => const MeetingFoodPage(),
   ),
   GoRoute(
-    path: MeetingRoutes.utilizationReport.path,
-    name: MeetingRoutes.utilizationReport.name,
+    path: MeetingRoutePaths.utilizationReport,
+    name: MeetingRouteNames.utilizationReport,
     builder: (context, state) => const MeetingUtilizationReportPage(),
   ),
   GoRoute(
-    path: MeetingRoutes.noShowReport.path,
-    name: MeetingRoutes.noShowReport.name,
+    path: MeetingRoutePaths.noShowReport,
+    name: MeetingRouteNames.noShowReport,
     builder: (context, state) => const MeetingNoShowReportPage(),
   ),
-  _placeholder(MeetingRoutes.feedbackReport, 'ผลประเมินห้องประชุม'),
-];
-
-GoRoute _placeholder(MeetingRouteSpec route, String title) => GoRoute(
-  path: route.path,
-  name: route.name,
-  builder: (context, state) => buildMeetingWorkspaceShell(
-    pageTitle: title,
-    activeMenu: route.name,
-    child: Center(child: Text('$title จะพัฒนาต่อในขั้นตอนถัดไป')),
+  GoRoute(
+    path: MeetingRoutePaths.feedbackReport,
+    name: MeetingRouteNames.feedbackReport,
+    builder: (context, state) => const MeetingFeedbackReportPage(),
   ),
-);
+];

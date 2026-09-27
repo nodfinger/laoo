@@ -122,7 +122,7 @@ abstract final class ServiceRoutes {
     FeatureRouteContract(
       projectCode: ServiceProject.code,
       menuCode: '16003',
-      screenType: 3,
+      screenType: 1,
       routeName: 'pmCalendar',
       routePath: '/pm/calendar',
     ),
@@ -227,7 +227,7 @@ abstract final class ServiceRoutes {
     FeatureRouteContract(
       projectCode: ServiceProject.code,
       menuCode: '20004',
-      screenType: 3,
+      screenType: 1,
       routeName: 'portalPmSchedule',
       routePath: '/portal/pm-schedule',
     ),

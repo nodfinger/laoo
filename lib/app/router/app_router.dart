@@ -353,6 +353,12 @@ String? resolveAppRouteRedirect({
           allowedMenuCodes.contains(spec.menuCode),
     );
     if (!hasViewPermission) {
+      // Let training self-service pages render their own standard API
+      // notification. The backend remains the source of truth for access.
+      final isTrainingSelfService =
+          path == '/company/training-results' ||
+          path == '/company/my-training';
+      if (isTrainingSelfService) return null;
       return _authorizedHome(isLaooSupport: isLaooSupport);
     }
     return null;

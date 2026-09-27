@@ -41,6 +41,8 @@ abstract final class RouteNames {
   static const String meetingFoodPlans = MeetingRouteNames.foodPlans;
   static const String meetingFoodOrderSummary =
       MeetingRouteNames.foodOrderSummary;
+  static const String meetingFoodDistribution =
+      MeetingRouteNames.foodDistribution;
   static const String meetingAttendance = MeetingRouteNames.attendance;
   static const String roomCheckIn = MeetingRouteNames.roomCheckIn;
   static const String roomSupportTasks = MeetingRouteNames.roomSupportTasks;
