@@ -89,7 +89,7 @@ NEW / RECEIVED / IN_PROGRESS
 | 🟡 | ประวัติซ่อมและค่าบริการ | `20003` `/portal/history` | ShowOnly; แสดงเฉพาะงานเสร็จสิ้นของผู้ Login; รอทดสอบรับมอบ |
 | 🟡 | รอบบำรุงรักษาของห้อง | `20004` `/portal/pm-schedule` | ScreenType 1; ดูและจัดการงาน PM ทั้ง Company, แสดงผู้พักอาศัยตามห้อง/Asset; รอทดสอบรับมอบ |
 | ⬜ | ประเมินความพึงพอใจ | `20005` `/portal/evaluation` |
-| ⬜ | แจ้งเรื่องร้องเรียน | `20006` `/portal/complaint` |
+| 🟡 | แจ้งเรื่องร้องเรียน | `20006` `/portal/complaint` | Popup ScreenType 1, Snapshot ผู้ร้อง/สถานที่, รูปแนบ, Flow NEW → IN_PROGRESS → COMPLETED/CANCELLED; รอทดสอบรับมอบ |
 
 ## 5. Scope Dashboard ภาพรวมงานบริการ
 

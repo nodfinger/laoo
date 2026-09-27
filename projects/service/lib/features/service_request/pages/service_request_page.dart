@@ -441,7 +441,7 @@ class _RequestDialogState extends State<_RequestDialog> {
         };
       });
     } catch (error) {
-      if (mounted)
+      if (mounted) {
         showTimedSnackBar(
           context,
           message: error is ApiException
@@ -449,6 +449,7 @@ class _RequestDialogState extends State<_RequestDialog> {
               : 'ไม่สามารถอ่าน QR Code ได้',
           error: true,
         );
+      }
     }
   }
 
@@ -648,7 +649,7 @@ class _RequestDialogState extends State<_RequestDialog> {
                 ],
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  value: _equipment == null
+                  initialValue: _equipment == null
                       ? null
                       : _equipment!['itemID'].toString(),
                   decoration: _input(label: 'อุปกรณ์ที่แจ้งซ่อม *'),

@@ -49,14 +49,16 @@ class _PmPlansState extends State<PmPlansPage> {
             child: FutureBuilder<Map<String, dynamic>>(
               future: data,
               builder: (c, s) {
-                if (!s.hasData)
+                if (!s.hasData) {
                   return const Center(child: CircularProgressIndicator());
+                }
                 final rows = ((s.data!['items'] as List?) ?? []).cast<Map>();
-                if (rows.isEmpty)
+                if (rows.isEmpty) {
                   return const Center(child: Text('ยังไม่มีแผน PM'));
+                }
                 return ListView.separated(
                   itemCount: rows.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  separatorBuilder: (_, _) => const SizedBox(height: 8),
                   itemBuilder: (_, i) {
                     final r = rows[i];
                     return Card(
@@ -211,7 +213,7 @@ class _CalendarState extends State<PmCalendarPage> {
               SizedBox(
                 width: 240,
                 child: DropdownButtonFormField<String>(
-                  value: status,
+                  initialValue: status,
                   decoration: const InputDecoration(labelText: 'สถานะ'),
                   items: const [
                     DropdownMenuItem(value: '', child: Text('ทั้งหมด')),
@@ -250,14 +252,16 @@ class _CalendarState extends State<PmCalendarPage> {
             child: FutureBuilder<Map<String, dynamic>>(
               future: data,
               builder: (c, s) {
-                if (!s.hasData)
+                if (!s.hasData) {
                   return const Center(child: CircularProgressIndicator());
+                }
                 final rows = ((s.data!['items'] as List?) ?? []).cast<Map>();
-                if (rows.isEmpty)
+                if (rows.isEmpty) {
                   return const Center(child: Text('ยังไม่มีงาน PM'));
+                }
                 return ListView.separated(
                   itemCount: rows.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  separatorBuilder: (_, _) => const SizedBox(height: 8),
                   itemBuilder: (_, i) {
                     final r = rows[i];
                     return Card(
@@ -325,11 +329,12 @@ class _PmWorkDialogState extends State<_PmWorkDialog> {
       child: FutureBuilder<Map<String, dynamic>>(
         future: data,
         builder: (c, s) {
-          if (!s.hasData)
+          if (!s.hasData) {
             return const SizedBox(
               height: 120,
               child: Center(child: CircularProgressIndicator()),
             );
+          }
           final work = Map<String, dynamic>.from(s.data!['workOrder'] as Map);
           final checks = ((s.data!['checks'] as List?) ?? []).cast<Map>();
           final status = work['statusCode']?.toString() ?? '';
@@ -405,7 +410,7 @@ class _PmWorkDialogState extends State<_PmWorkDialog> {
         builder: (c, s) {
           if (!s.hasData) return const SizedBox();
           final st = (s.data!['workOrder'] as Map)['statusCode'];
-          if (st == 'PENDING')
+          if (st == 'PENDING') {
             return Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -420,36 +425,17 @@ class _PmWorkDialogState extends State<_PmWorkDialog> {
                 ),
               ],
             );
-          if (st == 'IN_PROGRESS')
+          }
+          if (st == 'IN_PROGRESS') {
             return FilledButton(
               onPressed: saving ? null : () => action('complete'),
               child: const Text('บันทึกปิดงาน'),
             );
+          }
           return const SizedBox();
         },
       ),
     ],
-  );
-}
-
-class _List extends StatelessWidget {
-  const _List({
-    required this.title,
-    required this.menu,
-    required this.future,
-    required this.name,
-  });
-  final String title, menu, name;
-  final Future<Map<String, dynamic>> future;
-  @override
-  Widget build(BuildContext c) => SupportWorkspaceShell(
-    pageTitle: title,
-    activeMenu: menu,
-    menuScope: WorkspaceMenuScope.company,
-    child: Padding(
-      padding: const EdgeInsets.all(LaooLayout.cardMargin),
-      child: _Rows(future: future, name: name),
-    ),
   );
 }
 
@@ -466,7 +452,7 @@ class _Rows extends StatelessWidget {
       if (rows.isEmpty) return const Center(child: Text('ยังไม่มีข้อมูล'));
       return ListView.separated(
         itemCount: rows.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 8),
+        separatorBuilder: (_, _) => const SizedBox(height: 8),
         itemBuilder: (_, i) {
           final r = rows[i];
           return Card(
@@ -539,11 +525,12 @@ class _PlanChecklistDialogState extends State<_PlanChecklistDialog> {
       child: FutureBuilder<Map<String, dynamic>>(
         future: all,
         builder: (c, s) {
-          if (!s.hasData)
+          if (!s.hasData) {
             return const SizedBox(
               height: 120,
               child: Center(child: CircularProgressIndicator()),
             );
+          }
           final rows = ((s.data!['items'] as List?) ?? []).cast<Map>();
           return SingleChildScrollView(
             child: Column(
@@ -583,8 +570,9 @@ class _AssetAssignmentDialogState extends State<_AssetAssignmentDialog> {
     assigned = widget.api.planAssets((widget.plan['pmPlanId'] as num).toInt());
     assigned.then((x) {
       for (final a in ((x['items'] as List?) ?? []).cast<Map>()) {
-        if (a['isActive'] == true)
+        if (a['isActive'] == true) {
           ids.add((a['itemInstanceId'] as num).toInt());
+        }
       }
       if (mounted) setState(() {});
     });
@@ -606,11 +594,12 @@ class _AssetAssignmentDialogState extends State<_AssetAssignmentDialog> {
       child: FutureBuilder<Map<String, dynamic>>(
         future: candidates,
         builder: (c, s) {
-          if (!s.hasData)
+          if (!s.hasData) {
             return const SizedBox(
               height: 150,
               child: Center(child: CircularProgressIndicator()),
             );
+          }
           final rows = ((s.data!['items'] as List?) ?? []).cast<Map>();
           return SingleChildScrollView(
             child: Column(
@@ -680,11 +669,12 @@ class _NewPlanDialogState extends State<_NewPlanDialog> {
     content: FutureBuilder<Map<String, dynamic>>(
       future: types,
       builder: (c, s) {
-        if (!s.hasData)
+        if (!s.hasData) {
           return const SizedBox(
             height: 90,
             child: Center(child: CircularProgressIndicator()),
           );
+        }
         final x = ((s.data!['items'] as List?) ?? []).cast<Map>();
         return SizedBox(
           width: 500,
@@ -708,7 +698,7 @@ class _NewPlanDialogState extends State<_NewPlanDialog> {
                 onChanged: (z) => setState(() => t = z),
               ),
               DropdownButtonFormField<String>(
-                value: u,
+                initialValue: u,
                 items: const [
                   DropdownMenuItem(value: 'DAY', child: Text('วัน')),
                   DropdownMenuItem(value: 'MONTH', child: Text('เดือน')),
