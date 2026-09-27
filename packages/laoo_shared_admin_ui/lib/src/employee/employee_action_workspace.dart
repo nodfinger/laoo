@@ -27,6 +27,7 @@ class EmployeeActionWorkspace extends StatefulWidget {
     required this.carTypes,
     required this.oilTypes,
     required this.canSave,
+    this.serviceEntitled = false,
     required this.titleBuilder,
     required this.tokens,
     required this.formatDate,
@@ -49,6 +50,7 @@ class EmployeeActionWorkspace extends StatefulWidget {
   final List<EmployeeMasterOption> carTypes;
   final List<EmployeeMasterOption> oilTypes;
   final bool canSave;
+  final bool serviceEntitled;
   final SharedAdminTitleBuilder titleBuilder;
   final SharedAdminUiTokens tokens;
   final EmployeeDateText formatDate;
@@ -100,6 +102,7 @@ class _EmployeeActionWorkspaceState extends State<EmployeeActionWorkspace> {
   String? _carOil2;
   DateTime? _startDate;
   bool _active = true;
+  bool _technician = false;
   bool _notifyEmail = false;
   bool _notifySystem = true;
   bool _saving = false;
@@ -154,6 +157,7 @@ class _EmployeeActionWorkspaceState extends State<EmployeeActionWorkspace> {
     _divisionId = value?.divisionOrgUnitId;
     _departmentId = value?.departmentOrgUnitId;
     _active = value?.isActive ?? true;
+    _technician = value?.isServiceTechnician ?? false;
     _notifyEmail = value?.notifyByEmail ?? false;
     _notifySystem = value?.notifyInSystem ?? true;
     _startDate = value?.startWorkDate;
@@ -370,8 +374,8 @@ class _EmployeeActionWorkspaceState extends State<EmployeeActionWorkspace> {
     ),
   );
 
-  Widget _status() => Row(
-    mainAxisSize: MainAxisSize.min,
+  Widget _status() => Wrap(
+    crossAxisAlignment: WrapCrossAlignment.center,
     children: [
       const Text('สถานะ'),
       SizedBox(width: widget.tokens.itemSpacing),
@@ -380,6 +384,16 @@ class _EmployeeActionWorkspaceState extends State<EmployeeActionWorkspace> {
         onChanged: (value) => setState(() => _active = value),
       ),
       Text(_active ? 'เปิดใช้งาน' : 'ปิดใช้งาน'),
+      if (widget.serviceEntitled) ...[
+        SizedBox(width: widget.tokens.itemSpacing),
+        Checkbox(
+          value: _technician,
+          onChanged: widget.canSave && !_saving
+              ? (value) => setState(() => _technician = value ?? false)
+              : null,
+        ),
+        const Text('ช่างซ่อม'),
+      ],
     ],
   );
 
@@ -1012,6 +1026,7 @@ class _EmployeeActionWorkspaceState extends State<EmployeeActionWorkspace> {
     ),
     startWorkDate: _startDate,
     isActive: _active,
+    isServiceTechnician: _technician,
     username: field('username').text,
     password: field('password').text == '****' ? null : field('password').text,
     roleGroupId: _roleGroupId,

@@ -259,7 +259,7 @@ class _VillageLocationPageState extends State<VillageLocationPage> {
               Align(alignment: Alignment.centerLeft, child: Text('บ้านเลขที่ ${house['houseNo']}')),
               const SizedBox(height: 12),
               DropdownButtonFormField<int>(
-                value: personId,
+                initialValue: personId,
                 decoration: const InputDecoration(labelText: 'บุคคล *'),
                 items: people.map((person) {
                   final id = (person['personID'] as num).toInt();
@@ -303,7 +303,7 @@ class _VillageLocationPageState extends State<VillageLocationPage> {
       builder: (dialogContext) => StatefulBuilder(
         builder: (_, setDialogState) => AlertDialog(
           title: Text('ผู้อาศัยบ้านเลขที่ ${house['houseNo']}'),
-          content: SizedBox(width: 620, child: _residents.isEmpty ? const Text('ยังไม่มีผู้อาศัย') : ListView.separated(shrinkWrap: true, itemCount: _residents.length, separatorBuilder: (_, __) => const Divider(height: 1), itemBuilder: (_, index) {
+          content: SizedBox(width: 620, child: _residents.isEmpty ? const Text('ยังไม่มีผู้อาศัย') : ListView.separated(shrinkWrap: true, itemCount: _residents.length, separatorBuilder: (_, _) => const Divider(height: 1), itemBuilder: (_, index) {
             final resident = _residents[index];
             return ListTile(title: Text('${resident['personName']}'), subtitle: Text('${resident['startDate']?.toString().split('T').first ?? '-'} | ${resident['active'] == true ? 'ใช้งาน' : 'ไม่ใช้งาน'}'), trailing: IconButton(icon: const Icon(Icons.edit_outlined), onPressed: () async { await _editResident(house, resident); setDialogState(() {}); }));
           })),

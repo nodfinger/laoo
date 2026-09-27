@@ -15,7 +15,8 @@ Widget buildSalesWorkspaceShell({
   required Widget child,
 }) {
   final builder = _workspaceShellBuilder;
-  if (builder == null)
+  if (builder == null) {
     throw StateError('Sales feature host is not configured.');
+  }
   return builder(pageTitle: pageTitle, activeMenu: activeMenu, child: child);
 }

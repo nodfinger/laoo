@@ -47,18 +47,20 @@ class _VisitorInsidePageState extends State<VisitorInsidePage> {
     });
     try {
       final actions = await _repository.actions();
-      if (!actions.canView)
+      if (!actions.canView) {
         throw const VisitorApiException(403, 'ไม่มีสิทธิ์ดูผู้มาติดต่อภายใน');
+      }
       final result = await _repository.list(
         search: _search.text.trim(),
         page: _page,
         pageSize: _pageSize,
       );
-      if (mounted)
+      if (mounted) {
         setState(() {
           _actions = actions;
           _result = result;
         });
+      }
     } catch (error) {
       if (mounted) setState(() => _error = error.toString());
     } finally {

@@ -65,12 +65,13 @@ class _BranchHolidayExceptionPageState
         await api.get('/api/time/holiday-calendars/exceptions', query: q)
             as Map,
       );
-      if (mounted)
+      if (mounted) {
         setState(
           () => items = (x['items'] as List? ?? const [])
               .map((e) => Map<String, dynamic>.from(e as Map))
               .toList(),
         );
+      }
     } catch (e) {
       show(timeErrorText(e), true);
     } finally {
@@ -79,11 +80,12 @@ class _BranchHolidayExceptionPageState
   }
 
   void show(String x, bool error) {
-    if (mounted)
+    if (mounted) {
       setState(() {
         message = x;
         messageError = error;
       });
+    }
   }
 
   Future<void> edit([Map<String, dynamic>? value]) async {
@@ -163,7 +165,7 @@ class _BranchHolidayExceptionPageState
                       child: SizedBox(
                         width: 380,
                         child: DropdownButtonFormField<int?>(
-                          value: branchId,
+                          initialValue: branchId,
                           isExpanded: true,
                           decoration: const InputDecoration(labelText: 'สาขา'),
                           items: [
@@ -316,7 +318,7 @@ class _ExceptionDialogState extends State<_ExceptionDialog> {
               onChanged: (v) => setState(() => active = v),
             ),
             DropdownButtonFormField<int>(
-              value: branch,
+              initialValue: branch,
               isExpanded: true,
               decoration: const InputDecoration(labelText: 'สาขา *'),
               items: widget.branches
@@ -382,8 +384,9 @@ class _ExceptionDialogState extends State<_ExceptionDialog> {
         onPressed: () {
           if (branch == null ||
               reason.text.trim().isEmpty ||
-              (isHoliday && name.text.trim().isEmpty))
+              (isHoliday && name.text.trim().isEmpty)) {
             return;
+          }
           Navigator.pop(context, {
             'branchId': branch,
             'holidayDate': d(),

@@ -22,7 +22,8 @@ Widget buildEvaluationWorkspaceShell({
   required Widget child,
 }) {
   final builder = _builder;
-  if (builder == null)
+  if (builder == null) {
     throw StateError('Evaluation feature host is not configured.');
+  }
   return builder(pageTitle: pageTitle, activeMenu: activeMenu, child: child);
 }

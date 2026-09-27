@@ -43,11 +43,12 @@ class _AttendancePeriodSchemesPageState
     try {
       final actions = await _repo.actions('schemes');
       final items = await _repo.schemes();
-      if (mounted)
+      if (mounted) {
         setState(() {
           _actions = actions;
           _items = items;
         });
+      }
     } catch (error) {
       _show(timeErrorText(error), true);
     } finally {
@@ -229,7 +230,7 @@ class _AttendancePeriodAssignmentsPageState
       final actions = await _repo.actions('assignments');
       final schemes = await _repo.schemes();
       final employees = await _repo.employees();
-      if (mounted)
+      if (mounted) {
         setState(() {
           _actions = actions;
           _schemes = schemes.where((item) => item['isActive'] == true).toList();
@@ -238,6 +239,7 @@ class _AttendancePeriodAssignmentsPageState
               ? null
               : (_schemes.first['attendancePeriodSchemeId'] as num).toInt();
         });
+      }
     } catch (error) {
       _show(timeErrorText(error), true);
     } finally {
@@ -308,7 +310,7 @@ class _AttendancePeriodAssignmentsPageState
           SizedBox(
             width: 300,
             child: DropdownButtonFormField<int>(
-              value: _schemeId,
+              initialValue: _schemeId,
               isExpanded: true,
               decoration: const InputDecoration(labelText: 'รูปแบบงวดปิดผล'),
               items: [
@@ -354,10 +356,11 @@ class _AttendancePeriodAssignmentsPageState
                 return CheckboxListTile(
                   value: _selected.contains(employeeId),
                   onChanged: (selected) => setState(() {
-                    if (selected == true)
+                    if (selected == true) {
                       _selected.add(employeeId);
-                    else
+                    } else {
                       _selected.remove(employeeId);
+                    }
                   }),
                   title: Text('${item['employeeCode']} — ${item['fullName']}'),
                   subtitle: Text(
@@ -408,11 +411,12 @@ class _AttendancePeriodsPageState extends State<AttendancePeriodsPage> {
     try {
       final actions = await _repo.actions('');
       final items = await _repo.periods();
-      if (mounted)
+      if (mounted) {
         setState(() {
           _actions = actions;
           _items = items;
         });
+      }
     } catch (error) {
       _show(timeErrorText(error), true);
     } finally {
@@ -679,7 +683,7 @@ class _SchemeDialogState extends State<_SchemeDialog> {
         ),
         const SizedBox(height: 12),
         DropdownButtonFormField<String>(
-          value: _pattern,
+          initialValue: _pattern,
           decoration: const InputDecoration(labelText: 'วิธีสร้างงวด'),
           items: const [
             DropdownMenuItem(

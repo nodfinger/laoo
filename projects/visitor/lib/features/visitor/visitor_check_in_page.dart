@@ -122,11 +122,12 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
 
   Future<void> _loadRental() async {
     final data = await VisitorSettingsRepository(_api).rentalHosts();
-    if (mounted)
+    if (mounted) {
       setState(() {
         _rentalTenants = data.tenants;
         _rentalContacts = data.contacts;
       });
+    }
   }
 
   Future<void> _loadVillageLanes() async {
@@ -161,11 +162,12 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
       if (image != null && mounted) {
         final source = await image.readAsBytes();
         final bytes = _prepareCardImage(source);
-        if (mounted)
+        if (mounted) {
           setState(() {
             _cardImage = image;
             _cardImageBytes = bytes;
           });
+        }
       }
     } catch (error) {
       if (mounted) _show(error.toString(), error: true);
@@ -345,7 +347,7 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
   Widget _content(BuildContext context) {
     if (_loading) return const Center(child: CircularProgressIndicator());
     final settings = _settings;
-    if (settings == null)
+    if (settings == null) {
       return Center(
         child: FilledButton.icon(
           onPressed: _load,
@@ -353,6 +355,7 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
           label: const Text('ลองใหม่'),
         ),
       );
+    }
     return ListView(
       padding: const EdgeInsets.all(10),
       children: [
@@ -575,7 +578,7 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
           ),
           const SizedBox(height: 8),
           DropdownButtonFormField<int>(
-            value: _roomOptions.any((option) => option.id == _roomId)
+            initialValue: _roomOptions.any((option) => option.id == _roomId)
                 ? _roomId
                 : null,
             isExpanded: true,
@@ -616,7 +619,7 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
         ),
         const SizedBox(height: 8),
         DropdownButtonFormField<int>(
-          value:
+          initialValue:
               _hostOptions.any(
                 (option) => option.id == int.tryParse(_host.text),
               )
@@ -670,7 +673,7 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
     String Function(Map<String, dynamic>) text,
     ValueChanged<int?> changed,
   ) => DropdownButtonFormField<int>(
-    value:
+    initialValue:
         rows.any(
           (x) =>
               (x['id'] as num?)?.toInt() == value ||

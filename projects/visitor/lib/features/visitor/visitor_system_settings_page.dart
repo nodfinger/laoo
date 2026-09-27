@@ -213,7 +213,7 @@ class _VisitorSystemSettingsPageState extends State<VisitorSystemSettingsPage> {
           description: 'ภาพบัตรเก็บเป็นไฟล์ตามนโยบายบริษัท และบันทึกการแก้ไขทุกครั้ง',
           children: [
             DropdownButtonFormField<String>(
-              value: _retention,
+              initialValue: _retention,
               decoration: const InputDecoration(labelText: 'นโยบายเก็บภาพ'),
               items: const [
                 DropdownMenuItem(value: 'COMPANY_POLICY', child: Text('ตามนโยบายบริษัท')),
