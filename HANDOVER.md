@@ -7,6 +7,8 @@
 
 `main` ณ เวลาส่งมอบ: `0137977` (`Merge pull request #85`)
 
+ระหว่าง push มีเครื่องอื่นอัปเดต `origin/main` เพิ่มแล้ว จึงไม่ push/pull/merge `main` ในรอบ handover นี้ตามข้อกำหนด งานส่งมอบทั้งหมดอยู่ใน remote handover branches ด้านล่าง
+
 ## Branch ที่ต้องรับต่อ
 
 | Branch | Commit | ขอบเขต | สถานะ |
@@ -103,6 +105,18 @@ flutter run -d chrome --web-port 8080
 - runtime/build/cache: `.dart_tool`, `build`, generated plugin registrants, `pubspec.lock` ที่เปลี่ยนเพราะ runtime, screenshots/diagnostic images
 - worktree path ทั้งหมดต้องส่งเป็นรายชื่อ branch ด้านบน ไม่ต้อง copy cache หรือ temporary worktree
 
+## ไฟล์ที่ยังอยู่บนเครื่องเดิมและไม่ได้ส่งขึ้น Git
+
+ไฟล์ต่อไปถูกตรวจแล้วว่าเป็น artifact/runtime หรือ local container จึงตั้งใจไม่ commit:
+
+- `worktrees/` ใน root: worktree container
+- generated plugin registrants และ `pubspec.lock` ที่เปลี่ยนจาก runtime ใน worktree `training-results-nav`, `training-results-ui`, `unified-runtime`, `runtime-main`
+- `laoo-browser-diagnostic.png` ใน unified runtime worktree
+- `laoo_api/App_Data/` ใน unified runtime worktree
+- `test/app/router/failures/*.png` ใน `laoo-activitytype`
+
+ไม่มี source/migration/test ที่ยัง unstaged จาก worktree ที่เข้าถึงได้ ณ เวลาส่งมอบ
+
 ## ขั้นตอนรับงานบนเครื่อง mon
 
 1. `git fetch origin --prune`
@@ -111,4 +125,3 @@ flutter run -d chrome --web-port 8080
 4. ตรวจ migration ซ้ำกับ `dbo.__LaooMigrationHistory` ก่อน apply
 5. ย้าย config และ uploads ผ่านช่องทางปลอดภัยแยกจาก Git
 6. รัน build/analyze/test แล้วจึงเลือก merge เฉพาะชุดที่ผ่าน
-
