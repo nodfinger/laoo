@@ -42,8 +42,9 @@ class _HolidayCalendarPageState extends State<HolidayCalendarPage> {
   Future<void> _initialize() async {
     try {
       final value = await repo.actions();
-      if (value['view'] != true)
+      if (value['view'] != true) {
         throw StateError('ไม่มีสิทธิ์ดูข้อมูลหน้าจอนี้');
+      }
       if (mounted) setState(() => actions = value);
       await load();
     } catch (error) {
@@ -76,11 +77,12 @@ class _HolidayCalendarPageState extends State<HolidayCalendarPage> {
   }
 
   void showMessage(String value, bool error) {
-    if (mounted)
+    if (mounted) {
       setState(() {
         message = value;
         messageError = error;
       });
+    }
   }
 
   Future<void> edit([Map<String, dynamic>? row]) async {
@@ -169,7 +171,7 @@ class _HolidayCalendarPageState extends State<HolidayCalendarPage> {
                           SizedBox(
                             width: 180,
                             child: DropdownButtonFormField<bool?>(
-                              value: active,
+                              initialValue: active,
                               decoration: const InputDecoration(
                                 labelText: 'สถานะ',
                               ),

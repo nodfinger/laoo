@@ -59,6 +59,7 @@ class EmployeeFormInput {
     this.vehicle2 = const EmployeeVehicleInput(),
     this.startWorkDate,
     this.isActive = true,
+    this.isServiceTechnician = false,
     this.username,
     this.password,
     this.roleGroupId,
@@ -86,6 +87,7 @@ class EmployeeFormInput {
   final EmployeeVehicleInput vehicle2;
   final DateTime? startWorkDate;
   final bool isActive;
+  final bool isServiceTechnician;
   final String? username;
   final String? password;
   final int? roleGroupId;
@@ -160,6 +162,7 @@ class EmployeeFormInput {
     'carOilType2': _text(vehicle2.oilTypeCode),
     'startWorkDate': startWorkDate?.toIso8601String().split('T').first,
     'isActive': isActive,
+    'isServiceTechnician': isServiceTechnician,
     'username': _text(username),
     if ((password?.trim() ?? '').isNotEmpty) 'password': password!.trim(),
     'roleGroupId': roleGroupId,

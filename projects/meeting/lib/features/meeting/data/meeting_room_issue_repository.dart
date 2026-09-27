@@ -9,7 +9,7 @@ class MeetingRoomIssueRepository {
       List<Map<String, dynamic>>.from(
         await _api.get(
               _path,
-              query: {if (roomId != null) 'roomId': '${roomId}'},
+              query: {if (roomId != null) 'roomId': '$roomId'},
             )
             as List,
       );

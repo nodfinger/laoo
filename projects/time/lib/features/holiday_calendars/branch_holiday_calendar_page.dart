@@ -72,12 +72,13 @@ class _BranchHolidayCalendarPageState extends State<BranchHolidayCalendarPage> {
         await api.get('/api/time/holiday-calendars/assignments', query: q)
             as Map,
       );
-      if (mounted)
+      if (mounted) {
         setState(
           () => items = (x['items'] as List? ?? const [])
               .map((e) => Map<String, dynamic>.from(e as Map))
               .toList(),
         );
+      }
     } catch (e) {
       show(timeErrorText(e), true);
     } finally {
@@ -86,11 +87,12 @@ class _BranchHolidayCalendarPageState extends State<BranchHolidayCalendarPage> {
   }
 
   void show(String x, bool error) {
-    if (mounted)
+    if (mounted) {
       setState(() {
         message = x;
         messageError = error;
       });
+    }
   }
 
   Future<void> edit([Map<String, dynamic>? value]) async {
@@ -174,7 +176,7 @@ class _BranchHolidayCalendarPageState extends State<BranchHolidayCalendarPage> {
                       child: SizedBox(
                         width: 380,
                         child: DropdownButtonFormField<int?>(
-                          value: branchId,
+                          initialValue: branchId,
                           isExpanded: true,
                           decoration: const InputDecoration(labelText: 'สาขา'),
                           items: [
@@ -302,13 +304,15 @@ class _AssignmentDialogState extends State<_AssignmentDialog> {
       firstDate: DateTime(2000),
       lastDate: DateTime(2100),
     );
-    if (x != null)
+    if (x != null) {
       setState(() {
-        if (end)
+        if (end) {
           to = x;
-        else
+        } else {
           from = x;
+        }
       });
+    }
   }
 
   String d(DateTime x) =>
@@ -335,7 +339,7 @@ class _AssignmentDialogState extends State<_AssignmentDialog> {
               onChanged: (v) => setState(() => active = v),
             ),
             DropdownButtonFormField<int>(
-              value: branch,
+              initialValue: branch,
               isExpanded: true,
               decoration: const InputDecoration(labelText: 'สาขา *'),
               items: widget.branches
@@ -350,7 +354,7 @@ class _AssignmentDialogState extends State<_AssignmentDialog> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<int>(
-              value: calendar,
+              initialValue: calendar,
               isExpanded: true,
               decoration: const InputDecoration(labelText: 'ปฏิทินวันหยุด *'),
               items: widget.calendars
@@ -393,8 +397,9 @@ class _AssignmentDialogState extends State<_AssignmentDialog> {
         onPressed: () {
           if (branch == null ||
               calendar == null ||
-              (to != null && to!.isBefore(from)))
+              (to != null && to!.isBefore(from))) {
             return;
+          }
           Navigator.pop(context, {
             'branchId': branch,
             'holidayCalendarId': calendar,

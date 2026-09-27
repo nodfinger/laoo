@@ -531,7 +531,7 @@ class _CreateQrDialogState extends State<_CreateQrDialog> {
       final value = await widget.api.create(_instanceId!);
       if (mounted) Navigator.pop(context, value);
     } catch (error) {
-      if (mounted)
+      if (mounted) {
         showTimedSnackBar(
           context,
           message: error is ApiException
@@ -539,6 +539,7 @@ class _CreateQrDialogState extends State<_CreateQrDialog> {
               : 'บันทึก QR Code ไม่สำเร็จ',
           error: true,
         );
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -594,8 +595,9 @@ class _QrDialog extends StatelessWidget {
       FilledButton.icon(
         onPressed: () async {
           await Clipboard.setData(ClipboardData(text: _url));
-          if (context.mounted)
+          if (context.mounted) {
             showTimedSnackBar(context, message: 'คัดลอกลิงก์ QR แล้ว');
+          }
         },
         icon: const Icon(Icons.copy_outlined),
         label: const Text('คัดลอกลิงก์'),

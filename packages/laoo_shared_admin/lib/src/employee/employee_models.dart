@@ -46,6 +46,7 @@ class EmployeeRecord {
   }
 
   bool get isActive => _values['isActive'] != false;
+  bool get isServiceTechnician => _values['isServiceTechnician'] == true;
 
   Map<String, dynamic> toJson() => Map<String, dynamic>.from(_values);
 

@@ -75,13 +75,14 @@ class _HolidayDatePageState extends State<HolidayDatePage> {
             )
             as Map,
       );
-      if (mounted)
+      if (mounted) {
         setState(() {
           page = (x['page'] as num?)?.toInt() ?? targetPage;
           items = (x['items'] as List? ?? const [])
               .map((e) => Map<String, dynamic>.from(e as Map))
               .toList();
         });
+      }
     } catch (e) {
       showMessage(timeErrorText(e), true);
     } finally {
@@ -90,11 +91,12 @@ class _HolidayDatePageState extends State<HolidayDatePage> {
   }
 
   void showMessage(String x, bool error) {
-    if (mounted)
+    if (mounted) {
       setState(() {
         message = x;
         messageError = error;
       });
+    }
   }
 
   Future<void> edit([Map<String, dynamic>? row]) async {
@@ -175,7 +177,7 @@ class _HolidayDatePageState extends State<HolidayDatePage> {
                       child: SizedBox(
                         width: 420,
                         child: DropdownButtonFormField<int>(
-                          value: calendarId,
+                          initialValue: calendarId,
                           isExpanded: true,
                           decoration: const InputDecoration(
                             labelText: 'ปฏิทินวันหยุด',

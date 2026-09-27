@@ -32,6 +32,7 @@ void main() {
     required _FakeApi api,
     EmployeeRecord? employee,
     bool canSave = true,
+    bool serviceEntitled = false,
     EmployeeActionSaved? onSaved,
   }) => MaterialApp(
     home: Scaffold(
@@ -48,6 +49,7 @@ void main() {
         carTypes: const [EmployeeMasterOption(code: 'CAR', name: 'รถยนต์')],
         oilTypes: const [EmployeeMasterOption(code: 'GAS', name: 'เบนซิน')],
         canSave: canSave,
+        serviceEntitled: serviceEntitled,
         titleBuilder: (_, title, _) => Text(title),
         tokens: tokens,
         formatDate: (value) => value.toIso8601String().split('T').first,
@@ -70,6 +72,7 @@ void main() {
 
     expect(find.text('พนักงานจากเมนู > เพิ่ม'), findsOneWidget);
     expect(find.text('สถานะ'), findsOneWidget);
+    expect(find.text('ช่างซ่อม'), findsNothing);
     expect(find.text('ข้อมูลพนักงาน'), findsOneWidget);
     expect(find.text('User Login'), findsOneWidget);
     expect(find.text('กรณีฉุกเฉิน'), findsOneWidget);
@@ -87,6 +90,7 @@ void main() {
     await tester.pumpWidget(
       app(
         api: api,
+        serviceEntitled: true,
         employee: EmployeeRecord.fromJson({
           'employeeId': 17,
           'partnerId': 3,
@@ -95,6 +99,7 @@ void main() {
           'fullName': 'Employee One',
           'notifyInSystem': true,
           'isActive': true,
+          'isServiceTechnician': true,
         }),
         onSaved: (_, id) async => savedId = id,
       ),
@@ -105,6 +110,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(savedId, 17);
+    expect(find.text('ช่างซ่อม'), findsOneWidget);
+    expect((api.lastPutBody as Map)['isServiceTechnician'], true);
     expect(api.lastPutPath, '/api/company/employees/17');
   });
 
@@ -112,18 +119,20 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(390, 844));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
-    await tester.pumpWidget(app(api: _FakeApi()));
+    await tester.pumpWidget(app(api: _FakeApi(), serviceEntitled: true));
     await tester.pumpAndSettle();
 
     expect(find.byType(SingleChildScrollView), findsOneWidget);
     expect(find.text('รูปพนักงาน'), findsOneWidget);
     expect(find.text('รหัสพนักงาน *'), findsOneWidget);
+    expect(find.text('ช่างซ่อม'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }
 
 class _FakeApi implements JsonApiClient {
   String? lastPutPath;
+  Object? lastPutBody;
 
   @override
   Future<dynamic> get(
@@ -146,6 +155,7 @@ class _FakeApi implements JsonApiClient {
     bool authenticated = true,
   }) async {
     lastPutPath = path;
+    lastPutBody = body;
     return {'employeeId': 17};
   }
 

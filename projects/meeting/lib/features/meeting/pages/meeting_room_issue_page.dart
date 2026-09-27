@@ -168,8 +168,9 @@ class _MeetingRoomIssuePageState extends State<MeetingRoomIssuePage> {
               onPressed: () {
                 if (roomId == null ||
                     itemId == null ||
-                    description.text.trim().isEmpty)
+                    description.text.trim().isEmpty) {
                   return;
+                }
                 Navigator.pop(dialogContext, true);
               },
               child: const Text('แจ้งส่งซ่อม'),
@@ -180,8 +181,9 @@ class _MeetingRoomIssuePageState extends State<MeetingRoomIssuePage> {
     );
     final text = description.text.trim();
     description.dispose();
-    if (value != true || roomId == null || itemId == null || text.isEmpty)
+    if (value != true || roomId == null || itemId == null || text.isEmpty) {
       return;
+    }
     try {
       await _issues.create(roomId: roomId!, itemId: itemId!, description: text);
       if (mounted) {
@@ -189,8 +191,9 @@ class _MeetingRoomIssuePageState extends State<MeetingRoomIssuePage> {
         await _load();
       }
     } catch (error) {
-      if (mounted)
+      if (mounted) {
         setState(() => _message = _error(error, 'แจ้งส่งซ่อมไม่สำเร็จ'));
+      }
     }
   }
 
@@ -330,7 +333,7 @@ class _MeetingRoomIssuePageState extends State<MeetingRoomIssuePage> {
                     ? const Center(child: Text('ยังไม่มีรายการแจ้งซ่อม'))
                     : ListView.separated(
                         itemCount: _items.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        separatorBuilder: (_, _) => const SizedBox(height: 8),
                         itemBuilder: (context, index) {
                           final item = _items[index];
                           return ListTile(

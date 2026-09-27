@@ -432,7 +432,7 @@ class _TimeSystemSettingsPageState extends State<TimeSystemSettingsPage> {
               'ใช้สร้างการผูกงวดจริงเมื่อเปิดให้พนักงานต้องลงเวลา ค่านี้ไม่ย้ายพนักงานเดิมย้อนหลัง',
           children: [
             DropdownButtonFormField<int?>(
-              value: _defaultPeriodSchemeId,
+              initialValue: _defaultPeriodSchemeId,
               isExpanded: true,
               decoration: const InputDecoration(
                 labelText: 'รูปแบบงวดปิดผลเริ่มต้น',
@@ -464,7 +464,7 @@ class _TimeSystemSettingsPageState extends State<TimeSystemSettingsPage> {
               'ใช้เมื่อสาขายังไม่มีปฏิทินของตนเอง การเปลี่ยนมีผลตามวันที่เริ่มใช้ และไม่แก้ผลลงเวลาที่คำนวณแล้ว',
           children: [
             DropdownButtonFormField<int?>(
-              value: _defaultHolidayCalendarId,
+              initialValue: _defaultHolidayCalendarId,
               isExpanded: true,
               decoration: const InputDecoration(labelText: 'ปฏิทินวันหยุด'),
               items: _uniqueDropdownItems<int?>([

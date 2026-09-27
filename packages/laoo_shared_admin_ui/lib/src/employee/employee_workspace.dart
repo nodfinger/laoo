@@ -154,6 +154,7 @@ class _EmployeeWorkspaceState extends State<EmployeeWorkspace> {
                 caption: widget.caption,
                 repository: widget.repository,
                 employee: _editing,
+                serviceEntitled: _controller.serviceEntitled,
                 companyId: _editing?.companyId ?? _controller.companyId,
                 customerScope: widget.customerScope,
                 companies: widget.companies,

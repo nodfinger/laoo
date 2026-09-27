@@ -67,6 +67,8 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
   bool isActive = true;
   bool notifyByEmail = false;
   bool notifyInSystem = true;
+  bool isServiceTechnician = false;
+  bool _serviceEnabled = false;
   String? _alertMessage;
   bool _alertIsError = false;
   int sortColumn = 4;
@@ -193,6 +195,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
           _canCreate = p['create'] == true;
           _canEdit = p['edit'] == true;
           _canDelete = p['delete'] == true;
+          _serviceEnabled = p['serviceEnabled'] == true;
         });
       }
     } catch (_) {}
@@ -1734,6 +1737,21 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
                                         ],
                                       ),
                                       const SizedBox(width: 4),
+                                      if (_serviceEnabled)
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Checkbox(
+                                              value: isServiceTechnician,
+                                              onChanged: (value) => setState(
+                                                () => isServiceTechnician =
+                                                    value ?? false,
+                                              ),
+                                            ),
+                                            const Text('ช่างซ่อม'),
+                                          ],
+                                        ),
+                                      const SizedBox(width: 4),
                                       _actionField(
                                         'รหัสพนักงาน *',
                                         employeeCodeController,
@@ -2407,6 +2425,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
       'carOilType2': carOilType2,
       'startWorkDate': startDate?.toIso8601String().split('T').first,
       'isActive': isActive,
+      'isServiceTechnician': _serviceEnabled && isServiceTechnician,
     };
     try {
       body['companyId'] = widget.customer ? selectedCompanyId : null;
@@ -2503,6 +2522,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
       selectedDivisionId = null;
       selectedDepartmentId = null;
       isActive = true;
+      isServiceTechnician = false;
       notifyByEmail = false;
       notifyInSystem = true;
       if (mounted) {
@@ -2629,6 +2649,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
       selectedDivisionId = item['divisionOrgUnitId'] as int?;
       selectedDepartmentId = item['departmentOrgUnitId'] as int?;
       isActive = item['isActive'] == true;
+      isServiceTechnician = item['isServiceTechnician'] == true;
       notifyByEmail = _isActive(item['notifyByEmail']);
       notifyInSystem = _isActive(item['notifyInSystem']);
       final rawDate = item['startWorkDate'];

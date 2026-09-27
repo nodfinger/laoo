@@ -80,10 +80,12 @@ class _LeaveRequestPageState extends State<LeaveRequestPage> {
   }
 
   void _show(String value, bool error) {
-    if (mounted) setState(() {
+    if (mounted) {
+      setState(() {
       _message = value;
       _messageError = error;
     });
+    }
   }
 
   Future<void> _create() async {
@@ -433,7 +435,11 @@ class _LeaveRequestDialogState extends State<_LeaveRequestDialog> {
     if (selected == null || !mounted) return;
     setState(() {
       final minute = selected.hour * 60 + selected.minute;
-      if (start) _startMinute = minute; else _endMinute = minute;
+      if (start) {
+        _startMinute = minute;
+      } else {
+        _endMinute = minute;
+      }
     });
   }
 
@@ -457,7 +463,7 @@ class _LeaveRequestDialogState extends State<_LeaveRequestDialog> {
           const SizedBox(height: 12),
           if (proxy) ...[
             DropdownButtonFormField<int>(
-              value: _employeeId,
+              initialValue: _employeeId,
               decoration: const InputDecoration(labelText: 'พนักงาน *'),
               items: employees.map((x) => DropdownMenuItem(value: x['EmployeeID'] as int, child: Text('${x['EmployeeCode']} — ${x['FullName']}'))).toList(),
               onChanged: (value) => setState(() => _employeeId = value),
@@ -466,7 +472,7 @@ class _LeaveRequestDialogState extends State<_LeaveRequestDialog> {
             const SizedBox(height: 12),
           ],
           DropdownButtonFormField<int>(
-            value: _leaveTypeId,
+            initialValue: _leaveTypeId,
             decoration: const InputDecoration(labelText: 'ประเภทการลา *'),
             items: types.map((x) => DropdownMenuItem(value: x['LeaveTypeID'] as int, child: Text('${x['LeaveTypeCode']} — ${x['LeaveTypeName']}'))).toList(),
             onChanged: (value) => setState(() {
@@ -497,7 +503,7 @@ class _LeaveRequestDialogState extends State<_LeaveRequestDialog> {
           if (proxy) ...[
             const SizedBox(height: 16), Text('ข้อมูลการทำแทน', style: timeUiTokens.sectionStyle), const SizedBox(height: 12),
             DropdownButtonFormField<int>(
-              value: _onBehalfReasonId,
+              initialValue: _onBehalfReasonId,
               decoration: const InputDecoration(labelText: 'เหตุผลทำแทน *'),
               items: reasons.map((x) => DropdownMenuItem(value: x['OnBehalfReasonID'] as int, child: Text('${x['ReasonCode']} — ${x['ReasonName']}'))).toList(),
               onChanged: (value) => setState(() => _onBehalfReasonId = value), validator: _required,
