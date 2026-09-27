@@ -10,8 +10,14 @@ void main() {
     expect(AppConfig.apiBaseUrl, 'http://localhost:5080');
     expect(LaooOwnerScope.values, hasLength(3));
     expect(VisitorRoutes.all, hasLength(23));
-    expect(VisitorRoutes.implemented, hasLength(7));
-    expect(buildVisitorFeatureRoutes(), hasLength(10));
+    expect(VisitorRoutes.implemented, hasLength(8));
+    expect(buildVisitorFeatureRoutes(), hasLength(11));
+    expect(
+      VisitorRoutes.all
+          .singleWhere((route) => route.menuCode == '34003')
+          .isImplemented,
+      isTrue,
+    );
   });
 
   test('maps the Core employee host contract into a Visitor host option', () {
