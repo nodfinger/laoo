@@ -11,6 +11,7 @@ import '../job_dispatch/pages/job_dispatch_page.dart';
 import '../job_work_orders/pages/job_work_orders_page.dart';
 import '../pm/pages/pm_pages.dart';
 import '../service_dashboard/pages/service_dashboard_page.dart';
+import '../service_complaint/pages/service_complaint_page.dart';
 import '../repair_history/pages/repair_history_page.dart';
 import '../company/delivery_note/pages/delivery_note_page.dart';
 import '../company/pre_order/pages/pre_order_page.dart';
@@ -152,6 +153,7 @@ List<GoRoute> buildServiceFeatureRoutes({
     (entry) =>
         _workspacePlaceholder(ServiceRoutes.byMenuCode(entry.key), entry.value),
   ),
+  _page('20006', (state) => const ServiceComplaintPage()),
   ..._portalPlaceholders.entries.map(
     (entry) =>
         _portalPlaceholder(ServiceRoutes.byMenuCode(entry.key), entry.value),
@@ -194,7 +196,4 @@ const _workspacePlaceholders = <String, String>{
   '19003': 'รายงานผลประเมินความพึงพอใจ',
 };
 
-const _portalPlaceholders = <String, String>{
-  '20005': 'ประเมินความพึงพอใจ',
-  '20006': 'แจ้งเรื่องร้องเรียน',
-};
+const _portalPlaceholders = <String, String>{'20005': 'ประเมินความพึงพอใจ'};
