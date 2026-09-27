@@ -33,6 +33,26 @@ class MeetingRoomBookingRepository {
     return List<Map<String, dynamic>>.from(data['items'] as List? ?? const []);
   }
 
+  Future<Map<String, dynamic>> trainingTestTemplates(int bookingId) async {
+    final data =
+        await _api.get(
+              '/api/company/training/bookings/$bookingId/tests/templates',
+            )
+            as Map;
+    return Map<String, dynamic>.from(data);
+  }
+
+  Future<void> assignTrainingTestTemplates(
+    int bookingId, {
+    int? preTemplateId,
+    int? postTemplateId,
+  }) async {
+    await _api.put(
+      '/api/company/training/bookings/$bookingId/tests/templates',
+      body: {'preTemplateId': preTemplateId, 'postTemplateId': postTemplateId},
+    );
+  }
+
   Future<Map<String, dynamic>> list({
     required DateTime dateFrom,
     required DateTime dateTo,

@@ -57,6 +57,29 @@ WHERE E.CompanyID=@company AND E.BookingID=@booking AND A.BookingParticipantID=@
             locked = row is not null && await HasAttempts((long)row["ExamID"]!, token) });
     }, token);
 
+    [HttpGet("templates")]
+    public Task<IActionResult> Templates(long bookingId, CancellationToken token) => Run(bookingId, async () =>
+    {
+        Manage();
+        var rows = await Rows("SELECT TrainingTestTemplateID,TrainingTestTemplateCode,TrainingTestTemplateName,SectionCode,VersionNo FROM dbo.TDTRTrainingTestTemplate WHERE CompanyID=@company AND IsActive=1 ORDER BY SectionCode,TrainingTestTemplateName", token);
+        var selected = await Rows("SELECT SectionCode,TrainingTestTemplateID FROM dbo.TDTRBookingExam WHERE CompanyID=@company AND BookingID=@booking", token);
+        return Ok(new {
+            items = rows.Select(r => new { id = r["TrainingTestTemplateID"], code = r["TrainingTestTemplateCode"], name = r["TrainingTestTemplateName"], section = r["SectionCode"], versionNo = r["VersionNo"] }),
+            preTemplateId = selected.SingleOrDefault(r => r["SectionCode"]?.ToString() == "PRE")?["TrainingTestTemplateID"],
+            postTemplateId = selected.SingleOrDefault(r => r["SectionCode"]?.ToString() == "POST")?["TrainingTestTemplateID"]
+        });
+    }, token);
+
+    [HttpPut("templates")]
+    public Task<IActionResult> AssignTemplates(long bookingId, AssignTemplates request, CancellationToken token) => Run(bookingId, async () =>
+    {
+        Manage();
+        if (access.Status != "APPROVED") throw new ExamFailure(409, "กำหนดชุดแบบทดสอบได้หลังการจองอนุมัติแล้ว");
+        await AssignTemplate("PRE", request.PreTemplateId, token);
+        await AssignTemplate("POST", request.PostTemplateId, token);
+        return Ok(new { saved = true });
+    }, token);
+
     [HttpPut("{section}/definition")]
     public Task<IActionResult> SaveDefinition(long bookingId, string section, SaveExam request, CancellationToken token) => Run(bookingId, async () =>
     {
@@ -307,6 +330,22 @@ AND (UP.UserID IS NOT NULL OR U.IsCompanyAdmin=1 OR B.RequesterUserID=@user OR
     private Task<List<Dictionary<string,object?>>> ExamRows(string section,CancellationToken token) =>
         Rows("SELECT * FROM dbo.TDTRBookingExam WHERE CompanyID=@company AND BookingID=@booking AND SectionCode=@section",token,("@section",section));
     private async Task<Dictionary<string,object?>?> Exam(string section,CancellationToken token) => (await ExamRows(section,token)).SingleOrDefault();
+    private async Task AssignTemplate(string section, long? templateId, CancellationToken token) {
+        var current = await Exam(section, token);
+        if (current is not null && await HasAttempts((long)current["ExamID"]!, token))
+            throw new ExamFailure(409, "มีผู้เริ่มทำแบบทดสอบแล้ว จึงเปลี่ยนชุดข้อสอบไม่ได้");
+        if (templateId is null) {
+            if (current is not null) await Execute("DELETE dbo.TDTRBookingExam WHERE CompanyID=@company AND BookingID=@booking AND SectionCode=@section", token, ("@section", section));
+            return;
+        }
+        var source = (await Rows("SELECT TrainingTestTemplateID,TrainingTestTemplateCode,TrainingTestTemplateName,SectionCode,DefinitionJson,VersionNo FROM dbo.TDTRTrainingTestTemplate WHERE CompanyID=@company AND TrainingTestTemplateID=@id AND IsActive=1", token, ("@id", templateId))).SingleOrDefault()
+            ?? throw new ExamFailure(400, "ไม่พบชุดแบบทดสอบที่เลือก หรือชุดดังกล่าวไม่ใช้งานแล้ว");
+        if ((string)source["SectionCode"]! != section) throw new ExamFailure(400, "ประเภทชุดแบบทดสอบไม่ตรงกับช่วง PRE/POST");
+        await Execute(current is null
+            ? "INSERT dbo.TDTRBookingExam(CompanyID,BookingID,SectionCode,DefinitionJson,TrainingTestTemplateID,TrainingTestTemplateCodeSnapshot,TrainingTestTemplateNameSnapshot,TrainingTestTemplateVersionNo,CreateBy,UpdateBy) VALUES(@company,@booking,@section,@json,@template,@code,@name,@version,@user,@user)"
+            : "UPDATE dbo.TDTRBookingExam SET DefinitionJson=@json,TrainingTestTemplateID=@template,TrainingTestTemplateCodeSnapshot=@code,TrainingTestTemplateNameSnapshot=@name,TrainingTestTemplateVersionNo=@version,UpdateBy=@user,UpdateDate=SYSUTCDATETIME() WHERE CompanyID=@company AND BookingID=@booking AND SectionCode=@section",
+            token, ("@section", section), ("@json", source["DefinitionJson"]), ("@template", source["TrainingTestTemplateID"]), ("@code", source["TrainingTestTemplateCode"]), ("@name", source["TrainingTestTemplateName"]), ("@version", source["VersionNo"]));
+    }
     private async Task<Dictionary<string,object?>> RequiredExam(string section,CancellationToken token) =>
         await Exam(section,token) ?? throw new ExamFailure(404,"ยังไม่ได้กำหนดแบบทดสอบ");
     private async Task<bool> HasAttempts(long exam,CancellationToken token) =>
@@ -352,3 +391,4 @@ AND (UP.UserID IS NOT NULL OR U.IsCompanyAdmin=1 OR B.RequesterUserID=@user OR
 public sealed record SaveExam(ExamDefinition Definition,string? RowVersion);
 public sealed record SaveAnswers(List<ExamAnswer> Answers,bool Submit,string? RowVersion);
 public sealed record UploadImage(string Base64);
+public sealed record AssignTemplates(long? PreTemplateId, long? PostTemplateId);
