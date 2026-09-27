@@ -7,6 +7,7 @@ import 'pages/meeting_building_page.dart';
 import 'pages/meeting_food_page.dart';
 import 'pages/meeting_food_plan_page.dart';
 import 'pages/meeting_food_order_summary_page.dart';
+import 'pages/meeting_food_distribution_page.dart';
 import 'pages/meeting_attendance_page.dart';
 import 'pages/meeting_invitation_page.dart';
 import 'pages/meeting_room_approval_page.dart';
@@ -15,6 +16,9 @@ import 'pages/meeting_room_page.dart';
 import 'pages/meeting_room_issue_page.dart';
 import 'pages/meeting_equipment_request_page.dart';
 import 'pages/meeting_system_settings_page.dart';
+import 'pages/meeting_room_support_tasks_clean_page.dart';
+import 'pages/meeting_room_usage_pages.dart';
+import 'pages/meeting_feedback_report_page.dart';
 
 List<GoRoute> buildMeetingFeatureRoutes() => [
   GoRoute(
@@ -36,6 +40,11 @@ List<GoRoute> buildMeetingFeatureRoutes() => [
     path: MeetingRoutePaths.foodOrderSummary,
     name: MeetingRouteNames.foodOrderSummary,
     builder: (context, state) => const MeetingFoodOrderSummaryPage(),
+  ),
+  GoRoute(
+    path: MeetingRoutePaths.foodDistribution,
+    name: MeetingRouteNames.foodDistribution,
+    builder: (context, state) => const MeetingFoodDistributionPage(),
   ),
   GoRoute(
     path: MeetingRoutePaths.attendance,
@@ -65,8 +74,16 @@ List<GoRoute> buildMeetingFeatureRoutes() => [
     name: MeetingRouteNames.foodPlans,
     builder: (context, state) => const MeetingFoodPlanPage(),
   ),
-  _placeholder(MeetingRoutes.roomCheckIn, 'เช็กอินและคืนห้อง'),
-  _placeholder(MeetingRoutes.roomSupportTasks, 'งานเตรียมห้องและอุปกรณ์'),
+  GoRoute(
+    path: MeetingRoutePaths.roomCheckIn,
+    name: MeetingRouteNames.roomCheckIn,
+    builder: (context, state) => const MeetingRoomUsagePage(),
+  ),
+  GoRoute(
+    path: MeetingRoutePaths.roomSupportTasks,
+    name: MeetingRouteNames.roomSupportTasks,
+    builder: (context, state) => const MeetingRoomSupportTasksCleanPage(),
+  ),
   GoRoute(
     path: MeetingRoutePaths.roomIssues,
     name: MeetingRouteNames.roomIssues,
@@ -87,17 +104,19 @@ List<GoRoute> buildMeetingFeatureRoutes() => [
     name: MeetingRouteNames.foods,
     builder: (context, state) => const MeetingFoodPage(),
   ),
-  _placeholder(MeetingRoutes.utilizationReport, 'รายงานการใช้ห้อง'),
-  _placeholder(MeetingRoutes.noShowReport, 'รายงาน No-show'),
-  _placeholder(MeetingRoutes.feedbackReport, 'ผลประเมินห้องประชุม'),
-];
-
-GoRoute _placeholder(MeetingRouteSpec route, String title) => GoRoute(
-  path: route.path,
-  name: route.name,
-  builder: (context, state) => buildMeetingWorkspaceShell(
-    pageTitle: title,
-    activeMenu: route.name,
-    child: Center(child: Text('$title จะพัฒนาต่อในขั้นตอนถัดไป')),
+  GoRoute(
+    path: MeetingRoutePaths.utilizationReport,
+    name: MeetingRouteNames.utilizationReport,
+    builder: (context, state) => const MeetingUtilizationReportPage(),
   ),
-);
+  GoRoute(
+    path: MeetingRoutePaths.noShowReport,
+    name: MeetingRouteNames.noShowReport,
+    builder: (context, state) => const MeetingNoShowReportPage(),
+  ),
+  GoRoute(
+    path: MeetingRoutePaths.feedbackReport,
+    name: MeetingRouteNames.feedbackReport,
+    builder: (context, state) => const MeetingFeedbackReportPage(),
+  ),
+];

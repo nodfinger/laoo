@@ -23,7 +23,9 @@ import 'app/theme/workspace_theme_presets.dart';
 import 'core/api/api_client.dart';
 import 'core/api/api_exception.dart';
 import 'core/company_setup/company_setup_controller.dart';
+import 'core/navigation/navigation_menu_repository.dart';
 import 'core/widgets/auto_dismiss_message.dart';
+import 'core/widgets/timed_snack_bar.dart';
 import 'features/support/presentation/widgets/support_workspace_shell.dart';
 
 void main() {
@@ -35,7 +37,13 @@ void main() {
   configureVoteFeatureHost(_buildMeetingWorkspaceShell);
   configurePosFeatureHost(_buildMeetingWorkspaceShell);
   configureSalesFeatureHost(_buildMeetingWorkspaceShell);
-  configureEvaluationFeatureHost(_buildMeetingWorkspaceShell);
+  configureEvaluationFeatureHost(
+    _buildMeetingWorkspaceShell,
+    apiClientFactory: ApiClient.new,
+    apiClientDisposer: (client) => (client as ApiClient).dispose(),
+    messagePresenter: (context, {required message, required error}) =>
+        showTimedSnackBar(context, message: message, error: error),
+  );
   configureMeetingFeatureHost(_buildMeetingWorkspaceShell);
   configureServiceWorkspaceShell(_buildMeetingWorkspaceShell);
   configureGatePassFeatureHost(_buildMeetingWorkspaceShell);
@@ -118,6 +126,13 @@ void main() {
     messageBuilder: ({required message, required error, required onClose}) =>
         AutoDismissMessage(message: message, error: error, onClose: onClose),
     pageSizeProvider: () => companySetupController.pageSize,
+    menuCaptionResolver:
+        ({required menuCode, required routeName, required fallback}) =>
+            NavigationMenuRepository().resolveMenuName(
+              menuCode: menuCode,
+              routeName: routeName,
+              fallback: fallback,
+            ),
     uiTokensProvider: () {
       final theme = workspaceThemeController.value;
       return TrainingUiTokens(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:laoo_shared_workspace_ui/laoo_shared_workspace_ui.dart';
 
 import '../training/training_feature_host.dart';
@@ -14,14 +15,19 @@ class TrainingResultsPage extends StatefulWidget {
 class _TrainingResultsPageState extends State<TrainingResultsPage>
     with SingleTickerProviderStateMixin {
   final _search = TextEditingController();
+  final _course = TextEditingController();
   late final dynamic _api;
   late final TabController _tabs;
   List<Map<String, dynamic>> _items = [];
   Map<String, dynamic>? _detail;
   Map<String, dynamic>? _section;
+  List<Map<String, dynamic>> _evaluations = [];
   int _page = 1, _total = 0;
   bool _loading = true;
   String? _message;
+  String _status = '';
+  String _examResultFilter = '';
+  String _caption = 'ผลการอบรม';
 
   String get _sectionCode => _tabs.index == 0 ? 'PRE' : 'POST';
 
@@ -33,12 +39,23 @@ class _TrainingResultsPageState extends State<TrainingResultsPage>
       ..addListener(() {
         if (!_tabs.indexIsChanging && _detail != null) _loadSection();
       });
+    _loadCaption();
     _load();
+  }
+
+  Future<void> _loadCaption() async {
+    final caption = await resolveTrainingMenuCaption(
+      menuCode: TrainingMenuCodes.results,
+      routeName: TrainingRouteNames.results,
+      fallback: _caption,
+    );
+    if (mounted) setState(() => _caption = caption);
   }
 
   @override
   void dispose() {
     _search.dispose();
+    _course.dispose();
     _tabs.dispose();
     disposeTrainingApiClient(_api);
     super.dispose();
@@ -54,6 +71,8 @@ class _TrainingResultsPageState extends State<TrainingResultsPage>
                 'page': '$page',
                 'pageSize': '$trainingPageSize',
                 'search': _search.text.trim(),
+                'course': _course.text.trim(),
+                'status': _status,
               },
             )
             as Map,
@@ -78,13 +97,28 @@ class _TrainingResultsPageState extends State<TrainingResultsPage>
         await _api.get('/api/company/training/results/$bookingId') as Map,
       );
       if (!mounted) return;
-      setState(() => _detail = detail);
+      setState(() {
+        _detail = detail;
+        _examResultFilter = '';
+      });
       await _loadSection();
+      await _loadEvaluations();
     } catch (error) {
       _notice(trainingErrorText(error));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  Future<void> _loadEvaluations() async {
+    final id = (_detail?['bookingId'] as num?)?.toInt();
+    if (id == null) return;
+    try {
+      final data = Map<String, dynamic>.from(
+        await _api.get('/api/company/training/results/$id/evaluations') as Map,
+      );
+      if (mounted) setState(() => _evaluations = _maps(data['items']));
+    } catch (_) {}
   }
 
   Future<void> _loadSection() async {
@@ -115,7 +149,7 @@ class _TrainingResultsPageState extends State<TrainingResultsPage>
   Widget build(BuildContext context) {
     final tokens = trainingUiTokens;
     return buildTrainingWorkspaceShell(
-      pageTitle: 'ผลการอบรม',
+      pageTitle: _caption,
       activeMenu: TrainingMenuCodes.results,
       child: Stack(
         children: [
@@ -141,7 +175,7 @@ class _TrainingResultsPageState extends State<TrainingResultsPage>
       tokens: tokens.workspace,
       caption: LaooCaptionCard(
         tokens: tokens.workspace,
-        caption: 'ผลการอบรม',
+        caption: _caption,
         leading: Icon(Icons.assessment_outlined, color: tokens.primaryColor),
       ),
       filter: Wrap(
@@ -150,14 +184,43 @@ class _TrainingResultsPageState extends State<TrainingResultsPage>
         crossAxisAlignment: WrapCrossAlignment.end,
         children: [
           SizedBox(
-            width: 300,
+            width: 220,
             child: TextField(
               controller: _search,
               onSubmitted: (_) => _load(),
               decoration: const InputDecoration(
-                labelText: 'ค้นหาเลขที่จองหรือหัวข้ออบรม',
+                labelText: 'เลขที่จอง',
                 prefixIcon: Icon(Icons.search),
               ),
+            ),
+          ),
+          SizedBox(
+            width: 240,
+            child: TextField(
+              controller: _course,
+              onSubmitted: (_) => _load(),
+              decoration: const InputDecoration(
+                labelText: 'หลักสูตร',
+                prefixIcon: Icon(Icons.school_outlined),
+              ),
+            ),
+          ),
+          SizedBox(
+            width: 180,
+            child: DropdownButtonFormField<String>(
+              key: ValueKey(_status),
+              initialValue: _status,
+              decoration: const InputDecoration(labelText: 'สถานะ'),
+              items: const [
+                DropdownMenuItem(value: '', child: Text('ทั้งหมด')),
+                DropdownMenuItem(value: 'PENDING', child: Text('รออนุมัติ')),
+                DropdownMenuItem(value: 'APPROVED', child: Text('อนุมัติแล้ว')),
+                DropdownMenuItem(value: 'REJECTED', child: Text('ปฏิเสธ')),
+                DropdownMenuItem(value: 'CANCELLED', child: Text('ยกเลิก')),
+              ],
+              onChanged: _loading
+                  ? null
+                  : (value) => setState(() => _status = value ?? ''),
             ),
           ),
           FilledButton.icon(
@@ -168,6 +231,8 @@ class _TrainingResultsPageState extends State<TrainingResultsPage>
           OutlinedButton(
             onPressed: () {
               _search.clear();
+              _course.clear();
+              setState(() => _status = '');
               _load();
             },
             child: const Text('ล้าง Filter'),
@@ -237,65 +302,142 @@ class _TrainingResultsPageState extends State<TrainingResultsPage>
   Widget _detailView(TrainingUiTokens tokens) {
     final detail = _detail!;
     final section = _section;
-    return Column(
-      children: [
-        Card(
-          margin: tokens.workspace.contentMargin,
-          color: Colors.white,
-          child: Padding(
-            padding: tokens.workspace.cardPadding,
-            child: Row(
+    return SingleChildScrollView(
+      padding: tokens.workspace.contentMargin,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          LaooCaptionCard(
+            tokens: tokens.workspace,
+            caption: _caption,
+            leading: Icon(
+              Icons.assessment_outlined,
+              color: tokens.primaryColor,
+            ),
+          ),
+          const SizedBox(height: 6),
+          _surfaceCard(
+            tokens,
+            Row(
               children: [
                 IconButton(
+                  tooltip: 'กลับรายการผลการอบรม',
                   onPressed: () => setState(() {
                     _detail = null;
                     _section = null;
                   }),
                   icon: const Icon(Icons.arrow_back_outlined),
                 ),
-                Icon(Icons.assessment_outlined, color: tokens.primaryColor),
-                const SizedBox(width: 10),
+                const SizedBox(width: 4),
                 Expanded(
-                  child: Text(
-                    '${detail['bookingNo']} | ${detail['subject']}',
-                    style: tokens.workspace.captionStyle,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${detail['bookingNo'] ?? '-'}',
+                        style: tokens.workspace.sectionStyle,
+                      ),
+                      const SizedBox(height: 2),
+                      Text('${detail['subject'] ?? '-'}'),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
-        ),
-        Padding(
-          padding: tokens.workspace.contentMargin,
-          child: Wrap(
-            spacing: 10,
-            runSpacing: 8,
-            children: [
-              _count('เชิญทั้งหมด', detail['invited']),
-              _count('ตอบรับ', detail['accepted']),
-              _count('ตอบรับภายหลัง', detail['lateAccepted']),
-              _count('รอตอบรับ', detail['pending']),
-              _count('ปฏิเสธ', detail['declined']),
-            ],
+          SizedBox(height: tokens.workspace.sectionSpacing),
+          _surfaceCard(
+            tokens,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'รอบประเมินที่เกี่ยวข้อง',
+                        style: tokens.workspace.sectionStyle,
+                      ),
+                    ),
+                    TextButton.icon(
+                      onPressed: () =>
+                          context.go('/company/evaluation-results'),
+                      icon: const Icon(Icons.open_in_new),
+                      label: const Text('ดูผลประเมิน'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                if (_evaluations.isEmpty)
+                  const Text(
+                    'ยังไม่มีรอบประเมิน หรือรอคืนห้องเพื่อสร้างร่างประเมิน',
+                  )
+                else
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 8,
+                    children: _evaluations
+                        .map(
+                          (x) => Chip(
+                            label: Text(
+                              '${x['sourceType'] == 'TRAINING_INSTRUCTOR' ? 'วิทยากร' : 'หลักสูตร'}: ${_evaluationStatus(x['status'])} (${x['submitted']}/${x['eligible']})',
+                            ),
+                          ),
+                        )
+                        .toList(),
+                  ),
+              ],
+            ),
           ),
-        ),
-        TabBar(
-          controller: _tabs,
-          labelColor: tokens.primaryColor,
-          tabs: const [
-            Tab(text: 'ก่อนอบรม (PRE)'),
-            Tab(text: 'หลังอบรม (POST)'),
-          ],
-        ),
-        Expanded(
-          child: SingleChildScrollView(
-            padding: tokens.workspace.contentMargin,
-            child: _sectionTable(tokens, section),
+          SizedBox(height: tokens.workspace.sectionSpacing),
+          _surfaceCard(
+            tokens,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('สรุปคำเชิญ', style: tokens.workspace.sectionStyle),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 8,
+                  children: [
+                    _count('เชิญทั้งหมด', detail['invited']),
+                    _count('ตอบรับ', detail['accepted']),
+                    _count('ตอบรับภายหลัง', detail['lateAccepted']),
+                    _count('รอตอบรับ', detail['pending']),
+                    _count('ปฏิเสธ', detail['declined']),
+                  ],
+                ),
+              ],
+            ),
           ),
-        ),
-      ],
+          SizedBox(height: tokens.workspace.sectionSpacing),
+          _surfaceCard(
+            tokens,
+            TabBar(
+              controller: _tabs,
+              labelColor: tokens.primaryColor,
+              tabs: const [
+                Tab(text: 'ก่อนอบรม (PRE)'),
+                Tab(text: 'หลังอบรม (POST)'),
+              ],
+            ),
+          ),
+          SizedBox(height: tokens.workspace.sectionSpacing),
+          _sectionTable(tokens, section),
+        ],
+      ),
     );
   }
+
+  Widget _surfaceCard(TrainingUiTokens tokens, Widget child) => Card(
+    margin: EdgeInsets.zero,
+    color: Colors.white,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(tokens.workspace.radius),
+    ),
+    child: Padding(padding: tokens.workspace.cardPadding, child: child),
+  );
 
   Widget _count(String label, dynamic value) =>
       Chip(label: Text('$label: ${value ?? 0}'));
@@ -304,60 +446,98 @@ class _TrainingResultsPageState extends State<TrainingResultsPage>
     if (section == null) {
       return const Center(child: CircularProgressIndicator());
     }
-    final rows = _maps(section['items']);
+    final allRows = _maps(section['items']);
+    final rows = allRows
+        .where(
+          (item) =>
+              _examResultFilter.isEmpty || item['result'] == _examResultFilter,
+        )
+        .toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Wrap(
-          spacing: 10,
-          runSpacing: 8,
-          children: [
-            _count('ผู้มีสิทธิ์สอบ', section['eligible']),
-            _count('ยังไม่เริ่ม', section['notStarted']),
-            _count('กำลังทำ', section['inProgress']),
-            _count('ส่งแล้ว', section['submitted']),
-            _count('ผ่าน', section['passed']),
-            _count('ไม่ผ่าน', section['failed']),
-          ],
-        ),
-        const SizedBox(height: 10),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: DataTable(
-            columns: const [
-              DataColumn(label: Text('รหัส')),
-              DataColumn(label: Text('ชื่อ')),
-              DataColumn(label: Text('สถานะคำเชิญ')),
-              DataColumn(label: Text('สถานะสอบ')),
-              DataColumn(label: Text('คะแนน')),
-              DataColumn(label: Text('เปอร์เซ็นต์')),
-              DataColumn(label: Text('ผล')),
-              DataColumn(label: Text('เวลาส่ง')),
-            ],
-            rows: rows
-                .map(
-                  (x) => DataRow(
-                    cells: [
-                      DataCell(Text('${x['code'] ?? '-'}')),
-                      DataCell(Text('${x['name'] ?? '-'}')),
-                      DataCell(Text(_invite(x))),
-                      DataCell(Text(_test(x['testStatus']))),
-                      DataCell(
-                        Text(
-                          x['score'] == null
-                              ? '-'
-                              : '${x['score']}/${x['maxScore']}',
-                        ),
-                      ),
-                      DataCell(
-                        Text(x['percent'] == null ? '-' : '${x['percent']}%'),
-                      ),
-                      DataCell(Text(_result(x['result']))),
-                      DataCell(Text('${x['submittedDate'] ?? '-'}')),
+        _surfaceCard(
+          tokens,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('สรุปผลแบบทดสอบ', style: tokens.workspace.sectionStyle),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 10,
+                runSpacing: 8,
+                children: [
+                  _count('ผู้มีสิทธิ์สอบ', section['eligible']),
+                  _count('ยังไม่เริ่ม', section['notStarted']),
+                  _count('กำลังทำ', section['inProgress']),
+                  _count('ส่งแล้ว', section['submitted']),
+                  _count('ผ่าน', section['passed']),
+                  _count('ไม่ผ่าน', section['failed']),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Align(
+                alignment: Alignment.centerRight,
+                child: SizedBox(
+                  width: 190,
+                  child: DropdownButtonFormField<String>(
+                    key: ValueKey(_examResultFilter),
+                    initialValue: _examResultFilter,
+                    decoration: const InputDecoration(labelText: 'ผลสอบ'),
+                    items: const [
+                      DropdownMenuItem(value: '', child: Text('ทั้งหมด')),
+                      DropdownMenuItem(value: 'PASSED', child: Text('ผ่าน')),
+                      DropdownMenuItem(value: 'FAILED', child: Text('ไม่ผ่าน')),
                     ],
+                    onChanged: (value) =>
+                        setState(() => _examResultFilter = value ?? ''),
                   ),
-                )
-                .toList(),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text('แสดง ${rows.length} จาก ${allRows.length} คน'),
+            ],
+          ),
+        ),
+        SizedBox(height: tokens.workspace.sectionSpacing),
+        _surfaceCard(
+          tokens,
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: DataTable(
+              dataRowMinHeight: 64,
+              dataRowMaxHeight: double.infinity,
+              columns: const [
+                DataColumn(label: Text('รหัส')),
+                DataColumn(label: Text('ชื่อ')),
+                DataColumn(label: Text('สถานะคำเชิญ')),
+                DataColumn(label: Text('สถานะรวม')),
+                DataColumn(label: Text('ทำแล้ว')),
+                DataColumn(label: Text('ผลรวม')),
+                DataColumn(label: Text('ผลรายชุด')),
+              ],
+              rows: rows
+                  .map(
+                    (x) => DataRow(
+                      cells: [
+                        DataCell(Text('${x['code'] ?? '-'}')),
+                        DataCell(Text('${x['name'] ?? '-'}')),
+                        DataCell(Text(_invite(x))),
+                        DataCell(Text(_test(x['testStatus']))),
+                        DataCell(
+                          Text(
+                            '${x['submittedCount'] ?? 0}/${x['total'] ?? 0} ชุด',
+                          ),
+                        ),
+                        DataCell(Text(_result(x['result']))),
+                        DataCell(
+                          SizedBox(width: 320, child: Text(_examSummary(x))),
+                        ),
+                      ],
+                    ),
+                  )
+                  .toList(),
+            ),
           ),
         ),
       ],
@@ -380,5 +560,27 @@ class _TrainingResultsPageState extends State<TrainingResultsPage>
       ? 'ผ่าน'
       : value == 'FAILED'
       ? 'ไม่ผ่าน'
+      : value == 'INCOMPLETE'
+      ? 'รอทำให้ครบ'
       : '-';
+  String _examSummary(Map<String, dynamic> participant) {
+    final exams = _maps(participant['exams']);
+    if (exams.isEmpty) return 'ยังไม่ได้กำหนดชุดแบบทดสอบ';
+    return exams
+        .map((exam) {
+          final score = exam['score'] == null
+              ? _test(exam['status'])
+              : '${exam['score']}/${exam['maxScore']} (${exam['percent'] ?? '-'}%) ${_result(exam['result'])}';
+          return '${exam['sequenceNo']}. ${exam['templateName'] ?? '-'} — $score';
+        })
+        .join('\n');
+  }
+
+  String _evaluationStatus(dynamic value) => switch ('$value') {
+    'DRAFT' => 'ร่าง',
+    'PENDING_APPROVAL' => 'รออนุมัติ',
+    'PUBLISHED' => 'เปิดตอบ',
+    'CLOSED' => 'ปิดรอบ',
+    _ => '-',
+  };
 }

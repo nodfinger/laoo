@@ -28,6 +28,7 @@ import '../../features/meeting/pages/meeting_room_booking_page.dart';
 import '../../features/meeting/pages/meeting_room_approval_page.dart';
 import '../../features/meeting/pages/meeting_food_plan_page.dart';
 import '../../features/meeting/pages/meeting_food_order_summary_page.dart';
+import '../../features/meeting/pages/meeting_food_distribution_page.dart';
 import '../../features/meeting/pages/meeting_attendance_page.dart';
 import '../../features/meeting/pages/meeting_invitation_page.dart';
 import '../../features/meeting/pages/meeting_room_issue_page.dart';
@@ -443,6 +444,11 @@ final List<GoRoute> _meetingRoomPlaceholderRoutes = [
     path: RoutePaths.meetingFoodOrderSummary,
     name: RouteNames.meetingFoodOrderSummary,
     builder: (context, state) => const MeetingFoodOrderSummaryPage(),
+  ),
+  GoRoute(
+    path: RoutePaths.meetingFoodDistribution,
+    name: RouteNames.meetingFoodDistribution,
+    builder: (context, state) => const MeetingFoodDistributionPage(),
   ),
   GoRoute(
     path: RoutePaths.meetingAttendance,

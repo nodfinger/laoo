@@ -19,6 +19,7 @@ abstract final class MeetingRouteNames {
   static const approvals = 'meetingRoomApprovals';
   static const foodPlans = 'meetingFoodPlans';
   static const foodOrderSummary = 'meetingFoodOrderSummary';
+  static const foodDistribution = 'meetingFoodDistribution';
   static const attendance = 'meetingAttendance';
   static const roomCheckIn = 'roomCheckIn';
   static const roomSupportTasks = 'roomSupportTasks';
@@ -40,6 +41,7 @@ abstract final class MeetingMenuCodes {
   static const approvals = '21004';
   static const foodPlans = '21005';
   static const foodOrderSummary = '21006';
+  static const foodDistribution = '21007';
   static const attendance = '22004';
   static const roomCheckIn = '22001';
   static const roomSupportTasks = '22002';
@@ -61,6 +63,7 @@ abstract final class MeetingRoutePaths {
   static const approvals = '/company/meeting-room-approvals';
   static const foodPlans = '/company/meeting-food-plans';
   static const foodOrderSummary = '/company/meeting-food-order-summary';
+  static const foodDistribution = '/company/meeting-food-distribution';
   static const attendance = '/company/meeting-attendance';
   static const roomCheckIn = '/company/room-check-in';
   static const roomSupportTasks = '/company/room-support-tasks';
@@ -111,6 +114,12 @@ abstract final class MeetingRoutes {
     screenType: 3,
     name: MeetingRouteNames.foodOrderSummary,
     path: MeetingRoutePaths.foodOrderSummary,
+  );
+  static const foodDistribution = MeetingRouteSpec(
+    menuCode: MeetingMenuCodes.foodDistribution,
+    screenType: 2,
+    name: MeetingRouteNames.foodDistribution,
+    path: MeetingRoutePaths.foodDistribution,
   );
   static const attendance = MeetingRouteSpec(
     menuCode: MeetingMenuCodes.attendance,
@@ -192,6 +201,7 @@ abstract final class MeetingRoutes {
     approvals,
     foodPlans,
     foodOrderSummary,
+    foodDistribution,
     attendance,
     roomCheckIn,
     roomSupportTasks,

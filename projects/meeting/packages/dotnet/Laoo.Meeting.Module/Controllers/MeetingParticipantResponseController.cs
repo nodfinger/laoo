@@ -132,7 +132,7 @@ ORDER BY Q.SortOrder,Q.RequirementQuestionID,O.SortOrder,O.RequirementOptionID;
                 sortOrder=g.Key.Sort,answerValue=g.Key.Answer,options=g.Where(x=>x.OptionId is not null)
                     .Select(x=>new{optionId=x.OptionId,optionText=x.OptionText,sortOrder=x.OptionSort})}).ToList();
 
-        return Ok(new { invitation=new {participantId,access.BookingId,access.BookingNo,access.Subject,access.RoomCode,access.RoomName,
+        return Ok(new { invitation=new {participantId,access.BookingId,access.BookingNo,access.Subject,access.ActivityTypeCode,access.RoomCode,access.RoomName,
             startDateTime=access.Start,endDateTime=access.End,invitationStatus=access.Status,remark=access.Remark,
             access.ParticipantName,access.ParticipantNickName,access.OrganizerName,orderCutoffDateTime=access.Cutoff,canRespond,
             canEditPreferences,lateResponseMode,lateAcceptanceOnly,access.IsLateResponse,access.LateResponseReason,access.LateResponseAtUtc,
@@ -339,7 +339,7 @@ SELECT P.BookingID,P.EmployeeID,B.BookingNo,B.Subject,R.RoomCode,R.RoomNameTH,MI
   OR EXISTS(SELECT 1 FROM dbo.TDADUser U WHERE U.UserID=@user AND U.CompanyID=@company AND U.IsActive=1 AND U.IsCompanyAdmin=1)
   OR EXISTS(SELECT 1 FROM dbo.TDADMeetingRoomContact C JOIN dbo.TDADUserEmployee UE ON UE.EmployeeID=C.EmployeeID AND UE.CompanyID=@company AND UE.UserID=@user AND UE.IsActive=1 WHERE C.RoomID=B.RoomID AND C.IsActive=1)
  THEN 1 ELSE 0 END,
- P.IsLateResponse,P.LateResponseReason,P.LateResponseAtUtc
+ P.IsLateResponse,P.LateResponseReason,P.LateResponseAtUtc,B.ActivityTypeCode
 FROM dbo.TDADMeetingRoomBookingParticipant P {hint}
 JOIN dbo.TDADMeetingRoomBooking B ON B.BookingID=P.BookingID AND B.CompanyID=P.CompanyID AND B.BookingStatus='APPROVED'
 JOIN dbo.TDADMeetingRoom R ON R.RoomID=B.RoomID AND R.CompanyID=B.CompanyID
@@ -350,13 +350,13 @@ LEFT JOIN dbo.TDADEmployee RE ON RE.EmployeeID=COALESCE(B.RequesterEmployeeID,RU
 LEFT JOIN dbo.TDADMeetingBookingFoodPlan FP ON FP.BookingID=B.BookingID AND FP.CompanyID=B.CompanyID AND FP.IsActive=1
 WHERE P.BookingParticipantID=@participant AND P.CompanyID=@company
 GROUP BY P.BookingID,P.EmployeeID,B.BookingNo,B.Subject,R.RoomCode,R.RoomNameTH,P.InvitationStatus,P.Remark,PE.FullName,PE.NickName,RE.FullName,
- FP.OrderCutoffDateTime,B.RequesterUserID,B.RoomID,P.IsLateResponse,P.LateResponseReason,P.LateResponseAtUtc;
+ FP.OrderCutoffDateTime,B.RequesterUserID,B.RoomID,P.IsLateResponse,P.LateResponseReason,P.LateResponseAtUtc,B.ActivityTypeCode;
 """;
         await using var cmd=new SqlCommand(sql,db,tx);Add(cmd,"@participant",participant);Add(cmd,"@company",company);Add(cmd,"@user",user);
         await using var r=await cmd.ExecuteReaderAsync(token);if(!await r.ReadAsync(token))return null;
         return new(r.GetInt64(0),r.GetInt64(1),Text(r,2),r.GetString(3),r.GetString(4),r.GetString(5),r.GetDateTime(6),r.GetDateTime(7),
             r.GetString(8),Text(r,9),Text(r,10),Text(r,11),Text(r,12),Date(r,13),r.GetInt32(14)==1,r.GetInt32(15)==1,
-            r.GetBoolean(16),Text(r,17),Date(r,18));
+            r.GetBoolean(16),Text(r,17),Date(r,18),Text(r,19));
     }
 
     private bool Scope(out long company,out long user)
@@ -393,5 +393,5 @@ public sealed record ParticipantFoodItem(long FoodId,int Quantity);
 public sealed record ParticipantRequirementAnswerRequest(long QuestionId,string? Value,List<long>? OptionIds);
 internal sealed record AccessData(long BookingId,long EmployeeId,string? BookingNo,string Subject,string RoomCode,string RoomName,
  DateTime Start,DateTime End,string Status,string? Remark,string? ParticipantName,string? ParticipantNickName,string? OrganizerName,DateTime? Cutoff,bool Own,bool Manager,
- bool IsLateResponse,string? LateResponseReason,DateTime? LateResponseAtUtc);
+ bool IsLateResponse,string? LateResponseReason,DateTime? LateResponseAtUtc,string? ActivityTypeCode);
 internal sealed record QuestionRow(long Id,string Text,string Type,bool Required,int Sort,string? Answer,long? OptionId,string? OptionText,int? OptionSort);

@@ -16,6 +16,12 @@ typedef TrainingMessageBuilder =
       required bool error,
       required VoidCallback onClose,
     });
+typedef TrainingMenuCaptionResolver =
+    Future<String> Function({
+      required String menuCode,
+      required String routeName,
+      required String fallback,
+    });
 
 class TrainingUiTokens {
   const TrainingUiTokens({
@@ -35,6 +41,7 @@ String Function(Object)? _errorText;
 TrainingMessageBuilder? _message;
 TrainingUiTokens Function()? _tokens;
 int Function()? _pageSize;
+TrainingMenuCaptionResolver? _menuCaptionResolver;
 
 void configureTrainingFeatureHost(
   TrainingWorkspaceShellBuilder shell, {
@@ -44,6 +51,7 @@ void configureTrainingFeatureHost(
   required TrainingMessageBuilder messageBuilder,
   required TrainingUiTokens Function() uiTokensProvider,
   required int Function() pageSizeProvider,
+  TrainingMenuCaptionResolver? menuCaptionResolver,
 }) {
   _shell = shell;
   _apiFactory = apiClientFactory;
@@ -52,6 +60,7 @@ void configureTrainingFeatureHost(
   _message = messageBuilder;
   _tokens = uiTokensProvider;
   _pageSize = pageSizeProvider;
+  _menuCaptionResolver = menuCaptionResolver;
 }
 
 Widget buildTrainingWorkspaceShell({
@@ -80,6 +89,17 @@ void disposeTrainingApiClient(JsonApiClient client) =>
 String trainingErrorText(Object error) =>
     _errorText?.call(error) ?? error.toString();
 int get trainingPageSize => math.max(1, _pageSize?.call() ?? 30);
+Future<String> resolveTrainingMenuCaption({
+  required String menuCode,
+  required String routeName,
+  required String fallback,
+}) async =>
+    await _menuCaptionResolver?.call(
+      menuCode: menuCode,
+      routeName: routeName,
+      fallback: fallback,
+    ) ??
+    fallback;
 TrainingUiTokens get trainingUiTokens {
   final provider = _tokens;
   if (provider == null) {

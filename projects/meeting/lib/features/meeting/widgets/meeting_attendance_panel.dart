@@ -42,6 +42,7 @@ class _MeetingAttendancePanelState extends State<MeetingAttendancePanel> {
   bool _loadFailed = false;
   bool _available = true;
   int _generation = 0;
+  Timer? _refreshTimer;
   MeetingQrCode? _qr;
   String _qrCaption = '';
   MeetingCheckIn? _lastCheckIn;
@@ -60,6 +61,9 @@ class _MeetingAttendancePanelState extends State<MeetingAttendancePanel> {
     super.initState();
     _repository = widget.repository ?? MeetingAttendanceRepository();
     _load();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted && !_busy) _load();
+    });
   }
 
   @override
@@ -88,6 +92,7 @@ class _MeetingAttendancePanelState extends State<MeetingAttendancePanel> {
   @override
   void dispose() {
     _generation++;
+    _refreshTimer?.cancel();
     if (widget.repository == null) _repository.dispose();
     super.dispose();
   }
@@ -170,6 +175,37 @@ class _MeetingAttendancePanelState extends State<MeetingAttendancePanel> {
       if (item.participantId == participantId) return item.participantName;
     }
     return 'ผู้เข้าร่วม $participantId';
+  }
+
+  DateTime? _date(Object? value) =>
+      value == null ? null : DateTime.tryParse('$value')?.toLocal();
+
+  bool _open(MeetingAttendanceRow item) {
+    final start = _date(item.startDateTime);
+    final end = _date(item.endDateTime);
+    final now = DateTime.now();
+    return item.bookingStatus == 'APPROVED' &&
+        start != null &&
+        end != null &&
+        !now.isBefore(start) &&
+        now.isBefore(end);
+  }
+
+  String _entryStatus(MeetingAttendanceRow item) {
+    if (item.checkInDate != null) return 'เช็กอินแล้ว';
+    if (item.bookingStatus != 'APPROVED') return 'การจองยังไม่อนุมัติ';
+    final start = _date(item.startDateTime);
+    final end = _date(item.endDateTime);
+    final now = DateTime.now();
+    if (start != null && now.isBefore(start)) return 'ยังไม่ถึงเวลาเช็กอิน';
+    if (end != null && !now.isBefore(end)) return 'หมดเวลาเช็กอิน';
+    return 'เปิดให้เช็กอิน';
+  }
+
+  Color _statusColor(WorkspaceThemePreset preset, MeetingAttendanceRow item) {
+    if (item.checkInDate != null) return preset.primary;
+    if (_open(item)) return preset.primary;
+    return Theme.of(context).colorScheme.onSurfaceVariant;
   }
 
   Future<bool> _checkIn({String? token, MeetingAttendanceRow? item}) async {
@@ -315,7 +351,40 @@ class _MeetingAttendancePanelState extends State<MeetingAttendancePanel> {
           const Text('โหลดข้อมูลไม่สำเร็จ กดรีเฟรชเช็กอินเพื่อลองใหม่'),
         if (!_loading && !_loadFailed && items.isEmpty)
           const Text('ไม่พบผู้เข้าร่วมที่มีสิทธิ์ดูในรายการนี้'),
-        if (items.any((row) => row.canScanRoomQr || row.canScanPersonalQr)) ...[
+        if (items.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: LaooColors.white,
+              border: Border.all(color: _statusColor(preset, items.first)),
+              borderRadius: BorderRadius.circular(LaooRadius.xs),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  items.first.checkInDate != null
+                      ? Icons.check_circle_outline
+                      : Icons.schedule_outlined,
+                  color: _statusColor(preset, items.first),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _entryStatus(items.first),
+                    style: TextStyle(
+                      color: _statusColor(preset, items.first),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+        if (items.any(
+          (row) => _open(row) && (row.canScanRoomQr || row.canScanPersonalQr),
+        )) ...[
           const SizedBox(height: 12),
           MeetingQrScanner(
             key: ValueKey((widget.bookingId, widget.participantId)),
@@ -409,7 +478,7 @@ class _MeetingAttendancePanelState extends State<MeetingAttendancePanel> {
                       style: TextStyle(color: preset.primary),
                     )
                   else
-                    const Text('ยังไม่เช็กอิน'),
+                    Text(_entryStatus(item)),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,

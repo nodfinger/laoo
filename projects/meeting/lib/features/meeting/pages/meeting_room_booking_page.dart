@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 
 import '../widgets/meeting_popup.dart';
 import '../widgets/meeting_participant_dialog.dart';
@@ -3832,6 +3831,17 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
             ),
           ]
         : const <Widget>[];
+    final canConfigureEvaluations =
+        !hasStarted && (status == 'PENDING' || status == 'APPROVED');
+    final evaluationActions = canConfigureEvaluations
+        ? <Widget>[
+            IconButton(
+              tooltip: 'กำหนดแบบประเมิน',
+              onPressed: () => _openBookingEvaluations(item),
+              icon: Icon(Icons.rate_review_outlined, color: preset.primary),
+            ),
+          ]
+        : const <Widget>[];
     if (hasStarted) {
       return Wrap(
         children: [
@@ -3852,6 +3862,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
     return Wrap(
       children: [
         ...trainingTestActions,
+        ...evaluationActions,
         if (includeApproval &&
             status == 'PENDING' &&
             item['canApprove'] == true &&
@@ -3920,7 +3931,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
     );
   }
 
-  void _openTrainingTests(Map<String, dynamic> item) {
+  Future<void> _openTrainingTests(Map<String, dynamic> item) async {
     final bookingId = _int(item['bookingId']);
     if (bookingId == null || bookingId <= 0) {
       _showMessage(
@@ -3929,7 +3940,276 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
       );
       return;
     }
-    context.go('/company/training-tests/$bookingId?section=PRE');
+    try {
+      final templateData = await _repository.trainingTestTemplates(bookingId);
+      final templates = List<Map<String, dynamic>>.from(
+        templateData['items'] as List? ?? const [],
+      );
+      if (!mounted) return;
+      final pre = <int?>[
+        ...((templateData['preTemplateIds'] as List? ?? const [])
+            .whereType<num>()
+            .map((x) => x.toInt())),
+      ];
+      final post = <int?>[
+        ...((templateData['postTemplateIds'] as List? ?? const [])
+            .whereType<num>()
+            .map((x) => x.toInt())),
+      ];
+      if (pre.isEmpty) pre.add(null);
+      if (post.isEmpty) post.add(null);
+      final selected = await showDialog<Map<String, List<int>>>(
+        context: context,
+        builder: (context) => StatefulBuilder(
+          builder: (context, setDialogState) {
+            Widget buildSection(
+              String label,
+              String section,
+              List<int?> values,
+            ) {
+              final sectionTemplates = templates.where(
+                (x) => x['section'] == section,
+              );
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(label),
+                  const SizedBox(height: 6),
+                  ...values.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: DropdownButtonFormField<int?>(
+                              initialValue: entry.value,
+                              decoration: InputDecoration(
+                                labelText: 'ชุดที่ ${index + 1}',
+                              ),
+                              items: [
+                                const DropdownMenuItem(
+                                  value: null,
+                                  child: Text('ไม่กำหนด'),
+                                ),
+                                ...sectionTemplates.map(
+                                  (x) => DropdownMenuItem(
+                                    value: (x['id'] as num).toInt(),
+                                    child: Text('${x['code']} | ${x['name']}'),
+                                  ),
+                                ),
+                              ],
+                              onChanged: (v) =>
+                                  setDialogState(() => values[index] = v),
+                            ),
+                          ),
+                          if (index > 0)
+                            IconButton(
+                              tooltip: 'ลบชุดนี้',
+                              onPressed: () =>
+                                  setDialogState(() => values.removeAt(index)),
+                              icon: const Icon(Icons.delete_outline),
+                            ),
+                        ],
+                      ),
+                    );
+                  }),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: OutlinedButton.icon(
+                      onPressed: () => setDialogState(() => values.add(null)),
+                      icon: const Icon(Icons.add),
+                      label: Text('เพิ่มชุด $section'),
+                    ),
+                  ),
+                ],
+              );
+            }
+
+            return MeetingPopup(
+              title: const MeetingPopupTitle(
+                icon: Icons.quiz_outlined,
+                text: 'เลือกชุดแบบทดสอบอบรม',
+              ),
+              content: SizedBox(
+                width: 460,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      buildSection('ก่อนอบรม (PRE)', 'PRE', pre),
+                      const SizedBox(height: 12),
+                      buildSection('หลังอบรม (POST)', 'POST', post),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('ยกเลิก'),
+                ),
+                FilledButton.icon(
+                  onPressed: () => Navigator.pop(context, {
+                    'pre': pre.whereType<int>().toList(),
+                    'post': post.whereType<int>().toList(),
+                  }),
+                  icon: const Icon(Icons.save_outlined),
+                  label: const Text('บันทึก'),
+                ),
+              ],
+            );
+          },
+        ),
+      );
+      if (selected == null) return;
+      await _repository.assignTrainingTestTemplates(
+        bookingId,
+        preTemplateIds: selected['pre'],
+        postTemplateIds: selected['post'],
+      );
+      _showMessage('บันทึกชุดแบบทดสอบแล้ว');
+    } catch (error) {
+      _showMessage(
+        'ไม่สามารถบันทึกชุดแบบทดสอบได้\nรายละเอียดเพิ่มเติม: $error',
+        error: true,
+      );
+    }
+  }
+
+  Future<void> _openBookingEvaluations(Map<String, dynamic> item) async {
+    final bookingId = _int(item['bookingId']);
+    if (bookingId == null || bookingId <= 0) {
+      _showMessage(
+        'ไม่สามารถเปิดการกำหนดแบบประเมินได้\nรายละเอียดเพิ่มเติม: ไม่พบรหัสรายการจอง',
+        error: true,
+      );
+      return;
+    }
+    try {
+      final response = await _repository.evaluationTemplates(bookingId);
+      final templates = List<Map<String, dynamic>>.from(
+        response['items'] as List? ?? const [],
+      );
+      final isTraining = response['activityTypeCode'] == 'TRAINING';
+      final sources = <String>[
+        'MEETING_ROOM',
+        if (isTraining) 'TRAINING_COURSE',
+        if (isTraining) 'TRAINING_INSTRUCTOR',
+      ];
+      final selected = <String, int?>{
+        for (final source in sources) source: null,
+      };
+      for (final value in response['selections'] as List? ?? const []) {
+        final row = Map<String, dynamic>.from(value as Map);
+        final source = row['sourceType']?.toString();
+        if (source != null && selected.containsKey(source)) {
+          selected[source] = _int(row['templateId']);
+        }
+      }
+      if (!mounted) return;
+      String sourceLabel(String source) {
+        switch (source) {
+          case 'TRAINING_COURSE':
+            return 'ประเมินหลักสูตร';
+          case 'TRAINING_INSTRUCTOR':
+            return 'ประเมินวิทยากร';
+          default:
+            return 'ประเมินห้องประชุม';
+        }
+      }
+
+      final saved = await showDialog<List<Map<String, dynamic>>>(
+        context: context,
+        builder: (context) => StatefulBuilder(
+          builder: (context, setDialogState) => MeetingPopup(
+            title: const MeetingPopupTitle(
+              icon: Icons.rate_review_outlined,
+              text: 'กำหนดแบบประเมินสำหรับรอบนี้',
+            ),
+            content: SizedBox(
+              width: 500,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      'เลือกเฉพาะประเภทที่ต้องการประเมิน หากไม่เลือก ระบบจะไม่สร้างรอบประเมิน',
+                    ),
+                    const SizedBox(height: 16),
+                    for (final source in sources)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: DropdownButtonFormField<int?>(
+                          initialValue: selected[source],
+                          decoration: InputDecoration(
+                            labelText: sourceLabel(source),
+                          ),
+                          items: [
+                            const DropdownMenuItem(
+                              value: null,
+                              child: Text('ไม่ประเมิน'),
+                            ),
+                            ...templates
+                                .where(
+                                  (template) =>
+                                      template['sourceType'] == source,
+                                )
+                                .map(
+                                  (template) => DropdownMenuItem(
+                                    value: _int(template['id']),
+                                    child: Text(
+                                      template['code'].toString() +
+                                          ' | ' +
+                                          template['name'].toString(),
+                                    ),
+                                  ),
+                                ),
+                          ],
+                          onChanged: (value) =>
+                              setDialogState(() => selected[source] = value),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('ยกเลิก'),
+              ),
+              FilledButton.icon(
+                onPressed: () => Navigator.pop(
+                  context,
+                  sources
+                      .where((source) => selected[source] != null)
+                      .map(
+                        (source) => <String, dynamic>{
+                          'sourceType': source,
+                          'templateId': selected[source],
+                        },
+                      )
+                      .toList(),
+                ),
+                icon: const Icon(Icons.save_outlined),
+                label: const Text('บันทึก'),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (saved == null) return;
+      await _repository.assignEvaluationTemplates(bookingId, saved);
+      _showMessage('บันทึกการกำหนดแบบประเมินแล้ว');
+    } catch (error) {
+      _showMessage(
+        'ไม่สามารถบันทึกการกำหนดแบบประเมินได้\nรายละเอียดเพิ่มเติม: ' +
+            error.toString(),
+        error: true,
+      );
+    }
   }
 
   Widget _pagination(WorkspaceThemePreset preset) {

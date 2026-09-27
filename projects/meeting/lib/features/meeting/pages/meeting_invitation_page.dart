@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -44,16 +45,23 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
   bool _saving = false;
   int _page = 1;
   int _total = 0;
+  Timer? _examRefreshTimer;
+  bool _refreshingExams = false;
 
   @override
   void initState() {
     super.initState();
     _loadCaption();
     _load();
+    _examRefreshTimer = Timer.periodic(
+      const Duration(seconds: 15),
+      (_) => _refreshTrainingTests(),
+    );
   }
 
   @override
   void dispose() {
+    _examRefreshTimer?.cancel();
     _search.dispose();
     _remark.dispose();
     _changeReason.dispose();
@@ -69,6 +77,53 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
     if (mounted) setState(() => _caption = value);
   }
 
+  Future<void> _refreshTrainingTests() async {
+    if (!mounted || _loading || _saving || _refreshingExams) return;
+    _refreshingExams = true;
+    try {
+      final detailInvitation = _detail?['invitation'];
+      final invitations = <Map<String, dynamic>>[
+        ..._items,
+        if (detailInvitation is Map)
+          Map<String, dynamic>.from(detailInvitation),
+      ];
+      final ids = invitations
+          .where(
+            (item) =>
+                item['activityTypeCode'] == 'TRAINING' &&
+                item['invitationStatus'] == 'ACCEPTED',
+          )
+          .map((item) => (item['bookingId'] as num).toInt())
+          .toSet();
+      for (final id in ids) {
+        try {
+          final overview = await _repository.trainingTestOverview(id);
+          if (!mounted) return;
+          if (_loading || _saving) return;
+          setState(() {
+            _items = _items
+                .map(
+                  (item) => item['bookingId'] == id
+                      ? {...item, 'trainingTests': overview}
+                      : item,
+                )
+                .toList();
+            if (_detail?['invitation']?['bookingId'] == id) {
+              _detail = {..._detail!, 'trainingTests': overview};
+            }
+          });
+        } catch (error) {
+          if (mounted) {
+            _notify(_error(error, 'อัปเดตชุดแบบทดสอบไม่สำเร็จ'), true);
+          }
+          return;
+        }
+      }
+    } finally {
+      _refreshingExams = false;
+    }
+  }
+
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
@@ -77,11 +132,38 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
         status: _filterStatus,
         page: _page,
       );
+      final items = List<Map<String, dynamic>>.from(
+        result['items'] as List? ?? const [],
+      );
+      final testsByBooking = <int, Map<String, dynamic>>{};
+      await Future.wait(
+        items
+            .where(
+              (item) =>
+                  item['activityTypeCode'] == 'TRAINING' &&
+                  item['invitationStatus'] == 'ACCEPTED',
+            )
+            .map((item) async {
+              final bookingId = (item['bookingId'] as num).toInt();
+              try {
+                testsByBooking[bookingId] = await _repository
+                    .trainingTestOverview(bookingId);
+              } catch (_) {
+                // A training booking without a configured test remains usable.
+              }
+            }),
+      );
       if (!mounted) return;
       setState(() {
-        _items = List<Map<String, dynamic>>.from(
-          result['items'] as List? ?? const [],
-        );
+        _items = items
+            .map(
+              (item) => {
+                ...item,
+                if (testsByBooking[item['bookingId']] != null)
+                  'trainingTests': testsByBooking[item['bookingId']],
+              },
+            )
+            .toList();
         _total = (result['total'] as num?)?.toInt() ?? 0;
       });
     } catch (error) {
@@ -1328,42 +1410,51 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
           else if (sections.where((x) => x['configured'] == true).isEmpty)
             const Text('ผู้จัดยังไม่ได้แนบแบบทดสอบสำหรับการอบรมรอบนี้')
           else
-            ...sections.where((x) => x['configured'] == true).map((section) {
+            ...sections.where((x) => x['configured'] == true).expand((section) {
               final code = '${section['section']}';
               final label = code == 'PRE' ? 'ก่อนอบรม' : 'หลังอบรม';
-              final submitted = section['submitted'] == true;
-              final passed = section['passed'] == true;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Row(
-                  children: [
-                    Expanded(child: Text(label)),
-                    if (submitted)
-                      Text(
-                        'คะแนน ${section['score']}/${section['maxScore']} · ${passed ? 'ผ่าน' : 'ไม่ผ่าน'}',
-                        style: TextStyle(
-                          color: passed ? preset.primary : LaooColors.error,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      )
-                    else if (section['isOpen'] == true)
-                      FilledButton.icon(
-                        onPressed: () => GoRouter.of(context).go(
-                          '/company/training-tests/$bookingId?section=$code',
-                        ),
-                        icon: const Icon(Icons.play_arrow_outlined),
-                        label: Text('ทำแบบทดสอบ$label'),
-                      )
-                    else
-                      Text(
-                        code == 'PRE'
-                            ? 'เปิดให้ทำก่อนเริ่มอบรม'
-                            : 'เปิดให้ทำหลังจบอบรม',
-                        style: TextStyle(color: preset.textSecondary),
-                      ),
-                  ],
-                ),
+              final exams = List<Map<String, dynamic>>.from(
+                section['exams'] as List? ?? const [],
               );
+              return exams.map((exam) {
+                final submitted = exam['submitted'] == true;
+                final passed = exam['passed'] == true;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '$label ชุดที่ ${exam['sequenceNo'] ?? '-'}',
+                        ),
+                      ),
+                      if (submitted)
+                        Text(
+                          'คะแนน ${section['score']}/${section['maxScore']} · ${passed ? 'ผ่าน' : 'ไม่ผ่าน'}',
+                          style: TextStyle(
+                            color: passed ? preset.primary : LaooColors.error,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        )
+                      else if (exam['isOpen'] == true)
+                        FilledButton.icon(
+                          onPressed: () => GoRouter.of(context).go(
+                            '/company/training-tests/$bookingId?section=$code&examId=${exam['examId']}',
+                          ),
+                          icon: const Icon(Icons.play_arrow_outlined),
+                          label: Text('ทำแบบทดสอบ$label'),
+                        )
+                      else
+                        Text(
+                          code == 'PRE'
+                              ? 'เปิดให้ทำก่อนเริ่มอบรม'
+                              : 'เปิดให้ทำหลังจบอบรม',
+                          style: TextStyle(color: preset.textSecondary),
+                        ),
+                    ],
+                  ),
+                );
+              });
             }),
         ],
       ),
@@ -1479,6 +1570,7 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
                           separatorBuilder: (_, _) => const SizedBox(height: 6),
                           itemBuilder: (context, index) {
                             final item = _items[index];
+                            final openTests = _openTrainingTests(item);
                             final status = '${item['invitationStatus']}';
                             final late = item['isLateResponse'] == true;
                             final participantNickName =
@@ -1535,22 +1627,50 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
                                   'ผู้จัด: ${item['organizerName'] ?? '-'}',
                                 ),
                                 trailing: SizedBox(
-                                  width: 124,
-                                  height: 48,
-                                  child: FilledButton(
-                                    onPressed: () => _open(item),
-                                    style: FilledButton.styleFrom(
-                                      backgroundColor: preset.primary,
-                                      foregroundColor: Theme.of(
-                                        context,
-                                      ).colorScheme.onPrimary,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(
-                                          LaooRadius.xs,
+                                  width: 136,
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      ...openTests.map(
+                                        (section) => Padding(
+                                          padding: const EdgeInsets.only(
+                                            bottom: 6,
+                                          ),
+                                          child: FilledButton.icon(
+                                            onPressed: section['isOpen'] == true
+                                                ? () => GoRouter.of(context).go(
+                                                    '/company/training-tests/${item['bookingId']}?section=${section['section']}&examId=${section['examId']}',
+                                                  )
+                                                : null,
+                                            icon: const Icon(
+                                              Icons.play_arrow_outlined,
+                                            ),
+                                            label: Text(
+                                              section['section'] == 'PRE'
+                                                  ? 'ทำ PRE'
+                                                  : 'ทำ POST',
+                                            ),
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                    child: const Text('ดำเนินการ'),
+                                      FilledButton(
+                                        onPressed: () => _open(item),
+                                        style: FilledButton.styleFrom(
+                                          backgroundColor: preset.primary,
+                                          foregroundColor: Theme.of(
+                                            context,
+                                          ).colorScheme.onPrimary,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              LaooRadius.xs,
+                                            ),
+                                          ),
+                                        ),
+                                        child: const Text('ดำเนินการ'),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ),
@@ -1584,6 +1704,25 @@ class _MeetingInvitationPageState extends State<MeetingInvitationPage> {
         ],
       ),
     );
+  }
+
+  List<Map<String, dynamic>> _openTrainingTests(Map<String, dynamic> item) {
+    if (item['activityTypeCode'] != 'TRAINING' ||
+        item['invitationStatus'] != 'ACCEPTED') {
+      return const [];
+    }
+    final overview = item['trainingTests'] as Map?;
+    final result = <Map<String, dynamic>>[];
+    for (final raw in overview?['sections'] as List? ?? const []) {
+      final section = Map<String, dynamic>.from(raw as Map);
+      for (final rawExam in section['exams'] as List? ?? const []) {
+        final exam = Map<String, dynamic>.from(rawExam as Map);
+        if (exam['submitted'] != true) {
+          result.add({...exam, 'section': section['section']});
+        }
+      }
+    }
+    return result;
   }
 
   @override

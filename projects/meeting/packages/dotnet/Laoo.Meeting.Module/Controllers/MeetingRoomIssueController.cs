@@ -21,6 +21,7 @@ public sealed class MeetingRoomIssueController(IConfiguration configuration) : C
             view = await Permission("VIEW", token),
             create = await Permission("CREATE", token),
             edit = await Permission("EDIT", token),
+            delete = await Permission("DELETE", token),
         });
     }
 
@@ -125,6 +126,27 @@ WHERE IssueID=@id AND CompanyID=@company
             : NoContent();
     }
 
+    [HttpPut("{id:long}")]
+    public async Task<IActionResult> Update(long id, RoomIssueUpdateRequest request, CancellationToken token)
+    {
+        if (!IsCompany() || CompanyId() is not long company || !await Permission("EDIT", token)) return Forbid();
+        if (request.Description?.Trim() is not { Length: > 0 } description) return BadRequest(new { message = "กรุณาระบุรายละเอียดปัญหา" });
+        await using var db = await Open(token);
+        await using var command = new SqlCommand("UPDATE dbo.TDADMeetingRoomIssue SET Description=@description,ImageUrl=@image,UpdateDate=SYSUTCDATETIME() WHERE IssueID=@id AND CompanyID=@company AND StatusCode='OPEN'", db);
+        Add(command, "@description", description); Add(command, "@image", request.ImageUrl?.Trim()); Add(command, "@id", id); Add(command, "@company", company);
+        return await command.ExecuteNonQueryAsync(token) == 1 ? NoContent() : Conflict(new { message = "แก้ไขได้เฉพาะรายการสถานะ OPEN" });
+    }
+
+    [HttpDelete("{id:long}")]
+    public async Task<IActionResult> Delete(long id, CancellationToken token)
+    {
+        if (!IsCompany() || CompanyId() is not long company || !await Permission("DELETE", token)) return Forbid();
+        await using var db = await Open(token);
+        await using var command = new SqlCommand("DELETE dbo.TDADMeetingRoomIssue WHERE IssueID=@id AND CompanyID=@company AND StatusCode='OPEN'", db);
+        Add(command, "@id", id); Add(command, "@company", company);
+        return await command.ExecuteNonQueryAsync(token) == 1 ? NoContent() : Conflict(new { message = "ลบได้เฉพาะรายการสถานะ OPEN" });
+    }
+
     private async Task<bool> Permission(string action, CancellationToken token)
     {
         await using var db = await Open(token);
@@ -156,4 +178,5 @@ WHERE IssueID=@id AND CompanyID=@company
 }
 
 public sealed record RoomIssueRequest(long RoomId, long ItemId, string? Description, string? ImageUrl);
+public sealed record RoomIssueUpdateRequest(string? Description, string? ImageUrl);
 public sealed record IssueStatusRequest(string StatusCode);

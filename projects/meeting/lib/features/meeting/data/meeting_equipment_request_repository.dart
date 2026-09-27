@@ -17,9 +17,40 @@ class MeetingEquipmentRequestRepository {
             as Map,
       );
 
+  Future<Map<String, dynamic>> departmentTasks({
+    String? status,
+    DateTime? dateFrom,
+    DateTime? dateTo,
+    String? search,
+    int? roomId,
+    int page = 1,
+    int pageSize = 20,
+  }) async => Map<String, dynamic>.from(
+    await _api.get(
+          '$_path/department-tasks',
+          query: {
+            if (status != null && status.isNotEmpty) 'status': status,
+            if (dateFrom != null) 'dateFrom': dateFrom.toIso8601String(),
+            if (dateTo != null) 'dateTo': dateTo.toIso8601String(),
+            if (search != null && search.trim().isNotEmpty)
+              'search': search.trim(),
+            if (roomId != null) 'roomId': '$roomId',
+            'page': '$page',
+            'pageSize': '$pageSize',
+          },
+        )
+        as Map,
+  );
+
   Future<Map<String, dynamic>> booking(int bookingId) async =>
       Map<String, dynamic>.from(
         await _api.get('$_path/booking/$bookingId') as Map,
+      );
+
+  Future<List<Map<String, dynamic>>> departmentTaskRooms() async =>
+      List<Map<String, dynamic>>.from(
+        ((await _api.get('$_path/department-tasks/rooms') as Map)['items']
+            as List),
       );
 
   Future<Map<String, dynamic>> settings() async =>
@@ -59,9 +90,13 @@ class MeetingEquipmentRequestRepository {
   Future<void> cancel(int detailId) =>
       _api.put('$_path/details/$detailId/cancel');
 
-  Future<Map<String, dynamic>> timeline(int requestId) async =>
+  Future<Map<String, dynamic>> timeline(int requestId, {int? detailId}) async =>
       Map<String, dynamic>.from(
-        await _api.get('$_path/requests/$requestId/timeline') as Map,
+        await _api.get(
+              '$_path/requests/$requestId/timeline',
+              query: {if (detailId != null) 'detailId': '$detailId'},
+            )
+            as Map,
       );
 
   Future<void> updateStatus(

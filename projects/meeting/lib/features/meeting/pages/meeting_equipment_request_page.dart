@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../../core/api/api_exception.dart';
+import '../../../core/widgets/auto_dismiss_message.dart';
+import '../../../core/navigation/navigation_menu_repository.dart';
 
 import '../../../app/theme/laoo_design_tokens.dart';
 import '../../../app/theme/laoo_typography.dart';
@@ -17,6 +21,8 @@ class MeetingEquipmentRequestPage extends StatefulWidget {
 class _MeetingEquipmentRequestPageState
     extends State<MeetingEquipmentRequestPage> {
   final _repository = MeetingEquipmentRequestRepository();
+  String _caption = 'คำขออุปกรณ์เพิ่มเติม';
+  bool _canOpenSupportTasks = false;
   String? _status;
   bool _loading = true;
   String? _error;
@@ -25,7 +31,17 @@ class _MeetingEquipmentRequestPageState
   @override
   void initState() {
     super.initState();
+    _loadCaption();
     _load();
+  }
+
+  Future<void> _loadCaption() async {
+    final caption = await NavigationMenuRepository().resolveMenuName(
+      menuCode: MeetingMenuCodes.equipmentRequests,
+      routeName: MeetingRouteNames.equipmentRequests,
+      fallback: _caption,
+    );
+    if (mounted) setState(() => _caption = caption);
   }
 
   Future<void> _load() async {
@@ -36,15 +52,21 @@ class _MeetingEquipmentRequestPageState
     try {
       final data = await _repository.list(status: _status);
       if (mounted) {
+        _canOpenSupportTasks = data['canOpenSupportTasks'] == true;
         setState(
           () => _items = List<Map<String, dynamic>>.from(
             data['items'] as List? ?? const [],
           ),
         );
       }
-    } catch (_) {
+    } catch (error) {
       if (mounted) {
-        setState(() => _error = 'ไม่สามารถโหลดคำขออุปกรณ์เพิ่มเติมได้');
+        setState(
+          () => _error = _errorText(
+            error,
+            'ไม่สามารถโหลดคำขออุปกรณ์เพิ่มเติมได้',
+          ),
+        );
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -69,30 +91,12 @@ class _MeetingEquipmentRequestPageState
         detailIds: all ? null : [item['detailId'] as int],
       );
       await _load();
-    } catch (_) {
-      if (mounted) setState(() => _error = 'บันทึกผลการตรวจสอบไม่สำเร็จ');
-    }
-  }
-
-  Future<void> _departmentStatus(
-    Map<String, dynamic> item,
-    String status,
-  ) async {
-    final reject = status == 'DEPARTMENT_REJECTED';
-    final remark = await _remarkDialog(
-      reject ? 'เหตุผลปฏิเสธจากแผนก *' : 'ผลการดำเนินการ',
-      required: reject,
-    );
-    if (remark == null) return;
-    try {
-      await _repository.updateStatus(
-        item['detailId'] as int,
-        status,
-        resultRemark: remark,
-      );
-      await _load();
-    } catch (_) {
-      if (mounted) setState(() => _error = 'อัปเดตสถานะงานไม่สำเร็จ');
+    } catch (error) {
+      if (mounted) {
+        setState(
+          () => _error = _errorText(error, 'บันทึกผลการตรวจสอบไม่สำเร็จ'),
+        );
+      }
     }
   }
 
@@ -100,8 +104,10 @@ class _MeetingEquipmentRequestPageState
     try {
       await _repository.cancel(item['detailId'] as int);
       await _load();
-    } catch (_) {
-      if (mounted) setState(() => _error = 'ยกเลิกรายการไม่ได้');
+    } catch (error) {
+      if (mounted) {
+        setState(() => _error = _errorText(error, 'ยกเลิกรายการไม่ได้'));
+      }
     }
   }
 
@@ -185,84 +191,104 @@ class _MeetingEquipmentRequestPageState
           ],
         ),
       );
-    } catch (_) {
-      if (mounted) setState(() => _error = 'ไม่สามารถอ่านประวัติคำขอได้');
+    } catch (error) {
+      if (mounted) {
+        setState(
+          () => _error = _errorText(error, 'ไม่สามารถอ่านประวัติคำขอได้'),
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) => buildMeetingWorkspaceShell(
-    pageTitle: 'คำขออุปกรณ์เพิ่มเติม',
+    pageTitle: _caption,
     activeMenu: MeetingRouteNames.equipmentRequests,
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    child: Stack(
       children: [
-        Padding(
-          padding: const EdgeInsets.all(LaooLayout.cardPadding),
-          child: Row(
-            children: [
-              SizedBox(
-                width: 240,
-                child: DropdownButtonFormField<String?>(
-                  initialValue: _status,
-                  decoration: const InputDecoration(labelText: 'สถานะ'),
-                  items: const [
-                    DropdownMenuItem(value: null, child: Text('ทั้งหมด')),
-                    DropdownMenuItem(
-                      value: 'WAITING_REVIEW',
-                      child: Text('รอตรวจสอบ'),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(LaooLayout.cardPadding),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 240,
+                    child: DropdownButtonFormField<String?>(
+                      initialValue: _status,
+                      decoration: const InputDecoration(labelText: 'สถานะ'),
+                      items: const [
+                        DropdownMenuItem(value: null, child: Text('ทั้งหมด')),
+                        DropdownMenuItem(
+                          value: 'WAITING_REVIEW',
+                          child: Text('รอตรวจสอบ'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'PENDING',
+                          child: Text('รอดำเนินการ'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'IN_PROGRESS',
+                          child: Text('กำลังดำเนินการ'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'COMPLETED',
+                          child: Text('เสร็จสิ้น'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'REVIEW_REJECTED',
+                          child: Text('ไม่อนุมัติ'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'DEPARTMENT_REJECTED',
+                          child: Text('แผนกปฏิเสธ'),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        setState(() => _status = value);
+                        _load();
+                      },
                     ),
-                    DropdownMenuItem(
-                      value: 'PENDING',
-                      child: Text('รอดำเนินการ'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'IN_PROGRESS',
-                      child: Text('กำลังดำเนินการ'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'COMPLETED',
-                      child: Text('เสร็จสิ้น'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'REVIEW_REJECTED',
-                      child: Text('ไม่อนุมัติ'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'DEPARTMENT_REJECTED',
-                      child: Text('แผนกปฏิเสธ'),
-                    ),
-                  ],
-                  onChanged: (value) {
-                    setState(() => _status = value);
-                    _load();
-                  },
-                ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    tooltip: 'รีเฟรช',
+                    onPressed: _load,
+                    icon: const Icon(Icons.refresh_outlined),
+                  ),
+                ],
               ),
-              const SizedBox(width: 8),
-              IconButton(
-                tooltip: 'รีเฟรช',
-                onPressed: _load,
-                icon: const Icon(Icons.refresh_outlined),
-              ),
-            ],
+            ),
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+                      itemCount: _items.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 6),
+                      itemBuilder: (_, index) => _card(_items[index]),
+                    ),
+            ),
+          ],
+        ),
+        if (_error != null)
+          Positioned(
+            top: 12,
+            right: 12,
+            child: AutoDismissMessage(
+              message: _error!,
+              error: true,
+              onClose: () => setState(() => _error = null),
+            ),
           ),
-        ),
-        Expanded(
-          child: _loading
-              ? const Center(child: CircularProgressIndicator())
-              : _error != null
-              ? Center(child: Text(_error!))
-              : ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
-                  itemCount: _items.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 6),
-                  itemBuilder: (_, index) => _card(_items[index]),
-                ),
-        ),
       ],
     ),
   );
+
+  String _errorText(Object error, String fallback) => error is ApiException
+      ? '${error.message}\nรายละเอียดเพิ่มเติม: ${error.description ?? 'กรุณาโหลดข้อมูลล่าสุดแล้วลองอีกครั้ง'}'
+      : '$fallback\nรายละเอียดเพิ่มเติม: กรุณาตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง';
 
   Widget _card(Map<String, dynamic> item) {
     final status = '${item['statusCode'] ?? ''}';
@@ -343,25 +369,18 @@ class _MeetingEquipmentRequestPageState
                     onPressed: () => _cancel(item),
                     child: const Text('ยกเลิกรายการ'),
                   ),
-                if (status == 'PENDING' && item['canManageStatus'] == true) ...[
-                  FilledButton(
-                    onPressed: () => _departmentStatus(item, 'IN_PROGRESS'),
-                    child: const Text('เริ่มดำเนินการ'),
-                  ),
-                  FilledButton(
-                    onPressed: () => _departmentStatus(item, 'COMPLETED'),
-                    child: const Text('เสร็จสิ้น'),
-                  ),
-                  OutlinedButton(
+                if (_canOpenSupportTasks &&
+                    const [
+                      'PENDING',
+                      'IN_PROGRESS',
+                      'COMPLETED',
+                      'DEPARTMENT_REJECTED',
+                    ].contains(status))
+                  TextButton.icon(
                     onPressed: () =>
-                        _departmentStatus(item, 'DEPARTMENT_REJECTED'),
-                    child: const Text('แผนกปฏิเสธ'),
-                  ),
-                ],
-                if (status == 'IN_PROGRESS' && item['canManageStatus'] == true)
-                  FilledButton(
-                    onPressed: () => _departmentStatus(item, 'COMPLETED'),
-                    child: const Text('เสร็จสิ้น'),
+                        context.go(MeetingRoutePaths.roomSupportTasks),
+                    icon: const Icon(Icons.open_in_new),
+                    label: const Text('ไปหน้างานเตรียมอุปกรณ์'),
                   ),
               ],
             ),
@@ -383,6 +402,7 @@ class _MeetingEquipmentRequestPageState
     'REQUEST_CREATED' => 'สร้างคำขอ',
     'SUBMITTED_FOR_REVIEW' => 'ส่งตรวจสอบ',
     'SENT_TO_DEPARTMENT' => 'ส่งแผนก',
+    'RETURNED_FOR_REVIEW' => 'ส่งกลับเข้าคิวตรวจสอบ',
     'REVIEW_APPROVED' => 'อนุมัติแล้ว',
     _ => value,
   };

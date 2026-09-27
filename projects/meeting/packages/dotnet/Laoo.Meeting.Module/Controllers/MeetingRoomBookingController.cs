@@ -1085,6 +1085,35 @@ ORDER BY A.ApprovalOrder,E.EmployeeCode;
         return Ok(result);
     }
 
+    [HttpGet("{bookingId:long}/evaluation-templates")]
+    public async Task<IActionResult> EvaluationTemplates(long bookingId,CancellationToken token)
+    {
+        if(!TryCompany(out var company)||!await BookingAllowed(bookingId,"VIEW",token))return Forbid();
+        await using var db=await Open(token);
+        var activity=await Scalar(db,"SELECT ActivityTypeCode FROM dbo.TDADMeetingRoomBooking WHERE CompanyID=@company AND BookingID=@booking",token,("@company",(object?)company),("@booking",bookingId)) as string;
+        if(activity is null)return NotFound();
+        var sources=activity=="TRAINING"?"'MEETING_ROOM','TRAINING_COURSE','TRAINING_INSTRUCTOR'":"'MEETING_ROOM'";
+        await using var templates=new SqlCommand($"SELECT EvaluationTemplateID,TemplateCode,TemplateName,SourceType FROM dbo.TDEVTemplate WHERE CompanyID=@company AND IsActive=1 AND SourceType IN ({sources}) ORDER BY SourceType,TemplateCode",db);Add(templates,"@company",company);await using var reader=await templates.ExecuteReaderAsync(token);var items=new List<object>();while(await reader.ReadAsync(token))items.Add(new{id=reader.GetInt64(0),code=reader.GetString(1),name=reader.GetString(2),sourceType=reader.GetString(3)});await reader.DisposeAsync();
+        await using var selected=new SqlCommand("SELECT EvaluationSourceType,EvaluationTemplateID FROM dbo.TDADMeetingRoomBookingEvaluation WHERE CompanyID=@company AND BookingID=@booking AND IsActive=1",db);Add(selected,"@company",company);Add(selected,"@booking",bookingId);await using var rows=await selected.ExecuteReaderAsync(token);var selections=new List<object>();while(await rows.ReadAsync(token))selections.Add(new{sourceType=rows.GetString(0),templateId=rows.GetInt64(1)});return Ok(new{activityTypeCode=activity,items,selections});
+    }
+
+    [HttpPut("{bookingId:long}/evaluation-templates")]
+    public async Task<IActionResult> SaveEvaluationTemplates(long bookingId,[FromBody]BookingEvaluationTemplateSaveRequest request,CancellationToken token)
+    {
+        if(!TryCompany(out var company)||!TryUser(out var user)||!await BookingAllowed(bookingId,"EDIT",token))return Forbid();
+        var values=request.Items??[];var valid=new[]{"MEETING_ROOM","TRAINING_COURSE","TRAINING_INSTRUCTOR"};
+        if(values.Any(x=>!valid.Contains(x.SourceType?.Trim().ToUpperInvariant())||x.TemplateId<=0)||values.Select(x=>x.SourceType.Trim().ToUpperInvariant()).Distinct().Count()!=values.Count)return BadRequest(Error("ข้อมูลแบบประเมินไม่ถูกต้อง","แต่ละประเภทเลือก Template ได้ไม่เกินหนึ่งรายการ"));
+        await using var db=await Open(token);
+        var activity=await Scalar(db,"SELECT B.ActivityTypeCode FROM dbo.TDADMeetingRoomBooking B WHERE B.CompanyID=@company AND B.BookingID=@booking AND B.BookingStatus IN('PENDING','APPROVED') AND EXISTS(SELECT 1 FROM dbo.TDADMeetingRoomBookingSlot S WHERE S.CompanyID=B.CompanyID AND S.BookingID=B.BookingID AND S.StartDateTime>GETDATE())",token,("@company",(object?)company),("@booking",bookingId)) as string;
+        if(activity is null)return Conflict(Error("แก้ไขการกำหนดแบบประเมินไม่ได้","รายการจองต้องยังไม่ถูกยกเลิก"));
+        await using var tx=(SqlTransaction)await db.BeginTransactionAsync(token);
+        if(activity!="TRAINING"&&values.Any(x=>x.SourceType.Trim().ToUpperInvariant()!="MEETING_ROOM")){await tx.RollbackAsync(token);return BadRequest(Error("ประเภทประเมินไม่ถูกต้อง","การจองห้องทั่วไปเลือกได้เฉพาะประเมินห้องประชุม"));}
+        foreach(var item in values){var check=new SqlCommand("SELECT COUNT(1) FROM dbo.TDEVTemplate WHERE CompanyID=@company AND EvaluationTemplateID=@template AND IsActive=1 AND SourceType=@source",db,tx);Add(check,"@company",company);Add(check,"@template",item.TemplateId);Add(check,"@source",item.SourceType.Trim().ToUpperInvariant());if(Convert.ToInt32(await check.ExecuteScalarAsync(token))!=1){await tx.RollbackAsync(token);return BadRequest(Error("Template ไม่ถูกต้อง","Template ต้องตรงประเภทและอยู่ในบริษัทเดียวกัน"));}}
+        await Execute(db,tx,"DELETE dbo.TDADMeetingRoomBookingEvaluation WHERE CompanyID=@company AND BookingID=@booking",token,("@company",(object?)company),("@booking",bookingId));
+        foreach(var item in values)await Execute(db,tx,"INSERT dbo.TDADMeetingRoomBookingEvaluation(CompanyID,BookingID,EvaluationSourceType,EvaluationTemplateID,CreateBy) VALUES(@company,@booking,@source,@template,@user)",token,("@company",(object?)company),("@booking",bookingId),("@source",item.SourceType.Trim().ToUpperInvariant()),("@template",item.TemplateId),("@user",user));
+        await tx.CommitAsync(token);return NoContent();
+    }
+
     [HttpPost]
     public Task<IActionResult> Create(BookingSaveRequest request, CancellationToken token) => Save(null, request, token);
 
@@ -1628,6 +1657,13 @@ VALUES(@booking,@company,@from,@to,@user,@remark,@source);
         Add(command, "@trainingTypeName", training.TypeNameSnapshot); Add(command, "@trainingInstructorName", training.InstructorNameSnapshot); Add(command, "@trainingInstitute", training.InstituteSnapshot);
     }
 
+    private static async Task<object?> Scalar(SqlConnection connection, string sql, CancellationToken token, params (string Name, object? Value)[] parameters)
+    {
+        await using var command = new SqlCommand(sql, connection);
+        foreach (var parameter in parameters) Add(command, parameter.Name, parameter.Value);
+        return await command.ExecuteScalarAsync(token);
+    }
+
     private static async Task Execute(SqlConnection connection, SqlTransaction transaction, string sql, CancellationToken token, params (string Name, object? Value)[] parameters)
     {
         await using var command = new SqlCommand(sql, connection, transaction);
@@ -1646,6 +1682,8 @@ VALUES(@booking,@company,@from,@to,@user,@remark,@source);
 
 public sealed record BookingSlotRequest(DateTime StartDateTime, DateTime EndDateTime);
 public sealed record BookingSaveRequest(long RoomId, string Subject, string? Description, int AttendeeCount, List<BookingSlotRequest>? Slots, string? Remark, string? ActivityTypeCode = "MEETING", long? TrainingTypeId = null, long? TrainingInstructorId = null, string? TrainingTypeNameSnapshot = null, string? TrainingInstructorNameSnapshot = null, string? TrainingInstituteSnapshot = null);
+public sealed record BookingEvaluationTemplateRequest(string SourceType,long TemplateId);
+public sealed record BookingEvaluationTemplateSaveRequest(List<BookingEvaluationTemplateRequest>? Items);
 public sealed record ApprovalDecisionRequest(string Decision, string? Remark);
 public sealed record RollbackBookingRequest(string? Remark);
 public sealed record BookingCancellationRequest(string? Remark);
