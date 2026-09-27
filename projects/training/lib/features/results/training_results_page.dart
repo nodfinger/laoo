@@ -22,6 +22,7 @@ class _TrainingResultsPageState extends State<TrainingResultsPage>
   int _page = 1, _total = 0;
   bool _loading = true;
   String? _message;
+  String _caption = 'ผลการอบรม';
 
   String get _sectionCode => _tabs.index == 0 ? 'PRE' : 'POST';
 
@@ -33,7 +34,17 @@ class _TrainingResultsPageState extends State<TrainingResultsPage>
       ..addListener(() {
         if (!_tabs.indexIsChanging && _detail != null) _loadSection();
       });
+    _loadCaption();
     _load();
+  }
+
+  Future<void> _loadCaption() async {
+    final caption = await resolveTrainingMenuCaption(
+      menuCode: TrainingMenuCodes.results,
+      routeName: TrainingRouteNames.results,
+      fallback: _caption,
+    );
+    if (mounted) setState(() => _caption = caption);
   }
 
   @override
@@ -115,7 +126,7 @@ class _TrainingResultsPageState extends State<TrainingResultsPage>
   Widget build(BuildContext context) {
     final tokens = trainingUiTokens;
     return buildTrainingWorkspaceShell(
-      pageTitle: 'ผลการอบรม',
+      pageTitle: _caption,
       activeMenu: TrainingMenuCodes.results,
       child: Stack(
         children: [
@@ -141,7 +152,7 @@ class _TrainingResultsPageState extends State<TrainingResultsPage>
       tokens: tokens.workspace,
       caption: LaooCaptionCard(
         tokens: tokens.workspace,
-        caption: 'ผลการอบรม',
+        caption: _caption,
         leading: Icon(Icons.assessment_outlined, color: tokens.primaryColor),
       ),
       filter: Wrap(
@@ -237,65 +248,98 @@ class _TrainingResultsPageState extends State<TrainingResultsPage>
   Widget _detailView(TrainingUiTokens tokens) {
     final detail = _detail!;
     final section = _section;
-    return Column(
-      children: [
-        Card(
-          margin: tokens.workspace.contentMargin,
-          color: Colors.white,
-          child: Padding(
-            padding: tokens.workspace.cardPadding,
-            child: Row(
+    return SingleChildScrollView(
+      padding: tokens.workspace.contentMargin,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          LaooCaptionCard(
+            tokens: tokens.workspace,
+            caption: _caption,
+            leading: Icon(
+              Icons.assessment_outlined,
+              color: tokens.primaryColor,
+            ),
+          ),
+          const SizedBox(height: 6),
+          _surfaceCard(
+            tokens,
+            Row(
               children: [
                 IconButton(
+                  tooltip: 'กลับรายการผลการอบรม',
                   onPressed: () => setState(() {
                     _detail = null;
                     _section = null;
                   }),
                   icon: const Icon(Icons.arrow_back_outlined),
                 ),
-                Icon(Icons.assessment_outlined, color: tokens.primaryColor),
-                const SizedBox(width: 10),
+                const SizedBox(width: 4),
                 Expanded(
-                  child: Text(
-                    '${detail['bookingNo']} | ${detail['subject']}',
-                    style: tokens.workspace.captionStyle,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${detail['bookingNo'] ?? '-'}',
+                        style: tokens.workspace.sectionStyle,
+                      ),
+                      const SizedBox(height: 2),
+                      Text('${detail['subject'] ?? '-'}'),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
-        ),
-        Padding(
-          padding: tokens.workspace.contentMargin,
-          child: Wrap(
-            spacing: 10,
-            runSpacing: 8,
-            children: [
-              _count('เชิญทั้งหมด', detail['invited']),
-              _count('ตอบรับ', detail['accepted']),
-              _count('ตอบรับภายหลัง', detail['lateAccepted']),
-              _count('รอตอบรับ', detail['pending']),
-              _count('ปฏิเสธ', detail['declined']),
-            ],
+          SizedBox(height: tokens.workspace.sectionSpacing),
+          _surfaceCard(
+            tokens,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('สรุปคำเชิญ', style: tokens.workspace.sectionStyle),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 8,
+                  children: [
+                    _count('เชิญทั้งหมด', detail['invited']),
+                    _count('ตอบรับ', detail['accepted']),
+                    _count('ตอบรับภายหลัง', detail['lateAccepted']),
+                    _count('รอตอบรับ', detail['pending']),
+                    _count('ปฏิเสธ', detail['declined']),
+                  ],
+                ),
+              ],
+            ),
           ),
-        ),
-        TabBar(
-          controller: _tabs,
-          labelColor: tokens.primaryColor,
-          tabs: const [
-            Tab(text: 'ก่อนอบรม (PRE)'),
-            Tab(text: 'หลังอบรม (POST)'),
-          ],
-        ),
-        Expanded(
-          child: SingleChildScrollView(
-            padding: tokens.workspace.contentMargin,
-            child: _sectionTable(tokens, section),
+          SizedBox(height: tokens.workspace.sectionSpacing),
+          _surfaceCard(
+            tokens,
+            TabBar(
+              controller: _tabs,
+              labelColor: tokens.primaryColor,
+              tabs: const [
+                Tab(text: 'ก่อนอบรม (PRE)'),
+                Tab(text: 'หลังอบรม (POST)'),
+              ],
+            ),
           ),
-        ),
-      ],
+          SizedBox(height: tokens.workspace.sectionSpacing),
+          _sectionTable(tokens, section),
+        ],
+      ),
     );
   }
+
+  Widget _surfaceCard(TrainingUiTokens tokens, Widget child) => Card(
+    margin: EdgeInsets.zero,
+    color: Colors.white,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(tokens.workspace.radius),
+    ),
+    child: Padding(padding: tokens.workspace.cardPadding, child: child),
+  );
 
   Widget _count(String label, dynamic value) =>
       Chip(label: Text('$label: ${value ?? 0}'));
@@ -308,56 +352,69 @@ class _TrainingResultsPageState extends State<TrainingResultsPage>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Wrap(
-          spacing: 10,
-          runSpacing: 8,
-          children: [
-            _count('ผู้มีสิทธิ์สอบ', section['eligible']),
-            _count('ยังไม่เริ่ม', section['notStarted']),
-            _count('กำลังทำ', section['inProgress']),
-            _count('ส่งแล้ว', section['submitted']),
-            _count('ผ่าน', section['passed']),
-            _count('ไม่ผ่าน', section['failed']),
-          ],
-        ),
-        const SizedBox(height: 10),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: DataTable(
-            columns: const [
-              DataColumn(label: Text('รหัส')),
-              DataColumn(label: Text('ชื่อ')),
-              DataColumn(label: Text('สถานะคำเชิญ')),
-              DataColumn(label: Text('สถานะสอบ')),
-              DataColumn(label: Text('คะแนน')),
-              DataColumn(label: Text('เปอร์เซ็นต์')),
-              DataColumn(label: Text('ผล')),
-              DataColumn(label: Text('เวลาส่ง')),
+        _surfaceCard(
+          tokens,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('สรุปผลแบบทดสอบ', style: tokens.workspace.sectionStyle),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 10,
+                runSpacing: 8,
+                children: [
+                  _count('ผู้มีสิทธิ์สอบ', section['eligible']),
+                  _count('ยังไม่เริ่ม', section['notStarted']),
+                  _count('กำลังทำ', section['inProgress']),
+                  _count('ส่งแล้ว', section['submitted']),
+                  _count('ผ่าน', section['passed']),
+                  _count('ไม่ผ่าน', section['failed']),
+                ],
+              ),
             ],
-            rows: rows
-                .map(
-                  (x) => DataRow(
-                    cells: [
-                      DataCell(Text('${x['code'] ?? '-'}')),
-                      DataCell(Text('${x['name'] ?? '-'}')),
-                      DataCell(Text(_invite(x))),
-                      DataCell(Text(_test(x['testStatus']))),
-                      DataCell(
-                        Text(
-                          x['score'] == null
-                              ? '-'
-                              : '${x['score']}/${x['maxScore']}',
+          ),
+        ),
+        SizedBox(height: tokens.workspace.sectionSpacing),
+        _surfaceCard(
+          tokens,
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: DataTable(
+              columns: const [
+                DataColumn(label: Text('รหัส')),
+                DataColumn(label: Text('ชื่อ')),
+                DataColumn(label: Text('สถานะคำเชิญ')),
+                DataColumn(label: Text('สถานะสอบ')),
+                DataColumn(label: Text('คะแนน')),
+                DataColumn(label: Text('เปอร์เซ็นต์')),
+                DataColumn(label: Text('ผล')),
+                DataColumn(label: Text('เวลาส่ง')),
+              ],
+              rows: rows
+                  .map(
+                    (x) => DataRow(
+                      cells: [
+                        DataCell(Text('${x['code'] ?? '-'}')),
+                        DataCell(Text('${x['name'] ?? '-'}')),
+                        DataCell(Text(_invite(x))),
+                        DataCell(Text(_test(x['testStatus']))),
+                        DataCell(
+                          Text(
+                            x['score'] == null
+                                ? '-'
+                                : '${x['score']}/${x['maxScore']}',
+                          ),
                         ),
-                      ),
-                      DataCell(
-                        Text(x['percent'] == null ? '-' : '${x['percent']}%'),
-                      ),
-                      DataCell(Text(_result(x['result']))),
-                      DataCell(Text('${x['submittedDate'] ?? '-'}')),
-                    ],
-                  ),
-                )
-                .toList(),
+                        DataCell(
+                          Text(x['percent'] == null ? '-' : '${x['percent']}%'),
+                        ),
+                        DataCell(Text(_result(x['result']))),
+                        DataCell(Text('${x['submittedDate'] ?? '-'}')),
+                      ],
+                    ),
+                  )
+                  .toList(),
+            ),
           ),
         ),
       ],

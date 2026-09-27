@@ -23,6 +23,7 @@ import 'app/theme/workspace_theme_presets.dart';
 import 'core/api/api_client.dart';
 import 'core/api/api_exception.dart';
 import 'core/company_setup/company_setup_controller.dart';
+import 'core/navigation/navigation_menu_repository.dart';
 import 'core/widgets/auto_dismiss_message.dart';
 import 'features/support/presentation/widgets/support_workspace_shell.dart';
 
@@ -118,6 +119,13 @@ void main() {
     messageBuilder: ({required message, required error, required onClose}) =>
         AutoDismissMessage(message: message, error: error, onClose: onClose),
     pageSizeProvider: () => companySetupController.pageSize,
+    menuCaptionResolver:
+        ({required menuCode, required routeName, required fallback}) =>
+            NavigationMenuRepository().resolveMenuName(
+              menuCode: menuCode,
+              routeName: routeName,
+              fallback: fallback,
+            ),
     uiTokensProvider: () {
       final theme = workspaceThemeController.value;
       return TrainingUiTokens(
