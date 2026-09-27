@@ -1,7 +1,7 @@
 {
-  "role": "business",
-  "ownedModules": ["meeting", "training", "evaluation", "survey", "vote", "five_s"],
-  "allowedProjects": ["LAOO_MEETING", "LAOO_TRAINING", "LAOO_EVALUATION", "LAOO_SURVEY", "LAOO_VOTE", "LAOO_5S"],
+  "role": "center-service",
+  "ownedModules": ["service", "meeting", "visitor", "time", "training", "gate_pass", "five_s", "survey", "expense", "project", "intranet", "vote", "pos", "sales", "evaluation"],
+  "allowedProjects": ["LAOO", "LAOO_SERVICE", "LAOO_MEETING", "LAOO_VISITOR", "LAOO_TIME", "LAOO_TRAINING", "LAOO_GATE_PASS", "LAOO_5S", "LAOO_SURVEY", "LAOO_EXPENSE", "LAOO_PROJECT", "LAOO_INTRANET", "LAOO_VOTE", "LAOO_POS", "LAOO_SALES", "LAOO_EVALUATION"],
   "webPort": 8080,
   "apiPort": 5080
 }
