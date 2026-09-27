@@ -1,0 +1,3624 @@
+﻿[
+    {
+        "files":  [
+                      {
+                          "path":  "linux/flutter/generated_plugin_registrant.cc",
+                          "blob":  null,
+                          "status":  "excluded",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "linux/flutter/generated_plugins.cmake",
+                          "blob":  null,
+                          "status":  "excluded",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "macos/Flutter/GeneratedPluginRegistrant.swift",
+                          "blob":  null,
+                          "status":  "excluded",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/visitor/pubspec.lock",
+                          "blob":  "6e34598f7bb9272db45b7649934987919074bb2a",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "pubspec.lock",
+                          "blob":  "7c323165e73afc7efb6e8907a0c548b748a02eaa",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "windows/flutter/generated_plugin_registrant.cc",
+                          "blob":  null,
+                          "status":  "excluded",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "windows/flutter/generated_plugins.cmake",
+                          "blob":  null,
+                          "status":  "excluded",
+                          "role":  "working"
+                      }
+                  ],
+        "message":  "On core/fix-navigation-training-results-cast: before-sync-main-20260921",
+        "baseCommit":  "9d95236fcc3150dbb0ee753ebe90960354b18e29",
+        "stash":  "3932c1cfe3384988d62ee4ecd6a8d0f9675bca8c",
+        "repository":  "C:/laooplatform/laoo"
+    },
+    {
+        "files":  [
+                      {
+                          "path":  "database/migrations/20260921100000_LAOO_core_unified_resident_registry.sql",
+                          "blob":  "03c4505fa64629a3fbdbc3b009222724e5f697ba",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/BusinessLocationController.cs",
+                          "blob":  "07a7e28c0efdc1927ff30da6af8a2a7b0f323ddf",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/CoreLocationController.cs",
+                          "blob":  "4dc915ceb730ae62e9a998ce6e7abd7406bd442f",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/PeopleRegistryController.cs",
+                          "blob":  "c7e7c36d0e74bb253548cc1283bc8a5977a9f400",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/ServicePersonController.Write.cs",
+                          "blob":  "c37ed659fa4e82e4836059a6ee6b8f824c2c957f",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/ServicePersonController.cs",
+                          "blob":  "9decb6293b14141131e9585fab55305eac350733",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/features/company/resident/data/resident_registry_api.dart",
+                          "blob":  "71e5029a1bbbfb13eacf1f32148132d419326eb8",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/features/company/resident/pages/resident_registry_page.dart",
+                          "blob":  "b12f50976ea42cc6e59da6a96bc177ed3032c0c3",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "database/migrations/20260921100000_LAOO_core_unified_resident_registry.sql",
+                          "blob":  "03c4505fa64629a3fbdbc3b009222724e5f697ba",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/BusinessLocationController.cs",
+                          "blob":  "07a7e28c0efdc1927ff30da6af8a2a7b0f323ddf",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/CoreLocationController.cs",
+                          "blob":  "4dc915ceb730ae62e9a998ce6e7abd7406bd442f",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/PeopleRegistryController.cs",
+                          "blob":  "c7e7c36d0e74bb253548cc1283bc8a5977a9f400",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/ServicePersonController.Write.cs",
+                          "blob":  "c37ed659fa4e82e4836059a6ee6b8f824c2c957f",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/ServicePersonController.cs",
+                          "blob":  "9decb6293b14141131e9585fab55305eac350733",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "lib/features/company/resident/data/resident_registry_api.dart",
+                          "blob":  "71e5029a1bbbfb13eacf1f32148132d419326eb8",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "lib/features/company/resident/pages/resident_registry_page.dart",
+                          "blob":  "b12f50976ea42cc6e59da6a96bc177ed3032c0c3",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "database/migrations/20260921120000_LAO_navigation_visitor_group_activation.sql",
+                          "blob":  "e973033df1af8c233cc3f666031fe372ad1a205b",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      }
+                  ],
+        "message":  "On core/unified-resident-registry: preserve-core-resident-before-navigation-pr",
+        "baseCommit":  "c2d16c9b74c763927ff80f37318bf953e64e8ba1",
+        "stash":  "7fa74085594aa1f02bb4ffcace219fe2133aa9f7",
+        "repository":  "C:/laooplatform/laoo"
+    },
+    {
+        "files":  [
+                      {
+                          "path":  "database/migrations/20260921100000_LAOO_core_unified_resident_registry.sql",
+                          "blob":  "03c4505fa64629a3fbdbc3b009222724e5f697ba",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/BusinessLocationController.cs",
+                          "blob":  "07a7e28c0efdc1927ff30da6af8a2a7b0f323ddf",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/CoreLocationController.cs",
+                          "blob":  "4dc915ceb730ae62e9a998ce6e7abd7406bd442f",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/PeopleRegistryController.cs",
+                          "blob":  "4472ab87dea9dfa30b81cfdda43a1538850844be",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/ServicePersonController.Write.cs",
+                          "blob":  "1b4b95bcbe4f5ae4d35497c66f6786fc83755df0",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/ServicePersonController.cs",
+                          "blob":  "9decb6293b14141131e9585fab55305eac350733",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/features/company/resident/data/resident_registry_api.dart",
+                          "blob":  "71e5029a1bbbfb13eacf1f32148132d419326eb8",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/features/company/resident/pages/resident_registry_page.dart",
+                          "blob":  "b12f50976ea42cc6e59da6a96bc177ed3032c0c3",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "database/migrations/20260921100000_LAOO_core_unified_resident_registry.sql",
+                          "blob":  "03c4505fa64629a3fbdbc3b009222724e5f697ba",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/BusinessLocationController.cs",
+                          "blob":  "07a7e28c0efdc1927ff30da6af8a2a7b0f323ddf",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/CoreLocationController.cs",
+                          "blob":  "4dc915ceb730ae62e9a998ce6e7abd7406bd442f",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/PeopleRegistryController.cs",
+                          "blob":  "4472ab87dea9dfa30b81cfdda43a1538850844be",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/ServicePersonController.Write.cs",
+                          "blob":  "1b4b95bcbe4f5ae4d35497c66f6786fc83755df0",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/ServicePersonController.cs",
+                          "blob":  "9decb6293b14141131e9585fab55305eac350733",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "lib/features/company/resident/data/resident_registry_api.dart",
+                          "blob":  "71e5029a1bbbfb13eacf1f32148132d419326eb8",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "lib/features/company/resident/pages/resident_registry_page.dart",
+                          "blob":  "b12f50976ea42cc6e59da6a96bc177ed3032c0c3",
+                          "status":  "saved",
+                          "role":  "index"
+                      }
+                  ],
+        "message":  "On core/unified-resident-registry: core-resident-for-main-branch",
+        "baseCommit":  "7135947512b3e88debda849cabf765669ef4e78a",
+        "stash":  "592683180a3e7457c36dae1d60330113028f0f72",
+        "repository":  "C:/laooplatform/laoo"
+    },
+    {
+        "files":  [
+                      {
+                          "path":  "database/migrations/20260921100000_LAOO_core_unified_resident_registry.sql",
+                          "blob":  "03c4505fa64629a3fbdbc3b009222724e5f697ba",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/BusinessLocationController.cs",
+                          "blob":  "07a7e28c0efdc1927ff30da6af8a2a7b0f323ddf",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/CoreLocationController.cs",
+                          "blob":  "4dc915ceb730ae62e9a998ce6e7abd7406bd442f",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/PeopleRegistryController.cs",
+                          "blob":  "4472ab87dea9dfa30b81cfdda43a1538850844be",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/ServicePersonController.Write.cs",
+                          "blob":  "1b4b95bcbe4f5ae4d35497c66f6786fc83755df0",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/ServicePersonController.cs",
+                          "blob":  "9decb6293b14141131e9585fab55305eac350733",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/features/company/resident/data/resident_registry_api.dart",
+                          "blob":  "71e5029a1bbbfb13eacf1f32148132d419326eb8",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/features/company/resident/pages/resident_registry_page.dart",
+                          "blob":  "b12f50976ea42cc6e59da6a96bc177ed3032c0c3",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/features/support/menu_management/pages/laoo_menu_management_page.dart",
+                          "blob":  "ef23f894473627b693ddec7e7336aacf63786c69",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/evaluation/lib/features/evaluation/evaluation_feature_host.dart",
+                          "blob":  "10e6cadf571d6d8a232e937acea059d773a1e0b1",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/expense/lib/features/expense/expense_feature_host.dart",
+                          "blob":  "a354b124b785dded3cb88a2fbe251923b5958032",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/meeting/lib/features/meeting/data/meeting_room_issue_repository.dart",
+                          "blob":  "02faf23ff485c114f503aaab4bf082858cee3bcb",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/meeting/lib/features/meeting/pages/meeting_room_issue_page.dart",
+                          "blob":  "5afbb01ffe4962e31b3044cb227dbdb99cb8ab06",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/sales/lib/features/sales/sales_feature_host.dart",
+                          "blob":  "cf21b8e23d7adf5bf97ae98b9db3e03ea85d0a92",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/survey/lib/features/survey/survey_feature_host.dart",
+                          "blob":  "26a557b5a79d279923c34a5025d27b7ecae933b7",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/time/lib/features/attendance_periods/attendance_period_pages.dart",
+                          "blob":  "d45f0b0710878572b2726a8a4e1b87d86a3a35b7",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/time/lib/features/attendance_summary/attendance_summary_page.dart",
+                          "blob":  "fa954215d586cc974b8f174cd1a4286a2eef288d",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/time/lib/features/holiday_calendars/branch_holiday_calendar_page.dart",
+                          "blob":  "a0d45392a4afa1e66dc3d5911dcf8f7779f3ea75",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/time/lib/features/holiday_calendars/branch_holiday_exception_page.dart",
+                          "blob":  "18834d181c326b95c4a0ce2ad1f3469f2c56a5e5",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/time/lib/features/holiday_calendars/holiday_calendar_page.dart",
+                          "blob":  "fc04c4e5101165e53b70a0e0fd2c7964097a4a44",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/time/lib/features/holiday_calendars/holiday_date_page.dart",
+                          "blob":  "0cee9e870656b16899ffaf050386bdc1a4468666",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/time/lib/features/leave_entitlement_policies/leave_entitlement_policy_page.dart",
+                          "blob":  "e4b3cfc78b8a8be1888e06a4ec352bc8690dd13e",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/time/lib/features/leave_requests/leave_request_page.dart",
+                          "blob":  "ae6ae387d11ed1f5661d8fc54ac1621cd787387e",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/time/lib/features/system_settings/time_system_settings_page.dart",
+                          "blob":  "bf40bfa1d2b1b4f6363d0ff0c16c356d8bfd374b",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/time/lib/features/time/time_go_routes.dart",
+                          "blob":  "c8b10b0c8ec3e04f9b0b8e8ee039879eb4f9a81d",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "database/migrations/20260921100000_LAOO_core_unified_resident_registry.sql",
+                          "blob":  "03c4505fa64629a3fbdbc3b009222724e5f697ba",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/BusinessLocationController.cs",
+                          "blob":  "07a7e28c0efdc1927ff30da6af8a2a7b0f323ddf",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/CoreLocationController.cs",
+                          "blob":  "4dc915ceb730ae62e9a998ce6e7abd7406bd442f",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/PeopleRegistryController.cs",
+                          "blob":  "4472ab87dea9dfa30b81cfdda43a1538850844be",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/ServicePersonController.Write.cs",
+                          "blob":  "1b4b95bcbe4f5ae4d35497c66f6786fc83755df0",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/ServicePersonController.cs",
+                          "blob":  "9decb6293b14141131e9585fab55305eac350733",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "lib/features/company/resident/data/resident_registry_api.dart",
+                          "blob":  "71e5029a1bbbfb13eacf1f32148132d419326eb8",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "lib/features/company/resident/pages/resident_registry_page.dart",
+                          "blob":  "b12f50976ea42cc6e59da6a96bc177ed3032c0c3",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/drafts/14001-location-business-type-draft.md",
+                          "blob":  "10e7aa33d722c22e88d78a9711d494c3c99f6fed",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "projects/expense/pubspec.lock",
+                          "blob":  "4311a42d690d064e77e663ca1e98aa6ff9e2d167",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "projects/five_s/pubspec.lock",
+                          "blob":  "4311a42d690d064e77e663ca1e98aa6ff9e2d167",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "projects/gate_pass/pubspec.lock",
+                          "blob":  "4311a42d690d064e77e663ca1e98aa6ff9e2d167",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "projects/intranet/pubspec.lock",
+                          "blob":  "4311a42d690d064e77e663ca1e98aa6ff9e2d167",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "projects/project/pubspec.lock",
+                          "blob":  "4311a42d690d064e77e663ca1e98aa6ff9e2d167",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "projects/sales/pubspec.lock",
+                          "blob":  "4311a42d690d064e77e663ca1e98aa6ff9e2d167",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "projects/survey/pubspec.lock",
+                          "blob":  "4311a42d690d064e77e663ca1e98aa6ff9e2d167",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "projects/vote/pubspec.lock",
+                          "blob":  "4311a42d690d064e77e663ca1e98aa6ff9e2d167",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      }
+                  ],
+        "message":  "On core/fix-service-resident-dialog-feedback: preserve-unrelated-before-core-unified-resident",
+        "baseCommit":  "7135947512b3e88debda849cabf765669ef4e78a",
+        "stash":  "bb06117cf68d476f913debd7a2ed1090d1650d09",
+        "repository":  "C:/laooplatform/laoo"
+    },
+    {
+        "files":  [
+                      {
+                          "path":  "AGENTS.md",
+                          "blob":  "4d2940c5d694916029d10dd74115f3ef697f7973",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "CONTEXT.md",
+                          "blob":  "ac6c77bd6a35f15e4743a36d87bf67951f683c4a",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/NavigationController.cs",
+                          "blob":  "92168784bae1d97cbbd6e3c2fbf22e3906ae4091",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/PeopleRegistryController.cs",
+                          "blob":  "7b29dfb8cf8c13244a8c07eb27e79bedc7e5610c",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/app/router/app_menu_route_registry.dart",
+                          "blob":  "30f886e174d81d59bfedfef55416e3b12a3fe6ed",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/app/router/app_router.dart",
+                          "blob":  "7473fa0e081a8efd5ac4f98c68ee08f5552b7caf",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/app/router/route_names.dart",
+                          "blob":  "4ef4b0cacf0df20ae659f1263af6a2e5f43b4f77",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/app/router/route_paths.dart",
+                          "blob":  "0ef2b78b73285644213e39e51b19d8983e726394",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/core/navigation/navigation_menu_repository.dart",
+                          "blob":  "9612e2883b23a1bcfc64018c8c6ee82b701aad1e",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/features/company/person/data/person_registry_api.dart",
+                          "blob":  "d653d17224af435783d29562cc5984c8d1177e95",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/features/company/person/pages/person_registry_page.dart",
+                          "blob":  "ff1770c453da5507bef1f022d26a46d948789fea",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/features/company/resident/data/resident_registry_api.dart",
+                          "blob":  {
+
+                                   },
+                          "status":  "deleted",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/features/company/resident/pages/resident_registry_page.dart",
+                          "blob":  {
+
+                                   },
+                          "status":  "deleted",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/meeting/lib/features/meeting/pages/meeting_room_booking_page.dart",
+                          "blob":  "8c78ee5e6b3e685385c20d31aa3c170112555476",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/meeting/lib/features/meeting/pages/meeting_room_page.dart",
+                          "blob":  "ef76ed1103c2235f1b3a9845665012cb8ab4f8df",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/meeting/packages/dotnet/Laoo.Meeting.Module/Controllers/MeetingRoomBookingController.cs",
+                          "blob":  "242d7121fa8aeec086b289acb6cae9940d2531ad",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/meeting/packages/dotnet/Laoo.Meeting.Module/Controllers/MeetingRoomController.cs",
+                          "blob":  "445660a55907dcea9deeff9554e0e4f25273cde6",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/meeting/packages/dotnet/Laoo.Meeting.Module/Controllers/MeetingSetupLookupController.cs",
+                          "blob":  "b16b9254c178ddf6c4961cb1c8061d5354500013",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/service/lib/app/theme/laoo_design_tokens.dart",
+                          "blob":  "2f26f0616a4101d08d7ec08fc9e3d01293a525ec",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/service/lib/features/inventory/pages/stock_receipt_page.dart",
+                          "blob":  "30c2ae11268069c5d81eb7d56d4892b887f0fbdd",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/service/lib/features/service/service_go_routes.dart",
+                          "blob":  "6ba0e11587e663a2b7006fcedd9e2781dbcbb1cd",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/service/lib/features/service/service_route_contract.dart",
+                          "blob":  "a473c212c348b57442f6e351cbef51c26358ba3e",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/service/lib/service_feature.dart",
+                          "blob":  "1f5a0c118f620577efe837eea91189242bddcce8",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/service/packages/dotnet/Laoo.Service.Module/Controllers/StockReceiptController.cs",
+                          "blob":  "afea4e7e084687130258ab873cf89dcebe589965",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "test/features/company/person_resident_registry_test.dart",
+                          "blob":  "bb7d6b5370a518f053ce60916386e4cee4e57bb9",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "test/features/company/stock_receipt_test.dart",
+                          "blob":  "0fafd7737dba65997d89c0c1047fa3e40f51c72c",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "database/migrations/20260912160000_LAOO_person_contact_roles.sql",
+                          "blob":  "a885f4b82609f7eb664ec15404abed2635773ff9",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "docs/adr/0116-share-person-identity-with-project-owned-role-screens.md",
+                          "blob":  "f1211c311a78c313a22f21bd588a92c9078bd85a",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/ServicePersonController.Helpers.cs",
+                          "blob":  "2d3a3aab81025b4c3fa0e01bb07b6a592a362f0b",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/ServicePersonController.List.cs",
+                          "blob":  "59a8967b0f92910662484752d7d381a7c8dded1a",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/ServicePersonController.cs",
+                          "blob":  "c3a0c8729e4e093df01b9cf187a277f4eab33091",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "projects/service/database/migrations/20260912170000_LAOO_SERVICE_resident_project_screen.sql",
+                          "blob":  "fb345d0e688ecdec26ec8c97f2d3ed2db4570a0e",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "projects/service/database/migrations/20260913044500_LAOO_SERVICE_service_person_feature.sql",
+                          "blob":  "34f91055ac4b765a2eb5d40c15d492ea3149003f",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "projects/service/database/migrations/20260913100000_LAOO_SERVICE_service_person_roles.sql",
+                          "blob":  "3d82543518b55b54e66d0688d270d0e15425b22a",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "projects/service/lib/features/company/person/data/service_person_api.dart",
+                          "blob":  "b0c0e88130c97c45f46bd9e66185c1d492e014f7",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "projects/service/lib/features/company/person/pages/service_person_page.dart",
+                          "blob":  "9fa10014c4a86a1776affcd0499fa52b7ef9b5e0",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "projects/service/lib/features/company/resident/data/resident_registry_api.dart",
+                          "blob":  "bfcb41a5e023702fe1cec4cf9af58f9cfaa7a196",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "projects/service/lib/features/company/resident/pages/resident_registry_page.dart",
+                          "blob":  "88d8f84e89e6c4ef544d046b117700fbb8602128",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "projects/service/lib/features/company/shared/registry_ui.dart",
+                          "blob":  "4c40e1700271bca83de60725b254f299098c37e8",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "projects/service/packages/dotnet/Laoo.Service.Module/Controllers/ResidentController.cs",
+                          "blob":  "4359c442cbbd1e0aa65f94b512727042cbfa86d2",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "test/app/router/failures/pinned_data_table_isolatedDiff.png",
+                          "blob":  "de7cf016e687fabeb052f006a50c7e88faa56dff",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "test/app/router/failures/pinned_data_table_maskedDiff.png",
+                          "blob":  "bca7d82ec53ef3d74fb4221df44754488e48227c",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "test/app/router/failures/pinned_data_table_masterImage.png",
+                          "blob":  "d5b36461930242716759bd4bd9e150af0065d9cc",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "test/app/router/failures/pinned_data_table_testImage.png",
+                          "blob":  "76496942a40cdd2c25490ae681b03a5422d188f3",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "test/core/navigation/navigation_menu_repository_retry_test.dart",
+                          "blob":  "48ce7273f8dfc3e1423901e8bc0b2bd1aaaccdb2",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      }
+                  ],
+        "message":  "On core/fix-employee-without-login: codex-safety-before-main-sync-20260920",
+        "baseCommit":  "9e471ff674f539e442727563733a42e6a2a11803",
+        "stash":  "9bd16545f51c1300782ebe3070656afb239d1d33",
+        "repository":  "C:/laooplatform/laoo"
+    },
+    {
+        "files":  [
+                      {
+                          "path":  "laoo_api/Program.cs",
+                          "blob":  "fe57be5022e0db9193b24dbf5ff489a4d7268406",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "laoo_api/laoo_api.csproj",
+                          "blob":  "aab19b34485b43704223006b7238d5e89a77db5a",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/app/router/app_menu_route_registry.dart",
+                          "blob":  "16771b7b8fd17391df108f3145b24500f2e9f5dd",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/app/router/app_router.dart",
+                          "blob":  "9dadca1cb1d82da822b1827ab63677512000a80c",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/main.dart",
+                          "blob":  "401679dec2e6327f9c9fca46e66c8872ce0316d3",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "pubspec.lock",
+                          "blob":  "61416f84e109f0a6ca49bd9f636a993578779e9e",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "pubspec.yaml",
+                          "blob":  "ccf0afaf5ac62c43c4328fff00dcb71168e1a793",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "tools/migrations/Laoo.MigrationRunner/Program.cs",
+                          "blob":  "15296cf3fae1c59be8a99d58b50b84780ec945d5",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "tools/scripts/check-machine-boundaries.ps1",
+                          "blob":  "a571d180156c29b1a4b67d15ed1a8288346c8088",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "tools/scripts/run-migrations.ps1",
+                          "blob":  "0be1932a8d2e17c7368aabf680c1d3245b339dab",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "tools/scripts/test-project-bootstrap.ps1",
+                          "blob":  "d281ca86cde3f30d8c7849b492c4483e3230b095",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "tools/scripts/verify-center.ps1",
+                          "blob":  "e3f305b3a7fb3b491396063b905d014cb8718e9e",
+                          "status":  "saved",
+                          "role":  "working"
+                      }
+                  ],
+        "message":  "On core/sales-bootstrap: autostash",
+        "baseCommit":  "f3177a651213dfe709973a1739c2eaf5799b4cd5",
+        "stash":  "7ac2f8d492f27a981217d5a35adb0462442d050e",
+        "repository":  "C:/laooplatform/laoo"
+    },
+    {
+        "files":  [
+                      {
+                          "path":  "AGENTS.md",
+                          "blob":  "7868210c2d012bde1d80be40374b880c10453db7",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "CONTEXT.md",
+                          "blob":  "0025e1e5d298fceeca9b0f5e81863c377b8d05fd",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "database/migrations/README.md",
+                          "blob":  "315eb19b2921a4f5f6810e84d0f3b43bdd409188",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0005-time-management-business-project.md",
+                          "blob":  "8baeb6f46a7160505790ca16543c60af5ce4fdb3",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0006-preserve-original-attendance-events.md",
+                          "blob":  "722a5be95874dd048529fe125503fa684cffd0f3",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0007-anchor-overnight-shifts-to-start-date.md",
+                          "blob":  "94df6242a221eeac6ac2108addcb8a116012b54e",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0008-model-shifts-as-ordered-segments.md",
+                          "blob":  "62335abd181110715c0ee166538a916b9437d953",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0009-deduct-overlapping-scheduled-breaks.md",
+                          "blob":  "ad0a214bb18b69ab637da157f5f6988db6ad88fe",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0010-calculate-completed-minutes-from-elapsed-time.md",
+                          "blob":  "e4489e25c4dc94db4eea8fe25392b8bc5f050768",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0011-separate-attendance-tolerance-from-time-facts.md",
+                          "blob":  "d5cf82ecb23d125ac798cf81f3aad14d607318f7",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0012-effective-date-attendance-requirements.md",
+                          "blob":  "a633e498630421bab9534baf5cfccf4d24b17f26",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0013-separate-schedule-groups-leave-policies-and-permissions.md",
+                          "blob":  "19c5c53d70b5331e9a2577889906906b97e962e6",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0014-use-anchor-based-repeating-shift-rotations.md",
+                          "blob":  "a6266f3bfcd837509fad59a9028c15bd8d8bb3ca",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0015-employee-schedule-overrides-win-over-group-rotations.md",
+                          "blob":  "3cb2c618e30fa8bd95282dfcc037a4e8c91ba513",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0016-support-scheduled-day-and-minute-leave-units.md",
+                          "blob":  "9746f597f94d17823e217bd2c2a9e68a4f1af9f7",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0017-adjust-leave-entitlements-with-auditable-entries.md",
+                          "blob":  "b06aa4cb4993e47f8e959d67bf81d4045ea4156e",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0018-reserve-leave-while-requests-await-approval.md",
+                          "blob":  "a175c00cbd201d81ecdcdc0a41c2b199a43019b6",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0019-configurable-multi-step-leave-approval.md",
+                          "blob":  "ea0579a5276e91cb035736b59d6fe9f14d7a755d",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0020-require-authorization-and-attendance-for-overtime.md",
+                          "blob":  "af7de2ce100fa4a78f238825e7bb7910b9641d8c",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0021-block-double-counting-of-work-and-leave.md",
+                          "blob":  "a4e9a0db9e877358fe48456c92a8efd8411f8085",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0022-derive-absence-from-uncovered-scheduled-time.md",
+                          "blob":  "6a9dca67eedab9f279220bf00f7f6df75e344fcf",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0023-classify-and-select-events-with-schedule-windows.md",
+                          "blob":  "f29659074c9c4dc384971397ffbdb47d28f897b9",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0024-anchor-classification-windows-with-work-date-offsets.md",
+                          "blob":  "0532a136572c13c0fedb7c84f77ea994a5af67f2",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0025-do-not-infer-events-outside-classification-windows.md",
+                          "blob":  "7906d003a54b8f9b0b63f72d19d0d8fede5e3e68",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0026-treat-missing-schedules-as-configuration-gaps.md",
+                          "blob":  "48fa9283bc4d37b28a22ea9c05c4625953580880",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0027-layer-company-and-branch-holiday-calendars.md",
+                          "blob":  "fe5fc76be711747e0a9d8832814eb3a271487901",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0028-own-effective-dated-employee-organization-history-in-core.md",
+                          "blob":  "20b59e055382fd4f841be6530862b7c6e0ebbf9c",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0029-interpret-schedules-in-effective-branch-time-zones.md",
+                          "blob":  "c7170b78359ef912a9157721d92183ae9ebbba01",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0030-version-results-when-finalized-attendance-periods-change.md",
+                          "blob":  "afa6d4c338540a26e56bfe01f99ecaabb9a6b273",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0031-skip-identical-replayed-attendance-events.md",
+                          "blob":  "4d7d10f10f7ac637d7c6bb5b6c31ccddf32abcb8",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0032-use-one-company-unique-attendance-code-per-employee.md",
+                          "blob":  "d498f60f411d519b3511d5ea51932d575b6b358a",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0033-self-service-is-read-only-with-correction-requests.md",
+                          "blob":  "a00170cc86ddd35a2d8994cf08dabc7fe34c459a",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0034-manage-time-adjustment-reasons-as-company-master-data.md",
+                          "blob":  "4480f851fa2cdf9a45140e3a34e40c601039e0e7",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0035-configure-and-audit-leave-carryover-per-company.md",
+                          "blob":  "e2f2018587cda4f1cc038feed4d1c41ecfd87d51",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0036-record-leave-over-balance-as-explained-absence.md",
+                          "blob":  "d15955e22e9109dfc0c7fea63e47d59229d2f91d",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0037-classify-overtime-by-day-without-calculating-pay.md",
+                          "blob":  "261f4ef3a8ad93e5e7e5757cdc17327c86cb9d53",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0038-report-home-and-work-branches-separately.md",
+                          "blob":  "40db95b87cbff7fa034672f272e8d5209491997a",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0039-version-effective-time-and-leave-policies.md",
+                          "blob":  "b7d20e7fbfcbbba7d9c3faae6d6dd97101ecf7ce",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0040-preserve-minute-basis-for-fractional-leave-days.md",
+                          "blob":  "cbce1de416e47480c6eea3e70e4baf7c80d0c639",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0041-cancel-approved-leave-with-auditable-requests.md",
+                          "blob":  "351939c201edad770318c0ef71997f2c25c4cbc6",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0042-do-not-fabricate-missing-attendance-events.md",
+                          "blob":  "3205bd7a686300a7f774bc670a50f598e3f56716",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0043-calculate-segments-independently-but-resolve-the-whole-work-date.md",
+                          "blob":  "da8d4d4c38ffa919f259c2a0234d5a12f95e7e4c",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0044-classify-attendance-direction-only-with-system-windows.md",
+                          "blob":  "fcabdafa7d147c6d89be3647da1bffdd144ad075",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0045-calculate-segments-from-attendance-sessions.md",
+                          "blob":  "b81057b31ba0845312490f23f3cd146ed0f8dc2f",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0046-use-scheduled-breaks-as-the-initial-authority.md",
+                          "blob":  "e2f24df67fa08a02d31f7a2199fb2d5f895a8893",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0047-support-multiple-ordered-attendance-session-rules.md",
+                          "blob":  "0e5fc3401e57d56b88642ed89e116160d4fd1396",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0048-allow-one-effective-schedule-group-per-employee-and-day.md",
+                          "blob":  "a41c02fd585b97a765572dd097903c304f8c0cf5",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0049-exempt-employees-from-attendance-compliance-not-records.md",
+                          "blob":  "a1b0c8ddb782134f6587fb4adb7b75a0910eb2ed",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0050-require-evidence-for-ot-even-when-attendance-is-exempt.md",
+                          "blob":  "ee41b5ea676671ff7fa78ea5a03e3d8cb8be0732",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0051-quarantine-unmatched-attendance-imports.md",
+                          "blob":  "5335187f2c60b8c1aad50c9909feb4731a1182a1",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0052-resolve-device-codes-by-event-time.md",
+                          "blob":  "f3b677bf6b0b3bc6ea5e6f3863fdb212c9549b5a",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0053-allow-non-overlapping-device-code-reuse.md",
+                          "blob":  "ec45df5575c69bb07e2abbc8bf0487c88aae51fb",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0054-supersede-approved-time-adjustments.md",
+                          "blob":  "fb2a7856b90a96e01cc7276ba5b7fe165dca896d",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0055-configure-approval-workflows-for-time-adjustments.md",
+                          "blob":  "dc6a65c2188978ef7dde334a76dd3e01a6788b38",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0056-evaluate-late-and-early-status-per-session-rule.md",
+                          "blob":  "1138b3d114ec39f63d596a73e35ad8d551b8113c",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0057-layer-company-and-session-attendance-tolerances.md",
+                          "blob":  "0ab46a32d3b351bd4273e36b1aa63cd92a5f5dfb",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0058-aggregate-seconds-before-truncating-each-segment.md",
+                          "blob":  "2c02e751b87300f65f79831f1f513125180bf51b",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0059-deduplicate-overlapping-session-time-and-block-finalization.md",
+                          "blob":  "380c53799298b889a23da47b627678b44e9d60b7",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0060-preserve-source-utc-and-received-event-times.md",
+                          "blob":  "80b23482a47b97f7366dd909660fd963a2fed84c",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0061-quarantine-suspicious-events-from-calculation.md",
+                          "blob":  "bcc257d1a06ccc7d9c3090cc5db708ad6823fd66",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0062-use-thailand-time-for-all-attendance-processing.md",
+                          "blob":  "dfc8676a051cd77ddc4f5a4e7585d99f2702e1a3",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0063-distinguish-provisional-and-final-attendance-reports.md",
+                          "blob":  "42f990a4aa7219f84d87c88c283916abf96cc6c8",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0064-version-final-reports-after-period-reopening.md",
+                          "blob":  "0849891545f125b3a10169daf5ca3fa65e686d0c",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0065-support-multiple-attendance-period-schemes-per-company.md",
+                          "blob":  "82b5288e356137bc33ff2c6549591630098de1cb",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0066-require-contiguous-periods-within-each-scheme.md",
+                          "blob":  "a31c40274fae42e8d7fb89aed979ec6f5316c826",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0067-assign-period-schemes-effectively-by-work-date.md",
+                          "blob":  "a4fd2f8e0546ae9cd26882fd1f5b24902e130482",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0068-finalize-periods-per-company-and-scheme-with-branch-reviews.md",
+                          "blob":  "177e16cc65b02e5f08a1e6a2d89b82458476d122",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0069-assign-period-review-ownership-by-effective-home-branch.md",
+                          "blob":  "66ac7a098c8b0778f4ae080d8062ebed01a7b380",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0070-support-four-attendance-period-generation-patterns.md",
+                          "blob":  "20da2a44ea47b895a7ce4c169a7aa51efa4ec8c8",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0071-version-attendance-period-scheme-changes.md",
+                          "blob":  "993e33028abad0ee4fa7394c0a5f76649d0b905a",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0072-bridge-period-scheme-changes-with-transition-periods.md",
+                          "blob":  "b1fcab136f334822c96d8e77242d3bed48306335",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0073-use-effective-membership-within-shared-periods.md",
+                          "blob":  "fa630f1725912d74fe39d1a77d778d86dff8bcce",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0074-block-period-finalization-while-results-are-unresolved.md",
+                          "blob":  "bd62667e27a2190e1ef5bd0a4e9a6e2abad13d8a",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0075-invalidate-only-affected-branch-reviews-after-changes.md",
+                          "blob":  "f790b3f1f2d62957e630f33fc6b2e397cc994c4f",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0076-block-finalization-for-missing-period-assignments.md",
+                          "blob":  "f49de7f9ecc418bd2a2b7c30d7edfb21f3b17ce3",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0077-do-not-retroactively-apply-default-period-scheme-changes.md",
+                          "blob":  "88b58b88b334c9eaff7b755b77c4bb69f0d13025",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0078-apply-bulk-period-reassignments-atomically.md",
+                          "blob":  "59a559cf0a9972ca9deff0d45e5f509fb4147c11",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0079-notify-period-deadlines-without-auto-finalization.md",
+                          "blob":  "72c80f8b81ccadc0e66e5076ba9d46bb89343e75",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0080-require-all-periods-finalized-for-consolidated-official-reports.md",
+                          "blob":  "0c654149ff5ecd209c5654288f707d58e4672f07",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0081-validate-and-activate-rotations-without-publishing.md",
+                          "blob":  "44ed714340150089543ead31e5d9fa93a63ad729",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0082-version-effective-rotations-instead-of-rewriting-history.md",
+                          "blob":  "7f3ac39b7e67691f91a2b06946c7e3a51076cd7f",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0083-join-employees-at-the-groups-current-rotation-position.md",
+                          "blob":  "b7a1d172ad3beb388c47ecfb1a69b17565f99be0",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0084-place-rotation-anchor-dates-on-group-assignments.md",
+                          "blob":  "50a36be99c476a6574ba389b13c6757dc3156060",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0085-distinguish-required-and-optional-attendance-sessions.md",
+                          "blob":  "ed8729e105dac7e6506d42c8ed9cec0f7dda43ce",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0086-track-but-do-not-count-unapproved-extra-work.md",
+                          "blob":  "1706e97b5afffb8d519dff7a299bc2694ed9f479",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0087-separate-ot-capable-segments-from-ot-approval.md",
+                          "blob":  "2e70bdc3fe873caf08c85d4c33ff753c73463739",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0088-snapshot-group-members-when-approving-ot.md",
+                          "blob":  "1e8918a8766af61fc718797481061601b2ead5a0",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0089-configure-multi-step-ot-approval-workflows.md",
+                          "blob":  "2c142ca6afd700f8b41ef4c8e2c3fafec61b47c7",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0090-amend-or-cancel-approved-ot-without-rewriting-history.md",
+                          "blob":  "1c7b26ba6b7f91ec6bdff05487782d7755bc8643",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0091-route-late-time-corrections-through-elevated-approval.md",
+                          "blob":  "1712489cb92f91626eed9af6b0a2dc2730a76a49",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0092-prevent-overlapping-active-time-correction-requests.md",
+                          "blob":  "57dfa5251bef6304cfc7bddf6f1d76bc1241db71",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0093-correct-multiple-session-endpoints-atomically-per-work-date.md",
+                          "blob":  "5a2bf1f4e63e278e1484be2017ed2a6337b5abe5",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0094-limit-each-time-correction-request-to-one-work-date.md",
+                          "blob":  "c36aa3c842c3ac833f031e896d3c4b79dfab240a",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0095-keep-approved-time-correction-requests-immutable.md",
+                          "blob":  "226c4f30d58f9ee2adae0c4e931c6ff9f6502992",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0096-allow-approver-edits-with-complete-audit-logs.md",
+                          "blob":  "e94835d0070ed7ad0f06cca31ebf56cadd92ab05",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0097-notify-employees-of-approver-edited-corrections.md",
+                          "blob":  "5748d88a1381178d3c7444efc65119230e4b52e8",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0098-require-employee-reconfirmation-for-expanded-leave-edits.md",
+                          "blob":  "f2e4307b1ea8d53e46e942bcb0b77bbf27fb0bfc",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0099-atomically-replace-leave-reservations-after-approval-edits.md",
+                          "blob":  "87d1fabcbe8c14a4a148196286faa72514633453",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0100-expire-unconfirmed-leave-edits-and-release-reservations.md",
+                          "blob":  "e83c3980d0141b2e43eb26e55039030904f6e669",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0101-review-approved-leave-when-effective-schedules-change.md",
+                          "blob":  "52fa19f2017f4a10bc6e8ca03249f8ddd085c529",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0102-reconfirm-schedule-driven-leave-usage-increases.md",
+                          "blob":  "652774186aa63cbd31e9e122ed11b5902e6fdad9",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0103-do-not-auto-cancel-approved-leave-after-schedule-change.md",
+                          "blob":  "7e0fc36402a472d9288f451a47bdc0dbbc0b15d4",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0104-prepare-a-canonical-import-boundary-before-device-connectors.md",
+                          "blob":  "8a2dcbd3818e04d4721d20abbac280c2bf296097",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0105-represent-manual-time-entry-only-as-adjustments.md",
+                          "blob":  "c02e9f6651ce38d5359a67301416bc63677b469c",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0106-support-auditable-batch-time-adjustments.md",
+                          "blob":  "6ea13304832c76971eb39dfa9120f9ace60d2145",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0107-decide-batch-time-adjustments-per-employee.md",
+                          "blob":  "d4f347fafdecf890e42ddfd629cea7c142005a88",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0108-enforce-permission-and-employee-data-scope-together.md",
+                          "blob":  "bb0bbe7bba29e49182441bf9ed2fb2d2d6f47b07",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0109-configure-company-approval-control-profiles.md",
+                          "blob":  "e8f5bf99255800559e058759440ecc2806b55287",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0110-keep-owner-operated-direct-approvals-atomic-and-auditable.md",
+                          "blob":  "e2dd05c84c57637eac6e0d39cf6c0103d30650fb",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0111-separate-employee-request-policy-from-approval-control.md",
+                          "blob":  "e231e11d0dfc1a583a2ed80c518d8da78996568b",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0112-snapshot-effective-request-and-approval-policies.md",
+                          "blob":  "0ae1fd7ebb24e58291fa49f684205ed9e1fb1416",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0113-allow-audited-company-administrative-overrides.md",
+                          "blob":  "25c49fc27c5cb32629dade43702801a499b2cd3f",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/adr/0114-require-explicit-partner-time-administration-delegation.md",
+                          "blob":  "e41116f612b7cb28809ce9931022c982ccf966c9",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/architecture/MULTI_MACHINE_RUNBOOK.md",
+                          "blob":  "71c633079fae2ce710f0df2e0e6823b82184366a",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/architecture/TIME_APPROVAL_SELF_SERVICE_TECHNICAL_PLAN.md",
+                          "blob":  "48512de8b3026e091d45d9c59d294b2d48fbd857",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/specifications/LAOO_TIME_FUNCTIONAL_SPEC_AND_ROADMAP.docx",
+                          "blob":  "d34e7d0165585a0a77ee290ba5d989e40b4278fa",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/standards/ACTION_UI_STANDARD.md",
+                          "blob":  "5fcdc1c0ac8c46cd93a0c247e73d16ecb98cbd2c",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/standards/LIST_CARD_UI_STANDARD.md",
+                          "blob":  "d527f79c91ba5bb3b95458666b40b653c118db17",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/standards/POPUP_UI_STANDARD.md",
+                          "blob":  "815871827fc329be256a844ddec488d724b3aa02",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/ItemController.cs",
+                          "blob":  "778b685605f9c55a04fe9f49ac27953c181683c3",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "laoo_api/Models/ItemModels.cs",
+                          "blob":  "457ce03960fbc5a639bf95f6e655cc74ecb3a99b",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "laoo_api/Program.cs",
+                          "blob":  "84e45520e50645fc220ee998ca742c1b1d79c543",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "laoo_api/laoo_api.csproj",
+                          "blob":  "e107f5dd43112b0dafffea45ff8f3c6e05d2c612",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/app/router/app_menu_route_registry.dart",
+                          "blob":  "19176121a70b73e8d355b6259a932273190b8393",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/app/router/app_router.dart",
+                          "blob":  "8eebe1ae7061926a4c1671dfd114a63301256d8a",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/app/router/route_names.dart",
+                          "blob":  "24f237d512638828ea937448b3e6db98935bfd97",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/app/router/route_paths.dart",
+                          "blob":  "76b4486104ce4d362ae795630973ddff44c02f39",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/core/widgets/pinned_data_table.dart",
+                          "blob":  "ce6dae199688acf1f5ff769069f15afc7861317c",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/features/company/item/pages/item_form_layout.dart",
+                          "blob":  "9f9ac61c0d92494a33efea2cf2392985153b2c0c",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/features/company/item/pages/item_page.dart",
+                          "blob":  "7009b9499ef1b47563d88b6de2cf9055a1c94c22",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/features/company/vendor/pages/vendor_page.dart",
+                          "blob":  "7b9f9359ade8c51bb49394d364bc05fdf840c4e4",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/main.dart",
+                          "blob":  "1fb538b41fcae89cce2223b4c35e1acc3d2a11e7",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/meeting/lib/features/meeting/pages/meeting_building_page.dart",
+                          "blob":  "34650c88145acae1aa9d83e2f91f56634ba9d1c4",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/meeting/lib/features/meeting/pages/meeting_room_page.dart",
+                          "blob":  "2faab2da49641ddb17925fa4e036fea10b90846f",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/service/lib/features/company/item/pages/item_page.dart",
+                          "blob":  "ff126d1f154b60132c5020b98563d0595f298e9b",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/service/lib/features/inventory/data/inventory_api.dart",
+                          "blob":  "cd6d3933db24fb96eb23957b95bdcd5326338705",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/service/lib/features/inventory/pages/inventory_pages.dart",
+                          "blob":  "e9bcc270e39c98026856403ae2a188e4d0eede64",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/service/lib/features/inventory/pages/stock_receipt_page.dart",
+                          "blob":  "9fefcaaefa8754315daa8b2182a6e9f6988d034a",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/service/lib/features/service/service_route_contract.dart",
+                          "blob":  "9dffb3a6f35e7b0b253deb66834ff9cbfc3b7639",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/service/packages/dotnet/Laoo.Service.Module/Controllers/DeliveryNoteController.cs",
+                          "blob":  "1955f71cb6f1096dc882bf653574c20002419198",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/service/packages/dotnet/Laoo.Service.Module/Controllers/ItemInstanceController.cs",
+                          "blob":  "843bffb52c3f94b4b07706cb1a03ebd5f6542f2b",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/service/packages/dotnet/Laoo.Service.Module/Controllers/StockReceiptController.Save.cs",
+                          "blob":  "cfa2c763cfe4c7ab6446b3cf36d637d34e232688",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/service/packages/dotnet/Laoo.Service.Module/Controllers/StockReceiptController.cs",
+                          "blob":  "dee72aa9e8b82e5413814d0cb057faedcd798d83",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/service/packages/dotnet/Laoo.Service.Module/Models/InventoryModels.cs",
+                          "blob":  "9eada95cc168bf6cfd688d92149b6dec2fa67bc8",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/time/.gitignore",
+                          "blob":  "324678db896b6c1a2c89cb3bc55af70b1aba546f",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/time/database/migrations/20260911180000_LAOO_TIME_bootstrap.sql",
+                          "blob":  "2814f346d76199d9ad371d10f97eec503b862c0c",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/time/database/migrations/20260911190000_LAOO_TIME_foundation.sql",
+                          "blob":  "70b272600c6f0d71f5b5c59e596e301469a0ce52",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/time/database/migrations/20260911191000_LAOO_TIME_foundation_invariants.sql",
+                          "blob":  "e1c17f250ea8a8962b61e3781319d713c0dcfe0d",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/time/lib/core/config/app_config.dart",
+                          "blob":  "0aad53d2649cb1f3fc0d5d3f8f0e9bb7e0705ed0",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/time/lib/features/time/time_feature_host.dart",
+                          "blob":  "b8c6ef717dad8add60d6af8e780c8ff5452fe085",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/time/lib/features/time/time_go_routes.dart",
+                          "blob":  "848db365a4136a9033e4ec2bd69d49c07fae395b",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/time/lib/features/time/time_route_contract.dart",
+                          "blob":  "fc9c52da72f37ff31019a6cb6b699379ed711974",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/time/lib/time_feature.dart",
+                          "blob":  "257c18b45f6b42f8538f497b20691d35cc236aaa",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/time/packages/dotnet/Laoo.Time.Module/Controllers/TimeStatusController.cs",
+                          "blob":  "0b2e2ce1ded3d23b59ad5c45446a3c6e364a4444",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/time/packages/dotnet/Laoo.Time.Module/Laoo.Time.Module.csproj",
+                          "blob":  "e4a03bca3adb98f029a844d8957d42c2940bdd7e",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/time/packages/dotnet/Laoo.Time.Module/TimeModuleMarker.cs",
+                          "blob":  "f33de9e923430543e361c4f22acc9c346fb6f187",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/time/pubspec.lock",
+                          "blob":  "952c5632feb66c46357b842edd1172e8d5282384",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/time/pubspec.yaml",
+                          "blob":  "b48ed1c6be20e85756a4d9dee13f924f5a5d4ae2",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/time/test/time_feature_test.dart",
+                          "blob":  "a13811d0611c2a8cb6b1b78a55040333b014ace8",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "pubspec.lock",
+                          "blob":  "17cbabe4f7b76c8342e91fb162480181d2db19e5",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "pubspec.yaml",
+                          "blob":  "68cf2534c283d7224a7ed49dae66967389219f58",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "test/app/router/business_module_contract_test.dart",
+                          "blob":  "59879d4283be8a1ad924afc6980b05c48bfc6d4d",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "test/features/company/stock_receipt_test.dart",
+                          "blob":  "d9763c38571d72df4fe7da32869eccf6469b73d2",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "test/features/company/vendor/vendor_test.dart",
+                          "blob":  "0b11c55eeab843458346096621c1e09553c12fd4",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "test/workspace_action_header_test.dart",
+                          "blob":  "2c4245439f072d2d0fecf8022f1002423a7db2f9",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "tools/migrations/Laoo.MigrationRunner/Program.cs",
+                          "blob":  "9e67c5dd91ffd049c51366b40f2136e4d28394f1",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "tools/scripts/run-migrations.ps1",
+                          "blob":  "5d76ac22ea0617a2e7cc7a83959883dc171ba87c",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "tools/scripts/verify-center.ps1",
+                          "blob":  "ca24a1cd716805617c66fea2e8ffab6e15e9dfc1",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "AGENTS.md",
+                          "blob":  "7868210c2d012bde1d80be40374b880c10453db7",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "CONTEXT.md",
+                          "blob":  "e796d929c927c2c35af0a2568756b26eb6f8a9fd",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "database/migrations/README.md",
+                          "blob":  "315eb19b2921a4f5f6810e84d0f3b43bdd409188",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0005-time-management-business-project.md",
+                          "blob":  "8baeb6f46a7160505790ca16543c60af5ce4fdb3",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0006-preserve-original-attendance-events.md",
+                          "blob":  "722a5be95874dd048529fe125503fa684cffd0f3",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0007-anchor-overnight-shifts-to-start-date.md",
+                          "blob":  "94df6242a221eeac6ac2108addcb8a116012b54e",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0008-model-shifts-as-ordered-segments.md",
+                          "blob":  "62335abd181110715c0ee166538a916b9437d953",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0009-deduct-overlapping-scheduled-breaks.md",
+                          "blob":  "ad0a214bb18b69ab637da157f5f6988db6ad88fe",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0010-calculate-completed-minutes-from-elapsed-time.md",
+                          "blob":  "e4489e25c4dc94db4eea8fe25392b8bc5f050768",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0011-separate-attendance-tolerance-from-time-facts.md",
+                          "blob":  "d5cf82ecb23d125ac798cf81f3aad14d607318f7",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0012-effective-date-attendance-requirements.md",
+                          "blob":  "a633e498630421bab9534baf5cfccf4d24b17f26",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0013-separate-schedule-groups-leave-policies-and-permissions.md",
+                          "blob":  "19c5c53d70b5331e9a2577889906906b97e962e6",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0014-use-anchor-based-repeating-shift-rotations.md",
+                          "blob":  "a6266f3bfcd837509fad59a9028c15bd8d8bb3ca",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0015-employee-schedule-overrides-win-over-group-rotations.md",
+                          "blob":  "3cb2c618e30fa8bd95282dfcc037a4e8c91ba513",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0016-support-scheduled-day-and-minute-leave-units.md",
+                          "blob":  "9746f597f94d17823e217bd2c2a9e68a4f1af9f7",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0017-adjust-leave-entitlements-with-auditable-entries.md",
+                          "blob":  "b06aa4cb4993e47f8e959d67bf81d4045ea4156e",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0018-reserve-leave-while-requests-await-approval.md",
+                          "blob":  "a175c00cbd201d81ecdcdc0a41c2b199a43019b6",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0019-configurable-multi-step-leave-approval.md",
+                          "blob":  "ea0579a5276e91cb035736b59d6fe9f14d7a755d",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0020-require-authorization-and-attendance-for-overtime.md",
+                          "blob":  "af7de2ce100fa4a78f238825e7bb7910b9641d8c",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0021-block-double-counting-of-work-and-leave.md",
+                          "blob":  "a4e9a0db9e877358fe48456c92a8efd8411f8085",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0022-derive-absence-from-uncovered-scheduled-time.md",
+                          "blob":  "6a9dca67eedab9f279220bf00f7f6df75e344fcf",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0023-classify-and-select-events-with-schedule-windows.md",
+                          "blob":  "f29659074c9c4dc384971397ffbdb47d28f897b9",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0024-anchor-classification-windows-with-work-date-offsets.md",
+                          "blob":  "0532a136572c13c0fedb7c84f77ea994a5af67f2",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0025-do-not-infer-events-outside-classification-windows.md",
+                          "blob":  "7906d003a54b8f9b0b63f72d19d0d8fede5e3e68",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0026-treat-missing-schedules-as-configuration-gaps.md",
+                          "blob":  "48fa9283bc4d37b28a22ea9c05c4625953580880",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0027-layer-company-and-branch-holiday-calendars.md",
+                          "blob":  "fe5fc76be711747e0a9d8832814eb3a271487901",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0028-own-effective-dated-employee-organization-history-in-core.md",
+                          "blob":  "20b59e055382fd4f841be6530862b7c6e0ebbf9c",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0029-interpret-schedules-in-effective-branch-time-zones.md",
+                          "blob":  "c7170b78359ef912a9157721d92183ae9ebbba01",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0030-version-results-when-finalized-attendance-periods-change.md",
+                          "blob":  "afa6d4c338540a26e56bfe01f99ecaabb9a6b273",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0031-skip-identical-replayed-attendance-events.md",
+                          "blob":  "4d7d10f10f7ac637d7c6bb5b6c31ccddf32abcb8",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0032-use-one-company-unique-attendance-code-per-employee.md",
+                          "blob":  "d498f60f411d519b3511d5ea51932d575b6b358a",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0033-self-service-is-read-only-with-correction-requests.md",
+                          "blob":  "a00170cc86ddd35a2d8994cf08dabc7fe34c459a",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0034-manage-time-adjustment-reasons-as-company-master-data.md",
+                          "blob":  "4480f851fa2cdf9a45140e3a34e40c601039e0e7",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0035-configure-and-audit-leave-carryover-per-company.md",
+                          "blob":  "e2f2018587cda4f1cc038feed4d1c41ecfd87d51",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0036-record-leave-over-balance-as-explained-absence.md",
+                          "blob":  "d15955e22e9109dfc0c7fea63e47d59229d2f91d",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0037-classify-overtime-by-day-without-calculating-pay.md",
+                          "blob":  "261f4ef3a8ad93e5e7e5757cdc17327c86cb9d53",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0038-report-home-and-work-branches-separately.md",
+                          "blob":  "40db95b87cbff7fa034672f272e8d5209491997a",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0039-version-effective-time-and-leave-policies.md",
+                          "blob":  "b7d20e7fbfcbbba7d9c3faae6d6dd97101ecf7ce",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0040-preserve-minute-basis-for-fractional-leave-days.md",
+                          "blob":  "cbce1de416e47480c6eea3e70e4baf7c80d0c639",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0041-cancel-approved-leave-with-auditable-requests.md",
+                          "blob":  "351939c201edad770318c0ef71997f2c25c4cbc6",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0042-do-not-fabricate-missing-attendance-events.md",
+                          "blob":  "3205bd7a686300a7f774bc670a50f598e3f56716",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0043-calculate-segments-independently-but-resolve-the-whole-work-date.md",
+                          "blob":  "da8d4d4c38ffa919f259c2a0234d5a12f95e7e4c",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0044-classify-attendance-direction-only-with-system-windows.md",
+                          "blob":  "fcabdafa7d147c6d89be3647da1bffdd144ad075",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0045-calculate-segments-from-attendance-sessions.md",
+                          "blob":  "b81057b31ba0845312490f23f3cd146ed0f8dc2f",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0046-use-scheduled-breaks-as-the-initial-authority.md",
+                          "blob":  "e2f24df67fa08a02d31f7a2199fb2d5f895a8893",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0047-support-multiple-ordered-attendance-session-rules.md",
+                          "blob":  "0e5fc3401e57d56b88642ed89e116160d4fd1396",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0048-allow-one-effective-schedule-group-per-employee-and-day.md",
+                          "blob":  "a41c02fd585b97a765572dd097903c304f8c0cf5",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0049-exempt-employees-from-attendance-compliance-not-records.md",
+                          "blob":  "a1b0c8ddb782134f6587fb4adb7b75a0910eb2ed",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0050-require-evidence-for-ot-even-when-attendance-is-exempt.md",
+                          "blob":  "ee41b5ea676671ff7fa78ea5a03e3d8cb8be0732",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0051-quarantine-unmatched-attendance-imports.md",
+                          "blob":  "5335187f2c60b8c1aad50c9909feb4731a1182a1",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0052-resolve-device-codes-by-event-time.md",
+                          "blob":  "f3b677bf6b0b3bc6ea5e6f3863fdb212c9549b5a",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0053-allow-non-overlapping-device-code-reuse.md",
+                          "blob":  "ec45df5575c69bb07e2abbc8bf0487c88aae51fb",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0054-supersede-approved-time-adjustments.md",
+                          "blob":  "fb2a7856b90a96e01cc7276ba5b7fe165dca896d",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0055-configure-approval-workflows-for-time-adjustments.md",
+                          "blob":  "dc6a65c2188978ef7dde334a76dd3e01a6788b38",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0056-evaluate-late-and-early-status-per-session-rule.md",
+                          "blob":  "1138b3d114ec39f63d596a73e35ad8d551b8113c",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0057-layer-company-and-session-attendance-tolerances.md",
+                          "blob":  "0ab46a32d3b351bd4273e36b1aa63cd92a5f5dfb",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0058-aggregate-seconds-before-truncating-each-segment.md",
+                          "blob":  "2c02e751b87300f65f79831f1f513125180bf51b",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0059-deduplicate-overlapping-session-time-and-block-finalization.md",
+                          "blob":  "380c53799298b889a23da47b627678b44e9d60b7",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0060-preserve-source-utc-and-received-event-times.md",
+                          "blob":  "80b23482a47b97f7366dd909660fd963a2fed84c",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0061-quarantine-suspicious-events-from-calculation.md",
+                          "blob":  "bcc257d1a06ccc7d9c3090cc5db708ad6823fd66",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0062-use-thailand-time-for-all-attendance-processing.md",
+                          "blob":  "dfc8676a051cd77ddc4f5a4e7585d99f2702e1a3",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0063-distinguish-provisional-and-final-attendance-reports.md",
+                          "blob":  "42f990a4aa7219f84d87c88c283916abf96cc6c8",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0064-version-final-reports-after-period-reopening.md",
+                          "blob":  "0849891545f125b3a10169daf5ca3fa65e686d0c",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0065-support-multiple-attendance-period-schemes-per-company.md",
+                          "blob":  "82b5288e356137bc33ff2c6549591630098de1cb",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0066-require-contiguous-periods-within-each-scheme.md",
+                          "blob":  "a31c40274fae42e8d7fb89aed979ec6f5316c826",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0067-assign-period-schemes-effectively-by-work-date.md",
+                          "blob":  "a4fd2f8e0546ae9cd26882fd1f5b24902e130482",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0068-finalize-periods-per-company-and-scheme-with-branch-reviews.md",
+                          "blob":  "177e16cc65b02e5f08a1e6a2d89b82458476d122",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0069-assign-period-review-ownership-by-effective-home-branch.md",
+                          "blob":  "66ac7a098c8b0778f4ae080d8062ebed01a7b380",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0070-support-four-attendance-period-generation-patterns.md",
+                          "blob":  "20da2a44ea47b895a7ce4c169a7aa51efa4ec8c8",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0071-version-attendance-period-scheme-changes.md",
+                          "blob":  "993e33028abad0ee4fa7394c0a5f76649d0b905a",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0072-bridge-period-scheme-changes-with-transition-periods.md",
+                          "blob":  "b1fcab136f334822c96d8e77242d3bed48306335",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0073-use-effective-membership-within-shared-periods.md",
+                          "blob":  "fa630f1725912d74fe39d1a77d778d86dff8bcce",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0074-block-period-finalization-while-results-are-unresolved.md",
+                          "blob":  "bd62667e27a2190e1ef5bd0a4e9a6e2abad13d8a",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0075-invalidate-only-affected-branch-reviews-after-changes.md",
+                          "blob":  "f790b3f1f2d62957e630f33fc6b2e397cc994c4f",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0076-block-finalization-for-missing-period-assignments.md",
+                          "blob":  "f49de7f9ecc418bd2a2b7c30d7edfb21f3b17ce3",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0077-do-not-retroactively-apply-default-period-scheme-changes.md",
+                          "blob":  "88b58b88b334c9eaff7b755b77c4bb69f0d13025",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0078-apply-bulk-period-reassignments-atomically.md",
+                          "blob":  "59a559cf0a9972ca9deff0d45e5f509fb4147c11",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0079-notify-period-deadlines-without-auto-finalization.md",
+                          "blob":  "72c80f8b81ccadc0e66e5076ba9d46bb89343e75",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0080-require-all-periods-finalized-for-consolidated-official-reports.md",
+                          "blob":  "0c654149ff5ecd209c5654288f707d58e4672f07",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0081-validate-and-activate-rotations-without-publishing.md",
+                          "blob":  "44ed714340150089543ead31e5d9fa93a63ad729",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0082-version-effective-rotations-instead-of-rewriting-history.md",
+                          "blob":  "7f3ac39b7e67691f91a2b06946c7e3a51076cd7f",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0083-join-employees-at-the-groups-current-rotation-position.md",
+                          "blob":  "b7a1d172ad3beb388c47ecfb1a69b17565f99be0",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0084-place-rotation-anchor-dates-on-group-assignments.md",
+                          "blob":  "50a36be99c476a6574ba389b13c6757dc3156060",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0085-distinguish-required-and-optional-attendance-sessions.md",
+                          "blob":  "ed8729e105dac7e6506d42c8ed9cec0f7dda43ce",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0086-track-but-do-not-count-unapproved-extra-work.md",
+                          "blob":  "1706e97b5afffb8d519dff7a299bc2694ed9f479",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0087-separate-ot-capable-segments-from-ot-approval.md",
+                          "blob":  "2e70bdc3fe873caf08c85d4c33ff753c73463739",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0088-snapshot-group-members-when-approving-ot.md",
+                          "blob":  "1e8918a8766af61fc718797481061601b2ead5a0",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0089-configure-multi-step-ot-approval-workflows.md",
+                          "blob":  "2c142ca6afd700f8b41ef4c8e2c3fafec61b47c7",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0090-amend-or-cancel-approved-ot-without-rewriting-history.md",
+                          "blob":  "1c7b26ba6b7f91ec6bdff05487782d7755bc8643",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0091-route-late-time-corrections-through-elevated-approval.md",
+                          "blob":  "1712489cb92f91626eed9af6b0a2dc2730a76a49",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0092-prevent-overlapping-active-time-correction-requests.md",
+                          "blob":  "57dfa5251bef6304cfc7bddf6f1d76bc1241db71",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0093-correct-multiple-session-endpoints-atomically-per-work-date.md",
+                          "blob":  "5a2bf1f4e63e278e1484be2017ed2a6337b5abe5",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0094-limit-each-time-correction-request-to-one-work-date.md",
+                          "blob":  "c36aa3c842c3ac833f031e896d3c4b79dfab240a",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0095-keep-approved-time-correction-requests-immutable.md",
+                          "blob":  "226c4f30d58f9ee2adae0c4e931c6ff9f6502992",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0096-allow-approver-edits-with-complete-audit-logs.md",
+                          "blob":  "e94835d0070ed7ad0f06cca31ebf56cadd92ab05",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0097-notify-employees-of-approver-edited-corrections.md",
+                          "blob":  "5748d88a1381178d3c7444efc65119230e4b52e8",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0098-require-employee-reconfirmation-for-expanded-leave-edits.md",
+                          "blob":  "f2e4307b1ea8d53e46e942bcb0b77bbf27fb0bfc",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0099-atomically-replace-leave-reservations-after-approval-edits.md",
+                          "blob":  "87d1fabcbe8c14a4a148196286faa72514633453",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0100-expire-unconfirmed-leave-edits-and-release-reservations.md",
+                          "blob":  "e83c3980d0141b2e43eb26e55039030904f6e669",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0101-review-approved-leave-when-effective-schedules-change.md",
+                          "blob":  "52fa19f2017f4a10bc6e8ca03249f8ddd085c529",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0102-reconfirm-schedule-driven-leave-usage-increases.md",
+                          "blob":  "652774186aa63cbd31e9e122ed11b5902e6fdad9",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0103-do-not-auto-cancel-approved-leave-after-schedule-change.md",
+                          "blob":  "7e0fc36402a472d9288f451a47bdc0dbbc0b15d4",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0104-prepare-a-canonical-import-boundary-before-device-connectors.md",
+                          "blob":  "8a2dcbd3818e04d4721d20abbac280c2bf296097",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0105-represent-manual-time-entry-only-as-adjustments.md",
+                          "blob":  "c02e9f6651ce38d5359a67301416bc63677b469c",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0106-support-auditable-batch-time-adjustments.md",
+                          "blob":  "6ea13304832c76971eb39dfa9120f9ace60d2145",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0107-decide-batch-time-adjustments-per-employee.md",
+                          "blob":  "d4f347fafdecf890e42ddfd629cea7c142005a88",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0108-enforce-permission-and-employee-data-scope-together.md",
+                          "blob":  "bb0bbe7bba29e49182441bf9ed2fb2d2d6f47b07",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0109-configure-company-approval-control-profiles.md",
+                          "blob":  "e8f5bf99255800559e058759440ecc2806b55287",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0110-keep-owner-operated-direct-approvals-atomic-and-auditable.md",
+                          "blob":  "e2dd05c84c57637eac6e0d39cf6c0103d30650fb",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0111-separate-employee-request-policy-from-approval-control.md",
+                          "blob":  "e231e11d0dfc1a583a2ed80c518d8da78996568b",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0112-snapshot-effective-request-and-approval-policies.md",
+                          "blob":  "0ae1fd7ebb24e58291fa49f684205ed9e1fb1416",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0113-allow-audited-company-administrative-overrides.md",
+                          "blob":  "25c49fc27c5cb32629dade43702801a499b2cd3f",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/adr/0114-require-explicit-partner-time-administration-delegation.md",
+                          "blob":  "e41116f612b7cb28809ce9931022c982ccf966c9",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/architecture/MULTI_MACHINE_RUNBOOK.md",
+                          "blob":  "71c633079fae2ce710f0df2e0e6823b82184366a",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/architecture/TIME_APPROVAL_SELF_SERVICE_TECHNICAL_PLAN.md",
+                          "blob":  "48512de8b3026e091d45d9c59d294b2d48fbd857",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "docs/specifications/LAOO_TIME_FUNCTIONAL_SPEC_AND_ROADMAP.docx",
+                          "blob":  "d34e7d0165585a0a77ee290ba5d989e40b4278fa",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "laoo_api/Program.cs",
+                          "blob":  "84e45520e50645fc220ee998ca742c1b1d79c543",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "laoo_api/laoo_api.csproj",
+                          "blob":  "e107f5dd43112b0dafffea45ff8f3c6e05d2c612",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "lib/app/router/app_menu_route_registry.dart",
+                          "blob":  "29f90f1a45964bc7b6d8944631ba3e4dd54204a0",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "lib/app/router/app_router.dart",
+                          "blob":  "303d891352dd7ac474201aa832bcdc509714193a",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "lib/main.dart",
+                          "blob":  "1fb538b41fcae89cce2223b4c35e1acc3d2a11e7",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "projects/time/.gitignore",
+                          "blob":  "324678db896b6c1a2c89cb3bc55af70b1aba546f",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "projects/time/database/migrations/20260911180000_LAOO_TIME_bootstrap.sql",
+                          "blob":  "2814f346d76199d9ad371d10f97eec503b862c0c",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "projects/time/database/migrations/20260911190000_LAOO_TIME_foundation.sql",
+                          "blob":  "70b272600c6f0d71f5b5c59e596e301469a0ce52",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "projects/time/database/migrations/20260911191000_LAOO_TIME_foundation_invariants.sql",
+                          "blob":  "e1c17f250ea8a8962b61e3781319d713c0dcfe0d",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "projects/time/lib/core/config/app_config.dart",
+                          "blob":  "0aad53d2649cb1f3fc0d5d3f8f0e9bb7e0705ed0",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "projects/time/lib/features/time/time_feature_host.dart",
+                          "blob":  "b8c6ef717dad8add60d6af8e780c8ff5452fe085",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "projects/time/lib/features/time/time_go_routes.dart",
+                          "blob":  "848db365a4136a9033e4ec2bd69d49c07fae395b",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "projects/time/lib/features/time/time_route_contract.dart",
+                          "blob":  "fc9c52da72f37ff31019a6cb6b699379ed711974",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "projects/time/lib/time_feature.dart",
+                          "blob":  "257c18b45f6b42f8538f497b20691d35cc236aaa",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "projects/time/packages/dotnet/Laoo.Time.Module/Controllers/TimeStatusController.cs",
+                          "blob":  "0b2e2ce1ded3d23b59ad5c45446a3c6e364a4444",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "projects/time/packages/dotnet/Laoo.Time.Module/Laoo.Time.Module.csproj",
+                          "blob":  "e4a03bca3adb98f029a844d8957d42c2940bdd7e",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "projects/time/packages/dotnet/Laoo.Time.Module/TimeModuleMarker.cs",
+                          "blob":  "f33de9e923430543e361c4f22acc9c346fb6f187",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "projects/time/pubspec.lock",
+                          "blob":  "952c5632feb66c46357b842edd1172e8d5282384",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "projects/time/pubspec.yaml",
+                          "blob":  "b48ed1c6be20e85756a4d9dee13f924f5a5d4ae2",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "projects/time/test/time_feature_test.dart",
+                          "blob":  "a13811d0611c2a8cb6b1b78a55040333b014ace8",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "pubspec.lock",
+                          "blob":  "17cbabe4f7b76c8342e91fb162480181d2db19e5",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "pubspec.yaml",
+                          "blob":  "68cf2534c283d7224a7ed49dae66967389219f58",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "test/app/router/business_module_contract_test.dart",
+                          "blob":  "3df9a046f5c9b83df0e314bac0575ff963e8cef7",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "test/workspace_action_header_test.dart",
+                          "blob":  "2c4245439f072d2d0fecf8022f1002423a7db2f9",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "tools/migrations/Laoo.MigrationRunner/Program.cs",
+                          "blob":  "9e67c5dd91ffd049c51366b40f2136e4d28394f1",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "tools/scripts/run-migrations.ps1",
+                          "blob":  "5d76ac22ea0617a2e7cc7a83959883dc171ba87c",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "tools/scripts/verify-center.ps1",
+                          "blob":  "ca24a1cd716805617c66fea2e8ffab6e15e9dfc1",
+                          "status":  "saved",
+                          "role":  "index"
+                      },
+                      {
+                          "path":  "database/migrations/20260911143000_LAOO_serial_registry_core.sql",
+                          "blob":  "7afdde54b40ad3c15563297be2cd082f4944f77d",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "database/migrations/20260911170000_LAOO_item_serial_warranty.sql",
+                          "blob":  "3475cab01b3511718406fa787bca32846118722e",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "database/migrations/20260911173000_LAOO_item_serial_warranty_history.sql",
+                          "blob":  "aeac8d74bd2fe2065d6ee1e2aea881d4b5ab2c6b",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "database/migrations/20260911183000_LAOO_stock_receipt_pack_unit.sql",
+                          "blob":  "ca17c0987abdbd95b76b6774bf21cf0eae0a16d3",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "database/migrations/20260911200000_LAOO_person_resident_menus.sql",
+                          "blob":  "34dde17edfc98887ecda4d8df88b29031dc847aa",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/ItemController.Warranty.cs",
+                          "blob":  "825d91b03bc3b4097f4cbc0cf7fb63623264b5e4",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/PeopleRegistryController.cs",
+                          "blob":  "4ba38487aa1f6021b3428ebc795450488b22ffb6",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "lib/features/company/person/data/person_registry_api.dart",
+                          "blob":  "0774374109e4c713110aa10b38437738ac381348",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "lib/features/company/person/pages/person_registry_page.dart",
+                          "blob":  "07108b3cdaa82cba4c31530a82b80a3df25b0c59",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "lib/features/company/resident/data/resident_registry_api.dart",
+                          "blob":  "060abe78c6274af34e660ae13158a9a16313ac2f",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "lib/features/company/resident/pages/resident_registry_page.dart",
+                          "blob":  "6768fd09ef3ad88e0fb906feb071f73ae7058ae5",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "lib/features/company/shared/registry_ui.dart",
+                          "blob":  "3ade250796d31565a16d77c533cbbc9ce5960866",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "projects/service/packages/dotnet/Laoo.Service.Module/Infrastructure/ItemWarrantyService.cs",
+                          "blob":  "01befd92398a40fe2c1e1818a592cf5189d6baf8",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "tatus --shortgit status --short",
+                          "blob":  "756c2fccacb679d354e1acd401dbb539483db286",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "test/features/company/person_resident_registry_test.dart",
+                          "blob":  "80a66268489f7bc080cdb4552bbcd077ee1128cd",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      }
+                  ],
+        "message":  "On main: codex/pre-main-update-during-time-merge-20260911",
+        "baseCommit":  "bf9cd429a38079029f2db2b0ed5c019b3a97a705",
+        "stash":  "12233e6c8aa4e9995fe5dc8cb678626eb19518d5",
+        "repository":  "C:/laooplatform/laoo"
+    },
+    {
+        "files":  [
+                      {
+                          "path":  "CONTEXT.md",
+                          "blob":  "76527abb48ccca268dfe505518e627f0906facaa",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/standards/ACTION_UI_STANDARD.md",
+                          "blob":  "5fcdc1c0ac8c46cd93a0c247e73d16ecb98cbd2c",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/standards/LIST_CARD_UI_STANDARD.md",
+                          "blob":  "d527f79c91ba5bb3b95458666b40b653c118db17",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/standards/POPUP_UI_STANDARD.md",
+                          "blob":  "815871827fc329be256a844ddec488d724b3aa02",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/ItemController.cs",
+                          "blob":  "778b685605f9c55a04fe9f49ac27953c181683c3",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "laoo_api/Models/ItemModels.cs",
+                          "blob":  "457ce03960fbc5a639bf95f6e655cc74ecb3a99b",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/app/router/app_menu_route_registry.dart",
+                          "blob":  "2ef8667a90c4f32e498f05a2a1c3fb6b74a7bb62",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/app/router/app_router.dart",
+                          "blob":  "cb0ae1e8b077bf052b5c5d2d5abbb1306bf110b2",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/app/router/route_names.dart",
+                          "blob":  "24f237d512638828ea937448b3e6db98935bfd97",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/app/router/route_paths.dart",
+                          "blob":  "76b4486104ce4d362ae795630973ddff44c02f39",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/core/widgets/pinned_data_table.dart",
+                          "blob":  "ce6dae199688acf1f5ff769069f15afc7861317c",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/features/company/item/pages/item_form_layout.dart",
+                          "blob":  "9f9ac61c0d92494a33efea2cf2392985153b2c0c",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/features/company/item/pages/item_page.dart",
+                          "blob":  "7009b9499ef1b47563d88b6de2cf9055a1c94c22",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/features/company/vendor/pages/vendor_page.dart",
+                          "blob":  "7b9f9359ade8c51bb49394d364bc05fdf840c4e4",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/meeting/lib/features/meeting/pages/meeting_building_page.dart",
+                          "blob":  "34650c88145acae1aa9d83e2f91f56634ba9d1c4",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/meeting/lib/features/meeting/pages/meeting_room_page.dart",
+                          "blob":  "2faab2da49641ddb17925fa4e036fea10b90846f",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/service/lib/features/company/item/pages/item_page.dart",
+                          "blob":  "ff126d1f154b60132c5020b98563d0595f298e9b",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/service/lib/features/inventory/data/inventory_api.dart",
+                          "blob":  "cd6d3933db24fb96eb23957b95bdcd5326338705",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/service/lib/features/inventory/pages/inventory_pages.dart",
+                          "blob":  "e9bcc270e39c98026856403ae2a188e4d0eede64",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/service/lib/features/inventory/pages/stock_receipt_page.dart",
+                          "blob":  "9fefcaaefa8754315daa8b2182a6e9f6988d034a",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/service/lib/features/service/service_route_contract.dart",
+                          "blob":  "9dffb3a6f35e7b0b253deb66834ff9cbfc3b7639",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/service/packages/dotnet/Laoo.Service.Module/Controllers/DeliveryNoteController.cs",
+                          "blob":  "1955f71cb6f1096dc882bf653574c20002419198",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/service/packages/dotnet/Laoo.Service.Module/Controllers/ItemInstanceController.cs",
+                          "blob":  "843bffb52c3f94b4b07706cb1a03ebd5f6542f2b",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/service/packages/dotnet/Laoo.Service.Module/Controllers/StockReceiptController.Save.cs",
+                          "blob":  "cfa2c763cfe4c7ab6446b3cf36d637d34e232688",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/service/packages/dotnet/Laoo.Service.Module/Controllers/StockReceiptController.cs",
+                          "blob":  "dee72aa9e8b82e5413814d0cb057faedcd798d83",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/service/packages/dotnet/Laoo.Service.Module/Models/InventoryModels.cs",
+                          "blob":  "9eada95cc168bf6cfd688d92149b6dec2fa67bc8",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "test/app/router/business_module_contract_test.dart",
+                          "blob":  "5e92fbe07b8a0004852bd55be539bb298f2edccf",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "test/features/company/stock_receipt_test.dart",
+                          "blob":  "d9763c38571d72df4fe7da32869eccf6469b73d2",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "test/features/company/vendor/vendor_test.dart",
+                          "blob":  "0b11c55eeab843458346096621c1e09553c12fd4",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "database/migrations/20260911143000_LAOO_serial_registry_core.sql",
+                          "blob":  "7afdde54b40ad3c15563297be2cd082f4944f77d",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "database/migrations/20260911170000_LAOO_item_serial_warranty.sql",
+                          "blob":  "3475cab01b3511718406fa787bca32846118722e",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "database/migrations/20260911173000_LAOO_item_serial_warranty_history.sql",
+                          "blob":  "aeac8d74bd2fe2065d6ee1e2aea881d4b5ab2c6b",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "database/migrations/20260911183000_LAOO_stock_receipt_pack_unit.sql",
+                          "blob":  "ca17c0987abdbd95b76b6774bf21cf0eae0a16d3",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "database/migrations/20260911200000_LAOO_person_resident_menus.sql",
+                          "blob":  "34dde17edfc98887ecda4d8df88b29031dc847aa",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/ItemController.Warranty.cs",
+                          "blob":  "825d91b03bc3b4097f4cbc0cf7fb63623264b5e4",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/PeopleRegistryController.cs",
+                          "blob":  "4ba38487aa1f6021b3428ebc795450488b22ffb6",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "lib/features/company/person/data/person_registry_api.dart",
+                          "blob":  "0774374109e4c713110aa10b38437738ac381348",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "lib/features/company/person/pages/person_registry_page.dart",
+                          "blob":  "07108b3cdaa82cba4c31530a82b80a3df25b0c59",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "lib/features/company/resident/data/resident_registry_api.dart",
+                          "blob":  "060abe78c6274af34e660ae13158a9a16313ac2f",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "lib/features/company/resident/pages/resident_registry_page.dart",
+                          "blob":  "6768fd09ef3ad88e0fb906feb071f73ae7058ae5",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "lib/features/company/shared/registry_ui.dart",
+                          "blob":  "3ade250796d31565a16d77c533cbbc9ce5960866",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "projects/service/packages/dotnet/Laoo.Service.Module/Infrastructure/ItemWarrantyService.cs",
+                          "blob":  "01befd92398a40fe2c1e1818a592cf5189d6baf8",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "tatus --shortgit status --short",
+                          "blob":  "756c2fccacb679d354e1acd401dbb539483db286",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "test/features/company/person_resident_registry_test.dart",
+                          "blob":  "80a66268489f7bc080cdb4552bbcd077ee1128cd",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      }
+                  ],
+        "message":  "On main: codex/pre-time-integration-20260911",
+        "baseCommit":  "bf9cd429a38079029f2db2b0ed5c019b3a97a705",
+        "stash":  "0194da3fddbef80e617132ef25a5baee8a2392a6",
+        "repository":  "C:/laooplatform/laoo"
+    },
+    {
+        "files":  [
+                      {
+                          "path":  "CONTEXT.md",
+                          "blob":  "17f53c6ad74bb04f84c022498a26e21da5cac66a",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/standards/ACTION_UI_STANDARD.md",
+                          "blob":  "6bc21b21be0e76c3dc21d0bc8fa34b7fe5fc0a71",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/standards/LIST_CARD_UI_STANDARD.md",
+                          "blob":  "35dd0a18a5cf7f40ddfebd45e09edb1c650baa09",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/standards/PAGINATION_UI_STANDARD.md",
+                          "blob":  "a23a61e065ac8dec6dcee978fbe5b159ccc7d4d7",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/standards/POPUP_UI_STANDARD.md",
+                          "blob":  "f3abb840566397a3ee2966a5e1818cb205d78509",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/standards/TYPOGRAPHY_STANDARD.md",
+                          "blob":  "5ae5d211f74fcb0ba94014ee9ce1b5a3b45aaec8",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "docs/standards/UX_UI_STANDARD.md",
+                          "blob":  "2ec967bce48eddd93aa80c68ac3f778891662d7a",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/AuthContextController.cs",
+                          "blob":  "711c29be484495491cf8703e681989076b17261f",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/CompanySetupController.cs",
+                          "blob":  "b39173d76dc620f455c2fb83e7588c3b52aee971",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/CompanySetupRuntimeController.cs",
+                          "blob":  "4b8bd59d684ea8f4908bbd57ede05b99060361a3",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/EmployeeController.cs",
+                          "blob":  "2c12fb7c1923f5b69275f5b21a4ded509e9bc9a6",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/MenuPermissionController.cs",
+                          "blob":  "4cabcffe956e4bbcf7549ead1adb40a1b0f5d81e",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/NavigationController.cs",
+                          "blob":  "2061ce90133d218c92e919d2d414279b0f6faf1f",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/PartnerCompanyController.cs",
+                          "blob":  "455d0244f33dc4c70c4885bd1ec4ca09b1b28256",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "laoo_api/Models/Auth/PostLoginContextResponse.cs",
+                          "blob":  "44e60a596fb941da419d35368004f27bcb2c2f09",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "laoo_api/Models/AuthModels.cs",
+                          "blob":  "6a7424442ae07b57f096db7293212512ab195bf4",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "laoo_api/Models/CompanySetupModels.cs",
+                          "blob":  "bccc10fdaa971a181371aceeade83a645315fb57",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "laoo_api/Models/MenuPermissionModels.cs",
+                          "blob":  "f2b076d60a4e9074e5c28c729d3ba91496f6c1cd",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "laoo_api/Program.cs",
+                          "blob":  "49923cf91d3679ecf2088289f5414373d43c4e49",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "laoo_api/Security/CompanyProjectPermission.cs",
+                          "blob":  "034f2b141eebcdefee81fad88f0c4cc986b02f8d",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "laoo_api/Security/JwtTokenService.cs",
+                          "blob":  "be82d5cf0232ab265a55e9562bf97457c03c4e5c",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "laoo_api/Services/AuthenticationService.cs",
+                          "blob":  "138ab6f6dfcbd2b1e9afc4c05698a829fa88f4f8",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "laoo_api/Services/DatabaseSeeder.cs",
+                          "blob":  "4c2e66c0b159dbee2ffb2d5cf560f42b0f5daf2b",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/app/router/app_menu_route_registry.dart",
+                          "blob":  "18477e9e7523e9462445668d32c91502fc725ec1",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/app/router/app_router.dart",
+                          "blob":  "b9ea2c0471ba76770641f5aab53ffe9c70c5416a",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/core/auth/auth_service.dart",
+                          "blob":  "abd76380c6150b4ef8c8c7b0e758730dd91e23a9",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/core/auth/auth_session.dart",
+                          "blob":  "721f108b2475c18adf2092a5fa83d2bf4a6656dc",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/core/auth/auth_storage.dart",
+                          "blob":  "de22507a5d281b4de1f05e2ed85353cc81f5553b",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/core/company_setup/company_setup_context.dart",
+                          "blob":  "3f5e0137b6438796979db9cb3166ac49edb867a0",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/features/access/menu_permission/data/menu_permission_repository.dart",
+                          "blob":  "665d62949dc102e69ab7958c397d1ea10138b0ab",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/features/access/menu_permission/models/menu_permission_row.dart",
+                          "blob":  "9837150a733e1a2f7fc733bf9a5f6e5fea15da66",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/features/access/menu_permission/models/menu_permission_selection.dart",
+                          "blob":  "a767a83fa3603d653dc11c2114364387de9e6060",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/features/access/menu_permission/pages/menu_permission_page.dart",
+                          "blob":  "c4c037560b47dfe5553fe250f01b42b8ce2d6cb4",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/features/auth/data/models/login_models.dart",
+                          "blob":  "3edbdab692cc6d6547cb461b210ffe4557061cee",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/features/support/company_setup/data/company_setup_api.dart",
+                          "blob":  "a026b7c061517c9ac8150745ecad4c86d568b8b6",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/features/support/company_setup/models/company_setup_model.dart",
+                          "blob":  "6c012e005de7802fefbdc8d1f1a1af6f2d62fdb9",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/features/support/company_setup/pages/company_setup_page.dart",
+                          "blob":  "ef17e719813e4acc1cd9e678f8a66acee8da46e2",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "lib/features/support/presentation/widgets/support_workspace_shell.dart",
+                          "blob":  "3f997007b56dab97f1d83a615d7a963d07ea2d1a",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "packages/dotnet/Laoo.Shared.Contracts/Employees/EmployeeContracts.cs",
+                          "blob":  "4c63edd47b41855fa34a63fdbeb148e74d790c3a",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "packages/laoo_shared_admin/lib/src/employee/employee_form_models.dart",
+                          "blob":  "893e3319fd1fd8e24f39aa7460f89d1d69732df4",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "packages/laoo_shared_admin/lib/src/employee/employee_models.dart",
+                          "blob":  "62d4d38f69642d864e3f1af63034152cf1722904",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "packages/laoo_shared_admin/lib/src/employee/employee_repository.dart",
+                          "blob":  "f3abc472a1df3abcf806ceb5c7ae85a47a574872",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "packages/laoo_shared_admin_ui/lib/src/employee/employee_action_workspace.dart",
+                          "blob":  "29dbc4cafbc6e9175906d9910fe11a8a47d83b4e",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "packages/laoo_shared_admin_ui/lib/src/employee/employee_list_workspace.dart",
+                          "blob":  "40431e2d58aca0cb57a035b297a148957a61920b",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/meeting/lib/app/theme/app_theme.dart",
+                          "blob":  "26c5047ac4ecfa5edcfa6af74db7b23d08a8115d",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/meeting/lib/app/theme/laoo_theme.dart",
+                          "blob":  "56fccc3c8d0fa31d3b56931cbb156cfafb25f76c",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/meeting/lib/app/theme/workspace_theme_presets.dart",
+                          "blob":  "93ff146b90c0fc5fe8bffb40ea768ade338cc1ed",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/meeting/lib/features/meeting/pages/meeting_building_page.dart",
+                          "blob":  "cbe5003c7ad075fc3aaa749016a87fafb1439098",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/meeting/lib/features/meeting/pages/meeting_room_page.dart",
+                          "blob":  "9260b3c5ea55aed175a3f8d64bffaf34ed3c7de7",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/service/lib/app/theme/app_theme.dart",
+                          "blob":  "896e0d344cfb01c133483ecfaaa83c93c0592e9a",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/service/lib/app/theme/laoo_theme.dart",
+                          "blob":  "d72fd34bcbb2303c0be6e8b473a3a15a75bb5cfc",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/service/lib/app/theme/workspace_theme_presets.dart",
+                          "blob":  "206884dd6f9a301c3380227526867917a7fecbcb",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/service/lib/features/inventory/pages/inventory_pages.dart",
+                          "blob":  "f96533e2ec218e0b9add8357ef12059294b2a65f",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/service/packages/dotnet/Laoo.Service.Module/Controllers/CustomerController.cs",
+                          "blob":  "d93bacbd27ddff5eef899ec600ba2a8fa606736c",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/service/packages/dotnet/Laoo.Service.Module/Controllers/CustomerFileController.cs",
+                          "blob":  "776ebf476760c17f2d7bbaba1360b015c1de5d1e",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/service/packages/dotnet/Laoo.Service.Module/Controllers/DeliveryNoteController.cs",
+                          "blob":  "2c0c5721e8bfd383f2d8c2911ed77608e0d1415a",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/service/packages/dotnet/Laoo.Service.Module/Controllers/PreOrderController.cs",
+                          "blob":  "1d8c699ff1a7b589724b49b58102c63dbd9aed4c",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/service/packages/dotnet/Laoo.Service.Module/Controllers/QuotationController.cs",
+                          "blob":  "66d26ff99e6cdd4f06e3a77428140b97c7d5613c",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/service/packages/dotnet/Laoo.Service.Module/Controllers/TaxInvoiceController.cs",
+                          "blob":  "5ae742cde073356be7595140d34ed40eeb98ae57",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/service/packages/dotnet/Laoo.Service.Module/Controllers/TemporaryReceiptController.cs",
+                          "blob":  "377b876f3124b69b1e997303b0cf87ab763f68d6",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/service/packages/dotnet/Laoo.Service.Module/Controllers/WarehouseController.cs",
+                          "blob":  "a4890d792b4d0f9b873240e5c54bdf2d9ca744aa",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/service/packages/dotnet/Laoo.Service.Module/Infrastructure/InventoryControllerSupport.cs",
+                          "blob":  "554564dc3c48d2790ff3103f54ad0387fc7cf7a1",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "projects/service/packages/dotnet/Laoo.Service.Module/Laoo.Service.Module.csproj",
+                          "blob":  "0c7db3943f1875faa67d06853a3834b36cc6c9d5",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "test/app/router/app_menu_route_registry_test.dart",
+                          "blob":  "f35cfaea55aff8d7d718cae18949ce2d820db482",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "test/core/auth/auth_storage_test.dart",
+                          "blob":  "6831e07a14f16e4be3b91cbfc0d92b0a5f82b7fa",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "test/employee_form_service_test.dart",
+                          "blob":  "dd72e3465e5883cb62fac061e388fe6fc3572171",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "test/features/access/menu_permission/menu_permission_selection_test.dart",
+                          "blob":  "a98570f205ef333855c182ce53bfb70efe0b8f62",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "test/features/support/company_setup/company_setup_model_test.dart",
+                          "blob":  "0d9fc83119f614b8935e5f0b99dd268dc0b76c67",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "tools/migrations/Laoo.MigrationRunner/Program.cs",
+                          "blob":  "c0903613e5719b917d815c3862bba766df9b4525",
+                          "status":  "saved",
+                          "role":  "working"
+                      },
+                      {
+                          "path":  "database/migrations/20260908110000_LAOO_move_inventory_sales_to_center.sql",
+                          "blob":  "2b522f7598491d50d83e9a367e83836bcdd0363e",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "database/migrations/20260908113000_LAOO_move_assets_to_center.sql",
+                          "blob":  "a126c37ea5502aeb63d56af14c13cbd8d2a9971e",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "database/migrations/20260908120000_LAOO_company_business_type.sql",
+                          "blob":  "ee7a3e7a416576002cacbf98517978d361426159",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "database/migrations/20260908130000_LAOO_company_person.sql",
+                          "blob":  "16c2bda2e868bdf8407c87f4ad8f4ed3d2c23dc0",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "database/migrations/20260908140000_LAOO_core_locations.sql",
+                          "blob":  "5721f7130b8e60db82f4343776ce06ceed3f8b71",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "docs/adr/0004-company-person-central-identity.md",
+                          "blob":  "3036f92b2c1a40afbfca457a892e7fa5105dfcab",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/CompanyRolePermissionController.cs",
+                          "blob":  "44c011e578164437a3c85fa4661acf5321ac0937",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/CoreLocationController.cs",
+                          "blob":  "af410465d888e91685d2a4e882467360ba40d05d",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "laoo_api/Models/CompanyBusinessType.cs",
+                          "blob":  "80b4cda900da503dd4f4d0fc1bab3d0c4fd12054",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "laoo_api/Services/CompanyPersonService.cs",
+                          "blob":  "f8dfaeed8379b810de6c79cae774b4dcfc2f72d0",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "lib/features/support/locations/location_page.dart",
+                          "blob":  "3b36ebb0780f04ff8557697b3ae49ee44513d9ce",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "packages/dotnet/Laoo.Shared.Contracts/CompanyMenuAccess.cs",
+                          "blob":  "aa4badb4fb249e889219ad50e0906953445364b3",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      },
+                      {
+                          "path":  "projects/service/database/migrations/20260907130000_LAOO_SERVICE_link_inventory_menus.sql",
+                          "blob":  "94ddd8172ad7dac8fd018bcc85183a174bff49ee",
+                          "status":  "saved",
+                          "role":  "untracked"
+                      }
+                  ],
+        "message":  "On main: pre-sync-core-meeting-20260909",
+        "baseCommit":  "d22ee46976e400bc6e6806b1801a40587e8af55e",
+        "stash":  "0e1db30cd68edc01111754c88bf0ce01d1aa2235",
+        "repository":  "C:/laooplatform/laoo"
+    }
+]

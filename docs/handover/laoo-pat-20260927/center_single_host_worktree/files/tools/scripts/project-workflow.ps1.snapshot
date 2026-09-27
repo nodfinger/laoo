@@ -1,0 +1,296 @@
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory = $true)]
+    [ValidateSet('Start', 'Finish')]
+    [string]$Action,
+
+    [Parameter(Mandatory = $true)]
+    [ValidateSet('core', 'service', 'meeting', 'visitor')]
+    [string]$Module,
+
+    [string]$TaskName,
+    [string]$CommitMessage,
+    [switch]$DryRun
+)
+
+$ErrorActionPreference = 'Stop'
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+
+function Invoke-External {
+    param(
+        [Parameter(Mandatory = $true)][string]$Label,
+        [Parameter(Mandatory = $true)][scriptblock]$Command
+    )
+
+    Write-Host "[$Label]" -ForegroundColor Cyan
+    & $Command
+    if ($LASTEXITCODE -ne 0) {
+        throw "$Label failed with exit code $LASTEXITCODE"
+    }
+}
+
+function Get-GitOutput {
+    param([Parameter(Mandatory = $true)][scriptblock]$Command)
+
+    $output = & $Command
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Git command failed.'
+    }
+    return @($output)
+}
+
+function Assert-Command {
+    param([Parameter(Mandatory = $true)][string]$Name)
+
+    if (-not (Get-Command $Name -ErrorAction SilentlyContinue)) {
+        throw "Required command was not found: $Name"
+    }
+}
+
+function Get-MachineRole {
+    $configPath = Join-Path $repoRoot 'local.machine.json'
+    if (-not (Test-Path -LiteralPath $configPath)) {
+        throw 'local.machine.json was not found. Copy local.machine.example.json and set this machine role first.'
+    }
+
+    $config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json
+    if ($config.role -notin @('center-service', 'meeting', 'visitor')) {
+        throw "Unsupported machine role in local.machine.json: $($config.role)"
+    }
+    return [string]$config.role
+}
+
+function Assert-ModuleOwnership {
+    param(
+        [Parameter(Mandatory = $true)][string]$Role,
+        [Parameter(Mandatory = $true)][string]$SelectedModule
+    )
+
+    $allowedModules = switch ($Role) {
+        'center-service' { @('core', 'service') }
+        'meeting' { @('meeting') }
+        'visitor' { @('visitor') }
+    }
+
+    if ($SelectedModule -notin $allowedModules) {
+        throw "Machine role '$Role' cannot publish module '$SelectedModule'. Allowed: $($allowedModules -join ', ')"
+    }
+}
+
+function ConvertTo-BranchTaskName {
+    param([Parameter(Mandatory = $true)][string]$Value)
+
+    $slug = $Value.Trim().ToLowerInvariant()
+    $slug = $slug -replace '[\s\\~^:?*\[\]]+', '-'
+    $slug = $slug -replace '-+', '-'
+    $slug = $slug.Trim('-', '.', '/')
+    if ([string]::IsNullOrWhiteSpace($slug)) {
+        throw 'Task name must contain at least one valid character.'
+    }
+    return $slug
+}
+
+function Get-ChangedPaths {
+    $paths = @()
+    $paths += Get-GitOutput { git diff --name-only HEAD }
+    $paths += Get-GitOutput { git ls-files --others --exclude-standard }
+    return @($paths | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Sort-Object -Unique)
+}
+
+function Test-PathInModule {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$SelectedModule
+    )
+
+    $normalized = $Path.Replace('\', '/')
+    if ($SelectedModule -ne 'core') {
+        return $normalized.StartsWith("projects/$SelectedModule/", [StringComparison]::OrdinalIgnoreCase)
+    }
+
+    $coreDirectories = @('assets/', 'docs/', 'laoo_api/', 'lib/', 'packages/', 'test/', 'tools/', 'web/', 'windows/', '.vscode/')
+    if ($coreDirectories | Where-Object { $normalized.StartsWith($_, [StringComparison]::OrdinalIgnoreCase) }) {
+        return $true
+    }
+
+    return $normalized -in @(
+        'AGENTS.md',
+        'README.md',
+        'analysis_options.yaml',
+        'pubspec.lock',
+        'pubspec.yaml'
+    )
+}
+
+function Assert-SafePaths {
+    param(
+        [Parameter(Mandatory = $true)][string[]]$Paths,
+        [Parameter(Mandatory = $true)][string]$SelectedModule
+    )
+
+    $forbidden = @($Paths | Where-Object {
+        $normalized = $_.Replace('\', '/')
+        $normalized -match '(^|/)(bin|obj|build|\.dart_tool)(/|$)' -or
+        $normalized -match '(^|/)local\.json$' -or
+        $normalized -match '(^|/)local\.machine\.json$'
+    })
+    if ($forbidden.Count -gt 0) {
+        throw "Secret or build artifact detected: $($forbidden -join ', ')"
+    }
+
+    $outsideScope = @($Paths | Where-Object { -not (Test-PathInModule -Path $_ -SelectedModule $SelectedModule) })
+    if ($outsideScope.Count -gt 0) {
+        throw "Files outside '$SelectedModule' ownership detected: $($outsideScope -join ', ')"
+    }
+}
+
+function Assert-CenterStopped {
+    if (-not (Get-Command Get-NetTCPConnection -ErrorAction SilentlyContinue)) {
+        return
+    }
+
+    $listeners = @(Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue |
+        Where-Object { $_.LocalPort -in @(5080, 8080) })
+    if ($listeners.Count -gt 0) {
+        $ports = @($listeners.LocalPort | Sort-Object -Unique)
+        throw "Center is still running on port(s) $($ports -join ', '). Stop the LAOO: Run Center tasks before publishing."
+    }
+}
+
+function Invoke-StartWorkflow {
+    if ([string]::IsNullOrWhiteSpace($TaskName)) {
+        throw 'TaskName is required for Action Start.'
+    }
+
+    $taskSlug = ConvertTo-BranchTaskName -Value $TaskName
+    $branchName = "$Module/$taskSlug"
+    $workingChanges = Get-GitOutput { git status --porcelain }
+    if ($workingChanges.Count -gt 0) {
+        throw 'Working tree is not clean. Finish or preserve the current work before starting a new task.'
+    }
+
+    Invoke-External 'Validate branch name' { git check-ref-format --branch $branchName }
+    if ($DryRun) {
+        Write-Host "DRY RUN: git switch main"
+        Write-Host "DRY RUN: git pull --ff-only origin main"
+        Write-Host "DRY RUN: git switch -c $branchName"
+        return
+    }
+
+    Invoke-External 'Switch to main' { git switch main }
+    Invoke-External 'Pull current main' { git pull --ff-only origin main }
+    Invoke-External 'Create task branch' { git switch -c $branchName }
+    Write-Host "WORK STARTED: $branchName" -ForegroundColor Green
+}
+
+function Invoke-FinishWorkflow {
+    if ([string]::IsNullOrWhiteSpace($CommitMessage)) {
+        throw 'CommitMessage is required for Action Finish.'
+    }
+
+    $branch = (Get-GitOutput { git branch --show-current } | Select-Object -First 1)
+    if ([string]::IsNullOrWhiteSpace($branch) -or $branch -eq 'main') {
+        throw 'Finish must run from a task branch, not main.'
+    }
+    if (-not $branch.StartsWith("$Module/", [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Current branch '$branch' does not belong to module '$Module'."
+    }
+
+    $workingPaths = Get-ChangedPaths
+    if ($workingPaths.Count -gt 0) {
+        Assert-SafePaths -Paths $workingPaths -SelectedModule $Module
+    }
+
+    Invoke-External 'Git diff check' { git diff --check }
+
+    if ($DryRun) {
+        Write-Host "DRY RUN: verify center for $Module"
+        Write-Host "DRY RUN: commit scoped paths, merge origin/main, verify again if main changed"
+        Write-Host "DRY RUN: push, create PR, squash merge, switch to main and pull"
+        return
+    }
+
+    Assert-CenterStopped
+
+    if ($workingPaths.Count -gt 0) {
+        Invoke-External 'Stage owned files' { git add -- $workingPaths }
+        Invoke-External 'Commit work' { git commit -m $CommitMessage }
+    }
+
+    Invoke-External 'Fetch current main' { git fetch origin main }
+    $branchPaths = Get-GitOutput { git diff --name-only origin/main...HEAD }
+    if ($branchPaths.Count -eq 0) {
+        throw 'The task branch has no changes compared with origin/main.'
+    }
+    Assert-SafePaths -Paths $branchPaths -SelectedModule $Module
+
+    $mainBeforeMerge = (Get-GitOutput { git rev-parse origin/main } | Select-Object -First 1)
+    & git merge --no-edit origin/main
+    if ($LASTEXITCODE -ne 0) {
+        git merge --abort 2>$null
+        throw 'origin/main could not be merged cleanly. Merge was aborted; resolve the conflict manually.'
+    }
+
+    Invoke-External 'Verify Center and module' {
+        & (Join-Path $PSScriptRoot 'verify-center.ps1') -Module $Module
+    }
+
+    Invoke-External 'Refresh main after verification' { git fetch origin main }
+    $mainAfterMerge = (Get-GitOutput { git rev-parse origin/main } | Select-Object -First 1)
+    if ($mainBeforeMerge -ne $mainAfterMerge) {
+        throw 'origin/main changed during verification. Run Finish again to verify against the newest main.'
+    }
+
+    Assert-Command -Name 'gh'
+    Invoke-External 'Verify GitHub login' { gh auth status }
+    Invoke-External 'Push task branch' { git push -u origin $branch }
+
+    $pullRequestsJson = & gh pr list --head $branch --base main --state open --json number,url
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Unable to query GitHub pull requests.'
+    }
+    $pullRequests = @($pullRequestsJson | ConvertFrom-Json)
+    if ($pullRequests.Count -eq 0) {
+        $body = "Module: $Module`n`nVerification: tools/scripts/verify-center.ps1 -Module $Module passed."
+        Invoke-External 'Create pull request' {
+            gh pr create --base main --head $branch --title $CommitMessage --body $body
+        }
+        $pullRequestsJson = & gh pr list --head $branch --base main --state open --json number,url
+        if ($LASTEXITCODE -ne 0) {
+            throw 'Unable to find the newly created pull request.'
+        }
+        $pullRequests = @($pullRequestsJson | ConvertFrom-Json)
+    }
+
+    $pullRequest = $pullRequests | Select-Object -First 1
+    Invoke-External "Squash merge PR #$($pullRequest.number)" {
+        gh pr merge $pullRequest.number --squash --delete-branch
+    }
+    Invoke-External 'Switch to main' { git switch main }
+    Invoke-External 'Pull merged main' { git pull --ff-only origin main }
+    if (git branch --list $branch) {
+        Invoke-External 'Delete local task branch' { git branch -d $branch }
+    }
+
+    $remainingChanges = Get-GitOutput { git status --porcelain }
+    if ($remainingChanges.Count -gt 0) {
+        throw 'Workflow completed, but the working tree is not clean.'
+    }
+    Write-Host "WORK PUBLISHED: $($pullRequest.url)" -ForegroundColor Green
+}
+
+Push-Location $repoRoot
+try {
+    Assert-Command -Name 'git'
+    Invoke-External 'Validate repository' { git rev-parse --show-toplevel }
+    $machineRole = Get-MachineRole
+    Assert-ModuleOwnership -Role $machineRole -SelectedModule $Module
+
+    switch ($Action) {
+        'Start' { Invoke-StartWorkflow }
+        'Finish' { Invoke-FinishWorkflow }
+    }
+}
+finally {
+    Pop-Location
+}

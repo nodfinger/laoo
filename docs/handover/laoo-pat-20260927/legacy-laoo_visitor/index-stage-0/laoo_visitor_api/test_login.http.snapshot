@@ -1,0 +1,20 @@
+@baseUrl = https://localhost:7080
+
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "t",
+  "password": "t",
+  "projectCode": "LAOO"
+}
+
+### วาง Token ที่ได้จาก Login เพื่อทดสอบ Route ปัจจุบัน
+@accessToken = PASTE_ACCESS_TOKEN_HERE
+
+GET {{baseUrl}}/api/database-routing/current
+Authorization: Bearer {{accessToken}}
+
+### Support user เลือกทดสอบ Company
+GET {{baseUrl}}/api/database-routing/current?companyId=1
+Authorization: Bearer {{accessToken}}

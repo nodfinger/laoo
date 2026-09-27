@@ -1,0 +1,12 @@
+{
+  "ConnectionStrings": {
+    "LaooDatabase": "Server=YOUR_SERVER;Database=DBTDLaoo;User ID=YOUR_USER;Password=YOUR_PASSWORD;TrustServerCertificate=True",
+    "PartnerDatabaseExample": "Server=PARTNER_SERVER;Database=DBTDPartnerExample;User ID=YOUR_USER;Password=YOUR_PASSWORD;TrustServerCertificate=True"
+  },
+  "Jwt": {
+    "SecretKey": "REPLACE_WITH_AT_LEAST_32_RANDOM_CHARACTERS"
+  },
+  "SeedData": {
+    "Enabled": false
+  }
+}

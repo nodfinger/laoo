@@ -1,0 +1,46 @@
+# LAOO Popup, Dialog and Alert Standard
+
+มาตรฐานนี้ใช้กับ Popup, Dialog, Lookup, Confirm และ Notification ทุกหน้าจอ
+
+## Scope
+
+- ใช้ Popup เฉพาะงานสั้น เช่น Confirm Delete, Confirm Action, Lookup หรือจัดการ Master ขนาดเล็กที่ได้รับอนุมัติ
+- ห้ามใช้ Popup แทน Action Screen ที่มี Form หลาย Field เว้นแต่พ่ออนุมัติหน้าจอนั้นโดยตรง
+
+## Popup Layout
+
+- Popup ทุกชนิดใช้พื้นหลังสีขาว (`Colors.white`) ไม่มี `BorderSide` หรือเส้นกรอบรอบนอกเฉพาะหน้า และห้ามเปลี่ยนสีพื้นหลังตาม User Style
+- กรอบ Popup ใช้มุมโค้ง `LaooRadius.xs` (`4px`) ทุกมุม
+- ระยะขอบ Popup ใช้ `LaooLayout.dialogInsetPadding`; Padding ภายในใช้ `LaooLayout.cardPadding`
+- Popup Action Form ใช้ความกว้างสูงสุด `480px` และต้องคำนวณให้ไม่เกินความกว้างหน้าจอหลังหัก `dialogInsetPadding` ทั้งสองด้าน; ห้ามปล่อยให้ Popup แคบตามความกว้างของ Field โดยไม่จำเป็น
+- Caption ใช้มาตรฐานกลาง `fontSize: 18`, `fontWeight: FontWeight.w700`, `color: Colors.black` ตาม `TYPOGRAPHY_STANDARD.md`; ต้องมี Icon อยู่ด้านหน้า Caption และ Icon ใช้สีดำ (`Colors.black`) ยกเว้น Delete Confirmation ซึ่งใช้ Icon สีแดงตาม Semantic Pattern ของการลบ
+- ใช้เส้น `LaooColors.border` สีเทาอ่อนใต้ Caption และก่อนส่วนปุ่มด้านล่าง
+- Context Bar ที่แสดงรายการแม่/ห้อง/อาคารที่เลือก ใช้พื้น Primary แบบโปร่งแสงและข้อความขนาด `16px`
+- TextBox/ComboBox ใช้กรอบมาตรฐาน มุมโค้ง `4px`; Label และ Focus Border ใช้ Primary
+- ปุ่มด้านล่างใช้ Font `13px`, สูง `48px`, มุมโค้ง `LaooRadius.xs` (`4px`); ต้องกำหนด `RoundedRectangleBorder(borderRadius: BorderRadius.circular(LaooRadius.xs))` ใน Style ของปุ่มโดยตรง ห้ามปล่อยให้รับรูปทรง pill จาก Theme; ยกเลิกใช้ Text/Outlined Primary และบันทึกใช้ Filled Primary
+- เมื่อ Popup แคบต้องจัด Field ลงบรรทัดใหม่โดยไม่ Overflow
+
+## Validation and Notification
+
+- Validation ค่าว่างหรือข้อมูลไม่ถูกต้องต้องแสดงข้อความสีแดงใต้ Field ที่เกี่ยวข้อง
+- Success/Error Notification ต้องลอยมุมขวาบนของ Content Area ไม่ดัน Layout และไม่บังพื้นที่ข้อมูลหลัก
+- Notification ต้องหายอัตโนมัติตาม `TDSTCompanySetUp.TimeAlert` ผ่าน `CompanySetupController` และกดปิดเองได้
+- พื้นหลัง Notification ใช้ Primary ของ User Style ความทึบ `50%`; Error ใช้สีแดงได้
+- Error Notification ทุกจุดต้องแสดงอย่างน้อย 2 ส่วน: ข้อความหลัก (`message`) และ `รายละเอียดเพิ่มเติม` ที่อธิบายสาเหตุหรือสิ่งที่ผู้ใช้ควรทำต่อ
+- ห้ามแสดงเพียง `เกิดข้อผิดพลาดในการเรียก API`, ชื่อ Exception, Stack Trace หรือรหัส HTTP โดยไม่มีคำอธิบาย
+- ถ้า API ส่ง `description`, `detail` หรือ Validation `errors` ให้แสดงข้อมูลนั้นใต้ข้อความหลักโดยไม่แสดงซ้ำ
+- ถ้า API ไม่ส่งคำอธิบาย ให้ HTTP Client เติมข้อความสำรองตามสถานะ เช่น Session หมดอายุ, ไม่มีสิทธิ์, ไม่พบข้อมูล, ข้อมูลขัดแย้ง, Timeout หรือ Server ขัดข้อง
+- ข้อความสำหรับผู้ใช้ต้องไม่เปิดเผย SQL, Connection String, Secret, Stack Trace หรือรายละเอียดภายในระบบ
+
+## Delete Confirmation
+
+- ใช้ Pattern เดียวกันทั้งระบบ: Icon ถังขยะสีแดง, Caption ใช้มาตรฐานกลางสีดำ `18px`/`FontWeight.w700`, กล่องข้อความพื้นแดงอ่อนที่แสดง Key/ชื่อรายการ และข้อความว่าเรียกคืนไม่ได้
+- ปุ่ม `ยกเลิก` เป็น TextButton สี Primary ของ User Style
+- ปุ่ม `ลบ` เป็น Filled สีแดงพร้อม Icon ถังขยะ
+- Popup ยืนยันลบไม่มีเส้นกรอบรอบนอก
+
+## Prompt สำหรับส่งให้ AI
+
+```text
+ปรับ Popup/Dialog/Alert นี้ตาม docs/standards/UX_UI_STANDARD.md, POPUP_UI_STANDARD.md และ TYPOGRAPHY_STANDARD.md เอาเส้นกรอบรอบนอกออก Caption สีดำ 18px Icon ใช้สี Primary มีเส้นเทาอ่อนใต้ Caption และก่อนปุ่ม TextBox/ComboBox มุมโค้ง 4px Validation สีแดงใต้ Field ปุ่มด้านล่างสูง 48px มุมโค้ง 4px และใช้สี User Style ส่วน Delete Confirm ใช้ Pattern สีแดงกลางของระบบ Notification ต้องลอยมุมขวาบนและหายตาม TimeAlert ห้ามแก้ API, SQL, Repository หรือ Business Logic ตรวจ Responsive, Overflow, dart format และ dart analyze
+```

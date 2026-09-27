@@ -1,0 +1,35 @@
+using System.Data;
+using LaooApi.Security;
+using Microsoft.Data.SqlClient;
+
+namespace LaooApi.Controllers;
+
+public sealed partial class ServicePersonController
+{
+    private Task<SqlConnection> Open(CancellationToken token) => RegistryControllerSupport.Open(configuration, token);
+    private Task<bool> ScopeValid(SqlConnection c, CancellationToken token) => RegistryControllerSupport.ServiceScopeValid(c, User, token);
+    private Task<bool> Can(SqlConnection c, string action, CancellationToken token) => CompanyProjectPermission.IsAllowedAsync(c, User, ScreenCode, action, token);
+    private static void Add(SqlCommand c, string name, SqlDbType type, object? value, int size = 0) => RegistryControllerSupport.Add(c, name, type, value, size);
+
+    private static async Task<bool> HasRequesterLinkTable(SqlConnection c, CancellationToken token)
+    {
+        await using var command = new SqlCommand("SELECT CAST(CASE WHEN OBJECT_ID(N'dbo.TDADPersonContactLink',N'U') IS NULL THEN 0 ELSE 1 END AS bit);", c);
+        return Convert.ToBoolean(await command.ExecuteScalarAsync(token));
+    }
+
+    private static object Row(SqlDataReader r)
+    {
+        var customer = !r.IsDBNull(8) && r.GetBoolean(9);
+        var resident = !r.IsDBNull(11) && r.GetBoolean(15);
+        var requester = r.GetBoolean(17);
+        var roles = new List<string>();
+        if (resident) roles.Add("RESIDENT");
+        if (customer) roles.Add("SERVICE_CUSTOMER");
+        if (requester) roles.Add("REQUESTER");
+        return new { personID = r.GetInt64(1), fullName = r.GetString(2), nickName = Text(r, 3), email = Text(r, 4), mobile = Text(r, 5), isActive = r.GetBoolean(6), personRowVersion = Convert.ToBase64String((byte[])r[7]), serviceCustomer = customer, resident, serviceRoles = roles };
+    }
+
+    private static string? Text(SqlDataReader r, int index) => r.IsDBNull(index) ? null : r.GetString(index);
+}
+
+public sealed record ServicePersonIdentity(string FullName, string? NickName, string? Email, string? Mobile);

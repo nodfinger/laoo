@@ -1,0 +1,530 @@
+using System.Data;
+using System.Security.Claims;
+using System.Text.Json;
+using Laoo.Shared.Contracts;
+using LaooServiceModule.Infrastructure;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Logging;
+
+namespace LaooServiceModule.Controllers;
+
+[ApiController]
+[Authorize]
+[Route("api/service/residents")]
+public sealed class ResidentController(
+    IConfiguration configuration,
+    ILogger<ResidentController> logger) : ControllerBase
+{
+    private const string MenuCode = "14004";
+    private const string ProjectCode = "LAOO_SERVICE";
+    private const string PersonEditPoint = "PERSON_EDIT";
+
+    [HttpGet("actions")]
+    public async Task<IActionResult> Actions(CancellationToken token)
+    {
+        await using var connection = await Open(token);
+        if (!await ScopeValid(connection, token)) return Forbid();
+        return Ok(new
+        {
+            view = await Can(connection, "VIEW", token),
+            create = await Can(connection, "CREATE", token),
+            edit = await Can(connection, "EDIT", token),
+            delete = await Can(connection, "DELETE", token),
+            personEdit = await CanEditPerson(connection, token),
+        });
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> List(
+        [FromQuery] string? search,
+        [FromQuery] bool? isActive,
+        [FromQuery] long? buildingId,
+        [FromQuery] long? roomId,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken token = default)
+    {
+        await using var connection = await Open(token);
+        if (!await ScopeValid(connection, token) || !await Can(connection, "VIEW", token))
+            return Forbid();
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 200);
+        var query = search?.Trim() ?? string.Empty;
+        const string sql = """
+SELECT COUNT_BIG(1) OVER(),R.ResidentID,R.PersonID,P.FullName,P.NickName,P.Mobile,P.Email,
+       R.RoomID,RM.RoomCode,RM.RoomNameTH,B.BuildingID,B.BuildingCode,B.BuildingNameTH,
+       F.FloorID,F.FloorCode,F.FloorNameTH,R.StartDate,R.EndDate,R.IsActive,R.RowVersion,P.RowVersion,
+       CAST(CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADEmployee E WHERE E.CompanyID=P.CompanyID AND E.PersonID=P.PersonID) THEN 1 ELSE 0 END AS bit),
+       CAST(CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADUser U WHERE U.CompanyID=P.CompanyID AND U.PersonID=P.PersonID) THEN 1 ELSE 0 END AS bit)
+FROM dbo.TDADResident R
+INNER JOIN dbo.TDADPerson P ON P.CompanyID=R.CompanyID AND P.PersonID=R.PersonID
+INNER JOIN dbo.TDADRoom RM ON RM.CompanyID=R.CompanyID AND RM.RoomID=R.RoomID
+INNER JOIN dbo.TDADBuilding B ON B.CompanyID=R.CompanyID AND B.BuildingID=RM.BuildingID
+INNER JOIN dbo.TDADFloor F ON F.BuildingID=RM.BuildingID AND F.FloorID=RM.FloorID
+WHERE R.CompanyID=@company
+  AND (@active IS NULL OR R.IsActive=@active)
+  AND (@building IS NULL OR B.BuildingID=@building)
+  AND (@room IS NULL OR R.RoomID=@room)
+  AND (@search=N'' OR P.FullName LIKE @like OR P.NickName LIKE @like OR P.Mobile LIKE @like
+       OR P.Email LIKE @like OR RM.RoomCode LIKE @like OR RM.RoomNameTH LIKE @like)
+ORDER BY R.IsActive DESC,P.FullName,R.ResidentID
+OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY;
+""";
+        await using var command = new SqlCommand(sql, connection);
+        Add(command, "@company", SqlDbType.BigInt, CompanyId);
+        Add(command, "@active", SqlDbType.Bit, isActive);
+        Add(command, "@building", SqlDbType.BigInt, buildingId);
+        Add(command, "@room", SqlDbType.BigInt, roomId);
+        Add(command, "@search", SqlDbType.NVarChar, query, 320);
+        Add(command, "@like", SqlDbType.NVarChar, $"%{query}%", 330);
+        Add(command, "@offset", SqlDbType.Int, (page - 1) * pageSize);
+        Add(command, "@pageSize", SqlDbType.Int, pageSize);
+        var items = new List<object>();
+        long total = 0;
+        await using var reader = await command.ExecuteReaderAsync(token);
+        while (await reader.ReadAsync(token))
+        {
+            total = reader.GetInt64(0);
+            items.Add(ReadResident(reader));
+        }
+        return Ok(new { items, total, page, pageSize });
+    }
+
+    [HttpGet("lookup")]
+    public async Task<IActionResult> Lookup(
+        [FromQuery] long? includePersonId,
+        [FromQuery] long? includeRoomId,
+        CancellationToken token)
+    {
+        await using var connection = await Open(token);
+        if (!await ScopeValid(connection, token) || !await Can(connection, "VIEW", token))
+            return Forbid();
+        var canEditPerson = await CanEditPerson(connection, token);
+
+        const string sql = """
+SELECT P.PersonID,P.FullName,P.NickName,P.Mobile,P.Email,P.IsActive,P.RowVersion,
+       CAST(CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADEmployee E WHERE E.CompanyID=P.CompanyID AND E.PersonID=P.PersonID) THEN 1 ELSE 0 END AS bit),
+       CAST(CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADResident R WHERE R.CompanyID=P.CompanyID AND R.PersonID=P.PersonID) THEN 1 ELSE 0 END AS bit),
+       CAST(CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADUser U WHERE U.CompanyID=P.CompanyID AND U.PersonID=P.PersonID) THEN 1 ELSE 0 END AS bit)
+FROM dbo.TDADPerson P
+WHERE P.CompanyID=@company AND (P.IsActive=1 OR P.PersonID=@person)
+ORDER BY P.FullName,P.PersonID;
+SELECT BuildingID id,BuildingCode code,BuildingNameTH name
+FROM dbo.TDADBuilding WHERE CompanyID=@company AND IsActive=1 ORDER BY BuildingCode;
+SELECT F.FloorID id,F.BuildingID parentId,F.FloorCode code,F.FloorNameTH name
+FROM dbo.TDADFloor F
+INNER JOIN dbo.TDADBuilding B ON B.BuildingID=F.BuildingID AND B.CompanyID=@company
+WHERE F.IsActive=1 ORDER BY F.FloorNumber,F.FloorCode;
+SELECT RoomID id,BuildingID buildingId,FloorID parentId,RoomCode code,RoomNameTH name
+FROM dbo.TDADRoom
+WHERE CompanyID=@company AND (IsActive=1 OR RoomID=@room) AND RoomTypeCode=N'RESIDENTIAL'
+ORDER BY RoomCode;
+""";
+        await using var command = new SqlCommand(sql, connection);
+        Add(command, "@company", SqlDbType.BigInt, CompanyId);
+        Add(command, "@person", SqlDbType.BigInt, includePersonId);
+        Add(command, "@room", SqlDbType.BigInt, includeRoomId);
+        await using var reader = await command.ExecuteReaderAsync(token);
+
+        var persons = new List<object>();
+        while (await reader.ReadAsync(token))
+        {
+            var roles = new List<string>();
+            if (reader.GetBoolean(7)) roles.Add("EMPLOYEE");
+            if (reader.GetBoolean(8)) roles.Add("RESIDENT");
+            if (reader.GetBoolean(9)) roles.Add("USER");
+            if (roles.Count == 0) roles.Add("GENERAL");
+            persons.Add(new
+            {
+                id = reader.GetInt64(0),
+                name = reader.GetString(1),
+                nickName = Text(reader, 2),
+                mobile = Text(reader, 3),
+                email = Text(reader, 4),
+                isActive = reader.GetBoolean(5),
+                rowVersion = Convert.ToBase64String((byte[])reader[6]),
+                roles,
+            });
+        }
+        var buildings = await ReadDictionarySet(reader, token);
+        var floors = await ReadDictionarySet(reader, token);
+        var rooms = await ReadDictionarySet(reader, token);
+        await reader.CloseAsync();
+        return Ok(new
+        {
+            persons,
+            buildings,
+            floors,
+            rooms,
+            businessTypeCode = "DORMITORY",
+            canEditPerson,
+            requesterContract = new
+            {
+                residentId = "ResidentID",
+                personId = "PersonID",
+                roomId = "RoomID",
+                snapshotName = "RequesterNameSnapshot",
+            },
+        });
+    }
+
+    [HttpPost]
+    public Task<IActionResult> Create(ResidentSaveRequest request, CancellationToken token) =>
+        Save(null, request, token);
+
+    [HttpPut("{id:long}")]
+    public Task<IActionResult> Update(long id, ResidentSaveRequest request, CancellationToken token) =>
+        Save(id, request, token);
+
+    [HttpDelete("{id:long}")]
+    public async Task<IActionResult> Delete(long id, [FromQuery] string rowVersion, CancellationToken token)
+    {
+        if (!TryVersion(rowVersion, out var version))
+            return BadRequest(Problem("ข้อมูลเวอร์ชันไม่ถูกต้อง", "กรุณาโหลดรายการใหม่แล้วลองอีกครั้ง"));
+        await using var connection = await Open(token);
+        if (!await ScopeValid(connection, token) || !await Can(connection, "DELETE", token))
+            return Forbid();
+        await using var command = new SqlCommand(
+            "DELETE dbo.TDADResident WHERE CompanyID=@company AND ResidentID=@id AND RowVersion=@version",
+            connection);
+        Add(command, "@company", SqlDbType.BigInt, CompanyId);
+        Add(command, "@id", SqlDbType.BigInt, id);
+        Add(command, "@version", SqlDbType.Timestamp, version);
+        return await command.ExecuteNonQueryAsync(token) == 1
+            ? NoContent()
+            : Conflict(Problem("ข้อมูลถูกเปลี่ยนแล้ว", "กรุณาโหลดรายการใหม่ก่อนลบ"));
+    }
+
+    private async Task<IActionResult> Save(long? id, ResidentSaveRequest request, CancellationToken token)
+    {
+        var validation = Validate(id, request);
+        if (validation is not null) return BadRequest(Problem("ข้อมูลผู้พักอาศัยไม่ถูกต้อง", validation));
+
+        await using var connection = await Open(token);
+        if (!await ScopeValid(connection, token) ||
+            !await Can(connection, id.HasValue ? "EDIT" : "CREATE", token)) return Forbid();
+        if (request.PersonUpdate is not null && !await CanEditPerson(connection, token)) return Forbid();
+
+        await using var transaction = (SqlTransaction)await connection
+            .BeginTransactionAsync(IsolationLevel.Serializable, token);
+        var correlationId = Guid.NewGuid();
+        string? beforeJson = null;
+        try
+        {
+            long personId;
+            if (id.HasValue)
+            {
+                await using var current = new SqlCommand(
+                    "SELECT PersonID,(SELECT R.ResidentID,R.PersonID,R.RoomID,R.StartDate,R.EndDate,R.IsActive FOR JSON PATH,WITHOUT_ARRAY_WRAPPER) FROM dbo.TDADResident R WITH(UPDLOCK,HOLDLOCK) WHERE CompanyID=@company AND ResidentID=@id",
+                    connection, transaction);
+                Add(current, "@company", SqlDbType.BigInt, CompanyId);
+                Add(current, "@id", SqlDbType.BigInt, id.Value);
+                await using var currentReader = await current.ExecuteReaderAsync(token);
+                if (!await currentReader.ReadAsync(token))
+                {
+                    await transaction.RollbackAsync(token);
+                    return NotFound(Problem("ไม่พบผู้พักอาศัย", "รายการไม่ได้อยู่ใน Company นี้"));
+                }
+                personId = currentReader.GetInt64(0);
+                beforeJson = Text(currentReader, 1);
+                if (request.PersonId.HasValue && request.PersonId.Value != personId)
+                {
+                    await transaction.RollbackAsync(token);
+                    return Conflict(Problem("ไม่สามารถเปลี่ยนตัวบุคคล", "ให้สร้างรายการผู้พักอาศัยใหม่สำหรับบุคคลอื่น"));
+                }
+            }
+            else if (request.NewPerson is not null)
+            {
+                await using var insertPerson = new SqlCommand("""
+INSERT dbo.TDADPerson(CompanyID,FullName,NickName,Email,Mobile,IsActive,CreateBy)
+OUTPUT INSERTED.PersonID
+VALUES(@company,@name,@nick,@email,@mobile,1,@actor);
+""", connection, transaction);
+                BindPerson(insertPerson, request.NewPerson);
+                personId = Convert.ToInt64(await insertPerson.ExecuteScalarAsync(token));
+            }
+            else
+            {
+                personId = request.PersonId!.Value;
+            }
+
+            if (request.PersonUpdate is not null)
+            {
+                if (!TryVersion(request.PersonUpdate.RowVersion, out var personVersion))
+                    throw new ResidentRuleException("PERSON_VERSION_INVALID");
+                await using var updatePerson = new SqlCommand("""
+UPDATE dbo.TDADPerson
+SET FullName=@name,NickName=@nick,Email=@email,Mobile=@mobile,
+    UpdateDate=SYSUTCDATETIME(),UpdateBy=@actor
+WHERE CompanyID=@company AND PersonID=@person AND RowVersion=@personVersion;
+IF @@ROWCOUNT=0 THROW 52831,'PERSON_CONFLICT',1;
+UPDATE dbo.TDADEmployee
+SET FullName=@name,NickName=@nick,Email=@email,PersonalTelephone=@mobile,UpdateDate=SYSUTCDATETIME()
+WHERE CompanyID=@company AND PersonID=@person;
+UPDATE dbo.TDADUser
+SET DisplayName=@name,Email=@email,Mobile=@mobile,UpdateDate=SYSUTCDATETIME(),UpdateBy=@actor
+WHERE CompanyID=@company AND PersonID=@person;
+""", connection, transaction);
+                BindPerson(updatePerson, request.PersonUpdate);
+                Add(updatePerson, "@person", SqlDbType.BigInt, personId);
+                Add(updatePerson, "@personVersion", SqlDbType.Timestamp, personVersion);
+                await updatePerson.ExecuteNonQueryAsync(token);
+            }
+
+            const string saveSql = """
+IF NOT EXISTS(SELECT 1 FROM dbo.TDADPerson WHERE CompanyID=@company AND PersonID=@person AND (@active=0 OR IsActive=1))
+ THROW 52820,'INVALID_PERSON',1;
+IF NOT EXISTS
+(
+ SELECT 1 FROM dbo.TDADRoom RM
+ INNER JOIN dbo.TDADBuilding B ON B.BuildingID=RM.BuildingID AND B.CompanyID=RM.CompanyID
+ INNER JOIN dbo.TDADFloor F ON F.FloorID=RM.FloorID AND F.BuildingID=RM.BuildingID
+ WHERE RM.CompanyID=@company AND RM.RoomID=@room AND RM.RoomTypeCode=N'RESIDENTIAL'
+   AND (@active=0 OR (RM.IsActive=1 AND B.IsActive=1 AND F.IsActive=1))
+) THROW 52821,'INVALID_ROOM',1;
+IF EXISTS
+(
+ SELECT 1 FROM dbo.TDADResident R WITH(UPDLOCK,HOLDLOCK)
+ WHERE R.CompanyID=@company AND R.PersonID=@person
+   AND (@id IS NULL OR R.ResidentID<>@id)
+   AND R.StartDate<=ISNULL(@end,CONVERT(date,'99991231'))
+   AND ISNULL(R.EndDate,CONVERT(date,'99991231'))>=@start
+) THROW 52823,'RESIDENT_PERIOD_OVERLAP',1;
+IF @id IS NULL
+ INSERT dbo.TDADResident(CompanyID,PersonID,RoomID,StartDate,EndDate,IsActive,CreateBy)
+ OUTPUT INSERTED.ResidentID VALUES(@company,@person,@room,@start,@end,@active,@actor);
+ELSE
+BEGIN
+ UPDATE dbo.TDADResident
+ SET RoomID=@room,StartDate=@start,EndDate=@end,IsActive=@active,
+     UpdateDate=SYSUTCDATETIME(),UpdateBy=@actor
+ WHERE CompanyID=@company AND ResidentID=@id AND PersonID=@person AND RowVersion=@version;
+ IF @@ROWCOUNT=0 THROW 52822,'RESIDENT_CONFLICT',1;
+ SELECT @id;
+END;
+""";
+            await using var save = new SqlCommand(saveSql, connection, transaction);
+            Add(save, "@company", SqlDbType.BigInt, CompanyId);
+            Add(save, "@id", SqlDbType.BigInt, id);
+            Add(save, "@person", SqlDbType.BigInt, personId);
+            Add(save, "@room", SqlDbType.BigInt, request.RoomId);
+            Add(save, "@start", SqlDbType.Date, request.StartDate);
+            Add(save, "@end", SqlDbType.Date, request.EndDate);
+            Add(save, "@active", SqlDbType.Bit, request.IsActive);
+            Add(save, "@actor", SqlDbType.BigInt, UserId);
+            Add(save, "@version", SqlDbType.Timestamp,
+                id.HasValue && TryVersion(request.RowVersion, out var residentVersion) ? residentVersion : null);
+            var residentId = Convert.ToInt64(await save.ExecuteScalarAsync(token));
+
+            await transaction.CommitAsync(token);
+            logger.LogInformation(
+                "Resident audit {CorrelationId} {Action} Company={CompanyId} Resident={ResidentId} Person={PersonId} Actor={ActorId} Before={Before} After={After}",
+                correlationId, id.HasValue ? "UPDATE" : "CREATE", CompanyId, residentId,
+                personId, UserId, beforeJson, JsonSerializer.Serialize(new
+                {
+                    residentId,
+                    personId,
+                    request.RoomId,
+                    request.StartDate,
+                    request.EndDate,
+                    request.IsActive,
+                    personChanged = request.PersonUpdate is not null,
+                }));
+            return Ok(new { residentID = residentId, personID = personId, correlationID = correlationId });
+        }
+        catch (ResidentRuleException exception)
+        {
+            await transaction.RollbackAsync(token);
+            return BadRequest(Problem("ข้อมูลบุคคลไม่ถูกต้อง",
+                exception.Code == "PERSON_VERSION_INVALID"
+                    ? "กรุณาโหลดข้อมูลบุคคลใหม่ก่อนบันทึก"
+                    : "กรุณาตรวจสอบข้อมูลบุคคล"));
+        }
+        catch (SqlException exception) when (exception.Number is 52820 or 52821 or 52822 or 52823 or 52831 or 2601 or 2627)
+        {
+            await transaction.RollbackAsync(token);
+            return Conflict(exception.Number switch
+            {
+                52820 => Problem("เลือกบุคคลไม่ได้", "บุคคลไม่อยู่ใน Company หรือถูกปิดใช้งาน"),
+                52821 => Problem("เลือกห้องพักไม่ได้", "ต้องเลือกห้องพักที่เปิดใช้งานภายใน Company"),
+                52822 => Problem("ข้อมูลถูกเปลี่ยนแล้ว", "กรุณาโหลดรายการใหม่ก่อนบันทึก"),
+                52823 => Problem("ช่วงพักอาศัยซ้ำ", "บุคคลนี้มีช่วงพักอาศัยในห้องเดียวกันซ้อนอยู่แล้ว"),
+                52831 => Problem("ข้อมูลบุคคลถูกเปลี่ยนแล้ว", "กรุณาโหลดข้อมูลบุคคลใหม่ก่อนบันทึก"),
+                _ => Problem("ข้อมูลผู้พักอาศัยซ้ำ", "กรุณาตรวจสอบบุคคล ห้อง และวันที่เริ่มพัก"),
+            });
+        }
+    }
+
+    private static string? Validate(long? id, ResidentSaveRequest request)
+    {
+        if (request.RoomId <= 0 || request.StartDate == default || request.EndDate < request.StartDate)
+            return "กรุณาเลือกห้องและตรวจสอบช่วงวันที่พักอาศัย";
+        if (!id.HasValue && (request.PersonId.HasValue == (request.NewPerson is not null)))
+            return "กรุณาเลือกบุคคลเดิมหรือสร้างบุคคลใหม่อย่างใดอย่างหนึ่ง";
+        if (id.HasValue && request.NewPerson is not null)
+            return "การแก้ไขรายการเดิมไม่สามารถสร้างบุคคลใหม่ได้";
+        if (request.NewPerson is not null && request.PersonUpdate is not null)
+            return "ไม่สามารถสร้างและแก้ไขข้อมูลบุคคลพร้อมกันได้";
+        if (id.HasValue && !TryVersion(request.RowVersion, out _))
+            return "กรุณาโหลดรายการผู้พักอาศัยใหม่ก่อนบันทึก";
+        var person = (PersonInput?)request.NewPerson ?? request.PersonUpdate;
+        if (person is not null)
+        {
+            if (string.IsNullOrWhiteSpace(person.FullName) || person.FullName.Trim().Length > 200)
+                return "กรุณาระบุชื่อ-นามสกุลไม่เกิน 200 ตัวอักษร";
+            if (person.NickName?.Trim().Length > 100 || person.Mobile?.Trim().Length > 50 || person.Email?.Trim().Length > 320)
+                return "ข้อมูลชื่อเล่น โทรศัพท์ หรืออีเมลยาวเกินกำหนด";
+        }
+        return null;
+    }
+
+    private async Task<bool> ScopeValid(SqlConnection connection, CancellationToken token)
+    {
+        if (!string.Equals(User.FindFirstValue("user_type"), "COMPANY_USER", StringComparison.OrdinalIgnoreCase) ||
+            CompanyId <= 0 || PartnerId <= 0 || UserId <= 0 || ProjectId <= 0) return false;
+        const string sql = """
+SELECT CAST(CASE WHEN EXISTS
+(
+ SELECT 1
+ FROM dbo.TDSTCompanySetUp C
+ INNER JOIN dbo.TDADProject P ON P.ProjectID=@project AND P.ProjectCode=@projectCode AND P.IsActive=1
+ INNER JOIN dbo.TDADCompanyProject CP ON CP.ProjectID=P.ProjectID AND CP.CompanyID=C.CompanyID
+   AND CP.PartnerID=C.PartnerID AND CP.IsEnabled=1
+ INNER JOIN dbo.TDADUserProject UP ON UP.ProjectID=P.ProjectID AND UP.UserID=@user
+   AND UP.CompanyID=C.CompanyID AND UP.IsActive=1
+ WHERE C.CompanyID=@company AND C.PartnerID=@partner AND C.IsActive=1
+   AND C.BusinessTypeCode=N'DORMITORY'
+   AND (CP.StartDate IS NULL OR CP.StartDate<=CONVERT(date,SYSUTCDATETIME()))
+   AND (CP.ExpireDate IS NULL OR CP.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))
+) THEN 1 ELSE 0 END AS bit);
+""";
+        await using var command = new SqlCommand(sql, connection);
+        Add(command, "@project", SqlDbType.BigInt, ProjectId);
+        Add(command, "@projectCode", SqlDbType.NVarChar, ProjectCode, 50);
+        Add(command, "@company", SqlDbType.BigInt, CompanyId);
+        Add(command, "@partner", SqlDbType.BigInt, PartnerId);
+        Add(command, "@user", SqlDbType.BigInt, UserId);
+        return Convert.ToBoolean(await command.ExecuteScalarAsync(token));
+    }
+
+    private Task<bool> Can(SqlConnection connection, string action, CancellationToken token) =>
+        CompanyMenuAccess.IsAllowedAsync(connection, User, MenuCode, action, token);
+
+    private Task<bool> CanEditPerson(SqlConnection connection, CancellationToken token) =>
+        InventoryControllerSupport.CanAsync(
+            connection, User, MenuCode, "EDIT", PersonEditPoint, token);
+
+    private async Task<SqlConnection> Open(CancellationToken token)
+    {
+        var connection = new SqlConnection(configuration.GetConnectionString("LaooDatabase"));
+        await connection.OpenAsync(token);
+        return connection;
+    }
+
+    private void BindPerson(SqlCommand command, PersonInput person)
+    {
+        Add(command, "@company", SqlDbType.BigInt, CompanyId);
+        Add(command, "@name", SqlDbType.NVarChar, person.FullName.Trim(), 200);
+        Add(command, "@nick", SqlDbType.NVarChar, Blank(person.NickName), 100);
+        Add(command, "@email", SqlDbType.NVarChar, Blank(person.Email), 320);
+        Add(command, "@mobile", SqlDbType.NVarChar, Blank(person.Mobile), 50);
+        Add(command, "@actor", SqlDbType.BigInt, UserId);
+    }
+
+    private static object ReadResident(SqlDataReader reader) => new
+    {
+        residentID = reader.GetInt64(1),
+        personID = reader.GetInt64(2),
+        fullName = reader.GetString(3),
+        nickName = Text(reader, 4),
+        mobile = Text(reader, 5),
+        email = Text(reader, 6),
+        roomID = reader.GetInt64(7),
+        roomCode = reader.GetString(8),
+        roomName = reader.GetString(9),
+        buildingID = reader.GetInt64(10),
+        buildingCode = reader.GetString(11),
+        buildingName = reader.GetString(12),
+        floorID = reader.GetInt64(13),
+        floorCode = reader.GetString(14),
+        floorName = reader.GetString(15),
+        startDate = reader.GetDateTime(16),
+        endDate = reader.IsDBNull(17) ? null : (DateTime?)reader.GetDateTime(17),
+        isActive = reader.GetBoolean(18),
+        rowVersion = Convert.ToBase64String((byte[])reader[19]),
+        personRowVersion = Convert.ToBase64String((byte[])reader[20]),
+        roles = RoleCodes(reader.GetBoolean(21), true, reader.GetBoolean(22)),
+    };
+
+    private static IReadOnlyList<string> RoleCodes(bool employee, bool resident, bool user)
+    {
+        var roles = new List<string>();
+        if (employee) roles.Add("EMPLOYEE");
+        if (resident) roles.Add("RESIDENT");
+        if (user) roles.Add("USER");
+        if (roles.Count == 0) roles.Add("GENERAL");
+        return roles;
+    }
+
+    private static async Task<List<Dictionary<string, object?>>> ReadDictionarySet(
+        SqlDataReader reader, CancellationToken token)
+    {
+        await reader.NextResultAsync(token);
+        var rows = new List<Dictionary<string, object?>>();
+        while (await reader.ReadAsync(token))
+        {
+            var row = new Dictionary<string, object?>();
+            for (var index = 0; index < reader.FieldCount; index++)
+                row[reader.GetName(index)] = reader.IsDBNull(index) ? null : reader.GetValue(index);
+            rows.Add(row);
+        }
+        return rows;
+    }
+
+    private long CompanyId => Claim("company_id");
+    private long PartnerId => Claim("partner_id");
+    private long UserId => Claim("user_id");
+    private long ProjectId => Claim("project_id");
+    private long Claim(string name) => long.TryParse(User.FindFirstValue(name), out var value) ? value : 0;
+    private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    private static string? Text(SqlDataReader reader, int index) => reader.IsDBNull(index) ? null : reader.GetString(index);
+    private static object Problem(string message, string description) => new { message, description };
+    private static bool TryVersion(string? value, out byte[]? version)
+    {
+        version = null;
+        if (string.IsNullOrWhiteSpace(value)) return false;
+        try
+        {
+            version = Convert.FromBase64String(value);
+            return version.Length == 8;
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+    }
+    private static void Add(SqlCommand command, string name, SqlDbType type, object? value, int size = 0) =>
+        InventoryControllerSupport.Add(command, name, type, value, size);
+}
+
+public abstract record PersonInput(string FullName, string? NickName, string? Email, string? Mobile);
+public sealed record NewResidentPerson(string FullName, string? NickName, string? Email, string? Mobile)
+    : PersonInput(FullName, NickName, Email, Mobile);
+public sealed record ResidentPersonUpdate(string FullName, string? NickName, string? Email, string? Mobile, string RowVersion)
+    : PersonInput(FullName, NickName, Email, Mobile);
+public sealed record ResidentSaveRequest(
+    long? PersonId,
+    NewResidentPerson? NewPerson,
+    ResidentPersonUpdate? PersonUpdate,
+    long RoomId,
+    DateOnly StartDate,
+    DateOnly? EndDate,
+    bool IsActive = true,
+    string? RowVersion = null);
+
+internal sealed class ResidentRuleException(string code) : Exception(code)
+{
+    public string Code { get; } = code;
+}

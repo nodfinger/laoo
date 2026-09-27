@@ -1,0 +1,263 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Laoo <dev@laoo.local>
+Date: Mon, 7 Sep 2026 21:58:51 +0700
+Subject: [HANDOVER] Improve item API error details and apply inventory
+ migrations
+
+---
+ laoo_api/Program.cs                           | 23 +++++++++--
+ .../company/item/pages/item_page.dart         | 28 +++++++++----
+ ...00_LAOO_SERVICE_central_item_inventory.sql | 39 ++++---------------
+ ...60907091000_LAOO_SERVICE_opening_stock.sql | 14 -------
+ ...907092000_LAOO_SERVICE_inventory_menus.sql | 14 -------
+ 5 files changed, 49 insertions(+), 69 deletions(-)
+
+diff --git a/laoo_api/Program.cs b/laoo_api/Program.cs
+index 011537fa570bf5b6ecfbe6745b576d3edb3890d3..2f38aba35113902922f44891469d82d1a1716e76 100644
+--- a/laoo_api/Program.cs
++++ b/laoo_api/Program.cs
+@@ -7,6 +7,7 @@ using Laoo.Service.Api.Infrastructure.Database;
+ using Microsoft.AspNetCore.Authentication.JwtBearer;
+ using Microsoft.AspNetCore.DataProtection;
+ using Microsoft.AspNetCore.RateLimiting;
++using Microsoft.Data.SqlClient;
+ using Microsoft.IdentityModel.Tokens;
+ using Microsoft.OpenApi.Models;
+ using System.Threading.RateLimiting;
+@@ -217,10 +218,26 @@ if (seedEnabled)
+ 
+ var app = builder.Build();
+ 
+-if (!app.Environment.IsDevelopment())
++app.UseExceptionHandler(errorApp => errorApp.Run(async context =>
+ {
+-    app.UseExceptionHandler();
+-}
++    var exception = context.Features
++        .Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>()?.Error;
++    var description = exception switch
++    {
++        SqlException { Number: 207 or 208 } =>
++            "ฐานข้อมูลยังไม่ได้ติดตั้ง Schema ของทะเบียนสินค้า กรุณาให้ผู้ดูแลระบบรัน Migration สินค้าแล้วลองใหม่",
++        _ => "API ไม่สามารถดำเนินการได้ กรุณาตรวจสอบการเชื่อมต่อฐานข้อมูลหรือดู API log ด้วยรหัสติดตามนี้",
++    };
++
++    context.Response.StatusCode = StatusCodes.Status500InternalServerError;
++    context.Response.ContentType = "application/json; charset=utf-8";
++    await context.Response.WriteAsJsonAsync(new
++    {
++        message = "เกิดข้อผิดพลาดในการเรียก API",
++        description,
++        traceId = context.TraceIdentifier,
++    });
++}));
+ 
+ if (app.Environment.IsDevelopment())
+ {
+diff --git a/lib/features/company/item/pages/item_page.dart b/lib/features/company/item/pages/item_page.dart
+index 9022c8de6737a317816dd8c372abe65f1f8830d7..9c4a929fa562d602b22074a917b5f42228d93201 100644
+--- a/lib/features/company/item/pages/item_page.dart
++++ b/lib/features/company/item/pages/item_page.dart
+@@ -171,7 +171,12 @@ class _ItemPageState extends State<ItemPage> {
+           message: 'ไม่สามารถโหลด$subjectได้',
+           statusCode: error.statusCode,
+           code: error.code,
+-          details: error.message,
++          // Keep the structured API response so the user can see the
++          // server-provided description (and validation field errors).
++          details: error.details ??
++              (error.description == null
++                  ? null
++                  : <String, dynamic>{'description': error.description}),
+         );
+       }
+       rethrow;
+@@ -191,8 +196,21 @@ class _ItemPageState extends State<ItemPage> {
+ 
+   String _readableError(Object error) {
+     if (error is ApiException) {
++      final message = error.message.trim();
++      final description = error.description?.trim();
++      final parts = <String>[];
++      if (message.isNotEmpty && !message.contains('ApiException')) {
++        parts.add(message);
++      }
++      if (description != null &&
++          description.isNotEmpty &&
++          description != message &&
++          !message.contains(description)) {
++        parts.add('รายละเอียดเพิ่มเติม: $description');
++      }
++      if (parts.isNotEmpty) return parts.join('\n');
++
+       if (error.statusCode == 403) {
+-        final message = error.message.trim();
+         if (message.isNotEmpty && !message.contains('ApiException')) {
+           return message;
+         }
+@@ -201,10 +219,6 @@ class _ItemPageState extends State<ItemPage> {
+       if (error.statusCode == 401) {
+         return 'ไม่สามารถดำเนินการกับข้อมูลสินค้าได้: Session หมดอายุ กรุณาเข้าสู่ระบบใหม่';
+       }
+-      final message = error.message.trim();
+-      if (message.isNotEmpty && !message.contains('ApiException')) {
+-        return message;
+-      }
+       return 'ไม่สามารถดำเนินการกับข้อมูลสินค้าได้: API ตอบกลับผิดพลาด (HTTP ${error.statusCode})';
+     }
+     return 'ไม่สามารถดำเนินการกับข้อมูลสินค้าได้: ${error.toString()}';
+@@ -1083,7 +1097,7 @@ class _ItemPageState extends State<ItemPage> {
+       if (mounted) setState(() => _editing = detail);
+     } catch (e) {
+       if (mounted) {
+-        _show('ไม่สามารถเปิดหน้าแก้ไขสินค้าได้: $e');
++        _show('ไม่สามารถเปิดหน้าแก้ไขสินค้าได้:\n${_readableError(e)}');
+       }
+     }
+   }
+diff --git a/projects/service/database/migrations/20260907090000_LAOO_SERVICE_central_item_inventory.sql b/projects/service/database/migrations/20260907090000_LAOO_SERVICE_central_item_inventory.sql
+index 3f1f8e3d50ae2c5d1342834961568d3566970ed8..a88a59296497f4ac336de5660df76c323b793902 100644
+--- a/projects/service/database/migrations/20260907090000_LAOO_SERVICE_central_item_inventory.sql
++++ b/projects/service/database/migrations/20260907090000_LAOO_SERVICE_central_item_inventory.sql
+@@ -1,33 +1,12 @@
+ SET XACT_ABORT ON;
+-BEGIN TRANSACTION;
+-
+-DECLARE @LockResult int;
+-EXEC @LockResult=sys.sp_getapplock @Resource=N'LAOO_SCHEMA_MIGRATION',@LockMode=N'Exclusive',@LockOwner=N'Transaction',@LockTimeout=60000;
+-IF @LockResult<0 THROW 52300,N'Unable to acquire LAOO schema migration lock',1;
+-
+-IF OBJECT_ID(N'dbo.TDSTSchemaMigration',N'U') IS NULL
+-BEGIN
+-    CREATE TABLE dbo.TDSTSchemaMigration
+-    (
+-        ProjectCode nvarchar(30) NOT NULL,
+-        MigrationCode nvarchar(100) NOT NULL,
+-        Checksum varbinary(32) NOT NULL,
+-        AppliedDate datetime2(3) NOT NULL CONSTRAINT DF_TDSTSchemaMigration_AppliedDate DEFAULT SYSUTCDATETIME(),
+-        CONSTRAINT PK_TDSTSchemaMigration PRIMARY KEY(ProjectCode,MigrationCode)
+-    );
+-END;
+-
+-IF EXISTS(SELECT 1 FROM dbo.TDSTSchemaMigration WHERE ProjectCode=N'LAOO_SERVICE' AND MigrationCode=N'20260907090000')
+-BEGIN
+-    COMMIT TRANSACTION;
+-    RETURN;
+-END;
+ 
+ IF COL_LENGTH(N'dbo.TDIVItem', N'ItemKindCode') IS NULL
+     ALTER TABLE dbo.TDIVItem ADD ItemKindCode nvarchar(20) NULL;
+ IF COL_LENGTH(N'dbo.TDIVItem', N'StockTrackingCode') IS NULL
+     ALTER TABLE dbo.TDIVItem ADD StockTrackingCode nvarchar(20) NULL;
+ 
++GO
++
+ UPDATE dbo.TDIVItem
+ SET ItemKindCode = COALESCE(ItemKindCode, N'GOODS'),
+     StockTrackingCode = COALESCE(StockTrackingCode, N'QUANTITY')
+@@ -36,6 +15,8 @@ WHERE ItemKindCode IS NULL OR StockTrackingCode IS NULL;
+ ALTER TABLE dbo.TDIVItem ALTER COLUMN ItemKindCode nvarchar(20) NOT NULL;
+ ALTER TABLE dbo.TDIVItem ALTER COLUMN StockTrackingCode nvarchar(20) NOT NULL;
+ 
++GO
++
+ IF OBJECT_ID(N'dbo.CK_TDIVItem_ItemKindCode', N'C') IS NULL
+     ALTER TABLE dbo.TDIVItem ADD CONSTRAINT CK_TDIVItem_ItemKindCode
+         CHECK (ItemKindCode IN (N'GOODS', N'SERVICE'));
+@@ -186,14 +167,14 @@ BEGIN
+     (
+         StockReceiptDetailID bigint IDENTITY(1,1) NOT NULL CONSTRAINT PK_TDIVStockReceiptDetail PRIMARY KEY,
+         StockReceiptID bigint NOT NULL,
+-        LineNo int NOT NULL,
++        [LineNo] int NOT NULL,
+         ItemID bigint NOT NULL,
+         Quantity decimal(18,4) NOT NULL,
+         UnitCost decimal(18,4) NOT NULL CONSTRAINT DF_TDIVStockReceiptDetail_UnitCost DEFAULT(0),
+         Remark nvarchar(500) NULL,
+         CONSTRAINT FK_TDIVStockReceiptDetail_Header FOREIGN KEY(StockReceiptID) REFERENCES dbo.TDIVStockReceipt(StockReceiptID) ON DELETE CASCADE,
+         CONSTRAINT FK_TDIVStockReceiptDetail_Item FOREIGN KEY(ItemID) REFERENCES dbo.TDIVItem(ItemID),
+-        CONSTRAINT UQ_TDIVStockReceiptDetail_Line UNIQUE(StockReceiptID,LineNo),
++        CONSTRAINT UQ_TDIVStockReceiptDetail_Line UNIQUE(StockReceiptID,[LineNo]),
+         CONSTRAINT CK_TDIVStockReceiptDetail_Quantity CHECK(Quantity>0),
+         CONSTRAINT CK_TDIVStockReceiptDetail_UnitCost CHECK(UnitCost>=0)
+     );
+@@ -331,11 +312,11 @@ BEGIN
+     CREATE TABLE dbo.TDIVStockIssueDetail
+     (
+         StockIssueDetailID bigint IDENTITY(1,1) NOT NULL CONSTRAINT PK_TDIVStockIssueDetail PRIMARY KEY,
+-        StockIssueID bigint NOT NULL,LineNo int NOT NULL,ItemID bigint NOT NULL,Quantity decimal(18,4) NOT NULL,
++        StockIssueID bigint NOT NULL,[LineNo] int NOT NULL,ItemID bigint NOT NULL,Quantity decimal(18,4) NOT NULL,
+         Remark nvarchar(500) NULL,
+         CONSTRAINT FK_TDIVStockIssueDetail_Header FOREIGN KEY(StockIssueID) REFERENCES dbo.TDIVStockIssue(StockIssueID) ON DELETE CASCADE,
+         CONSTRAINT FK_TDIVStockIssueDetail_Item FOREIGN KEY(ItemID) REFERENCES dbo.TDIVItem(ItemID),
+-        CONSTRAINT UQ_TDIVStockIssueDetail_Line UNIQUE(StockIssueID,LineNo),
++        CONSTRAINT UQ_TDIVStockIssueDetail_Line UNIQUE(StockIssueID,[LineNo]),
+         CONSTRAINT CK_TDIVStockIssueDetail_Quantity CHECK(Quantity>0)
+     );
+ END;
+@@ -350,7 +331,3 @@ BEGIN
+     );
+ END;
+ 
+-INSERT dbo.TDSTSchemaMigration(ProjectCode,MigrationCode,Checksum)
+-VALUES(N'LAOO_SERVICE',N'20260907090000',HASHBYTES('SHA2_256',N'central-item-inventory-v1'));
+-
+-COMMIT TRANSACTION;
+diff --git a/projects/service/database/migrations/20260907091000_LAOO_SERVICE_opening_stock.sql b/projects/service/database/migrations/20260907091000_LAOO_SERVICE_opening_stock.sql
+index 0561f669db3ca7a6d072494199e28671a18b01fa..9945b8a84ae40eaaebc9639c929ab19a14a52fe5 100644
+--- a/projects/service/database/migrations/20260907091000_LAOO_SERVICE_opening_stock.sql
++++ b/projects/service/database/migrations/20260907091000_LAOO_SERVICE_opening_stock.sql
+@@ -1,16 +1,6 @@
+ SET XACT_ABORT ON;
+-BEGIN TRANSACTION;
+-
+-DECLARE @LockResult int;
+-EXEC @LockResult=sys.sp_getapplock @Resource=N'LAOO_SCHEMA_MIGRATION',@LockMode=N'Exclusive',@LockOwner=N'Transaction',@LockTimeout=60000;
+-IF @LockResult<0 THROW 52303,N'Unable to acquire LAOO schema migration lock',1;
+ IF OBJECT_ID(N'dbo.TDSTSchemaMigration',N'U') IS NULL
+     THROW 52304,N'Run migration 20260907090000 before opening stock migration',1;
+-IF EXISTS(SELECT 1 FROM dbo.TDSTSchemaMigration WHERE ProjectCode=N'LAOO_SERVICE' AND MigrationCode=N'20260907091000')
+-BEGIN
+-    COMMIT TRANSACTION;
+-    RETURN;
+-END;
+ 
+ IF EXISTS
+ (
+@@ -68,7 +58,3 @@ IF EXISTS
+ )
+     THROW 52302,N'Warehouse totals do not match TDIVItem.StockBalance',1;
+ 
+-INSERT dbo.TDSTSchemaMigration(ProjectCode,MigrationCode,Checksum)
+-VALUES(N'LAOO_SERVICE',N'20260907091000',HASHBYTES('SHA2_256',N'opening-stock-v1'));
+-
+-COMMIT TRANSACTION;
+diff --git a/projects/service/database/migrations/20260907092000_LAOO_SERVICE_inventory_menus.sql b/projects/service/database/migrations/20260907092000_LAOO_SERVICE_inventory_menus.sql
+index ee41627556ea46d3eb547ff620f8504a160ba4d7..c7b485f26833cf9a43dc149dba8a61941e49542d 100644
+--- a/projects/service/database/migrations/20260907092000_LAOO_SERVICE_inventory_menus.sql
++++ b/projects/service/database/migrations/20260907092000_LAOO_SERVICE_inventory_menus.sql
+@@ -1,16 +1,6 @@
+ SET XACT_ABORT ON;
+-BEGIN TRANSACTION;
+-
+-DECLARE @LockResult int;
+-EXEC @LockResult=sys.sp_getapplock @Resource=N'LAOO_SCHEMA_MIGRATION',@LockMode=N'Exclusive',@LockOwner=N'Transaction',@LockTimeout=60000;
+-IF @LockResult<0 THROW 52305,N'Unable to acquire LAOO schema migration lock',1;
+ IF OBJECT_ID(N'dbo.TDSTSchemaMigration',N'U') IS NULL
+     THROW 52306,N'Run migration 20260907090000 before inventory menu migration',1;
+-IF EXISTS(SELECT 1 FROM dbo.TDSTSchemaMigration WHERE ProjectCode=N'LAOO_SERVICE' AND MigrationCode=N'20260907092000')
+-BEGIN
+-    COMMIT TRANSACTION;
+-    RETURN;
+-END;
+ 
+ DECLARE @Menus table
+ (
+@@ -31,7 +21,3 @@ INSERT dbo.TDADMainMenu(MenuCode,MenuGroupCode,MenuName,ScreenType,RouteName,Rou
+ SELECT S.MenuCode,N'08',S.MenuName,S.ScreenType,S.RouteName,S.RoutePath,NULL,S.IconName,S.SortOrder,1,1,1
+ FROM @Menus S WHERE NOT EXISTS(SELECT 1 FROM dbo.TDADMainMenu T WHERE T.MenuCode=S.MenuCode);
+ 
+-INSERT dbo.TDSTSchemaMigration(ProjectCode,MigrationCode,Checksum)
+-VALUES(N'LAOO_SERVICE',N'20260907092000',HASHBYTES('SHA2_256',N'inventory-menus-v1'));
+-
+-COMMIT TRANSACTION;

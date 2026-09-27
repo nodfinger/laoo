@@ -1,0 +1,3274 @@
+﻿[
+    {
+        "label":  "laoo",
+        "files":  [
+                      {
+                          "path":  "laoo_api/Controllers/CoreLocationController.cs",
+                          "sha256":  "DDBEC66469424934BE0E21006E5CEFEDA6EA5A99AA65620954CA1D77319193CC",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/EmployeeController.cs",
+                          "sha256":  "1B102F1614AC486B69F94C125E7A3284CB139C36FF1472A3DFE188827E73BE32",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "lib/features/support/employee/pages/employee_ux_page.dart",
+                          "sha256":  "46F2C2FCEDCB69FE7AEFB5A6754F42E6B9ADB4A7E60F4E1D71E938ACBB3754A0",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "lib/features/support/locations/location_page.dart",
+                          "sha256":  "96B770762FED448FC7F4281F2454699E6752A36A98FAB353D86FD7077A941641",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "lib/features/support/locations/village_location_page.dart",
+                          "sha256":  "6B6F658DEDA56ACF05BCDEAF30001BAD86C35B28B2A59574DFB5952A76E2A341",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "lib/features/support/menu_management/pages/laoo_menu_management_page.dart",
+                          "sha256":  "DB75AF0AC57F94AAD07B8E9F9E5844E4781F9506CC31584D5EB4D0611C8B5A6A",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "linux/flutter/generated_plugin_registrant.cc",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "linux/flutter/generated_plugins.cmake",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "macos/Flutter/GeneratedPluginRegistrant.swift",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "packages/laoo_shared_admin/lib/src/employee/employee_form_models.dart",
+                          "sha256":  "625833A47C8DBAE99B65E26512E44B57CA48AC829F3EA564BD634ABE20E2E30E",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "packages/laoo_shared_admin/lib/src/employee/employee_models.dart",
+                          "sha256":  "BADB1E1CB1D4FF4557937743CCCCC340240A3E7C073EF2CC6854AF7D6DFEB7E1",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "packages/laoo_shared_admin_ui/lib/src/employee/employee_action_workspace.dart",
+                          "sha256":  "A6FA9563733C487F945C658D8194500391CC1BC2131D84484CE4F2283E627195",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "packages/laoo_shared_admin_ui/lib/src/employee/employee_list_controller.dart",
+                          "sha256":  "82195531F0A9779AB369F2297AF9F4FB6F4F99AEDD34D2574697B04DFFE75E1E",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "packages/laoo_shared_admin_ui/lib/src/employee/employee_workspace.dart",
+                          "sha256":  "6344378E8382E268677F929160A3177ADA33FEB80F9431561E8BF96D447D4E53",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "packages/laoo_shared_admin_ui/test/employee_action_workspace_test.dart",
+                          "sha256":  "056966A4D8FAD2795D2D5F9CF3868F701770C75D582C426A11A69673AF5CF558",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "projects/evaluation/lib/features/evaluation/evaluation_feature_host.dart",
+                          "sha256":  "B236053899AC3265CB69E673AB68DF1D88ABBD72BCA540500AE57A6693B76C6A",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "projects/expense/lib/features/expense/expense_feature_host.dart",
+                          "sha256":  "B05CCE842C1D89A0ABACA31E27057A0F61A2ADCCFA1082D135B8C9DFB94DF315",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "projects/meeting/lib/features/meeting/data/meeting_room_issue_repository.dart",
+                          "sha256":  "1D8CC0480363CB549E9602C63A1ABE094FE1D33ECF308D01A4753980F9694ABC",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "projects/meeting/lib/features/meeting/pages/meeting_room_issue_page.dart",
+                          "sha256":  "22716019E6ECFC1CCCC8B802E33F2D73A0BDBC0ADB9DAC1710EB0EBC222C6EE6",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "projects/sales/lib/features/sales/sales_feature_host.dart",
+                          "sha256":  "F048EFB4DA86411C088031FCC929B518C796651BEE4454DE69B51B91422BFCC5",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "projects/service/lib/features/service_request/pages/service_request_page.dart",
+                          "sha256":  "EFF8A7DBC273C2DB05D2167595B2F2012DDA6FC8311FFAC84C760C93C198C800",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "projects/service/lib/features/service_request_qr/pages/service_request_qr_page.dart",
+                          "sha256":  "C807D7B7C9C4B5EADC09C099190C44AAB7941C7B0C2EEDC2AB6445687FA06D23",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "projects/service/lib/features/support/employee/pages/employee_ux_page.dart",
+                          "sha256":  "5945988A19808E0CD47AB8F9200E04EA0D22484F585C8BDB846C5DD221480BE2",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "projects/survey/lib/features/survey/survey_feature_host.dart",
+                          "sha256":  "F15EF9C951F3EF8F38113C1EDEB562D7383EF729A25C865F7C44B3F1E654DABB",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "projects/time/lib/features/attendance_periods/attendance_period_pages.dart",
+                          "sha256":  "9745E47C059141143F590872920CBC89537B219886DB59F20451F280CEAC40B1",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "projects/time/lib/features/attendance_summary/attendance_summary_page.dart",
+                          "sha256":  "CA99EF72F54F0AD68454F26D591E4A3368571AFBF13DFB27A7E6EA9205245509",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "projects/time/lib/features/holiday_calendars/branch_holiday_calendar_page.dart",
+                          "sha256":  "9611D0171DFE1DF2B8756368919DAC779D4B044BFEC08D6EEBCA9AB1812223DB",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "projects/time/lib/features/holiday_calendars/branch_holiday_exception_page.dart",
+                          "sha256":  "336F5FF7AB15F68BDE624418646ABBA306CC2B789C77AF90F61F472D8ADC8A7E",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "projects/time/lib/features/holiday_calendars/holiday_calendar_page.dart",
+                          "sha256":  "3C322C27F7BC9D37EFA752AFE01903AD6ACB728B18226B0A8B50E3523E02C271",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "projects/time/lib/features/holiday_calendars/holiday_date_page.dart",
+                          "sha256":  "0024C75CEFCDA8B20243AE98CB2F030DF8DB4067ABDDADDF765C5FB77F77EA62",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "projects/time/lib/features/leave_entitlement_policies/leave_entitlement_policy_page.dart",
+                          "sha256":  "B78091F0890DECC4B231EB13AB7AE2F8DA288D2A755539CCE6A2155B6B1400D6",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "projects/time/lib/features/leave_requests/leave_request_page.dart",
+                          "sha256":  "FAF465C5E27EAA889DF8BA35E3CCE2C56A2B2490A27649CE306891E520E176A7",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "projects/time/lib/features/system_settings/time_system_settings_page.dart",
+                          "sha256":  "BDD3A4784BBDD99F01F3CDA5D9457B27EC9AA062A90239BE7F2DA891FB7366D5",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "projects/time/lib/features/time/time_go_routes.dart",
+                          "sha256":  "C63C0BD69D7BA417792A996613F85A4C1801B21CD2B37C06D4D317887DC4C74D",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "projects/visitor/lib/features/visitor/visitor_check_in_page.dart",
+                          "sha256":  "7DBDB00BF28808D71229C450DBEACB239BE53B3EB1594171A1F1B37DF84CA7EC",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "projects/visitor/lib/features/visitor/visitor_contact_points_page.dart",
+                          "sha256":  "A63403444DF942EBA103B3F3AC358ED0127875FEC2E88C936970E589D0B017AA",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "projects/visitor/lib/features/visitor/visitor_go_routes.dart",
+                          "sha256":  "2D7E1FE8A54AE39CC59BEFC01F67561B5BF06A764A13F9F954F4A69C831228DD",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "projects/visitor/lib/features/visitor/visitor_inside_page.dart",
+                          "sha256":  "56B74DF2ABA8CD8220D4FFA3B825693860502B7282C0F92D418B740743021A7B",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "projects/visitor/lib/features/visitor/visitor_system_settings_page.dart",
+                          "sha256":  "790D31773EAA55D9CEBD53B991079FBFFA7A67A1AACCDE7A0E292E2324AAE078",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "projects/visitor/pubspec.lock",
+                          "sha256":  "F8D6A26F87B896FB47E84AAAF38EDF3F2277B9BF35B3A216127A43FCDDB41BF4",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "pubspec.lock",
+                          "sha256":  "41A67AFD688677169CE6CABA5F23A069FB9B3B7F08EFE15C6B8FE766E9171FCA",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "windows/flutter/generated_plugin_registrant.cc",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "windows/flutter/generated_plugins.cmake",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      }
+                  ],
+        "baseCommit":  "c6b44639970dce6491b63ecac43f8b1494989431",
+        "path":  "C:/laooplatform/laoo",
+        "index":  [
+
+                  ],
+        "mergeHead":  {
+
+                      },
+        "branch":  "core/in-app-notifications-phase1"
+    },
+    {
+        "label":  "laoo-core-merge-company-hosts",
+        "files":  [
+                      {
+                          "path":  "linux/flutter/generated_plugin_registrant.cc",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "linux/flutter/generated_plugins.cmake",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "macos/Flutter/GeneratedPluginRegistrant.swift",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "pubspec.lock",
+                          "sha256":  "880CA7C34EE2317C0EABD9262B3949CD0EA639F70A21134790718CD9B02D9494",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "windows/flutter/generated_plugin_registrant.cc",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "windows/flutter/generated_plugins.cmake",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      }
+                  ],
+        "baseCommit":  "7f4dfaeb7b559505aa85ffd15ee13b783474b1d7",
+        "path":  "C:/laooplatform/laoo-core-merge-company-hosts",
+        "index":  [
+
+                  ],
+        "mergeHead":  {
+
+                      },
+        "branch":  "main"
+    },
+    {
+        "label":  "laoo-service-baseline-merge",
+        "files":  [
+                      {
+                          "path":  "linux/flutter/generated_plugin_registrant.cc",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "linux/flutter/generated_plugins.cmake",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "macos/Flutter/GeneratedPluginRegistrant.swift",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "windows/flutter/generated_plugin_registrant.cc",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "windows/flutter/generated_plugins.cmake",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      }
+                  ],
+        "baseCommit":  "1efa7b27f3fbbdb712fe6a524dd796bb02e9acff",
+        "path":  "C:/laooplatform/laoo-service-baseline-merge",
+        "index":  [
+
+                  ],
+        "mergeHead":  {
+
+                      },
+        "branch":  "core/merge-service-baseline"
+    },
+    {
+        "label":  "laoo-service-pm",
+        "files":  [
+                      {
+                          "path":  "laoo_api/Controllers/ServicePmController.cs",
+                          "sha256":  "D2AE5ACD44DD1A8CED6F75B08209A9ECD40CEF0E9B7D0C0D6467535F6CBD7D90",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "projects/service/lib/features/pm/data/pm_api.dart",
+                          "sha256":  "9E10B5EEE4FB46FE64C46CF4CD1F48B3E7971154F1EC3E60F0DA06188A164DD9",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "projects/service/lib/features/pm/pages/pm_pages.dart",
+                          "sha256":  "97E6C4802293DACEF5C3CEDBE7466789EED816E83C053B670CBB77B155EDF881",
+                          "status":  "saved"
+                      }
+                  ],
+        "baseCommit":  "a1a742acab2acdf31741d3389d08edb1388b1184",
+        "path":  "C:/laooplatform/laoo-service-pm",
+        "index":  [
+
+                  ],
+        "mergeHead":  {
+
+                      },
+        "branch":  "core/service-pm"
+    },
+    {
+        "label":  "laoo-service-pm-operations",
+        "files":  [
+                      {
+                          "path":  "linux/flutter/generated_plugin_registrant.cc",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "linux/flutter/generated_plugins.cmake",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "macos/Flutter/GeneratedPluginRegistrant.swift",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "pubspec.lock",
+                          "sha256":  "880CA7C34EE2317C0EABD9262B3949CD0EA639F70A21134790718CD9B02D9494",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "windows/flutter/generated_plugin_registrant.cc",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "windows/flutter/generated_plugins.cmake",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      }
+                  ],
+        "baseCommit":  "91f44ebce2be398eed12fbd35dc95721b5d5b870",
+        "path":  "C:/laooplatform/laoo-service-pm-operations",
+        "index":  [
+
+                  ],
+        "mergeHead":  {
+
+                      },
+        "branch":  "service/pm-operations"
+    },
+    {
+        "label":  "laoo_core_visitor_exceptions",
+        "files":  [
+                      {
+                          "path":  "database/migrations/20260927150000_LAOO_visitor_exceptions_menu_activation.sql",
+                          "sha256":  "E36E9D39FF110002C7E9F062B129B63F7C2BF58EB9E192C77019E226E41FA79A",
+                          "status":  "saved"
+                      }
+                  ],
+        "baseCommit":  "8d46c2d254f0d01f14cf88d5812551f6dfe92d2b",
+        "path":  "C:/laooplatform/laoo_core_visitor_exceptions",
+        "index":  [
+
+                  ],
+        "mergeHead":  {
+
+                      },
+        "branch":  "core/enable-visitor-exceptions"
+    },
+    {
+        "label":  "laoo_core_visitor_exceptions_ready",
+        "files":  [
+                      {
+                          "path":  "linux/flutter/generated_plugin_registrant.cc",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "linux/flutter/generated_plugins.cmake",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "macos/Flutter/GeneratedPluginRegistrant.swift",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "pubspec.lock",
+                          "sha256":  "880CA7C34EE2317C0EABD9262B3949CD0EA639F70A21134790718CD9B02D9494",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "windows/flutter/generated_plugin_registrant.cc",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "windows/flutter/generated_plugins.cmake",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      }
+                  ],
+        "baseCommit":  "2be4300bd37d010f9b640c23fc84db88fa14915c",
+        "path":  "C:/laooplatform/laoo_core_visitor_exceptions_ready",
+        "index":  [
+
+                  ],
+        "mergeHead":  {
+
+                      },
+        "branch":  "core/enable-visitor-exceptions-main"
+    },
+    {
+        "label":  "asset-registry",
+        "files":  [
+                      {
+                          "path":  "linux/flutter/generated_plugin_registrant.cc",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "linux/flutter/generated_plugins.cmake",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "macos/Flutter/GeneratedPluginRegistrant.swift",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "output/pdf/LAOO_SERVICE_STATUS_REPORT_TH.pdf",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "pubspec.lock",
+                          "sha256":  "880CA7C34EE2317C0EABD9262B3949CD0EA639F70A21134790718CD9B02D9494",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "tmp/service-page.png",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "windows/flutter/generated_plugin_registrant.cc",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "windows/flutter/generated_plugins.cmake",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      }
+                  ],
+        "baseCommit":  "68bbe459cc94f589e0a692582d0daa8f9e852cee",
+        "path":  "C:/laooplatform/laoo_service/asset-registry",
+        "index":  [
+
+                  ],
+        "mergeHead":  {
+
+                      },
+        "branch":  "service/asset-registry"
+    },
+    {
+        "label":  "center_single_host_worktree",
+        "files":  [
+                      {
+                          "path":  ".vscode/tasks.json",
+                          "sha256":  "65746F8532CC5201F53A7CDE1CFA1F9BB51CEBFEBEB5B52DD3352B105C9033BA",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "AGENTS.md",
+                          "sha256":  "ABB87D8FEE3E4D520658F3461DD855B9848AFEBF3809B02C7AF859A6C0E44285",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "docs/architecture/MONOREPO_WORKFLOW.md",
+                          "sha256":  "CF6760BD0A4AFA8C057211F66B4EB0D5B0B021D97FEC3A6BEEDD192459EFB97B",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "docs/architecture/MULTI_MACHINE_RUNBOOK.md",
+                          "sha256":  "5048AED2A7A4488F6619CF50560DAE962D90DDC1B28B17451A92C8FF1A245361",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "tools/scripts/project-workflow.ps1",
+                          "sha256":  "42D15C2B5137DA16263E00F1D57BB2A13EE31E674CA2A3B53C0F4F803EFD38CB",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "tools/scripts/verify-center.ps1",
+                          "sha256":  "53ABECA1AC3D99E21D4F6C893479978488973E564CC09EAFF619E488BE13102F",
+                          "status":  "saved"
+                      }
+                  ],
+        "baseCommit":  "9ceb130b9feb79baa5f011f83d45c29f54983b51",
+        "path":  "C:/laooplatform/laoo_service/center_single_host_worktree",
+        "index":  [
+
+                  ],
+        "mergeHead":  {
+
+                      },
+        "branch":  "core/vscode-project-workflow"
+    },
+    {
+        "label":  "core-evaluation-phase1",
+        "files":  [
+                      {
+                          "path":  "test/app/router/failures/pinned_data_table_isolatedDiff.png",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "test/app/router/failures/pinned_data_table_maskedDiff.png",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "test/app/router/failures/pinned_data_table_masterImage.png",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "test/app/router/failures/pinned_data_table_testImage.png",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      }
+                  ],
+        "baseCommit":  "e2b85b2d832783a0b6e3a66fa7f2f4ca2eebaf6a",
+        "path":  "C:/laooplatform/laoo_service/core-evaluation-phase1",
+        "index":  [
+
+                  ],
+        "mergeHead":  {
+
+                      },
+        "branch":  "core/multi-machine-owned-modules"
+    },
+    {
+        "label":  "core-expense-menu-bootstrap",
+        "files":  [
+
+                  ],
+        "baseCommit":  "19a50df757957a5bc91f646ad02ffa7005bd6d5c",
+        "path":  "C:/laooplatform/laoo_service/core-expense-menu-bootstrap",
+        "index":  [
+
+                  ],
+        "mergeHead":  {
+
+                      },
+        "branch":  "core/expense-menu-bootstrap"
+    },
+    {
+        "label":  "core-five-s-bootstrap",
+        "files":  [
+
+                  ],
+        "baseCommit":  "cb3a6cf92e8a1fa0259b93c27c0af0c05917d184",
+        "path":  "C:/laooplatform/laoo_service/core-five-s-bootstrap",
+        "index":  [
+
+                  ],
+        "mergeHead":  {
+
+                      },
+        "branch":  "core/five-s-bootstrap"
+    },
+    {
+        "label":  "core-gate-pass-bootstrap",
+        "files":  [
+
+                  ],
+        "baseCommit":  "f2614f8ace4c6447f537d6c57c9c65d44dbf246c",
+        "path":  "C:/laooplatform/laoo_service/core-gate-pass-bootstrap",
+        "index":  [
+
+                  ],
+        "mergeHead":  {
+
+                      },
+        "branch":  "core/gate-pass-bootstrap"
+    },
+    {
+        "label":  "core-host-notification-recipient",
+        "files":  [
+                      {
+                          "path":  "laoo_api/Controllers/BusinessLocationController.cs",
+                          "sha256":  "072D3E1ACDDCE9640FD8D08F71AA0CBA23344B7395E48957A551326277902D58",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/CompanyRolePermissionController.cs",
+                          "sha256":  "277A7FCC877DAC5D37C718FBEA9FC08AA00B5F4073BD9C25420BF6F5696BE002",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/CompanySetupController.cs",
+                          "sha256":  "3D83EA5A9EDA54C26B3EB317316E19707BAC1C60721F1BCFBA0A0B50F34655EA",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/CompanySubPermissionController.cs",
+                          "sha256":  "E9CEC8555D0005757D2CD1634FE01C457E54F1AC868E2CACAAE9CCA22DDAB698",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/CoreLocationController.cs",
+                          "sha256":  "5974E7070A8C7BF3EA533D8682F2FABF51DBBE24F156D98F008B428405EC36CC",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/CurrentUserHostIdentityController.cs",
+                          "sha256":  "BB289FDFE63C0C2F56A1A0E247EE5197DB39BBB6CCFB12AC1CD802E1348005E6",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/EmployeeController.cs",
+                          "sha256":  "2D337A654D82ACFA475AA4F1182FCD6E8EFCA6AFB6B144FAB3C77904CF308769",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/EmployeeOrganizationAssignmentController.cs",
+                          "sha256":  "18B1382368F61ED2D0AE12E4EC4343EFB695FCF4352A11325E7811F8551D8DE3",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/ItemController.cs",
+                          "sha256":  "9220A4B02A467A598445FFF0031A6F5F291FB9917657F9BAD6EE4C5EA7B6A05A",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/ItemController.Projects.cs",
+                          "sha256":  "82E2ABF89D240C000813D9E0C21547E37E7E86FB96D6D8BD28063B90F093C162",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/ItemController.Warranty.cs",
+                          "sha256":  "7F2063DD65D051D50564911F8A8C776B90480FEAC9D12AC4CE8DBEEEEA5020BC",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/MenuPermissionController.cs",
+                          "sha256":  "E83557E896BAFE335007AF95D035B7A4B17D0C9C9C44EEB19183D1C99346FF83",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/OrganizationStructureController.cs",
+                          "sha256":  "F82AD3B3783358F29642ED8B026CA5AA40D239CD80D8808273DF35CECAAC340B",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/PartnerCompanyController.cs",
+                          "sha256":  "F04746CCF143D55FC6E989B85A73F6065B68AC0CB396831D1463D30491770216",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/PartnerController.cs",
+                          "sha256":  "EFE47985A1890183DB337F5D9436204DC4BC7CF409855672278861A06B0A02F2",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/PartnerUserController.cs",
+                          "sha256":  "9AA3E93092ADE251AA24307E52087005A998DBF225C1AE90058A9728457163EE",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/PeopleRegistryController.cs",
+                          "sha256":  "64739CA9645DA6EB5EF1E3C7EF1E492DB90293C27B50AB56D9C34F55EBFD3D91",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/ServiceDashboardController.cs",
+                          "sha256":  "860D0064AAB400A252093809ADDC32A295770BCF24FE67F47D2BACCCA7B8D5CB",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/ServicePersonController.Write.cs",
+                          "sha256":  "839FA35A750C51C2EA69816520473D01BF0BA4BEF500EC96369DD24633EF7573",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/ServicePmController.cs",
+                          "sha256":  "95DAAAC89934A133FB755B6C0F2114312695CA838C8A5444F439CA10A2D7E95A",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/ServiceRequestController.cs",
+                          "sha256":  "7F7D003DBD9680D16C4DBFE9C34C8C016962A523CF293CCAE79A74175872854C",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/UserProfileController.cs",
+                          "sha256":  "A0005D59FB11336870CA5BA3EFAD4DE1D3C465AC583AE4C025C50E41CCC51D30",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/VendorController.cs",
+                          "sha256":  "BBB4B6EA330EDA0E52F29AA95058A80ABB367FC3C5300A5F9B3CD78BD0AEB0B7",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_api/Models/CompanySetupModels.cs",
+                          "sha256":  "2216A1F5BCB58B34A6A45B9C408B92D91FB7E58723EE2AB122F37C2919796D3D",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_api/Models/VendorModels.cs",
+                          "sha256":  "8284BF602AEFB39271C7DEDCB66D3FD1CC0C2D836D441DC7DB0E9B0C448FA7D4",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_api/Security/RequireItemCatalogProjectAttribute.cs",
+                          "sha256":  "A39DD8F7E0B4A9EADAEB3AB07AC8B991821CDBDBD135E242376097CFF18F21DF",
+                          "status":  "saved"
+                      }
+                  ],
+        "baseCommit":  "4fa68e6eba9a504f8174fe0927a4dc00d7c0f47a",
+        "path":  "C:/laooplatform/laoo_service/core-host-notification-recipient",
+        "index":  [
+
+                  ],
+        "mergeHead":  {
+
+                      },
+        "branch":  "core/host-notification-recipient"
+    },
+    {
+        "label":  "core-intranet-bootstrap",
+        "files":  [
+
+                  ],
+        "baseCommit":  "ce0105705322e06d4a168e791ad5fc582730c438",
+        "path":  "C:/laooplatform/laoo_service/core-intranet-bootstrap",
+        "index":  [
+
+                  ],
+        "mergeHead":  {
+
+                      },
+        "branch":  "core/intranet-bootstrap"
+    },
+    {
+        "label":  "core-location-migration",
+        "files":  [
+                      {
+                          "path":  "database/migrations/20260908140000_LAOO_core_locations.sql",
+                          "sha256":  "C1374568022DAF15F200458DC3F82A318FEE51BD7A3C235291E21E5D00466CCB",
+                          "status":  "saved"
+                      }
+                  ],
+        "baseCommit":  "73826ff1c44698282d8552c8a440d100350c80c8",
+        "path":  "C:/laooplatform/laoo_service/core-location-migration",
+        "index":  [
+
+                  ],
+        "mergeHead":  {
+
+                      },
+        "branch":  {
+
+                   }
+    },
+    {
+        "label":  "core-merge-host-notification",
+        "files":  [
+
+                  ],
+        "baseCommit":  "09415df46745f04ca8f1f46a18c73bf6aed18244",
+        "path":  "C:/laooplatform/laoo_service/core-merge-host-notification",
+        "index":  [
+
+                  ],
+        "mergeHead":  {
+
+                      },
+        "branch":  "core/merge-host-notification"
+    },
+    {
+        "label":  "core-merge-project-bootstraps",
+        "files":  [
+
+                  ],
+        "baseCommit":  "c8a2b196cb55525554ee4c88bfde4954f12733c7",
+        "path":  "C:/laooplatform/laoo_service/core-merge-project-bootstraps",
+        "index":  [
+
+                  ],
+        "mergeHead":  {
+
+                      },
+        "branch":  "core/merge-project-bootstraps"
+    },
+    {
+        "label":  "core-pos-bootstrap",
+        "files":  [
+
+                  ],
+        "baseCommit":  "56f51b18377d58e2e163303ffdbc340d9b9d90f9",
+        "path":  "C:/laooplatform/laoo_service/core-pos-bootstrap",
+        "index":  [
+
+                  ],
+        "mergeHead":  {
+
+                      },
+        "branch":  "core/pos-bootstrap"
+    },
+    {
+        "label":  "core-project-bootstrap",
+        "files":  [
+
+                  ],
+        "baseCommit":  "70512dcbf34d75300de332bf4a5e8247640fa79e",
+        "path":  "C:/laooplatform/laoo_service/core-project-bootstrap",
+        "index":  [
+
+                  ],
+        "mergeHead":  {
+
+                      },
+        "branch":  "core/project-bootstrap"
+    },
+    {
+        "label":  "core-project-machine-independence",
+        "files":  [
+                      {
+                          "path":  "test/app/router/failures/pinned_data_table_isolatedDiff.png",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "test/app/router/failures/pinned_data_table_maskedDiff.png",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "test/app/router/failures/pinned_data_table_masterImage.png",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "test/app/router/failures/pinned_data_table_testImage.png",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      }
+                  ],
+        "baseCommit":  "7e53c127d1e9989b77a0edd0e4dc3c2100a6f744",
+        "path":  "C:/laooplatform/laoo_service/core-project-machine-independence",
+        "index":  [
+
+                  ],
+        "mergeHead":  {
+
+                      },
+        "branch":  "core/project-machine-independence"
+    },
+    {
+        "label":  "core-project-portfolio-working-plan",
+        "files":  [
+
+                  ],
+        "baseCommit":  "69c8ea1f592528066ce8d490f1cacd7808699344",
+        "path":  "C:/laooplatform/laoo_service/core-project-portfolio-working-plan",
+        "index":  [
+
+                  ],
+        "mergeHead":  {
+
+                      },
+        "branch":  "core/project-portfolio-working-plan"
+    },
+    {
+        "label":  "core-sales-bootstrap",
+        "files":  [
+
+                  ],
+        "baseCommit":  "70cca51edf2805f21a940d0c3cc89e27bda950de",
+        "path":  "C:/laooplatform/laoo_service/core-sales-bootstrap",
+        "index":  [
+
+                  ],
+        "mergeHead":  {
+
+                      },
+        "branch":  "core/sales-bootstrap"
+    },
+    {
+        "label":  "core-survey-menu-bootstrap",
+        "files":  [
+
+                  ],
+        "baseCommit":  "e08b7d5a2e681602d61e1fe5c5616ad83dde5588",
+        "path":  "C:/laooplatform/laoo_service/core-survey-menu-bootstrap",
+        "index":  [
+
+                  ],
+        "mergeHead":  {
+
+                      },
+        "branch":  "core/survey-menu-bootstrap"
+    },
+    {
+        "label":  "core-time-attendance-results-bootstrap",
+        "files":  [
+                      {
+                          "path":  "api-build-check/appsettings.Development.json",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/appsettings.json",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/Azure.Core.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/Azure.Identity.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/cs/Microsoft.Data.SqlClient.resources.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/de/Microsoft.Data.SqlClient.resources.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/es/Microsoft.Data.SqlClient.resources.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/fr/Microsoft.Data.SqlClient.resources.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/it/Microsoft.Data.SqlClient.resources.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/ja/Microsoft.Data.SqlClient.resources.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/ko/Microsoft.Data.SqlClient.resources.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/Laoo.Meeting.Module.deps.json",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/Laoo.Meeting.Module.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/Laoo.Meeting.Module.pdb",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/Laoo.Service.Module.deps.json",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/Laoo.Service.Module.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/Laoo.Service.Module.pdb",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/Laoo.Shared.Contracts.deps.json",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/Laoo.Shared.Contracts.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/Laoo.Shared.Contracts.pdb",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/Laoo.Time.Module.deps.json",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/Laoo.Time.Module.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/Laoo.Time.Module.pdb",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/Laoo.Visitor.Module.deps.json",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/Laoo.Visitor.Module.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/Laoo.Visitor.Module.pdb",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/laoo_api.deps.json",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/laoo_api.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/laoo_api.pdb",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/laoo_api.runtimeconfig.json",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/laoo_api.staticwebassets.endpoints.json",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/laoo_api.staticwebassets.runtime.json",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/local.example.json",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/Microsoft.AspNetCore.Authentication.JwtBearer.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/Microsoft.Bcl.AsyncInterfaces.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/Microsoft.Data.SqlClient.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/Microsoft.Extensions.Caching.Memory.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/Microsoft.Extensions.DependencyInjection.Abstractions.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/Microsoft.Extensions.Logging.Abstractions.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/Microsoft.Extensions.Options.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/Microsoft.Identity.Client.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/Microsoft.Identity.Client.Extensions.Msal.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/Microsoft.IdentityModel.Abstractions.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/Microsoft.IdentityModel.JsonWebTokens.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/Microsoft.IdentityModel.Logging.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/Microsoft.IdentityModel.Protocols.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/Microsoft.IdentityModel.Protocols.OpenIdConnect.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/Microsoft.IdentityModel.Tokens.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/Microsoft.OpenApi.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/Microsoft.SqlServer.Server.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/pl/Microsoft.Data.SqlClient.resources.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/pt-BR/Microsoft.Data.SqlClient.resources.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/publish/appsettings.Development.json",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/publish/appsettings.json",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/publish/laoo_api.deps.json",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/publish/laoo_api.runtimeconfig.json",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/publish/laoo_api.staticwebassets.endpoints.json",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/publish/local.example.json",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/publish/web.config",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/ru/Microsoft.Data.SqlClient.resources.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/runtimes/unix/lib/net8.0/Microsoft.Data.SqlClient.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/runtimes/win/lib/net8.0/Microsoft.Data.SqlClient.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/runtimes/win/lib/net8.0/System.Diagnostics.EventLog.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/runtimes/win/lib/net8.0/System.Security.Cryptography.Pkcs.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/runtimes/win-arm64/native/Microsoft.Data.SqlClient.SNI.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/runtimes/win-x64/native/Microsoft.Data.SqlClient.SNI.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/runtimes/win-x86/native/Microsoft.Data.SqlClient.SNI.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/Swashbuckle.AspNetCore.Swagger.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/Swashbuckle.AspNetCore.SwaggerGen.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/Swashbuckle.AspNetCore.SwaggerUI.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/System.ClientModel.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/System.Configuration.ConfigurationManager.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/System.Diagnostics.EventLog.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/System.IdentityModel.Tokens.Jwt.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/System.Memory.Data.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/System.Security.Cryptography.Pkcs.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/System.Security.Cryptography.ProtectedData.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/tr/Microsoft.Data.SqlClient.resources.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/zh-Hans/Microsoft.Data.SqlClient.resources.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "api-build-check/zh-Hant/Microsoft.Data.SqlClient.resources.dll",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      }
+                  ],
+        "baseCommit":  "5291be4f6e4d5f6d5123a8772457a05457cc8818",
+        "path":  "C:/laooplatform/laoo_service/core-time-attendance-results-bootstrap",
+        "index":  [
+
+                  ],
+        "mergeHead":  {
+
+                      },
+        "branch":  "core/time-attendance-results-bootstrap"
+    },
+    {
+        "label":  "core-time-leave-balance-generate",
+        "files":  [
+
+                  ],
+        "baseCommit":  "6c1a520eb1b440d0e9070469ad43e4a9400b6d97",
+        "path":  "C:/laooplatform/laoo_service/core-time-leave-balance-generate",
+        "index":  [
+
+                  ],
+        "mergeHead":  {
+
+                      },
+        "branch":  "core/time-leave-balance-generate"
+    },
+    {
+        "label":  "core-time-leave-report-bootstrap",
+        "files":  [
+
+                  ],
+        "baseCommit":  "1715f04635ab51109c709e25b46ecee366524da9",
+        "path":  "C:/laooplatform/laoo_service/core-time-leave-report-bootstrap",
+        "index":  [
+
+                  ],
+        "mergeHead":  {
+
+                      },
+        "branch":  "core/time-leave-report-bootstrap"
+    },
+    {
+        "label":  "core-time-payroll-export-bootstrap",
+        "files":  [
+                      {
+                          "path":  "test/app/router/failures/pinned_data_table_isolatedDiff.png",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "test/app/router/failures/pinned_data_table_maskedDiff.png",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "test/app/router/failures/pinned_data_table_masterImage.png",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "test/app/router/failures/pinned_data_table_testImage.png",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      }
+                  ],
+        "baseCommit":  "503423f9907d46a7ca4f3a0bee9f81b4823e1009",
+        "path":  "C:/laooplatform/laoo_service/core-time-payroll-export-bootstrap",
+        "index":  [
+
+                  ],
+        "mergeHead":  {
+
+                      },
+        "branch":  "core/time-payroll-export-bootstrap"
+    },
+    {
+        "label":  "core-time-results-placeholder-removal",
+        "files":  [
+
+                  ],
+        "baseCommit":  "e50c4637796dfbd6e10fb3ba171be70af42b61ed",
+        "path":  "C:/laooplatform/laoo_service/core-time-results-placeholder-removal",
+        "index":  [
+
+                  ],
+        "mergeHead":  {
+
+                      },
+        "branch":  "core/remove-time-results-placeholder"
+    },
+    {
+        "label":  "core-training-flutter-feature-integration",
+        "files":  [
+                      {
+                          "path":  "lib/app/router/app_router.dart",
+                          "sha256":  "B4B2B05AA61FF7FDDA4CF3FA64EF12082B28E93FF86F77C80D78AD715FD45286",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "projects/service/lib/features/company/person/pages/service_person_page.dart",
+                          "sha256":  "B0A4C775F16AB6C5356FEFC3D4FE9B682FA167247159F22FFC8EC6D446A62E1A",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "projects/service/test/service_person_route_contract_test.dart",
+                          "sha256":  "C841F19BF3FA1CF18DBDB4C9A302824DE57CF6D6366AF1868B1E109F176DE86D",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "projects/time/lib/features/leave_requests/leave_request_page.dart",
+                          "sha256":  "1D87CDBB49C7B518EFAEBF6D0E5E4868A85473BF9C7C3A012B4FB3E52E54F63F",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "projects/time/lib/features/leave_requests/leave_request_repository.dart",
+                          "sha256":  "CC26DF0ABB0929991B4C7BF0DC8FE0FF9CD2F50F87964762CD40F3F0298B7D3C",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "projects/time/lib/features/time/time_go_routes.dart",
+                          "sha256":  "14F171186D87FB41F792678CBDE12C047631838E1028F6368BEB920D4D05AB53",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "projects/time/lib/features/time/time_route_contract.dart",
+                          "sha256":  "09A83F7ABA6BB6BF354F15EDAAD86FA49BF93194D569B4EE34B87AA67FF9652B",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "projects/time/packages/dotnet/Laoo.Time.Module/AttendanceCalculator.cs",
+                          "sha256":  "9126A84F8E4C5104006C7BFCAE3A2838ABB28A23068A1858CC044201AD102AA6",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "projects/time/packages/dotnet/Laoo.Time.Module/Controllers/LeaveRequestsController.cs",
+                          "sha256":  "F972A2219A6067E136C28F3C5C8FF5569790158BC6EC00AB71CECCAC6F458C7E",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "test/app/router/business_module_contract_test.dart",
+                          "sha256":  "AC168C17E6E1089B58FAAD3F523736B445A70AA6C65DBC76D9E02F20BBE5C43D",
+                          "status":  "saved"
+                      }
+                  ],
+        "baseCommit":  "67feeff1857ea35970fc8bdcb1a32982383df452",
+        "path":  "C:/laooplatform/laoo_service/core-training-flutter-feature-integration",
+        "index":  [
+                      {
+                          "path":  "lib/app/router/app_router.dart",
+                          "blob":  "cc267e4612dcfa3d474789061e576f9d07d9b171",
+                          "stage":  "1"
+                      },
+                      {
+                          "path":  "lib/app/router/app_router.dart",
+                          "blob":  "984e0a75263b069b28b1a7c791aa0fb6350be696",
+                          "stage":  "2"
+                      },
+                      {
+                          "path":  "lib/app/router/app_router.dart",
+                          "blob":  "50c3141778933538816b4302fef6a24192d55c3b",
+                          "stage":  "3"
+                      },
+                      {
+                          "path":  "projects/service/lib/features/company/person/pages/service_person_page.dart",
+                          "blob":  "aa4b81345dd43d72b1639b1b5b2dae79b1e11864",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "projects/service/test/service_person_route_contract_test.dart",
+                          "blob":  "d9b0f83b8b3c4b05e38bfe739f5029513581d2da",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "projects/time/lib/features/leave_requests/leave_request_page.dart",
+                          "blob":  "50c45aec9026bba2fae202009a16ed1aba9f1777",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "projects/time/lib/features/leave_requests/leave_request_repository.dart",
+                          "blob":  "8d0d98a7794d5112db8b31efa2952ad0525c1e65",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "projects/time/lib/features/time/time_go_routes.dart",
+                          "blob":  "0ee60a018b74bc3e37e4d0f31ca23e56687533d5",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "projects/time/lib/features/time/time_route_contract.dart",
+                          "blob":  "4d7ff979343ecec9bb5e8018b7fa91430d69bf60",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "projects/time/packages/dotnet/Laoo.Time.Module/AttendanceCalculator.cs",
+                          "blob":  "7a726cea04a7e57cc200287bf5270957dac70883",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "projects/time/packages/dotnet/Laoo.Time.Module/Controllers/LeaveRequestsController.cs",
+                          "blob":  "bcb5f674ee1a6491b33812819b9b4972a101b660",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "test/app/router/business_module_contract_test.dart",
+                          "blob":  "878c6c77ac4d45d143781edec95619958307e4eb",
+                          "stage":  "1"
+                      },
+                      {
+                          "path":  "test/app/router/business_module_contract_test.dart",
+                          "blob":  "c45d9136d2db165d901eef60a9b3fb16929e3288",
+                          "stage":  "2"
+                      },
+                      {
+                          "path":  "test/app/router/business_module_contract_test.dart",
+                          "blob":  "44597f513d8d77d427c1f624a1760a0d96769d96",
+                          "stage":  "3"
+                      }
+                  ],
+        "mergeHead":  "c8aebdf6fe136407f3234e84492f361709db8791",
+        "branch":  "core/training-flutter-feature-integration"
+    },
+    {
+        "label":  "core-training-test-template",
+        "files":  [
+
+                  ],
+        "baseCommit":  "e7da6c0c133709cc5651cff6c9485c3554f78fc3",
+        "path":  "C:/laooplatform/laoo_service/core-training-test-template",
+        "index":  [
+
+                  ],
+        "mergeHead":  {
+
+                      },
+        "branch":  "core/training-test-template"
+    },
+    {
+        "label":  "core-vote-bootstrap",
+        "files":  [
+
+                  ],
+        "baseCommit":  "8ff791464ea8cac5baf1c27ffb053e327a2b6294",
+        "path":  "C:/laooplatform/laoo_service/core-vote-bootstrap",
+        "index":  [
+
+                  ],
+        "mergeHead":  {
+
+                      },
+        "branch":  "core/vote-bootstrap"
+    },
+    {
+        "label":  "main-time-merge",
+        "files":  [
+
+                  ],
+        "baseCommit":  "8ed447e9c835617160153559d2fae08d4f4542c3",
+        "path":  "C:/laooplatform/laoo_service/main-time-merge",
+        "index":  [
+
+                  ],
+        "mergeHead":  {
+
+                      },
+        "branch":  {
+
+                   }
+    },
+    {
+        "label":  "meeting_list_card_worktree",
+        "files":  [
+
+                  ],
+        "baseCommit":  "93c982d0314d5ae71b0381b95932c0eeffb781bf",
+        "path":  "C:/laooplatform/laoo_service/meeting_list_card_worktree",
+        "index":  [
+
+                  ],
+        "mergeHead":  {
+
+                      },
+        "branch":  "fix/meeting-list-card-standards"
+    },
+    {
+        "label":  "pr62-sales-reconcile",
+        "files":  [
+
+                  ],
+        "baseCommit":  "5caf269526476666b363dc7d17e13718459cd946",
+        "path":  "C:/laooplatform/laoo_service/pr62-sales-reconcile",
+        "index":  [
+
+                  ],
+        "mergeHead":  {
+
+                      },
+        "branch":  {
+
+                   }
+    },
+    {
+        "label":  "rebase-intranet",
+        "files":  [
+                      {
+                          "path":  "projects/intranet/pubspec.lock",
+                          "sha256":  "C5FBAAF2057198C00AEAA558E466B68FE4B3EFC6131C173C231950B19CC9EA94",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "test/app/router/failures/pinned_data_table_isolatedDiff.png",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "test/app/router/failures/pinned_data_table_maskedDiff.png",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "test/app/router/failures/pinned_data_table_masterImage.png",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "test/app/router/failures/pinned_data_table_testImage.png",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      }
+                  ],
+        "baseCommit":  "b1bf255060efdb97bc8f52aea1c8b3cf07d4a4a2",
+        "path":  "C:/laooplatform/laoo_service/rebase-intranet",
+        "index":  [
+
+                  ],
+        "mergeHead":  {
+
+                      },
+        "branch":  "core/intranet-bootstrap-rebase"
+    },
+    {
+        "label":  "run-core-migration",
+        "files":  [
+                      {
+                          "path":  "test/app/router/failures/pinned_data_table_isolatedDiff.png",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "test/app/router/failures/pinned_data_table_maskedDiff.png",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "test/app/router/failures/pinned_data_table_masterImage.png",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "test/app/router/failures/pinned_data_table_testImage.png",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      }
+                  ],
+        "baseCommit":  "0f1b39c0b338809c7911ac92a090ad9741045c44",
+        "path":  "C:/laooplatform/laoo_service/run-core-migration",
+        "index":  [
+
+                  ],
+        "mergeHead":  {
+
+                      },
+        "branch":  {
+
+                   }
+    },
+    {
+        "label":  "service-person-roles",
+        "files":  [
+                      {
+                          "path":  "laoo_api/Controllers/NavigationController.cs",
+                          "sha256":  "D0BCBCCEE6A59A2D94CF4E0569B4A7F9F55DB187DF4FA3A86919B4EA3CB840BE",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_api/Controllers/ServicePersonController.Write.cs",
+                          "sha256":  "506667DFFA0E77C979275EE1C69DD957C21377E1D9712CF6B79574806C4AC968",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "projects/service/lib/features/company/person/pages/service_person_page.dart",
+                          "sha256":  "7E73BF86264DE41CFDA89B438FEA944AD5398F3188B9024B9C4355CE65B733FD",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "projects/service/test/service_person_route_contract_test.dart",
+                          "sha256":  "D3985876F43466B9726F95A22F2D1D8460F4CBE269E028239E7AEFB552942013",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "tools/navigation-tests/NavigationTests.csproj",
+                          "sha256":  "73CE5C6EA34E2EC0CBF0B89EFA8CD13F4D043F81E588A68130134D53677F9C20",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "tools/navigation-tests/Program.cs",
+                          "sha256":  "AACC9BCDE399D4AD9AA1C4B70FB6E5E15C62A9802CC9B6CDCC5A0814A1E2AA3B",
+                          "status":  "saved"
+                      }
+                  ],
+        "baseCommit":  "807dab6492c7e6c065b054ac2e8d51061265dd5a",
+        "path":  "C:/laooplatform/laoo_service/service-person-roles",
+        "index":  [
+
+                  ],
+        "mergeHead":  {
+
+                      },
+        "branch":  "core/person-role-screens"
+    },
+    {
+        "label":  "time-leave-root-verify",
+        "files":  [
+                      {
+                          "path":  "lib/app/router/app_router.dart",
+                          "sha256":  "65C6E4EA005EE28B08D69174A7F5383D36A7A61CFB92C2AF369ADCDD9F6BDD66",
+                          "status":  "saved"
+                      }
+                  ],
+        "baseCommit":  "a6aee8d1bdcaf21a423ea516212956d4ffa2ed83",
+        "path":  "C:/laooplatform/laoo_service/time-leave-root-verify",
+        "index":  [
+
+                  ],
+        "mergeHead":  {
+
+                      },
+        "branch":  {
+
+                   }
+    },
+    {
+        "label":  "verify-meeting-pr43",
+        "files":  [
+                      {
+                          "path":  "test/app/router/failures/pinned_data_table_isolatedDiff.png",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "test/app/router/failures/pinned_data_table_maskedDiff.png",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "test/app/router/failures/pinned_data_table_masterImage.png",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "test/app/router/failures/pinned_data_table_testImage.png",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      }
+                  ],
+        "baseCommit":  "ad0a5533e906e620162840df38ceb882feff3cef",
+        "path":  "C:/laooplatform/laoo_service/verify-meeting-pr43",
+        "index":  [
+
+                  ],
+        "mergeHead":  {
+
+                      },
+        "branch":  "hotfix/meeting-booking-training-migration-batch"
+    },
+    {
+        "label":  "laoo-core-time-contract",
+        "files":  [
+
+                  ],
+        "baseCommit":  "2454de1122ea34af0803b492353bfca40a3168f1",
+        "path":  "C:/tmp/laoo-core-time-contract",
+        "index":  [
+
+                  ],
+        "mergeHead":  {
+
+                      },
+        "branch":  "core/time-route-contract-assertions"
+    },
+    {
+        "label":  "laoo-core-time-summary-report",
+        "files":  [
+
+                  ],
+        "baseCommit":  "ca05cf2ca1a496ef420c6557ebe89aade6625f92",
+        "path":  "C:/tmp/laoo-core-time-summary-report",
+        "index":  [
+
+                  ],
+        "mergeHead":  {
+
+                      },
+        "branch":  "core/time-attendance-summary-report"
+    },
+    {
+        "label":  "laoo-time-pr18-review",
+        "files":  [
+
+                  ],
+        "baseCommit":  "914ffa704b792517bbf83e3164990478fba00d1e",
+        "path":  "C:/tmp/laoo-time-pr18-review",
+        "index":  [
+
+                  ],
+        "mergeHead":  {
+
+                      },
+        "branch":  {
+
+                   }
+    },
+    {
+        "label":  "laoo-time-review",
+        "files":  [
+
+                  ],
+        "baseCommit":  "fe3071740c0b87f163a4c92ea357928401c4d73f",
+        "path":  "C:/tmp/laoo-time-review",
+        "index":  [
+
+                  ],
+        "mergeHead":  {
+
+                      },
+        "branch":  {
+
+                   }
+    },
+    {
+        "label":  "legacy-laoo_visitor",
+        "files":  [
+                      {
+                          "path":  ".tmp_spec_read/[Content_Types].xml",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  ".tmp_spec_read/_rels/.rels",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  ".tmp_spec_read/customXml/_rels/item1.xml.rels",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  ".tmp_spec_read/customXml/item1.xml",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  ".tmp_spec_read/customXml/itemProps1.xml",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  ".tmp_spec_read/docProps/app.xml",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  ".tmp_spec_read/docProps/core.xml",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  ".tmp_spec_read/docProps/thumbnail.jpeg",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  ".tmp_spec_read/spec.zip",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  ".tmp_spec_read/word/_rels/document.xml.rels",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  ".tmp_spec_read/word/document.xml",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  ".tmp_spec_read/word/fontTable.xml",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  ".tmp_spec_read/word/numbering.xml",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  ".tmp_spec_read/word/settings.xml",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  ".tmp_spec_read/word/styles.xml",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  ".tmp_spec_read/word/stylesWithEffects.xml",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  ".tmp_spec_read/word/theme/theme1.xml",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  ".tmp_spec_read/word/webSettings.xml",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "AGENTS.md",
+                          "sha256":  "25A66E349A68AC5B6D1F492DB34BF7079B072963107DC307729623D07DCC3B07",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "analysis_options.yaml",
+                          "sha256":  "75D2D8FF5435CB5D89F2F36D0AE95DCEFE6CBB6906F80616094905A33D957E50",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "android/app/build.gradle.kts",
+                          "sha256":  "F1C60EE0A36BEEB406908B9CF7B64F4C972F89B47CDB3037FEDD4FB5B564C1D9",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "android/app/src/main/AndroidManifest.xml",
+                          "sha256":  "A13A308D70A25A76252CBD0010192F41CA0A761028171DE5A7C36B271458E7E4",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "android/app/src/main/kotlin/com/example/laoo_meeting/MainActivity.kt",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "android/app/src/main/kotlin/com/example/laoo_visitor/MainActivity.kt",
+                          "sha256":  "AA55E70ACAD610376D5E75B81A4D703496738E28098BF3ABBFF3DE1A5E7EE14C",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "android/build.gradle.kts",
+                          "sha256":  "C76BDC457CEC69F1D96F20CAF1C0C8C9A833957EC43059BE83E0B9C415519395",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "ios/Runner.xcodeproj/project.pbxproj",
+                          "sha256":  "A7A26D2307E8705BA0D056B8DADB0FE38247B78E247DC50C578263054DC8AA5F",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "ios/Runner/Info.plist",
+                          "sha256":  "B35250DC8EC96D3CD18A71335492DCAFF1A24FD0057EF551F7A204FC1301EC43",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/.gitignore",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/appsettings.Development.json",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/appsettings.json",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Contracts/Common/ApiErrorResponse.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Contracts/SystemInfo/SystemInfoResponse.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Controllers/AuthContextController.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Controllers/AuthController.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Controllers/BranchController.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Controllers/CompanyContextController.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Controllers/CompanySetupController.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Controllers/CompanySetupRuntimeController.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Controllers/DatabaseRoutingController.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Controllers/EmployeeController.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Controllers/MasterDataController.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Controllers/MenuPermissionController.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Controllers/NavigationController.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Controllers/OrganizationStructureController.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Controllers/PartnerCompanyController.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Controllers/PartnerController.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Controllers/PartnerUserController.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Controllers/PermissionController.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Controllers/RoleGroupController.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Controllers/SupportCompanyController.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Controllers/TechnicalInfoController.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Controllers/UserFavoriteController.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Controllers/UserProfileController.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Data/DatabaseRouteResolver.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Data/SqlConnectionFactory.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/docs/POST_LOGIN_CONTEXT_API.md",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Endpoints/SystemInfoEndpoints.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Infrastructure/Database/ISqlConnectionChecker.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Infrastructure/Database/SqlConnectionChecker.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/laoo_meeting_api.csproj",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/local.example.json",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Models/Auth/PermissionResponse.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Models/Auth/PostLoginContextResponse.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Models/AuthenticationModels.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Models/AuthModels.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Models/CompanyContextModels.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Models/CompanySetupModels.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Models/DatabaseRouting/DatabaseRouteModels.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Models/MasterConstCodes.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Models/MasterDataModels.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Models/MasterGroupCodes.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Models/MenuPermissionModels.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Models/Navigation/NavigationMenuModels.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Models/Partner/PartnerCompanyModels.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Models/Partner/PartnerUserModels.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Models/PasswordResetModels.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Models/RoleGroupModels.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Models/Support/EmployeeModels.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Models/Support/PartnerModels.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Program.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Properties/launchSettings.json",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/README.md",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Security/CompanySetupSecretService.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Security/JwtOptions.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Security/JwtTokenService.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Security/PasswordService.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Services/AuthenticationProjectAccess.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Services/AuthenticationService.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Services/DatabaseSeeder.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/Services/PasswordResetService.cs",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/test_login.http",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_meeting_api/อ่านวิธีติดตั้ง.txt",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/.gitignore",
+                          "sha256":  "6233D1FC5B2760614A8CB0216DEB0A1D1EE95256768AD13B6E099AB48543453D",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/appsettings.Development.json",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/appsettings.json",
+                          "sha256":  null,
+                          "status":  "excluded"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Contracts/Common/ApiErrorResponse.cs",
+                          "sha256":  "21224EE59AB79D7C82ECEE750D3FA5A1A1C9A9D8EA54B80E59DE2A80CE8692E3",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Contracts/SystemInfo/SystemInfoResponse.cs",
+                          "sha256":  "6B579014EDF7DF880FFBF253F0F5EB41B9F6F4857F3782554EF6A7450C2858C0",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Controllers/AuthContextController.cs",
+                          "sha256":  "EDC9D369C531E45CF38C264D6313D14ED7B228E992D32B562A7EC16F21494208",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Controllers/AuthController.cs",
+                          "sha256":  "726289622E61B9537B2F05DAA3BBF362BC36962A480E68632BC7F8D1602D55F2",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Controllers/BranchController.cs",
+                          "sha256":  "1E38728273B16B5475C6C3F517A76E20A192A4ED3BACF680F515D70AB1850751",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Controllers/CompanyContextController.cs",
+                          "sha256":  "386E39E763AB48E3FB1FC5313E7CB4EA4BF9663DD09C6FBEBF1BD2530E83679B",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Controllers/CompanySetupController.cs",
+                          "sha256":  "F975EAE01B591670F0F98F27821F79361380F6554977B56CB7855E51C54AA1C8",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Controllers/CompanySetupRuntimeController.cs",
+                          "sha256":  "19764EF90781CE4C911B073A3C8C960EF4632BE3991BDE38CA9B12FCBEDABC3D",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Controllers/DatabaseRoutingController.cs",
+                          "sha256":  "441EBA3EB7C363213EDC097BC965BE6A5A55D08A085B56CCAD94217311E0329C",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Controllers/EmployeeController.cs",
+                          "sha256":  "47C42B966E17B799C6F33C41A2B34CCEAF8FCA6B7E9AB5C5445774626A80BA05",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Controllers/MasterDataController.cs",
+                          "sha256":  "9AEAF70EF267B63F3997172655144AF915E91A4A0074742F0A46745BFFD0CADF",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Controllers/MenuPermissionController.cs",
+                          "sha256":  "7B5DC9F9CF75DCD262314C46901500833C64A94CCBF1A54E57C3471FEFE1C025",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Controllers/NavigationController.cs",
+                          "sha256":  "B3A5E14AFB1F268E582716B57416B0496D046043A7DAF30C6F02BF4D66297A08",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Controllers/OrganizationStructureController.cs",
+                          "sha256":  "34DDC1FCA80EDDE8D516595A9E999136B962D3D4CA353542E7E5DA7ACDF35B3C",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Controllers/PartnerCompanyController.cs",
+                          "sha256":  "2E0BB10318AF1ABF25C145321030970AEA949EA90F517A54CED8DF63B1F9F095",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Controllers/PartnerController.cs",
+                          "sha256":  "DF067C6BC4117D9AD727757938F963DEA05B5FD5C4EFB3FF7BC9EF95029D854B",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Controllers/PartnerUserController.cs",
+                          "sha256":  "45DD3B879A22E74C0882222BE9E585B8A49C2D4014EDB9A038C54AC695FA2E62",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Controllers/PermissionController.cs",
+                          "sha256":  "D606CDD478A6B1695D2A64C798194A53DB6B03E3C4B6B28CA594649BBCAF8596",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Controllers/RoleGroupController.cs",
+                          "sha256":  "F6856406F28A94B3CD5D9945D205B5792D49D05594FD3228CBDA09394E0D4D1C",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Controllers/SupportCompanyController.cs",
+                          "sha256":  "B32401CB8F5CCA9589EC70B973B6D721244C2E24D0F633F2620BBA3AB2969A60",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Controllers/TechnicalInfoController.cs",
+                          "sha256":  "B41FAAC9535CF3EF0D7DA94945BFB203F0565CA0DA22379B98482F2600109660",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Controllers/UserFavoriteController.cs",
+                          "sha256":  "D3607A395C564D0EBBA92D60EBBF24C0AC0B82DFEB8FFD15D279A48952F8AFFE",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Controllers/UserProfileController.cs",
+                          "sha256":  "252068A245C6CD2200A360FEA66E548FAA327B89F287110255B827394F310242",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Data/DatabaseRouteResolver.cs",
+                          "sha256":  "CC75E9EF2A97CB108ADB94DC67F7C1C7C0B43AEC809FB236865FCCD027AC8F4B",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Data/SqlConnectionFactory.cs",
+                          "sha256":  "BA688E1418A105675C347F7E58C4AC1478B22EF708151BBCB5A56CE478872102",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/docs/POST_LOGIN_CONTEXT_API.md",
+                          "sha256":  "98FBB198DC3098A63AD4CF5A3C55811C9939AE343DA886C16EE8BA594EBD9D73",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Endpoints/SystemInfoEndpoints.cs",
+                          "sha256":  "BE5ED2ECF7777E012F8345D4C7863344B489E62AF0B974BE753B279091D09600",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Infrastructure/Database/ISqlConnectionChecker.cs",
+                          "sha256":  "32CFB3FB00745E519250027A41892A5B4DC28E04B402204CDB44FCF162C12FB8",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Infrastructure/Database/SqlConnectionChecker.cs",
+                          "sha256":  "D32F3C029925EA72D7C143BA2253485FAEF67EC13CCF2482C1DC5CDDB7BF35D3",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/LaooVisitorApi.csproj",
+                          "sha256":  "A17F00F6CAF3994B5D6D3DE482A70FD18258390EE73C60147F5A37D0472A4A0B",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/local.example.json",
+                          "sha256":  "0D40F8871AD57FECAC2790FDB974BBADE96ABE7E36C94E2D8880B66C877DFC64",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Models/Auth/PermissionResponse.cs",
+                          "sha256":  "7A115E2267776304F196589A1F0AB2CB732AEC717B7B32B3C06007A325528270",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Models/Auth/PostLoginContextResponse.cs",
+                          "sha256":  "8815C943F5E252C029C1AAD2E3D4D8CD04E99554AF04A78AF04721D3629C5FBD",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Models/AuthenticationModels.cs",
+                          "sha256":  "5DAD609C929EE2C1D8E0DF97A88D96DA3F01D81970363980CBEF78C994478447",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Models/AuthModels.cs",
+                          "sha256":  "EBF2A33C37247E42ACF7741B29BEF17974D17294A412B8E764DAE16DFC30CBAD",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Models/CompanyContextModels.cs",
+                          "sha256":  "9F248684C9D2860FFED00633360198BFA1AE5A2FFB741B4D4C0466B9D392B02E",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Models/CompanySetupModels.cs",
+                          "sha256":  "53E824D90CE817B4D1426ACD01D58CA719E6028757DE743026730416858F2C85",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Models/DatabaseRouting/DatabaseRouteModels.cs",
+                          "sha256":  "E8394CB1A3B10C58A95E16E87D19EE084DC321519BC15EE68A1068908DDB1B1D",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Models/MasterConstCodes.cs",
+                          "sha256":  "C1FC43333772E4E5D407AEADDF48D1C96638057E14DDC0E50A0329C4E572BF4B",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Models/MasterDataModels.cs",
+                          "sha256":  "1DFFF16CEA565B0C4D65AB5F47438258FC3117587BC8F8EA2CBBADF473EB2BE1",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Models/MasterGroupCodes.cs",
+                          "sha256":  "EF1DF803A45C4790C6802CDF9FB64E89937B7AE2A744CA912686AF8AF507D07A",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Models/MenuPermissionModels.cs",
+                          "sha256":  "D6363598ADE01B06805DDAD73F290D85C88C3D2ECA5B925D25C2E0959F319EFD",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Models/Navigation/NavigationMenuModels.cs",
+                          "sha256":  "6F70E83ACF3135EE80B2FFD562628CCBEEBDFDBD2A6F489674AD0B7A9C050F3C",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Models/Partner/PartnerCompanyModels.cs",
+                          "sha256":  "2383D889D5AA9A5FF114308E1AB4477A724FEB72F6D2545AECF3BA2265362DBE",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Models/Partner/PartnerUserModels.cs",
+                          "sha256":  "E83DFF310D1BB66A367319CB2363740414BAD67347CEFA78A3E027F2DFA1E328",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Models/PasswordResetModels.cs",
+                          "sha256":  "C7F9A79706D7FF322CF154779A2D925DA87408FF477D1358E9C976E9ADFE1E14",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Models/RoleGroupModels.cs",
+                          "sha256":  "BF899DB433F1F7F6E2959D9ACE85A9498C5FFB95EE141A2B044693704EC06855",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Models/Support/EmployeeModels.cs",
+                          "sha256":  "B464EC26177516B96FCE3093BBA63476E0EBDEE4BBB60C1C340F22C7F7DC0861",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Models/Support/PartnerModels.cs",
+                          "sha256":  "6806BB8FDAB8715F35658668A2DDF6061469FEB300F22AA70517BC64717E962D",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Program.cs",
+                          "sha256":  "8F0CCA052D61458A91BECD876366A94DB36DDE623B9015DCC0C5EB81502B1BF8",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Properties/launchSettings.json",
+                          "sha256":  "DCD608C6B83C04676D0DCF54B489A2F5609183887DF5F96B6D1F01FAAE48DD35",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/README.md",
+                          "sha256":  "487F03B4783A66FC038D4F6F462217B1DDE90D1D5FA34D90778273D6567DAB29",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Security/CompanySetupSecretService.cs",
+                          "sha256":  "433D0C46EBD7F6B3B7424579780DB05FE90FBCB90AFE08E052C6483E2475413F",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Security/JwtOptions.cs",
+                          "sha256":  "1B1D91E869ED65030478FCC7D3859BD407A88BB6819920FE019FDAB0AB8E1CB1",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Security/JwtTokenService.cs",
+                          "sha256":  "8790BE4158C7F263444C76F34BFD8FA52D69DD33CDCC99DA2843CB5AFEACC455",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Security/PasswordService.cs",
+                          "sha256":  "2666B33AEAE45A5EAE7AC40D73EE4590027BCDA7AD010F91112616F33EAD62C7",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Services/AuthenticationProjectAccess.cs",
+                          "sha256":  "B083628E143C29CE7DEA54B202A35004C33945753728F167139C68E73D2477ED",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Services/AuthenticationService.cs",
+                          "sha256":  "C7915E5329E7286CE93B0B608075701281BF9C580A2B46278E80803FF2683E38",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Services/DatabaseSeeder.cs",
+                          "sha256":  "DDEE01A5E0DF8B7E1B166571B3E8D08729CFFA80367A737D276AD62B8AD9846B",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Services/PasswordResetService.cs",
+                          "sha256":  "D99D1D404F47CA29EC34CC48D5F810BE4C8D06FF3400A68C2A825EB864E2CF45",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/test_login.http",
+                          "sha256":  "3B2A03D54E7E1928FE3CE05981C15CE5517460BF27C7DD3104B011F70357F22C",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/อ่านวิธีติดตั้ง.txt",
+                          "sha256":  "8AFB7E47D719E9B03C278436A1428882ECB145D6C99DEAF609C973F9DFE81E0C",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "lib/app/app.dart",
+                          "sha256":  "4FA56F72C975DD7321F80F6A1F3F82683B63C69E94356060C26B5EA982A8065C",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "lib/app/laoo_meeting_app.dart",
+                          "sha256":  null,
+                          "status":  "deleted"
+                      },
+                      {
+                          "path":  "lib/app/laoo_visitor_app.dart",
+                          "sha256":  "952D59C11975E2726A0B060123794DAFA9871282725A48D19EFB65B03FB1901E",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "lib/app/router/app_menu_route_registry.dart",
+                          "sha256":  "8E47CDC318273340885AE3BE2D6D2C2AF6081297DF7DA607ABAA51DF4BFB3448",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "lib/app/router/app_router.dart",
+                          "sha256":  "39B81E44671F003B39E15FF3E67112766AFC09EC8A4E44BFF3D0251F71905751",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "lib/core/company_setup/company_setup_context.dart",
+                          "sha256":  "FFB9A62506693614848BDC9CF2F2B5C0501B04FB3E86E6C0A14A444DE5986D3E",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "lib/core/company_setup/company_setup_controller.dart",
+                          "sha256":  "057FBFE71B381319F6CDAE58511C6422CB4E3586D10D0FF5B6F8AEEB20E6859F",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "lib/core/config/app_config.dart",
+                          "sha256":  "DA4A20D9B730FE525890953146B1CFDC1266DD1DFD85533F2523405888757FDC",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "lib/core/widgets/auto_dismiss_message.dart",
+                          "sha256":  "BA338918DF6720DB89C8A17C72AA5121DBC63F4502FE9C9DD7BE04E8493D731D",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "lib/features/access/role_group/pages/role_group_page.dart",
+                          "sha256":  "5E1BDE2B2B465AA18CFED99EC8C46F14563933DD569E8E82BB8745718631186C",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "lib/features/auth/data/services/auth_api_service.dart",
+                          "sha256":  "A14B693A49D8298E8C53259BDD5D45862F2F55D90CDF32EB2A8CED9F25434C69",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "lib/features/auth/presentation/pages/login_page.dart",
+                          "sha256":  "E76219A368CF66444412C8E49C5215A95BAC8E72B5B32A3B30E5520BBB96C3F1",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "lib/features/landing/presentation/pages/landing_page.dart",
+                          "sha256":  "572F6BAA39FD3E1AD82D089F617E0A097CF57644A40A18E84AA304D3EDE7CBFB",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "lib/features/support/master_data/pages/master_data_page.dart",
+                          "sha256":  "E76B17E970D909ED7E6E32AAC5B334493FBA43E9CC06156E61480E6B024222C4",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "lib/features/support/presentation/widgets/support_workspace_shell.dart",
+                          "sha256":  "80B1A3701B9B07228E39FB0C41A99C1EF16831DD0446E93F784303BF6CCFD069",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "lib/main.dart",
+                          "sha256":  "E69BE0A90D3EDA0DA081AC9CCC8203C7A9C8E005A5E259F9EFBCB882D3303994",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "linux/CMakeLists.txt",
+                          "sha256":  "34E47E790453A54DFE7FF0F437BC5A4C9F9DBDF1BD07999FB6E33F023177772A",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "linux/runner/my_application.cc",
+                          "sha256":  "1C5FA01ACF3E36280961CDC1A92FE2E8650DF0E2285F6DE1FB6E502AD67DE927",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "macos/Runner.xcodeproj/project.pbxproj",
+                          "sha256":  "E4388444E15EDEC66A1748769295AECA32346F0C428E1A1B825902564E5D80BD",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "macos/Runner.xcodeproj/xcshareddata/xcschemes/Runner.xcscheme",
+                          "sha256":  "D6B62AE30A4CA26CA8766A6BDACD43000EED4188D9E88C7F50A1691861CC59F1",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "macos/Runner/Configs/AppInfo.xcconfig",
+                          "sha256":  "CF949A5287E5023DA18E514F4649D8C76FF9861C475737EAA9A7625DA8DE8EF4",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "PROJECT.md",
+                          "sha256":  "570E3A3F548CBA8EBF1D5128D95340D07EE2081EDFEA17599B796A6527B27D58",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "PROJECT_UPDATE_REQUIRED_DOCUMENTS.md",
+                          "sha256":  "B36F38834D05FC9F49A7EB8E6A86E190B35C3ED395BACF92CD6E6FDBDB64377A",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "pubspec.lock",
+                          "sha256":  "06642E8B67E2F6530660938C32D397183193455EB12B4228B584DF40F2794A37",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "pubspec.yaml",
+                          "sha256":  "340EF30E636B7CD00ADE0A34168B77E36D424A30DAC6DE241DEA08C3B10C0AD6",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "README.md",
+                          "sha256":  "EAACBEDD80A58E18F3E8A20CB608F53EE2B70F813209F0DD8E6E3FF4EB99AF6C",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "README_LOGIN_UPDATE.md",
+                          "sha256":  "8D82414D67DE5C0E24591557E707C069D2BAF8584741B122D75F943C19FF2D71",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "README_REPLACE.md",
+                          "sha256":  "8F572F39AD6ED447B5BF88DB2C4119F967941F10792A84BE1FA4DF981CE4C94E",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "README_REPLACE.txt",
+                          "sha256":  "01302E63C3BFAE54F84139B9D615044833476A0109C688A4B25CECB8DF662984",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "README_UPDATE.md",
+                          "sha256":  "A0E11DB33FCCFF3C11E1BC091F6EB1C4A54A2EB8F90F249B55BD0EB1EAEC35A1",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "test/app/router/app_menu_route_registry_test.dart",
+                          "sha256":  "36C3B5C33408062E6BDEE9EA97AC893F338B83367A8ED6744C138612635FE245",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "test/app/router/app_router_redirect_test.dart",
+                          "sha256":  "5DDD1363E2CA04A88648A6263BAB2A69F5B33E9455D4DBAD5EA570978CF07139",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "test/app/router/navigation_route_authorization_test.dart",
+                          "sha256":  "12A98CE06EEBFE3610DC5B2D7175FF72C46BEA81193433785A06A3E90CD037F1",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "test/app/theme/workspace_theme_presets_test.dart",
+                          "sha256":  "9BADA5C7AC0A5EA9DAB26E13FAC048BA3B353A58E73EEB0E64E73DE658D5ADB3",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "test/core/auth/auth_storage_test.dart",
+                          "sha256":  "247AB2D9AF89B9FD969A6EE7CBE48C63867B18CB59D8A3A2F33F9BA67B1129AB",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "test/core/widgets/notification_timing_test.dart",
+                          "sha256":  "DE4BE29F0E94CCECBD0165D3A5D6257E5CE9A758861FBDEAE6BFBB42643064E1",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "test/widget_test.dart",
+                          "sha256":  "0E81064E62DF319C77B986BC4974C638C7799FBC7848474DDDC0B29FFB3631C5",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "tools/scripts/install_login_ui.ps1",
+                          "sha256":  "3CC7C5CF76B943FE6299DCCEA69D173656ACE062C549AAF2760B80E4FE487F62",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "tools/scripts/navigation_migration_check.ps1",
+                          "sha256":  "7CA6D93B1FC5849E87CAE71843A14E2F48CA19973CF1CF9758A5F54AD7B80FC4",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "tools/scripts/REPOSITORY_STANDARD.md",
+                          "sha256":  "C37BFE1281FE8BEAD00701129709AAFE82FDD0626FBCD6673664440955A7AEC7",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "tools/scripts/run_laoo_visitor.ps1",
+                          "sha256":  "E0FB49365104BF8515D769AF8FE1FE54A6CF4C7B3062519EF94852F8B8039B2E",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "tools/scripts/sprint02_application_bootstrap_fixed.ps1",
+                          "sha256":  "C73616CE01FF3F470AEDAA23F29ACADFE936BE3DAD42345E49B4B435366D4CBF",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "tools/scripts/sprint03_login_ui_foundation.ps1",
+                          "sha256":  "C31882673A6437CD7F48A05B15C6542B18374477095E426152B4AD76F58D5134",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "UPDATE_GUIDE.md",
+                          "sha256":  "DC4406AAC3A1152B437E2E316A2972925C7C20BACFE89A1E2890362B65AF8EAE",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "web/index.html",
+                          "sha256":  "4666D1CEFB235D4791BA7950A1E815A4C81DE8D3E72DCFE64C83D0B61166461A",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "web/manifest.json",
+                          "sha256":  "6DC8AF1273592EC64D4DD50C49F05E5045B56B7E20D3B75E91B8C68F1A5D0DF9",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "windows/CMakeLists.txt",
+                          "sha256":  "9FFDDE1B143A7C9F7C4BE4B60CC6CFD0B6C3236DC489B0B7D524F24FFF5E0857",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "windows/runner/main.cpp",
+                          "sha256":  "48B19414A89B41027880D7CFC7CFD54D1043B0FF07F95200DBF998E21CFBE408",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "windows/runner/Runner.rc",
+                          "sha256":  "BC614F99F629B01F4CAE55A4A4F4CC5FE14E970652B455F5B2714E58A0A94371",
+                          "status":  "saved"
+                      }
+                  ],
+        "baseCommit":  "ec68d1fdf7ec28101ad11a5dc8ee89eb216052d3",
+        "path":  "C:/Work/laoo_visitor",
+        "index":  [
+                      {
+                          "path":  "laoo_visitor_api/.gitignore",
+                          "blob":  "957c4370575a22829f8e7ab4db3dc8701da453f5",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Contracts/Common/ApiErrorResponse.cs",
+                          "blob":  "874540072cb2d9eee7bf3d2c0a3a407f7ed9cb52",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Contracts/SystemInfo/SystemInfoResponse.cs",
+                          "blob":  "a256dda4433238a97877adfbf0df7032566393b7",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Controllers/AuthContextController.cs",
+                          "blob":  "8b4ffce1ba80e369ddfa19f1cb420251a04bfacf",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Controllers/AuthController.cs",
+                          "blob":  "20e73b820783bc27a991ed7c6b4ff3f3890dff4e",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Controllers/BranchController.cs",
+                          "blob":  "1f8374e7b79e226cd6ced93232b72aa04e75070f",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Controllers/CompanyContextController.cs",
+                          "blob":  "a7c1d1845b11a1a1d8cd5d4f468f68d975586c39",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Controllers/CompanySetupController.cs",
+                          "blob":  "fdce08af4a978928eff1b92844894a2e82e43ce6",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Controllers/CompanySetupRuntimeController.cs",
+                          "blob":  "4f3e4ad3ecee33d59409da677fef914a33f6c60d",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Controllers/DatabaseRoutingController.cs",
+                          "blob":  "ca5624cfd436bfce1a4c501212480569675249b5",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Controllers/EmployeeController.cs",
+                          "blob":  "5f7dd796d474cc619c40d555f066be5165d7ee48",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Controllers/MasterDataController.cs",
+                          "blob":  "a9c7ce2adcd2fc15b807cf2e3b01a31f6502714d",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Controllers/MenuPermissionController.cs",
+                          "blob":  "a2664a4662db806d58bbb37c3feee8c279a59db3",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Controllers/NavigationController.cs",
+                          "blob":  "e4944ec5acdc845e10dcc72ce12249c984b4b623",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Controllers/OrganizationStructureController.cs",
+                          "blob":  "d38a39bc0939ae05b83448cc9e5c824aa48c275a",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Controllers/PartnerCompanyController.cs",
+                          "blob":  "2e6736c32748c01aff53fcba4ba1725748052303",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Controllers/PartnerController.cs",
+                          "blob":  "0744622cb205455bfd0f7db65ad2282c1dbc6bbe",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Controllers/PartnerUserController.cs",
+                          "blob":  "4537e0734964e37437ec22b0f5939196ad2db2f2",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Controllers/PermissionController.cs",
+                          "blob":  "c19dc834ee82fbcb3bd080fdc0b3b2f3b2bee030",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Controllers/RoleGroupController.cs",
+                          "blob":  "70860c926316ae0600eb718eb3b4c46cf06b6989",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Controllers/SupportCompanyController.cs",
+                          "blob":  "c7c1fba9853f46dc90953a75d4de54b48f3e8e24",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Controllers/TechnicalInfoController.cs",
+                          "blob":  "ca4f708f698def35b0c6e06e3b52a2c674597b6e",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Controllers/UserFavoriteController.cs",
+                          "blob":  "c75e4f2a08695c07cba967a8e60ef6e526aae8c2",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Controllers/UserProfileController.cs",
+                          "blob":  "2c147182b6fc80b4448a133db304319c6fdb92b3",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Data/DatabaseRouteResolver.cs",
+                          "blob":  "e5312a4db13f9a3945e3bbec604bcfb2a7a75fb3",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Data/SqlConnectionFactory.cs",
+                          "blob":  "5b383ba08111581bfc28ef02d89a719dc6346e6a",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Endpoints/SystemInfoEndpoints.cs",
+                          "blob":  "c43927758ac8f05280728ae856772fcca5e1dd4e",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Infrastructure/Database/ISqlConnectionChecker.cs",
+                          "blob":  "bde2da823f8ef2e8379830d95395b6beccc8844f",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Infrastructure/Database/SqlConnectionChecker.cs",
+                          "blob":  "87233a06888912cfdc78ceff8e8b1e8aa8ed2948",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/LaooMeetingApi.csproj",
+                          "blob":  "a5657074362e83d18a2989319e558e822b5c7eee",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Models/Auth/PermissionResponse.cs",
+                          "blob":  "e69b2b1f7857738f7b371c1d42de07ff02e588ea",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Models/Auth/PostLoginContextResponse.cs",
+                          "blob":  "bd8096b40a61dc6fd9ab53ebb446abe9ed5ea33c",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Models/AuthModels.cs",
+                          "blob":  "6df3b83ca6265a3029d12993c91d477b5f7dd623",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Models/AuthenticationModels.cs",
+                          "blob":  "03dcf5463b5643a9ead6b105ee80dbcf13d95eaf",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Models/CompanyContextModels.cs",
+                          "blob":  "791e0d786bc40fbfeb204961af81faf94ce38e03",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Models/CompanySetupModels.cs",
+                          "blob":  "e8070613e74ba8e93a7aa075cd5e46e3c6f99a87",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Models/DatabaseRouting/DatabaseRouteModels.cs",
+                          "blob":  "18036de1ad68f593d492e5288ba7da370d4821c6",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Models/MasterConstCodes.cs",
+                          "blob":  "45202d6a7f16c143f912e7a29e7e020981796aaa",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Models/MasterDataModels.cs",
+                          "blob":  "833c7d0387daa58f3a1835fffb54c765771b3ff7",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Models/MasterGroupCodes.cs",
+                          "blob":  "778145ff189b7f162f163a51601240dffd3db871",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Models/MenuPermissionModels.cs",
+                          "blob":  "e3f53557ce206e55e06d12db6bbd07c509e796f8",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Models/Navigation/NavigationMenuModels.cs",
+                          "blob":  "4ea23086ebc2ccb3ce4c9d97a40710e2325d77a4",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Models/Partner/PartnerCompanyModels.cs",
+                          "blob":  "d60337737639d32f238c275fe18b5b65b0230900",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Models/Partner/PartnerUserModels.cs",
+                          "blob":  "713efd0c6a7f6e801a5c4ca94b1aa75b9081e602",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Models/PasswordResetModels.cs",
+                          "blob":  "671afc8eb9e691ec7a2a329c28b6426bac55e6af",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Models/RoleGroupModels.cs",
+                          "blob":  "f965e4169227b6342b6d4b4bb4a2a2d003569bf5",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Models/Support/EmployeeModels.cs",
+                          "blob":  "f4e3857c043bfe3b366cf872a592dcdc835e3df5",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Models/Support/PartnerModels.cs",
+                          "blob":  "95b5f7f3e31525bb557f46a100fff790d8ead4ac",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Program.cs",
+                          "blob":  "80b33d4351aa29251639fbfe526c4ea5931b2fa6",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Properties/launchSettings.json",
+                          "blob":  "9fe1d4ed33409fd125302d75504b8d25bc2e5066",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/README.md",
+                          "blob":  "103a2cbe9feaebe3049d86d784d47b1037a661f2",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Security/CompanySetupSecretService.cs",
+                          "blob":  "c0a7afd741bd6968195b46a49aab4e991f587172",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Security/JwtOptions.cs",
+                          "blob":  "d247691280a05542d9993bec928c06a3840d1562",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Security/JwtTokenService.cs",
+                          "blob":  "de70c56d759964c4dde0ee2fc7f5689e9d7c694c",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Security/PasswordService.cs",
+                          "blob":  "b3655a18098a4b616f8d3bebad5a211ca90da506",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Services/AuthenticationProjectAccess.cs",
+                          "blob":  "72642f4e366a18b1c551679086604b3b30504f51",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Services/AuthenticationService.cs",
+                          "blob":  "df5c604f65ef76176f3b960af532ca46633fe252",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Services/DatabaseSeeder.cs",
+                          "blob":  "0c3a69cb37d58079c085b4dfb98438a9f18bda5b",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/Services/PasswordResetService.cs",
+                          "blob":  "98681445ef38e134eaea118738b23ca233fc2325",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/docs/POST_LOGIN_CONTEXT_API.md",
+                          "blob":  "29b96d409601e1a6a4c4294df2b68f1e2059ca97",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/local.example.json",
+                          "blob":  "0fc384386e9827171910975d4ea71425c9573a7a",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/test_login.http",
+                          "blob":  "c7ab73e2d8b536786257f7bf43502a69871ee9c0",
+                          "stage":  "0"
+                      },
+                      {
+                          "path":  "laoo_visitor_api/อ่านวิธีติดตั้ง.txt",
+                          "blob":  "94f967acea930822f9427d0835ec47528331c214",
+                          "stage":  "0"
+                      }
+                  ],
+        "mergeHead":  {
+
+                      },
+        "branch":  "main"
+    },
+    {
+        "label":  "legacy-laoo_meeting",
+        "files":  [
+                      {
+                          "path":  "AGENTS.md",
+                          "sha256":  "7A0751B1F5A34454C936D121DF713B14DD0CA9E02459C05965159B67AEAA511E",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "lib/core/widgets/auto_dismiss_message.dart",
+                          "sha256":  "BA338918DF6720DB89C8A17C72AA5121DBC63F4502FE9C9DD7BE04E8493D731D",
+                          "status":  "saved"
+                      },
+                      {
+                          "path":  "lib/features/access/role_group/pages/role_group_page.dart",
+                          "sha256":  "5E1BDE2B2B465AA18CFED99EC8C46F14563933DD569E8E82BB8745718631186C",
+                          "status":  "saved"
+                      }
+                  ],
+        "baseCommit":  "ec68d1fdf7ec28101ad11a5dc8ee89eb216052d3",
+        "path":  "C:/Work/Laoo/รวมprojectต้นแบบ/laoo_meeting",
+        "index":  [
+
+                  ],
+        "mergeHead":  {
+
+                      },
+        "branch":  "main"
+    }
+]

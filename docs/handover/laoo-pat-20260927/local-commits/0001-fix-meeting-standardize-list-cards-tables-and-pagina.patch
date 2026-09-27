@@ -1,0 +1,665 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Laoo <dev@laoo.local>
+Date: Sun, 6 Sep 2026 23:39:03 +0700
+Subject: [HANDOVER] fix(meeting): standardize list cards tables and pagination
+
+---
+ docs/standards/LIST_CARD_UI_STANDARD.md       |   5 +-
+ .../lib/app/theme/laoo_design_tokens.dart     |   1 +
+ .../meeting/pages/meeting_building_page.dart  |   6 +-
+ .../meeting/pages/meeting_facility_page.dart  | 121 ++++++---------
+ .../meeting/pages/meeting_room_page.dart      |  91 ++++--------
+ .../widgets/meeting_pagination_card.dart      | 139 ++++++++++++++++++
+ .../widgets/support_workspace_shell.dart      |   1 +
+ .../widgets/meeting_pagination_card_test.dart |  85 +++++++++++
+ 8 files changed, 309 insertions(+), 140 deletions(-)
+ create mode 100644 projects/meeting/lib/features/meeting/widgets/meeting_pagination_card.dart
+ create mode 100644 projects/meeting/test/features/meeting/widgets/meeting_pagination_card_test.dart
+
+diff --git a/docs/standards/LIST_CARD_UI_STANDARD.md b/docs/standards/LIST_CARD_UI_STANDARD.md
+index 76529e2a50746158e7fec33433b6aa068ee96a86..f939d82e5a80d5806f8cb97fc2c684ea91ccf591 100644
+--- a/docs/standards/LIST_CARD_UI_STANDARD.md
++++ b/docs/standards/LIST_CARD_UI_STANDARD.md
+@@ -6,7 +6,8 @@
+ 
+ - ใช้พื้นหลังและ Design Token จากส่วนกลางเท่านั้น
+ - ส่วน Caption, Filter, Table/List และ Pagination เป็น Card สีขาวเต็มความกว้างของ Content Area
+-- Card ของแต่ละ Section จัดให้ติดกันและใช้เส้น `LaooColors.border` คั่น ห้ามใช้ช่องว่างหรือกรอบสีสร้างขอบซ้ำ
++- Caption Card และ Filter Card ต้องแยกเป็นคนละ Card และเว้นระยะห่าง `6px` พอดี
++- Filter, Table/List และ Pagination ต้องแยกเป็น Card คนละ Section โดยใช้ `LaooLayout.cardSpacing` ระหว่าง Section และใช้เส้น `LaooColors.border` ภายในจุดที่มาตรฐานกำหนด ห้ามใช้กรอบสีสร้างขอบซ้ำ
+ - Margin ซ้าย บน ขวาของ Content ใช้ `LaooLayout.cardMargin`
+ - Card ทุกตัวไม่มีเส้นกรอบสีและใช้มุมโค้ง `LaooRadius.xs`
+ 
+@@ -49,5 +50,5 @@
+ ## Prompt สำหรับส่งให้ AI
+ 
+ ```text
+-ปรับหน้า List/Card นี้ตาม docs/standards/UX_UI_STANDARD.md, LIST_CARD_UI_STANDARD.md, PAGINATION_UI_STANDARD.md และ TYPOGRAPHY_STANDARD.md ใช้ Caption จาก MenuName, Card สีขาวไม่มีกรอบสี, Filter/Table/Pagination เต็มความกว้าง, Action ตาม Permission และ User Style เมื่อหน้าจอแคบกว่า 900px ให้เป็น Card Mode อัตโนมัติ โดย Card รายการแต่ละใบห่างกัน 6px พอดี ห้ามพึ่ง Card default margin ห้ามแก้ API, SQL, Repository หรือ Business Logic และต้องตรวจ Responsive, Overflow, dart format และ dart analyze
++ปรับหน้า List/Card นี้ตาม docs/standards/UX_UI_STANDARD.md, LIST_CARD_UI_STANDARD.md, PAGINATION_UI_STANDARD.md และ TYPOGRAPHY_STANDARD.md ใช้ Caption จาก MenuName, Caption Card กับ Filter Card ห่างกัน 6px, Card สีขาวไม่มีกรอบสี, Filter/Table/Pagination เต็มความกว้าง, Action ตาม Permission และ User Style เมื่อหน้าจอแคบกว่า 900px ให้เป็น Card Mode อัตโนมัติ โดย Card รายการแต่ละใบห่างกัน 6px พอดี ห้ามพึ่ง Card default margin ห้ามแก้ API, SQL, Repository หรือ Business Logic และต้องตรวจ Responsive, Overflow, dart format และ dart analyze
+ ```
+diff --git a/projects/meeting/lib/app/theme/laoo_design_tokens.dart b/projects/meeting/lib/app/theme/laoo_design_tokens.dart
+index bcf7014cf00cbbe659f141cd8b88fadd305291f1..e4156dc2a9a9893a5bf76f5c545d7d49f5f2c88c 100644
+--- a/projects/meeting/lib/app/theme/laoo_design_tokens.dart
++++ b/projects/meeting/lib/app/theme/laoo_design_tokens.dart
+@@ -32,6 +32,7 @@ abstract final class LaooLayout {
+   static const double cardSpacing = 10;
+   static const double cardMargin = 10;
+   static const double cardPadding = 10;
++  static const double captionFilterSpacing = 6;
+   static const double captionCardPaddingVertical = 12;
+   static const double dialogInsetPadding = 24;
+   static const double paginationCardHeight = 56;
+diff --git a/projects/meeting/lib/features/meeting/pages/meeting_building_page.dart b/projects/meeting/lib/features/meeting/pages/meeting_building_page.dart
+index eb9d730d87837bb843fad6966c3677b73ad7411f..84a77687a3b1f9ad113cb6c7ac798e47c4ef5dc4 100644
+--- a/projects/meeting/lib/features/meeting/pages/meeting_building_page.dart
++++ b/projects/meeting/lib/features/meeting/pages/meeting_building_page.dart
+@@ -887,11 +887,7 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
+                       ],
+                     ),
+                   ),
+-                  const Divider(
+-                    height: 1,
+-                    thickness: 1,
+-                    color: LaooColors.border,
+-                  ),
++                  const SizedBox(height: LaooLayout.captionFilterSpacing),
+                   WorkspaceSectionCard(
+                     child: DropdownButtonFormField<int?>(
+                       initialValue: _branchId,
+diff --git a/projects/meeting/lib/features/meeting/pages/meeting_facility_page.dart b/projects/meeting/lib/features/meeting/pages/meeting_facility_page.dart
+index abe787b158c850e9e5464bda8684cf807c49c4e5..48a88bc6446e9531e1988e3bac07371120ed4b8a 100644
+--- a/projects/meeting/lib/features/meeting/pages/meeting_facility_page.dart
++++ b/projects/meeting/lib/features/meeting/pages/meeting_facility_page.dart
+@@ -10,6 +10,7 @@ import '../../support/presentation/widgets/support_workspace_shell.dart';
+ import '../../profile/pages/user_profile_dialog.dart';
+ import '../data/meeting_facility_repository.dart';
+ import '../meeting_feature_host.dart';
++import '../widgets/meeting_pagination_card.dart';
+ 
+ class MeetingFacilityPage extends StatefulWidget {
+   const MeetingFacilityPage({super.key});
+@@ -125,10 +126,18 @@ class _MeetingFacilityPageState extends State<MeetingFacilityPage> {
+       return cardMode
+           ? ListView.separated(
+               itemCount: _visibleItems.length,
+-              separatorBuilder: (_, _) => const SizedBox(height: 8),
++              separatorBuilder: (_, _) => const SizedBox(height: 6),
+               itemBuilder: (context, index) {
+                 final item = _visibleItems[index];
+                 return Card(
++                  margin: EdgeInsets.zero,
++                  color: LaooColors.white,
++                  surfaceTintColor: Colors.transparent,
++                  elevation: 0,
++                  shape: RoundedRectangleBorder(
++                    borderRadius: BorderRadius.circular(LaooRadius.xs),
++                    side: BorderSide.none,
++                  ),
+                   child: ListTile(
+                     title: Text('${item['code']} | ${item['nameTh']}'),
+                     subtitle: Text(
+@@ -140,21 +149,29 @@ class _MeetingFacilityPageState extends State<MeetingFacilityPage> {
+                 );
+               },
+             )
+-          : Card(
+-              margin: EdgeInsets.zero,
+-              clipBehavior: Clip.antiAlias,
++          : WorkspaceSectionCard(
++              padding: EdgeInsets.zero,
+               child: SingleChildScrollView(
+                 scrollDirection: Axis.horizontal,
+                 child: ConstrainedBox(
+                   constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                   child: DataTable(
++                    horizontalMargin: LaooDataTable.horizontalMargin,
++                    columnSpacing: LaooDataTable.columnSpacing,
++                    dividerThickness: LaooDataTable.dividerThickness,
+                     headingRowColor: WidgetStatePropertyAll(
+                       preset.primary.withValues(alpha: .10),
+                     ),
+                     headingTextStyle: TextStyle(
+                       color: preset.primary,
++                      fontSize: LaooTypography.tableHeader,
+                       fontWeight: FontWeight.w700,
+                     ),
++                    dataTextStyle: TextStyle(
++                      color: Theme.of(context).colorScheme.onSurface,
++                      fontSize: LaooTypography.tableBody,
++                    ),
++                    dataRowColor: LaooDataTable.rowColor(preset.primary),
+                     dataRowMinHeight: 48,
+                     dataRowMaxHeight: 56,
+                     border: TableBorder(
+@@ -227,61 +244,17 @@ class _MeetingFacilityPageState extends State<MeetingFacilityPage> {
+ 
+   Widget _pagination(WorkspaceThemePreset preset) {
+     final total = _filtered.length;
+-    final start = total == 0 ? 0 : _currentPage * _pageSize + 1;
+-    final end = ((_currentPage + 1) * _pageSize).clamp(0, total);
+-    return Wrap(
+-      spacing: 8,
+-      runSpacing: 8,
+-      crossAxisAlignment: WrapCrossAlignment.center,
+-      children: [
+-        OutlinedButton(
+-          style: OutlinedButton.styleFrom(
+-            backgroundColor: Theme.of(
+-              context,
+-            ).colorScheme.surfaceContainerHighest,
+-            foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
+-            side: BorderSide.none,
+-            shape: RoundedRectangleBorder(
+-              borderRadius: BorderRadius.circular(LaooRadius.xs),
+-            ),
+-          ),
+-          onPressed: _currentPage > 0
+-              ? () => setState(() => _currentPage--)
+-              : null,
+-          child: const Icon(Icons.chevron_left),
+-        ),
+-        FilledButton(
+-          style: FilledButton.styleFrom(
+-            backgroundColor: preset.primary,
+-            disabledBackgroundColor: preset.primary,
+-            disabledForegroundColor: Theme.of(context).colorScheme.onPrimary,
+-            foregroundColor: Theme.of(context).colorScheme.onPrimary,
+-            shape: RoundedRectangleBorder(
+-              borderRadius: BorderRadius.circular(LaooRadius.xs),
+-            ),
+-            padding: const EdgeInsets.all(14),
+-          ),
+-          onPressed: null,
+-          child: Text('${_pageCount == 0 ? 0 : _currentPage + 1}'),
+-        ),
+-        OutlinedButton(
+-          style: OutlinedButton.styleFrom(
+-            backgroundColor: Theme.of(
+-              context,
+-            ).colorScheme.surfaceContainerHighest,
+-            foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
+-            side: BorderSide.none,
+-            shape: RoundedRectangleBorder(
+-              borderRadius: BorderRadius.circular(LaooRadius.xs),
+-            ),
+-          ),
+-          onPressed: _currentPage < _pageCount - 1
+-              ? () => setState(() => _currentPage++)
+-              : null,
+-          child: const Icon(Icons.chevron_right),
+-        ),
+-        Text('$start-$end จาก $total'),
+-      ],
++    return MeetingPaginationCard(
++      total: total,
++      pageIndex: _currentPage,
++      pageSize: _pageSize,
++      primary: preset.primary,
++      onPrevious: _currentPage > 0
++          ? () => setState(() => _currentPage--)
++          : null,
++      onNext: _currentPage < _pageCount - 1
++          ? () => setState(() => _currentPage++)
++          : null,
+     );
+   }
+ 
+@@ -558,11 +531,11 @@ class _MeetingFacilityPageState extends State<MeetingFacilityPage> {
+         children: [
+           Padding(
+             padding: const EdgeInsets.all(LaooLayout.cardMargin),
+-            child: WorkspaceSectionCard(
+-              child: Column(
+-                crossAxisAlignment: CrossAxisAlignment.stretch,
+-                children: [
+-                  Row(
++            child: Column(
++              crossAxisAlignment: CrossAxisAlignment.stretch,
++              children: [
++                WorkspaceSectionCard(
++                  child: Row(
+                     children: [
+                       Expanded(
+                         child: WorkspacePageTitle(
+@@ -600,8 +573,10 @@ class _MeetingFacilityPageState extends State<MeetingFacilityPage> {
+                         ),
+                     ],
+                   ),
+-                  const SizedBox(height: 8),
+-                  LayoutBuilder(
++                ),
++                const SizedBox(height: LaooLayout.captionFilterSpacing),
++                WorkspaceSectionCard(
++                  child: LayoutBuilder(
+                     builder: (context, constraints) => Wrap(
+                       spacing: 8,
+                       runSpacing: 8,
+@@ -701,13 +676,13 @@ class _MeetingFacilityPageState extends State<MeetingFacilityPage> {
+                       ],
+                     ),
+                   ),
+-                  const SizedBox(height: 8),
+-                  if (_loading) const LinearProgressIndicator(),
+-                  Expanded(child: _facilityList(preset)),
+-                  const SizedBox(height: 8),
+-                  _pagination(preset),
+-                ],
+-              ),
++                ),
++                const SizedBox(height: LaooLayout.cardSpacing),
++                if (_loading) const LinearProgressIndicator(),
++                Expanded(child: _facilityList(preset)),
++                const SizedBox(height: LaooLayout.cardSpacing),
++                _pagination(preset),
++              ],
+             ),
+           ),
+           if (_message != null)
+diff --git a/projects/meeting/lib/features/meeting/pages/meeting_room_page.dart b/projects/meeting/lib/features/meeting/pages/meeting_room_page.dart
+index 1fe5bf8c2e382cfc6db3f9493e6455d2d6550b7b..f08a5d56b66b81c0ae890cb586be71dcd189e402 100644
+--- a/projects/meeting/lib/features/meeting/pages/meeting_room_page.dart
++++ b/projects/meeting/lib/features/meeting/pages/meeting_room_page.dart
+@@ -19,6 +19,7 @@ import '../../support/employee/data/employee_repository.dart';
+ import '../../support/organization/data/organization_repository.dart';
+ import '../../profile/pages/user_profile_dialog.dart';
+ import '../meeting_feature_host.dart';
++import '../widgets/meeting_pagination_card.dart';
+ 
+ class MeetingRoomPage extends StatefulWidget {
+   const MeetingRoomPage({super.key});
+@@ -1195,6 +1196,14 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
+ 
+   Widget _roomCard(Map<String, dynamic> item, WorkspaceThemePreset preset) =>
+       Card(
++        margin: EdgeInsets.zero,
++        color: LaooColors.white,
++        surfaceTintColor: Colors.transparent,
++        elevation: 0,
++        shape: RoundedRectangleBorder(
++          borderRadius: BorderRadius.circular(LaooRadius.xs),
++          side: BorderSide.none,
++        ),
+         child: Padding(
+           padding: const EdgeInsets.all(LaooLayout.cardPadding),
+           child: Column(
+@@ -1249,16 +1258,18 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
+             child: cards
+                 ? ListView.separated(
+                     itemCount: _filtered.length,
+-                    separatorBuilder: (_, _) => const SizedBox(height: 8),
++                    separatorBuilder: (_, _) => const SizedBox(height: 6),
+                     itemBuilder: (context, i) => _roomCard(_filtered[i], p),
+                   )
+-                : Card(
+-                    margin: EdgeInsets.zero,
++                : WorkspaceSectionCard(
++                    padding: EdgeInsets.zero,
+                     child: SingleChildScrollView(
+                       scrollDirection: Axis.horizontal,
+                       child: ConstrainedBox(
+                         constraints: BoxConstraints(minWidth: c.maxWidth),
+                         child: DataTable(
++                          horizontalMargin: LaooDataTable.horizontalMargin,
++                          dividerThickness: LaooDataTable.dividerThickness,
+                           border: TableBorder(
+                             horizontalInside: BorderSide(
+                               color: LaooColors.border.withValues(alpha: .45),
+@@ -1275,8 +1286,14 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
+                           ),
+                           headingTextStyle: TextStyle(
+                             color: p.primary,
++                            fontSize: LaooTypography.tableHeader,
+                             fontWeight: FontWeight.w700,
+                           ),
++                          dataTextStyle: TextStyle(
++                            color: Theme.of(context).colorScheme.onSurface,
++                            fontSize: LaooTypography.tableBody,
++                          ),
++                          dataRowColor: LaooDataTable.rowColor(p.primary),
+                           columns: [
+                             DataColumn(
+                               columnWidth: LaooDataTable.idColumnWidth,
+@@ -1349,8 +1366,8 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
+                     ),
+                   ),
+           ),
+-          const SizedBox(height: 8),
+-          WorkspaceSectionCard(child: _pagination(_total, p)),
++          const SizedBox(height: LaooLayout.cardSpacing),
++          _pagination(_total, p),
+         ],
+       );
+     },
+@@ -2311,7 +2328,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
+                     ],
+                   ),
+                 ),
+-                const SizedBox(height: 8),
++                const SizedBox(height: LaooLayout.captionFilterSpacing),
+                 WorkspaceSectionCard(
+                   child: LayoutBuilder(
+                     builder: (context, constraints) {
+@@ -2513,7 +2530,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
+                     },
+                   ),
+                 ),
+-                const SizedBox(height: 8),
++                const SizedBox(height: LaooLayout.cardSpacing),
+                 if (_loading) const LinearProgressIndicator(),
+                 Expanded(child: _roomContent(p)),
+               ],
+@@ -2550,59 +2567,13 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
+   );
+   Widget _pagination(int total, WorkspaceThemePreset p) {
+     final pages = (total / _size).ceil();
+-    final muted = Theme.of(context).colorScheme.surfaceContainerHighest;
+-    final shape = RoundedRectangleBorder(
+-      borderRadius: BorderRadius.circular(LaooRadius.xs),
+-    );
+-    return Wrap(
+-      spacing: 8,
+-      runSpacing: 8,
+-      crossAxisAlignment: WrapCrossAlignment.center,
+-      children: [
+-        OutlinedButton(
+-          style: OutlinedButton.styleFrom(
+-            backgroundColor: muted,
+-            disabledBackgroundColor: muted,
+-            foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
+-            disabledForegroundColor: Theme.of(
+-              context,
+-            ).colorScheme.onSurfaceVariant,
+-            side: BorderSide.none,
+-            shape: shape,
+-          ),
+-          onPressed: _page > 0 ? () => setState(() => _page--) : null,
+-          child: const Icon(Icons.chevron_left),
+-        ),
+-        FilledButton(
+-          style: FilledButton.styleFrom(
+-            backgroundColor: p.primary,
+-            disabledBackgroundColor: p.primary,
+-            foregroundColor: Theme.of(context).colorScheme.onPrimary,
+-            disabledForegroundColor: Theme.of(context).colorScheme.onPrimary,
+-            shape: shape,
+-            padding: const EdgeInsets.all(14),
+-          ),
+-          onPressed: null,
+-          child: Text('${pages == 0 ? 0 : _page + 1}'),
+-        ),
+-        OutlinedButton(
+-          style: OutlinedButton.styleFrom(
+-            backgroundColor: muted,
+-            disabledBackgroundColor: muted,
+-            foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
+-            disabledForegroundColor: Theme.of(
+-              context,
+-            ).colorScheme.onSurfaceVariant,
+-            side: BorderSide.none,
+-            shape: shape,
+-          ),
+-          onPressed: _page < pages - 1 ? () => setState(() => _page++) : null,
+-          child: const Icon(Icons.chevron_right),
+-        ),
+-        Text(
+-          '${total == 0 ? 0 : _page * _size + 1}-${((_page + 1) * _size).clamp(0, total)} จาก $total',
+-        ),
+-      ],
++    return MeetingPaginationCard(
++      total: total,
++      pageIndex: _page,
++      pageSize: _size,
++      primary: p.primary,
++      onPrevious: _page > 0 ? () => setState(() => _page--) : null,
++      onNext: _page < pages - 1 ? () => setState(() => _page++) : null,
+     );
+   }
+ }
+diff --git a/projects/meeting/lib/features/meeting/widgets/meeting_pagination_card.dart b/projects/meeting/lib/features/meeting/widgets/meeting_pagination_card.dart
+new file mode 100644
+index 0000000000000000000000000000000000000000..8f2e3f6dd90c8fb24f43c16a0f010c365d39dbdb
+--- /dev/null
++++ b/projects/meeting/lib/features/meeting/widgets/meeting_pagination_card.dart
+@@ -0,0 +1,139 @@
++import 'package:flutter/material.dart';
++
++import '../../../app/theme/laoo_design_tokens.dart';
++import '../../../app/theme/laoo_typography.dart';
++
++class MeetingPaginationCard extends StatelessWidget {
++  const MeetingPaginationCard({
++    super.key,
++    required this.total,
++    required this.pageIndex,
++    required this.pageSize,
++    required this.primary,
++    required this.onPrevious,
++    required this.onNext,
++  });
++
++  final int total;
++  final int pageIndex;
++  final int pageSize;
++  final Color primary;
++  final VoidCallback? onPrevious;
++  final VoidCallback? onNext;
++
++  @override
++  Widget build(BuildContext context) {
++    final pageCount = (total / pageSize).ceil();
++    final currentPage = pageCount == 0 ? 0 : pageIndex + 1;
++    final start = total == 0 ? 0 : pageIndex * pageSize + 1;
++    final end = ((pageIndex + 1) * pageSize).clamp(0, total);
++    final muted = Theme.of(context).colorScheme.surfaceContainerHighest;
++    final mutedText = Theme.of(context).colorScheme.onSurfaceVariant;
++    final onPrimary = Theme.of(context).colorScheme.onPrimary;
++    final shape = RoundedRectangleBorder(
++      borderRadius: BorderRadius.circular(LaooRadius.xs),
++    );
++
++    Widget navigationButton({
++      required IconData icon,
++      required VoidCallback? onPressed,
++      required String tooltip,
++    }) => Tooltip(
++      message: tooltip,
++      child: SizedBox.square(
++        dimension: 40,
++        child: OutlinedButton(
++          style: OutlinedButton.styleFrom(
++            padding: EdgeInsets.zero,
++            backgroundColor: muted,
++            disabledBackgroundColor: muted,
++            foregroundColor: mutedText,
++            disabledForegroundColor: mutedText.withValues(alpha: .55),
++            side: BorderSide.none,
++            shape: shape,
++          ),
++          onPressed: onPressed,
++          child: Icon(icon, size: 20),
++        ),
++      ),
++    );
++
++    return Card(
++      margin: EdgeInsets.zero,
++      color: LaooColors.white,
++      surfaceTintColor: Colors.transparent,
++      elevation: 0,
++      clipBehavior: Clip.antiAlias,
++      shape: RoundedRectangleBorder(
++        borderRadius: BorderRadius.circular(LaooRadius.xs),
++        side: BorderSide.none,
++      ),
++      child: SizedBox(
++        width: double.infinity,
++        height: LaooLayout.paginationCardHeight,
++        child: Column(
++          children: [
++            const Divider(height: 1, thickness: 1, color: LaooColors.border),
++            Expanded(
++              child: Padding(
++                padding: const EdgeInsets.symmetric(
++                  horizontal: LaooLayout.cardPadding,
++                ),
++                child: Align(
++                  alignment: Alignment.centerLeft,
++                  child: SingleChildScrollView(
++                    scrollDirection: Axis.horizontal,
++                    child: Row(
++                      children: [
++                        navigationButton(
++                          icon: Icons.chevron_left,
++                          onPressed: onPrevious,
++                          tooltip: 'หน้าก่อนหน้า',
++                        ),
++                        const SizedBox(width: 8),
++                        SizedBox.square(
++                          dimension: 40,
++                          child: FilledButton(
++                            style: FilledButton.styleFrom(
++                              padding: EdgeInsets.zero,
++                              backgroundColor: primary,
++                              disabledBackgroundColor: primary,
++                              foregroundColor: onPrimary,
++                              disabledForegroundColor: onPrimary,
++                              shape: shape,
++                            ),
++                            onPressed: null,
++                            child: Text(
++                              '$currentPage',
++                              style: const TextStyle(
++                                fontSize: LaooTypography.tableBody,
++                                fontWeight: FontWeight.w700,
++                              ),
++                            ),
++                          ),
++                        ),
++                        const SizedBox(width: 8),
++                        navigationButton(
++                          icon: Icons.chevron_right,
++                          onPressed: onNext,
++                          tooltip: 'หน้าถัดไป',
++                        ),
++                        const SizedBox(width: 10),
++                        Text(
++                          '$start-$end จาก $total',
++                          style: const TextStyle(
++                            fontSize: LaooTypography.tableBody,
++                          ),
++                        ),
++                      ],
++                    ),
++                  ),
++                ),
++              ),
++            ),
++          ],
++        ),
++      ),
++    );
++  }
++}
+diff --git a/projects/meeting/lib/features/support/presentation/widgets/support_workspace_shell.dart b/projects/meeting/lib/features/support/presentation/widgets/support_workspace_shell.dart
+index 6a7591a3ff85feb5054dcfb876b4fdb1a0e4f685..3a5e0ad8f7ab8ce0fd160a91279e205f32230107 100644
+--- a/projects/meeting/lib/features/support/presentation/widgets/support_workspace_shell.dart
++++ b/projects/meeting/lib/features/support/presentation/widgets/support_workspace_shell.dart
+@@ -92,6 +92,7 @@ class WorkspaceSectionCard extends StatelessWidget {
+         color: LaooColors.white,
+         surfaceTintColor: Colors.transparent,
+         elevation: 0,
++        clipBehavior: Clip.antiAlias,
+         shape: RoundedRectangleBorder(
+           borderRadius: BorderRadius.circular(LaooRadius.xs),
+           side: BorderSide.none,
+diff --git a/projects/meeting/test/features/meeting/widgets/meeting_pagination_card_test.dart b/projects/meeting/test/features/meeting/widgets/meeting_pagination_card_test.dart
+new file mode 100644
+index 0000000000000000000000000000000000000000..fd0643f080c96eb594f6a829a688a4a56754c65b
+--- /dev/null
++++ b/projects/meeting/test/features/meeting/widgets/meeting_pagination_card_test.dart
+@@ -0,0 +1,85 @@
++import 'package:flutter/material.dart';
++import 'package:flutter_test/flutter_test.dart';
++import 'package:laoo_meeting/app/theme/laoo_design_tokens.dart';
++import 'package:laoo_meeting/features/meeting/widgets/meeting_pagination_card.dart';
++
++void main() {
++  Widget app(Widget child) => MaterialApp(
++    theme: ThemeData(useMaterial3: true),
++    home: Scaffold(body: child),
++  );
++
++  testWidgets('uses the standard card and empty pagination state', (
++    tester,
++  ) async {
++    await tester.pumpWidget(
++      app(
++        const MeetingPaginationCard(
++          total: 0,
++          pageIndex: 0,
++          pageSize: 20,
++          primary: Color(0xFF168364),
++          onPrevious: null,
++          onNext: null,
++        ),
++      ),
++    );
++
++    final card = tester.widget<Card>(find.byType(Card));
++    final shape = card.shape! as RoundedRectangleBorder;
++    expect(card.margin, EdgeInsets.zero);
++    expect(card.color, LaooColors.white);
++    expect(card.elevation, 0);
++    expect(shape.borderRadius, BorderRadius.circular(LaooRadius.xs));
++    expect(shape.side, BorderSide.none);
++    expect(find.text('0'), findsOneWidget);
++    expect(find.text('0-0 จาก 0'), findsOneWidget);
++    expect(
++      tester
++          .widget<OutlinedButton>(
++            find.widgetWithIcon(OutlinedButton, Icons.chevron_left),
++          )
++          .onPressed,
++      isNull,
++    );
++    expect(
++      tester
++          .widget<OutlinedButton>(
++            find.widgetWithIcon(OutlinedButton, Icons.chevron_right),
++          )
++          .onPressed,
++      isNull,
++    );
++    expect(
++      find.byWidgetPredicate(
++        (widget) =>
++            widget is SizedBox &&
++            widget.height == LaooLayout.paginationCardHeight,
++      ),
++      findsOneWidget,
++    );
++  });
++
++  testWidgets('enables next page and keeps the shared spacing token', (
++    tester,
++  ) async {
++    var nextCount = 0;
++    await tester.pumpWidget(
++      app(
++        MeetingPaginationCard(
++          total: 42,
++          pageIndex: 0,
++          pageSize: 20,
++          primary: const Color(0xFF168364),
++          onPrevious: null,
++          onNext: () => nextCount++,
++        ),
++      ),
++    );
++
++    expect(LaooLayout.captionFilterSpacing, 6);
++    expect(find.text('1-20 จาก 42'), findsOneWidget);
++    await tester.tap(find.byIcon(Icons.chevron_right));
++    expect(nextCount, 1);
++  });
++}

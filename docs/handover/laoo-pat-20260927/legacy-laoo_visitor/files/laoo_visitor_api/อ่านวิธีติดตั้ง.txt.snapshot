@@ -1,0 +1,7 @@
+C:\laooplatform\laoo_visitor\laoo_visitor_api
+
+
+run
+cd C:\laooplatform\laoo_visitor\laoo_visitor_api
+powershell -ExecutionPolicy Bypass -File .\setup_laoo_visitor_api.ps1
+dotnet run

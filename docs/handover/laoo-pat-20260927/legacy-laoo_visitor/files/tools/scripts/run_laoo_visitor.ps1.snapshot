@@ -1,0 +1,45 @@
+param(
+    [switch]$ApiOnly,
+    [switch]$FlutterOnly,
+    [switch]$Web
+)
+
+$ErrorActionPreference = 'Stop'
+$projectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+$apiRoot = Join-Path $projectRoot 'laoo_visitor_api'
+
+if ($ApiOnly -and $FlutterOnly) {
+    throw 'เลือกใช้ -ApiOnly หรือ -FlutterOnly ได้ทีละตัว'
+}
+
+if (-not $FlutterOnly) {
+    if (-not (Test-Path (Join-Path $apiRoot 'LaooVisitorApi.csproj'))) {
+        throw "ไม่พบ API project ที่ $apiRoot"
+    }
+
+    $apiCommand = "Set-Location '$apiRoot'; dotnet run --launch-profile http"
+    Start-Process powershell.exe -ArgumentList @(
+        '-NoExit',
+        '-ExecutionPolicy', 'Bypass',
+        '-Command', $apiCommand
+    ) | Out-Null
+    Write-Host 'API started: http://localhost:5082' -ForegroundColor Green
+}
+
+if (-not $ApiOnly) {
+    if ($Web) {
+        $flutterCommand = "Set-Location '$projectRoot'; flutter run -d web-server --web-port 8082"
+        $flutterTarget = 'Flutter Web'
+    }
+    else {
+        $flutterCommand = "Set-Location '$projectRoot'; flutter run -d windows"
+        $flutterTarget = 'Flutter Windows'
+    }
+
+    Start-Process powershell.exe -ArgumentList @(
+        '-NoExit',
+        '-ExecutionPolicy', 'Bypass',
+        '-Command', $flutterCommand
+    ) | Out-Null
+    Write-Host "$flutterTarget started" -ForegroundColor Green
+}

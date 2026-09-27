@@ -1,0 +1,638 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Laoo <dev@laoo.local>
+Date: Sun, 20 Sep 2026 00:04:25 +0700
+Subject: [HANDOVER] feat(core): bootstrap sales project
+
+---
+ ...919120000_LAOO_sales_project_bootstrap.sql |  15 +++
+ ...O_sales_navigation_permission_baseline.sql |  44 ++++++++
+ docs/architecture/MULTI_MACHINE_RUNBOOK.md    |  20 +++-
+ laoo_api/Program.cs                           |   2 +
+ laoo_api/laoo_api.csproj                      |   1 +
+ lib/app/router/app_menu_route_registry.dart   |  12 ++-
+ lib/app/router/app_router.dart                |   2 +
+ lib/main.dart                                 |   2 +
+ local.machine.sales.example.json              |   7 ++
+ projects/sales/database/migrations/.gitkeep   |   0
+ .../features/sales/sales_feature_host.dart    |  21 ++++
+ .../lib/features/sales/sales_go_routes.dart   |   4 +
+ .../features/sales/sales_route_contract.dart  |   7 ++
+ projects/sales/lib/sales_feature.dart         | 101 ++++++++++++++++++
+ .../Laoo.Sales.Module.csproj                  |   1 +
+ .../Laoo.Sales.Module/SalesModuleMarker.cs    |   2 +
+ projects/sales/pubspec.yaml                   |  16 +++
+ pubspec.lock                                  |   7 ++
+ pubspec.yaml                                  |   2 +
+ test/app/router/sales_bootstrap_test.dart     |  19 ++++
+ .../Laoo.MigrationRunner/Program.cs           |   1 +
+ tools/scripts/check-machine-boundaries.ps1    |   7 +-
+ tools/scripts/run-migrations.ps1              |   3 +-
+ tools/scripts/test-project-bootstrap.ps1      |   2 +-
+ tools/scripts/verify-center.ps1               |   8 +-
+ 25 files changed, 295 insertions(+), 11 deletions(-)
+ create mode 100644 database/migrations/20260919120000_LAOO_sales_project_bootstrap.sql
+ create mode 100644 database/migrations/20260919121000_LAOO_sales_navigation_permission_baseline.sql
+ create mode 100644 local.machine.sales.example.json
+ create mode 100644 projects/sales/database/migrations/.gitkeep
+ create mode 100644 projects/sales/lib/features/sales/sales_feature_host.dart
+ create mode 100644 projects/sales/lib/features/sales/sales_go_routes.dart
+ create mode 100644 projects/sales/lib/features/sales/sales_route_contract.dart
+ create mode 100644 projects/sales/lib/sales_feature.dart
+ create mode 100644 projects/sales/packages/dotnet/Laoo.Sales.Module/Laoo.Sales.Module.csproj
+ create mode 100644 projects/sales/packages/dotnet/Laoo.Sales.Module/SalesModuleMarker.cs
+ create mode 100644 projects/sales/pubspec.yaml
+ create mode 100644 test/app/router/sales_bootstrap_test.dart
+
+diff --git a/database/migrations/20260919120000_LAOO_sales_project_bootstrap.sql b/database/migrations/20260919120000_LAOO_sales_project_bootstrap.sql
+new file mode 100644
+index 0000000000000000000000000000000000000000..2a19039958bde2aca66098652bb7cf66f0f95be9
+--- /dev/null
++++ b/database/migrations/20260919120000_LAOO_sales_project_bootstrap.sql
+@@ -0,0 +1,15 @@
++﻿/* Core-owned LAOO_SALES entitlement bootstrap. Company enablement is opt-in. */
++SET NOCOUNT ON;
++SET XACT_ABORT ON;
++BEGIN TRY
++ BEGIN TRANSACTION;
++ UPDATE dbo.TDADProject SET ProjectNameTH=N'ระบบบริหารงานขาย',ProjectNameEN=N'Sales Management',DescriptionText=N'ระบบบริหารลูกค้าเป้าหมาย โอกาสการขาย และงานติดตาม',ProjectType=N'BUSINESS',IconName=N'trending_up_outlined',SortOrder=140,IsExpandedDefault=0,IsActive=1,UpdateDate=SYSUTCDATETIME() WHERE ProjectCode=N'LAOO_SALES';
++ IF NOT EXISTS(SELECT 1 FROM dbo.TDADProject WHERE ProjectCode=N'LAOO_SALES') INSERT dbo.TDADProject(ProjectCode,ProjectNameTH,ProjectNameEN,DescriptionText,IsActive,CreateDate,ProjectType,SortOrder,IconName,IsExpandedDefault) VALUES(N'LAOO_SALES',N'ระบบบริหารงานขาย',N'Sales Management',N'ระบบบริหารลูกค้าเป้าหมาย โอกาสการขาย และงานติดตาม',1,SYSUTCDATETIME(),N'BUSINESS',140,N'trending_up_outlined',0);
++ /* TDADCompanyProject is intentionally not seeded. */
++ COMMIT TRANSACTION;
++END TRY
++BEGIN CATCH
++ IF @@TRANCOUNT>0 ROLLBACK TRANSACTION;
++ THROW;
++END CATCH;
++GO
+diff --git a/database/migrations/20260919121000_LAOO_sales_navigation_permission_baseline.sql b/database/migrations/20260919121000_LAOO_sales_navigation_permission_baseline.sql
+new file mode 100644
+index 0000000000000000000000000000000000000000..30e0cae9aa915d78f8745b427d930be69f8e333c
+--- /dev/null
++++ b/database/migrations/20260919121000_LAOO_sales_navigation_permission_baseline.sql
+@@ -0,0 +1,44 @@
++/* Core-owned LAOO_SALES menu and permission baseline. */
++SET NOCOUNT ON;
++SET XACT_ABORT ON;
++BEGIN TRY
++ BEGIN TRANSACTION;
++ DECLARE @ProjectID bigint=(SELECT ProjectID FROM dbo.TDADProject WHERE ProjectCode=N'LAOO_SALES' AND IsActive=1);
++ IF @ProjectID IS NULL THROW 52970,N'Active LAOO_SALES project is required.',1;
++ DECLARE @MenuGroupCode char(2)=N'45';
++ IF EXISTS(SELECT 1 FROM dbo.TDADMenuGroup WHERE MenuGroupCode=@MenuGroupCode AND (AudienceType<>N'C' OR MenuGroupName<>N'ระบบบริหารงานขาย')) THROW 52971,N'LAOO_SALES MenuGroupCode conflicts with an existing group.',1;
++ UPDATE dbo.TDADMenuGroup SET AudienceType=N'C',MenuGroupName=N'ระบบบริหารงานขาย',IconName=N'trending_up_outlined',SortOrder=450,IsExpandedDefault=0,IsActive=1,ShowPermissionPoint=0,OpenOption=0,UpdateDate=SYSUTCDATETIME() WHERE MenuGroupCode=@MenuGroupCode;
++ IF NOT EXISTS(SELECT 1 FROM dbo.TDADMenuGroup WHERE MenuGroupCode=@MenuGroupCode) INSERT dbo.TDADMenuGroup(AudienceType,MenuGroupCode,MenuGroupName,IconName,SortOrder,IsExpandedDefault,IsActive,CreateDate,ShowPermissionPoint,OpenOption) VALUES(N'C',@MenuGroupCode,N'ระบบบริหารงานขาย',N'trending_up_outlined',450,0,1,SYSUTCDATETIME(),0,0);
++ DECLARE @Menus TABLE(MenuCode char(5) PRIMARY KEY,MenuName nvarchar(150),ScreenType int,RouteName nvarchar(150),RoutePath nvarchar(300),FeatureCode nvarchar(100),IconName nvarchar(100),SortOrder int);
++ INSERT @Menus VALUES
++ (N'45001',N'ตั้งค่าระบบขาย',2,N'salesSettings',N'/company/sales-settings',N'SALES_SETTINGS',N'settings_outlined',10),
++ (N'45002',N'ขั้นตอนการขาย',1,N'salesPipelineStages',N'/company/sales-pipeline-stages',N'SALES_PIPELINE_STAGES',N'account_tree_outlined',20),
++ (N'45003',N'ลูกค้าเป้าหมาย',1,N'salesLeads',N'/company/sales-leads',N'SALES_LEADS',N'person_search_outlined',30),
++ (N'45004',N'โอกาสการขาย',1,N'salesOpportunities',N'/company/sales-opportunities',N'SALES_OPPORTUNITIES',N'handshake_outlined',40),
++ (N'45005',N'กิจกรรมติดตาม',1,N'salesActivities',N'/company/sales-activities',N'SALES_ACTIVITIES',N'event_note_outlined',50),
++ (N'45006',N'งานขายของฉัน',2,N'mySalesTasks',N'/company/my-sales-tasks',N'MY_SALES_TASKS',N'assignment_ind_outlined',60),
++ (N'45007',N'รายงานการขาย',3,N'salesReports',N'/company/sales-reports',N'SALES_REPORTS',N'insights_outlined',70);
++ IF EXISTS(SELECT 1 FROM @Menus s JOIN dbo.TDADMainMenu t ON t.MenuCode=s.MenuCode WHERE t.MenuGroupCode<>@MenuGroupCode OR t.ScreenType<>s.ScreenType OR ISNULL(t.RouteName,N'')<>s.RouteName OR ISNULL(t.RoutePath,N'')<>s.RoutePath) THROW 52972,N'LAOO_SALES MenuCode conflicts with existing ScreenType or route.',1;
++ IF EXISTS(SELECT 1 FROM @Menus s JOIN dbo.TDADMainMenu t ON (t.RouteName=s.RouteName OR t.RoutePath=s.RoutePath) AND t.MenuCode<>s.MenuCode) THROW 52973,N'LAOO_SALES RouteName or RoutePath is already used.',1;
++ UPDATE t SET MenuGroupCode=@MenuGroupCode,MenuName=s.MenuName,ScreenType=s.ScreenType,RouteName=s.RouteName,RoutePath=s.RoutePath,FeatureCode=s.FeatureCode,IconName=s.IconName,SortOrder=s.SortOrder,IsVisible=1,IsFavoriteAllowed=1,IsActive=1,ShowPermissionPoint=0,UpdateDate=SYSUTCDATETIME() FROM dbo.TDADMainMenu t JOIN @Menus s ON s.MenuCode=t.MenuCode;
++ INSERT dbo.TDADMainMenu(MenuCode,MenuGroupCode,MenuName,ScreenType,RouteName,RoutePath,FeatureCode,IconName,SortOrder,IsVisible,IsFavoriteAllowed,IsActive,CreateDate,ShowPermissionPoint) SELECT MenuCode,@MenuGroupCode,MenuName,ScreenType,RouteName,RoutePath,FeatureCode,IconName,SortOrder,1,1,1,SYSUTCDATETIME(),0 FROM @Menus s WHERE NOT EXISTS(SELECT 1 FROM dbo.TDADMainMenu t WHERE t.MenuCode=s.MenuCode);
++ /* Inactive until the Sales machine delivers real route, API and migrations. */
++ UPDATE dbo.TDADProjectMenuGroup SET SortOrder=1,IsActive=0,UpdateDate=SYSUTCDATETIME() WHERE ProjectID=@ProjectID AND MenuGroupCode=@MenuGroupCode;
++ IF NOT EXISTS(SELECT 1 FROM dbo.TDADProjectMenuGroup WHERE ProjectID=@ProjectID AND MenuGroupCode=@MenuGroupCode) INSERT dbo.TDADProjectMenuGroup(ProjectID,MenuGroupCode,SortOrder,IsActive,CreateDate) VALUES(@ProjectID,@MenuGroupCode,1,0,SYSUTCDATETIME());
++ UPDATE t SET MenuGroupCode=@MenuGroupCode,SortOrder=s.SortOrder,IsActive=0,UpdateDate=SYSUTCDATETIME() FROM dbo.TDADProjectMenu t JOIN @Menus s ON s.MenuCode=t.MenuCode WHERE t.ProjectID=@ProjectID;
++ INSERT dbo.TDADProjectMenu(ProjectID,MenuCode,MenuGroupCode,SortOrder,IsActive,CreateDate) SELECT @ProjectID,MenuCode,@MenuGroupCode,SortOrder,0,SYSUTCDATETIME() FROM @Menus s WHERE NOT EXISTS(SELECT 1 FROM dbo.TDADProjectMenu t WHERE t.ProjectID=@ProjectID AND t.MenuCode=s.MenuCode);
++ DECLARE @Permissions TABLE(MenuCode char(5),ActionCode nvarchar(50),PRIMARY KEY(MenuCode,ActionCode));
++ INSERT @Permissions VALUES
++ (N'45001',N'VIEW'),(N'45001',N'EDIT'),(N'45002',N'VIEW'),(N'45002',N'CREATE'),(N'45002',N'EDIT'),(N'45002',N'DELETE'),
++ (N'45003',N'VIEW'),(N'45003',N'CREATE'),(N'45003',N'EDIT'),(N'45003',N'DELETE'),(N'45003',N'CONVERT'),
++ (N'45004',N'VIEW'),(N'45004',N'CREATE'),(N'45004',N'EDIT'),(N'45004',N'DELETE'),(N'45004',N'CLOSE'),
++ (N'45005',N'VIEW'),(N'45005',N'CREATE'),(N'45005',N'EDIT'),(N'45005',N'DELETE'),(N'45006',N'VIEW'),(N'45006',N'EDIT'),(N'45007',N'VIEW');
++ UPDATE t SET ScreenNameTH=m.MenuName,ScreenNameEN=m.FeatureCode,ActionNameTH=p.ActionCode,ActionNameEN=p.ActionCode,IsActive=1,ModifiedDate=SYSUTCDATETIME() FROM dbo.TDADPermission t JOIN @Permissions p ON p.MenuCode=t.ScreenCode AND p.ActionCode=t.ActionCode JOIN @Menus m ON m.MenuCode=p.MenuCode WHERE t.ProjectID=@ProjectID;
++ INSERT dbo.TDADPermission(ProjectID,ScreenCode,ScreenNameTH,ScreenNameEN,ActionCode,ActionNameTH,ActionNameEN,IsActive,CreatedDate) SELECT @ProjectID,p.MenuCode,m.MenuName,m.FeatureCode,p.ActionCode,p.ActionCode,p.ActionCode,1,SYSUTCDATETIME() FROM @Permissions p JOIN @Menus m ON m.MenuCode=p.MenuCode WHERE NOT EXISTS(SELECT 1 FROM dbo.TDADPermission t WHERE t.ProjectID=@ProjectID AND t.ScreenCode=p.MenuCode AND t.ActionCode=p.ActionCode);
++ COMMIT TRANSACTION;
++END TRY
++BEGIN CATCH
++ IF @@TRANCOUNT>0 ROLLBACK TRANSACTION;
++ THROW;
++END CATCH;
++GO
+diff --git a/docs/architecture/MULTI_MACHINE_RUNBOOK.md b/docs/architecture/MULTI_MACHINE_RUNBOOK.md
+index 8d904c53574763214d71653ea38d9c2c6de8dd7e..d6df667026441be20c86f2e62d74cd6885618a79 100644
+--- a/docs/architecture/MULTI_MACHINE_RUNBOOK.md
++++ b/docs/architecture/MULTI_MACHINE_RUNBOOK.md
+@@ -8,8 +8,10 @@
+ | `meeting` | `projects/meeting` and `projects/training` |
+ | `visitor` | `projects/visitor` |
+ | `time` | `projects/time` |
+-| 	raining | projects/training |
+-| intranet | projects/intranet |
++| `training` | `projects/training` |
++| `intranet` | `projects/intranet` |
++| `vote` | `projects/vote` |
++| `sales` | `projects/sales` |
+ 
+ Every machine clones `nodfinger/laoo` to `C:\laooplatform\laoo`. Never
+ share a live working tree, `.git`, `.dart_tool`, `build`, `bin`, or `obj`.
+@@ -205,3 +207,17 @@ Visitor is a package/module scaffold. Its 22 route contracts remain marked
+ unimplemented and must not enter the active route registry until each screen
+ and API is ready. Shared employee, branch, user, organization, permission,
+ and theme code remains in Core/shared packages.
++
++Sales machine example:
++
++```json
++{
++  "role": "sales",
++  "allowedProjects": ["LAOO", "LAOO_SALES"],
++  "webPort": 8080,
++  "apiPort": 5080
++}
++```
++
++Copy `local.machine.sales.example.json` to ignored `local.machine.json` on that
++machine. Never commit a real `local.machine.json`.
+\ No newline at end of file
+diff --git a/laoo_api/Program.cs b/laoo_api/Program.cs
+index d377c10dfc3ccd7e9262aea0d4ff571961aea462..c17ace7065a09a1a80026c0d46fc54a10a8c5058 100644
+--- a/laoo_api/Program.cs
++++ b/laoo_api/Program.cs
+@@ -11,6 +11,7 @@ using LaooExpenseModule;
+ using LaooProjectModule;
+ using LaooIntranetModule;
+ using LaooVoteModule;
++using LaooSalesModule;
+ using LaooTrainingModule;
+ using Microsoft.AspNetCore.Authentication.JwtBearer;
+ using Microsoft.AspNetCore.DataProtection;
+@@ -51,6 +52,7 @@ builder.Services
+     .AddApplicationPart(typeof(ProjectModuleMarker).Assembly)
+     .AddApplicationPart(typeof(IntranetModuleMarker).Assembly)
+     .AddApplicationPart(typeof(VoteModuleMarker).Assembly)
++    .AddApplicationPart(typeof(SalesModuleMarker).Assembly)
+     .AddApplicationPart(typeof(TrainingModuleMarker).Assembly);
+ builder.Services.AddProblemDetails(options =>
+ {
+diff --git a/laoo_api/laoo_api.csproj b/laoo_api/laoo_api.csproj
+index cb0b887e26de1a22f0d7add3374a7d2ff5e36a11..464de6a1a932ac22b8e6b548743fe053ac1e0e31 100644
+--- a/laoo_api/laoo_api.csproj
++++ b/laoo_api/laoo_api.csproj
+@@ -33,6 +33,7 @@
+     <ProjectReference Include="..\projects\vote\packages\dotnet\Laoo.Vote.Module\Laoo.Vote.Module.csproj" />
+     <ProjectReference Include="..\projects\training\packages\dotnet\Laoo.Training.Module\Laoo.Training.Module.csproj" />
+     <ProjectReference Include="..\projects\gate_pass\packages\dotnet\Laoo.GatePass.Module\Laoo.GatePass.Module.csproj" />
++    <ProjectReference Include="..\projects\sales\packages\dotnet\Laoo.Sales.Module\Laoo.Sales.Module.csproj" />
+   </ItemGroup>
+ 
+ </Project>
+diff --git a/lib/app/router/app_menu_route_registry.dart b/lib/app/router/app_menu_route_registry.dart
+index 49a87b378e9e72958e5800a9669159e0a38f8ecd..ed0ff9210b3fbb9b61a19b1e78a02ef52aff7cfa 100644
+--- a/lib/app/router/app_menu_route_registry.dart
++++ b/lib/app/router/app_menu_route_registry.dart
+@@ -12,6 +12,7 @@ import 'package:laoo_intranet/intranet_feature.dart'
+     show IntranetMenuCodes, IntranetRouteNames, IntranetRoutePaths;
+ import 'package:laoo_vote/vote_feature.dart'
+     show VoteMenuCodes, VoteRouteNames, VoteRoutePaths;
++import 'package:laoo_sales/sales_feature.dart' show SalesRoutes;
+ import 'package:laoo_meeting/meeting_feature.dart'
+     show MeetingMenuCodes, MeetingRoutes;
+ import 'package:laoo_service/service_feature.dart' show ServiceRoutes;
+@@ -861,7 +862,8 @@ abstract final class AppMenuRouteRegistry {
+       goRouteName: VoteRouteNames.results,
+       path: VoteRoutePaths.results,
+       scope: AppMenuScope.company,
+-    ),    ExpenseMenuCodes.settings: AppMenuRouteSpec(
++    ),
++    ExpenseMenuCodes.settings: AppMenuRouteSpec(
+       menuCode: ExpenseMenuCodes.settings,
+       databaseRouteName: ExpenseRouteNames.settings,
+       goRouteName: ExpenseRouteNames.settings,
+@@ -1132,6 +1134,14 @@ abstract final class AppMenuRouteRegistry {
+         path: route.routePath,
+         scope: AppMenuScope.company,
+       ),
++    for (final route in SalesRoutes.all)
++      route.menuCode: AppMenuRouteSpec(
++        menuCode: route.menuCode,
++        databaseRouteName: route.routeName,
++        goRouteName: route.effectiveGoRouteName,
++        path: route.routePath,
++        scope: AppMenuScope.company,
++      ),
+   };
+ 
+   static AppMenuRouteSpec? byMenuCode(String menuCode) =>
+diff --git a/lib/app/router/app_router.dart b/lib/app/router/app_router.dart
+index a0ac53656a89dee48b31459756c3a0c08a54a237..dcb06faedffeb3f8ae83dfa63f2951ec68994403 100644
+--- a/lib/app/router/app_router.dart
++++ b/lib/app/router/app_router.dart
+@@ -11,6 +11,7 @@ import 'package:laoo_expense/expense_feature.dart';
+ import 'package:laoo_project/project_feature.dart';
+ import 'package:laoo_intranet/intranet_feature.dart';
+ import 'package:laoo_vote/vote_feature.dart';
++import 'package:laoo_sales/sales_feature.dart';
+ import 'package:laoo_service/service_feature.dart';
+ import 'package:laoo_time/time_feature.dart';
+ import 'package:laoo_training/training_feature.dart';
+@@ -186,6 +187,7 @@ final GoRouter appRouter = GoRouter(
+     ...buildProjectFeatureRoutes(),
+     ...buildIntranetFeatureRoutes(),
+     ...buildVoteFeatureRoutes(),
++    ...buildSalesFeatureRoutes(),
+     GoRoute(
+       path: RoutePaths.companyBranches,
+       name: RouteNames.companyBranches,
+diff --git a/lib/main.dart b/lib/main.dart
+index 5d18b5ec631434bd387c9a6fc57a0bdcf34a3758..9462b73bb235f40d43e8388521e5db42c6aec45a 100644
+--- a/lib/main.dart
++++ b/lib/main.dart
+@@ -6,6 +6,7 @@ import 'package:laoo_expense/expense_feature.dart';
+ import 'package:laoo_project/project_feature.dart';
+ import 'package:laoo_intranet/intranet_feature.dart';
+ import 'package:laoo_vote/vote_feature.dart';
++import 'package:laoo_sales/sales_feature.dart';
+ import 'package:laoo_service/service_feature.dart';
+ import 'package:laoo_time/time_feature.dart';
+ import 'package:laoo_training/training_feature.dart';
+@@ -30,6 +31,7 @@ void main() {
+   configureProjectFeatureHost(_buildMeetingWorkspaceShell);
+   configureIntranetFeatureHost(_buildMeetingWorkspaceShell);
+   configureVoteFeatureHost(_buildMeetingWorkspaceShell);
++  configureSalesFeatureHost(_buildMeetingWorkspaceShell);
+   configureMeetingFeatureHost(_buildMeetingWorkspaceShell);
+   configureServiceWorkspaceShell(_buildMeetingWorkspaceShell);
+   configureGatePassFeatureHost(_buildMeetingWorkspaceShell);
+diff --git a/local.machine.sales.example.json b/local.machine.sales.example.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..5d80e84afe28a8a3e365edaad4d29fbb3af95367
+--- /dev/null
++++ b/local.machine.sales.example.json
+@@ -0,0 +1,7 @@
++{
++  "role": "sales",
++  "ownedModules": ["sales"],
++  "allowedProjects": ["LAOO", "LAOO_SALES"],
++  "webPort": 8080,
++  "apiPort": 5080
++}
+diff --git a/projects/sales/database/migrations/.gitkeep b/projects/sales/database/migrations/.gitkeep
+new file mode 100644
+index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
+diff --git a/projects/sales/lib/features/sales/sales_feature_host.dart b/projects/sales/lib/features/sales/sales_feature_host.dart
+new file mode 100644
+index 0000000000000000000000000000000000000000..a5394f6b074906d3211c1dde063f4796ffcb34ed
+--- /dev/null
++++ b/projects/sales/lib/features/sales/sales_feature_host.dart
+@@ -0,0 +1,21 @@
++import 'package:flutter/widgets.dart';
++
++typedef SalesWorkspaceShellBuilder =
++    Widget Function({
++      required String pageTitle,
++      required String activeMenu,
++      required Widget child,
++    });
++SalesWorkspaceShellBuilder? _workspaceShellBuilder;
++void configureSalesFeatureHost(SalesWorkspaceShellBuilder builder) =>
++    _workspaceShellBuilder = builder;
++Widget buildSalesWorkspaceShell({
++  required String pageTitle,
++  required String activeMenu,
++  required Widget child,
++}) {
++  final builder = _workspaceShellBuilder;
++  if (builder == null)
++    throw StateError('Sales feature host is not configured.');
++  return builder(pageTitle: pageTitle, activeMenu: activeMenu, child: child);
++}
+diff --git a/projects/sales/lib/features/sales/sales_go_routes.dart b/projects/sales/lib/features/sales/sales_go_routes.dart
+new file mode 100644
+index 0000000000000000000000000000000000000000..fc52c24416a4d5b047cc12d9c0fdbd299c2bc304
+--- /dev/null
++++ b/projects/sales/lib/features/sales/sales_go_routes.dart
+@@ -0,0 +1,4 @@
++import 'package:go_router/go_router.dart';
++
++// The owning Project machine adds real Sales routes here.
++List<GoRoute> buildSalesFeatureRoutes() => <GoRoute>[];
+diff --git a/projects/sales/lib/features/sales/sales_route_contract.dart b/projects/sales/lib/features/sales/sales_route_contract.dart
+new file mode 100644
+index 0000000000000000000000000000000000000000..6be16eed87bad8210d030689ff560c5dd6c69f4d
+--- /dev/null
++++ b/projects/sales/lib/features/sales/sales_route_contract.dart
+@@ -0,0 +1,7 @@
++export '../../sales_feature.dart'
++    show
++        SalesMenuCodes,
++        SalesProject,
++        SalesRouteNames,
++        SalesRoutePaths,
++        SalesRoutes;
+diff --git a/projects/sales/lib/sales_feature.dart b/projects/sales/lib/sales_feature.dart
+new file mode 100644
+index 0000000000000000000000000000000000000000..04b09770127b2895f712f8ccc95a08a0b3f0acee
+--- /dev/null
++++ b/projects/sales/lib/sales_feature.dart
+@@ -0,0 +1,101 @@
++export 'features/sales/sales_feature_host.dart';
++export 'features/sales/sales_go_routes.dart';
++export 'features/sales/sales_route_contract.dart';
++import 'package:laoo_shared_core/laoo_shared_core.dart';
++
++abstract final class SalesProject {
++  static const code = 'LAOO_SALES';
++}
++
++abstract final class SalesMenuCodes {
++  static const settings = '45001',
++      pipelineStages = '45002',
++      leads = '45003',
++      opportunities = '45004',
++      activities = '45005',
++      myTasks = '45006',
++      reports = '45007';
++}
++
++abstract final class SalesRouteNames {
++  static const settings = 'salesSettings',
++      pipelineStages = 'salesPipelineStages',
++      leads = 'salesLeads',
++      opportunities = 'salesOpportunities',
++      activities = 'salesActivities',
++      myTasks = 'mySalesTasks',
++      reports = 'salesReports';
++}
++
++abstract final class SalesRoutePaths {
++  static const settings = '/company/sales-settings',
++      pipelineStages = '/company/sales-pipeline-stages',
++      leads = '/company/sales-leads',
++      opportunities = '/company/sales-opportunities',
++      activities = '/company/sales-activities',
++      myTasks = '/company/my-sales-tasks',
++      reports = '/company/sales-reports';
++}
++
++abstract final class SalesRoutes {
++  static const all = <FeatureRouteContract>[
++    FeatureRouteContract(
++      projectCode: SalesProject.code,
++      menuCode: SalesMenuCodes.settings,
++      screenType: 2,
++      routeName: SalesRouteNames.settings,
++      routePath: SalesRoutePaths.settings,
++      isImplemented: false,
++    ),
++    FeatureRouteContract(
++      projectCode: SalesProject.code,
++      menuCode: SalesMenuCodes.pipelineStages,
++      screenType: 1,
++      routeName: SalesRouteNames.pipelineStages,
++      routePath: SalesRoutePaths.pipelineStages,
++      isImplemented: false,
++    ),
++    FeatureRouteContract(
++      projectCode: SalesProject.code,
++      menuCode: SalesMenuCodes.leads,
++      screenType: 4,
++      routeName: SalesRouteNames.leads,
++      routePath: SalesRoutePaths.leads,
++      isImplemented: false,
++    ),
++    FeatureRouteContract(
++      projectCode: SalesProject.code,
++      menuCode: SalesMenuCodes.opportunities,
++      screenType: 4,
++      routeName: SalesRouteNames.opportunities,
++      routePath: SalesRoutePaths.opportunities,
++      isImplemented: false,
++    ),
++    FeatureRouteContract(
++      projectCode: SalesProject.code,
++      menuCode: SalesMenuCodes.activities,
++      screenType: 4,
++      routeName: SalesRouteNames.activities,
++      routePath: SalesRoutePaths.activities,
++      isImplemented: false,
++    ),
++    FeatureRouteContract(
++      projectCode: SalesProject.code,
++      menuCode: SalesMenuCodes.myTasks,
++      screenType: 2,
++      routeName: SalesRouteNames.myTasks,
++      routePath: SalesRoutePaths.myTasks,
++      isImplemented: false,
++    ),
++    FeatureRouteContract(
++      projectCode: SalesProject.code,
++      menuCode: SalesMenuCodes.reports,
++      screenType: 3,
++      routeName: SalesRouteNames.reports,
++      routePath: SalesRoutePaths.reports,
++      isImplemented: false,
++    ),
++  ];
++  static Iterable<FeatureRouteContract> get implemented =>
++      all.where((route) => route.isImplemented);
++}
+diff --git a/projects/sales/packages/dotnet/Laoo.Sales.Module/Laoo.Sales.Module.csproj b/projects/sales/packages/dotnet/Laoo.Sales.Module/Laoo.Sales.Module.csproj
+new file mode 100644
+index 0000000000000000000000000000000000000000..776adbfb4f148e532a9fb34fb90986467bb4ecdd
+--- /dev/null
++++ b/projects/sales/packages/dotnet/Laoo.Sales.Module/Laoo.Sales.Module.csproj
+@@ -0,0 +1 @@
++﻿<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net8.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><RootNamespace>LaooSalesModule</RootNamespace></PropertyGroup><ItemGroup><ProjectReference Include="../../../../../packages/dotnet/Laoo.Shared.Contracts/Laoo.Shared.Contracts.csproj" /></ItemGroup></Project>
+diff --git a/projects/sales/packages/dotnet/Laoo.Sales.Module/SalesModuleMarker.cs b/projects/sales/packages/dotnet/Laoo.Sales.Module/SalesModuleMarker.cs
+new file mode 100644
+index 0000000000000000000000000000000000000000..025b6c21d882f36e54969080448663566d8a8289
+--- /dev/null
++++ b/projects/sales/packages/dotnet/Laoo.Sales.Module/SalesModuleMarker.cs
+@@ -0,0 +1,2 @@
++﻿namespace LaooSalesModule;
++public sealed class SalesModuleMarker { }
+diff --git a/projects/sales/pubspec.yaml b/projects/sales/pubspec.yaml
+new file mode 100644
+index 0000000000000000000000000000000000000000..69cfa9aacafd43f3f2183a6dfac5ae7e727d409e
+--- /dev/null
++++ b/projects/sales/pubspec.yaml
+@@ -0,0 +1,16 @@
++﻿name: laoo_sales
++description: LAOO Sales Management feature package.
++publish_to: none
++version: 1.0.0+1
++environment:
++  sdk: ^3.12.2
++dependencies:
++  flutter:
++    sdk: flutter
++  go_router: ^17.4.0
++  laoo_shared_core:
++    path: ../../packages/laoo_shared_core
++dev_dependencies:
++  flutter_test:
++    sdk: flutter
++  flutter_lints: ^6.0.0
+diff --git a/pubspec.lock b/pubspec.lock
+index 69518558d7a0372d83e5a48d69bc749af871d6ae..3fe2ac489dcfba52bace220250195ea3b6648653 100644
+--- a/pubspec.lock
++++ b/pubspec.lock
+@@ -359,6 +359,13 @@ packages:
+       relative: true
+     source: path
+     version: "1.0.0+1"
++  laoo_sales:
++    dependency: "direct main"
++    description:
++      path: "projects/sales"
++      relative: true
++    source: path
++    version: "1.0.0+1"
+   laoo_service:
+     dependency: "direct main"
+     description:
+diff --git a/pubspec.yaml b/pubspec.yaml
+index b19ba8714e6b5c501fc530798fcc8985e232a4c8..be437b3cbd3d6f64afb701215294ebeae49c6caf 100644
+--- a/pubspec.yaml
++++ b/pubspec.yaml
+@@ -44,6 +44,8 @@ dependencies:
+     path: projects/intranet
+   laoo_vote:
+     path: projects/vote
++  laoo_sales:
++    path: projects/sales
+ 
+   cupertino_icons: ^1.0.8
+   flutter_riverpod: ^3.4.2
+diff --git a/test/app/router/sales_bootstrap_test.dart b/test/app/router/sales_bootstrap_test.dart
+new file mode 100644
+index 0000000000000000000000000000000000000000..33bf994f66f89a1cdb9f106dac2a5b9aed9918f3
+--- /dev/null
++++ b/test/app/router/sales_bootstrap_test.dart
+@@ -0,0 +1,19 @@
++import 'package:flutter_test/flutter_test.dart';
++import 'package:laoo/app/router/app_menu_route_registry.dart';
++import 'package:laoo_sales/sales_feature.dart';
++
++void main() {
++  test('Sales has all approved contracts but no active routes', () {
++    expect(SalesProject.code, 'LAOO_SALES');
++    expect(SalesRoutes.all, hasLength(7));
++    expect(SalesRoutes.implemented, isEmpty);
++    expect(buildSalesFeatureRoutes(), isEmpty);
++    for (final route in SalesRoutes.all) {
++      final mapped = AppMenuRouteRegistry.byMenuCode(route.menuCode);
++      expect(mapped, isNotNull);
++      expect(mapped!.databaseRouteName, route.routeName);
++      expect(mapped.goRouteName, route.routeName);
++      expect(mapped.path, route.routePath);
++    }
++  });
++}
+diff --git a/tools/migrations/Laoo.MigrationRunner/Program.cs b/tools/migrations/Laoo.MigrationRunner/Program.cs
+index fe4a21ced20addd6bbd6746316e28de89a2d551b..1ba8c211a14a6ef887abab7ea8af21653e45554b 100644
+--- a/tools/migrations/Laoo.MigrationRunner/Program.cs
++++ b/tools/migrations/Laoo.MigrationRunner/Program.cs
+@@ -59,6 +59,7 @@ static string ResolveMigrationDirectory(string root, string projectCode) =>
+         "LAOO_PROJECT" => Path.Combine(root, "projects", "project", "database", "migrations"),
+         "LAOO_INTRANET" => Path.Combine(root, "projects", "intranet", "database", "migrations"),
+         "LAOO_VOTE" => Path.Combine(root, "projects", "vote", "database", "migrations"),
++        "LAOO_SALES" => Path.Combine(root, "projects", "sales", "database", "migrations"),
+         _ => throw new ArgumentOutOfRangeException(nameof(projectCode), projectCode, "Unsupported ProjectCode"),
+     };
+ 
+diff --git a/tools/scripts/check-machine-boundaries.ps1 b/tools/scripts/check-machine-boundaries.ps1
+index bef33d8b4347447a392a33f43438080291f4a78b..3a31c5be7b11fc16f0c58090e4bcfa64e219fcb9 100644
+--- a/tools/scripts/check-machine-boundaries.ps1
++++ b/tools/scripts/check-machine-boundaries.ps1
+@@ -1,9 +1,9 @@
+ param(
+     [Parameter(Mandatory = $true)]
+-    [ValidateSet('service', 'meeting', 'visitor', 'time', 'training', 'project', 'intranet', 'vote')]
++    [ValidateSet('service', 'meeting', 'visitor', 'time', 'training', 'project', 'intranet', 'vote', 'sales')]
+     [string]$Module,
+ 
+-    [ValidateSet('center-service', 'meeting', 'visitor', 'time', 'training', 'project', 'intranet', 'vote')]
++    [ValidateSet('center-service', 'meeting', 'visitor', 'time', 'training', 'project', 'intranet', 'vote', 'sales')]
+     [string]$Role,
+ 
+     [string]$BaseRef = 'origin/main'
+@@ -26,7 +26,7 @@ if ([string]::IsNullOrWhiteSpace($Role)) {
+     $Role = [string]$machineConfig.role
+ }
+ 
+-$validRoles = @('center-service', 'meeting', 'visitor', 'time', 'training', 'project', 'intranet', 'vote')
++$validRoles = @('center-service', 'meeting', 'visitor', 'time', 'training', 'project', 'intranet', 'vote', 'sales')
+ if ($Role -notin $validRoles) {
+     throw "Invalid machine role '$Role'. Expected: $($validRoles -join ', ')."
+ }
+@@ -44,6 +44,7 @@ $ownedRoleByModule = @{
+     project = 'project'
+     intranet = 'intranet'
+     vote = 'vote'
++    sales = 'sales'
+ }
+ 
+ if ($Role -ne $ownedRoleByModule[$Module]) {
+diff --git a/tools/scripts/run-migrations.ps1 b/tools/scripts/run-migrations.ps1
+index f431a0afa450cf03a73c00f096f99c1b801b5ec3..50a2db8fd46d0f41844b685cff64f3fdcd47391b 100644
+--- a/tools/scripts/run-migrations.ps1
++++ b/tools/scripts/run-migrations.ps1
+@@ -1,6 +1,6 @@
+ param(
+     [Parameter(Mandatory = $true)]
+-    [ValidateSet('core', 'service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense', 'project', 'intranet', 'vote')]
++    [ValidateSet('core', 'service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense', 'project', 'intranet', 'vote', 'sales')]
+     [string]$Module,
+     [switch]$DryRun
+ )
+@@ -21,6 +21,7 @@ $projectCodes = @{
+     project = 'LAOO_PROJECT'
+     intranet = 'LAOO_INTRANET'
+     vote = 'LAOO_VOTE'
++    sales = 'LAOO_SALES'
+ }
+ $arguments = @(
+     'run',
+diff --git a/tools/scripts/test-project-bootstrap.ps1 b/tools/scripts/test-project-bootstrap.ps1
+index 169d2b0d695cea140594d4cb8a0b4f6d19d6ba26..c9d977bdbcb6d47e58cbc02d1753fb97ce64f31a 100644
+--- a/tools/scripts/test-project-bootstrap.ps1
++++ b/tools/scripts/test-project-bootstrap.ps1
+@@ -1,6 +1,6 @@
+ param(
+     [Parameter(Mandatory = $true)]
+-    [ValidateSet('service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense', 'project', 'intranet', 'vote')]
++    [ValidateSet('service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense', 'project', 'intranet', 'vote', 'sales')]
+     [string]$Project
+ )
+ 
+diff --git a/tools/scripts/verify-center.ps1 b/tools/scripts/verify-center.ps1
+index 4ba1facf34d523921cf0f3c671a4f52f830d5333..52c9f3b6ffbaf3a9671620e2ff8ddbde1080122d 100644
+--- a/tools/scripts/verify-center.ps1
++++ b/tools/scripts/verify-center.ps1
+@@ -1,9 +1,9 @@
+ param(
+     [Parameter(Mandatory = $true)]
+-    [ValidateSet('service', 'meeting', 'visitor', 'time', 'training', 'project', 'intranet', 'vote')]
++    [ValidateSet('service', 'meeting', 'visitor', 'time', 'training', 'project', 'intranet', 'vote', 'sales')]
+     [string]$Module,
+ 
+-    [ValidateSet('center-service', 'meeting', 'visitor', 'time', 'training', 'project', 'intranet', 'vote')]
++    [ValidateSet('center-service', 'meeting', 'visitor', 'time', 'training', 'project', 'intranet', 'vote', 'sales')]
+     [string]$Role
+ )
+ 
+@@ -57,7 +57,8 @@ try {
+             'projects\time\lib\main.dart',
+             'projects\training\lib\main.dart',
+             'projects\intranet\lib\main.dart',
+-            'projects\vote\lib\main.dart'
++            'projects\\vote\\lib\\main.dart',
++            'projects\\sales\\lib\\main.dart'
+         ) | Where-Object { Test-Path (Join-Path $repoRoot $_) }
+         if ($legacyHosts.Count -gt 0) {
+             throw "Standalone hosts are not allowed: $($legacyHosts -join ', ')"
+@@ -89,6 +90,7 @@ try {
+         'project' { 'projects\project\packages\dotnet\Laoo.Project.Module\Laoo.Project.Module.csproj' }
+         'intranet' { 'projects\intranet\packages\dotnet\Laoo.Intranet.Module\Laoo.Intranet.Module.csproj' }
+         'vote' { 'projects\vote\packages\dotnet\Laoo.Vote.Module\Laoo.Vote.Module.csproj' }
++        'sales' { 'projects\sales\packages\dotnet\Laoo.Sales.Module\Laoo.Sales.Module.csproj' }
+     }
+     Invoke-Checked "$Module API module Release build" { dotnet build $apiModule -c Release }
+ }

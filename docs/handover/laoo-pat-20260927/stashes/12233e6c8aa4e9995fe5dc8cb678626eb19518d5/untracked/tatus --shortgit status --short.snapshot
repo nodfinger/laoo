@@ -1,0 +1,81 @@
+warning: in the working copy of 'AGENTS.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'CONTEXT.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/standards/ACTION_UI_STANDARD.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/standards/LIST_CARD_UI_STANDARD.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/standards/PAGINATION_UI_STANDARD.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/standards/POPUP_UI_STANDARD.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/standards/TYPOGRAPHY_STANDARD.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'laoo_api/Controllers/AuthContextController.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'laoo_api/Controllers/BranchController.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'laoo_api/Controllers/ItemController.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'laoo_api/Models/ItemModels.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'laoo_api/Services/AuthenticationService.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'lib/app/router/app_router.dart', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'lib/app/theme/laoo_typography.dart', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'packages/dotnet/Laoo.Shared.Contracts/Branches/BranchContracts.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'packages/laoo_shared_admin/lib/src/branch/branch_models.dart', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'packages/laoo_shared_admin/lib/src/branch/branch_repository.dart', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'packages/laoo_shared_admin_ui/lib/src/branch/branch_workspace.dart', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'projects/service/README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'projects/service/lib/features/company/item/pages/item_page.dart', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'projects/service/lib/features/inventory/pages/inventory_pages.dart', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'projects/service/packages/dotnet/Laoo.Service.Module/Controllers/CustomerController.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'projects/service/packages/dotnet/Laoo.Service.Module/Controllers/CustomerFileController.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'projects/service/packages/dotnet/Laoo.Service.Module/Controllers/DeliveryNoteController.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'projects/service/packages/dotnet/Laoo.Service.Module/Controllers/InventoryIssueController.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'projects/service/packages/dotnet/Laoo.Service.Module/Controllers/ItemInstanceController.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'projects/service/packages/dotnet/Laoo.Service.Module/Controllers/PreOrderController.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'projects/service/packages/dotnet/Laoo.Service.Module/Controllers/QuotationController.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'projects/service/packages/dotnet/Laoo.Service.Module/Controllers/StockReceiptController.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'projects/service/packages/dotnet/Laoo.Service.Module/Controllers/TaxInvoiceController.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'projects/service/packages/dotnet/Laoo.Service.Module/Controllers/TemporaryReceiptController.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'projects/service/packages/dotnet/Laoo.Service.Module/Controllers/WarehouseController.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'projects/service/packages/dotnet/Laoo.Service.Module/Infrastructure/InventoryStockService.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'projects/service/packages/dotnet/Laoo.Service.Module/Models/InventoryModels.cs', LF will be replaced by CRLF the next time Git touches it
+ AGENTS.md                                          |    2 [32m+[m[31m-[m
+ CONTEXT.md                                         |    8 [32m+[m
+ docs/standards/ACTION_UI_STANDARD.md               |   12 [32m+[m[31m-[m
+ docs/standards/LIST_CARD_UI_STANDARD.md            |    3 [32m+[m[31m-[m
+ docs/standards/PAGINATION_UI_STANDARD.md           |    8 [32m+[m[31m-[m
+ docs/standards/POPUP_UI_STANDARD.md                |   11 [32m+[m[31m-[m
+ docs/standards/TYPOGRAPHY_STANDARD.md              |    2 [32m+[m[31m-[m
+ laoo_api/Controllers/AuthContextController.cs      |   15 [32m+[m[31m-[m
+ laoo_api/Controllers/BranchController.cs           |  128 [32m++[m[31m-[m
+ laoo_api/Controllers/ItemController.cs             |   58 [32m+[m[31m-[m
+ laoo_api/Models/ItemModels.cs                      |   15 [32m+[m[31m-[m
+ laoo_api/Services/AuthenticationService.cs         |   21 [32m+[m[31m-[m
+ lib/app/router/app_menu_route_registry.dart        |    7 [32m+[m
+ lib/app/router/app_router.dart                     |    6 [32m+[m
+ lib/app/router/route_names.dart                    |    1 [32m+[m
+ lib/app/router/route_paths.dart                    |    1 [32m+[m
+ lib/app/theme/laoo_typography.dart                 |    2 [32m+[m[31m-[m
+ lib/features/company/item/data/item_api.dart       |   22 [32m+[m[31m-[m
+ .../company/item/pages/item_form_layout.dart       |  779 [32m++++++++++[m[31m-----[m
+ lib/features/company/item/pages/item_page.dart     |  483 [32m++++++[m[31m----[m
+ .../master_data/pages/master_data_page.dart        |  257 [32m++[m[31m---[m
+ .../Branches/BranchContracts.cs                    |    6 [32m+[m[31m-[m
+ .../lib/src/branch/branch_models.dart              |   53 [32m+[m
+ .../lib/src/branch/branch_repository.dart          |   21 [32m+[m
+ .../lib/src/branch/branch_workspace.dart           |  842 [32m+++++++++++[m[31m-----[m
+ .../lib/src/employee/employee_list_workspace.dart  |  328 [32m++++[m[31m---[m
+ .../meeting/pages/meeting_building_page.dart       |   30 [32m+[m[31m-[m
+ .../features/meeting/pages/meeting_room_page.dart  |   96 [32m+[m[31m-[m
+ projects/service/README.md                         |   15 [32m+[m
+ .../company/item/pages/item_form_layout.dart       |  216 [32m+++[m[31m--[m
+ .../lib/features/company/item/pages/item_page.dart |  377 [32m++++[m[31m----[m
+ .../lib/features/inventory/data/inventory_api.dart |   15 [32m+[m
+ .../features/inventory/pages/inventory_pages.dart  | 1016 [32m+++++++++++++++[m[31m-----[m
+ .../Controllers/CustomerController.cs              |    2 [32m+[m[31m-[m
+ .../Controllers/CustomerFileController.cs          |    2 [32m+[m[31m-[m
+ .../Controllers/DeliveryNoteController.cs          |   27 [32m+[m[31m-[m
+ .../Controllers/InventoryIssueController.cs        |   22 [32m+[m[31m-[m
+ .../Controllers/ItemInstanceController.cs          |   17 [32m+[m[31m-[m
+ .../Controllers/PreOrderController.cs              |   11 [32m+[m[31m-[m
+ .../Controllers/QuotationController.cs             |   10 [32m+[m[31m-[m
+ .../Controllers/StockReceiptController.cs          |   27 [32m+[m[31m-[m
+ .../Controllers/TaxInvoiceController.cs            |   26 [32m+[m[31m-[m
+ .../Controllers/TemporaryReceiptController.cs      |    2 [32m+[m[31m-[m
+ .../Controllers/WarehouseController.cs             |   56 [32m+[m[31m-[m
+ .../Infrastructure/InventoryStockService.cs        |    3 [32m+[m
+ .../Laoo.Service.Module/Models/InventoryModels.cs  |    4 [32m+[m
+ 46 files changed, 3481 insertions(+), 1584 deletions(-)

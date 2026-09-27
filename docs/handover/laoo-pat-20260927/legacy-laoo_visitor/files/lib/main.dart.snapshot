@@ -1,0 +1,7 @@
+import 'package:flutter/material.dart';
+
+import 'app/laoo_visitor_app.dart';
+
+void main() {
+  runApp(const LaooVisitorApp());
+}

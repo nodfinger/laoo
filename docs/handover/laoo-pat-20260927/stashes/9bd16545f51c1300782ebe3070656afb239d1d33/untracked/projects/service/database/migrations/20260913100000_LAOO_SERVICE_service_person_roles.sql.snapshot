@@ -1,0 +1,35 @@
+-- Service-owned role for a shared Company Person.  A badge is derived from
+-- this relationship; it is never stored independently on TDADPerson.
+SET XACT_ABORT ON;
+BEGIN TRANSACTION;
+
+IF OBJECT_ID(N'dbo.TDADPerson', N'U') IS NULL
+    THROW 52940, N'TDADPerson is required before Service Person roles.', 1;
+
+IF OBJECT_ID(N'dbo.TDADServiceCustomer', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.TDADServiceCustomer
+    (
+        ServiceCustomerID bigint IDENTITY(1,1) NOT NULL
+            CONSTRAINT PK_TDADServiceCustomer PRIMARY KEY,
+        CompanyID bigint NOT NULL,
+        PersonID bigint NOT NULL,
+        IsActive bit NOT NULL
+            CONSTRAINT DF_TDADServiceCustomer_IsActive DEFAULT(1),
+        CreateDate datetime2(3) NOT NULL
+            CONSTRAINT DF_TDADServiceCustomer_CreateDate DEFAULT(SYSUTCDATETIME()),
+        CreateBy bigint NULL,
+        UpdateDate datetime2(3) NULL,
+        UpdateBy bigint NULL,
+        RowVersion rowversion NOT NULL,
+        CONSTRAINT FK_TDADServiceCustomer_Person FOREIGN KEY(CompanyID, PersonID)
+            REFERENCES dbo.TDADPerson(CompanyID, PersonID),
+        CONSTRAINT UQ_TDADServiceCustomer_Company_Person UNIQUE(CompanyID, PersonID),
+        CONSTRAINT UQ_TDADServiceCustomer_Company_ID UNIQUE(CompanyID, ServiceCustomerID)
+    );
+
+    CREATE INDEX IX_TDADServiceCustomer_Company_Active_Person
+        ON dbo.TDADServiceCustomer(CompanyID, IsActive, PersonID);
+END;
+
+COMMIT TRANSACTION;

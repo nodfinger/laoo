@@ -1,0 +1,7 @@
+C:\laooplatformplatformplatform\laoo\laoo_meeting_api
+
+
+run
+cd C:\laooplatformplatformplatform\laoo\laoo_meeting_api
+powershell -ExecutionPolicy Bypass -File .\setup_laoo_meeting_api.ps1
+dotnet run

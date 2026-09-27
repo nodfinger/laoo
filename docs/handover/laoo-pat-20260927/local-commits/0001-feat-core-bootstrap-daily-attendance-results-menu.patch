@@ -1,0 +1,258 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Laoo <dev@laoo.local>
+Date: Sun, 13 Sep 2026 15:19:29 +0700
+Subject: [HANDOVER] feat(core): bootstrap daily attendance results menu
+
+---
+ ...LAOO_time_attendance_results_bootstrap.sql | 142 ++++++++++++++++++
+ lib/app/router/app_menu_route_registry.dart   |   7 +
+ lib/app/router/app_router.dart                |   7 +
+ lib/app/router/route_names.dart               |   1 +
+ lib/app/router/route_paths.dart               |   2 +
+ .../time_attendance_results_route_test.dart   |  27 ++++
+ 6 files changed, 186 insertions(+)
+ create mode 100644 database/migrations/20260913142000_LAOO_time_attendance_results_bootstrap.sql
+ create mode 100644 test/app/router/time_attendance_results_route_test.dart
+
+diff --git a/database/migrations/20260913142000_LAOO_time_attendance_results_bootstrap.sql b/database/migrations/20260913142000_LAOO_time_attendance_results_bootstrap.sql
+new file mode 100644
+index 0000000000000000000000000000000000000000..942ca78c7b78914d6d8be99c5037a1ff44ac5c68
+--- /dev/null
++++ b/database/migrations/20260913142000_LAOO_time_attendance_results_bootstrap.sql
+@@ -0,0 +1,142 @@
++/* Core-owned navigation and permission bootstrap for LAOO_TIME daily attendance results. */
++SET NOCOUNT ON;
++SET XACT_ABORT ON;
++
++BEGIN TRY
++    BEGIN TRANSACTION;
++
++    DECLARE @TimeProjectID bigint =
++    (
++        SELECT ProjectID FROM dbo.TDADProject
++        WHERE ProjectCode = N'LAOO_TIME' AND IsActive = 1
++    );
++    IF @TimeProjectID IS NULL
++        THROW 52780, N'Active LAOO_TIME project is required.', 1;
++
++    IF EXISTS
++    (
++        SELECT 1 FROM dbo.TDADMainMenu
++        WHERE MenuCode = N'25002'
++          AND (ScreenType <> 3
++            OR ISNULL(RouteName, N'') <> N'timeAttendanceResults'
++            OR ISNULL(RoutePath, N'') <> N'/company/time-attendance-results')
++    )
++        THROW 52781, N'Time attendance results MenuCode conflicts with existing ScreenType or route.', 1;
++
++    IF EXISTS
++    (
++        SELECT 1 FROM dbo.TDADMainMenu
++        WHERE MenuCode <> N'25002'
++          AND (RouteName = N'timeAttendanceResults'
++            OR RoutePath = N'/company/time-attendance-results')
++    )
++        THROW 52782, N'Time attendance results RouteName or RoutePath is already used.', 1;
++
++    UPDATE dbo.TDADMenuGroup
++    SET MenuGroupName = N'งานเวลาและการลงเวลา', IsActive = 1,
++        UpdateDate = SYSUTCDATETIME()
++    WHERE MenuGroupCode = N'25';
++
++    IF NOT EXISTS (SELECT 1 FROM dbo.TDADMenuGroup WHERE MenuGroupCode = N'25')
++        INSERT dbo.TDADMenuGroup
++        (
++            AudienceType, MenuGroupCode, MenuGroupName, IconName, SortOrder,
++            IsExpandedDefault, IsActive, CreateDate, ShowPermissionPoint, OpenOption
++        )
++        VALUES
++        (
++            N'C', N'25', N'งานเวลาและการลงเวลา', N'access_time_outlined', 250,
++            0, 1, SYSUTCDATETIME(), 0, 0
++        );
++
++    UPDATE dbo.TDADMainMenu
++    SET MenuGroupCode = N'25', MenuName = N'ผลการลงเวลารายวัน',
++        ScreenType = 3, RouteName = N'timeAttendanceResults',
++        RoutePath = N'/company/time-attendance-results',
++        FeatureCode = N'TIME_ATTENDANCE_RESULTS', IconName = N'analytics_outlined',
++        SortOrder = 20, IsVisible = 1, IsFavoriteAllowed = 1, IsActive = 1,
++        ShowPermissionPoint = 0, UpdateDate = SYSUTCDATETIME()
++    WHERE MenuCode = N'25002';
++
++    IF NOT EXISTS (SELECT 1 FROM dbo.TDADMainMenu WHERE MenuCode = N'25002')
++        INSERT dbo.TDADMainMenu
++        (
++            MenuCode, MenuGroupCode, MenuName, ScreenType, RouteName, RoutePath,
++            FeatureCode, IconName, SortOrder, IsVisible, IsFavoriteAllowed,
++            IsActive, CreateDate, ShowPermissionPoint
++        )
++        VALUES
++        (
++            N'25002', N'25', N'ผลการลงเวลารายวัน', 3,
++            N'timeAttendanceResults', N'/company/time-attendance-results',
++            N'TIME_ATTENDANCE_RESULTS', N'analytics_outlined', 20, 1, 1,
++            1, SYSUTCDATETIME(), 0
++        );
++
++    UPDATE dbo.TDADProjectMenuGroup
++    SET SortOrder = 1, IsActive = 1, UpdateDate = SYSUTCDATETIME()
++    WHERE ProjectID = @TimeProjectID AND MenuGroupCode = N'25';
++
++    IF NOT EXISTS
++    (
++        SELECT 1 FROM dbo.TDADProjectMenuGroup
++        WHERE ProjectID = @TimeProjectID AND MenuGroupCode = N'25'
++    )
++        INSERT dbo.TDADProjectMenuGroup
++            (ProjectID, MenuGroupCode, SortOrder, IsActive, CreateDate)
++        VALUES(@TimeProjectID, N'25', 1, 1, SYSUTCDATETIME());
++
++    UPDATE dbo.TDADProjectMenu
++    SET MenuGroupCode = N'25', SortOrder = 20, IsActive = 1,
++        UpdateDate = SYSUTCDATETIME()
++    WHERE ProjectID = @TimeProjectID AND MenuCode = N'25002';
++
++    IF NOT EXISTS
++    (
++        SELECT 1 FROM dbo.TDADProjectMenu
++        WHERE ProjectID = @TimeProjectID AND MenuCode = N'25002'
++    )
++        INSERT dbo.TDADProjectMenu
++            (ProjectID, MenuCode, MenuGroupCode, SortOrder, IsActive, CreateDate)
++        VALUES(@TimeProjectID, N'25002', N'25', 20, 1, SYSUTCDATETIME());
++
++    UPDATE dbo.TDADProjectMenu
++    SET IsActive = 0, UpdateDate = SYSUTCDATETIME()
++    WHERE MenuCode = N'25002' AND ProjectID <> @TimeProjectID AND IsActive = 1;
++
++    UPDATE dbo.TDADPermission
++    SET ScreenNameTH = N'ผลการลงเวลารายวัน',
++        ScreenNameEN = N'Daily attendance results', ActionNameTH = N'ดูข้อมูล',
++        ActionNameEN = N'View', IsActive = 1
++    WHERE ProjectID = @TimeProjectID AND ScreenCode = N'25002'
++      AND ActionCode = N'VIEW';
++
++    IF NOT EXISTS
++    (
++        SELECT 1 FROM dbo.TDADPermission
++        WHERE ProjectID = @TimeProjectID AND ScreenCode = N'25002'
++          AND ActionCode = N'VIEW'
++    )
++        INSERT dbo.TDADPermission
++        (
++            ProjectID, ScreenCode, ScreenNameTH, ScreenNameEN,
++            ActionCode, ActionNameTH, ActionNameEN, IsActive, CreatedDate
++        )
++        VALUES
++        (
++            @TimeProjectID, N'25002', N'ผลการลงเวลารายวัน',
++            N'Daily attendance results', N'VIEW', N'ดูข้อมูล', N'View', 1,
++            SYSUTCDATETIME()
++        );
++
++    UPDATE dbo.TDADPermission
++    SET IsActive = 0
++    WHERE ProjectID = @TimeProjectID AND ScreenCode = N'25002'
++      AND ActionCode <> N'VIEW' AND IsActive = 1;
++
++    COMMIT TRANSACTION;
++END TRY
++BEGIN CATCH
++    IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
++    THROW;
++END CATCH;
+diff --git a/lib/app/router/app_menu_route_registry.dart b/lib/app/router/app_menu_route_registry.dart
+index 19176121a70b73e8d355b6259a932273190b8393..42c545bcc5a52f364ed5210b1d8fa0d9c1dd0fd1 100644
+--- a/lib/app/router/app_menu_route_registry.dart
++++ b/lib/app/router/app_menu_route_registry.dart
+@@ -608,6 +608,13 @@ abstract final class AppMenuRouteRegistry {
+       path: RoutePaths.laooUsers,
+       scope: AppMenuScope.support,
+     ),
++    '25002': AppMenuRouteSpec(
++      menuCode: '25002',
++      databaseRouteName: 'timeAttendanceResults',
++      goRouteName: RouteNames.timeAttendanceResults,
++      path: RoutePaths.timeAttendanceResults,
++      scope: AppMenuScope.company,
++    ),
+     for (final route in ServiceRoutes.all)
+       route.menuCode: AppMenuRouteSpec(
+         menuCode: route.menuCode,
+diff --git a/lib/app/router/app_router.dart b/lib/app/router/app_router.dart
+index 8eebe1ae7061926a4c1671dfd114a63301256d8a..3429b6a51ef927239a630c9321b70c40f5bd3fdb 100644
+--- a/lib/app/router/app_router.dart
++++ b/lib/app/router/app_router.dart
+@@ -175,6 +175,13 @@ final GoRouter appRouter = GoRouter(
+     ).where((route) => route.path != RoutePaths.assetLocations),
+     ...buildVisitorFeatureRoutes(),
+     ...buildTimeFeatureRoutes(),
++    _scopePlaceholder(
++      RoutePaths.timeAttendanceResults,
++      RouteNames.timeAttendanceResults,
++      'ผลการลงเวลารายวัน',
++      WorkspaceMenuScope.company,
++      'timeAttendanceResults',
++    ),
+     GoRoute(
+       path: RoutePaths.companyBranches,
+       name: RouteNames.companyBranches,
+diff --git a/lib/app/router/route_names.dart b/lib/app/router/route_names.dart
+index 9c727ca1d6b5bea8e31ee5ac0699d6fd579c5689..4b9aa43d628ab35fd2342132a3490b54ea8de84f 100644
+--- a/lib/app/router/route_names.dart
++++ b/lib/app/router/route_names.dart
+@@ -71,6 +71,7 @@ abstract final class RouteNames {
+   static const String laooEmployees = 'laooEmployees';
+   static const String laooUsers = 'laooUsers';
+   static const String companySupervisors = 'companySupervisors';
++  static const String timeAttendanceResults = 'timeAttendanceResults';
+   static const String meetingRoomBookings = MeetingRouteNames.bookings;
+   static const String meetingRoomApprovals = MeetingRouteNames.approvals;
+   static const String meetingRoomCalendar = MeetingRouteNames.calendar;
+diff --git a/lib/app/router/route_paths.dart b/lib/app/router/route_paths.dart
+index fbd5af2ace4c6decc00ec15e09ea86cc8497486e..5f96f512adc124d6319d41c23963c3d0acfaada2 100644
+--- a/lib/app/router/route_paths.dart
++++ b/lib/app/router/route_paths.dart
+@@ -73,6 +73,8 @@ abstract final class RoutePaths {
+   static const String laooEmployees = '/support/employees';
+   static const String laooUsers = '/support/users';
+   static const String companySupervisors = '/company/supervisors';
++  static const String timeAttendanceResults =
++      '/company/time-attendance-results';
+   static const String meetingRoomBookings = MeetingRoutePaths.bookings;
+   static const String meetingRoomApprovals = MeetingRoutePaths.approvals;
+   static const String meetingRoomCalendar = MeetingRoutePaths.calendar;
+diff --git a/test/app/router/time_attendance_results_route_test.dart b/test/app/router/time_attendance_results_route_test.dart
+new file mode 100644
+index 0000000000000000000000000000000000000000..339bb29a6335f4989e22408b0fea143031b65f13
+--- /dev/null
++++ b/test/app/router/time_attendance_results_route_test.dart
+@@ -0,0 +1,27 @@
++import 'package:flutter_test/flutter_test.dart';
++import 'package:go_router/go_router.dart';
++import 'package:laoo/app/router/app_menu_route_registry.dart';
++import 'package:laoo/app/router/app_router.dart';
++import 'package:laoo/app/router/route_names.dart';
++import 'package:laoo/app/router/route_paths.dart';
++
++void main() {
++  test(
++    'daily attendance results is a company-scoped Core placeholder route',
++    () {
++      final spec = AppMenuRouteRegistry.byMenuCode('25002');
++
++      expect(spec, isNotNull);
++      expect(spec!.databaseRouteName, 'timeAttendanceResults');
++      expect(spec.goRouteName, RouteNames.timeAttendanceResults);
++      expect(spec.path, RoutePaths.timeAttendanceResults);
++      expect(spec.scope, AppMenuScope.company);
++
++      final routes = appRouter.configuration.routes.whereType<GoRoute>();
++      expect(
++        routes.where((route) => route.path == RoutePaths.timeAttendanceResults),
++        hasLength(1),
++      );
++    },
++  );
++}

@@ -1,0 +1,675 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Laoo <dev@laoo.local>
+Date: Sat, 19 Sep 2026 17:51:35 +0700
+Subject: [HANDOVER] feat(core): bootstrap vote project
+
+---
+ ...0919110000_LAOO_vote_project_bootstrap.sql | 25 ++++++
+ ...OO_vote_navigation_permission_baseline.sql | 55 +++++++++++++
+ docs/architecture/MULTI_MACHINE_RUNBOOK.md    | 14 ++++
+ laoo_api/Program.cs                           |  2 +
+ laoo_api/laoo_api.csproj                      |  1 +
+ lib/app/router/app_menu_route_registry.dart   | 38 ++++++++-
+ lib/app/router/app_router.dart                |  2 +
+ lib/main.dart                                 |  2 +
+ local.machine.vote.example.json               |  6 ++
+ projects/vote/database/migrations/.gitkeep    |  0
+ .../lib/features/vote/vote_feature_host.dart  | 25 ++++++
+ .../lib/features/vote/vote_go_routes.dart     |  4 +
+ .../features/vote/vote_route_contract.dart    |  2 +
+ projects/vote/lib/vote_feature.dart           | 81 +++++++++++++++++++
+ .../Laoo.Vote.Module/Laoo.Vote.Module.csproj  |  7 ++
+ .../Laoo.Vote.Module/VoteModuleMarker.cs      |  3 +
+ projects/vote/pubspec.yaml                    | 16 ++++
+ pubspec.lock                                  |  7 ++
+ pubspec.yaml                                  |  2 +
+ test/app/router/vote_bootstrap_test.dart      | 29 +++++++
+ .../Laoo.MigrationRunner/Program.cs           |  1 +
+ tools/scripts/check-machine-boundaries.ps1    |  7 +-
+ tools/scripts/run-migrations.ps1              |  3 +-
+ tools/scripts/test-project-bootstrap.ps1      |  2 +-
+ tools/scripts/verify-center.ps1               |  8 +-
+ 25 files changed, 333 insertions(+), 9 deletions(-)
+ create mode 100644 database/migrations/20260919110000_LAOO_vote_project_bootstrap.sql
+ create mode 100644 database/migrations/20260919111000_LAOO_vote_navigation_permission_baseline.sql
+ create mode 100644 local.machine.vote.example.json
+ create mode 100644 projects/vote/database/migrations/.gitkeep
+ create mode 100644 projects/vote/lib/features/vote/vote_feature_host.dart
+ create mode 100644 projects/vote/lib/features/vote/vote_go_routes.dart
+ create mode 100644 projects/vote/lib/features/vote/vote_route_contract.dart
+ create mode 100644 projects/vote/lib/vote_feature.dart
+ create mode 100644 projects/vote/packages/dotnet/Laoo.Vote.Module/Laoo.Vote.Module.csproj
+ create mode 100644 projects/vote/packages/dotnet/Laoo.Vote.Module/VoteModuleMarker.cs
+ create mode 100644 projects/vote/pubspec.yaml
+ create mode 100644 test/app/router/vote_bootstrap_test.dart
+
+diff --git a/database/migrations/20260919110000_LAOO_vote_project_bootstrap.sql b/database/migrations/20260919110000_LAOO_vote_project_bootstrap.sql
+new file mode 100644
+index 0000000000000000000000000000000000000000..da890a2aa64e59b131906c4f7e54ba077b908b99
+--- /dev/null
++++ b/database/migrations/20260919110000_LAOO_vote_project_bootstrap.sql
+@@ -0,0 +1,25 @@
++/* Core-owned LAOO_VOTE entitlement bootstrap. Company enablement is opt-in. */
++SET NOCOUNT ON;
++SET XACT_ABORT ON;
++BEGIN TRY
++    BEGIN TRANSACTION;
++    UPDATE dbo.TDADProject
++    SET ProjectNameTH = N'ระบบโหวต', ProjectNameEN = N'Vote',
++        DescriptionText = N'ระบบสร้างหัวข้อ ลงคะแนน และสรุปผลการโหวต',
++        ProjectType = N'BUSINESS', IconName = N'how_to_vote_outlined',
++        SortOrder = 130, IsExpandedDefault = 0, IsActive = 1, UpdateDate = SYSUTCDATETIME()
++    WHERE ProjectCode = N'LAOO_VOTE';
++    IF NOT EXISTS (SELECT 1 FROM dbo.TDADProject WHERE ProjectCode = N'LAOO_VOTE')
++        INSERT dbo.TDADProject
++            (ProjectCode, ProjectNameTH, ProjectNameEN, DescriptionText, IsActive, CreateDate, ProjectType, SortOrder, IconName, IsExpandedDefault)
++        VALUES
++            (N'LAOO_VOTE', N'ระบบโหวต', N'Vote', N'ระบบสร้างหัวข้อ ลงคะแนน และสรุปผลการโหวต',
++             1, SYSUTCDATETIME(), N'BUSINESS', 130, N'how_to_vote_outlined', 0);
++    /* TDADCompanyProject is intentionally not seeded. */
++    COMMIT TRANSACTION;
++END TRY
++BEGIN CATCH
++    IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
++    THROW;
++END CATCH;
++GO
+\ No newline at end of file
+diff --git a/database/migrations/20260919111000_LAOO_vote_navigation_permission_baseline.sql b/database/migrations/20260919111000_LAOO_vote_navigation_permission_baseline.sql
+new file mode 100644
+index 0000000000000000000000000000000000000000..4bfc0af384097e7adbf642823a35166fbf9825e9
+--- /dev/null
++++ b/database/migrations/20260919111000_LAOO_vote_navigation_permission_baseline.sql
+@@ -0,0 +1,55 @@
++/* Core-owned LAOO_VOTE menu and permission baseline. */
++SET NOCOUNT ON;
++SET XACT_ABORT ON;
++BEGIN TRY
++    BEGIN TRANSACTION;
++    DECLARE @ProjectID bigint = (SELECT ProjectID FROM dbo.TDADProject WHERE ProjectCode = N'LAOO_VOTE' AND IsActive = 1);
++    IF @ProjectID IS NULL THROW 52960, N'Active LAOO_VOTE project is required.', 1;
++    DECLARE @MenuGroupCode char(2) = N'44';
++    IF EXISTS (SELECT 1 FROM dbo.TDADMenuGroup WHERE MenuGroupCode = @MenuGroupCode AND (AudienceType <> N'C' OR MenuGroupName <> N'ระบบโหวต'))
++        THROW 52959, N'LAOO_VOTE MenuGroupCode conflicts with an existing group.', 1;
++    UPDATE dbo.TDADMenuGroup SET AudienceType=N'C', MenuGroupName=N'ระบบโหวต', IconName=N'how_to_vote_outlined', SortOrder=440, IsExpandedDefault=0, IsActive=1, ShowPermissionPoint=0, OpenOption=0, UpdateDate=SYSUTCDATETIME() WHERE MenuGroupCode=@MenuGroupCode;
++    IF NOT EXISTS (SELECT 1 FROM dbo.TDADMenuGroup WHERE MenuGroupCode=@MenuGroupCode)
++        INSERT dbo.TDADMenuGroup(AudienceType,MenuGroupCode,MenuGroupName,IconName,SortOrder,IsExpandedDefault,IsActive,CreateDate,ShowPermissionPoint,OpenOption)
++        VALUES(N'C',@MenuGroupCode,N'ระบบโหวต',N'how_to_vote_outlined',440,0,1,SYSUTCDATETIME(),0,0);
++
++    DECLARE @Menus TABLE(MenuCode char(5) PRIMARY KEY, MenuName nvarchar(150), ScreenType int, RouteName nvarchar(150), RoutePath nvarchar(300), FeatureCode nvarchar(100), IconName nvarchar(100), SortOrder int);
++    INSERT @Menus VALUES
++        (N'44001',N'ตั้งค่าระบบโหวต',2,N'voteSettings',N'/company/vote-settings',N'VOTE_SETTINGS',N'settings_outlined',10),
++        (N'44002',N'หัวข้อโหวต',4,N'votes',N'/company/votes',N'VOTES',N'how_to_vote_outlined',20),
++        (N'44003',N'กล่องอนุมัติหัวข้อโหวต',3,N'voteApprovalInbox',N'/company/vote-approvals',N'VOTE_APPROVAL',N'approval_outlined',30),
++        (N'44004',N'โหวตของฉัน',3,N'myVotes',N'/company/my-votes',N'MY_VOTES',N'ballot_outlined',40),
++        (N'44005',N'ผลและรายงานการโหวต',3,N'voteResults',N'/company/vote-results',N'VOTE_RESULTS',N'bar_chart_outlined',50);
++    IF EXISTS (SELECT 1 FROM @Menus s JOIN dbo.TDADMainMenu t ON t.MenuCode=s.MenuCode WHERE t.MenuGroupCode<>@MenuGroupCode OR t.ScreenType<>s.ScreenType OR ISNULL(t.RouteName,N'')<>s.RouteName OR ISNULL(t.RoutePath,N'')<>s.RoutePath)
++        THROW 52961,N'LAOO_VOTE MenuCode conflicts with existing ScreenType or route.',1;
++    IF EXISTS (SELECT 1 FROM @Menus s JOIN dbo.TDADMainMenu t ON (t.RouteName=s.RouteName OR t.RoutePath=s.RoutePath) AND t.MenuCode<>s.MenuCode)
++        THROW 52962,N'LAOO_VOTE RouteName or RoutePath is already used.',1;
++    UPDATE t SET MenuGroupCode=@MenuGroupCode,MenuName=s.MenuName,ScreenType=s.ScreenType,RouteName=s.RouteName,RoutePath=s.RoutePath,FeatureCode=s.FeatureCode,IconName=s.IconName,SortOrder=s.SortOrder,IsVisible=1,IsFavoriteAllowed=1,IsActive=1,ShowPermissionPoint=0,UpdateDate=SYSUTCDATETIME() FROM dbo.TDADMainMenu t JOIN @Menus s ON s.MenuCode=t.MenuCode;
++    INSERT dbo.TDADMainMenu(MenuCode,MenuGroupCode,MenuName,ScreenType,RouteName,RoutePath,FeatureCode,IconName,SortOrder,IsVisible,IsFavoriteAllowed,IsActive,CreateDate,ShowPermissionPoint)
++    SELECT MenuCode,@MenuGroupCode,MenuName,ScreenType,RouteName,RoutePath,FeatureCode,IconName,SortOrder,1,1,1,SYSUTCDATETIME(),0 FROM @Menus s WHERE NOT EXISTS(SELECT 1 FROM dbo.TDADMainMenu t WHERE t.MenuCode=s.MenuCode);
++
++    /* Menus remain unavailable until real routes, API and project migrations exist. */
++    UPDATE dbo.TDADProjectMenuGroup SET SortOrder=1,IsActive=0,UpdateDate=SYSUTCDATETIME() WHERE ProjectID=@ProjectID AND MenuGroupCode=@MenuGroupCode;
++    IF NOT EXISTS(SELECT 1 FROM dbo.TDADProjectMenuGroup WHERE ProjectID=@ProjectID AND MenuGroupCode=@MenuGroupCode)
++        INSERT dbo.TDADProjectMenuGroup(ProjectID,MenuGroupCode,SortOrder,IsActive,CreateDate) VALUES(@ProjectID,@MenuGroupCode,1,0,SYSUTCDATETIME());
++    UPDATE t SET MenuGroupCode=@MenuGroupCode,SortOrder=s.SortOrder,IsActive=0,UpdateDate=SYSUTCDATETIME() FROM dbo.TDADProjectMenu t JOIN @Menus s ON s.MenuCode=t.MenuCode WHERE t.ProjectID=@ProjectID;
++    INSERT dbo.TDADProjectMenu(ProjectID,MenuCode,MenuGroupCode,SortOrder,IsActive,CreateDate)
++    SELECT @ProjectID,MenuCode,@MenuGroupCode,SortOrder,0,SYSUTCDATETIME() FROM @Menus s WHERE NOT EXISTS(SELECT 1 FROM dbo.TDADProjectMenu t WHERE t.ProjectID=@ProjectID AND t.MenuCode=s.MenuCode);
++
++    DECLARE @Permissions TABLE(MenuCode char(5),ActionCode nvarchar(50),PRIMARY KEY(MenuCode,ActionCode));
++    INSERT @Permissions VALUES
++        (N'44001',N'VIEW'),(N'44001',N'EDIT'),
++        (N'44002',N'VIEW'),(N'44002',N'CREATE'),(N'44002',N'EDIT'),(N'44002',N'DELETE'),(N'44002',N'SUBMIT'),(N'44002',N'CANCEL'),(N'44002',N'PUBLISH'),(N'44002',N'CLOSE'),
++        (N'44003',N'VIEW'),(N'44003',N'APPROVE'),(N'44003',N'SELF_APPROVE'),
++        (N'44004',N'VIEW'),(N'44004',N'VOTE'),
++        (N'44005',N'VIEW');
++    UPDATE t SET ScreenNameTH=m.MenuName,ScreenNameEN=m.FeatureCode,ActionNameTH=CASE p.ActionCode WHEN N'VIEW' THEN N'ดูข้อมูล' WHEN N'CREATE' THEN N'เพิ่มข้อมูล' WHEN N'EDIT' THEN N'แก้ไขข้อมูล' WHEN N'DELETE' THEN N'ลบข้อมูล' WHEN N'SUBMIT' THEN N'ส่งอนุมัติ' WHEN N'CANCEL' THEN N'ยกเลิก' WHEN N'PUBLISH' THEN N'เผยแพร่' WHEN N'CLOSE' THEN N'ปิดรอบโหวต' WHEN N'APPROVE' THEN N'อนุมัติ' WHEN N'SELF_APPROVE' THEN N'อนุมัติรายการของตนเอง' WHEN N'VOTE' THEN N'ลงคะแนน' END,ActionNameEN=p.ActionCode,IsActive=1,ModifiedDate=SYSUTCDATETIME() FROM dbo.TDADPermission t JOIN @Permissions p ON p.MenuCode=t.ScreenCode AND p.ActionCode=t.ActionCode JOIN @Menus m ON m.MenuCode=p.MenuCode WHERE t.ProjectID=@ProjectID;
++    INSERT dbo.TDADPermission(ProjectID,ScreenCode,ScreenNameTH,ScreenNameEN,ActionCode,ActionNameTH,ActionNameEN,IsActive,CreatedDate)
++    SELECT @ProjectID,p.MenuCode,m.MenuName,m.FeatureCode,p.ActionCode,CASE p.ActionCode WHEN N'VIEW' THEN N'ดูข้อมูล' WHEN N'CREATE' THEN N'เพิ่มข้อมูล' WHEN N'EDIT' THEN N'แก้ไขข้อมูล' WHEN N'DELETE' THEN N'ลบข้อมูล' WHEN N'SUBMIT' THEN N'ส่งอนุมัติ' WHEN N'CANCEL' THEN N'ยกเลิก' WHEN N'PUBLISH' THEN N'เผยแพร่' WHEN N'CLOSE' THEN N'ปิดรอบโหวต' WHEN N'APPROVE' THEN N'อนุมัติ' WHEN N'SELF_APPROVE' THEN N'อนุมัติรายการของตนเอง' WHEN N'VOTE' THEN N'ลงคะแนน' END,p.ActionCode,1,SYSUTCDATETIME() FROM @Permissions p JOIN @Menus m ON m.MenuCode=p.MenuCode WHERE NOT EXISTS(SELECT 1 FROM dbo.TDADPermission t WHERE t.ProjectID=@ProjectID AND t.ScreenCode=p.MenuCode AND t.ActionCode=p.ActionCode);
++    COMMIT TRANSACTION;
++END TRY
++BEGIN CATCH
++    IF @@TRANCOUNT>0 ROLLBACK TRANSACTION;
++    THROW;
++END CATCH;
++GO
+\ No newline at end of file
+diff --git a/docs/architecture/MULTI_MACHINE_RUNBOOK.md b/docs/architecture/MULTI_MACHINE_RUNBOOK.md
+index c48f6bdf5241f3d4844131a1cd532de388571f03..4d82b296095bd737f2502f97e689d92611fbda00 100644
+--- a/docs/architecture/MULTI_MACHINE_RUNBOOK.md
++++ b/docs/architecture/MULTI_MACHINE_RUNBOOK.md
+@@ -9,6 +9,7 @@
+ | `visitor` | `projects/visitor` |
+ | `time` | `projects/time` |
+ | `training` | `projects/training` |
++| `vote` | `projects/vote` |
+ 
+ Every machine clones `nodfinger/laoo` to `C:\laooplatform\laoo`. Never
+ share a live working tree, `.git`, `.dart_tool`, `build`, `bin`, or `obj`.
+@@ -39,6 +40,19 @@ Meeting machine with Training example:
+ 
+ Copy local.machine.meeting-training.example.json to the ignored
+ local.machine.json on the Meeting machine. Never commit a machine local.machine.json.
++Vote machine example:
++
++```json
++{
++  "role": "vote",
++  "allowedProjects": ["LAOO", "LAOO_VOTE"],
++  "webPort": 8080,
++  "apiPort": 5080
++}
++```
++
++Copy `local.machine.vote.example.json` to ignored `local.machine.json` on that
++machine. Never commit a real `local.machine.json`.
+ 
+ Run `tools/scripts/check-machine-boundaries.ps1 -Module <module>` before full
+ verification. On Meeting, Visitor, and Time machines it rejects changed files
+diff --git a/laoo_api/Program.cs b/laoo_api/Program.cs
+index 6f6749548e875506c859ba88252310989a979a56..576bc0f38755438868d3d386f8f729d07cd9b57f 100644
+--- a/laoo_api/Program.cs
++++ b/laoo_api/Program.cs
+@@ -8,6 +8,7 @@ using LaooFiveSModule;
+ using LaooGatePassModule;
+ using LaooSurveyModule;
+ using LaooExpenseModule;
++using LaooVoteModule;
+ using LaooTrainingModule;
+ using Microsoft.AspNetCore.Authentication.JwtBearer;
+ using Microsoft.AspNetCore.DataProtection;
+@@ -45,6 +46,7 @@ builder.Services
+     .AddApplicationPart(typeof(GatePassModuleMarker).Assembly)
+     .AddApplicationPart(typeof(SurveyModuleMarker).Assembly)
+     .AddApplicationPart(typeof(ExpenseModuleMarker).Assembly)
++    .AddApplicationPart(typeof(VoteModuleMarker).Assembly)
+     .AddApplicationPart(typeof(TrainingModuleMarker).Assembly);
+ builder.Services.AddProblemDetails(options =>
+ {
+diff --git a/laoo_api/laoo_api.csproj b/laoo_api/laoo_api.csproj
+index cde7cd350a528802cbfae719957ed582aed6d90f..39e67638caefb95db87119e0c59eba94397ddd47 100644
+--- a/laoo_api/laoo_api.csproj
++++ b/laoo_api/laoo_api.csproj
+@@ -28,6 +28,7 @@
+     <ProjectReference Include="..\projects\five_s\packages\dotnet\Laoo.FiveS.Module\Laoo.FiveS.Module.csproj" />
+     <ProjectReference Include="..\projects\survey\packages\dotnet\Laoo.Survey.Module\Laoo.Survey.Module.csproj" />
+     <ProjectReference Include="..\projects\expense\packages\dotnet\Laoo.Expense.Module\Laoo.Expense.Module.csproj" />
++    <ProjectReference Include="..\projects\vote\packages\dotnet\Laoo.Vote.Module\Laoo.Vote.Module.csproj" />
+     <ProjectReference Include="..\projects\training\packages\dotnet\Laoo.Training.Module\Laoo.Training.Module.csproj" />
+     <ProjectReference Include="..\projects\gate_pass\packages\dotnet\Laoo.GatePass.Module\Laoo.GatePass.Module.csproj" />
+   </ItemGroup>
+diff --git a/lib/app/router/app_menu_route_registry.dart b/lib/app/router/app_menu_route_registry.dart
+index f9fea5237a9f9412a497215609dc5bf522ef2c7d..4f7154151f2a0d5f1270dbd428dc27da680aadae 100644
+--- a/lib/app/router/app_menu_route_registry.dart
++++ b/lib/app/router/app_menu_route_registry.dart
+@@ -6,6 +6,8 @@ import 'package:laoo_survey/survey_feature.dart'
+     show SurveyMenuCodes, SurveyRouteNames, SurveyRoutePaths;
+ import 'package:laoo_expense/expense_feature.dart'
+     show ExpenseMenuCodes, ExpenseRouteNames, ExpenseRoutePaths;
++import 'package:laoo_vote/vote_feature.dart'
++    show VoteMenuCodes, VoteRouteNames, VoteRoutePaths;
+ import 'package:laoo_meeting/meeting_feature.dart'
+     show MeetingMenuCodes, MeetingRoutes;
+ import 'package:laoo_service/service_feature.dart' show ServiceRoutes;
+@@ -786,7 +788,41 @@ abstract final class AppMenuRouteRegistry {
+       path: SurveyRoutePaths.reports,
+       scope: AppMenuScope.company,
+     ),
+-    ExpenseMenuCodes.settings: AppMenuRouteSpec(
++    VoteMenuCodes.settings: AppMenuRouteSpec(
++      menuCode: VoteMenuCodes.settings,
++      databaseRouteName: VoteRouteNames.settings,
++      goRouteName: VoteRouteNames.settings,
++      path: VoteRoutePaths.settings,
++      scope: AppMenuScope.company,
++    ),
++    VoteMenuCodes.topics: AppMenuRouteSpec(
++      menuCode: VoteMenuCodes.topics,
++      databaseRouteName: VoteRouteNames.topics,
++      goRouteName: VoteRouteNames.topics,
++      path: VoteRoutePaths.topics,
++      scope: AppMenuScope.company,
++    ),
++    VoteMenuCodes.approvalInbox: AppMenuRouteSpec(
++      menuCode: VoteMenuCodes.approvalInbox,
++      databaseRouteName: VoteRouteNames.approvalInbox,
++      goRouteName: VoteRouteNames.approvalInbox,
++      path: VoteRoutePaths.approvalInbox,
++      scope: AppMenuScope.company,
++    ),
++    VoteMenuCodes.myVotes: AppMenuRouteSpec(
++      menuCode: VoteMenuCodes.myVotes,
++      databaseRouteName: VoteRouteNames.myVotes,
++      goRouteName: VoteRouteNames.myVotes,
++      path: VoteRoutePaths.myVotes,
++      scope: AppMenuScope.company,
++    ),
++    VoteMenuCodes.results: AppMenuRouteSpec(
++      menuCode: VoteMenuCodes.results,
++      databaseRouteName: VoteRouteNames.results,
++      goRouteName: VoteRouteNames.results,
++      path: VoteRoutePaths.results,
++      scope: AppMenuScope.company,
++    ),    ExpenseMenuCodes.settings: AppMenuRouteSpec(
+       menuCode: ExpenseMenuCodes.settings,
+       databaseRouteName: ExpenseRouteNames.settings,
+       goRouteName: ExpenseRouteNames.settings,
+diff --git a/lib/app/router/app_router.dart b/lib/app/router/app_router.dart
+index 6f3288b49f2c25207fe2a0d968e3ffc88f78d469..c28a90aba45401de43a252ed5f25c5c5c8d9d325 100644
+--- a/lib/app/router/app_router.dart
++++ b/lib/app/router/app_router.dart
+@@ -8,6 +8,7 @@ import 'package:laoo_meeting/meeting_feature.dart';
+ import 'package:laoo_five_s/five_s_feature.dart';
+ import 'package:laoo_survey/survey_feature.dart';
+ import 'package:laoo_expense/expense_feature.dart';
++import 'package:laoo_vote/vote_feature.dart';
+ import 'package:laoo_service/service_feature.dart';
+ import 'package:laoo_time/time_feature.dart';
+ import 'package:laoo_training/training_feature.dart';
+@@ -180,6 +181,7 @@ final GoRouter appRouter = GoRouter(
+     ...buildFiveSFeatureRoutes(),
+     ...buildSurveyFeatureRoutes(),
+     ...buildExpenseFeatureRoutes(),
++    ...buildVoteFeatureRoutes(),
+     GoRoute(
+       path: RoutePaths.companyBranches,
+       name: RouteNames.companyBranches,
+diff --git a/lib/main.dart b/lib/main.dart
+index e0b3715030aba957db7ce45eca3b94c732423c2b..0e0fdcb4837d2c0d8802b40caa8bdf6aacb3b367 100644
+--- a/lib/main.dart
++++ b/lib/main.dart
+@@ -3,6 +3,7 @@ import 'package:laoo_meeting/meeting_feature.dart';
+ import 'package:laoo_five_s/five_s_feature.dart';
+ import 'package:laoo_survey/survey_feature.dart';
+ import 'package:laoo_expense/expense_feature.dart';
++import 'package:laoo_vote/vote_feature.dart';
+ import 'package:laoo_service/service_feature.dart';
+ import 'package:laoo_time/time_feature.dart';
+ import 'package:laoo_training/training_feature.dart';
+@@ -24,6 +25,7 @@ void main() {
+   configureFiveSFeatureHost(_buildMeetingWorkspaceShell);
+   configureSurveyFeatureHost(_buildMeetingWorkspaceShell);
+   configureExpenseFeatureHost(_buildMeetingWorkspaceShell);
++  configureVoteFeatureHost(_buildMeetingWorkspaceShell);
+   configureMeetingFeatureHost(_buildMeetingWorkspaceShell);
+   configureServiceWorkspaceShell(_buildMeetingWorkspaceShell);
+   configureGatePassFeatureHost(_buildMeetingWorkspaceShell);
+diff --git a/local.machine.vote.example.json b/local.machine.vote.example.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..a952e801baae2233e2176c5aefbbae2089824ce9
+--- /dev/null
++++ b/local.machine.vote.example.json
+@@ -0,0 +1,6 @@
++{
++  "role": "vote",
++  "allowedProjects": ["LAOO", "LAOO_VOTE"],
++  "webPort": 8080,
++  "apiPort": 5080
++}
+\ No newline at end of file
+diff --git a/projects/vote/database/migrations/.gitkeep b/projects/vote/database/migrations/.gitkeep
+new file mode 100644
+index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
+diff --git a/projects/vote/lib/features/vote/vote_feature_host.dart b/projects/vote/lib/features/vote/vote_feature_host.dart
+new file mode 100644
+index 0000000000000000000000000000000000000000..440ffe563c990bc2203712c87571ed2e9f88d70b
+--- /dev/null
++++ b/projects/vote/lib/features/vote/vote_feature_host.dart
+@@ -0,0 +1,25 @@
++import 'package:flutter/widgets.dart';
++
++typedef VoteWorkspaceShellBuilder =
++    Widget Function({
++      required String pageTitle,
++      required String activeMenu,
++      required Widget child,
++    });
++
++VoteWorkspaceShellBuilder? _workspaceShellBuilder;
++
++void configureVoteFeatureHost(VoteWorkspaceShellBuilder builder) =>
++    _workspaceShellBuilder = builder;
++
++Widget buildVoteWorkspaceShell({
++  required String pageTitle,
++  required String activeMenu,
++  required Widget child,
++}) {
++  final builder = _workspaceShellBuilder;
++  if (builder == null) {
++    throw StateError('Vote feature host is not configured.');
++  }
++  return builder(pageTitle: pageTitle, activeMenu: activeMenu, child: child);
++}
+diff --git a/projects/vote/lib/features/vote/vote_go_routes.dart b/projects/vote/lib/features/vote/vote_go_routes.dart
+new file mode 100644
+index 0000000000000000000000000000000000000000..0c8197fdcb6c37fd45c3929716e9493b049e1290
+--- /dev/null
++++ b/projects/vote/lib/features/vote/vote_go_routes.dart
+@@ -0,0 +1,4 @@
++import 'package:go_router/go_router.dart';
++
++// The Vote owner adds real routes here as each menu becomes ready.
++List<GoRoute> buildVoteFeatureRoutes() => <GoRoute>[];
+diff --git a/projects/vote/lib/features/vote/vote_route_contract.dart b/projects/vote/lib/features/vote/vote_route_contract.dart
+new file mode 100644
+index 0000000000000000000000000000000000000000..fe78c37db12f3515b99d3dbb02c5236ea9d45845
+--- /dev/null
++++ b/projects/vote/lib/features/vote/vote_route_contract.dart
+@@ -0,0 +1,2 @@
++export '../../vote_feature.dart'
++    show VoteMenuCodes, VoteProject, VoteRouteNames, VoteRoutePaths, VoteRoutes;
+diff --git a/projects/vote/lib/vote_feature.dart b/projects/vote/lib/vote_feature.dart
+new file mode 100644
+index 0000000000000000000000000000000000000000..d12ba8f5a344590cea478da5c9e6c5709b14677c
+--- /dev/null
++++ b/projects/vote/lib/vote_feature.dart
+@@ -0,0 +1,81 @@
++export 'features/vote/vote_feature_host.dart';
++export 'features/vote/vote_go_routes.dart';
++export 'features/vote/vote_route_contract.dart';
++
++import 'package:laoo_shared_core/laoo_shared_core.dart';
++
++abstract final class VoteProject {
++  static const code = 'LAOO_VOTE';
++}
++
++abstract final class VoteMenuCodes {
++  static const settings = '44001';
++  static const topics = '44002';
++  static const approvalInbox = '44003';
++  static const myVotes = '44004';
++  static const results = '44005';
++}
++
++abstract final class VoteRouteNames {
++  static const settings = 'voteSettings';
++  static const topics = 'votes';
++  static const approvalInbox = 'voteApprovalInbox';
++  static const myVotes = 'myVotes';
++  static const results = 'voteResults';
++}
++
++abstract final class VoteRoutePaths {
++  static const settings = '/company/vote-settings';
++  static const topics = '/company/votes';
++  static const approvalInbox = '/company/vote-approvals';
++  static const myVotes = '/company/my-votes';
++  static const results = '/company/vote-results';
++}
++
++abstract final class VoteRoutes {
++  static const all = <FeatureRouteContract>[
++    FeatureRouteContract(
++      projectCode: VoteProject.code,
++      menuCode: VoteMenuCodes.settings,
++      screenType: 2,
++      routeName: VoteRouteNames.settings,
++      routePath: VoteRoutePaths.settings,
++      isImplemented: false,
++    ),
++    FeatureRouteContract(
++      projectCode: VoteProject.code,
++      menuCode: VoteMenuCodes.topics,
++      screenType: 4,
++      routeName: VoteRouteNames.topics,
++      routePath: VoteRoutePaths.topics,
++      isImplemented: false,
++    ),
++    FeatureRouteContract(
++      projectCode: VoteProject.code,
++      menuCode: VoteMenuCodes.approvalInbox,
++      screenType: 3,
++      routeName: VoteRouteNames.approvalInbox,
++      routePath: VoteRoutePaths.approvalInbox,
++      isImplemented: false,
++    ),
++    FeatureRouteContract(
++      projectCode: VoteProject.code,
++      menuCode: VoteMenuCodes.myVotes,
++      screenType: 3,
++      routeName: VoteRouteNames.myVotes,
++      routePath: VoteRoutePaths.myVotes,
++      isImplemented: false,
++    ),
++    FeatureRouteContract(
++      projectCode: VoteProject.code,
++      menuCode: VoteMenuCodes.results,
++      screenType: 3,
++      routeName: VoteRouteNames.results,
++      routePath: VoteRoutePaths.results,
++      isImplemented: false,
++    ),
++  ];
++
++  static Iterable<FeatureRouteContract> get implemented =>
++      all.where((route) => route.isImplemented);
++}
+diff --git a/projects/vote/packages/dotnet/Laoo.Vote.Module/Laoo.Vote.Module.csproj b/projects/vote/packages/dotnet/Laoo.Vote.Module/Laoo.Vote.Module.csproj
+new file mode 100644
+index 0000000000000000000000000000000000000000..a6b9113f5db4047c50aca699c8f1fa87346bccad
+--- /dev/null
++++ b/projects/vote/packages/dotnet/Laoo.Vote.Module/Laoo.Vote.Module.csproj
+@@ -0,0 +1,7 @@
++<Project Sdk="Microsoft.NET.Sdk">
++  <PropertyGroup>
++    <TargetFramework>net8.0</TargetFramework>
++    <ImplicitUsings>enable</ImplicitUsings>
++    <Nullable>enable</Nullable>
++  </PropertyGroup>
++</Project>
+\ No newline at end of file
+diff --git a/projects/vote/packages/dotnet/Laoo.Vote.Module/VoteModuleMarker.cs b/projects/vote/packages/dotnet/Laoo.Vote.Module/VoteModuleMarker.cs
+new file mode 100644
+index 0000000000000000000000000000000000000000..0b5ab1bdc10f0aedce14ac5ac97b4563322c11fa
+--- /dev/null
++++ b/projects/vote/packages/dotnet/Laoo.Vote.Module/VoteModuleMarker.cs
+@@ -0,0 +1,3 @@
++namespace LaooVoteModule;
++
++public sealed class VoteModuleMarker;
+\ No newline at end of file
+diff --git a/projects/vote/pubspec.yaml b/projects/vote/pubspec.yaml
+new file mode 100644
+index 0000000000000000000000000000000000000000..6ad22f2855973fef2e441bc84f8353baded4139d
+--- /dev/null
++++ b/projects/vote/pubspec.yaml
+@@ -0,0 +1,16 @@
++name: laoo_vote
++description: LAOO Vote feature package.
++publish_to: none
++version: 1.0.0+1
++environment:
++  sdk: ^3.12.2
++dependencies:
++  flutter:
++    sdk: flutter
++  go_router: ^17.4.0
++  laoo_shared_core:
++    path: ../../packages/laoo_shared_core
++dev_dependencies:
++  flutter_test:
++    sdk: flutter
++  flutter_lints: ^6.0.0
+\ No newline at end of file
+diff --git a/pubspec.lock b/pubspec.lock
+index c85ec8d282d797737e12ce339ef05b754fbecb33..7e7b74120ac2869ec1a2b192c16b84f011e92f3c 100644
+--- a/pubspec.lock
++++ b/pubspec.lock
+@@ -408,6 +408,13 @@ packages:
+       relative: true
+     source: path
+     version: "1.0.0+1"
++  laoo_vote:
++    dependency: "direct main"
++    description:
++      path: "projects/vote"
++      relative: true
++    source: path
++    version: "1.0.0+1"
+   leak_tracker:
+     dependency: transitive
+     description:
+diff --git a/pubspec.yaml b/pubspec.yaml
+index f4099df69ceb262e8af949ec8ea68b2a68ec74eb..885f53ff772ad47110b90de823d3a032b3242bf4 100644
+--- a/pubspec.yaml
++++ b/pubspec.yaml
+@@ -38,6 +38,8 @@ dependencies:
+     path: projects/survey
+   laoo_expense:
+     path: projects/expense
++  laoo_vote:
++    path: projects/vote
+ 
+   cupertino_icons: ^1.0.8
+   flutter_riverpod: ^3.4.2
+diff --git a/test/app/router/vote_bootstrap_test.dart b/test/app/router/vote_bootstrap_test.dart
+new file mode 100644
+index 0000000000000000000000000000000000000000..060f11bf778303a525b1d5a27a5d878976d09e85
+--- /dev/null
++++ b/test/app/router/vote_bootstrap_test.dart
+@@ -0,0 +1,29 @@
++import 'package:flutter_test/flutter_test.dart';
++import 'package:laoo/app/router/app_menu_route_registry.dart';
++import 'package:laoo_vote/vote_feature.dart';
++
++void main() {
++  test('Vote has all approved contracts but no active routes', () {
++    expect(VoteProject.code, 'LAOO_VOTE');
++    expect(VoteRoutes.all, hasLength(5));
++    expect(
++      VoteRoutes.all.map((route) => route.menuCode),
++      orderedEquals(const <String>[
++        '44001',
++        '44002',
++        '44003',
++        '44004',
++        '44005',
++      ]),
++    );
++    expect(VoteRoutes.implemented, isEmpty);
++    expect(buildVoteFeatureRoutes(), isEmpty);
++    for (final route in VoteRoutes.all) {
++      final mapped = AppMenuRouteRegistry.byMenuCode(route.menuCode);
++      expect(mapped, isNotNull);
++      expect(mapped!.databaseRouteName, route.routeName);
++      expect(mapped.goRouteName, route.routeName);
++      expect(mapped.path, route.routePath);
++    }
++  });
++}
+diff --git a/tools/migrations/Laoo.MigrationRunner/Program.cs b/tools/migrations/Laoo.MigrationRunner/Program.cs
+index 8b25479766fb69cfeb59e0a2f59d31d9c9fc7a00..22eaedec4fe2d4132bb8c95b887ec43ff7c12e20 100644
+--- a/tools/migrations/Laoo.MigrationRunner/Program.cs
++++ b/tools/migrations/Laoo.MigrationRunner/Program.cs
+@@ -56,6 +56,7 @@ static string ResolveMigrationDirectory(string root, string projectCode) =>
+         "LAOO_5S" => Path.Combine(root, "projects", "five_s", "database", "migrations"),
+         "LAOO_SURVEY" => Path.Combine(root, "projects", "survey", "database", "migrations"),
+         "LAOO_EXPENSE" => Path.Combine(root, "projects", "expense", "database", "migrations"),
++        "LAOO_VOTE" => Path.Combine(root, "projects", "vote", "database", "migrations"),
+         _ => throw new ArgumentOutOfRangeException(nameof(projectCode), projectCode, "Unsupported ProjectCode"),
+     };
+ 
+diff --git a/tools/scripts/check-machine-boundaries.ps1 b/tools/scripts/check-machine-boundaries.ps1
+index e8b0d60583f1cb50d3676099d097331634ec0032..0d7880bff3fd5ce692a999f1cfc25d83eaecd5d8 100644
+--- a/tools/scripts/check-machine-boundaries.ps1
++++ b/tools/scripts/check-machine-boundaries.ps1
+@@ -1,9 +1,9 @@
+ param(
+     [Parameter(Mandatory = $true)]
+-    [ValidateSet('service', 'meeting', 'visitor', 'time', 'training')]
++    [ValidateSet('service', 'meeting', 'visitor', 'time', 'training', 'vote')]
+     [string]$Module,
+ 
+-    [ValidateSet('center-service', 'meeting', 'visitor', 'time', 'training')]
++    [ValidateSet('center-service', 'meeting', 'visitor', 'time', 'training', 'vote')]
+     [string]$Role,
+ 
+     [string]$BaseRef = 'origin/main'
+@@ -26,7 +26,7 @@ if ([string]::IsNullOrWhiteSpace($Role)) {
+     $Role = [string]$machineConfig.role
+ }
+ 
+-$validRoles = @('center-service', 'meeting', 'visitor', 'time', 'training')
++$validRoles = @('center-service', 'meeting', 'visitor', 'time', 'training', 'vote')
+ if ($Role -notin $validRoles) {
+     throw "Invalid machine role '$Role'. Expected: $($validRoles -join ', ')."
+ }
+@@ -41,6 +41,7 @@ $ownedRoleByModule = @{
+     visitor = 'visitor'
+     time = 'time'
+     training = 'training'
++    vote = 'vote'
+ }
+ 
+ if ($Role -ne $ownedRoleByModule[$Module]) {
+diff --git a/tools/scripts/run-migrations.ps1 b/tools/scripts/run-migrations.ps1
+index fe28ff7eaf23a8fe8865a81c6684051fc8c7afbf..a1fb082b1b35941b45042bbbc352592aecb99df7 100644
+--- a/tools/scripts/run-migrations.ps1
++++ b/tools/scripts/run-migrations.ps1
+@@ -1,6 +1,6 @@
+ param(
+     [Parameter(Mandatory = $true)]
+-    [ValidateSet('core', 'service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense')]
++    [ValidateSet('core', 'service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense', 'vote')]
+     [string]$Module,
+     [switch]$DryRun
+ )
+@@ -18,6 +18,7 @@ $projectCodes = @{
+     five_s = 'LAOO_5S'
+     survey = 'LAOO_SURVEY'
+     expense = 'LAOO_EXPENSE'
++    vote = 'LAOO_VOTE'
+ }
+ $arguments = @(
+     'run',
+diff --git a/tools/scripts/test-project-bootstrap.ps1 b/tools/scripts/test-project-bootstrap.ps1
+index bcb950edae1027ea21e6bff31aa23a92d44d65b8..9f1b0f7637322fbfbbc0e73cb2ec54f07be1f4ca 100644
+--- a/tools/scripts/test-project-bootstrap.ps1
++++ b/tools/scripts/test-project-bootstrap.ps1
+@@ -1,6 +1,6 @@
+ param(
+     [Parameter(Mandatory = $true)]
+-    [ValidateSet('service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense')]
++    [ValidateSet('service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense', 'vote')]
+     [string]$Project
+ )
+ 
+diff --git a/tools/scripts/verify-center.ps1 b/tools/scripts/verify-center.ps1
+index 7a65ab69d8b38e76fe08f3643bec0350b0aa5ce7..c18a8ebdbee5becf678771cc1f914d9a20076749 100644
+--- a/tools/scripts/verify-center.ps1
++++ b/tools/scripts/verify-center.ps1
+@@ -1,9 +1,9 @@
+ param(
+     [Parameter(Mandatory = $true)]
+-    [ValidateSet('service', 'meeting', 'visitor', 'time', 'training')]
++    [ValidateSet('service', 'meeting', 'visitor', 'time', 'training', 'vote')]
+     [string]$Module,
+ 
+-    [ValidateSet('center-service', 'meeting', 'visitor', 'time', 'training')]
++    [ValidateSet('center-service', 'meeting', 'visitor', 'time', 'training', 'vote')]
+     [string]$Role
+ )
+ 
+@@ -55,7 +55,8 @@ try {
+             'projects\meeting\lib\main.dart',
+             'projects\visitor\lib\main.dart',
+             'projects\time\lib\main.dart',
+-            'projects\training\lib\main.dart'
++            'projects\training\lib\main.dart',
++            'projects\vote\lib\main.dart'
+         ) | Where-Object { Test-Path (Join-Path $repoRoot $_) }
+         if ($legacyHosts.Count -gt 0) {
+             throw "Standalone hosts are not allowed: $($legacyHosts -join ', ')"
+@@ -84,6 +85,7 @@ try {
+         'visitor' { 'projects\visitor\packages\dotnet\Laoo.Visitor.Module\Laoo.Visitor.Module.csproj' }
+         'time' { 'projects\time\packages\dotnet\Laoo.Time.Module\Laoo.Time.Module.csproj' }
+         'training' { 'projects\training\packages\dotnet\Laoo.Training.Module\Laoo.Training.Module.csproj' }
++        'vote' { 'projects\vote\packages\dotnet\Laoo.Vote.Module\Laoo.Vote.Module.csproj' }
+     }
+     Invoke-Checked "$Module API module Release build" { dotnet build $apiModule -c Release }
+ }

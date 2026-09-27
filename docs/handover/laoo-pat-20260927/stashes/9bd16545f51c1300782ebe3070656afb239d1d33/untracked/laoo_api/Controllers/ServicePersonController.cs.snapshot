@@ -1,0 +1,34 @@
+using System.Data;
+using System.Text.Json;
+using LaooApi.Security;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.SqlClient;
+
+namespace LaooApi.Controllers;
+
+[ApiController, Authorize]
+[Route("api/service/person-roles")]
+public sealed partial class ServicePersonController(
+    IConfiguration configuration,
+    ILogger<ServicePersonController> logger) : ControllerBase
+{
+    private const string ScreenCode = "14004";
+    private long CompanyId => RegistryControllerSupport.ClaimLong(User, "company_id");
+    private long UserId => RegistryControllerSupport.ClaimLong(User, "user_id");
+
+    [HttpGet("actions")]
+    public async Task<IActionResult> Actions(CancellationToken token)
+    {
+        await using var connection = await Open(token);
+        if (!await ScopeValid(connection, token)) return Forbid();
+        return Ok(new
+        {
+            view = await Can(connection, "VIEW", token),
+            create = await Can(connection, "CREATE", token),
+            edit = await Can(connection, "EDIT", token),
+            delete = false,
+            personEdit = await RegistryControllerSupport.PersonEditAllowed(connection, User, ScreenCode, token),
+        });
+    }
+}

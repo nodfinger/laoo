@@ -1,0 +1,63 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:laoo/core/api/api_client.dart';
+import 'package:laoo/core/navigation/navigation_menu_repository.dart';
+
+class _FlakyNavigationApi extends ApiClient {
+  final Map<String, int> calls = {};
+
+  @override
+  Future<dynamic> get(
+    String path, {
+    Map<String, String>? query,
+    bool authenticated = true,
+  }) async {
+    final count = calls.update(path, (value) => value + 1, ifAbsent: () => 1);
+    if (count == 1) throw StateError('network unavailable');
+    if (path == '/api/navigation/menus') {
+      return [
+        {
+          'menuGroupCode': '14',
+          'menuGroupName': 'Service',
+          'items': [
+            {'menuCode': '14004', 'menuName': 'ทะเบียนบุคคล'},
+          ],
+        },
+      ];
+    }
+    return [
+      {
+        'projectId': 4,
+        'projectCode': 'LAOO_SERVICE',
+        'projectName': 'Service',
+        'projectType': 'SERVICE',
+        'menuGroups': [],
+      },
+    ];
+  }
+}
+
+void main() {
+  test('menu cache retries after an API failure', () async {
+    final api = _FlakyNavigationApi();
+    addTearDown(api.dispose);
+    final repository = NavigationMenuRepository(apiClient: api);
+
+    await expectLater(repository.getMenus(), throwsStateError);
+    final menus = await repository.getMenus();
+
+    expect(menus.single.items.single.code, '14004');
+    expect(api.calls['/api/navigation/menus'], 2);
+  });
+
+  test('project cache retries after an API failure', () async {
+    final api = _FlakyNavigationApi();
+    addTearDown(api.dispose);
+    final repository = NavigationMenuRepository(apiClient: api);
+
+    await expectLater(repository.getProjects(), throwsStateError);
+    final projects = await repository.getProjects();
+
+    expect(projects.single.code, 'LAOO_SERVICE');
+    expect(api.calls['/api/navigation/projects'], 2);
+  });
+}

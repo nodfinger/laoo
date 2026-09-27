@@ -1,0 +1,109 @@
+SET XACT_ABORT ON;
+BEGIN TRANSACTION;
+
+DECLARE @ServiceProjectID bigint =
+(
+    SELECT TOP (1) ProjectID
+    FROM dbo.TDADProject
+    WHERE ProjectCode=N'LAOO_SERVICE' AND IsActive=1
+);
+DECLARE @CoreProjectID bigint =
+(
+    SELECT TOP (1) ProjectID
+    FROM dbo.TDADProject
+    WHERE ProjectCode=N'LAOO' AND IsActive=1
+);
+
+IF @ServiceProjectID IS NULL
+    THROW 52920, N'ไม่พบ Project LAOO_SERVICE ที่เปิดใช้งาน', 1;
+IF OBJECT_ID(N'dbo.TDADPerson',N'U') IS NULL
+    THROW 52921, N'TDADPerson is required before Service Person Registry.', 1;
+
+UPDATE dbo.TDADMainMenu
+SET MenuGroupCode=N'14',MenuName=N'ทะเบียนบุคคล',ScreenType=1,
+    RouteName=N'servicePersons',RoutePath=N'/service/persons',IconName=N'person_outline',
+    SortOrder=40,IsVisible=1,IsFavoriteAllowed=1,IsActive=1,ShowPermissionPoint=1,
+    UpdateDate=SYSUTCDATETIME()
+WHERE MenuCode=N'14004';
+
+UPDATE dbo.TDADProjectMenu
+SET IsActive=0
+WHERE MenuCode=N'14004' AND ProjectID<>@ServiceProjectID;
+
+MERGE dbo.TDADProjectMenu AS Target
+USING (SELECT @ServiceProjectID ProjectID,N'14004' MenuCode,N'14' MenuGroupCode,40 SortOrder) AS Source
+ON Target.ProjectID=Source.ProjectID AND Target.MenuCode=Source.MenuCode
+WHEN MATCHED THEN
+    UPDATE SET MenuGroupCode=Source.MenuGroupCode,SortOrder=Source.SortOrder,IsActive=1
+WHEN NOT MATCHED THEN
+    INSERT(ProjectID,MenuCode,MenuGroupCode,SortOrder,IsActive)
+    VALUES(Source.ProjectID,Source.MenuCode,Source.MenuGroupCode,Source.SortOrder,1);
+
+MERGE dbo.TDADProjectMenuGroup AS Target
+USING (SELECT @ServiceProjectID ProjectID,N'14' MenuGroupCode,201 SortOrder) AS Source
+ON Target.ProjectID=Source.ProjectID AND Target.MenuGroupCode=Source.MenuGroupCode
+WHEN MATCHED THEN UPDATE SET SortOrder=Source.SortOrder,IsActive=1
+WHEN NOT MATCHED THEN
+    INSERT(ProjectID,MenuGroupCode,SortOrder,IsActive)
+    VALUES(Source.ProjectID,Source.MenuGroupCode,Source.SortOrder,1);
+
+IF @CoreProjectID IS NOT NULL
+BEGIN
+    UPDATE dbo.TDADPermission
+    SET IsActive=0
+    WHERE ProjectID=@CoreProjectID AND ScreenCode=N'14004';
+END;
+
+DECLARE @Actions TABLE(ActionCode nvarchar(30),ActionNameTH nvarchar(100));
+INSERT @Actions VALUES
+    (N'VIEW',N'แสดง'),(N'CREATE',N'เพิ่ม'),(N'EDIT',N'แก้ไข'),(N'DELETE',N'ลบ');
+
+UPDATE Permission
+SET ScreenNameTH=N'ทะเบียนบุคคล',ScreenNameEN=N'Service Person Registry',
+    ActionNameTH=Action.ActionNameTH,IsActive=1
+FROM dbo.TDADPermission Permission
+INNER JOIN @Actions Action ON Action.ActionCode=Permission.ActionCode
+WHERE Permission.ProjectID=@ServiceProjectID AND Permission.ScreenCode=N'14004';
+
+INSERT dbo.TDADPermission
+    (ProjectID,ScreenCode,ScreenNameTH,ScreenNameEN,ActionCode,ActionNameTH,IsActive)
+SELECT @ServiceProjectID,N'14004',N'ทะเบียนบุคคล',N'Service Person Registry',
+       Action.ActionCode,Action.ActionNameTH,1
+FROM @Actions Action
+WHERE NOT EXISTS
+(
+    SELECT 1 FROM dbo.TDADPermission Permission
+    WHERE Permission.ProjectID=@ServiceProjectID
+      AND Permission.ScreenCode=N'14004'
+      AND Permission.ActionCode=Action.ActionCode
+);
+
+UPDATE dbo.TDADMenuGroup
+SET ShowPermissionPoint=1,UpdateDate=SYSUTCDATETIME()
+WHERE MenuGroupCode=N'14';
+
+DECLARE @PersonEditSort int =
+(
+    SELECT ISNULL(MAX(SortOrder),0)+1
+    FROM dbo.TDADUserPermissionPointName
+    WHERE MenuCode=N'14004'
+);
+
+MERGE dbo.TDADUserPermissionPointName AS Target
+USING
+(
+    SELECT N'14004' MenuCode,N'PERSON_EDIT' PermissionPointCode,
+           N'แก้ไขข้อมูลบุคคลกลาง' PermissionPointName,
+           N'อนุญาตให้แก้ชื่อ โทรศัพท์ และอีเมลใน TDADPerson ซึ่งมีผลต่อทุกระบบ' PermissionPointDescription
+) AS Source
+ON Target.MenuCode=Source.MenuCode AND Target.PermissionPointCode=Source.PermissionPointCode
+WHEN MATCHED THEN
+    UPDATE SET PermissionPointName=Source.PermissionPointName,
+               PermissionPointDescription=Source.PermissionPointDescription,
+               IsActive=1
+WHEN NOT MATCHED THEN
+    INSERT(MenuCode,PermissionPointCode,PermissionPointName,PermissionPointDescription,SortOrder,IsActive)
+    VALUES(Source.MenuCode,Source.PermissionPointCode,Source.PermissionPointName,
+           Source.PermissionPointDescription,@PersonEditSort,1);
+
+COMMIT TRANSACTION;

@@ -1,0 +1,2 @@
+*.snapshot binary
+*.patch -text

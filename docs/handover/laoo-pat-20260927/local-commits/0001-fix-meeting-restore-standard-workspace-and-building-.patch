@@ -1,0 +1,257 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Laoo <dev@laoo.local>
+Date: Sun, 6 Sep 2026 22:13:09 +0700
+Subject: [HANDOVER] fix(meeting): restore standard workspace and building
+ cards
+
+---
+ .../widgets/support_workspace_shell.dart      |   9 +++-
+ .../meeting/pages/meeting_building_page.dart  |  17 ++++++--
+ .../goldens/workspace_top_bar_mobile.png      | Bin 5659 -> 5670 bytes
+ .../widgets/workspace_section_card_test.dart  |  40 ++++++++++++++++++
+ 4 files changed, 62 insertions(+), 4 deletions(-)
+ create mode 100644 test/features/support/presentation/widgets/workspace_section_card_test.dart
+
+diff --git a/lib/features/support/presentation/widgets/support_workspace_shell.dart b/lib/features/support/presentation/widgets/support_workspace_shell.dart
+index d67c6c964b13adad800410b9585f9f4dd8cb0a1c..bc249fafad9e179f78ecf754abb72a32853cb96a 100644
+--- a/lib/features/support/presentation/widgets/support_workspace_shell.dart
++++ b/lib/features/support/presentation/widgets/support_workspace_shell.dart
+@@ -42,7 +42,14 @@ class WorkspaceSectionCard extends StatelessWidget {
+   @override
+   Widget build(BuildContext context) => Card(
+     margin: EdgeInsets.zero,
++    color: LaooColors.white,
++    surfaceTintColor: Colors.transparent,
++    elevation: 0,
+     clipBehavior: Clip.antiAlias,
++    shape: RoundedRectangleBorder(
++      borderRadius: BorderRadius.circular(LaooRadius.xs),
++      side: BorderSide.none,
++    ),
+     child: Padding(padding: padding, child: child),
+   );
+ }
+@@ -252,7 +259,7 @@ class SupportWorkspaceShell extends StatelessWidget {
+           data: workspaceTheme,
+           child: Builder(
+             builder: (context) => Scaffold(
+-              backgroundColor: preset.background,
++              backgroundColor: LaooColors.background,
+               drawer: compact
+                   ? ValueListenableBuilder<bool>(
+                       valueListenable: workspaceButtonMenu,
+diff --git a/projects/meeting/lib/features/meeting/pages/meeting_building_page.dart b/projects/meeting/lib/features/meeting/pages/meeting_building_page.dart
+index c9a80a3fe72b1ca46f732bdefd4613cae904fede..eb9d730d87837bb843fad6966c3677b73ad7411f 100644
+--- a/projects/meeting/lib/features/meeting/pages/meeting_building_page.dart
++++ b/projects/meeting/lib/features/meeting/pages/meeting_building_page.dart
+@@ -887,7 +887,11 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
+                       ],
+                     ),
+                   ),
+-                  const SizedBox(height: 8),
++                  const Divider(
++                    height: 1,
++                    thickness: 1,
++                    color: LaooColors.border,
++                  ),
+                   WorkspaceSectionCard(
+                     child: DropdownButtonFormField<int?>(
+                       initialValue: _branchId,
+@@ -917,12 +921,12 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
+                       },
+                     ),
+                   ),
+-                  const SizedBox(height: 8),
++                  const SizedBox(height: 6),
+                   if (_loading) const LinearProgressIndicator(),
+                   Expanded(
+                     child: ListView.separated(
+                       itemCount: _items.length,
+-                      separatorBuilder: (_, __) => const SizedBox(height: 8),
++                      separatorBuilder: (_, __) => const SizedBox(height: 6),
+                       itemBuilder: (context, index) {
+                         final building = _items[index];
+                         final floors = List<Map<String, dynamic>>.from(
+@@ -930,6 +934,13 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
+                         );
+                         return Card(
+                           margin: EdgeInsets.zero,
++                          color: LaooColors.white,
++                          surfaceTintColor: Colors.transparent,
++                          elevation: 0,
++                          shape: RoundedRectangleBorder(
++                            borderRadius: BorderRadius.circular(LaooRadius.xs),
++                            side: BorderSide.none,
++                          ),
+                           child: ExpansionTile(
+                             tilePadding: const EdgeInsets.all(
+                               LaooLayout.cardPadding,
+diff --git a/test/app/router/goldens/workspace_top_bar_mobile.png b/test/app/router/goldens/workspace_top_bar_mobile.png
+index 36ea09142a46d8e8b43bc04b623e27f4b2106fc3..46670101c661696f1a5b5645b1f01a5e2ce2adf4 100644
+GIT binary patch
+delta 3000
+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
+MbKYlZzl7iaACG9M_W%F@
+
+delta 2990
+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
+H)7Ae0gW-`{
+
+diff --git a/test/features/support/presentation/widgets/workspace_section_card_test.dart b/test/features/support/presentation/widgets/workspace_section_card_test.dart
+new file mode 100644
+index 0000000000000000000000000000000000000000..6adf80d8dab109922480be248e0c2973099b1aa3
+--- /dev/null
++++ b/test/features/support/presentation/widgets/workspace_section_card_test.dart
+@@ -0,0 +1,40 @@
++import 'package:flutter/material.dart';
++import 'package:flutter_test/flutter_test.dart';
++import 'package:laoo/app/theme/laoo_design_tokens.dart';
++import 'package:laoo/features/support/presentation/widgets/support_workspace_shell.dart';
++
++void main() {
++  Future<void> pumpCard(WidgetTester tester, Size size) async {
++    await tester.binding.setSurfaceSize(size);
++    addTearDown(() => tester.binding.setSurfaceSize(null));
++    await tester.pumpWidget(
++      const MaterialApp(
++        home: Scaffold(
++          backgroundColor: LaooColors.background,
++          body: WorkspaceSectionCard(child: Text('อาคารและชั้น')),
++        ),
++      ),
++    );
++  }
++
++  for (final size in const [Size(1440, 900), Size(412, 924)]) {
++    testWidgets('uses standard background and borderless card at $size', (
++      tester,
++    ) async {
++      await pumpCard(tester, size);
++
++      final scaffold = tester.widget<Scaffold>(find.byType(Scaffold));
++      final card = tester.widget<Card>(find.byType(Card));
++      final shape = card.shape! as RoundedRectangleBorder;
++
++      expect(scaffold.backgroundColor, LaooColors.background);
++      expect(card.color, LaooColors.white);
++      expect(card.surfaceTintColor, Colors.transparent);
++      expect(card.elevation, 0);
++      expect(card.margin, EdgeInsets.zero);
++      expect(shape.borderRadius, BorderRadius.circular(LaooRadius.xs));
++      expect(shape.side, BorderSide.none);
++      expect(tester.takeException(), isNull);
++    });
++  }
++}

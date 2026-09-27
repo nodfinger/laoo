@@ -1,0 +1,148 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "LAOO: เริ่มงาน",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\tools\\scripts\\project-workflow.ps1",
+        "-Action",
+        "Start",
+        "-Module",
+        "${input:laooModule}",
+        "-TaskName",
+        "${input:laooTaskName}"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "LAOO: Run Center",
+      "dependsOrder": "parallel",
+      "dependsOn": [
+        "LAOO: Run Center API",
+        "LAOO: Run Center Web"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "LAOO: Run Center API",
+      "type": "shell",
+      "command": "dotnet",
+      "args": [
+        "run",
+        "--project",
+        "${workspaceFolder}\\laoo_api\\laoo_api.csproj"
+      ],
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "laoo-api",
+        "pattern": {
+          "regexp": "^(?!)$"
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".*",
+          "endsPattern": "Now listening on:.*5080"
+        }
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "laoo-center-api"
+      }
+    },
+    {
+      "label": "LAOO: Run Center Web",
+      "type": "shell",
+      "command": "flutter",
+      "args": [
+        "run",
+        "-d",
+        "web-server",
+        "--web-port",
+        "8080",
+        "--dart-define=API_URL=http://localhost:5080",
+        "--dart-define=PROJECT_CODE=LAOO"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "laoo-web",
+        "pattern": {
+          "regexp": "^(?!)$"
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".*",
+          "endsPattern": "lib\\main.dart is being served at"
+        }
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "laoo-center-web"
+      }
+    },
+    {
+      "label": "LAOO: ส่งงาน",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\tools\\scripts\\project-workflow.ps1",
+        "-Action",
+        "Finish",
+        "-Module",
+        "${input:laooModule}",
+        "-CommitMessage",
+        "${input:laooCommitMessage}"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    }
+  ],
+  "inputs": [
+    {
+      "id": "laooModule",
+      "type": "pickString",
+      "description": "เลือก Project ที่รับผิดชอบ",
+      "options": [
+        "core",
+        "service",
+        "meeting",
+        "visitor"
+      ],
+      "default": "meeting"
+    },
+    {
+      "id": "laooTaskName",
+      "type": "promptString",
+      "description": "ชื่องานสำหรับ Branch เช่น building-card",
+      "default": "task-name"
+    },
+    {
+      "id": "laooCommitMessage",
+      "type": "promptString",
+      "description": "ข้อความ Commit เช่น fix(meeting): update building card"
+    }
+  ]
+}

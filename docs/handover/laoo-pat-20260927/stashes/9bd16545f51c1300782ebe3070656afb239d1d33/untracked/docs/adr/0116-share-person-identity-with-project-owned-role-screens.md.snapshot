@@ -1,0 +1,5 @@
+# Share Person identity with project-owned role screens
+
+LAOO keeps one Company-scoped Person identity while each Business Project owns its menu, permission, and role-specific workflow. Service has its own Person Registry menu but reads and writes the shared Person identity; a Dormitory Resident is derived from TDADResident, while future Service Requester roles are derived from their service relationship. This prevents duplicate people without allowing a badge to become a second source of truth.
+
+Service may select an existing Person or create a Person in the same transaction when a role workflow requires it. Changing shared Person fields requires the explicit `PERSON_EDIT` permission, optimistic concurrency, an impact warning, and an audit record. Resident self-service and Visitor remain later capabilities and must always link to the existing Person rather than create another identity.

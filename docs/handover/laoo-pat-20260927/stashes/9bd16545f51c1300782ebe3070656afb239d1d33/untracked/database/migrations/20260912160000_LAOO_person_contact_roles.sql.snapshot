@@ -1,0 +1,42 @@
+-- Core-owned relationship used to derive the CONTACT badge without duplicating Person data.
+SET XACT_ABORT ON;
+
+IF OBJECT_ID(N'dbo.TDADPerson', N'U') IS NULL
+    THROW 52900, 'TDADPerson is required before person contact roles.', 1;
+
+IF OBJECT_ID(N'dbo.TDADPersonContactLink', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.TDADPersonContactLink
+    (
+        PersonContactLinkID bigint IDENTITY(1,1) NOT NULL
+            CONSTRAINT PK_TDADPersonContactLink PRIMARY KEY,
+        CompanyID bigint NOT NULL,
+        PersonID bigint NOT NULL,
+        SourceProjectCode varchar(30) NOT NULL,
+        SourceType varchar(30) NOT NULL,
+        SourceID bigint NOT NULL,
+        IsActive bit NOT NULL
+            CONSTRAINT DF_TDADPersonContactLink_IsActive DEFAULT (1),
+        CreateDate datetime2(3) NOT NULL
+            CONSTRAINT DF_TDADPersonContactLink_CreateDate DEFAULT (SYSUTCDATETIME()),
+        CreateBy bigint NULL,
+        UpdateDate datetime2(3) NULL,
+        UpdateBy bigint NULL,
+        CONSTRAINT FK_TDADPersonContactLink_Person
+            FOREIGN KEY (CompanyID, PersonID)
+            REFERENCES dbo.TDADPerson(CompanyID, PersonID),
+        CONSTRAINT UQ_TDADPersonContactLink_Source
+            UNIQUE (CompanyID, PersonID, SourceProjectCode, SourceType, SourceID),
+        CONSTRAINT CK_TDADPersonContactLink_Project
+            CHECK (LEN(LTRIM(RTRIM(SourceProjectCode))) > 0),
+        CONSTRAINT CK_TDADPersonContactLink_Type
+            CHECK (LEN(LTRIM(RTRIM(SourceType))) > 0),
+        CONSTRAINT CK_TDADPersonContactLink_SourceID
+            CHECK (SourceID > 0)
+    );
+
+    CREATE INDEX IX_TDADPersonContactLink_Company_Person_Active
+        ON dbo.TDADPersonContactLink(CompanyID, PersonID, IsActive);
+    CREATE INDEX IX_TDADPersonContactLink_Source
+        ON dbo.TDADPersonContactLink(CompanyID, SourceProjectCode, SourceType, SourceID, IsActive);
+END;
