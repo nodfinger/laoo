@@ -23,6 +23,7 @@ public sealed class VisitorSystemController(
     private const string SettingsMenu = "36004";
     private const string CheckInMenu = "31002";
     private const string HistoryMenu = "31005";
+    private const string ExceptionsMenu = "34003";
     private const string HostConfirmMenu = "32003";
     private static readonly TimeSpan ThailandOffset = TimeSpan.FromHours(7);
 
@@ -160,7 +161,7 @@ VALUES(@CompanyID,@VisitID,@Result,@Note,@UserID,@Name);
         return Ok(new
         {
             businessTypeCode = businessType,
-            employeeAllowed = businessType == "COMPANY",
+            employeeAllowed = businessType is "COMPANY" or "DORMITORY",
             residentAllowed = businessType is "DORMITORY" or "VILLAGE",
             serviceCustomerAllowed = businessType == "SERVICE_CENTER",
             defaultHostType = businessType switch
@@ -229,7 +230,7 @@ ORDER BY B.BuildingNameTH,F.FloorNumber,RM.RoomCode,RM.RoomID;
         var type = Clean(hostType)?.ToUpperInvariant();
         var businessType = await BusinessType(connection, companyId, token);
         if (type is not ("EMPLOYEE" or "RESIDENT" or "SERVICE_CUSTOMER" or "RENTAL_OFFICE" or "VILLAGE") ||
-            (businessType == "DORMITORY" && type != "RESIDENT") ||
+            (businessType == "DORMITORY" && type is not ("RESIDENT" or "EMPLOYEE")) ||
             (businessType == "COMPANY" && type != "EMPLOYEE") ||
             (businessType == "SERVICE_CENTER" && type != "SERVICE_CUSTOMER") ||
             (businessType == "RENTAL_OFFICE" && type != "RENTAL_OFFICE") ||
@@ -607,13 +608,146 @@ OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;
         return Ok(new { items, total, page, pageSize });
     }
 
+    [HttpGet("exceptions/actions")]
+    public async Task<IActionResult> ExceptionActions(CancellationToken token)
+    {
+        if (!TryScope(out _, out _)) return Forbid();
+        await using var connection = await Open(token);
+        return Ok(new
+        {
+            menuCode = ExceptionsMenu,
+            caption = await Caption(connection, ExceptionsMenu, token),
+            screenType = 3,
+            view = await Can(connection, ExceptionsMenu, "VIEW", token),
+        });
+    }
+
+    [HttpGet("exceptions")]
+    public async Task<IActionResult> Exceptions(
+        CancellationToken token,
+        [FromQuery] string? search,
+        [FromQuery] string? exceptionType,
+        [FromQuery] DateOnly? dateFrom,
+        [FromQuery] DateOnly? dateTo,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
+    {
+        if (!TryScope(out var companyId, out var userId)) return Forbid();
+        await using var connection = await Open(token);
+        if (!await Can(connection, ExceptionsMenu, "VIEW", token)) return Forbid();
+        var contactPoint = await ActiveContactPoint(connection, null, companyId, userId, token);
+        if (contactPoint is null)
+            return NotFound(new { message = "No active contact point is assigned to this account." });
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 100);
+        var query = Clean(search) ?? string.Empty;
+        var type = Clean(exceptionType)?.ToUpperInvariant();
+        if (type is not null && type is not (
+                "HOST_CONFIRMATION_PENDING" or "CHECKOUT_OTHER" or
+                "NOTIFICATION_FAILED" or "NOTIFICATION_NO_CHANNEL" or
+                "CHECKOUT_RULE_MISMATCH"))
+            return BadRequest(new { message = "Invalid exception type." });
+        if (dateFrom.HasValue && dateTo.HasValue && dateFrom > dateTo)
+            return BadRequest(new { message = "Start date must not be after end date." });
+
+        await using var command = new SqlCommand("""
+WITH ExceptionRows AS
+(
+    SELECT V.VisitorVisitID, V.VisitorName, V.HostNameSnapshot, V.ContactPointNameSnapshot,
+           V.CheckedInDate AS OccurredDate, 'HOST_CONFIRMATION_PENDING' AS ExceptionType,
+           N'??????????????????????????????' AS ExceptionDescription
+    FROM dbo.TDTMVisitorVisit V
+    LEFT JOIN dbo.TDTMVisitorHostConfirmation C
+      ON C.CompanyID=V.CompanyID AND C.VisitorVisitID=V.VisitorVisitID
+    WHERE V.CompanyID=@CompanyID AND V.VisitorContactPointID=@ContactPointID
+      AND V.StatusCode='CHECKED_IN' AND C.VisitorHostConfirmationID IS NULL
+
+    UNION ALL
+
+    SELECT V.VisitorVisitID, V.VisitorName, V.HostNameSnapshot, V.ContactPointNameSnapshot,
+           V.CheckedOutDate, 'CHECKOUT_OTHER', N'Check-out ?????????????? ?'
+    FROM dbo.TDTMVisitorVisit V
+    WHERE V.CompanyID=@CompanyID AND V.VisitorContactPointID=@ContactPointID
+      AND V.StatusCode='CHECKED_OUT' AND V.CheckoutReasonCode='OTHER'
+
+    UNION ALL
+
+    SELECT V.VisitorVisitID, V.VisitorName, V.HostNameSnapshot, V.ContactPointNameSnapshot,
+           N.CreateDate, 'NOTIFICATION_FAILED', N'?????????????????????????????????'
+    FROM dbo.TDTMVisitorVisit V
+    JOIN dbo.TDTMVisitorNotificationOutbox N
+      ON N.CompanyID=V.CompanyID AND N.VisitorVisitID=V.VisitorVisitID
+    WHERE V.CompanyID=@CompanyID AND V.VisitorContactPointID=@ContactPointID
+      AND N.StatusCode='FAILED'
+
+    UNION ALL
+
+    SELECT V.VisitorVisitID, V.VisitorName, V.HostNameSnapshot, V.ContactPointNameSnapshot,
+           N.CreateDate, 'NOTIFICATION_NO_CHANNEL', N'????????????????????????????????????'
+    FROM dbo.TDTMVisitorVisit V
+    JOIN dbo.TDTMVisitorNotificationOutbox N
+      ON N.CompanyID=V.CompanyID AND N.VisitorVisitID=V.VisitorVisitID
+    WHERE V.CompanyID=@CompanyID AND V.VisitorContactPointID=@ContactPointID
+      AND N.StatusCode='NO_CHANNEL'
+
+    UNION ALL
+
+    SELECT V.VisitorVisitID, V.VisitorName, V.HostNameSnapshot, V.ContactPointNameSnapshot,
+           V.CheckedOutDate, 'CHECKOUT_RULE_MISMATCH', N'???????????????????? Check-out ??????????????'
+    FROM dbo.TDTMVisitorVisit V
+    WHERE V.CompanyID=@CompanyID AND V.VisitorContactPointID=@ContactPointID
+      AND V.StatusCode='CHECKED_OUT'
+      AND NOT (
+        (V.VisitOutcomeCode='MET' AND V.CheckoutReasonCode IN('NORMAL','FORGOT_MEETING_CONFIRMATION')) OR
+        (V.VisitOutcomeCode='NOT_MET' AND V.CheckoutReasonCode IN('HOST_ABSENT','VISITOR_LEFT')) OR
+        (V.CheckoutReasonCode='OTHER' AND NULLIF(LTRIM(RTRIM(V.CheckoutNote)),N'') IS NOT NULL)
+      )
+)
+SELECT COUNT_BIG(1) OVER(),VisitorVisitID,VisitorName,HostNameSnapshot,ContactPointNameSnapshot,
+       OccurredDate,ExceptionType,ExceptionDescription
+FROM ExceptionRows
+WHERE (@Search=N'' OR VisitorName LIKE @Like OR HostNameSnapshot LIKE @Like
+       OR ContactPointNameSnapshot LIKE @Like OR ExceptionDescription LIKE @Like)
+  AND (@Type IS NULL OR ExceptionType=@Type)
+  AND (@DateFrom IS NULL OR OccurredDate>=@DateFrom)
+  AND (@DateTo IS NULL OR OccurredDate<DATEADD(DAY,1,@DateTo))
+ORDER BY OccurredDate DESC,VisitorVisitID DESC,ExceptionType
+OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;
+""", connection);
+        Add(command, "@CompanyID", SqlDbType.BigInt, companyId);
+        Add(command, "@ContactPointID", SqlDbType.BigInt, contactPoint.Id);
+        Add(command, "@Search", SqlDbType.NVarChar, query, 200);
+        Add(command, "@Like", SqlDbType.NVarChar, $"%{query}%", 210);
+        Add(command, "@Type", SqlDbType.VarChar, type, 40);
+        Add(command, "@DateFrom", SqlDbType.Date, dateFrom?.ToDateTime(TimeOnly.MinValue));
+        Add(command, "@DateTo", SqlDbType.Date, dateTo?.ToDateTime(TimeOnly.MinValue));
+        Add(command, "@Offset", SqlDbType.Int, (page - 1) * pageSize);
+        Add(command, "@PageSize", SqlDbType.Int, pageSize);
+        await using var reader = await command.ExecuteReaderAsync(token);
+        var items = new List<object>();
+        long total = 0;
+        while (await reader.ReadAsync(token))
+        {
+            total = reader.GetInt64(0);
+            items.Add(new
+            {
+                visitorVisitId = reader.GetInt64(1), visitorName = reader.GetString(2),
+                hostName = Text(reader, 3), contactPointName = Text(reader, 4),
+                occurredDate = reader.GetDateTime(5), exceptionType = reader.GetString(6),
+                exceptionDescription = reader.GetString(7),
+            });
+        }
+        return Ok(new { items, total, page, pageSize });
+    }
+
     [HttpGet("check-ins/{visitId:long}")]
     public async Task<IActionResult> Detail(long visitId, CancellationToken token)
     {
         if (!TryScope(out var companyId, out var userId)) return Forbid();
         await using var connection = await Open(token);
         if (!await Can(connection, CheckInMenu, "VIEW", token) &&
-            !await Can(connection, HistoryMenu, "VIEW", token)) return Forbid();
+            !await Can(connection, HistoryMenu, "VIEW", token) &&
+            !await Can(connection, ExceptionsMenu, "VIEW", token)) return Forbid();
         var contactPoint = await ActiveContactPoint(connection, null, companyId, userId, token);
         if (contactPoint is null) return NotFound(new { message = "No active contact point is assigned to this account." });
         await using var visit = new SqlCommand("""
@@ -671,7 +805,8 @@ ORDER BY VisitorNotificationOutboxID;
         if (!TryScope(out var companyId, out var userId)) return Forbid();
         await using var connection = await Open(token);
         if (!await Can(connection, CheckInMenu, "VIEW", token) &&
-            !await Can(connection, HistoryMenu, "VIEW", token)) return Forbid();
+            !await Can(connection, HistoryMenu, "VIEW", token) &&
+            !await Can(connection, ExceptionsMenu, "VIEW", token)) return Forbid();
         var contactPoint = await ActiveContactPoint(connection, null, companyId, userId, token);
         if (contactPoint is null) return NotFound(new { message = "No active contact point is assigned to this account." });
         await using var command = new SqlCommand("""
@@ -738,7 +873,8 @@ WHERE CompanyID=@CompanyID AND VisitorVisitID=@VisitID AND StatusCode IN('CHECKE
     {
         if (!TryScope(out var companyId, out var userId)) return Forbid();
         await using var connection = await Open(token);
-        if (!await Can(connection, CheckInMenu, "VIEW", token)) return Forbid();
+        if (!await Can(connection, CheckInMenu, "VIEW", token) &&
+            !await Can(connection, ExceptionsMenu, "VIEW", token)) return Forbid();
         var contactPoint = await ActiveContactPoint(connection, null, companyId, userId, token);
         if (contactPoint is null) return Forbid();
         await using var scope = new SqlCommand("""
@@ -790,7 +926,9 @@ FROM dbo.TDTMVisitorVisitAudit WHERE CompanyID=@CompanyID AND VisitorVisitID=@Vi
             var businessType = await BusinessType(connection, companyId, token, transaction);
             var validHost = businessType switch
             {
-                "DORMITORY" => hostType == "RESIDENT" && request.HostResidentId is not null && request.HostRoomId is not null,
+                "DORMITORY" =>
+                    (hostType == "RESIDENT" && request.HostResidentId is not null && request.HostRoomId is not null) ||
+                    (hostType == "EMPLOYEE" && request.HostEmployeeId is not null),
                 "RENTAL_OFFICE" => hostType == "RENTAL_OFFICE" && request.HostTenantId is not null && request.HostTenantContactId is not null,
                 "VILLAGE" => hostType == "VILLAGE" && request.HostResidentId is not null,
                 "COMPANY" => hostType == "EMPLOYEE" && request.HostEmployeeId is not null,

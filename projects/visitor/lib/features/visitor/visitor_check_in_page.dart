@@ -118,7 +118,9 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
   }
 
   Future<void> _loadHostOptions([String search = '']) async {
-    if (_companyContext?.isDormitory == true && _roomId == null) {
+    if (_companyContext?.isDormitory == true &&
+        _hostType == 'RESIDENT' &&
+        _roomId == null) {
       if (mounted) setState(() => _hostOptions = const []);
       return;
     }
@@ -792,51 +794,83 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (_companyContext!.isDormitory) ...[
-          TextField(
-            decoration: const InputDecoration(
-              labelText: 'ค้นหาห้องพัก',
-              prefixIcon: Icon(Icons.meeting_room_outlined),
-            ),
-            onChanged: _loadRooms,
-          ),
-          const SizedBox(height: 8),
-          DropdownButtonFormField<int>(
-            key: ValueKey('room:$_roomId:${_roomOptions.length}'),
-            initialValue: _roomOptions.any((option) => option.id == _roomId)
-                ? _roomId
-                : null,
+          DropdownButtonFormField<String>(
+            key: ValueKey('dormitory-host-type:$_hostType'),
+            initialValue: _hostType,
             isExpanded: true,
-            decoration: const InputDecoration(labelText: 'ห้องพัก *'),
-            items: _roomOptions
-                .map(
-                  (option) => DropdownMenuItem<int>(
-                    value: option.id,
-                    child: Text(
-                      '${option.code} — ${option.building} / ${option.floor}',
-                    ),
-                  ),
-                )
-                .toList(growable: false),
+            decoration: const InputDecoration(labelText: 'ติดต่อประเภท *'),
+            items: const [
+              DropdownMenuItem(value: 'RESIDENT', child: Text('ผู้พักอาศัย')),
+              DropdownMenuItem(value: 'EMPLOYEE', child: Text('พนักงาน')),
+            ],
             onChanged: (value) {
+              if (value == null || value == _hostType) return;
               setState(() {
-                _roomId = value;
+                _hostType = value;
                 _host.clear();
                 _hostOptions = const [];
               });
-              _loadHostOptions();
+              if (value == 'RESIDENT') {
+                _loadRooms();
+              } else {
+                _loadHostOptions();
+              }
             },
           ),
           const SizedBox(height: 12),
+          if (_hostType == 'RESIDENT') ...[
+            TextField(
+              decoration: const InputDecoration(
+                labelText: 'ค้นหาห้องพัก',
+                prefixIcon: Icon(Icons.meeting_room_outlined),
+              ),
+              onChanged: _loadRooms,
+            ),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<int>(
+              key: ValueKey('room:$_roomId:${_roomOptions.length}'),
+              initialValue: _roomOptions.any((option) => option.id == _roomId)
+                  ? _roomId
+                  : null,
+              isExpanded: true,
+              decoration: const InputDecoration(labelText: 'ห้องพัก *'),
+              items: _roomOptions
+                  .map(
+                    (option) => DropdownMenuItem<int>(
+                      value: option.id,
+                      child: Text(
+                        '${option.code} — ${option.building} / ${option.floor}',
+                      ),
+                    ),
+                  )
+                  .toList(growable: false),
+              onChanged: (value) {
+                setState(() {
+                  _roomId = value;
+                  _host.clear();
+                  _hostOptions = const [];
+                });
+                _loadHostOptions();
+              },
+            ),
+            const SizedBox(height: 12),
+          ],
         ],
         TextField(
-          enabled: !_companyContext!.isDormitory || _roomId != null,
+          enabled:
+              !_companyContext!.isDormitory ||
+              _hostType != 'RESIDENT' ||
+              _roomId != null,
           decoration: InputDecoration(
             labelText: _hostType == 'RESIDENT'
                 ? 'ค้นหาชื่อหรือเบอร์โทรผู้พักอาศัย'
                 : _hostType == 'EMPLOYEE'
                 ? 'ค้นหาชื่อหรือเบอร์โทรพนักงาน'
                 : 'ค้นหาชื่อหรือเบอร์โทรผู้ใช้บริการ',
-            hintText: _companyContext!.isDormitory && _roomId == null
+            hintText:
+                _companyContext!.isDormitory &&
+                    _hostType == 'RESIDENT' &&
+                    _roomId == null
                 ? 'เลือกห้องพักก่อนค้นหา'
                 : null,
             prefixIcon: const Icon(Icons.search),
