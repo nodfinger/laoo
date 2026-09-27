@@ -40,7 +40,7 @@ abstract final class VoteRoutes {
       screenType: 2,
       routeName: VoteRouteNames.settings,
       routePath: VoteRoutePaths.settings,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: VoteProject.code,
@@ -48,7 +48,7 @@ abstract final class VoteRoutes {
       screenType: 4,
       routeName: VoteRouteNames.topics,
       routePath: VoteRoutePaths.topics,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: VoteProject.code,
@@ -56,7 +56,7 @@ abstract final class VoteRoutes {
       screenType: 3,
       routeName: VoteRouteNames.approvalInbox,
       routePath: VoteRoutePaths.approvalInbox,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: VoteProject.code,
@@ -64,7 +64,7 @@ abstract final class VoteRoutes {
       screenType: 3,
       routeName: VoteRouteNames.myVotes,
       routePath: VoteRoutePaths.myVotes,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: VoteProject.code,
@@ -72,7 +72,7 @@ abstract final class VoteRoutes {
       screenType: 3,
       routeName: VoteRouteNames.results,
       routePath: VoteRoutePaths.results,
-      isImplemented: false,
+      isImplemented: true,
     ),
   ];
 
