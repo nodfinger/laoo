@@ -90,9 +90,13 @@ class MeetingEquipmentRequestRepository {
   Future<void> cancel(int detailId) =>
       _api.put('$_path/details/$detailId/cancel');
 
-  Future<Map<String, dynamic>> timeline(int requestId) async =>
+  Future<Map<String, dynamic>> timeline(int requestId, {int? detailId}) async =>
       Map<String, dynamic>.from(
-        await _api.get('$_path/requests/$requestId/timeline') as Map,
+        await _api.get(
+              '$_path/requests/$requestId/timeline',
+              query: {if (detailId != null) 'detailId': '$detailId'},
+            )
+            as Map,
       );
 
   Future<void> updateStatus(

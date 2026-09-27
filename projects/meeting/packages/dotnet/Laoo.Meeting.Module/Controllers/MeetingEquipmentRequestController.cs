@@ -68,12 +68,13 @@ ELSE
         var normalizedStatus = Clean(status)?.ToUpperInvariant();
         var normalizedSearch = Clean(search);
         var admin = await CompanyAdmin(db, company, user, token);
-        const string from = """
+        var canEdit = await AllowedScreen(db, "22002", "EDIT", token);
+        var from = $"""
 FROM dbo.TDADMeetingBookingEquipmentRequestDetail D
 JOIN dbo.TDADMeetingBookingEquipmentRequest H ON H.EquipmentRequestID=D.EquipmentRequestID AND H.CompanyID=D.CompanyID
 JOIN dbo.TDADMeetingRoomBooking B ON B.BookingID=H.BookingID AND B.CompanyID=H.CompanyID
 JOIN dbo.TDADMeetingRoom R ON R.RoomID=B.RoomID AND R.CompanyID=B.CompanyID
-JOIN dbo.TDADMeetingRoomBookingSlot S ON S.BookingID=B.BookingID AND S.CompanyID=B.CompanyID
+CROSS APPLY (SELECT MIN(BS.StartDateTime) AS StartDateTime, MAX(BS.EndDateTime) AS EndDateTime FROM dbo.TDADMeetingRoomBookingSlot BS WHERE BS.BookingID=B.BookingID AND BS.CompanyID=B.CompanyID) S
 JOIN dbo.TDIVItem I ON I.ItemID=D.ItemID AND I.CompanyID=D.CompanyID
 LEFT JOIN dbo.TDADOrganizationUnit DEP ON DEP.OrgUnitID=D.ResponsibleDepartmentOrgUnitID AND DEP.CompanyID=D.CompanyID
 WHERE D.CompanyID=@company
@@ -114,6 +115,7 @@ SELECT
             completedToday = summaryReader.IsDBNull(2) ? 0 : summaryReader.GetInt32(2),
             rejected = summaryReader.IsDBNull(3) ? 0 : summaryReader.GetInt32(3),
         };
+        await summaryReader.DisposeAsync();
 
         await using var data = new SqlCommand($"""
 SELECT D.EquipmentRequestDetailID,H.EquipmentRequestID,H.BookingID,B.BookingNo,B.Subject,
@@ -127,7 +129,7 @@ SELECT D.EquipmentRequestDetailID,H.EquipmentRequestID,H.BookingID,B.BookingNo,B
 GROUP BY D.EquipmentRequestDetailID,H.EquipmentRequestID,H.BookingID,B.BookingNo,B.Subject,R.RoomCode,R.RoomNameTH,
          I.ItemID,I.ItemName,I.UnitCode,D.Quantity,D.Remark,D.StatusCode,D.ResultRemark,
          D.ResponsibleDepartmentOrgUnitID,DEP.NameTH,H.RequestedByName,H.RequestedByRoleCode,H.CreateDate,
-         D.ProcessedByUserID,D.ProcessedDateTime
+         D.ProcessedByUserID,D.ProcessedDateTime,D.CompanyID
 ORDER BY CASE D.StatusCode WHEN 'PENDING' THEN 0 WHEN 'IN_PROGRESS' THEN 1 WHEN 'DEPARTMENT_REJECTED' THEN 2 ELSE 3 END,
          MIN(S.StartDateTime),H.CreateDate DESC,D.EquipmentRequestDetailID DESC
 OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY;
@@ -149,6 +151,7 @@ OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY;
                 resultRemark = Text(reader, 15), departmentId = reader.GetInt64(16), departmentName = Text(reader, 17),
                 requesterName = Text(reader, 18), requesterRoleCode = Text(reader, 19), requestedDate = reader.GetDateTime(20),
                 processedByUserId = Long(reader, 21), processedDateTime = Date(reader, 22),
+                canManageStatus = canEdit && reader.GetDateTime(8) > DateTime.Now && reader.GetString(14) is "PENDING" or "IN_PROGRESS",
                 latestEventCode = Text(reader, 23), latestEventRemark = Text(reader, 24), latestEventDateTime = Date(reader, 25),
             });
         }
@@ -196,7 +199,7 @@ ORDER BY R.RoomCode
 SELECT D.EquipmentRequestDetailID,H.EquipmentRequestID,H.BookingID,B.BookingNo,B.Subject,R.RoomCode,R.RoomNameTH,
  MIN(S.StartDateTime),MAX(S.EndDateTime),I.ItemID,I.ItemName,I.UnitCode,D.Quantity,D.Remark,D.StatusCode,D.ResultRemark,
  D.ResponsibleDepartmentOrgUnitID,DEP.NameTH,H.RequestedByUserID,H.RequestedByName,H.RequestedByRoleCode,H.CreateDate,H.RequiresReview,CASE WHEN H.RequestedByUserID=@user THEN 1 ELSE 0 END,
- CASE WHEN @admin=1 OR B.RequesterUserID=@user OR {MeetingRoomAdminAccess.BookingRoomSql} THEN 1 ELSE 0 END,
+ CASE WHEN @edit=1 AND B.BookingStatus='APPROVED' AND MAX(S.EndDateTime)>GETDATE() AND (@admin=1 OR B.RequesterUserID=@user OR {MeetingRoomAdminAccess.BookingRoomSql}) THEN 1 ELSE 0 END,
  CASE WHEN @admin=1 OR B.RequesterUserID=@user OR {MeetingRoomAdminAccess.BookingRoomSql} OR (@edit=1 AND EXISTS(SELECT 1 FROM dbo.TDADUserEmployee UE JOIN dbo.TDADEmployee E ON E.EmployeeID=UE.EmployeeID AND E.CompanyID=UE.CompanyID AND E.IsActive=1 WHERE UE.CompanyID=@company AND UE.UserID=@user AND UE.IsActive=1 AND E.DepartmentOrgUnitID=D.ResponsibleDepartmentOrgUnitID)) THEN 1 ELSE 0 END,
  D.ReviewedByUserID,D.ReviewedByName,D.ReviewedDateTime,D.ReviewRemark,D.ProcessedByUserID,D.ProcessedDateTime,
  CASE WHEN D.StatusCode IN('WAITING_REVIEW','PENDING') AND MIN(S.StartDateTime)>GETDATE()
@@ -216,7 +219,7 @@ WHERE D.CompanyID=@company AND (@status IS NULL OR D.StatusCode=@status) AND (@r
  AND (@admin=1 OR H.RequestedByUserID=@user
    OR B.RequesterUserID=@user OR {MeetingRoomAdminAccess.BookingRoomSql}
    OR (D.StatusCode IN('PENDING','IN_PROGRESS','COMPLETED','DEPARTMENT_REJECTED') AND EXISTS(SELECT 1 FROM dbo.TDADUserEmployee UE JOIN dbo.TDADEmployee E ON E.EmployeeID=UE.EmployeeID AND E.CompanyID=UE.CompanyID AND E.IsActive=1 WHERE UE.CompanyID=@company AND UE.UserID=@user AND UE.IsActive=1 AND E.DepartmentOrgUnitID=D.ResponsibleDepartmentOrgUnitID)))
-GROUP BY D.EquipmentRequestDetailID,H.EquipmentRequestID,H.BookingID,B.BookingNo,B.Subject,B.RequesterUserID,B.RoomID,B.CompanyID,R.RoomCode,R.RoomNameTH,I.ItemID,I.ItemName,I.UnitCode,D.Quantity,D.Remark,D.StatusCode,D.ResultRemark,D.ResponsibleDepartmentOrgUnitID,DEP.NameTH,H.RequestedByUserID,H.RequestedByName,H.RequestedByRoleCode,H.CreateDate,H.RequiresReview,CASE WHEN H.RequestedByUserID=@user THEN 1 ELSE 0 END,D.ReviewedByUserID,D.ReviewedByName,D.ReviewedDateTime,D.ReviewRemark,D.ProcessedByUserID,D.ProcessedDateTime
+GROUP BY D.EquipmentRequestDetailID,H.EquipmentRequestID,H.BookingID,B.BookingNo,B.Subject,B.RequesterUserID,B.RoomID,B.CompanyID,B.BookingStatus,R.RoomCode,R.RoomNameTH,I.ItemID,I.ItemName,I.UnitCode,D.Quantity,D.Remark,D.StatusCode,D.ResultRemark,D.ResponsibleDepartmentOrgUnitID,DEP.NameTH,H.RequestedByUserID,H.RequestedByName,H.RequestedByRoleCode,H.CreateDate,H.RequiresReview,CASE WHEN H.RequestedByUserID=@user THEN 1 ELSE 0 END,D.ReviewedByUserID,D.ReviewedByName,D.ReviewedDateTime,D.ReviewRemark,D.ProcessedByUserID,D.ProcessedDateTime
 ORDER BY MIN(S.StartDateTime),H.CreateDate DESC,D.EquipmentRequestDetailID DESC;
 """;
         await using var cmd = new SqlCommand(sql, db);
@@ -226,7 +229,8 @@ ORDER BY MIN(S.StartDateTime),H.CreateDate DESC,D.EquipmentRequestDetailID DESC;
         while (await reader.ReadAsync(token)) items.Add(new {
             detailId=reader.GetInt64(0), requestId=reader.GetInt64(1), bookingId=reader.GetInt64(2), bookingNo=reader.GetString(3), subject=reader.GetString(4), roomCode=reader.GetString(5), roomName=reader.GetString(6), startDateTime=reader.GetDateTime(7), endDateTime=reader.GetDateTime(8), itemId=reader.GetInt64(9), itemName=reader.GetString(10), unitCode=Text(reader,11), quantity=reader.GetDecimal(12), remark=Text(reader,13), statusCode=reader.GetString(14), resultRemark=Text(reader,15), departmentId=reader.GetInt64(16), departmentName=Text(reader,17), requestedByUserId=reader.GetInt64(18), requesterName=Text(reader,19), requesterRoleCode=Text(reader,20), requestedDate=reader.GetDateTime(21), requiresReview=reader.GetBoolean(22), isOwnRequest=reader.GetInt32(23)==1, canManageBooking=reader.GetInt32(24)==1, canManageStatus=reader.GetInt32(25)==1, reviewedByUserId=Long(reader,26), reviewedByName=Text(reader,27), reviewedDateTime=Date(reader,28), reviewRemark=Text(reader,29), processedByUserId=Long(reader,30), processedDateTime=Date(reader,31),canCancel=reader.GetInt32(32)==1
         });
-        return Ok(new { items });
+        await reader.DisposeAsync();
+        return Ok(new { items, canOpenSupportTasks = await AllowedScreen(db, "22002", "VIEW", token) });
     }
 
     [HttpGet("booking/{bookingId:long}")]
@@ -309,13 +313,19 @@ WHERE H.CompanyID=@company AND H.BookingID=@booking AND H.RequestedByUserID=@use
         await using var db = await Open(token);
         var bookingId = await RequestBooking(db, company, requestId, token); if (bookingId is null) return NotFound();
         var access = await GetAccess(db, company, user, bookingId.Value, token); if (access is null || !access.CanReview) return Forbid();
+        if (!await Allowed(db, "EDIT", token)) return Forbid();
+        if (access.Status != "APPROVED" || access.End <= DateTime.Now) return Conflict(Error("ตรวจสอบคำขอไม่ได้", "การประชุมสิ้นสุดหรือไม่ได้อยู่ในสถานะอนุมัติ กรุณาโหลดข้อมูลล่าสุด"));
         await using var tx = (SqlTransaction)await db.BeginTransactionAsync(IsolationLevel.Serializable, token);
         var ids = request.DetailIds?.Where(x=>x>0).Distinct().ToList() ?? [];
         var filter = ids.Count == 0 ? "" : " AND D.EquipmentRequestDetailID IN (" + string.Join(',', ids.Select((_, i) => "@id"+i)) + ")";
         var next = action == "APPROVE" ? "PENDING" : "REVIEW_REJECTED";
-        var sql = $"""UPDATE D SET StatusCode=@next,ReviewedByUserID=@user,ReviewedByName=@name,ReviewedDateTime=SYSUTCDATETIME(),ReviewRemark=@remark,UpdateBy=@user,UpdateDate=SYSUTCDATETIME() FROM dbo.TDADMeetingBookingEquipmentRequestDetail D WHERE D.CompanyID=@company AND D.EquipmentRequestID=@request AND D.StatusCode='WAITING_REVIEW'{filter};""";
-        await using var cmd = new SqlCommand(sql, db, tx); Add(cmd,"@next",next); Add(cmd,"@user",user); Add(cmd,"@name",access.UserName); Add(cmd,"@remark",Clean(request.Remark)); Add(cmd,"@company",company); Add(cmd,"@request",requestId); for(var i=0;i<ids.Count;i++) Add(cmd,"@id"+i,ids[i]); var affected=await cmd.ExecuteNonQueryAsync(token); if(affected==0) return BadRequest(Error("ไม่มีรายการรอตรวจสอบ", "รายการที่เลือกอาจถูกตรวจสอบไปแล้ว"));
-        await Timeline(db, tx, company, requestId, null, action == "APPROVE" ? "REVIEW_APPROVED" : "REVIEW_REJECTED", Clean(request.Remark), user, access.UserName, token);
+        var sql = $"""UPDATE D SET StatusCode=@next,ReviewedByUserID=@user,ReviewedByName=@name,ReviewedDateTime=SYSUTCDATETIME(),ReviewRemark=@remark,UpdateBy=@user,UpdateDate=SYSUTCDATETIME() OUTPUT INSERTED.EquipmentRequestDetailID FROM dbo.TDADMeetingBookingEquipmentRequestDetail D WHERE D.CompanyID=@company AND D.EquipmentRequestID=@request AND D.StatusCode='WAITING_REVIEW' AND EXISTS(SELECT 1 FROM dbo.TDADMeetingRoomBooking B WHERE B.CompanyID=@company AND B.BookingID=@booking AND B.BookingStatus='APPROVED' AND EXISTS(SELECT 1 FROM dbo.TDADMeetingRoomBookingSlot S WHERE S.CompanyID=B.CompanyID AND S.BookingID=B.BookingID AND S.EndDateTime>GETDATE())){filter};""";
+        await using var cmd = new SqlCommand(sql, db, tx); Add(cmd,"@next",next); Add(cmd,"@booking",bookingId.Value); Add(cmd,"@user",user); Add(cmd,"@name",access.UserName); Add(cmd,"@remark",Clean(request.Remark)); Add(cmd,"@company",company); Add(cmd,"@request",requestId); for(var i=0;i<ids.Count;i++) Add(cmd,"@id"+i,ids[i]); var reviewed = new List<long>();
+        await using (var changed = await cmd.ExecuteReaderAsync(token))
+            while (await changed.ReadAsync(token)) reviewed.Add(changed.GetInt64(0));
+        if(reviewed.Count==0) return BadRequest(Error("ไม่มีรายการรอตรวจสอบ", "รายการที่เลือกอาจถูกตรวจสอบไปแล้ว"));
+        foreach (var reviewedId in reviewed)
+            await Timeline(db, tx, company, requestId, reviewedId, action == "APPROVE" ? "REVIEW_APPROVED" : "REVIEW_REJECTED", Clean(request.Remark), user, access.UserName, token);
         await tx.CommitAsync(token);
         return NoContent();
     }
@@ -347,22 +357,71 @@ WHERE H.CompanyID=@company AND H.BookingID=@booking AND H.RequestedByUserID=@use
         if (!Scope(out var company, out var user)) return Forbid();
         var status=Clean(request.StatusCode)?.ToUpperInvariant(); if(status is not("IN_PROGRESS" or "COMPLETED" or "DEPARTMENT_REJECTED")) return BadRequest(Error("สถานะไม่ถูกต้อง","แผนกเปลี่ยนได้เป็น IN_PROGRESS, COMPLETED หรือ DEPARTMENT_REJECTED"));
         if(status=="DEPARTMENT_REJECTED"&&string.IsNullOrWhiteSpace(request.ResultRemark)) return BadRequest(Error("กรุณาระบุเหตุผล","การปฏิเสธโดยแผนกต้องระบุเหตุผล"));
-        await using var db=await Open(token); var booking=await DetailBooking(db,company,detailId,token); if(booking is null)return NotFound(); var access=await GetAccess(db,company,user,booking.Value,token); var manager=access?.CanReview==true; var departmentEdit=await AllowedScreen(db,"22002","EDIT",token) && await IsResponsibleDepartmentMember(db,company,user,detailId,token); var edit=await Allowed(db,"EDIT",token) || departmentEdit; if(!manager&&!edit)return Forbid();
+        await using var db = await Open(token);
+        if (!await AllowedScreen(db, "22002", "EDIT", token)) return Forbid();
+        var booking = await DetailBooking(db, company, detailId, token);
+        if (booking is null) return NotFound();
+        var access = await GetAccess(db, company, user, booking.Value, token);
+        var manager = access?.CanReview == true;
+        var edit = await IsResponsibleDepartmentMember(db, company, user, detailId, token);
+        if (!manager && !edit) return Forbid();
+        if (access is null || access.Status != "APPROVED" || access.End <= DateTime.Now)
+            return Conflict(Error("เปลี่ยนสถานะงานไม่ได้", "การประชุมสิ้นสุดหรือไม่ได้อยู่ในสถานะอนุมัติ กรุณาโหลดข้อมูลล่าสุด"));
         await using var tx = (SqlTransaction)await db.BeginTransactionAsync(IsolationLevel.Serializable, token);
-        const string sql="""UPDATE D SET StatusCode=@status,ResultRemark=@remark,ProcessedByUserID=@user,ProcessedDateTime=SYSUTCDATETIME(),UpdateBy=@user,UpdateDate=SYSUTCDATETIME() OUTPUT INSERTED.EquipmentRequestID FROM dbo.TDADMeetingBookingEquipmentRequestDetail D WHERE D.CompanyID=@company AND D.EquipmentRequestDetailID=@detail AND ((@status='IN_PROGRESS' AND D.StatusCode='PENDING') OR (@status='COMPLETED' AND D.StatusCode='IN_PROGRESS') OR (@status='DEPARTMENT_REJECTED' AND D.StatusCode IN('PENDING','IN_PROGRESS'))) AND (@manager=1 OR (@edit=1 AND EXISTS(SELECT 1 FROM dbo.TDADUserEmployee UE JOIN dbo.TDADEmployee E ON E.EmployeeID=UE.EmployeeID AND E.CompanyID=UE.CompanyID AND E.IsActive=1 WHERE UE.CompanyID=@company AND UE.UserID=@user AND UE.IsActive=1 AND E.DepartmentOrgUnitID=D.ResponsibleDepartmentOrgUnitID)));""";
-        await using var cmd=new SqlCommand(sql,db,tx);Add(cmd,"@status",status);Add(cmd,"@remark",Clean(request.ResultRemark));Add(cmd,"@user",user);Add(cmd,"@company",company);Add(cmd,"@detail",detailId);Add(cmd,"@manager",manager);Add(cmd,"@edit",edit);var requestId=await cmd.ExecuteScalarAsync(token);if(requestId is null)return Forbid();
+        const string sql="""UPDATE D SET StatusCode=@status,ResultRemark=@remark,ProcessedByUserID=@user,ProcessedDateTime=SYSUTCDATETIME(),UpdateBy=@user,UpdateDate=SYSUTCDATETIME() OUTPUT INSERTED.EquipmentRequestID FROM dbo.TDADMeetingBookingEquipmentRequestDetail D WHERE D.CompanyID=@company AND D.EquipmentRequestDetailID=@detail AND EXISTS(SELECT 1 FROM dbo.TDADMeetingRoomBooking B WHERE B.CompanyID=@company AND B.BookingID=@booking AND B.BookingStatus='APPROVED' AND EXISTS(SELECT 1 FROM dbo.TDADMeetingRoomBookingSlot S WHERE S.CompanyID=B.CompanyID AND S.BookingID=B.BookingID AND S.EndDateTime>GETDATE())) AND ((@status='IN_PROGRESS' AND D.StatusCode='PENDING') OR (@status='COMPLETED' AND D.StatusCode='IN_PROGRESS') OR (@status='DEPARTMENT_REJECTED' AND D.StatusCode IN('PENDING','IN_PROGRESS'))) AND (@manager=1 OR (@edit=1 AND EXISTS(SELECT 1 FROM dbo.TDADUserEmployee UE JOIN dbo.TDADEmployee E ON E.EmployeeID=UE.EmployeeID AND E.CompanyID=UE.CompanyID AND E.IsActive=1 WHERE UE.CompanyID=@company AND UE.UserID=@user AND UE.IsActive=1 AND E.DepartmentOrgUnitID=D.ResponsibleDepartmentOrgUnitID)));""";
+        await using var cmd=new SqlCommand(sql,db,tx);Add(cmd,"@booking",booking.Value);Add(cmd,"@status",status);Add(cmd,"@remark",Clean(request.ResultRemark));Add(cmd,"@user",user);Add(cmd,"@company",company);Add(cmd,"@detail",detailId);Add(cmd,"@manager",manager);Add(cmd,"@edit",edit);var requestId=await cmd.ExecuteScalarAsync(token);if(requestId is null)return Conflict(Error("เปลี่ยนสถานะงานไม่ได้","รายการอาจถูกดำเนินการแล้ว ต้องเริ่มเตรียมก่อนกดเสร็จสิ้น กรุณาโหลดข้อมูลล่าสุด"));
         await Timeline(db,tx,company,Convert.ToInt64(requestId),detailId,status,Clean(request.ResultRemark),user,access?.UserName,token);
         await tx.CommitAsync(token); return NoContent();
     }
 
     [HttpGet("requests/{requestId:long}/timeline")]
-    public async Task<IActionResult> Timeline(long requestId, CancellationToken token)
+    public async Task<IActionResult> Timeline(long requestId, long? detailId, CancellationToken token)
     {
-        if(!Scope(out var company,out var user))return Forbid(); await using var db=await Open(token); var booking=await RequestBooking(db,company,requestId,token);if(booking is null)return NotFound();var access=await GetAccess(db,company,user,booking.Value,token);if(access is null||!access.InScope)return Forbid();
-        const string sql="SELECT EquipmentRequestDetailID,EventCode,EventRemark,ActorName,CreateDate FROM dbo.TDADMeetingBookingEquipmentRequestTimeline WHERE CompanyID=@company AND EquipmentRequestID=@request AND (@manager=1 OR EXISTS(SELECT 1 FROM dbo.TDADMeetingBookingEquipmentRequest H WHERE H.EquipmentRequestID=@request AND H.CompanyID=@company AND H.RequestedByUserID=@user)) ORDER BY CreateDate,EquipmentRequestTimelineID;";await using var cmd=new SqlCommand(sql,db);Add(cmd,"@company",company);Add(cmd,"@request",requestId);Add(cmd,"@manager",access.CanReview);Add(cmd,"@user",user);await using var r=await cmd.ExecuteReaderAsync(token);var items=new List<object>();while(await r.ReadAsync(token))items.Add(new{detailId=Long(r,0),eventCode=r.GetString(1),remark=Text(r,2),actorName=Text(r,3),createDate=r.GetDateTime(4)});return Ok(new{items});
+        if (!Scope(out var company, out var user)) return Forbid();
+        await using var db = await Open(token);
+        var booking = await RequestBooking(db, company, requestId, token);
+        if (booking is null) return NotFound();
+        var access = await GetAccess(db, company, user, booking.Value, token);
+        var manager = access?.CanReview == true &&
+            (await Allowed(db, "VIEW", token) || await AllowedScreen(db, "22002", "VIEW", token));
+        var departmentView = await AllowedScreen(db, "22002", "VIEW", token);
+        const string sql = """
+SELECT T.EquipmentRequestDetailID,T.EventCode,T.EventRemark,T.ActorName,T.CreateDate
+FROM dbo.TDADMeetingBookingEquipmentRequestTimeline T
+JOIN dbo.TDADMeetingBookingEquipmentRequest H ON H.CompanyID=T.CompanyID AND H.EquipmentRequestID=T.EquipmentRequestID
+WHERE T.CompanyID=@company AND T.EquipmentRequestID=@request
+ AND (@detail IS NULL OR T.EquipmentRequestDetailID=@detail OR
+      (T.EquipmentRequestDetailID IS NULL AND (@manager=1 OR H.RequestedByUserID=@user)))
+ AND (@detail IS NULL OR EXISTS(SELECT 1 FROM dbo.TDADMeetingBookingEquipmentRequestDetail D WHERE D.CompanyID=@company AND D.EquipmentRequestID=@request AND D.EquipmentRequestDetailID=@detail))
+ AND (@manager=1 OR H.RequestedByUserID=@user OR (@departmentView=1 AND EXISTS(
+    SELECT 1 FROM dbo.TDADMeetingBookingEquipmentRequestDetail D
+    JOIN dbo.TDADUserEmployee UE ON UE.CompanyID=D.CompanyID AND UE.UserID=@user AND UE.IsActive=1
+    JOIN dbo.TDADEmployee E ON E.CompanyID=UE.CompanyID AND E.EmployeeID=UE.EmployeeID AND E.IsActive=1
+    WHERE D.CompanyID=@company AND D.EquipmentRequestID=@request
+      AND D.EquipmentRequestDetailID=T.EquipmentRequestDetailID
+      AND D.ResponsibleDepartmentOrgUnitID=E.DepartmentOrgUnitID
+      AND D.StatusCode IN('PENDING','IN_PROGRESS','COMPLETED','DEPARTMENT_REJECTED'))))
+ORDER BY T.CreateDate,T.EquipmentRequestTimelineID;
+""";
+        await using var cmd = new SqlCommand(sql, db);
+        Add(cmd,"@company",company); Add(cmd,"@request",requestId); Add(cmd,"@detail",detailId);
+        Add(cmd,"@user",user); Add(cmd,"@manager",manager); Add(cmd,"@departmentView",departmentView);
+        await using var reader = await cmd.ExecuteReaderAsync(token);
+        var items = new List<object>();
+        while(await reader.ReadAsync(token)) items.Add(new {
+            detailId=Long(reader,0),eventCode=reader.GetString(1),remark=Text(reader,2),
+            actorName=Text(reader,3),createDate=reader.GetDateTime(4)
+        });
+        return Ok(new { items });
     }
 
-    private async Task<bool> RequiresReview(SqlConnection db,long company,CancellationToken token,SqlTransaction? tx=null){await using var cmd=new SqlCommand("SELECT TOP(1) RequireEquipmentRequestReview FROM dbo.TDSTCompanySetupSystemMeeting WHERE CompanyID=@company AND ProjectID=@project",db,tx);Add(cmd,"@company",company);Add(cmd,"@project",MeetingProjectId);var value=await cmd.ExecuteScalarAsync(token);return value is not null&&value!=DBNull.Value&&Convert.ToBoolean(value);}
+    private async Task<bool> RequiresReview(SqlConnection db,long company,CancellationToken token,SqlTransaction? tx=null)
+    {
+        await using var cmd=new SqlCommand("SELECT TOP(1) RequireEquipmentRequestReview FROM dbo.TDSTCompanySetupSystemMeeting WHERE CompanyID=@company AND ProjectID=@project",db,tx);
+        Add(cmd,"@company",company); Add(cmd,"@project",MeetingProjectId);
+        var value=await cmd.ExecuteScalarAsync(token);
+        return value is null || value==DBNull.Value || Convert.ToBoolean(value);
+    }
     private async Task<long> InsertHeader(SqlConnection db,SqlTransaction tx,long company,long booking,long user,string name,string role,bool review,CancellationToken token){const string sql="INSERT dbo.TDADMeetingBookingEquipmentRequest(CompanyID,BookingID,RequestedByUserID,RequestedByName,RequestedByRoleCode,RequiresReview) OUTPUT INSERTED.EquipmentRequestID VALUES(@company,@booking,@user,@name,@role,@review)";await using var cmd=new SqlCommand(sql,db,tx);Add(cmd,"@company",company);Add(cmd,"@booking",booking);Add(cmd,"@user",user);Add(cmd,"@name",name);Add(cmd,"@role",role);Add(cmd,"@review",review);return Convert.ToInt64(await cmd.ExecuteScalarAsync(token));}
     private async Task<long> InsertDetail(SqlConnection db,SqlTransaction tx,long request,long company,long item,long department,decimal quantity,string? remark,string status,CancellationToken token){const string sql="INSERT dbo.TDADMeetingBookingEquipmentRequestDetail(EquipmentRequestID,CompanyID,ItemID,ResponsibleDepartmentOrgUnitID,Quantity,Remark,StatusCode) OUTPUT INSERTED.EquipmentRequestDetailID VALUES(@request,@company,@item,@department,@quantity,@remark,@status)";await using var cmd=new SqlCommand(sql,db,tx);Add(cmd,"@request",request);Add(cmd,"@company",company);Add(cmd,"@item",item);Add(cmd,"@department",department);Add(cmd,"@quantity",quantity);Add(cmd,"@remark",remark);Add(cmd,"@status",status);Add(cmd,"@user",UserId());return Convert.ToInt64(await cmd.ExecuteScalarAsync(token));}
     private async Task Timeline(SqlConnection db,SqlTransaction? tx,long company,long request,long? detail,string code,string? remark,long actor,string? name,CancellationToken token){const string sql="INSERT dbo.TDADMeetingBookingEquipmentRequestTimeline(CompanyID,EquipmentRequestID,EquipmentRequestDetailID,EventCode,EventRemark,ActorUserID,ActorName) VALUES(@company,@request,@detail,@code,@remark,@actor,@name)";await using var cmd=new SqlCommand(sql,db,tx);Add(cmd,"@company",company);Add(cmd,"@request",request);Add(cmd,"@detail",detail);Add(cmd,"@code",code);Add(cmd,"@remark",remark);Add(cmd,"@actor",actor);Add(cmd,"@name",name);await cmd.ExecuteNonQueryAsync(token);}

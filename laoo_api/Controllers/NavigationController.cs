@@ -64,9 +64,13 @@ public sealed class NavigationController : ControllerBase
         var admin = await IsAdminAsync(connection, userType, cancellationToken);
         var canViewTrainingResults = userType == "COMPANY_USER" &&
             await CanViewTrainingResultsAsync(connection, cancellationToken);
+        var canViewMyTraining = userType == "COMPANY_USER" &&
+            await CanViewMyTrainingAsync(connection, cancellationToken);
         var allowedFeatures = admin ? null : await LoadAllowedFeaturesAsync(connection, userType, cancellationToken);
         if (canViewTrainingResults)
             allowedFeatures?.Add("37005");
+        if (canViewMyTraining)
+            allowedFeatures?.Add("37006");
         var audienceType = userType == "PARTNER_USER" ? "P" : userType == "COMPANY_USER" ? "C" : "L";
         const string sql = """
 WITH AllowedProjects AS
@@ -94,7 +98,7 @@ WITH AllowedProjects AS
        AND CP.PartnerID=C.PartnerID AND CP.IsEnabled=1
        AND (CP.StartDate IS NULL OR CP.StartDate<=CONVERT(date,SYSUTCDATETIME()))
        AND (CP.ExpireDate IS NULL OR CP.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))
-    WHERE @UserType=N'COMPANY_USER' AND @CanViewTrainingResults=1
+    WHERE @UserType=N'COMPANY_USER' AND (@CanViewTrainingResults=1 OR @CanViewMyTraining=1)
       AND PR.ProjectCode=N'LAOO_TRAINING' AND PR.IsActive=1
 )
 SELECT PR.ProjectID,PR.ProjectCode,PR.ProjectNameTH,PR.ProjectType,PR.IconName,
@@ -149,6 +153,7 @@ ORDER BY PR.SortOrder,PG.SortOrder,PM.SortOrder,M.MenuCode;
         command.Parameters.Add("@CompanyID", SqlDbType.BigInt).Value = LongClaim("company_id") is long companyId ? companyId : DBNull.Value;
         command.Parameters.Add("@UserID", SqlDbType.BigInt).Value = LongClaim("user_id") is long userId ? userId : DBNull.Value;
         command.Parameters.Add("@CanViewTrainingResults", SqlDbType.Bit).Value = canViewTrainingResults;
+        command.Parameters.Add("@CanViewMyTraining", SqlDbType.Bit).Value = canViewMyTraining;
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         var all = new List<(NavigationProjectResponse Project, NavigationMenuGroupResponse Group, NavigationMenuItemResponse Item)>();
         while (await reader.ReadAsync(cancellationToken))
@@ -234,13 +239,40 @@ SELECT CASE WHEN EXISTS
         return Convert.ToBoolean(await command.ExecuteScalarAsync(token));
     }
 
+    private async Task<bool> CanViewMyTrainingAsync(SqlConnection connection, CancellationToken token)
+    {
+        if (LongClaim("user_id") is not long userId || LongClaim("company_id") is not long companyId)
+            return false;
+        const string sql = """
+SELECT CASE WHEN EXISTS
+(
+    SELECT 1
+    FROM dbo.TDADUser U
+    INNER JOIN dbo.TDSTCompanySetUp C ON C.CompanyID=U.CompanyID AND C.IsActive=1
+    INNER JOIN dbo.TDADUserEmployee UE ON UE.UserID=U.UserID AND UE.CompanyID=U.CompanyID AND UE.IsActive=1
+    INNER JOIN dbo.TDADEmployee E ON E.EmployeeID=UE.EmployeeID AND E.CompanyID=UE.CompanyID AND E.IsActive=1
+    INNER JOIN dbo.TDADProject PR ON PR.ProjectCode=N'LAOO_TRAINING' AND PR.IsActive=1
+    INNER JOIN dbo.TDADCompanyProject CP
+        ON CP.ProjectID=PR.ProjectID AND CP.CompanyID=C.CompanyID AND CP.PartnerID=C.PartnerID
+       AND CP.IsEnabled=1
+       AND (CP.StartDate IS NULL OR CP.StartDate<=CONVERT(date,SYSUTCDATETIME()))
+       AND (CP.ExpireDate IS NULL OR CP.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))
+    WHERE U.UserID=@UserID AND U.CompanyID=@CompanyID AND U.IsActive=1
+) THEN CAST(1 AS bit) ELSE CAST(0 AS bit) END;
+""";
+        await using var command = new SqlCommand(sql, connection);
+        command.Parameters.Add("@UserID", SqlDbType.BigInt).Value = userId;
+        command.Parameters.Add("@CompanyID", SqlDbType.BigInt).Value = companyId;
+        return Convert.ToBoolean(await command.ExecuteScalarAsync(token));
+    }
+
     private async Task<bool> CanViewTrainingResultsAsync(SqlConnection connection, CancellationToken token)
     {
         if (LongClaim("user_id") is not long userId || LongClaim("company_id") is not long companyId)
             return false;
 
         const string sql = """
-SELECT CAST(CASE WHEN EXISTS
+SELECT CASE WHEN EXISTS
 (
     SELECT 1
     FROM dbo.TDADUser U
@@ -265,7 +297,7 @@ SELECT CAST(CASE WHEN EXISTS
                 WHERE RC.RoomID=B.RoomID AND RC.IsActive=1
             ))
       )
- ) THEN CAST(1 AS bit) ELSE CAST(0 AS bit) END AS bit);
+ ) THEN CAST(1 AS bit) ELSE CAST(0 AS bit) END AS bit;
 """;
         await using var command = new SqlCommand(sql, connection);
         command.Parameters.Add("@UserID", SqlDbType.BigInt).Value = userId;

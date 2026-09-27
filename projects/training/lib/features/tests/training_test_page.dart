@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:laoo_shared_core/laoo_shared_core.dart';
 
 import '../training/training_feature_host.dart';
@@ -12,11 +13,13 @@ class TrainingTestPage extends StatefulWidget {
   const TrainingTestPage({
     required this.bookingId,
     required this.initialSection,
+    this.examId,
     super.key,
   });
 
   final int bookingId;
   final String initialSection;
+  final int? examId;
 
   @override
   State<TrainingTestPage> createState() => _TrainingTestPageState();
@@ -34,10 +37,17 @@ class _TrainingTestPageState extends State<TrainingTestPage>
   bool _saving = false;
   String? _message;
   bool _error = false;
+  int _questionIndex = 0;
 
   String get _section => _tabs.index == 0 ? 'PRE' : 'POST';
   String get _base =>
       '/api/company/training/bookings/${widget.bookingId}/tests';
+  Map<String, String> get _examQuery =>
+      widget.examId == null ? const {} : {'examId': '${widget.examId}'};
+  String _examPath(String path) =>
+      widget.examId == null ? path : '$path?examId=${widget.examId}';
+  bool get _managerView =>
+      _overview?['canManage'] == true && _overview?['participantId'] == null;
 
   @override
   void initState() {
@@ -92,17 +102,24 @@ class _TrainingTestPageState extends State<TrainingTestPage>
   Future<void> _loadSection({bool loading = true}) async {
     if (loading && mounted) setState(() => _loading = true);
     try {
-      if (_overview?['canManage'] == true) {
-        _definition = _map(await _api.get('$_base/$_section/definition'));
+      if (_managerView) {
+        _definition = _map(
+          await _api.get('$_base/$_section/definition', query: _examQuery),
+        );
         _results = _map(
           await _api.get(
             '$_base/$_section/results',
-            query: {'page': '1', 'pageSize': trainingPageSize.toString()},
+            query: {
+              'page': '1',
+              'pageSize': trainingPageSize.toString(),
+              ..._examQuery,
+            },
           ),
         );
         _attempt = null;
       } else {
-        _attempt = _map(await _api.post('$_base/$_section/attempt'));
+        _attempt = _map(await _api.post(_examPath('$_base/$_section/attempt')));
+        _questionIndex = 0;
         _definition = null;
         _results = null;
       }
@@ -148,7 +165,7 @@ class _TrainingTestPageState extends State<TrainingTestPage>
     setState(() => _saving = true);
     try {
       await _api.put(
-        '$_base/$_section/definition',
+        _examPath('$_base/$_section/definition'),
         body: {'definition': exam, 'rowVersion': _definition?['rowVersion']},
       );
       _notice('บันทึกชุดข้อสอบแล้ว', false);
@@ -203,7 +220,7 @@ class _TrainingTestPageState extends State<TrainingTestPage>
     await _save(exam);
   }
 
-  Future<void> _saveAttempt(bool submit) async {
+  Future<bool> _saveAttempt(bool submit) async {
     final selected = Map<String, String>.from(
       _attempt?['_selected'] as Map? ?? {},
     );
@@ -218,7 +235,7 @@ class _TrainingTestPageState extends State<TrainingTestPage>
     try {
       _attempt = _map(
         await _api.put(
-          '$_base/$_section/attempt',
+          _examPath('$_base/$_section/attempt'),
           body: {
             'answers': answers,
             'submit': submit,
@@ -229,11 +246,35 @@ class _TrainingTestPageState extends State<TrainingTestPage>
       _attempt!['_selected'] = selected;
       _notice(submit ? 'ส่งข้อสอบแล้ว' : 'บันทึกคำตอบแล้ว', false);
       if (submit) await _loadSection(loading: false);
+      return true;
     } catch (error) {
       _notice(trainingErrorText(error), true);
+      return false;
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  Future<void> _confirmAnswerAndContinue(
+    List<Map<String, dynamic>> questions,
+  ) async {
+    if (questions.isEmpty) return;
+    final selected = Map<String, String>.from(
+      _attempt?['_selected'] as Map? ?? const {},
+    );
+    final question = questions[_questionIndex];
+    if (selected['${question['id']}'] == null) {
+      _notice('กรุณาเลือกคำตอบก่อนยืนยัน', true);
+      return;
+    }
+    final isLast = _questionIndex == questions.length - 1;
+    if (await _saveAttempt(isLast) && mounted && !isLast) {
+      setState(() => _questionIndex++);
+    }
+  }
+
+  void _exitExam() {
+    context.go('/company/meeting-invitations');
   }
 
   @override
@@ -269,6 +310,11 @@ class _TrainingTestPageState extends State<TrainingTestPage>
                             style: tokens.workspace.captionStyle,
                           ),
                         ),
+                        OutlinedButton.icon(
+                          onPressed: _saving ? null : _exitExam,
+                          icon: const Icon(Icons.exit_to_app_outlined),
+                          label: const Text('ออก'),
+                        ),
                       ],
                     ),
                   ),
@@ -284,7 +330,7 @@ class _TrainingTestPageState extends State<TrainingTestPage>
                 Expanded(
                   child: SingleChildScrollView(
                     padding: tokens.workspace.contentMargin,
-                    child: _overview?['canManage'] == true
+                    child: _managerView
                         ? _manager(tokens)
                         : _participant(tokens),
                   ),
@@ -482,12 +528,19 @@ class _TrainingTestPageState extends State<TrainingTestPage>
           },
     );
     _attempt!['_selected'] = selected;
+    final questions = _items(_attempt?['questions']);
+    final isTrueFalse = _attempt?['questionType'] == 'TRUE_FALSE';
+    if (questions.isEmpty) return _empty(tokens, 'ยังไม่มีข้อสอบในช่วงนี้');
+    final questionIndex = _questionIndex.clamp(0, questions.length - 1);
+    final isLastQuestion = questionIndex == questions.length - 1;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (_attempt?['canAnswer'] != true)
           _empty(tokens, 'อยู่นอกช่วงเวลาทำแบบทดสอบ'),
-        ..._items(_attempt?['questions']).asMap().entries.map((entry) {
+        ...questions.asMap().entries.where((entry) => entry.key == questionIndex).map((
+          entry,
+        ) {
           final question = entry.value;
           return Card(
             margin: const EdgeInsets.only(bottom: 6),
@@ -501,7 +554,7 @@ class _TrainingTestPageState extends State<TrainingTestPage>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'ข้อ ${entry.key + 1}',
+                    'ข้อ ${entry.key + 1} จาก ${questions.length}',
                     style: tokens.workspace.sectionStyle,
                   ),
                   if ((question['text'] as String?)?.isNotEmpty == true)
@@ -512,68 +565,164 @@ class _TrainingTestPageState extends State<TrainingTestPage>
                       imageId: question['imageId'].toString(),
                     ),
                   const SizedBox(height: 8),
-                  ..._items(question['options']).asMap().entries.map(
-                    (option) => Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
-                      child: OutlinedButton(
-                        style: OutlinedButton.styleFrom(
-                          alignment: Alignment.centerLeft,
-                          side: BorderSide(
-                            color:
-                                selected[question['id'].toString()] ==
-                                    option.value['id'].toString()
-                                ? tokens.primaryColor
-                                : tokens.borderColor,
+                  ..._items(question['options']).asMap().entries.map((option) {
+                    final isSelected =
+                        selected[question['id'].toString()] ==
+                        option.value['id'].toString();
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Semantics(
+                        button: true,
+                        enabled: _attempt?['canAnswer'] == true,
+                        selected: isSelected,
+                        child: Material(
+                          color: isSelected
+                              ? tokens.primaryColor.withValues(alpha: .10)
+                              : Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            side: BorderSide(
+                              width: isSelected ? 2 : 1,
+                              color: isSelected
+                                  ? tokens.primaryColor
+                                  : tokens.borderColor,
+                            ),
+                          ),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(8),
+                            onTap: _attempt?['canAnswer'] == true
+                                ? () => setState(() {
+                                    selected[question['id'].toString()] = option
+                                        .value['id']
+                                        .toString();
+                                    _attempt!['_selected'] = selected;
+                                  })
+                                : null,
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(
+                                minHeight: isTrueFalse ? 64 : 48,
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Container(
+                                      width: 32,
+                                      height: 32,
+                                      alignment: Alignment.center,
+                                      decoration: BoxDecoration(
+                                        color: isSelected
+                                            ? tokens.primaryColor
+                                            : Colors.transparent,
+                                        border: Border.all(
+                                          color: isSelected
+                                              ? tokens.primaryColor
+                                              : tokens.borderColor,
+                                        ),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: isSelected
+                                          ? const Icon(Icons.check, size: 20)
+                                          : Text('${option.key + 1}'),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          if (isTrueFalse)
+                                            const Text(
+                                              'เลือกข้อนี้',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
+                                          Text(
+                                            isTrueFalse
+                                                ? '${option.value['text'] ?? '-'}'
+                                                : '${option.key + 1}. ${option.value['text'] ?? '(รูปภาพ)'}',
+                                          ),
+                                          if (!isTrueFalse &&
+                                              option.value['imageId'] != null)
+                                            TrainingExamImage(
+                                              bookingId: widget.bookingId,
+                                              imageId: option.value['imageId']
+                                                  .toString(),
+                                              compact: true,
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
                           ),
                         ),
-                        onPressed: _attempt?['canAnswer'] == true
-                            ? () => setState(() {
-                                selected[question['id'].toString()] = option
-                                    .value['id']
-                                    .toString();
-                                _attempt!['_selected'] = selected;
-                              })
-                            : null,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '${option.key + 1}. ${option.value['text'] ?? '(รูปภาพ)'}',
-                            ),
-                            if (option.value['imageId'] != null)
-                              TrainingExamImage(
-                                bookingId: widget.bookingId,
-                                imageId: option.value['imageId'].toString(),
-                                compact: true,
-                              ),
-                          ],
-                        ),
                       ),
-                    ),
-                  ),
+                    );
+                  }),
                 ],
               ),
             ),
           );
         }),
         Wrap(
-          alignment: WrapAlignment.end,
+          alignment: WrapAlignment.center,
           spacing: 8,
+          runSpacing: 8,
           children: [
             OutlinedButton(
-              onPressed: _saving || _attempt?['canAnswer'] != true
+              onPressed: _saving || questionIndex == 0
                   ? null
-                  : () => _saveAttempt(false),
-              child: const Text('บันทึกคำตอบ'),
+                  : () => setState(() => _questionIndex--),
+              child: const Text('← ก่อนหน้า'),
             ),
-            FilledButton.icon(
-              onPressed: _saving || _attempt?['canAnswer'] != true
+            ...List.generate(
+              questions.length,
+              (index) => OutlinedButton(
+                onPressed: _saving
+                    ? null
+                    : () => setState(() => _questionIndex = index),
+                style: OutlinedButton.styleFrom(
+                  backgroundColor: index == questionIndex
+                      ? tokens.primaryColor.withValues(alpha: .10)
+                      : null,
+                  side: BorderSide(
+                    color: index == questionIndex
+                        ? tokens.primaryColor
+                        : tokens.borderColor,
+                  ),
+                ),
+                child: Text('${index + 1}'),
+              ),
+            ),
+            OutlinedButton(
+              onPressed: _saving || questionIndex == questions.length - 1
                   ? null
-                  : () => _saveAttempt(true),
-              icon: const Icon(Icons.send_outlined),
-              label: const Text('ส่งข้อสอบ'),
+                  : () => setState(() => _questionIndex++),
+              child: const Text('ถัดไป →'),
             ),
           ],
+        ),
+        const SizedBox(height: 12),
+        Align(
+          alignment: Alignment.centerRight,
+          child: FilledButton.icon(
+            onPressed: _saving || _attempt?['canAnswer'] != true
+                ? null
+                : () => _confirmAnswerAndContinue(questions),
+            icon: Icon(
+              isLastQuestion ? Icons.send_outlined : Icons.check_outlined,
+            ),
+            label: Text(
+              isLastQuestion
+                  ? 'ยืนยันคำตอบและส่งข้อสอบ'
+                  : 'ยืนยันคำตอบและไปข้อถัดไป',
+            ),
+          ),
         ),
       ],
     );
@@ -909,6 +1058,7 @@ class TrainingExamImage extends StatefulWidget {
 class _TrainingExamImageState extends State<TrainingExamImage> {
   late final JsonApiClient _api;
   Uint8List? _bytes;
+  bool _failed = false;
 
   @override
   void initState() {
@@ -935,12 +1085,14 @@ class _TrainingExamImageState extends State<TrainingExamImage> {
       setState(() => _bytes = base64Decode(value['base64'] as String));
     } catch (_) {
       // The question remains usable if a referenced file is unavailable.
+      if (mounted) setState(() => _failed = true);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final bytes = _bytes;
+    if (_failed) return const SizedBox.shrink();
     if (bytes == null) {
       return const Padding(
         padding: EdgeInsets.only(top: 6),

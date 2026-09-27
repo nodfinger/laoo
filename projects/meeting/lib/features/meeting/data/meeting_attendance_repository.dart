@@ -14,6 +14,7 @@ class MeetingAttendanceRow {
   bool get isLateResponse => json['isLateResponse'] == true;
   String? get lateResponseReason => json['lateResponseReason'] as String?;
   Object? get lateResponseAtUtc => json['lateResponseAtUtc'];
+  String get bookingStatus => json['bookingStatus'] as String? ?? '';
   // Fail closed: never infer a QR capability from canCheckIn or client roles.
   bool get canIssueRoomQr => json['canIssueRoomQr'] == true;
   bool get canIssuePersonalQr => json['canIssuePersonalQr'] == true;

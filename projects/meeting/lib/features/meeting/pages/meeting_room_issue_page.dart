@@ -194,6 +194,107 @@ class _MeetingRoomIssuePageState extends State<MeetingRoomIssuePage> {
     }
   }
 
+  Future<void> _viewIssue(Map<String, dynamic> item) => showDialog<void>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('รายละเอียดแจ้งปัญหา'),
+      content: SizedBox(
+        width: 480,
+        child: Text(
+          '${item['roomCode']} | ${item['roomNameTh']}\n${item['itemName']} (${item['itemCode']})\n\n${item['description']}\n\nสถานะ: ${item['statusCode']}',
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('ปิด'),
+        ),
+      ],
+    ),
+  );
+
+  Future<void> _editIssue(Map<String, dynamic> item) async {
+    if (item['statusCode'] != 'OPEN') {
+      setState(() => _message = 'แก้ไขได้เฉพาะรายการสถานะ OPEN');
+      return;
+    }
+    final description = TextEditingController(
+      text: '${item['description'] ?? ''}',
+    );
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('แก้ไขแจ้งปัญหา'),
+        content: TextField(
+          controller: description,
+          maxLines: 4,
+          decoration: const InputDecoration(labelText: 'รายละเอียดปัญหา *'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('ยกเลิก'),
+          ),
+          FilledButton(
+            onPressed: () =>
+                Navigator.pop(context, description.text.trim().isNotEmpty),
+            child: const Text('บันทึก'),
+          ),
+        ],
+      ),
+    );
+    final text = description.text.trim();
+    description.dispose();
+    if (saved != true) return;
+    try {
+      await _issues.update((item['issueId'] as num).toInt(), description: text);
+      if (mounted) {
+        setState(() => _message = 'แก้ไขรายการสำเร็จ');
+        await _load();
+      }
+    } catch (error) {
+      if (mounted)
+        setState(() => _message = _error(error, 'แก้ไขรายการไม่สำเร็จ'));
+    }
+  }
+
+  Future<void> _deleteIssue(Map<String, dynamic> item) async {
+    if (item['statusCode'] != 'OPEN') {
+      setState(() => _message = 'ลบได้เฉพาะรายการสถานะ OPEN');
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        icon: const Icon(Icons.delete_outline, color: Colors.red),
+        title: const Text('ลบรายการแจ้งปัญหา'),
+        content: Text('รายการ: ${item['itemName']}\nไม่สามารถเรียกคืนได้'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('ยกเลิก'),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(context, true),
+            icon: const Icon(Icons.delete_outline),
+            label: const Text('ลบ'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await _issues.delete((item['issueId'] as num).toInt());
+      if (mounted) {
+        setState(() => _message = 'ลบรายการสำเร็จ');
+        await _load();
+      }
+    } catch (error) {
+      if (mounted)
+        setState(() => _message = _error(error, 'ลบรายการไม่สำเร็จ'));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final preset = workspaceThemeController.value;
@@ -240,7 +341,33 @@ class _MeetingRoomIssuePageState extends State<MeetingRoomIssuePage> {
                             subtitle: Text(
                               '${item['roomCode']} | ${item['roomNameTh']}\n${item['description']}',
                             ),
-                            trailing: Text('${item['statusCode']}'),
+                            trailing: Wrap(
+                              spacing: 2,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                Text('${item['statusCode']}'),
+                                IconButton(
+                                  tooltip: 'ดู',
+                                  onPressed: () => _viewIssue(item),
+                                  icon: const Icon(Icons.visibility_outlined),
+                                ),
+                                if (_actions['edit'] == true)
+                                  IconButton(
+                                    tooltip: 'แก้ไข',
+                                    onPressed: () => _editIssue(item),
+                                    icon: const Icon(Icons.edit_outlined),
+                                  ),
+                                if (_actions['delete'] == true)
+                                  IconButton(
+                                    tooltip: 'ลบ',
+                                    onPressed: () => _deleteIssue(item),
+                                    icon: const Icon(
+                                      Icons.delete_outline,
+                                      color: Colors.red,
+                                    ),
+                                  ),
+                              ],
+                            ),
                           );
                         },
                       ),

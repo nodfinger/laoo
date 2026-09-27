@@ -37,4 +37,18 @@ class MeetingRoomIssueRepository {
 
   Future<void> updateStatus(int id, String statusCode) =>
       _api.put('$_path/$id/status', body: {'statusCode': statusCode});
+
+  Future<void> update(
+    int id, {
+    required String description,
+    String? imageUrl,
+  }) => _api.put(
+    '$_path/$id',
+    body: {
+      'description': description,
+      if (imageUrl != null && imageUrl.isNotEmpty) 'imageUrl': imageUrl,
+    },
+  );
+
+  Future<void> delete(int id) => _api.delete('$_path/$id');
 }
