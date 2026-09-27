@@ -27,7 +27,7 @@ List<GoRoute> buildTrainingFeatureRoutes() => [
   GoRoute(
     path: TrainingRoutePaths.testTemplates,
     name: TrainingRouteNames.testTemplates,
-    builder: (context, state) => const TrainingTestTemplatePage(),
+    builder: (context, state) => const TrainingTestTemplatePlaceholderPage(),
   ),
   GoRoute(
     path: TrainingRoutePaths.results,
