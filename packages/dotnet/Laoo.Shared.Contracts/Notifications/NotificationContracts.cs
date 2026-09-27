@@ -19,3 +19,10 @@ public sealed record NotificationPreferenceResponse(
     bool CanReceive);
 
 public sealed record NotificationPreferenceUpdateRequest(long PersonId, bool NotifyInSystem);
+
+public sealed record HostNotificationRecipientResponse(
+    string HostType,
+    long PersonId,
+    long? UserId,
+    bool NotifyInSystem,
+    bool CanNotify);

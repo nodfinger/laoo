@@ -46,10 +46,10 @@ abstract final class EvaluationRoutes {
     FeatureRouteContract(
       projectCode: EvaluationProject.code,
       menuCode: EvaluationMenuCodes.settings,
-      screenType: 2,
+      screenType: 1,
       routeName: EvaluationRouteNames.settings,
       routePath: EvaluationRoutePaths.settings,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: EvaluationProject.code,
@@ -57,7 +57,7 @@ abstract final class EvaluationRoutes {
       screenType: 1,
       routeName: EvaluationRouteNames.templates,
       routePath: EvaluationRoutePaths.templates,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: EvaluationProject.code,
@@ -65,7 +65,7 @@ abstract final class EvaluationRoutes {
       screenType: 4,
       routeName: EvaluationRouteNames.rounds,
       routePath: EvaluationRoutePaths.rounds,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: EvaluationProject.code,
@@ -73,7 +73,7 @@ abstract final class EvaluationRoutes {
       screenType: 3,
       routeName: EvaluationRouteNames.approvals,
       routePath: EvaluationRoutePaths.approvals,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: EvaluationProject.code,
@@ -81,7 +81,7 @@ abstract final class EvaluationRoutes {
       screenType: 3,
       routeName: EvaluationRouteNames.mine,
       routePath: EvaluationRoutePaths.mine,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: EvaluationProject.code,
@@ -89,7 +89,7 @@ abstract final class EvaluationRoutes {
       screenType: 3,
       routeName: EvaluationRouteNames.results,
       routePath: EvaluationRoutePaths.results,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: EvaluationProject.code,
@@ -97,7 +97,7 @@ abstract final class EvaluationRoutes {
       screenType: 3,
       routeName: EvaluationRouteNames.reports,
       routePath: EvaluationRoutePaths.reports,
-      isImplemented: false,
+      isImplemented: true,
     ),
   ];
   static Iterable<FeatureRouteContract> get implemented =>

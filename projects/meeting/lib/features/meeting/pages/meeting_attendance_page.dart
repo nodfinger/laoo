@@ -11,7 +11,13 @@ import '../meeting_route_contract.dart';
 import '../widgets/meeting_attendance_panel.dart';
 
 class MeetingAttendancePage extends StatefulWidget {
-  const MeetingAttendancePage({super.key});
+  const MeetingAttendancePage({
+    super.key,
+    this.menuCode = MeetingMenuCodes.attendance,
+    this.routeName = MeetingRouteNames.attendance,
+  });
+  final String menuCode;
+  final String routeName;
   @override
   State<MeetingAttendancePage> createState() => _State();
 }
@@ -33,8 +39,8 @@ class _State extends State<MeetingAttendancePage> {
     super.initState();
     NavigationMenuRepository()
         .resolveMenuName(
-          menuCode: MeetingMenuCodes.attendance,
-          routeName: MeetingRouteNames.attendance,
+          menuCode: widget.menuCode,
+          routeName: widget.routeName,
           fallback: caption,
         )
         .then((value) {
@@ -249,6 +255,52 @@ class _State extends State<MeetingAttendancePage> {
       ),
     ),
   );
+  Future<void> returnRoom() async {
+    if (selected == null) return;
+    final remark = TextEditingController();
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('คืนห้องและปิดรอบ'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('ยืนยันการคืนห้อง รายการนี้จะคืนซ้ำไม่ได้'),
+            TextField(
+              controller: remark,
+              maxLines: 3,
+              decoration: const InputDecoration(labelText: 'หมายเหตุ'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('ยกเลิก'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('ยืนยันคืนห้อง'),
+          ),
+        ],
+      ),
+    );
+    if (accepted != true || selected == null) return;
+    try {
+      await repo.returnRoom(
+        (selected!['bookingId'] as num).toInt(),
+        (selected!['slotId'] as num).toInt(),
+        remark: remark.text,
+      );
+      if (!mounted) return;
+      notify('คืนห้องและปิดรอบแล้ว', false);
+      setState(() => selected = null);
+      await load();
+    } catch (error) {
+      if (mounted) notify(errorText(error, 'คืนห้องไม่สำเร็จ'), true);
+    }
+  }
+
   Widget detailView(WorkspaceThemePreset preset) => Padding(
     padding: const EdgeInsets.all(LaooLayout.cardMargin),
     child: Column(
@@ -257,8 +309,14 @@ class _State extends State<MeetingAttendancePage> {
         WorkspaceSectionCard(
           child: WorkspaceActionHeader(
             title: '$caption > รายละเอียด',
-            favoriteKey: MeetingMenuCodes.attendance,
+            favoriteKey: widget.menuCode,
             actions: [
+              if (widget.menuCode == MeetingMenuCodes.roomCheckIn)
+                FilledButton.icon(
+                  onPressed: returnRoom,
+                  icon: const Icon(Icons.meeting_room_outlined),
+                  label: const Text('คืนห้อง'),
+                ),
               OutlinedButton.icon(
                 onPressed: () {
                   setState(() => selected = null);
@@ -327,7 +385,7 @@ class _State extends State<MeetingAttendancePage> {
     final preset = workspaceThemeController.value;
     return buildMeetingWorkspaceShell(
       pageTitle: caption,
-      activeMenu: MeetingMenuCodes.attendance,
+      activeMenu: widget.menuCode,
       child: Stack(
         children: [
           if (selected != null)
@@ -341,7 +399,7 @@ class _State extends State<MeetingAttendancePage> {
                   WorkspaceSectionCard(
                     child: WorkspaceActionHeader(
                       title: caption,
-                      favoriteKey: MeetingMenuCodes.attendance,
+                      favoriteKey: widget.menuCode,
                       actions: [
                         IconButton(
                           tooltip: 'รีเฟรช',

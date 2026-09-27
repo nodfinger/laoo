@@ -15,6 +15,7 @@ dependencies:
     path: ../../packages/laoo_shared_workspace_ui
   go_router: ^17.4.0
   file_picker: ^10.3.10
+  image: ^4.9.2
 
 dev_dependencies:
   flutter_test:

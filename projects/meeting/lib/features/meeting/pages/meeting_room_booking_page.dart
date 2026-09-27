@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 
 import '../widgets/meeting_popup.dart';
 import '../widgets/meeting_participant_dialog.dart';
@@ -3832,6 +3831,17 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
             ),
           ]
         : const <Widget>[];
+    final canConfigureEvaluations =
+        !hasStarted && (status == 'PENDING' || status == 'APPROVED');
+    final evaluationActions = canConfigureEvaluations
+        ? <Widget>[
+            IconButton(
+              tooltip: 'กำหนดแบบประเมิน',
+              onPressed: () => _openBookingEvaluations(item),
+              icon: Icon(Icons.rate_review_outlined, color: preset.primary),
+            ),
+          ]
+        : const <Widget>[];
     if (hasStarted) {
       return Wrap(
         children: [
@@ -3852,6 +3862,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
     return Wrap(
       children: [
         ...trainingTestActions,
+        ...evaluationActions,
         if (includeApproval &&
             status == 'PENDING' &&
             item['canApprove'] == true &&
@@ -3920,7 +3931,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
     );
   }
 
-  void _openTrainingTests(Map<String, dynamic> item) {
+  Future<void> _openTrainingTests(Map<String, dynamic> item) async {
     final bookingId = _int(item['bookingId']);
     if (bookingId == null || bookingId <= 0) {
       _showMessage(
@@ -3929,7 +3940,324 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
       );
       return;
     }
-    context.go('/company/training-tests/$bookingId?section=PRE');
+    try {
+      final templateData = await _repository.trainingTestTemplates(bookingId);
+      final templates = List<Map<String, dynamic>>.from(
+        templateData['items'] as List? ?? const [],
+      );
+      if (!mounted) return;
+      final preIds =
+          (templateData['preTemplateIds'] as List? ??
+                  [templateData['preTemplateId']])
+              .whereType<num>()
+              .map((id) => id.toInt())
+              .toList();
+      final postIds =
+          (templateData['postTemplateIds'] as List? ??
+                  [templateData['postTemplateId']])
+              .whereType<num>()
+              .map((id) => id.toInt())
+              .toList();
+      int? pre = preIds.isEmpty ? null : preIds.first;
+      int? post = postIds.isEmpty ? null : postIds.first;
+      final extraPre = <int?>[...preIds.skip(1)];
+      final extraPost = <int?>[...postIds.skip(1)];
+      final selected = await showDialog<Map<String, dynamic>>(
+        context: context,
+        builder: (context) => StatefulBuilder(
+          builder: (context, setDialogState) => MeetingPopup(
+            title: const MeetingPopupTitle(
+              icon: Icons.quiz_outlined,
+              text: 'เลือกชุดแบบทดสอบอบรม',
+            ),
+            content: SizedBox(
+              width: 460,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<int?>(
+                    initialValue: pre,
+                    decoration: const InputDecoration(
+                      labelText: 'ก่อนอบรม (PRE)',
+                    ),
+                    items: [
+                      const DropdownMenuItem(
+                        value: null,
+                        child: Text('ไม่กำหนด'),
+                      ),
+                      ...templates
+                          .where((x) => x['section'] == 'PRE')
+                          .map(
+                            (x) => DropdownMenuItem(
+                              value: (x['id'] as num).toInt(),
+                              child: Text('${x['code']} | ${x['name']}'),
+                            ),
+                          ),
+                    ],
+                    onChanged: (v) => setDialogState(() => pre = v),
+                  ),
+                  ...extraPre.asMap().entries.map(
+                    (entry) => Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: DropdownButtonFormField<int?>(
+                        initialValue: entry.value,
+                        decoration: InputDecoration(
+                          labelText: 'ก่อนอบรม ชุด ${entry.key + 2}',
+                        ),
+                        items: [
+                          const DropdownMenuItem(
+                            value: null,
+                            child: Text('ไม่กำหนด'),
+                          ),
+                          ...templates
+                              .where((x) => x['section'] == 'PRE')
+                              .map(
+                                (x) => DropdownMenuItem(
+                                  value: (x['id'] as num).toInt(),
+                                  child: Text('${x['code']} | ${x['name']}'),
+                                ),
+                              ),
+                        ],
+                        onChanged: (v) =>
+                            setDialogState(() => extraPre[entry.key] = v),
+                      ),
+                    ),
+                  ),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: () => setDialogState(() => extraPre.add(null)),
+                      icon: const Icon(Icons.add),
+                      label: const Text('เพิ่มชุด PRE'),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<int?>(
+                    initialValue: post,
+                    decoration: const InputDecoration(
+                      labelText: 'หลังอบรม (POST)',
+                    ),
+                    items: [
+                      const DropdownMenuItem(
+                        value: null,
+                        child: Text('ไม่กำหนด'),
+                      ),
+                      ...templates
+                          .where((x) => x['section'] == 'POST')
+                          .map(
+                            (x) => DropdownMenuItem(
+                              value: (x['id'] as num).toInt(),
+                              child: Text('${x['code']} | ${x['name']}'),
+                            ),
+                          ),
+                    ],
+                    onChanged: (v) => setDialogState(() => post = v),
+                  ),
+                  ...extraPost.asMap().entries.map(
+                    (entry) => Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: DropdownButtonFormField<int?>(
+                        initialValue: entry.value,
+                        decoration: InputDecoration(
+                          labelText: 'หลังอบรม ชุด ${entry.key + 2}',
+                        ),
+                        items: [
+                          const DropdownMenuItem(
+                            value: null,
+                            child: Text('ไม่กำหนด'),
+                          ),
+                          ...templates
+                              .where((x) => x['section'] == 'POST')
+                              .map(
+                                (x) => DropdownMenuItem(
+                                  value: (x['id'] as num).toInt(),
+                                  child: Text('${x['code']} | ${x['name']}'),
+                                ),
+                              ),
+                        ],
+                        onChanged: (v) =>
+                            setDialogState(() => extraPost[entry.key] = v),
+                      ),
+                    ),
+                  ),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: () =>
+                          setDialogState(() => extraPost.add(null)),
+                      icon: const Icon(Icons.add),
+                      label: const Text('เพิ่มชุด POST'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('ยกเลิก'),
+              ),
+              FilledButton.icon(
+                onPressed: () => Navigator.pop(context, {
+                  'preTemplateIds': [
+                    if (pre != null) pre!,
+                    ...extraPre.whereType<int>(),
+                  ],
+                  'postTemplateIds': [
+                    if (post != null) post!,
+                    ...extraPost.whereType<int>(),
+                  ],
+                }),
+                icon: const Icon(Icons.save_outlined),
+                label: const Text('บันทึก'),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (selected == null) return;
+      await _repository.assignTrainingTestTemplates(
+        bookingId,
+        preTemplateIds: List<int>.from(
+          selected['preTemplateIds'] as List? ?? const [],
+        ),
+        postTemplateIds: List<int>.from(
+          selected['postTemplateIds'] as List? ?? const [],
+        ),
+      );
+      _showMessage('บันทึกชุดแบบทดสอบแล้ว');
+    } catch (error) {
+      _showMessage(
+        'ไม่สามารถบันทึกชุดแบบทดสอบได้\nรายละเอียดเพิ่มเติม: $error',
+        error: true,
+      );
+    }
+  }
+
+  Future<void> _openBookingEvaluations(Map<String, dynamic> item) async {
+    final bookingId = _int(item['bookingId']);
+    if (bookingId == null || bookingId <= 0) {
+      _showMessage(
+        'ไม่สามารถเปิดการกำหนดแบบประเมินได้\nรายละเอียดเพิ่มเติม: ไม่พบรหัสรายการจอง',
+        error: true,
+      );
+      return;
+    }
+    try {
+      final response = await _repository.evaluationTemplates(bookingId);
+      final templates = List<Map<String, dynamic>>.from(
+        response['items'] as List? ?? const [],
+      );
+      final isTraining = response['activityTypeCode'] == 'TRAINING';
+      final sources = <String>[
+        'MEETING_ROOM',
+        if (isTraining) 'TRAINING_COURSE',
+        if (isTraining) 'TRAINING_INSTRUCTOR',
+      ];
+      final selected = <String, int?>{
+        for (final source in sources) source: null,
+      };
+      for (final value in response['selections'] as List? ?? const []) {
+        final row = Map<String, dynamic>.from(value as Map);
+        final source = row['sourceType']?.toString();
+        if (source != null && selected.containsKey(source)) {
+          selected[source] = _int(row['templateId']);
+        }
+      }
+      if (!mounted) return;
+      String sourceLabel(String source) => switch (source) {
+        'TRAINING_COURSE' => 'ประเมินหลักสูตร',
+        'TRAINING_INSTRUCTOR' => 'ประเมินวิทยากร',
+        _ => 'ประเมินห้องประชุม',
+      };
+      final saved = await showDialog<List<Map<String, dynamic>>>(
+        context: context,
+        builder: (context) => StatefulBuilder(
+          builder: (context, setDialogState) => MeetingPopup(
+            title: const MeetingPopupTitle(
+              icon: Icons.rate_review_outlined,
+              text: 'กำหนดแบบประเมินสำหรับรอบนี้',
+            ),
+            content: SizedBox(
+              width: 500,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      'เลือกเฉพาะประเภทที่ต้องการประเมิน หากไม่เลือก ระบบจะไม่สร้างรอบประเมิน',
+                    ),
+                    const SizedBox(height: 16),
+                    for (final source in sources)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: DropdownButtonFormField<int?>(
+                          initialValue: selected[source],
+                          decoration: InputDecoration(
+                            labelText: sourceLabel(source),
+                          ),
+                          items: [
+                            const DropdownMenuItem(
+                              value: null,
+                              child: Text('ไม่ประเมิน'),
+                            ),
+                            ...templates
+                                .where(
+                                  (template) =>
+                                      template['sourceType'] == source,
+                                )
+                                .map(
+                                  (template) => DropdownMenuItem(
+                                    value: _int(template['id']),
+                                    child: Text(
+                                      '${template['code']} | ${template['name']}',
+                                    ),
+                                  ),
+                                ),
+                          ],
+                          onChanged: (value) =>
+                              setDialogState(() => selected[source] = value),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('ยกเลิก'),
+              ),
+              FilledButton.icon(
+                onPressed: () => Navigator.pop(
+                  context,
+                  sources
+                      .where((source) => selected[source] != null)
+                      .map(
+                        (source) => <String, dynamic>{
+                          'sourceType': source,
+                          'templateId': selected[source],
+                        },
+                      )
+                      .toList(),
+                ),
+                icon: const Icon(Icons.save_outlined),
+                label: const Text('บันทึก'),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (saved == null) return;
+      await _repository.assignEvaluationTemplates(bookingId, saved);
+      _showMessage('บันทึกการกำหนดแบบประเมินแล้ว');
+    } catch (error) {
+      _showMessage(
+        'ไม่สามารถบันทึกการกำหนดแบบประเมินได้\nรายละเอียดเพิ่มเติม: $error',
+        error: true,
+      );
+    }
   }
 
   Widget _pagination(WorkspaceThemePreset preset) {

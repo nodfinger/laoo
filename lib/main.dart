@@ -32,10 +32,18 @@ void main() {
   configureExpenseFeatureHost(_buildMeetingWorkspaceShell);
   configureProjectFeatureHost(_buildMeetingWorkspaceShell);
   configureIntranetFeatureHost(_buildMeetingWorkspaceShell);
-  configureVoteFeatureHost(_buildMeetingWorkspaceShell);
+  configureVoteFeatureHost(
+    _buildMeetingWorkspaceShell,
+    apiClientFactory: ApiClient.new,
+    apiClientDisposer: (client) => (client as ApiClient).dispose(),
+  );
   configurePosFeatureHost(_buildMeetingWorkspaceShell);
   configureSalesFeatureHost(_buildMeetingWorkspaceShell);
-  configureEvaluationFeatureHost(_buildMeetingWorkspaceShell);
+  configureEvaluationFeatureHost(
+    _buildMeetingWorkspaceShell,
+    apiClientFactory: ApiClient.new,
+    apiClientDisposer: (client) => (client as ApiClient).dispose(),
+  );
   configureMeetingFeatureHost(_buildMeetingWorkspaceShell);
   configureServiceWorkspaceShell(_buildMeetingWorkspaceShell);
   configureGatePassFeatureHost(_buildMeetingWorkspaceShell);

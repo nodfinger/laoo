@@ -1,7 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:image/image.dart' as image;
 import 'package:laoo_shared_workspace_ui/laoo_shared_workspace_ui.dart';
 
 import '../training/training_feature_host.dart';
@@ -28,6 +32,8 @@ class _TrainingTestTemplatePlaceholderPageState
   bool? _isActive = true;
   bool _loading = true;
   String? _error;
+  String? _message;
+  bool _messageError = false;
 
   @override
   void initState() {
@@ -120,16 +126,25 @@ class _TrainingTestTemplatePlaceholderPageState
           item: detail,
           onUploadImage: item == null
               ? null
-              : () => _uploadImage((item['id'] as num).toInt()),
+              : (onSelected) =>
+                    _uploadImage((item['id'] as num).toInt(), onSelected),
+          onSave: (request) async {
+            if (item == null) {
+              await _api.post(_path, body: request);
+            } else {
+              await _api.put('$_path/${item['id']}', body: request);
+            }
+          },
         ),
       );
       if (request == null) return;
-      if (item == null) {
-        await _api.post(_path, body: request);
-      } else {
-        await _api.put('$_path/${item['id']}', body: request);
-      }
       await _load(targetPage: _page);
+      if (mounted) {
+        setState(() {
+          _message = 'บันทึกข้อมูลสำเร็จ';
+          _messageError = false;
+        });
+      }
     } catch (error) {
       if (mounted) setState(() => _error = trainingErrorText(error));
     }
@@ -190,31 +205,74 @@ class _TrainingTestTemplatePlaceholderPageState
     }
   }
 
-  Future<String?> _uploadImage(int templateId) async {
-    final selected = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: const ['jpg', 'jpeg', 'png', 'webp'],
-      withData: true,
-    );
+  Future<_UploadedTemplateImage?> _uploadImage(
+    int templateId,
+    ValueChanged<Uint8List> onSelected,
+  ) async {
+    // The web implementation exposes this option but the shared interface does
+    // not. Keep the web-only call here so native pickers retain their contract.
+    final FilePickerResult? selected = kIsWeb
+        ? await (FilePicker.platform as dynamic).pickFiles(
+            type: FileType.custom,
+            allowedExtensions: const ['jpg', 'jpeg', 'png', 'webp'],
+            withData: true,
+            // Focus may return before change; rely on the input cancel event.
+            cancelUploadOnWindowBlur: false,
+          )
+        : await FilePicker.platform.pickFiles(
+            type: FileType.custom,
+            allowedExtensions: const ['jpg', 'jpeg', 'png', 'webp'],
+            withData: true,
+          );
     final file = selected?.files.single;
-    if (file?.bytes == null) return null;
-    if (file!.bytes!.length > 1024 * 1024) {
-      if (mounted) setState(() => _error = 'รูปภาพต้องมีขนาดไม่เกิน 1 MB');
-      return null;
+    if (file == null) return null;
+    if (file.bytes == null) {
+      throw StateError('อ่านไฟล์รูปไม่ได้ กรุณาเลือกไฟล์ใหม่');
     }
+    onSelected(file.bytes!);
+    final bytes = await _fitImage(file.bytes!);
+    if (bytes == null) throw StateError('ลดขนาดรูปไม่ได้ กรุณาเลือกไฟล์ใหม่');
     try {
       final response = Map<String, dynamic>.from(
         await _api.post(
               '$_path/$templateId/images',
-              body: {'base64': base64Encode(file.bytes!)},
+              body: {'base64': base64Encode(bytes)},
             )
             as Map,
       );
-      return response['id']?.toString();
+      final imageId = response['id']?.toString();
+      if (imageId == null || imageId.isEmpty) {
+        throw StateError(
+          'อัปโหลดรูปไม่ได้: ระบบไม่ส่งรหัสรูปกลับมา กรุณาลองใหม่',
+        );
+      }
+      return _UploadedTemplateImage(imageId, bytes);
     } catch (error) {
-      if (mounted) setState(() => _error = trainingErrorText(error));
+      rethrow;
+    }
+  }
+
+  Future<Uint8List?> _fitImage(Uint8List source) async {
+    const limit = 1024 * 1024;
+    if (source.length <= limit) return source;
+    final decoded = image.decodeImage(source);
+    if (decoded == null) {
+      if (mounted) setState(() => _error = 'ไม่สามารถอ่านไฟล์รูปภาพได้');
       return null;
     }
+    var current = decoded;
+    for (var step = 0; step < 6; step++) {
+      final encoded = image.encodeJpg(current, quality: 80 - step * 8);
+      if (encoded.length <= limit) return Uint8List.fromList(encoded);
+      current = image.copyResize(current, width: (current.width * .72).round());
+    }
+    if (mounted) {
+      setState(
+        () =>
+            _error = 'ไม่สามารถลดขนาดรูปให้ต่ำกว่า 1 MB ได้ กรุณาเลือกรูปอื่น',
+      );
+    }
+    return null;
   }
 
   String get _caption => _actions?['caption'] as String? ?? 'ชุดแบบทดสอบอบรม';
@@ -226,84 +284,102 @@ class _TrainingTestTemplatePlaceholderPageState
     return buildTrainingWorkspaceShell(
       pageTitle: _caption,
       activeMenu: TrainingMenuCodes.testTemplates,
-      child: LaooListWorkspace(
-        tokens: tokens.workspace,
-        caption: LaooCaptionCard(
-          tokens: tokens.workspace,
-          caption: _caption,
-          leading: Icon(Icons.quiz_outlined, color: tokens.primaryColor),
-          trailing: _actions?['create'] == true
-              ? FilledButton.icon(
-                  onPressed: _loading ? null : _edit,
-                  icon: const Icon(Icons.add),
-                  label: const Text('เพิ่ม'),
-                )
-              : null,
-        ),
-        filter: Wrap(
-          spacing: 6,
-          runSpacing: 6,
-          crossAxisAlignment: WrapCrossAlignment.end,
-          children: [
-            SizedBox(
-              width: 260,
-              child: TextField(
-                controller: _search,
-                onSubmitted: (_) => _load(),
-                decoration: const InputDecoration(
-                  labelText: 'ค้นหารหัสหรือชื่อชุดแบบทดสอบ',
-                  prefixIcon: Icon(Icons.search),
+      child: Stack(
+        children: [
+          LaooListWorkspace(
+            tokens: tokens.workspace,
+            caption: LaooCaptionCard(
+              tokens: tokens.workspace,
+              caption: _caption,
+              leading: Icon(Icons.quiz_outlined, color: tokens.primaryColor),
+              trailing: _actions?['create'] == true
+                  ? FilledButton.icon(
+                      onPressed: _loading ? null : _edit,
+                      icon: const Icon(Icons.add),
+                      label: const Text('เพิ่ม'),
+                    )
+                  : null,
+            ),
+            filter: Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              crossAxisAlignment: WrapCrossAlignment.end,
+              children: [
+                SizedBox(
+                  width: 260,
+                  child: TextField(
+                    controller: _search,
+                    onSubmitted: (_) => _load(),
+                    decoration: const InputDecoration(
+                      labelText: 'ค้นหารหัสหรือชื่อชุดแบบทดสอบ',
+                      prefixIcon: Icon(Icons.search),
+                    ),
+                  ),
                 ),
+                SizedBox(
+                  width: 160,
+                  child: DropdownButtonFormField<String?>(
+                    initialValue: _section,
+                    decoration: const InputDecoration(
+                      labelText: 'ช่วงแบบทดสอบ',
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: null, child: Text('ทั้งหมด')),
+                      DropdownMenuItem(value: 'PRE', child: Text('ก่อนอบรม')),
+                      DropdownMenuItem(value: 'POST', child: Text('หลังอบรม')),
+                    ],
+                    onChanged: (value) => setState(() => _section = value),
+                  ),
+                ),
+                SizedBox(
+                  width: 150,
+                  child: DropdownButtonFormField<bool?>(
+                    initialValue: _isActive,
+                    decoration: const InputDecoration(labelText: 'สถานะ'),
+                    items: const [
+                      DropdownMenuItem(value: true, child: Text('ใช้งาน')),
+                      DropdownMenuItem(value: false, child: Text('ไม่ใช้งาน')),
+                      DropdownMenuItem(value: null, child: Text('ทั้งหมด')),
+                    ],
+                    onChanged: (value) => setState(() => _isActive = value),
+                  ),
+                ),
+                FilledButton.icon(
+                  onPressed: _loading ? null : _load,
+                  icon: const Icon(Icons.search),
+                  label: const Text('ค้นหา'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _loading ? null : _clearFilters,
+                  icon: const Icon(Icons.clear),
+                  label: const Text('ล้าง Filter'),
+                ),
+              ],
+            ),
+            table: _buildTable(tokens.primaryColor),
+            pagination: LaooPaginationCard(
+              tokens: tokens.workspace,
+              page: _page,
+              pageCount: pageCount,
+              pageSize: trainingPageSize,
+              total: _total,
+              onPrevious: _page > 1 ? () => _load(targetPage: _page - 1) : null,
+              onNext: _page < pageCount
+                  ? () => _load(targetPage: _page + 1)
+                  : null,
+            ),
+          ),
+          if (_message != null)
+            Positioned(
+              right: 16,
+              top: 16,
+              child: buildTrainingMessage(
+                message: _message!,
+                error: _messageError,
+                onClose: () => setState(() => _message = null),
               ),
             ),
-            SizedBox(
-              width: 160,
-              child: DropdownButtonFormField<String?>(
-                initialValue: _section,
-                decoration: const InputDecoration(labelText: 'ช่วงแบบทดสอบ'),
-                items: const [
-                  DropdownMenuItem(value: null, child: Text('ทั้งหมด')),
-                  DropdownMenuItem(value: 'PRE', child: Text('ก่อนอบรม')),
-                  DropdownMenuItem(value: 'POST', child: Text('หลังอบรม')),
-                ],
-                onChanged: (value) => setState(() => _section = value),
-              ),
-            ),
-            SizedBox(
-              width: 150,
-              child: DropdownButtonFormField<bool?>(
-                initialValue: _isActive,
-                decoration: const InputDecoration(labelText: 'สถานะ'),
-                items: const [
-                  DropdownMenuItem(value: true, child: Text('ใช้งาน')),
-                  DropdownMenuItem(value: false, child: Text('ไม่ใช้งาน')),
-                  DropdownMenuItem(value: null, child: Text('ทั้งหมด')),
-                ],
-                onChanged: (value) => setState(() => _isActive = value),
-              ),
-            ),
-            FilledButton.icon(
-              onPressed: _loading ? null : _load,
-              icon: const Icon(Icons.search),
-              label: const Text('ค้นหา'),
-            ),
-            OutlinedButton.icon(
-              onPressed: _loading ? null : _clearFilters,
-              icon: const Icon(Icons.clear),
-              label: const Text('ล้าง Filter'),
-            ),
-          ],
-        ),
-        table: _buildTable(tokens.primaryColor),
-        pagination: LaooPaginationCard(
-          tokens: tokens.workspace,
-          page: _page,
-          pageCount: pageCount,
-          pageSize: trainingPageSize,
-          total: _total,
-          onPrevious: _page > 1 ? () => _load(targetPage: _page - 1) : null,
-          onNext: _page < pageCount ? () => _load(targetPage: _page + 1) : null,
-        ),
+        ],
       ),
     );
   }
@@ -400,11 +476,18 @@ class _TrainingTestTemplatePlaceholderPageState
 }
 
 class _TemplateDialog extends StatefulWidget {
-  const _TemplateDialog({required this.caption, this.item, this.onUploadImage});
+  const _TemplateDialog({
+    required this.caption,
+    this.item,
+    this.onUploadImage,
+    this.onSave,
+  });
 
   final String caption;
   final Map<String, dynamic>? item;
-  final Future<String?> Function()? onUploadImage;
+  final Future<_UploadedTemplateImage?> Function(ValueChanged<Uint8List>)?
+  onUploadImage;
+  final Future<void> Function(Map<String, dynamic> request)? onSave;
 
   @override
   State<_TemplateDialog> createState() => _TemplateDialogState();
@@ -419,6 +502,9 @@ class _TemplateDialogState extends State<_TemplateDialog> {
   late String _section;
   late bool _isActive;
   late Map<String, dynamic> _definition;
+  bool _saving = false;
+  OverlayEntry? _saveErrorOverlay;
+  Timer? _saveErrorTimer;
 
   @override
   void initState() {
@@ -431,6 +517,16 @@ class _TemplateDialogState extends State<_TemplateDialog> {
     _definition = Map<String, dynamic>.from(
       item?['definition'] as Map? ?? _starterDefinition(),
     );
+    if (item == null) {
+      _definition['questions'] = <Map<String, dynamic>>[];
+    }
+    _definition['questionType'] =
+        (_definition['questionType'] as String?) ?? 'SINGLE_CHOICE';
+    if (_definition['questionType'] == 'TRUE_FALSE') {
+      _definition['questions'] = _questions
+          .map(_normalizeTrueFalseQuestion)
+          .toList();
+    }
     _questionCount = TextEditingController(
       text: '${_definition['questionCount'] as num? ?? 1}',
     );
@@ -440,6 +536,7 @@ class _TemplateDialogState extends State<_TemplateDialog> {
   }
 
   Map<String, dynamic> _starterDefinition() => {
+    'questionType': 'SINGLE_CHOICE',
     'questionCount': 1,
     'passingPercent': 60,
     'isActive': true,
@@ -483,6 +580,36 @@ class _TemplateDialogState extends State<_TemplateDialog> {
           .map((item) => Map<String, dynamic>.from(item as Map))
           .toList();
 
+  Map<String, dynamic> _normalizeTrueFalseQuestion(
+    Map<String, dynamic> question,
+  ) {
+    final options = (question['options'] as List? ?? [])
+        .map((item) => Map<String, dynamic>.from(item as Map))
+        .toList();
+    final correct = options.indexWhere((item) => item['isCorrect'] == true);
+    return {
+      ...question,
+      'options': [
+        {
+          'id': options.isNotEmpty
+              ? options[0]['id']
+              : _QuestionDialogState._newId(),
+          'text': 'ถูก',
+          'imageId': null,
+          'isCorrect': correct != 1,
+        },
+        {
+          'id': options.length > 1
+              ? options[1]['id']
+              : _QuestionDialogState._newId(),
+          'text': 'ผิด',
+          'imageId': null,
+          'isCorrect': correct == 1,
+        },
+      ],
+    };
+  }
+
   void _setQuestions(List<Map<String, dynamic>> questions) {
     setState(() {
       _definition = {..._definition, 'questions': questions};
@@ -500,7 +627,9 @@ class _TemplateDialogState extends State<_TemplateDialog> {
       barrierDismissible: false,
       builder: (_) => _QuestionDialog(
         question: index == null ? null : questions[index],
+        trueFalse: _definition['questionType'] == 'TRUE_FALSE',
         onUploadImage: widget.onUploadImage,
+        templateId: (widget.item?['id'] as num?)?.toInt(),
       ),
     );
     if (result == null || !mounted) return;
@@ -535,8 +664,72 @@ class _TemplateDialogState extends State<_TemplateDialog> {
     _setQuestions(questions);
   }
 
+  Future<void> _saveTemplate() async {
+    if (_formKey.currentState?.validate() != true) return;
+    final definition = {
+      ..._definition,
+      'questionCount': int.parse(_questionCount.text),
+      'passingPercent': double.parse(_passingPercent.text),
+      'isActive': _isActive,
+    };
+    final request = {
+      'code': _code.text.trim().isEmpty ? null : _code.text.trim(),
+      'name': _name.text.trim(),
+      'section': _section,
+      'isActive': _isActive,
+      'definition': definition,
+      if (widget.item?['rowVersion'] != null)
+        'rowVersion': widget.item!['rowVersion'],
+    };
+    if (widget.onSave == null) {
+      Navigator.pop(context, request);
+      return;
+    }
+    setState(() {
+      _saving = true;
+    });
+    try {
+      await widget.onSave!(request);
+      if (mounted) Navigator.pop(context, request);
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _saving = false;
+        });
+        _showSaveError(trainingErrorText(error));
+      }
+    }
+  }
+
+  void _showSaveError(String message) {
+    _saveErrorTimer?.cancel();
+    _saveErrorOverlay?.remove();
+    final entry = OverlayEntry(
+      builder: (_) => Positioned(
+        top: 12,
+        right: 12,
+        child: buildTrainingMessage(
+          message: message,
+          error: true,
+          onClose: _dismissSaveError,
+        ),
+      ),
+    );
+    _saveErrorOverlay = entry;
+    Overlay.of(context, rootOverlay: true).insert(entry);
+    _saveErrorTimer = Timer(const Duration(seconds: 6), _dismissSaveError);
+  }
+
+  void _dismissSaveError() {
+    _saveErrorTimer?.cancel();
+    _saveErrorTimer = null;
+    _saveErrorOverlay?.remove();
+    _saveErrorOverlay = null;
+  }
+
   @override
   void dispose() {
+    _dismissSaveError();
     _code.dispose();
     _name.dispose();
     _questionCount.dispose();
@@ -591,10 +784,69 @@ class _TemplateDialogState extends State<_TemplateDialog> {
             onChanged: (value) => setState(() => _section = value ?? 'PRE'),
           ),
           const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            initialValue:
+                (_definition['questionType'] as String?) == 'TRUE_FALSE'
+                ? 'TRUE_FALSE'
+                : 'SINGLE_CHOICE',
+            decoration: const InputDecoration(labelText: 'ประเภทข้อสอบ *'),
+            items: const [
+              DropdownMenuItem(
+                value: 'SINGLE_CHOICE',
+                child: Text('4 ตัวเลือก'),
+              ),
+              DropdownMenuItem(value: 'TRUE_FALSE', child: Text('ถูก / ผิด')),
+            ],
+            onChanged: _questions.isNotEmpty
+                ? null
+                : (value) {
+                    if (value == null || value == _definition['questionType']) {
+                      return;
+                    }
+                    final questions = _questions.map((question) {
+                      if (value != 'TRUE_FALSE') return question;
+                      final options = (question['options'] as List? ?? [])
+                          .map((item) => Map<String, dynamic>.from(item as Map))
+                          .toList();
+                      final correct = options.indexWhere(
+                        (item) => item['isCorrect'] == true,
+                      );
+                      return {
+                        ...question,
+                        'options': [
+                          {
+                            'id': _QuestionDialogState._newId(),
+                            'text': 'ถูก',
+                            'imageId': null,
+                            'isCorrect': correct == 0 || correct < 0,
+                          },
+                          {
+                            'id': _QuestionDialogState._newId(),
+                            'text': 'ผิด',
+                            'imageId': null,
+                            'isCorrect': correct != 0,
+                          },
+                        ],
+                      };
+                    }).toList();
+                    setState(
+                      () => _definition = {
+                        ..._definition,
+                        'questionType': value,
+                        'questions': questions,
+                      },
+                    );
+                  },
+          ),
+          const SizedBox(height: 12),
           TextFormField(
             controller: _questionCount,
             keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: 'จำนวนข้อที่สุ่ม *'),
+            decoration: const InputDecoration(
+              labelText: 'จำนวนข้อที่ให้ทำ *',
+              helperText:
+                  'เช่น มี 30 ข้อ ให้ทำ 20 ข้อ: ระบุ 20 | ให้ทำครบทุกข้อ: ระบุเท่ากับจำนวนข้อสอบ',
+            ),
             validator: (value) {
               final number = int.tryParse(value ?? '');
               final bankCount =
@@ -637,6 +889,8 @@ class _TemplateDialogState extends State<_TemplateDialog> {
             (entry) => _QuestionCard(
               number: entry.key + 1,
               question: entry.value,
+              trueFalse: _definition['questionType'] == 'TRUE_FALSE',
+              templateId: (widget.item?['id'] as num?)?.toInt(),
               canMoveUp: entry.key > 0,
               canMoveDown: entry.key < _questions.length - 1,
               onEdit: () => _editQuestion(index: entry.key),
@@ -659,24 +913,7 @@ class _TemplateDialogState extends State<_TemplateDialog> {
         child: const Text('ยกเลิก'),
       ),
       FilledButton.icon(
-        onPressed: () {
-          if (_formKey.currentState?.validate() != true) return;
-          _definition = {
-            ..._definition,
-            'questionCount': int.parse(_questionCount.text),
-            'passingPercent': double.parse(_passingPercent.text),
-            'isActive': _isActive,
-          };
-          Navigator.pop(context, {
-            'code': _code.text.trim().isEmpty ? null : _code.text.trim(),
-            'name': _name.text.trim(),
-            'section': _section,
-            'isActive': _isActive,
-            'definition': _definition,
-            if (widget.item?['rowVersion'] != null)
-              'rowVersion': widget.item!['rowVersion'],
-          });
-        },
+        onPressed: _saving ? null : _saveTemplate,
         icon: const Icon(Icons.save_outlined),
         label: const Text('บันทึก'),
       ),
@@ -688,6 +925,8 @@ class _QuestionCard extends StatelessWidget {
   const _QuestionCard({
     required this.number,
     required this.question,
+    required this.trueFalse,
+    required this.templateId,
     required this.canMoveUp,
     required this.canMoveDown,
     required this.onEdit,
@@ -698,6 +937,8 @@ class _QuestionCard extends StatelessWidget {
 
   final int number;
   final Map<String, dynamic> question;
+  final bool trueFalse;
+  final int? templateId;
   final bool canMoveUp;
   final bool canMoveDown;
   final VoidCallback onEdit;
@@ -709,7 +950,13 @@ class _QuestionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final options = (question['options'] as List? ?? [])
         .map((item) => Map<String, dynamic>.from(item as Map))
+        .take(trueFalse ? 2 : 4)
         .toList();
+    final inferredTrueFalse =
+        options.length >= 2 &&
+        options[0]['text'] == 'ถูก' &&
+        options[1]['text'] == 'ผิด';
+    final isTrueFalse = trueFalse || inferredTrueFalse;
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
@@ -755,6 +1002,11 @@ class _QuestionCard extends StatelessWidget {
                 ? question['text'] as String
                 : 'คำถามเป็นรูปภาพ',
           ),
+          if (templateId != null && question['imageId'] != null)
+            _TemplateImage(
+              templateId: templateId!,
+              imageId: '${question['imageId']}',
+            ),
           const SizedBox(height: 8),
           OutlinedButton.icon(
             onPressed: null,
@@ -766,7 +1018,7 @@ class _QuestionCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6),
-          ...List<Widget>.generate(4, (index) {
+          ...List<Widget>.generate(isTrueFalse ? options.length : 4, (index) {
             final option = index < options.length
                 ? options[index]
                 : const <String, dynamic>{};
@@ -790,10 +1042,18 @@ class _QuestionCard extends StatelessWidget {
 }
 
 class _QuestionDialog extends StatefulWidget {
-  const _QuestionDialog({this.question, this.onUploadImage});
+  const _QuestionDialog({
+    this.question,
+    this.onUploadImage,
+    this.templateId,
+    this.trueFalse = false,
+  });
 
   final Map<String, dynamic>? question;
-  final Future<String?> Function()? onUploadImage;
+  final Future<_UploadedTemplateImage?> Function(ValueChanged<Uint8List>)?
+  onUploadImage;
+  final int? templateId;
+  final bool trueFalse;
 
   @override
   State<_QuestionDialog> createState() => _QuestionDialogState();
@@ -807,7 +1067,12 @@ class _QuestionDialogState extends State<_QuestionDialog> {
   late final List<String> _optionIds;
   String? _questionImageId;
   late final List<String?> _optionImageIds;
+  Uint8List? _questionImagePreview;
+  late final List<Uint8List?> _optionImagePreviews;
   int _correctIndex = 0;
+  bool _uploading = false;
+
+  int get _optionCount => widget.trueFalse ? 2 : 4;
 
   @override
   void initState() {
@@ -822,24 +1087,27 @@ class _QuestionDialogState extends State<_QuestionDialog> {
         .map((item) => Map<String, dynamic>.from(item as Map))
         .toList();
     _optionTexts = List.generate(
-      4,
+      _optionCount,
       (index) => TextEditingController(
-        text: index < options.length
+        text: widget.trueFalse
+            ? (index == 0 ? 'ถูก' : 'ผิด')
+            : index < options.length
             ? options[index]['text'] as String? ?? ''
             : '',
       ),
     );
     _optionIds = List.generate(
-      4,
+      _optionCount,
       (index) => index < options.length
           ? options[index]['id'] as String? ?? _newId()
           : _newId(),
     );
     _optionImageIds = List.generate(
-      4,
+      _optionCount,
       (index) =>
           index < options.length ? options[index]['imageId'] as String? : null,
     );
+    _optionImagePreviews = List<Uint8List?>.filled(_optionCount, null);
     final savedCorrect = options.indexWhere(
       (option) => option['isCorrect'] == true,
     );
@@ -869,7 +1137,7 @@ class _QuestionDialogState extends State<_QuestionDialog> {
       _showError('กรุณาระบุคำถามหรือเพิ่มรูปภาพคำถาม');
       return;
     }
-    for (var index = 0; index < 4; index++) {
+    for (var index = 0; index < _optionCount; index++) {
       if (_optionTexts[index].text.trim().isEmpty &&
           _optionImageIds[index] == null) {
         _showError('กรุณาระบุตัวเลือก ${index + 1}');
@@ -883,13 +1151,13 @@ class _QuestionDialogState extends State<_QuestionDialog> {
           : _questionText.text.trim(),
       'imageId': _questionImageId,
       'options': List.generate(
-        4,
+        _optionCount,
         (index) => {
           'id': _optionIds[index],
           'text': _optionTexts[index].text.trim().isEmpty
               ? null
               : _optionTexts[index].text.trim(),
-          'imageId': _optionImageIds[index],
+          'imageId': widget.trueFalse ? null : _optionImageIds[index],
           'isCorrect': index == _correctIndex,
         },
       ),
@@ -914,17 +1182,116 @@ class _QuestionDialogState extends State<_QuestionDialog> {
 
   Future<void> _selectImage({required bool question, int option = 0}) async {
     final upload = widget.onUploadImage;
-    if (upload == null) return;
-    final imageId = await upload();
-    if (imageId == null || !mounted) return;
-    setState(() {
-      if (question) {
-        _questionImageId = imageId;
-      } else {
-        _optionImageIds[option] = imageId;
-      }
-    });
+    if (upload == null || _uploading) return;
+    final oldPreview = question
+        ? _questionImagePreview
+        : _optionImagePreviews[option];
+    setState(() => _uploading = true);
+    try {
+      final uploaded = await upload((bytes) {
+        if (!mounted) return;
+        setState(() {
+          if (question) {
+            _questionImagePreview = bytes;
+          } else {
+            _optionImagePreviews[option] = bytes;
+          }
+        });
+      });
+      if (uploaded == null || !mounted) return;
+      setState(() {
+        if (question) {
+          _questionImageId = uploaded.id;
+          _questionImagePreview = uploaded.bytes;
+        } else {
+          _optionImageIds[option] = uploaded.id;
+          _optionImagePreviews[option] = uploaded.bytes;
+        }
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        if (question) {
+          _questionImagePreview = oldPreview;
+        } else {
+          _optionImagePreviews[option] = oldPreview;
+        }
+      });
+      _showError(
+        'ไม่สามารถแนบรูปภาพได้\nรายละเอียดเพิ่มเติม: ${trainingErrorText(error)}',
+      );
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
   }
+
+  Future<void> _removeImage({required bool question, int option = 0}) async {
+    final imageId = question ? _questionImageId : _optionImageIds[option];
+    if (imageId == null || widget.templateId == null) return;
+    final api = createTrainingApiClient();
+    try {
+      await api.delete(
+        '/api/company/training/test-templates/${widget.templateId}/images/$imageId',
+      );
+      if (!mounted) return;
+      setState(() {
+        if (question) {
+          _questionImageId = null;
+          _questionImagePreview = null;
+        } else {
+          _optionImageIds[option] = null;
+          _optionImagePreviews[option] = null;
+        }
+      });
+    } finally {
+      disposeTrainingApiClient(api);
+    }
+  }
+
+  Widget _imageActions(
+    String? imageId, {
+    Uint8List? previewBytes,
+    required bool question,
+    int option = 0,
+  }) => (imageId == null && previewBytes == null) || widget.templateId == null
+      ? const SizedBox.shrink()
+      : Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _ImagePreview(
+              previewBytes: previewBytes,
+              templateId: widget.templateId!,
+              imageId: imageId ?? '',
+            ),
+            Row(
+              children: [
+                TextButton.icon(
+                  onPressed: _uploading
+                      ? null
+                      : () => showDialog<void>(
+                          context: context,
+                          builder: (_) => Dialog(
+                            child: _ImagePreview(
+                              previewBytes: previewBytes,
+                              templateId: widget.templateId!,
+                              imageId: imageId ?? '',
+                            ),
+                          ),
+                        ),
+                  icon: const Icon(Icons.visibility_outlined),
+                  label: const Text('Preview'),
+                ),
+                TextButton.icon(
+                  onPressed: _uploading
+                      ? null
+                      : () => _removeImage(question: question, option: option),
+                  icon: const Icon(Icons.delete_outline),
+                  label: const Text('ลบรูป'),
+                ),
+              ],
+            ),
+          ],
+        );
 
   @override
   Widget build(BuildContext context) => TrainingActionDialog(
@@ -934,6 +1301,8 @@ class _QuestionDialogState extends State<_QuestionDialog> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (_uploading) const LinearProgressIndicator(),
+        if (_uploading) const Text('กำลังแนบรูปภาพ กรุณารอสักครู่'),
         TextFormField(
           controller: _questionText,
           maxLength: 2000,
@@ -950,11 +1319,22 @@ class _QuestionDialogState extends State<_QuestionDialog> {
             _questionImageId == null ? 'เลือกรูปภาพคำถาม' : 'มีรูปภาพคำถาม',
           ),
         ),
-        const SizedBox(height: 18),
-        const Text(
-          'ตัวเลือก 1–4 และคำตอบที่ถูกต้อง',
-          style: TextStyle(fontWeight: FontWeight.w700),
+        _imageActions(
+          _questionImageId,
+          previewBytes: _questionImagePreview,
+          question: true,
         ),
+        const SizedBox(height: 18),
+        if (!widget.trueFalse)
+          const Text(
+            'ตัวเลือก 1–4 และคำตอบที่ถูกต้อง',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+        if (widget.trueFalse)
+          const Text(
+            'ถูก / ผิด และคำตอบที่ถูกต้อง',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
         const SizedBox(height: 8),
         RadioGroup<int>(
           groupValue: _correctIndex,
@@ -963,7 +1343,7 @@ class _QuestionDialogState extends State<_QuestionDialog> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               ...List<Widget>.generate(
-                4,
+                _optionCount,
                 (index) => Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: Row(
@@ -976,26 +1356,39 @@ class _QuestionDialogState extends State<_QuestionDialog> {
                           children: [
                             TextFormField(
                               controller: _optionTexts[index],
+                              readOnly: widget.trueFalse,
                               maxLength: 1000,
-                              decoration: InputDecoration(
-                                labelText: 'ตัวเลือก ${index + 1}',
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            OutlinedButton.icon(
-                              onPressed: widget.onUploadImage == null
-                                  ? null
-                                  : () => _selectImage(
-                                      question: false,
-                                      option: index,
+                              decoration: widget.trueFalse
+                                  ? InputDecoration(
+                                      labelText: index == 0 ? 'ถูก' : 'ผิด',
+                                    )
+                                  : InputDecoration(
+                                      labelText: 'ตัวเลือก ${index + 1}',
                                     ),
-                              icon: const Icon(Icons.image_outlined),
-                              label: Text(
-                                _optionImageIds[index] == null
-                                    ? 'เลือกรูปภาพตัวเลือก'
-                                    : 'มีรูปภาพตัวเลือก',
-                              ),
                             ),
+                            if (!widget.trueFalse) ...[
+                              const SizedBox(height: 6),
+                              OutlinedButton.icon(
+                                onPressed: widget.onUploadImage == null
+                                    ? null
+                                    : () => _selectImage(
+                                        question: false,
+                                        option: index,
+                                      ),
+                                icon: const Icon(Icons.image_outlined),
+                                label: Text(
+                                  _optionImageIds[index] == null
+                                      ? 'เลือกรูปภาพตัวเลือก'
+                                      : 'มีรูปภาพตัวเลือก',
+                                ),
+                              ),
+                              _imageActions(
+                                _optionImageIds[index],
+                                previewBytes: _optionImagePreviews[index],
+                                question: false,
+                                option: index,
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -1014,7 +1407,7 @@ class _QuestionDialogState extends State<_QuestionDialog> {
         child: const Text('ยกเลิก'),
       ),
       FilledButton.icon(
-        onPressed: _save,
+        onPressed: _uploading ? null : _save,
         icon: const Icon(Icons.save_outlined),
         label: const Text('บันทึกข้อสอบ'),
       ),
@@ -1081,4 +1474,117 @@ class _QuestionDeleteDialog extends StatelessWidget {
       ),
     ),
   );
+}
+
+class _UploadedTemplateImage {
+  const _UploadedTemplateImage(this.id, this.bytes);
+
+  final String id;
+  final Uint8List bytes;
+}
+
+class _ImagePreview extends StatelessWidget {
+  const _ImagePreview({
+    required this.previewBytes,
+    required this.templateId,
+    required this.imageId,
+  });
+
+  final Uint8List? previewBytes;
+  final int templateId;
+  final String imageId;
+
+  @override
+  Widget build(BuildContext context) => previewBytes == null
+      ? _TemplateImage(templateId: templateId, imageId: imageId)
+      : Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 160),
+            child: Image.memory(previewBytes!, fit: BoxFit.contain),
+          ),
+        );
+}
+
+class _TemplateImage extends StatefulWidget {
+  const _TemplateImage({required this.templateId, required this.imageId});
+  final int templateId;
+  final String imageId;
+  @override
+  State<_TemplateImage> createState() => _TemplateImageState();
+}
+
+class _TemplateImageState extends State<_TemplateImage> {
+  late final dynamic _api = createTrainingApiClient();
+  Uint8List? _bytes;
+  String? _loadError;
+  int _loadVersion = 0;
+  @override
+  void didUpdateWidget(covariant _TemplateImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.imageId != widget.imageId ||
+        oldWidget.templateId != widget.templateId) {
+      _load();
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    disposeTrainingApiClient(_api);
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    final version = ++_loadVersion;
+    setState(() {
+      _bytes = null;
+      _loadError = null;
+    });
+    try {
+      final value = Map<String, dynamic>.from(
+        await _api.get(
+              '/api/company/training/test-templates/${widget.templateId}/images/${widget.imageId}',
+            )
+            as Map,
+      );
+      if (mounted && version == _loadVersion) {
+        setState(() => _bytes = base64Decode(value['base64'] as String));
+      }
+    } catch (error) {
+      if (mounted && version == _loadVersion) {
+        setState(() => _loadError = trainingErrorText(error));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => _bytes == null
+      ? _loadError == null
+            ? const Padding(
+                padding: EdgeInsets.all(8),
+                child: LinearProgressIndicator(),
+              )
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('โหลดรูปภาพไม่สำเร็จ\nรายละเอียดเพิ่มเติม: $_loadError'),
+                  TextButton(
+                    onPressed: _load,
+                    child: const Text('ลองโหลดรูปใหม่'),
+                  ),
+                ],
+              )
+      : Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 160),
+            child: Image.memory(_bytes!, fit: BoxFit.contain),
+          ),
+        );
 }

@@ -348,10 +348,6 @@ class _MeetingEquipmentRequestPageState
                     onPressed: () => _departmentStatus(item, 'IN_PROGRESS'),
                     child: const Text('เริ่มดำเนินการ'),
                   ),
-                  FilledButton(
-                    onPressed: () => _departmentStatus(item, 'COMPLETED'),
-                    child: const Text('เสร็จสิ้น'),
-                  ),
                   OutlinedButton(
                     onPressed: () =>
                         _departmentStatus(item, 'DEPARTMENT_REJECTED'),
