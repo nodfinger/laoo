@@ -8,13 +8,16 @@ import 'pages/meeting_food_page.dart';
 import 'pages/meeting_food_plan_page.dart';
 import 'pages/meeting_food_order_summary_page.dart';
 import 'pages/meeting_attendance_page.dart';
+import 'pages/meeting_no_show_report_page.dart';
 import 'pages/meeting_invitation_page.dart';
 import 'pages/meeting_room_approval_page.dart';
 import 'pages/meeting_room_booking_page.dart';
 import 'pages/meeting_room_page.dart';
 import 'pages/meeting_room_issue_page.dart';
 import 'pages/meeting_equipment_request_page.dart';
+import 'pages/meeting_room_support_tasks_page.dart';
 import 'pages/meeting_system_settings_page.dart';
+import 'pages/meeting_utilization_report_page.dart';
 
 List<GoRoute> buildMeetingFeatureRoutes() => [
   GoRoute(
@@ -65,8 +68,19 @@ List<GoRoute> buildMeetingFeatureRoutes() => [
     name: MeetingRouteNames.foodPlans,
     builder: (context, state) => const MeetingFoodPlanPage(),
   ),
-  _placeholder(MeetingRoutes.roomCheckIn, 'เช็กอินและคืนห้อง'),
-  _placeholder(MeetingRoutes.roomSupportTasks, 'งานเตรียมห้องและอุปกรณ์'),
+  GoRoute(
+    path: MeetingRoutes.roomCheckIn.path,
+    name: MeetingRoutes.roomCheckIn.name,
+    builder: (context, state) => const MeetingAttendancePage(
+      menuCode: MeetingMenuCodes.roomCheckIn,
+      routeName: MeetingRouteNames.roomCheckIn,
+    ),
+  ),
+  GoRoute(
+    path: MeetingRoutePaths.roomSupportTasks,
+    name: MeetingRouteNames.roomSupportTasks,
+    builder: (context, state) => const MeetingRoomSupportTasksPage(),
+  ),
   GoRoute(
     path: MeetingRoutePaths.roomIssues,
     name: MeetingRouteNames.roomIssues,
@@ -87,8 +101,16 @@ List<GoRoute> buildMeetingFeatureRoutes() => [
     name: MeetingRouteNames.foods,
     builder: (context, state) => const MeetingFoodPage(),
   ),
-  _placeholder(MeetingRoutes.utilizationReport, 'รายงานการใช้ห้อง'),
-  _placeholder(MeetingRoutes.noShowReport, 'รายงาน No-show'),
+  GoRoute(
+    path: MeetingRoutes.utilizationReport.path,
+    name: MeetingRoutes.utilizationReport.name,
+    builder: (context, state) => const MeetingUtilizationReportPage(),
+  ),
+  GoRoute(
+    path: MeetingRoutes.noShowReport.path,
+    name: MeetingRoutes.noShowReport.name,
+    builder: (context, state) => const MeetingNoShowReportPage(),
+  ),
   _placeholder(MeetingRoutes.feedbackReport, 'ผลประเมินห้องประชุม'),
 ];
 

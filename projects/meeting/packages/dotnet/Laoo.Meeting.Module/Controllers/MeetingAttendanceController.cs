@@ -22,6 +22,7 @@ public sealed class MeetingAttendanceController(IConfiguration configuration, ID
     public sealed record ConsumeQrRequest([Required, StringLength(8192)] string Token);
     public sealed record ReceiptItem(long FoodOrderDetailId, int ReceivedQuantity);
     public sealed record ReceiptRequest([Required] List<ReceiptItem>? Items);
+    public sealed record RoomReturnRequest([StringLength(1000)] string? Remark);
     private sealed record QrPayload(long CompanyId, long BookingId, long SlotId, long RoomId,
         long? ParticipantId, long? EmployeeId, string Kind, DateTimeOffset ExpiresAtUtc);
 
@@ -144,6 +145,44 @@ ORDER BY S.StartDateTime,B.BookingID,S.BookingSlotID OFFSET @offset ROWS FETCH N
             roomCode=reader.GetString(4),roomName=reader.GetString(5),slotId=reader.GetInt64(6),startDateTime=reader.GetDateTime(7),endDateTime=reader.GetDateTime(8),
             participantCount=invited,checkedInCount=checkedIn,pendingCheckInCount=Math.Max(0,invited-checkedIn)}); }
         return Ok(new {available=true,total,page,pageSize,items});
+    }
+
+    [HttpGet("utilization-report")]
+    public async Task<IActionResult> UtilizationReport([FromQuery] DateOnly? dateFrom,[FromQuery] DateOnly? dateTo,[FromQuery] int page=1,[FromQuery] int pageSize=20,CancellationToken token=default)
+    {
+        if(!Scope(out var company,out var user)) return Denied();
+        if(page<1 || pageSize is <1 or >100) return BadRequest(new {message="ตัวกรองไม่ถูกต้อง",description="หน้าและจำนวนต่อหน้าต้องอยู่ในช่วงที่กำหนด"});
+        var from=dateFrom ?? DateOnly.FromDateTime(DateTime.Today.AddDays(-30)); var to=dateTo ?? DateOnly.FromDateTime(DateTime.Today);
+        if(to<from || to.DayNumber-from.DayNumber>366) return BadRequest(new {message="ช่วงวันที่ไม่ถูกต้อง",description="เลือกช่วงได้ไม่เกิน 366 วัน"});
+        await using var db=new SqlConnection(configuration.GetConnectionString("LaooDatabase"));await db.OpenAsync(token);
+        if(!await ActiveUser(db,company,user,token) || !await Allowed(db,company,user,"VIEW",token,"24001")) return Denied();
+        const string source="""FROM dbo.TDADMeetingRoomBooking B JOIN dbo.TDADMeetingRoomBookingSlot S ON S.CompanyID=B.CompanyID AND S.BookingID=B.BookingID JOIN dbo.TDADMeetingRoom R ON R.CompanyID=B.CompanyID AND R.RoomID=B.RoomID WHERE B.CompanyID=@company AND B.BookingStatus='APPROVED' AND S.StartDateTime<DATEADD(day,1,CAST(@to AS datetime2)) AND S.EndDateTime>=CAST(@from AS datetime2) AND (B.RequesterUserID=@user OR EXISTS(SELECT 1 FROM dbo.TDADUser U WHERE U.CompanyID=@company AND U.UserID=@user AND U.IsCompanyAdmin=1 AND U.IsActive=1) OR EXISTS(SELECT 1 FROM dbo.TDADMeetingRoomContact C JOIN dbo.TDADUserEmployee UE ON UE.EmployeeID=C.EmployeeID AND UE.CompanyID=@company AND UE.UserID=@user AND UE.IsActive=1 WHERE C.RoomID=B.RoomID AND C.IsActive=1))""";
+        await using var count=new SqlCommand($"SELECT COUNT_BIG(DISTINCT B.RoomID) {source}",db);Bind(count,company,user,0);count.Parameters.AddWithValue("@from",from.ToDateTime(TimeOnly.MinValue));count.Parameters.AddWithValue("@to",to.ToDateTime(TimeOnly.MinValue));var total=Convert.ToInt64(await count.ExecuteScalarAsync(token));
+        await using var cmd=new SqlCommand($"""SELECT R.RoomID,R.RoomCode,R.RoomNameTH,COUNT(DISTINCT B.BookingID),COUNT_BIG(*),SUM(DATEDIFF(minute,S.StartDateTime,S.EndDateTime)) {source} GROUP BY R.RoomID,R.RoomCode,R.RoomNameTH ORDER BY R.RoomCode OFFSET @offset ROWS FETCH NEXT @take ROWS ONLY""",db);Bind(cmd,company,user,0);cmd.Parameters.AddWithValue("@from",from.ToDateTime(TimeOnly.MinValue));cmd.Parameters.AddWithValue("@to",to.ToDateTime(TimeOnly.MinValue));cmd.Parameters.AddWithValue("@offset",(page-1)*pageSize);cmd.Parameters.AddWithValue("@take",pageSize);var items=new List<object>();await using var r=await cmd.ExecuteReaderAsync(token);while(await r.ReadAsync(token))items.Add(new {roomId=r.GetInt64(0),roomCode=r.GetString(1),roomName=r.GetString(2),bookingCount=r.GetInt32(3),slotCount=r.GetInt64(4),minutes=r.IsDBNull(5)?0:r.GetInt32(5)});return Ok(new {dateFrom=from,dateTo=to,total,page,pageSize,items});
+    }
+
+    [HttpGet("no-show-report")]
+    public async Task<IActionResult> NoShowReport([FromQuery] DateOnly? dateFrom,[FromQuery] DateOnly? dateTo,[FromQuery] int page=1,[FromQuery] int pageSize=20,CancellationToken token=default)
+    {
+        if(!Scope(out var company,out var user)) return Denied();
+        if(page<1 || pageSize is <1 or >100) return BadRequest(new {message="ตัวกรองไม่ถูกต้อง",description="หน้าและจำนวนต่อหน้าต้องอยู่ในช่วงที่กำหนด"});
+        var from=dateFrom ?? DateOnly.FromDateTime(DateTime.Today.AddDays(-30)); var to=dateTo ?? DateOnly.FromDateTime(DateTime.Today);
+        if(to<from || to.DayNumber-from.DayNumber>366) return BadRequest(new {message="ช่วงวันที่ไม่ถูกต้อง",description="เลือกช่วงได้ไม่เกิน 366 วัน"});
+        await using var db=new SqlConnection(configuration.GetConnectionString("LaooDatabase"));await db.OpenAsync(token);
+        if(!await ActiveUser(db,company,user,token) || !await Allowed(db,company,user,"VIEW",token,"24002")) return Denied();
+        var source=$"""
+FROM dbo.TDADMeetingRoomBooking B
+JOIN dbo.TDADMeetingRoomBookingSlot S ON S.CompanyID=B.CompanyID AND S.BookingID=B.BookingID
+JOIN dbo.TDADMeetingRoom R ON R.CompanyID=B.CompanyID AND R.RoomID=B.RoomID
+JOIN dbo.TDADMeetingRoomBookingParticipant P ON P.CompanyID=B.CompanyID AND P.BookingID=B.BookingID
+JOIN dbo.TDADEmployee E ON E.CompanyID=P.CompanyID AND E.EmployeeID=P.EmployeeID AND E.IsActive=1
+LEFT JOIN dbo.TDADMeetingParticipantCheckIn C ON C.CompanyID=P.CompanyID AND C.BookingParticipantID=P.BookingParticipantID AND C.BookingSlotID=S.BookingSlotID
+WHERE B.CompanyID=@company AND B.BookingStatus='APPROVED' AND P.InvitationStatus='ACCEPTED'
+ AND S.EndDateTime<GETDATE() AND S.StartDateTime<DATEADD(day,1,CAST(@to AS datetime2)) AND S.EndDateTime>=CAST(@from AS datetime2)
+ AND C.ParticipantCheckInID IS NULL AND {ManagerSql}
+""";
+        await using var count=new SqlCommand($"SELECT COUNT_BIG(*) {source}",db);Bind(count,company,user,0);count.Parameters.AddWithValue("@from",from.ToDateTime(TimeOnly.MinValue));count.Parameters.AddWithValue("@to",to.ToDateTime(TimeOnly.MinValue));var total=Convert.ToInt64(await count.ExecuteScalarAsync(token));
+        await using var cmd=new SqlCommand($"""SELECT P.BookingParticipantID,B.BookingID,B.BookingNo,B.Subject,R.RoomCode,R.RoomNameTH,E.FullName,S.BookingSlotID,S.StartDateTime,S.EndDateTime {source} ORDER BY S.EndDateTime DESC,B.BookingNo,E.FullName OFFSET @offset ROWS FETCH NEXT @take ROWS ONLY""",db);Bind(cmd,company,user,0);cmd.Parameters.AddWithValue("@from",from.ToDateTime(TimeOnly.MinValue));cmd.Parameters.AddWithValue("@to",to.ToDateTime(TimeOnly.MinValue));cmd.Parameters.AddWithValue("@offset",(page-1)*pageSize);cmd.Parameters.AddWithValue("@take",pageSize);var items=new List<object>();await using var r=await cmd.ExecuteReaderAsync(token);while(await r.ReadAsync(token))items.Add(new {participantId=r.GetInt64(0),bookingId=r.GetInt64(1),bookingNo=r.GetString(2),subject=r.GetString(3),roomCode=r.GetString(4),roomName=r.GetString(5),participantName=r.GetString(6),slotId=r.GetInt64(7),startDateTime=r.GetDateTime(8),endDateTime=r.GetDateTime(9)});return Ok(new {dateFrom=from,dateTo=to,total,page,pageSize,items});
     }
 
     [HttpGet("{bookingId:long}")]
@@ -465,5 +504,34 @@ SELECT CheckInDate,CheckInByUserID,CheckInMethod FROM dbo.TDADMeetingParticipant
         }
         await tx.CommitAsync(token);
         return Ok(new {bookingId,participantId,slotId,checkInDate=DateTime.SpecifyKind(date,DateTimeKind.Utc),checkInByUserId=actor,method=savedMethod});
+    }
+    [HttpPost("{bookingId:long}/{slotId:long}/return-room")]
+    public async Task<IActionResult> ReturnRoom(long bookingId,long slotId,RoomReturnRequest request,CancellationToken token)
+    {
+        if(!Scope(out var company,out var user) || bookingId<=0 || slotId<=0) return Denied();
+        await using var db=new SqlConnection(configuration.GetConnectionString("LaooDatabase"));
+        await db.OpenAsync(token);
+        if(!await ActiveUser(db,company,user,token) || !await Allowed(db,company,user,"EDIT",token,"22001")) return Denied();
+        await using var tx=(SqlTransaction)await db.BeginTransactionAsync(IsolationLevel.Serializable,token);
+        await using var eligible=new SqlCommand($"""
+SELECT B.BookingID
+FROM dbo.TDADMeetingRoomBooking B WITH (UPDLOCK,HOLDLOCK)
+JOIN dbo.TDADMeetingRoomBookingSlot S ON S.CompanyID=B.CompanyID AND S.BookingID=B.BookingID
+WHERE B.CompanyID=@company AND B.BookingID=@booking AND S.BookingSlotID=@slot
+ AND B.BookingStatus='APPROVED' AND S.StartDateTime<=GETDATE() AND {ManagerSql};
+""",db,tx);
+        Bind(eligible,company,user,bookingId);eligible.Parameters.AddWithValue("@slot",slotId);
+        if(await eligible.ExecuteScalarAsync(token) is null) { await tx.RollbackAsync(token); return Denied(); }
+        await using var save=new SqlCommand("""
+IF EXISTS(SELECT 1 FROM dbo.TDADMeetingRoomReturn WITH (UPDLOCK,HOLDLOCK) WHERE CompanyID=@company AND BookingSlotID=@slot)
+  THROW 51000,N'ROOM_ALREADY_RETURNED',1;
+INSERT dbo.TDADMeetingRoomReturn(CompanyID,BookingID,BookingSlotID,ReturnByUserID,Remark)
+VALUES(@company,@booking,@slot,@user,@remark);
+SELECT ReturnDate,ReturnByUserID,Remark FROM dbo.TDADMeetingRoomReturn WHERE CompanyID=@company AND BookingSlotID=@slot;
+""",db,tx);
+        Bind(save,company,user,bookingId);save.Parameters.AddWithValue("@slot",slotId);save.Parameters.AddWithValue("@remark",(object?)request.Remark?.Trim()??DBNull.Value);
+        try { await using var r=await save.ExecuteReaderAsync(token);await r.ReadAsync(token);var returnedAt=r.GetDateTime(0);var returnedBy=r.GetInt64(1);var remark=r.IsDBNull(2)?null:r.GetString(2);await tx.CommitAsync(token);return Ok(new {bookingId,slotId,returnedAt=DateTime.SpecifyKind(returnedAt,DateTimeKind.Utc),returnedByUserId=returnedBy,remark}); }
+        catch(SqlException ex) when(ex.Number==51000) { await tx.RollbackAsync(token);return Conflict(new {message="คืนห้องแล้ว",description="รอบประชุมนี้ถูกคืนห้องและปิดรอบแล้ว จึงแก้ไขซ้ำไม่ได้"}); }
+        catch { await tx.RollbackAsync(token);throw; }
     }
 }
