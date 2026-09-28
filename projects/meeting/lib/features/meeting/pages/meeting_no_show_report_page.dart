@@ -250,13 +250,7 @@ class _MeetingNoShowReportPageState extends State<MeetingNoShowReportPage> {
                   child: WorkspaceActionHeader(
                     title: _caption,
                     favoriteKey: MeetingMenuCodes.noShowReport,
-                    actions: [
-                      IconButton(
-                        tooltip: 'โหลดข้อมูลล่าสุด',
-                        onPressed: _load,
-                        icon: Icon(Icons.refresh, color: preset.primary),
-                      ),
-                    ],
+                    actions: const [],
                   ),
                 ),
                 const SizedBox(height: LaooLayout.cardSpacing),

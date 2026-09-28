@@ -310,13 +310,7 @@ class _State extends State<MeetingFoodDistributionPage> {
                   child: WorkspaceActionHeader(
                     title: caption,
                     favoriteKey: MeetingMenuCodes.foodDistribution,
-                    actions: [
-                      OutlinedButton.icon(
-                        onPressed: loading ? null : load,
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('โหลดข้อมูลล่าสุด'),
-                      ),
-                    ],
+                    actions: const [],
                   ),
                 ),
                 const SizedBox(height: LaooLayout.cardSpacing),

@@ -251,12 +251,6 @@ class _MeetingEquipmentRequestPageState
                       },
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    tooltip: 'รีเฟรช',
-                    onPressed: _load,
-                    icon: const Icon(Icons.refresh_outlined),
-                  ),
                 ],
               ),
             ),

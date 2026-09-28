@@ -267,11 +267,6 @@ class _MeetingFeedbackReportPageState extends State<MeetingFeedbackReportPage> {
         icon: const Icon(Icons.clear),
         label: const Text('ล้าง Filter'),
       ),
-      IconButton(
-        tooltip: 'โหลดข้อมูลล่าสุด',
-        onPressed: _loading ? null : _load,
-        icon: const Icon(Icons.refresh),
-      ),
     ],
   );
 

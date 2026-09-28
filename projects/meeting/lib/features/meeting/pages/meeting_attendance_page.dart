@@ -400,13 +400,7 @@ class _State extends State<MeetingAttendancePage> {
                     child: WorkspaceActionHeader(
                       title: caption,
                       favoriteKey: widget.menuCode,
-                      actions: [
-                        IconButton(
-                          tooltip: 'รีเฟรช',
-                          onPressed: load,
-                          icon: Icon(Icons.refresh, color: preset.primary),
-                        ),
-                      ],
+                      actions: const [],
                     ),
                   ),
                   const SizedBox(height: LaooLayout.cardSpacing),

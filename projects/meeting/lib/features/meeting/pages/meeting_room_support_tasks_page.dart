@@ -476,11 +476,6 @@ class _MeetingRoomSupportTasksPageState
                         icon: const Icon(Icons.clear),
                         label: const Text('ล้าง Filter'),
                       ),
-                      IconButton(
-                        tooltip: 'รีเฟรช',
-                        onPressed: _loading ? null : _load,
-                        icon: const Icon(Icons.refresh_outlined),
-                      ),
                     ],
                   ),
                 ),

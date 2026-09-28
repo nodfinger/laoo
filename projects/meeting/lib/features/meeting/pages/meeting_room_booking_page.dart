@@ -3009,11 +3009,6 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
               ),
             ),
           ),
-          IconButton(
-            tooltip: 'รีเฟรชรายการจองและสิทธิ์',
-            onPressed: _searching || _loading ? null : _load,
-            icon: Icon(Icons.refresh, color: preset.primary),
-          ),
         ],
       ),
       const Divider(color: LaooColors.border),

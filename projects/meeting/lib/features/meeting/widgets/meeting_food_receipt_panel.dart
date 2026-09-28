@@ -205,11 +205,6 @@ class _MeetingFoodReceiptPanelState extends State<MeetingFoodReceiptPanel> {
                   onPressed: _saving ? null : widget.onClose,
                   child: const Text('ปิดรายการรับอาหาร'),
                 ),
-                OutlinedButton.icon(
-                  onPressed: _loading || _saving ? null : _load,
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('โหลดข้อมูลรับอาหารล่าสุด'),
-                ),
                 if (receipt?.canReceive == true)
                   FilledButton.icon(
                     key: const ValueKey('save-food-receipt'),
@@ -230,8 +225,15 @@ class _MeetingFoodReceiptPanelState extends State<MeetingFoodReceiptPanel> {
             ),
             const SizedBox(height: 12),
             if (_loading) const LinearProgressIndicator(),
-            if (_needsRefresh)
-              const Text('กรุณาโหลดข้อมูลรับอาหารล่าสุดก่อนบันทึกอีกครั้ง'),
+            if (_needsRefresh) ...[
+              const Text(
+                'ข้อมูลรับอาหารอาจไม่ล่าสุด กรุณาลองอีกครั้งก่อนบันทึก',
+              ),
+              OutlinedButton(
+                onPressed: _loading || _saving ? null : _load,
+                child: const Text('ลองอีกครั้ง'),
+              ),
+            ],
             if (!_loading && receipt != null) ...[
               if (receipt.checkInDate == null)
                 const Text('ต้องเช็กอินรอบนี้ก่อนรับอาหาร')

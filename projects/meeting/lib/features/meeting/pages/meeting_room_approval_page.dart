@@ -772,13 +772,7 @@ class _MeetingRoomApprovalPageState extends State<MeetingRoomApprovalPage> {
                         child: WorkspaceActionHeader(
                           title: _caption,
                           favoriteKey: '21004',
-                          actions: [
-                            IconButton(
-                              tooltip: 'รีเฟรช',
-                              onPressed: _load,
-                              icon: Icon(Icons.refresh, color: preset.primary),
-                            ),
-                          ],
+                          actions: const [],
                         ),
                       ),
                       const SizedBox(height: LaooLayout.cardSpacing),
