@@ -92,6 +92,7 @@ class _MeetingRoomIssuePageState extends State<MeetingRoomIssuePage> {
       : '$fallback\n$error';
 
   Future<void> _createIssue() async {
+    if (_actions['create'] != true) return;
     final rooms = _roomsData
         .where((room) => (room['itemItems'] as List? ?? const []).isNotEmpty)
         .toList();
@@ -107,13 +108,13 @@ class _MeetingRoomIssuePageState extends State<MeetingRoomIssuePage> {
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, refresh) => MeetingPopup(
-          title: const MeetingPopupTitle(
+          title: MeetingPopupTitle(
             icon: Icons.handyman_outlined,
-            text: 'แจ้งส่งซ่อมอุปกรณ์',
+            text: '$_caption > เพิ่ม',
           ),
           scrollable: true,
-          content: SizedBox(
-            width: 480,
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -145,7 +146,7 @@ class _MeetingRoomIssuePageState extends State<MeetingRoomIssuePage> {
                     });
                   },
                 ),
-                const SizedBox(height: LaooLayout.cardSpacing),
+                const SizedBox(height: LaooLayout.popupFieldSpacing),
                 DropdownButtonFormField<int>(
                   initialValue: itemId,
                   isExpanded: true,
@@ -167,7 +168,7 @@ class _MeetingRoomIssuePageState extends State<MeetingRoomIssuePage> {
                   }(),
                   onChanged: (value) => refresh(() => itemId = value),
                 ),
-                const SizedBox(height: LaooLayout.cardSpacing),
+                const SizedBox(height: LaooLayout.popupFieldSpacing),
                 TextField(
                   controller: description,
                   maxLines: 4,
@@ -219,12 +220,12 @@ class _MeetingRoomIssuePageState extends State<MeetingRoomIssuePage> {
   Future<void> _viewIssue(Map<String, dynamic> item) => showDialog<void>(
     context: context,
     builder: (context) => MeetingPopup(
-      title: const MeetingPopupTitle(
+      title: MeetingPopupTitle(
         icon: Icons.info_outline,
-        text: 'รายละเอียดแจ้งปัญหา',
+        text: '$_caption > ดู',
       ),
-      content: SizedBox(
-        width: 480,
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480),
         child: Text(
           '${item['roomCode']} | ${item['roomNameTh']}\n${item['itemName']} (${item['itemCode']})\n\n${item['description']}\n\nสถานะ: ${item['statusCode']}',
         ),
@@ -239,6 +240,7 @@ class _MeetingRoomIssuePageState extends State<MeetingRoomIssuePage> {
   );
 
   Future<void> _editIssue(Map<String, dynamic> item) async {
+    if (_actions['edit'] != true) return;
     if (item['statusCode'] != 'OPEN') {
       setState(() => _message = 'แก้ไขได้เฉพาะรายการสถานะ OPEN');
       return;
@@ -249,9 +251,9 @@ class _MeetingRoomIssuePageState extends State<MeetingRoomIssuePage> {
     final saved = await showDialog<bool>(
       context: context,
       builder: (context) => MeetingPopup(
-        title: const MeetingPopupTitle(
+        title: MeetingPopupTitle(
           icon: Icons.edit_outlined,
-          text: 'แก้ไขแจ้งปัญหา',
+          text: '$_caption > แก้ไข',
         ),
         content: TextField(
           controller: description,
@@ -281,19 +283,24 @@ class _MeetingRoomIssuePageState extends State<MeetingRoomIssuePage> {
         await _load();
       }
     } catch (error) {
-      if (mounted)
+      if (mounted) {
         setState(() => _message = _error(error, 'แก้ไขรายการไม่สำเร็จ'));
+      }
     }
   }
 
   Future<void> _deleteIssue(Map<String, dynamic> item) async {
+    if (_actions['delete'] != true) return;
     if (item['statusCode'] != 'OPEN') {
       setState(() => _message = 'ลบได้เฉพาะรายการสถานะ OPEN');
       return;
     }
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (_) => MeetingDeletePopup(record: '${item['itemName']}'),
+      builder: (_) => MeetingDeletePopup(
+        record: '${item['itemName']} (${item['itemCode']})',
+        description: 'รายการสถานะ OPEN จะถูกลบถาวรและเรียกคืนไม่ได้',
+      ),
     );
     if (confirmed != true) return;
     try {
@@ -303,8 +310,9 @@ class _MeetingRoomIssuePageState extends State<MeetingRoomIssuePage> {
         await _load();
       }
     } catch (error) {
-      if (mounted)
+      if (mounted) {
         setState(() => _message = _error(error, 'ลบรายการไม่สำเร็จ'));
+      }
     }
   }
 
@@ -385,13 +393,15 @@ class _MeetingRoomIssuePageState extends State<MeetingRoomIssuePage> {
                                 onPressed: () => _viewIssue(item),
                                 icon: const Icon(Icons.visibility_outlined),
                               ),
-                              if (_actions['edit'] == true)
+                              if (_actions['edit'] == true &&
+                                  item['statusCode'] == 'OPEN')
                                 IconButton(
                                   tooltip: 'แก้ไข',
                                   onPressed: () => _editIssue(item),
                                   icon: const Icon(Icons.edit_outlined),
                                 ),
-                              if (_actions['delete'] == true)
+                              if (_actions['delete'] == true &&
+                                  item['statusCode'] == 'OPEN')
                                 IconButton(
                                   tooltip: 'ลบ',
                                   onPressed: () => _deleteIssue(item),

@@ -72,7 +72,9 @@ class _VotePageState extends State<VotePage> {
     'mine' => 'โหวตของฉัน',
     _ => 'ผลและรายงานการโหวต',
   };
-  void reload() => setState(() => future = _load());
+  void reload() => setState(() {
+    future = _load();
+  });
 
   void _search() {
     _appliedSearch = _searchController.text.trim();
@@ -120,22 +122,26 @@ class _VotePageState extends State<VotePage> {
             title: title,
             menuCode: menuCode,
             content: VoteEmptyCard(
-              message: 'ไม่สามารถโหลดข้อมูลได้ กรุณาลองใหม่อีกครั้ง',
+              message:
+                  'ไม่สามารถโหลดข้อมูลได้\nรายละเอียดเพิ่มเติม: กรุณาตรวจสอบการเชื่อมต่อหรือสิทธิ์ใช้งาน แล้วลองอีกครั้ง',
               onRetry: reload,
             ),
           );
         }
-        return _loaded(snapshot.data);
+        return _loaded(context, snapshot.data);
       },
     ),
   );
 
-  Widget _loaded(dynamic data) {
+  Widget _loaded(BuildContext contentContext, dynamic data) {
     if (widget.kind == 'settings') {
       return VotePageLayout(
         title: title,
         menuCode: menuCode,
-        content: _settings(Map<String, dynamic>.from(data as Map)),
+        content: _settings(
+          contentContext,
+          Map<String, dynamic>.from(data as Map),
+        ),
       );
     }
 
@@ -375,11 +381,11 @@ class _VotePageState extends State<VotePage> {
         : text;
   }
 
-  Widget _settings(Map x) {
+  Widget _settings(BuildContext context, Map x) {
     final theme = Theme.of(context);
     return Card(
-      color: theme.colorScheme.surface,
-      surfaceTintColor: theme.colorScheme.surface,
+      color: theme.cardTheme.color ?? theme.colorScheme.surface,
+      surfaceTintColor: Colors.transparent,
       elevation: 0,
       margin: EdgeInsets.zero,
       shape: voteShape(),
@@ -576,6 +582,7 @@ class _VotePageState extends State<VotePage> {
               'หัวข้อเปิด': x['open'],
               'ปิดแล้ว': x['closed'],
               'รออนุมัติ': x['pendingApproval'],
+              'ผู้มีสิทธิ์': x['eligible'],
               'อัตราโหวต': '${x['turnout'] ?? 0}%',
             }.entries)
               SizedBox(

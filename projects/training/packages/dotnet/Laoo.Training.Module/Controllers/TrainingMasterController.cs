@@ -149,7 +149,7 @@ DECLARE @targetId bigint=@id;
 DECLARE @code nvarchar(30)=NULLIF(LTRIM(RTRIM(@codeInput)),N'');
 IF @targetId IS NULL
 BEGIN
-    IF @code IS NULL SET @code=N'__PENDING_'+CONVERT(nvarchar(36),NEWID());
+    IF @code IS NULL SET @code=N'__PENDING_'+LEFT(REPLACE(CONVERT(nvarchar(36),NEWID()),N'-',N''),16);
     INSERT {definition.TableName}(CompanyID,{definition.CodeColumn},{definition.NameColumn},{extraColumns})
     VALUES(@company,@code,@name,{extraValues});
     SET @targetId=SCOPE_IDENTITY();
@@ -257,9 +257,16 @@ SELECT @targetId;
         rowVersion = Convert.ToBase64String((byte[])reader.GetValue(9)),
     };
 
-    private async Task<bool> Allowed(SqlConnection connection, string screenCode, string action, CancellationToken token) =>
-        (action == "VIEW" || await ScreenType(connection, screenCode, token) == 1)
-        && await CompanyMenuAccess.IsAllowedAsync(connection, User, screenCode, action, token);
+    private async Task<bool> Allowed(SqlConnection connection, string screenCode, string action, CancellationToken token)
+    {
+        if (!long.TryParse(User.FindFirstValue("project_id"), out var activeProjectId)) return false;
+        await using var command = new SqlCommand(
+            "SELECT COUNT_BIG(*) FROM dbo.TDADProject WHERE ProjectCode=N'LAOO_TRAINING' AND ProjectID=@project AND IsActive=1", connection);
+        command.Parameters.AddWithValue("@project", activeProjectId);
+        if (Convert.ToInt64(await command.ExecuteScalarAsync(token)) != 1) return false;
+        return (action == "VIEW" || await ScreenType(connection, screenCode, token) == 1)
+            && await CompanyMenuAccess.IsAllowedAsync(connection, User, screenCode, action, token);
+    }
 
     private async Task<SqlConnection> Open(CancellationToken token)
     {

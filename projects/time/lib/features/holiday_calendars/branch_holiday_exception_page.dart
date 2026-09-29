@@ -14,9 +14,15 @@ class _BranchHolidayExceptionPageState
     extends State<BranchHolidayExceptionPage> {
   late final JsonApiClient api;
   Map<String, dynamic>? actions;
+  bool get canCreate =>
+      actions?['screenType'] == 1 && actions?['create'] == true;
+  bool get canEdit => actions?['screenType'] == 1 && actions?['edit'] == true;
+  bool get canDelete =>
+      actions?['screenType'] == 1 && actions?['delete'] == true;
   List<Map<String, dynamic>> branches = [];
   List<Map<String, dynamic>> items = [];
   int? branchId;
+  int page = 1, total = 0;
   bool loading = true;
   String? message;
   bool messageError = false;
@@ -53,12 +59,12 @@ class _BranchHolidayExceptionPageState
     }
   }
 
-  Future<void> load() async {
+  Future<void> load({int targetPage = 1}) async {
     setState(() => loading = true);
     try {
       final q = <String, String>{
-        'page': '1',
-        'pageSize': '30',
+        'page': '$targetPage',
+        'pageSize': '$timePageSize',
         if (branchId != null) 'branchId': '$branchId',
       };
       final x = Map<String, dynamic>.from(
@@ -66,11 +72,13 @@ class _BranchHolidayExceptionPageState
             as Map,
       );
       if (mounted) {
-        setState(
-          () => items = (x['items'] as List? ?? const [])
+        setState(() {
+          page = (x['page'] as num?)?.toInt() ?? targetPage;
+          total = (x['total'] as num?)?.toInt() ?? 0;
+          items = (x['items'] as List? ?? const [])
               .map((e) => Map<String, dynamic>.from(e as Map))
-              .toList(),
-        );
+              .toList();
+        });
       }
     } catch (e) {
       show(timeErrorText(e), true);
@@ -89,6 +97,7 @@ class _BranchHolidayExceptionPageState
   }
 
   Future<void> edit([Map<String, dynamic>? value]) async {
+    if (value == null ? !canCreate : !canEdit) return;
     final x = await showDialog<Map<String, dynamic>>(
       context: context,
       barrierDismissible: false,
@@ -104,7 +113,7 @@ class _BranchHolidayExceptionPageState
           body: x,
         );
       }
-      await load();
+      await load(targetPage: page);
       show('บันทึกข้อมูลสำเร็จ', false);
     } catch (e) {
       show(timeErrorText(e), true);
@@ -112,6 +121,7 @@ class _BranchHolidayExceptionPageState
   }
 
   Future<void> remove(Map<String, dynamic> x) async {
+    if (!canDelete) return;
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => TimeDeleteDialog(
@@ -124,7 +134,7 @@ class _BranchHolidayExceptionPageState
         '/api/time/holiday-calendars/exceptions/${x['branchHolidayExceptionId']}',
         query: {'rowVersion': x['rowVersion'].toString()},
       );
-      await load();
+      await load(targetPage: page > 1 && items.length == 1 ? page - 1 : page);
       show('ลบข้อมูลสำเร็จ', false);
     } catch (e) {
       show(timeErrorText(e), true);
@@ -149,7 +159,7 @@ class _BranchHolidayExceptionPageState
                     api: api,
                     menuCode: TimeMenuCodes.branchHolidayExceptions,
                     caption: caption,
-                    trailing: actions?['create'] == true
+                    trailing: canCreate
                         ? FilledButton.icon(
                             onPressed: () => edit(),
                             icon: const Icon(Icons.add),
@@ -190,12 +200,14 @@ class _BranchHolidayExceptionPageState
                       ),
                     ),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 6),
                   Expanded(
                     child: Card(
                       margin: EdgeInsets.zero,
                       child: loading
                           ? const Center(child: CircularProgressIndicator())
+                          : items.isEmpty
+                          ? const Center(child: Text('ไม่พบข้อมูล'))
                           : ListView.separated(
                               padding: timeUiTokens.cardPadding,
                               itemCount: items.length,
@@ -213,19 +225,21 @@ class _BranchHolidayExceptionPageState
                                   isThreeLine: true,
                                   trailing: Wrap(
                                     children: [
-                                      if (actions?['edit'] == true)
+                                      if (canEdit)
                                         IconButton(
                                           onPressed: () => edit(x),
                                           tooltip: 'แก้ไข',
                                           icon: const Icon(Icons.edit_outlined),
                                         ),
-                                      if (actions?['delete'] == true)
+                                      if (canDelete)
                                         IconButton(
                                           onPressed: () => remove(x),
                                           tooltip: 'ลบ',
-                                          icon: const Icon(
+                                          icon: Icon(
                                             Icons.delete_outline,
-                                            color: Colors.red,
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.error,
                                           ),
                                         ),
                                     ],
@@ -234,6 +248,20 @@ class _BranchHolidayExceptionPageState
                               },
                             ),
                     ),
+                  ),
+                  const SizedBox(height: 6),
+                  TimePaginationCard(
+                    tokens: timeUiTokens.workspace,
+                    page: page,
+                    pageCount: total == 0 ? 1 : (total / timePageSize).ceil(),
+                    pageSize: timePageSize,
+                    total: total,
+                    onPrevious: page > 1
+                        ? () => load(targetPage: page - 1)
+                        : null,
+                    onNext: page * timePageSize < total
+                        ? () => load(targetPage: page + 1)
+                        : null,
                   ),
                 ],
               ),

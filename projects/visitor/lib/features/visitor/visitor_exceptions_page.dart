@@ -7,7 +7,9 @@ import 'visitor_inside_repository.dart';
 import 'visitor_visit_detail_dialog.dart';
 
 class VisitorExceptionsPage extends StatefulWidget {
-  const VisitorExceptionsPage({super.key});
+  const VisitorExceptionsPage({super.key, this.apiClient});
+
+  final VisitorApiClient? apiClient;
 
   @override
   State<VisitorExceptionsPage> createState() => _VisitorExceptionsPageState();
@@ -30,7 +32,7 @@ class _VisitorExceptionsPageState extends State<VisitorExceptionsPage> {
   @override
   void initState() {
     super.initState();
-    _api = VisitorApiClient();
+    _api = widget.apiClient ?? VisitorApiClient();
     _repository = VisitorExceptionsRepository(_api);
     _detailRepository = VisitorInsideRepository(_api);
     _load();
@@ -39,7 +41,7 @@ class _VisitorExceptionsPageState extends State<VisitorExceptionsPage> {
   @override
   void dispose() {
     _search.dispose();
-    _api.dispose();
+    if (widget.apiClient == null) _api.dispose();
     super.dispose();
   }
 
@@ -68,7 +70,15 @@ class _VisitorExceptionsPageState extends State<VisitorExceptionsPage> {
         _result = result;
       });
     } catch (error) {
-      if (mounted) setState(() => _error = error.toString());
+      if (mounted) {
+        final detail = error is VisitorApiException
+            ? error.message
+            : 'กรุณาตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง';
+        setState(
+          () => _error =
+              'ไม่สามารถโหลดรายการผิดปกติได้\nรายละเอียดเพิ่มเติม: $detail',
+        );
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -124,84 +134,96 @@ class _VisitorExceptionsPageState extends State<VisitorExceptionsPage> {
         SizedBox(height: visitorUiTokens.listSectionSpacing),
         if (_error != null) ...[
           _surface(
-            Text(
-              _error!,
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _error!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton(
+                  onPressed: _loading ? null : _load,
+                  child: const Text('ลองอีกครั้ง'),
+                ),
+              ],
             ),
           ),
           SizedBox(height: visitorUiTokens.listSectionSpacing),
         ],
-        _surface(_list()),
+        if (_error == null) _surface(_list()),
         SizedBox(height: visitorUiTokens.listSectionSpacing),
         _pagination(),
       ],
     ),
   );
 
-  Widget _filters() => Wrap(
-    spacing: 8,
-    runSpacing: 8,
-    crossAxisAlignment: WrapCrossAlignment.center,
-    children: [
-      SizedBox(
-        width: 280,
-        child: TextField(
-          controller: _search,
-          onSubmitted: (_) => _load(resetPage: true),
-          decoration: const InputDecoration(
-            labelText: 'ค้นหาชื่อ / ผู้รับรอง / จุดติดต่อ',
-            prefixIcon: Icon(Icons.search),
+  Widget _filters() => LayoutBuilder(
+    builder: (context, constraints) => Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        SizedBox(
+          width: constraints.maxWidth < 280 ? constraints.maxWidth : 280,
+          child: TextField(
+            controller: _search,
+            onSubmitted: (_) => _load(resetPage: true),
+            decoration: const InputDecoration(
+              labelText: 'ค้นหาชื่อ / ผู้รับรอง / จุดติดต่อ',
+              prefixIcon: Icon(Icons.search),
+            ),
           ),
         ),
-      ),
-      SizedBox(
-        width: 250,
-        child: DropdownButtonFormField<String>(
-          key: ValueKey(_type),
-          initialValue: _type,
-          isExpanded: true,
-          decoration: const InputDecoration(labelText: 'ประเภทผิดปกติ'),
-          items: const [
-            DropdownMenuItem(value: 'ALL', child: Text('ทั้งหมด')),
-            DropdownMenuItem(
-              value: 'HOST_CONFIRMATION_PENDING',
-              child: Text('รอยืนยันการเข้าพบ'),
-            ),
-            DropdownMenuItem(
-              value: 'CHECKOUT_OTHER',
-              child: Text('Check-out เหตุผลอื่น ๆ'),
-            ),
-            DropdownMenuItem(
-              value: 'NOTIFICATION_FAILED',
-              child: Text('แจ้งเตือนส่งไม่สำเร็จ'),
-            ),
-            DropdownMenuItem(
-              value: 'NOTIFICATION_NO_CHANNEL',
-              child: Text('ไม่มีช่องทางแจ้งเตือน'),
-            ),
-            DropdownMenuItem(
-              value: 'CHECKOUT_RULE_MISMATCH',
-              child: Text('ผลและเหตุผลไม่สัมพันธ์กัน'),
-            ),
-          ],
-          onChanged: (value) => setState(() => _type = value ?? 'ALL'),
+        SizedBox(
+          width: constraints.maxWidth < 250 ? constraints.maxWidth : 250,
+          child: DropdownButtonFormField<String>(
+            key: ValueKey(_type),
+            initialValue: _type,
+            isExpanded: true,
+            decoration: const InputDecoration(labelText: 'ประเภทผิดปกติ'),
+            items: const [
+              DropdownMenuItem(value: 'ALL', child: Text('ทั้งหมด')),
+              DropdownMenuItem(
+                value: 'HOST_CONFIRMATION_PENDING',
+                child: Text('รอยืนยันการเข้าพบ'),
+              ),
+              DropdownMenuItem(
+                value: 'CHECKOUT_OTHER',
+                child: Text('Check-out เหตุผลอื่น ๆ'),
+              ),
+              DropdownMenuItem(
+                value: 'NOTIFICATION_FAILED',
+                child: Text('แจ้งเตือนส่งไม่สำเร็จ'),
+              ),
+              DropdownMenuItem(
+                value: 'NOTIFICATION_NO_CHANNEL',
+                child: Text('ไม่มีช่องทางแจ้งเตือน'),
+              ),
+              DropdownMenuItem(
+                value: 'CHECKOUT_RULE_MISMATCH',
+                child: Text('ผลและเหตุผลไม่สัมพันธ์กัน'),
+              ),
+            ],
+            onChanged: (value) => setState(() => _type = value ?? 'ALL'),
+          ),
         ),
-      ),
-      OutlinedButton.icon(
-        onPressed: _loading ? null : _pickPeriod,
-        icon: const Icon(Icons.date_range_outlined),
-        label: Text(_periodText),
-      ),
-      FilledButton.icon(
-        onPressed: _loading ? null : () => _load(resetPage: true),
-        icon: const Icon(Icons.search),
-        label: const Text('ค้นหา'),
-      ),
-      OutlinedButton(
-        onPressed: _loading ? null : _clear,
-        child: const Text('ล้าง Filter'),
-      ),
-    ],
+        OutlinedButton.icon(
+          onPressed: _loading ? null : _pickPeriod,
+          icon: const Icon(Icons.date_range_outlined),
+          label: Text(_periodText),
+        ),
+        FilledButton.icon(
+          onPressed: _loading ? null : () => _load(resetPage: true),
+          icon: const Icon(Icons.search),
+          label: const Text('ค้นหา'),
+        ),
+        OutlinedButton(
+          onPressed: _loading ? null : _clear,
+          child: const Text('ล้าง Filter'),
+        ),
+      ],
+    ),
   );
 
   String get _periodText {

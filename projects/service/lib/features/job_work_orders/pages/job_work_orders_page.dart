@@ -3,24 +3,30 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
 import '../../../app/theme/laoo_design_tokens.dart';
+import '../../../app/theme/laoo_typography.dart';
 import '../../../core/api/api_exception.dart';
+import '../../../core/navigation/navigation_menu_repository.dart';
 import '../../../core/widgets/timed_snack_bar.dart';
 import '../../service_request/data/service_request_api.dart';
 import '../../support/presentation/widgets/support_workspace_shell.dart';
 
 class JobWorkOrdersPage extends StatefulWidget {
-  const JobWorkOrdersPage({super.key, this.initialStatus = 'OPEN'});
+  const JobWorkOrdersPage({super.key, this.initialStatus = 'OPEN', this.api});
   final String initialStatus;
+  final ServiceRequestApi? api;
 
   @override
   State<JobWorkOrdersPage> createState() => _JobWorkOrdersPageState();
 }
 
 class _JobWorkOrdersPageState extends State<JobWorkOrdersPage> {
-  final _api = ServiceRequestApi();
+  late final ServiceRequestApi _api = widget.api ?? ServiceRequestApi();
   final _search = TextEditingController();
+  String _caption = 'ทะเบียนใบงานทั้งหมด';
+  bool _canEdit = false;
   String _status = 'OPEN';
   bool _loading = true;
+  String? _loadError;
   int _page = 1;
   int _total = 0;
   List<Map<String, dynamic>> _items = const [];
@@ -30,6 +36,30 @@ class _JobWorkOrdersPageState extends State<JobWorkOrdersPage> {
     super.initState();
     _status = widget.initialStatus;
     _load();
+    _loadActions();
+    _loadCaption();
+  }
+
+  Future<void> _loadActions() async {
+    try {
+      final actions = await _api.actions();
+      if (mounted) {
+        setState(() => _canEdit = actions['workOrderEdit'] == true);
+      }
+    } catch (_) {
+      // Keep mutation actions hidden if permission lookup fails.
+    }
+  }
+
+  Future<void> _loadCaption() async {
+    try {
+      final caption = await NavigationMenuRepository().resolveMenuName(
+        menuCode: '17002',
+        routeName: 'jobWorkOrders',
+        fallback: _caption,
+      );
+      if (mounted) setState(() => _caption = caption);
+    } catch (_) {}
   }
 
   @override
@@ -39,12 +69,16 @@ class _JobWorkOrdersPageState extends State<JobWorkOrdersPage> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
     try {
       final value = await _api.list(
         search: _search.text.trim(),
         status: _status,
         page: _page,
+        menuCode: '17002',
       );
       if (!mounted) return;
       setState(() {
@@ -54,7 +88,15 @@ class _JobWorkOrdersPageState extends State<JobWorkOrdersPage> {
         _total = (value['total'] as num?)?.toInt() ?? 0;
       });
     } catch (error) {
-      if (mounted) _message(error);
+      if (mounted) {
+        setState(() {
+          _items = const [];
+          _total = 0;
+          _loadError = error is ApiException
+              ? '${error.message}\nรายละเอียดเพิ่มเติม: ${error.description ?? 'กรุณาตรวจสอบการเชื่อมต่อและลองอีกครั้ง'}'
+              : 'ไม่สามารถโหลดทะเบียนใบงานได้\nรายละเอียดเพิ่มเติม: กรุณาตรวจสอบการเชื่อมต่อและลองอีกครั้ง';
+        });
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -64,13 +106,18 @@ class _JobWorkOrdersPageState extends State<JobWorkOrdersPage> {
     final id = (row['requestId'] as num?)?.toInt();
     if (id == null) return;
     try {
-      final data = await _api.detail(id);
-      final attachments = await _api.attachments(id);
+      final data = await _api.detail(id, menuCode: '17002');
+      final attachments = await _api.attachments(id, menuCode: '17002');
       if (!mounted) return;
       final changed = await showDialog<bool>(
         context: context,
-        builder: (_) =>
-            _WorkOrderDialog(api: _api, data: data, attachments: attachments),
+        builder: (_) => _WorkOrderDialog(
+          api: _api,
+          data: data,
+          attachments: attachments,
+          canEdit: _canEdit,
+          caption: _caption,
+        ),
       );
       if (changed == true && mounted) await _load();
     } catch (error) {
@@ -87,7 +134,7 @@ class _JobWorkOrdersPageState extends State<JobWorkOrdersPage> {
 
   @override
   Widget build(BuildContext context) => SupportWorkspaceShell(
-    pageTitle: 'ทะเบียนใบงานทั้งหมด',
+    pageTitle: _caption,
     activeMenu: 'jobWorkOrders',
     menuScope: WorkspaceMenuScope.company,
     child: Padding(
@@ -95,13 +142,63 @@ class _JobWorkOrdersPageState extends State<JobWorkOrdersPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Card(
+            margin: EdgeInsets.zero,
+            child: Padding(
+              padding: const EdgeInsets.all(LaooLayout.cardPadding),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.star_border,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: LaooLayout.cardPadding),
+                  Expanded(
+                    child: Text(
+                      _caption,
+                      style: LaooTypography.screenCaptionStyle,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: LaooLayout.listSectionSpacing),
           _toolbar(),
-          const SizedBox(height: LaooLayout.cardSpacing),
+          const SizedBox(height: LaooLayout.listSectionSpacing),
           Expanded(
             child: _loading
-                ? const Center(child: CircularProgressIndicator())
+                ? const Card(
+                    margin: EdgeInsets.zero,
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                : _loadError != null
+                ? Card(
+                    margin: EdgeInsets.zero,
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(LaooLayout.cardPadding),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(_loadError!, textAlign: TextAlign.center),
+                            const SizedBox(
+                              height: LaooLayout.listSectionSpacing,
+                            ),
+                            OutlinedButton(
+                              onPressed: _load,
+                              child: const Text('ลองอีกครั้ง'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  )
                 : _items.isEmpty
-                ? const Center(child: Text('ไม่พบใบงาน'))
+                ? const Card(
+                    margin: EdgeInsets.zero,
+                    child: Center(child: Text('ไม่พบใบงาน')),
+                  )
                 : LayoutBuilder(
                     builder: (context, constraints) =>
                         constraints.maxWidth < 900
@@ -117,7 +214,8 @@ class _JobWorkOrdersPageState extends State<JobWorkOrdersPage> {
                         : _WorkOrderTable(items: _items, onOpen: _open),
                   ),
           ),
-          if (!_loading && _total > 20) _pagination(),
+          const SizedBox(height: LaooLayout.listSectionSpacing),
+          _pagination(),
         ],
       ),
     ),
@@ -127,51 +225,67 @@ class _JobWorkOrdersPageState extends State<JobWorkOrdersPage> {
     margin: EdgeInsets.zero,
     child: Padding(
       padding: const EdgeInsets.all(LaooLayout.cardPadding),
-      child: Wrap(
-        spacing: 10,
-        runSpacing: 10,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          SizedBox(
-            width: 320,
-            child: TextField(
-              controller: _search,
-              onSubmitted: (_) => _refresh(),
-              decoration: const InputDecoration(
-                labelText: 'ค้นหาเลขที่ ผู้แจ้ง หัวข้อ หรือช่าง',
-                prefixIcon: Icon(Icons.search),
+      child: LayoutBuilder(
+        builder: (context, constraints) => Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            SizedBox(
+              width: constraints.maxWidth < 320 ? constraints.maxWidth : 320,
+              child: TextField(
+                controller: _search,
+                onSubmitted: (_) => _refresh(),
+                decoration: const InputDecoration(
+                  labelText: 'ค้นหาเลขที่ ผู้แจ้ง หัวข้อ หรือช่าง',
+                  prefixIcon: Icon(Icons.search),
+                ),
               ),
             ),
-          ),
-          DropdownButton<String>(
-            value: _status,
-            items: const [
-              DropdownMenuItem(value: 'OPEN', child: Text('งานที่ยังไม่เสร็จ')),
-              DropdownMenuItem(value: 'RECEIVED', child: Text('รับเรื่องแล้ว')),
-              DropdownMenuItem(
-                value: 'IN_PROGRESS',
-                child: Text('กำลังดำเนินการ'),
+            SizedBox(
+              width: constraints.maxWidth < 240 ? constraints.maxWidth : 240,
+              child: DropdownButtonFormField<String>(
+                initialValue: _status,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'สถานะ'),
+                items: const [
+                  DropdownMenuItem(
+                    value: 'OPEN',
+                    child: Text('งานที่ยังไม่เสร็จ'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'RECEIVED',
+                    child: Text('รับเรื่องแล้ว'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'IN_PROGRESS',
+                    child: Text('กำลังดำเนินการ'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'COMPLETED',
+                    child: Text('เสร็จสิ้น'),
+                  ),
+                  DropdownMenuItem(value: 'CANCELLED', child: Text('ยกเลิก')),
+                  DropdownMenuItem(value: 'ALL', child: Text('ทั้งหมด')),
+                ],
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() {
+                      _status = value;
+                      _page = 1;
+                    });
+                  }
+                  _load();
+                },
               ),
-              DropdownMenuItem(value: 'COMPLETED', child: Text('เสร็จสิ้น')),
-              DropdownMenuItem(value: 'CANCELLED', child: Text('ยกเลิก')),
-              DropdownMenuItem(value: 'ALL', child: Text('ทั้งหมด')),
-            ],
-            onChanged: (value) {
-              if (value != null) {
-                setState(() {
-                  _status = value;
-                  _page = 1;
-                });
-              }
-              _load();
-            },
-          ),
-          FilledButton.icon(
-            onPressed: _loading ? null : _refresh,
-            icon: const Icon(Icons.search),
-            label: const Text('ค้นหา'),
-          ),
-        ],
+            ),
+            FilledButton.icon(
+              onPressed: _loading ? null : _refresh,
+              icon: const Icon(Icons.search),
+              label: const Text('ค้นหา'),
+            ),
+          ],
+        ),
       ),
     ),
   );
@@ -181,30 +295,92 @@ class _JobWorkOrdersPageState extends State<JobWorkOrdersPage> {
     await _load();
   }
 
-  Widget _pagination() => Row(
-    mainAxisAlignment: MainAxisAlignment.end,
-    children: [
-      IconButton(
-        onPressed: _page > 1
-            ? () {
-                _page--;
-                _load();
-              }
-            : null,
-        icon: const Icon(Icons.chevron_left),
+  Widget _pagination() {
+    final primary = Theme.of(context).colorScheme.primary;
+    final first = _total == 0 ? 0 : (_page - 1) * 20 + 1;
+    final last = _total == 0 ? 0 : (_page * 20).clamp(0, _total);
+    return Card(
+      margin: EdgeInsets.zero,
+      child: SizedBox(
+        height: LaooLayout.paginationCardHeight,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: LaooLayout.cardPadding,
+          ),
+          child: Row(
+            children: [
+              _pageButton(
+                Icons.chevron_left,
+                _loading || _page <= 1
+                    ? null
+                    : () {
+                        _page--;
+                        _load();
+                      },
+              ),
+              const SizedBox(width: LaooLayout.listSectionSpacing),
+              SizedBox(
+                width: LaooLayout.paginationButtonSize,
+                height: LaooLayout.paginationButtonSize,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: primary,
+                    borderRadius: BorderRadius.circular(LaooRadius.xs),
+                  ),
+                  child: Center(
+                    child: Text(
+                      '$_page',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onPrimary,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: LaooLayout.listSectionSpacing),
+              _pageButton(
+                Icons.chevron_right,
+                _loading || _page * 20 >= _total
+                    ? null
+                    : () {
+                        _page++;
+                        _load();
+                      },
+              ),
+              const SizedBox(width: 12),
+              Flexible(
+                child: Text(
+                  '$first-$last จาก $_total',
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
-      Text('หน้า $_page'),
-      IconButton(
-        onPressed: _page * 20 < _total
-            ? () {
-                _page++;
-                _load();
-              }
-            : null,
-        icon: const Icon(Icons.chevron_right),
+    );
+  }
+
+  Widget _pageButton(IconData icon, VoidCallback? onPressed) {
+    final color = onPressed == null
+        ? Theme.of(context).colorScheme.outline
+        : Theme.of(context).colorScheme.primary;
+    return SizedBox(
+      width: LaooLayout.paginationButtonSize,
+      height: LaooLayout.paginationButtonSize,
+      child: OutlinedButton(
+        onPressed: onPressed,
+        style: OutlinedButton.styleFrom(
+          padding: EdgeInsets.zero,
+          side: BorderSide(color: color),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(LaooRadius.xs),
+          ),
+        ),
+        child: Icon(icon, size: 18, color: color),
       ),
-    ],
-  );
+    );
+  }
 }
 
 class _WorkOrderTable extends StatelessWidget {
@@ -327,10 +503,14 @@ class _WorkOrderDialog extends StatefulWidget {
     required this.api,
     required this.data,
     required this.attachments,
+    required this.canEdit,
+    required this.caption,
   });
   final ServiceRequestApi api;
   final Map<String, dynamic> data;
   final List<Map<String, dynamic>> attachments;
+  final bool canEdit;
+  final String caption;
 
   @override
   State<_WorkOrderDialog> createState() => _WorkOrderDialogState();
@@ -352,7 +532,7 @@ class _WorkOrderDialogState extends State<_WorkOrderDialog> {
         (item) => Map<String, dynamic>.from(item as Map),
       ),
     );
-    if (status == 'IN_PROGRESS') _loadPartsLookup();
+    if (widget.canEdit && status == 'IN_PROGRESS') _loadPartsLookup();
   }
 
   @override
@@ -379,6 +559,7 @@ class _WorkOrderDialogState extends State<_WorkOrderDialog> {
   }
 
   Future<void> _addPart() async {
+    if (!widget.canEdit) return;
     final lookup = _partsLookup;
     if (lookup == null) {
       await _loadPartsLookup();
@@ -386,7 +567,8 @@ class _WorkOrderDialogState extends State<_WorkOrderDialog> {
     }
     final value = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (_) => _PartPickerDialog(lookup: lookup),
+      builder: (_) =>
+          _PartPickerDialog(lookup: lookup, caption: widget.caption),
     );
     if (value == null || !mounted) return;
     final duplicate = _parts.any(
@@ -407,7 +589,7 @@ class _WorkOrderDialogState extends State<_WorkOrderDialog> {
   }
 
   Future<void> _start() async {
-    if (_busy) return;
+    if (_busy || !widget.canEdit) return;
     setState(() => _busy = true);
     try {
       await widget.api.start((widget.data['requestId'] as num).toInt());
@@ -425,6 +607,7 @@ class _WorkOrderDialogState extends State<_WorkOrderDialog> {
   }
 
   Future<void> _complete() async {
+    if (!widget.canEdit) return;
     final resolution = _resolution.text.trim();
     if (resolution.isEmpty) {
       showTimedSnackBar(
@@ -476,9 +659,46 @@ class _WorkOrderDialogState extends State<_WorkOrderDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-    title: Text(widget.data['requestNo']?.toString() ?? 'รายละเอียดใบงาน'),
+    backgroundColor: Colors.white,
+    surfaceTintColor: Colors.transparent,
+    insetPadding: const EdgeInsets.all(LaooLayout.dialogInsetPadding),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(LaooRadius.xs),
+    ),
+    title: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ConstrainedBox(
+          constraints: const BoxConstraints(
+            minHeight: LaooLayout.popupHeaderMinHeight,
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.build_circle_outlined,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(width: LaooLayout.cardPadding),
+              Expanded(
+                child: Text(
+                  '${widget.caption} > ${widget.data['requestNo'] ?? 'รายละเอียด'}',
+                  style: const TextStyle(
+                    color: LaooColors.pageCaption,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const Divider(color: LaooColors.border, height: 1),
+      ],
+    ),
     content: SizedBox(
-      width: (MediaQuery.sizeOf(context).width - 32).clamp(280.0, 620.0),
+      width:
+          (MediaQuery.sizeOf(context).width - LaooLayout.dialogInsetPadding * 2)
+              .clamp(0.0, 480.0),
       child: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -528,7 +748,7 @@ class _WorkOrderDialogState extends State<_WorkOrderDialog> {
                       style: TextStyle(fontWeight: FontWeight.w700),
                     ),
                   ),
-                  if (status == 'IN_PROGRESS')
+                  if (widget.canEdit && status == 'IN_PROGRESS')
                     OutlinedButton.icon(
                       onPressed: _busy || _partsLoading ? null : _addPart,
                       icon: const Icon(Icons.add),
@@ -554,7 +774,7 @@ class _WorkOrderDialogState extends State<_WorkOrderDialog> {
                       '${part['warehouseName'] ?? ''}  จำนวน ${_quantity(part['quantity'])} ${part['unitCode'] ?? ''}\nต้นทุน ${_money(part['unitCost'])} บาท / รวม ${_money(part['totalCost'] ?? ((part['quantity'] as num?)?.toDouble() ?? 0) * ((part['unitCost'] as num?)?.toDouble() ?? 0))} บาท${((part['serialNos'] as List?) ?? const []).isEmpty ? '' : '\nSerial: ${(part['serialNos'] as List).join(', ')}'}',
                     ),
                     isThreeLine: true,
-                    trailing: status == 'IN_PROGRESS'
+                    trailing: widget.canEdit && status == 'IN_PROGRESS'
                         ? IconButton(
                             tooltip: 'ลบรายการ',
                             onPressed: _busy
@@ -575,7 +795,7 @@ class _WorkOrderDialogState extends State<_WorkOrderDialog> {
                   ),
                 ),
             ],
-            if (status == 'IN_PROGRESS') ...[
+            if (widget.canEdit && status == 'IN_PROGRESS') ...[
               const SizedBox(height: 16),
               TextField(
                 controller: _resolution,
@@ -593,28 +813,63 @@ class _WorkOrderDialogState extends State<_WorkOrderDialog> {
         ),
       ),
     ),
+    actionsPadding: EdgeInsets.zero,
     actions: [
-      TextButton(
-        onPressed: _busy ? null : () => Navigator.pop(context),
-        child: const Text('ปิด'),
+      Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Divider(color: LaooColors.border, height: 1),
+          Padding(
+            padding: const EdgeInsets.all(LaooLayout.cardPadding),
+            child: Wrap(
+              alignment: WrapAlignment.end,
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton(
+                  onPressed: _busy ? null : () => Navigator.pop(context),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(0, 48),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(LaooRadius.xs),
+                    ),
+                  ),
+                  child: const Text('ปิด'),
+                ),
+                if (widget.canEdit && status == 'RECEIVED')
+                  FilledButton.icon(
+                    onPressed: _busy ? null : _start,
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(0, 48),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(LaooRadius.xs),
+                      ),
+                    ),
+                    icon: const Icon(Icons.play_arrow),
+                    label: const Text('เริ่มดำเนินการ'),
+                  ),
+                if (widget.canEdit && status == 'IN_PROGRESS')
+                  FilledButton.icon(
+                    onPressed: _busy ? null : _complete,
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(0, 48),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(LaooRadius.xs),
+                      ),
+                    ),
+                    icon: const Icon(Icons.task_alt),
+                    label: const Text('บันทึกปิดงาน'),
+                  ),
+              ],
+            ),
+          ),
+        ],
       ),
-      if (status == 'RECEIVED')
-        FilledButton.icon(
-          onPressed: _busy ? null : _start,
-          icon: const Icon(Icons.play_arrow),
-          label: const Text('เริ่มดำเนินการ'),
-        ),
-      if (status == 'IN_PROGRESS')
-        FilledButton.icon(
-          onPressed: _busy ? null : _complete,
-          icon: const Icon(Icons.task_alt),
-          label: const Text('บันทึกปิดงาน'),
-        ),
     ],
   );
 
   Widget _line(String label, Object? value) => Padding(
-    padding: const EdgeInsets.only(bottom: 8),
+    padding: const EdgeInsets.only(bottom: LaooLayout.popupFieldSpacing),
     child: Text(
       '$label: ${value?.toString().isNotEmpty == true ? value : '-'}',
       softWrap: true,
@@ -623,8 +878,9 @@ class _WorkOrderDialogState extends State<_WorkOrderDialog> {
 }
 
 class _PartPickerDialog extends StatefulWidget {
-  const _PartPickerDialog({required this.lookup});
+  const _PartPickerDialog({required this.lookup, required this.caption});
   final Map<String, dynamic> lookup;
+  final String caption;
 
   @override
   State<_PartPickerDialog> createState() => _PartPickerDialogState();
@@ -736,9 +992,47 @@ class _PartPickerDialogState extends State<_PartPickerDialog> {
     final item = _selectedItem;
     final serial = item?['stockTrackingCode'] == 'SERIAL';
     return AlertDialog(
-      title: const Text('เพิ่มอะไหล่ที่ใช้ซ่อม'),
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      insetPadding: const EdgeInsets.all(LaooLayout.dialogInsetPadding),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(LaooRadius.xs),
+      ),
+      title: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ConstrainedBox(
+            constraints: const BoxConstraints(
+              minHeight: LaooLayout.popupHeaderMinHeight,
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.add_box_outlined,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(width: LaooLayout.cardPadding),
+                Expanded(
+                  child: Text(
+                    '${widget.caption} > เพิ่มอะไหล่ที่ใช้ซ่อม',
+                    style: LaooTypography.screenCaptionStyle,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Divider(
+            height: 1,
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
+        ],
+      ),
       content: SizedBox(
-        width: (MediaQuery.sizeOf(context).width - 32).clamp(280.0, 520.0),
+        width:
+            (MediaQuery.sizeOf(context).width -
+                    LaooLayout.dialogInsetPadding * 2 -
+                    LaooLayout.cardPadding * 2)
+                .clamp(0.0, 480.0),
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -766,7 +1060,7 @@ class _PartPickerDialogState extends State<_PartPickerDialog> {
                   _error = null;
                 }),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: LaooLayout.popupFieldSpacing),
               DropdownButtonFormField<int>(
                 key: ValueKey(_warehouseId),
                 initialValue: _itemId,
@@ -790,7 +1084,7 @@ class _PartPickerDialogState extends State<_PartPickerDialog> {
                   _error = null;
                 }),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: LaooLayout.popupFieldSpacing),
               if (!serial)
                 TextField(
                   controller: _quantityController,
@@ -834,26 +1128,61 @@ class _PartPickerDialogState extends State<_PartPickerDialog> {
                 ),
               ],
               if (item != null) ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: LaooLayout.popupFieldSpacing),
                 Text('ต้นทุนต่อหน่วย ${_money(item['unitCost'])} บาท'),
               ],
               if (_error != null) ...[
                 const SizedBox(height: 8),
-                Text(_error!, style: const TextStyle(color: Colors.red)),
+                Text(
+                  _error!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
               ],
             ],
           ),
         ),
       ),
+      actionsPadding: EdgeInsets.zero,
       actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('ยกเลิก'),
-        ),
-        FilledButton.icon(
-          onPressed: _save,
-          icon: const Icon(Icons.add),
-          label: const Text('เพิ่มรายการ'),
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Divider(
+              height: 1,
+              color: Theme.of(context).colorScheme.outlineVariant,
+            ),
+            Padding(
+              padding: const EdgeInsets.all(LaooLayout.cardPadding),
+              child: Wrap(
+                alignment: WrapAlignment.end,
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  OutlinedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(0, 48),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(LaooRadius.xs),
+                      ),
+                    ),
+                    child: const Text('ยกเลิก'),
+                  ),
+                  FilledButton.icon(
+                    onPressed: _save,
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(0, 48),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(LaooRadius.xs),
+                      ),
+                    ),
+                    icon: const Icon(Icons.add),
+                    label: const Text('เพิ่มรายการ'),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -885,6 +1214,7 @@ class _AttachmentPreview extends StatelessWidget {
     future: api.downloadAttachment(
       requestId,
       (item['attachmentId'] as num).toInt(),
+      menuCode: '17002',
     ),
     builder: (context, snapshot) => SizedBox(
       width: 76,

@@ -101,28 +101,25 @@ class _TrainingMasterPageState extends State<TrainingMasterPage> {
   });
   Future<void> _edit([Map<String, dynamic>? item]) async {
     if (item == null ? !canCreate : !canEdit) return;
-    final result = await showDialog<Map<String, dynamic>>(
+    await showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (_) => _MasterDialog(
         instructors: instructors,
         caption: actions?['caption'] as String? ?? '',
         item: item,
+        onSave: (result) async {
+          final id = result['id'];
+          if (id == null) {
+            await api.post(path, body: result);
+          } else {
+            await api.put('$path/$id', body: result);
+          }
+          await _load(target: page);
+          if (mounted) _notice('บันทึกข้อมูลสำเร็จ', false);
+        },
       ),
     );
-    if (result == null) return;
-    try {
-      final id = result['id'];
-      if (id == null) {
-        await api.post(path, body: result);
-      } else {
-        await api.put('$path/$id', body: result);
-      }
-      await _load(target: page);
-      _notice('บันทึกข้อมูลสำเร็จ', false);
-    } catch (e) {
-      _notice(trainingErrorText(e), true);
-    }
   }
 
   Future<void> _delete(Map<String, dynamic> item) async {
@@ -419,17 +416,21 @@ class _MasterDialog extends StatefulWidget {
   const _MasterDialog({
     required this.instructors,
     required this.caption,
+    required this.onSave,
     this.item,
   });
   final bool instructors;
   final String caption;
+  final Future<void> Function(Map<String, dynamic> request) onSave;
   final Map<String, dynamic>? item;
   @override
   State<_MasterDialog> createState() => _MasterDialogState();
 }
 
 class _MasterDialogState extends State<_MasterDialog> {
-  final key = GlobalKey<FormState>();
+  GlobalKey<FormState> key = GlobalKey<FormState>();
+  bool saving = false;
+  OverlayEntry? saveMessageOverlay;
   late final TextEditingController code,
       name,
       phone,
@@ -456,6 +457,7 @@ class _MasterDialogState extends State<_MasterDialog> {
 
   @override
   void dispose() {
+    saveMessageOverlay?.remove();
     for (final c in [
       code,
       name,
@@ -468,6 +470,74 @@ class _MasterDialogState extends State<_MasterDialog> {
       c.dispose();
     }
     super.dispose();
+  }
+
+  Future<void> save() async {
+    if (key.currentState?.validate() != true || saving) return;
+    final request = {
+      'id': widget.item?['id'],
+      'code': code.text.trim(),
+      'name': name.text.trim(),
+      'phoneNumber': phone.text.trim(),
+      'email': email.text.trim(),
+      'contactStartDate': contactDate.text.trim().isEmpty
+          ? null
+          : contactDate.text.trim(),
+      'instituteName': institute.text.trim(),
+      'remark': remark.text.trim(),
+      'isActive': active,
+      'rowVersion': widget.item?['rowVersion'],
+    };
+    setState(() => saving = true);
+    try {
+      await widget.onSave(request);
+      if (!mounted) return;
+      if (widget.item != null) {
+        Navigator.pop(context);
+        return;
+      }
+      setState(() {
+        key = GlobalKey<FormState>();
+        for (final field in [
+          code,
+          name,
+          phone,
+          email,
+          contactDate,
+          institute,
+          remark,
+        ]) {
+          field.clear();
+        }
+        active = true;
+        saving = false;
+      });
+      showSaveMessage('บันทึกข้อมูลสำเร็จ', error: false);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => saving = false);
+      showSaveMessage(trainingErrorText(error), error: true);
+    }
+  }
+
+  void showSaveMessage(String text, {required bool error}) {
+    saveMessageOverlay?.remove();
+    final entry = OverlayEntry(
+      builder: (_) => Positioned(
+        top: 12,
+        right: 12,
+        child: buildTrainingMessage(
+          message: text,
+          error: error,
+          onClose: () {
+            saveMessageOverlay?.remove();
+            saveMessageOverlay = null;
+          },
+        ),
+      ),
+    );
+    saveMessageOverlay = entry;
+    Overlay.of(context, rootOverlay: true).insert(entry);
   }
 
   @override
@@ -546,23 +616,7 @@ class _MasterDialogState extends State<_MasterDialog> {
         child: const Text('ยกเลิก'),
       ),
       FilledButton.icon(
-        onPressed: () {
-          if (key.currentState?.validate() != true) return;
-          Navigator.pop(context, {
-            'id': widget.item?['id'],
-            'code': code.text.trim(),
-            'name': name.text.trim(),
-            'phoneNumber': phone.text.trim(),
-            'email': email.text.trim(),
-            'contactStartDate': contactDate.text.trim().isEmpty
-                ? null
-                : contactDate.text.trim(),
-            'instituteName': institute.text.trim(),
-            'remark': remark.text.trim(),
-            'isActive': active,
-            'rowVersion': widget.item?['rowVersion'],
-          });
-        },
+        onPressed: saving ? null : save,
         icon: const Icon(Icons.save_outlined),
         label: const Text('บันทึก'),
       ),

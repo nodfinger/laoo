@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../app/theme/laoo_design_tokens.dart';
+import '../../../app/theme/laoo_typography.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/api/api_exception.dart';
 import '../../../core/navigation/navigation_menu_repository.dart';
@@ -10,17 +11,19 @@ import '../../support/presentation/widgets/support_workspace_shell.dart';
 
 /// ScreenType 3: read-only completed repair history and issued-part costs.
 class RepairHistoryPage extends StatefulWidget {
-  const RepairHistoryPage({super.key});
+  const RepairHistoryPage({super.key, this.api});
+  final ServiceRequestApi? api;
   @override
   State<RepairHistoryPage> createState() => _RepairHistoryPageState();
 }
 
 class _RepairHistoryPageState extends State<RepairHistoryPage> {
-  final _api = ServiceRequestApi();
+  late final ServiceRequestApi _api = widget.api ?? ServiceRequestApi();
   final _client = ApiClient();
   final _search = TextEditingController();
   String _caption = 'ประวัติการซ่อมและค่าใช้จ่าย';
   bool _loading = true;
+  String? _loadError;
   int _page = 1;
   int _total = 0;
   List<Map<String, dynamic>> _items = const [];
@@ -54,7 +57,10 @@ class _RepairHistoryPageState extends State<RepairHistoryPage> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
     try {
       final value = await _api.repairHistory(
         search: _search.text.trim(),
@@ -68,7 +74,15 @@ class _RepairHistoryPageState extends State<RepairHistoryPage> {
         _total = (value['total'] as num?)?.toInt() ?? 0;
       });
     } catch (error) {
-      if (mounted) _message(error);
+      if (mounted) {
+        setState(() {
+          _items = const [];
+          _total = 0;
+          _loadError = error is ApiException
+              ? 'ไม่สามารถโหลดประวัติการซ่อมได้\nรายละเอียดเพิ่มเติม: ${error.description ?? error.message}'
+              : 'ไม่สามารถโหลดประวัติการซ่อมได้\nรายละเอียดเพิ่มเติม: กรุณาตรวจสอบการเชื่อมต่อและลองอีกครั้ง';
+        });
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -78,13 +92,16 @@ class _RepairHistoryPageState extends State<RepairHistoryPage> {
     final id = (row['requestId'] as num?)?.toInt();
     if (id == null) return;
     try {
-      final data = await _api.detail(id);
-      final attachments = await _api.attachments(id);
+      final data = await _api.detail(id, menuCode: '19002');
+      final attachments = await _api.attachments(id, menuCode: '19002');
       if (!mounted) return;
       await showDialog<void>(
         context: context,
-        builder: (_) =>
-            _RepairHistoryDetail(data: data, attachments: attachments),
+        builder: (_) => _RepairHistoryDetail(
+          caption: _caption,
+          data: data,
+          attachments: attachments,
+        ),
       );
     } catch (error) {
       if (mounted) _message(error);
@@ -114,18 +131,44 @@ class _RepairHistoryPageState extends State<RepairHistoryPage> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _toolbar(),
-          const SizedBox(height: LaooLayout.cardSpacing),
+          const SizedBox(height: LaooLayout.listSectionSpacing),
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
+                : _loadError != null
+                ? Card(
+                    margin: EdgeInsets.zero,
+                    child: Padding(
+                      padding: const EdgeInsets.all(LaooLayout.cardPadding),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(_loadError!),
+                          const SizedBox(height: LaooLayout.cardSpacing),
+                          OutlinedButton(
+                            onPressed: _load,
+                            child: const Text('ลองอีกครั้ง'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
                 : _items.isEmpty
-                ? const Center(child: Text('ไม่พบประวัติการซ่อมที่ปิดงานแล้ว'))
+                ? const Card(
+                    margin: EdgeInsets.zero,
+                    child: Padding(
+                      padding: EdgeInsets.all(LaooLayout.cardPadding),
+                      child: Text('ไม่พบประวัติการซ่อมที่ปิดงานแล้ว'),
+                    ),
+                  )
                 : LayoutBuilder(
                     builder: (context, box) => box.maxWidth < 900
                         ? ListView.separated(
                             itemCount: _items.length,
-                            separatorBuilder: (_, _) =>
-                                const SizedBox(height: 6),
+                            separatorBuilder: (_, _) => const SizedBox(
+                              height: LaooLayout.listItemSpacing,
+                            ),
                             itemBuilder: (_, index) => _HistoryCard(
                               row: _items[index],
                               onOpen: () => _open(_items[index]),
@@ -134,7 +177,8 @@ class _RepairHistoryPageState extends State<RepairHistoryPage> {
                         : _HistoryTable(items: _items, onOpen: _open),
                   ),
           ),
-          if (!_loading && _total > 20) _pagination(),
+          const SizedBox(height: LaooLayout.listSectionSpacing),
+          if (!_loading) _pagination(),
         ],
       ),
     ),
@@ -144,65 +188,128 @@ class _RepairHistoryPageState extends State<RepairHistoryPage> {
     margin: EdgeInsets.zero,
     child: Padding(
       padding: const EdgeInsets.all(LaooLayout.cardPadding),
-      child: Wrap(
-        spacing: 10,
-        runSpacing: 10,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          SizedBox(
-            width: 360,
-            child: TextField(
-              controller: _search,
-              onSubmitted: (_) => _refresh(),
-              decoration: const InputDecoration(
-                labelText: 'ค้นหาเลขที่ ผู้แจ้ง หัวข้อ หรือช่าง',
-                prefixIcon: Icon(Icons.search),
+      child: LayoutBuilder(
+        builder: (context, box) => Wrap(
+          spacing: LaooLayout.cardSpacing,
+          runSpacing: LaooLayout.cardSpacing,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            SizedBox(
+              width: box.maxWidth < 360 ? box.maxWidth : 360,
+              child: TextField(
+                controller: _search,
+                onSubmitted: (_) => _refresh(),
+                decoration: const InputDecoration(
+                  labelText: 'ค้นหาเลขที่/ชื่อ/ช่าง',
+                  prefixIcon: Icon(Icons.search),
+                ),
               ),
             ),
-          ),
-          FilledButton.icon(
-            onPressed: _loading ? null : _refresh,
-            icon: const Icon(Icons.search),
-            label: const Text('ค้นหา'),
-          ),
-          Text(
-            'พบ $_total รายการ',
-            style: const TextStyle(fontWeight: FontWeight.w600),
-          ),
-        ],
+            FilledButton.icon(
+              onPressed: _loading ? null : _refresh,
+              icon: const Icon(Icons.search),
+              label: const Text('ค้นหา'),
+            ),
+            Text(
+              'พบ $_total รายการ',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
       ),
     ),
   );
 
-  Widget _pagination() => SizedBox(
-    height: LaooLayout.paginationCardHeight,
-    child: Row(
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: [
-        IconButton(
-          tooltip: 'หน้าก่อนหน้า',
-          onPressed: _page > 1
-              ? () {
-                  _page--;
-                  _load();
-                }
-              : null,
-          icon: const Icon(Icons.chevron_left),
+  Widget _pagination() {
+    final primary = Theme.of(context).colorScheme.primary;
+    final disabled = Theme.of(context).disabledColor;
+    final start = _total == 0 ? 0 : (_page - 1) * 20 + 1;
+    final end = _page * 20 < _total ? _page * 20 : _total;
+    ButtonStyle arrowStyle(bool enabled) => OutlinedButton.styleFrom(
+      fixedSize: const Size(
+        LaooLayout.paginationButtonSize,
+        LaooLayout.paginationButtonSize,
+      ),
+      minimumSize: const Size(
+        LaooLayout.paginationButtonSize,
+        LaooLayout.paginationButtonSize,
+      ),
+      padding: EdgeInsets.zero,
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      side: BorderSide(color: enabled ? primary : disabled),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(LaooRadius.xs),
+      ),
+    );
+    return Card(
+      margin: EdgeInsets.zero,
+      child: SizedBox(
+        height: LaooLayout.paginationCardHeight,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: LaooLayout.cardPadding,
+          ),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Wrap(
+              spacing: LaooLayout.listSectionSpacing,
+              runSpacing: LaooLayout.listSectionSpacing,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                OutlinedButton(
+                  onPressed: _page > 1
+                      ? () {
+                          _page--;
+                          _load();
+                        }
+                      : null,
+                  style: arrowStyle(_page > 1),
+                  child: const Icon(Icons.chevron_left),
+                ),
+                FilledButton(
+                  onPressed: null,
+                  style: FilledButton.styleFrom(
+                    disabledBackgroundColor: primary,
+                    disabledForegroundColor: Theme.of(
+                      context,
+                    ).colorScheme.onPrimary,
+                    fixedSize: const Size(
+                      LaooLayout.paginationButtonSize,
+                      LaooLayout.paginationButtonSize,
+                    ),
+                    minimumSize: const Size(
+                      LaooLayout.paginationButtonSize,
+                      LaooLayout.paginationButtonSize,
+                    ),
+                    padding: EdgeInsets.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(LaooRadius.xs),
+                    ),
+                  ),
+                  child: Text('$_page'),
+                ),
+                OutlinedButton(
+                  onPressed: _page * 20 < _total
+                      ? () {
+                          _page++;
+                          _load();
+                        }
+                      : null,
+                  style: arrowStyle(_page * 20 < _total),
+                  child: const Icon(Icons.chevron_right),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(left: 6),
+                  child: Text('$start-$end จาก $_total'),
+                ),
+              ],
+            ),
+          ),
         ),
-        Text('หน้า $_page'),
-        IconButton(
-          tooltip: 'หน้าถัดไป',
-          onPressed: _page * 20 < _total
-              ? () {
-                  _page++;
-                  _load();
-                }
-              : null,
-          icon: const Icon(Icons.chevron_right),
-        ),
-      ],
-    ),
-  );
+      ),
+    );
+  }
 }
 
 class _HistoryTable extends StatelessWidget {
@@ -283,13 +390,12 @@ class _HistoryCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Text(
-                  _text(row['requestNo']),
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
+              Text(
+                _text(row['requestNo']),
+                style: const TextStyle(fontWeight: FontWeight.w700),
               ),
               Text(_date(row['completedDate'])),
             ],
@@ -322,7 +428,12 @@ class _HistoryCard extends StatelessWidget {
 }
 
 class _RepairHistoryDetail extends StatelessWidget {
-  const _RepairHistoryDetail({required this.data, required this.attachments});
+  const _RepairHistoryDetail({
+    required this.caption,
+    required this.data,
+    required this.attachments,
+  });
+  final String caption;
   final Map<String, dynamic> data;
   final List<Map<String, dynamic>> attachments;
   List<Map<String, dynamic>> get _parts =>
@@ -331,10 +442,38 @@ class _RepairHistoryDetail extends StatelessWidget {
           .toList();
   @override
   Widget build(BuildContext context) => AlertDialog(
+    backgroundColor: Colors.white,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(LaooRadius.xs),
+    ),
     insetPadding: const EdgeInsets.all(16),
-    title: Text(data['requestNo']?.toString() ?? 'รายละเอียดประวัติการซ่อม'),
+    title: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              Icons.visibility_outlined,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(width: LaooLayout.listSectionSpacing),
+            Expanded(
+              child: Text(
+                '$caption > ${data['requestNo'] ?? 'รายละเอียด'}',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontSize: LaooTypography.pageTitle,
+                  fontWeight: LaooTypography.pageTitleWeight,
+                  color: Colors.black,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const Divider(color: LaooColors.border),
+      ],
+    ),
     content: SizedBox(
-      width: (MediaQuery.sizeOf(context).width - 32).clamp(280.0, 640.0),
+      width: (MediaQuery.sizeOf(context).width - 80).clamp(200.0, 640.0),
       child: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -384,14 +523,27 @@ class _RepairHistoryDetail extends StatelessWidget {
       ),
     ),
     actions: [
-      TextButton(
-        onPressed: () => Navigator.pop(context),
-        child: const Text('ปิด'),
+      Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          const Divider(color: LaooColors.border),
+          OutlinedButton(
+            onPressed: () => Navigator.pop(context),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(96, LaooTypography.buttonHeight),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(LaooRadius.xs),
+              ),
+            ),
+            child: const Text('ปิด'),
+          ),
+        ],
       ),
     ],
   );
   Widget _line(String label, Object? value) => Padding(
-    padding: const EdgeInsets.only(bottom: 10),
+    padding: const EdgeInsets.only(bottom: LaooLayout.popupFieldSpacing),
     child: Text('$label: ${_text(value)}', softWrap: true),
   );
 }

@@ -36,8 +36,11 @@ class _TrainingTestPageState extends State<TrainingTestPage>
   bool _loading = true;
   bool _saving = false;
   String? _message;
+  String? _loadError;
+  String? _sectionError;
   bool _error = false;
   int _questionIndex = 0;
+  int _sectionLoadEpoch = 0;
 
   String get _section => _tabs.index == 0 ? 'PRE' : 'POST';
   String get _base =>
@@ -88,27 +91,45 @@ class _TrainingTestPageState extends State<TrainingTestPage>
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _loadError = null;
+      _sectionError = null;
+      _overview = null;
+      _definition = null;
+      _attempt = null;
+      _results = null;
+    });
     try {
       _overview = _map(await _api.get(_base));
       await _loadSection(loading: false);
     } catch (error) {
-      _notice(trainingErrorText(error), true);
+      if (mounted) setState(() => _loadError = trainingErrorText(error));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
   Future<void> _loadSection({bool loading = true}) async {
-    if (loading && mounted) setState(() => _loading = true);
+    final section = _section;
+    final epoch = ++_sectionLoadEpoch;
+    if (mounted) {
+      setState(() {
+        if (loading) _loading = true;
+        _sectionError = null;
+        _definition = null;
+        _attempt = null;
+        _results = null;
+      });
+    }
     try {
       if (_managerView) {
-        _definition = _map(
-          await _api.get('$_base/$_section/definition', query: _examQuery),
+        final definition = _map(
+          await _api.get('$_base/$section/definition', query: _examQuery),
         );
-        _results = _map(
+        final results = _map(
           await _api.get(
-            '$_base/$_section/results',
+            '$_base/$section/results',
             query: {
               'page': '1',
               'pageSize': trainingPageSize.toString(),
@@ -116,17 +137,31 @@ class _TrainingTestPageState extends State<TrainingTestPage>
             },
           ),
         );
-        _attempt = null;
+        if (mounted && epoch == _sectionLoadEpoch) {
+          setState(() {
+            _definition = definition;
+            _results = results;
+          });
+        }
       } else {
-        _attempt = _map(await _api.post(_examPath('$_base/$_section/attempt')));
-        _questionIndex = 0;
-        _definition = null;
-        _results = null;
+        final attempt = _map(
+          await _api.post(_examPath('$_base/$section/attempt')),
+        );
+        if (mounted && epoch == _sectionLoadEpoch) {
+          setState(() {
+            _attempt = attempt;
+            _questionIndex = 0;
+          });
+        }
       }
     } catch (error) {
-      _notice(trainingErrorText(error), true);
+      if (mounted && epoch == _sectionLoadEpoch) {
+        setState(() => _sectionError = trainingErrorText(error));
+      }
     } finally {
-      if (loading && mounted) setState(() => _loading = false);
+      if (loading && mounted && epoch == _sectionLoadEpoch) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -287,6 +322,8 @@ class _TrainingTestPageState extends State<TrainingTestPage>
         children: [
           if (_loading)
             const Center(child: CircularProgressIndicator())
+          else if (_loadError != null)
+            _errorState(_loadError!, _load)
           else
             Column(
               children: [
@@ -319,18 +356,31 @@ class _TrainingTestPageState extends State<TrainingTestPage>
                     ),
                   ),
                 ),
-                TabBar(
-                  controller: _tabs,
-                  labelColor: tokens.primaryColor,
-                  tabs: const [
-                    Tab(text: 'ก่อนอบรม'),
-                    Tab(text: 'หลังอบรม'),
-                  ],
-                ),
+                if (widget.examId == null)
+                  TabBar(
+                    controller: _tabs,
+                    labelColor: tokens.primaryColor,
+                    tabs: const [
+                      Tab(text: 'ก่อนอบรม'),
+                      Tab(text: 'หลังอบรม'),
+                    ],
+                  )
+                else
+                  Padding(
+                    padding: tokens.workspace.contentMargin,
+                    child: Text(
+                      _section == 'PRE'
+                          ? 'แบบทดสอบก่อนอบรม'
+                          : 'แบบทดสอบหลังอบรม',
+                      style: tokens.workspace.sectionStyle,
+                    ),
+                  ),
                 Expanded(
                   child: SingleChildScrollView(
                     padding: tokens.workspace.contentMargin,
-                    child: _managerView
+                    child: _sectionError != null
+                        ? _errorState(_sectionError!, () => _loadSection())
+                        : _managerView
                         ? _manager(tokens)
                         : _participant(tokens),
                   ),
@@ -351,6 +401,20 @@ class _TrainingTestPageState extends State<TrainingTestPage>
       ),
     );
   }
+
+  Widget _errorState(String message, VoidCallback retry) => Center(
+    child: ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 420),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(message, textAlign: TextAlign.center),
+          const SizedBox(height: 16),
+          OutlinedButton(onPressed: retry, child: const Text('ลองอีกครั้ง')),
+        ],
+      ),
+    ),
+  );
 
   Widget _manager(TrainingUiTokens tokens) {
     final locked = _definition?['locked'] == true;

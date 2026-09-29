@@ -27,8 +27,7 @@ class _AttendanceResultsPageState extends State<AttendanceResultsPage> {
   int _total = 0;
   int _page = 1;
   bool _loading = true;
-  String? _message;
-  bool _messageError = false;
+  String? _loadError;
 
   @override
   void initState() {
@@ -51,18 +50,26 @@ class _AttendanceResultsPageState extends State<AttendanceResultsPage> {
   Future<void> _initialize() async {
     try {
       final actions = await _repository.actions();
-      if (actions['view'] != true)
+      if (actions['view'] != true) {
         throw StateError('ไม่มีสิทธิ์ดูข้อมูลหน้าจอนี้');
+      }
       if (mounted) setState(() => _actions = actions);
       await _load();
     } catch (error) {
-      _show(timeErrorText(error), true);
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() {
+          _loadError = timeErrorText(error);
+          _loading = false;
+        });
+      }
     }
   }
 
   Future<void> _load({int page = 1}) async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
     try {
       final value = await _repository.list(
         fromWorkDate: _fromDate,
@@ -81,7 +88,7 @@ class _AttendanceResultsPageState extends State<AttendanceResultsPage> {
         _page = (value['page'] as num?)?.toInt() ?? page;
       });
     } catch (error) {
-      _show(timeErrorText(error), true);
+      if (mounted) setState(() => _loadError = timeErrorText(error));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -96,14 +103,6 @@ class _AttendanceResultsPageState extends State<AttendanceResultsPage> {
       _statusCode = null;
     });
     _load();
-  }
-
-  void _show(String message, bool error) {
-    if (!mounted) return;
-    setState(() {
-      _message = message;
-      _messageError = error;
-    });
   }
 
   Future<void> _pickDate({required bool from}) async {
@@ -175,6 +174,7 @@ class _AttendanceResultsPageState extends State<AttendanceResultsPage> {
                   width: 180,
                   child: DropdownButtonFormField<String?>(
                     initialValue: _statusCode,
+                    isExpanded: true,
                     decoration: const InputDecoration(labelText: 'สถานะ'),
                     items: const [
                       DropdownMenuItem(value: null, child: Text('ทั้งหมด')),
@@ -220,6 +220,33 @@ class _AttendanceResultsPageState extends State<AttendanceResultsPage> {
             ),
             table: _loading
                 ? const Center(child: CircularProgressIndicator())
+                : _loadError != null
+                ? Center(
+                    child: Padding(
+                      padding: timeUiTokens.cardPadding,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.error_outline,
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                          SizedBox(height: timeUiTokens.itemSpacing),
+                          const Text('โหลดผลการลงเวลาไม่สำเร็จ'),
+                          SizedBox(height: timeUiTokens.itemSpacing),
+                          Text(
+                            'รายละเอียดเพิ่มเติม: $_loadError กรุณาลองอีกครั้ง',
+                            textAlign: TextAlign.center,
+                          ),
+                          SizedBox(height: timeUiTokens.itemSpacing),
+                          OutlinedButton(
+                            onPressed: _actions == null ? _initialize : _load,
+                            child: const Text('ลองอีกครั้ง'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
                 : _items.isEmpty
                 ? const Center(child: Text('ไม่พบข้อมูล'))
                 : LayoutBuilder(
@@ -238,16 +265,6 @@ class _AttendanceResultsPageState extends State<AttendanceResultsPage> {
               onNext: _page < pageCount ? () => _load(page: _page + 1) : null,
             ),
           ),
-          if (_message != null)
-            Positioned(
-              right: 16,
-              top: 16,
-              child: buildTimeMessage(
-                message: _message!,
-                error: _messageError,
-                onClose: () => setState(() => _message = null),
-              ),
-            ),
         ],
       ),
     );

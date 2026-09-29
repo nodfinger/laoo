@@ -4,21 +4,26 @@ import 'package:flutter/material.dart';
 
 import '../../../app/theme/laoo_design_tokens.dart';
 import '../../../core/api/api_exception.dart';
+import '../../../core/navigation/navigation_menu_repository.dart';
 import '../../../core/widgets/timed_snack_bar.dart';
 import '../../service_request/data/service_request_api.dart';
 import '../../support/presentation/widgets/support_workspace_shell.dart';
 
 class JobDispatchPage extends StatefulWidget {
-  const JobDispatchPage({super.key});
+  const JobDispatchPage({super.key, this.api});
+  final ServiceRequestApi? api;
 
   @override
   State<JobDispatchPage> createState() => _JobDispatchPageState();
 }
 
 class _JobDispatchPageState extends State<JobDispatchPage> {
-  final _api = ServiceRequestApi();
+  late final ServiceRequestApi _api = widget.api ?? ServiceRequestApi();
   final _search = TextEditingController();
+  String _caption = 'กระดานจ่ายงานช่าง';
+  bool _canDispatch = false;
   bool _loading = true;
+  int _page = 1;
   int _total = 0;
   List<Map<String, dynamic>> _items = const [];
 
@@ -26,6 +31,30 @@ class _JobDispatchPageState extends State<JobDispatchPage> {
   void initState() {
     super.initState();
     _load();
+    _loadActions();
+    _loadCaption();
+  }
+
+  Future<void> _loadActions() async {
+    try {
+      final actions = await _api.actions();
+      if (mounted) {
+        setState(() => _canDispatch = actions['dispatchEdit'] == true);
+      }
+    } catch (_) {
+      // Keep mutation actions hidden when permissions cannot be loaded.
+    }
+  }
+
+  Future<void> _loadCaption() async {
+    try {
+      final caption = await NavigationMenuRepository().resolveMenuName(
+        menuCode: '17001',
+        routeName: 'jobDispatch',
+        fallback: _caption,
+      );
+      if (mounted) setState(() => _caption = caption);
+    } catch (_) {}
   }
 
   @override
@@ -37,7 +66,12 @@ class _JobDispatchPageState extends State<JobDispatchPage> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final value = await _api.list(search: _search.text.trim(), status: 'NEW');
+      final value = await _api.list(
+        search: _search.text.trim(),
+        status: 'NEW',
+        page: _page,
+        menuCode: '17001',
+      );
       if (!mounted) return;
       setState(() {
         _items = ((value['items'] as List?) ?? const [])
@@ -53,17 +87,19 @@ class _JobDispatchPageState extends State<JobDispatchPage> {
   }
 
   Future<void> _dispatch(Map<String, dynamic> row) async {
+    if (!_canDispatch) return;
     final id = (row['requestId'] as num?)?.toInt();
     if (id == null) return;
     try {
-      final detail = await _api.detail(id);
-      final attachments = await _api.attachments(id);
+      final detail = await _api.detail(id, menuCode: '17001');
+      final attachments = await _api.attachments(id, menuCode: '17001');
       final technicians = await _api.technicians();
       if (!mounted) return;
       final selected = await showDialog<int>(
         context: context,
         builder: (_) => _DispatchDialog(
           api: _api,
+          caption: _caption,
           data: detail,
           attachments: attachments,
           technicians: technicians,
@@ -87,7 +123,7 @@ class _JobDispatchPageState extends State<JobDispatchPage> {
 
   @override
   Widget build(BuildContext context) => SupportWorkspaceShell(
-    pageTitle: 'จัดส่งงาน/มอบหมายช่าง',
+    pageTitle: _caption,
     activeMenu: 'jobDispatch',
     menuScope: WorkspaceMenuScope.company,
     child: Padding(
@@ -95,8 +131,33 @@ class _JobDispatchPageState extends State<JobDispatchPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Card(
+            margin: EdgeInsets.zero,
+            child: Padding(
+              padding: const EdgeInsets.all(LaooLayout.cardPadding),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.engineering_outlined,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      _caption,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: LaooLayout.listSectionSpacing),
           _toolbar(),
-          const SizedBox(height: LaooLayout.cardSpacing),
+          const SizedBox(height: LaooLayout.listSectionSpacing),
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
@@ -111,11 +172,48 @@ class _JobDispatchPageState extends State<JobDispatchPage> {
                                 const SizedBox(height: 6),
                             itemBuilder: (_, index) => _JobCard(
                               row: _items[index],
-                              onDispatch: () => _dispatch(_items[index]),
+                              onDispatch: _canDispatch
+                                  ? () => _dispatch(_items[index])
+                                  : null,
                             ),
                           )
-                        : _JobTable(items: _items, onDispatch: _dispatch),
+                        : _JobTable(
+                            items: _items,
+                            onDispatch: _canDispatch ? _dispatch : null,
+                          ),
                   ),
+          ),
+          const SizedBox(height: LaooLayout.listSectionSpacing),
+          Card(
+            margin: EdgeInsets.zero,
+            child: SizedBox(
+              height: 56,
+              child: Row(
+                children: [
+                  IconButton(
+                    tooltip: 'หน้าก่อน',
+                    onPressed: _loading || _page <= 1
+                        ? null
+                        : () {
+                            _page--;
+                            _load();
+                          },
+                    icon: const Icon(Icons.chevron_left),
+                  ),
+                  Text('หน้า $_page · $_total รายการ'),
+                  IconButton(
+                    tooltip: 'หน้าถัดไป',
+                    onPressed: _loading || _page * 20 >= _total
+                        ? null
+                        : () {
+                            _page++;
+                            _load();
+                          },
+                    icon: const Icon(Icons.chevron_right),
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
       ),
@@ -135,7 +233,10 @@ class _JobDispatchPageState extends State<JobDispatchPage> {
             width: 320,
             child: TextField(
               controller: _search,
-              onSubmitted: (_) => _load(),
+              onSubmitted: (_) {
+                _page = 1;
+                _load();
+              },
               decoration: const InputDecoration(
                 labelText: 'ค้นหาเลขที่ ผู้แจ้ง หรือหัวข้อ',
                 prefixIcon: Icon(Icons.search),
@@ -143,15 +244,16 @@ class _JobDispatchPageState extends State<JobDispatchPage> {
             ),
           ),
           FilledButton.icon(
-            onPressed: _loading ? null : _load,
+            onPressed: _loading
+                ? null
+                : () {
+                    _page = 1;
+                    _load();
+                  },
             icon: const Icon(Icons.search),
             label: const Text('ค้นหา'),
           ),
-          OutlinedButton.icon(
-            onPressed: _loading ? null : () => setState(() => _search.clear()),
-            icon: const Icon(Icons.refresh),
-            label: Text('งานใหม่ ($_total)'),
-          ),
+          Text('งานใหม่ $_total รายการ'),
         ],
       ),
     ),
@@ -161,7 +263,7 @@ class _JobDispatchPageState extends State<JobDispatchPage> {
 class _JobTable extends StatelessWidget {
   const _JobTable({required this.items, required this.onDispatch});
   final List<Map<String, dynamic>> items;
-  final ValueChanged<Map<String, dynamic>> onDispatch;
+  final ValueChanged<Map<String, dynamic>>? onDispatch;
 
   @override
   Widget build(BuildContext context) => Card(
@@ -197,11 +299,13 @@ class _JobTable extends StatelessWidget {
                 ),
                 const DataCell(Text('งานใหม่')),
                 DataCell(
-                  FilledButton.icon(
-                    onPressed: () => onDispatch(row),
-                    icon: const Icon(Icons.person_add_alt_1),
-                    label: const Text('มอบหมาย'),
-                  ),
+                  onDispatch == null
+                      ? const SizedBox.shrink()
+                      : FilledButton.icon(
+                          onPressed: () => onDispatch!(row),
+                          icon: const Icon(Icons.person_add_alt_1),
+                          label: const Text('มอบหมาย'),
+                        ),
                 ),
               ],
             ),
@@ -214,7 +318,7 @@ class _JobTable extends StatelessWidget {
 class _JobCard extends StatelessWidget {
   const _JobCard({required this.row, required this.onDispatch});
   final Map<String, dynamic> row;
-  final VoidCallback onDispatch;
+  final VoidCallback? onDispatch;
 
   @override
   Widget build(BuildContext context) => Card(
@@ -240,14 +344,15 @@ class _JobCard extends StatelessWidget {
           Text('สถานที่: ${row['locationSnapshot'] ?? '-'}', softWrap: true),
           Text('หัวข้อ: ${row['subject'] ?? '-'}', softWrap: true),
           const SizedBox(height: 10),
-          Align(
-            alignment: Alignment.centerRight,
-            child: FilledButton.icon(
-              onPressed: onDispatch,
-              icon: const Icon(Icons.person_add_alt_1),
-              label: const Text('มอบหมายช่าง'),
+          if (onDispatch != null)
+            Align(
+              alignment: Alignment.centerRight,
+              child: FilledButton.icon(
+                onPressed: onDispatch,
+                icon: const Icon(Icons.person_add_alt_1),
+                label: const Text('มอบหมายช่าง'),
+              ),
             ),
-          ),
         ],
       ),
     ),
@@ -257,11 +362,13 @@ class _JobCard extends StatelessWidget {
 class _DispatchDialog extends StatefulWidget {
   const _DispatchDialog({
     required this.api,
+    required this.caption,
     required this.data,
     required this.attachments,
     required this.technicians,
   });
   final ServiceRequestApi api;
+  final String caption;
   final Map<String, dynamic> data;
   final List<Map<String, dynamic>> attachments;
   final List<Map<String, dynamic>> technicians;
@@ -299,11 +406,40 @@ class _DispatchDialogState extends State<_DispatchDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-    title: const Row(
+    backgroundColor: Colors.white,
+    surfaceTintColor: Colors.transparent,
+    insetPadding: const EdgeInsets.all(LaooLayout.dialogInsetPadding),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(LaooRadius.xs),
+    ),
+    title: Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(Icons.engineering_outlined),
-        SizedBox(width: 8),
-        Text('จัดส่งงาน > มอบหมายช่าง'),
+        ConstrainedBox(
+          constraints: const BoxConstraints(
+            minHeight: LaooLayout.popupHeaderMinHeight,
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.engineering_outlined,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '${widget.caption} > มอบหมายช่าง',
+                  style: const TextStyle(
+                    color: Colors.black,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const Divider(color: LaooColors.border, height: 1),
       ],
     ),
     content: SizedBox(
@@ -362,20 +498,48 @@ class _DispatchDialogState extends State<_DispatchDialog> {
       ),
     ),
     actions: [
-      TextButton(
-        onPressed: _saving ? null : () => Navigator.pop(context),
-        child: const Text('ยกเลิก'),
-      ),
-      FilledButton.icon(
-        onPressed: _employeeId == null || _saving ? null : _save,
-        icon: const Icon(Icons.send_outlined),
-        label: Text(_saving ? 'กำลังบันทึก...' : 'มอบหมายงาน'),
+      Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Divider(color: LaooColors.border, height: 1),
+          Padding(
+            padding: const EdgeInsets.all(LaooLayout.cardPadding),
+            child: Wrap(
+              alignment: WrapAlignment.end,
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton(
+                  onPressed: _saving ? null : () => Navigator.pop(context),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(0, 48),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(LaooRadius.xs),
+                    ),
+                  ),
+                  child: const Text('ยกเลิก'),
+                ),
+                FilledButton.icon(
+                  onPressed: _employeeId == null || _saving ? null : _save,
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(0, 48),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(LaooRadius.xs),
+                    ),
+                  ),
+                  icon: const Icon(Icons.send_outlined),
+                  label: Text(_saving ? 'กำลังบันทึก...' : 'มอบหมายงาน'),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     ],
   );
 
   Widget _line(String label, Object? value) => Padding(
-    padding: const EdgeInsets.only(bottom: 8),
+    padding: const EdgeInsets.only(bottom: LaooLayout.popupFieldSpacing),
     child: Text(
       '$label: ${value?.toString().isNotEmpty == true ? value : '-'}',
       softWrap: true,
@@ -398,6 +562,7 @@ class _AttachmentPreview extends StatelessWidget {
     future: api.downloadAttachment(
       requestId,
       (item['attachmentId'] as num).toInt(),
+      menuCode: '17001',
     ),
     builder: (context, snapshot) => SizedBox(
       width: 76,

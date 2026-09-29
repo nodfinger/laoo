@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../app/theme/laoo_design_tokens.dart';
 import '../../../app/theme/laoo_typography.dart';
 import '../../../core/api/api_exception.dart';
+import '../../../core/navigation/navigation_menu_repository.dart';
 import '../../../core/widgets/timed_snack_bar.dart';
 import '../../support/presentation/widgets/support_workspace_shell.dart';
 import '../data/pm_api.dart';
@@ -420,8 +421,9 @@ class PmCalendarPage extends StatefulWidget {
 class _CalendarState extends State<PmCalendarPage> {
   late final PmApi api = widget.api ?? PmApi();
   late Future<Map<String, dynamic>> data;
+  late String _caption = widget.pageTitle;
   String status = '';
-  bool canCreate = false;
+  bool canGenerate = false;
   bool canEdit = false;
   bool generating = false;
   String? generateError;
@@ -432,19 +434,39 @@ class _CalendarState extends State<PmCalendarPage> {
       status: status,
       portalSchedule: widget.portalSchedule,
     );
+    _loadCaption();
     api
         .workOrderActions(portalSchedule: widget.portalSchedule)
         .then((value) {
           if (mounted) {
             setState(() {
-              canCreate = value['create'] == true;
-              canEdit = value['edit'] == true;
+              final correctType =
+                  value['screenType'] == (widget.portalSchedule ? 3 : 2);
+              canGenerate =
+                  !widget.portalSchedule &&
+                  correctType &&
+                  value['generate'] == true;
+              canEdit =
+                  !widget.portalSchedule &&
+                  correctType &&
+                  value['edit'] == true;
             });
           }
         })
         .catchError((Object _) {
           // Keep mutation actions hidden if permissions cannot be loaded.
         });
+  }
+
+  Future<void> _loadCaption() async {
+    try {
+      final caption = await NavigationMenuRepository().resolveMenuName(
+        menuCode: widget.menuCode,
+        routeName: widget.routeName,
+        fallback: _caption,
+      );
+      if (mounted) setState(() => _caption = caption);
+    } catch (_) {}
   }
 
   void refresh() => setState(() {
@@ -460,6 +482,7 @@ class _CalendarState extends State<PmCalendarPage> {
       builder: (_) => _PmWorkDialog(
         api,
         id,
+        caption: _caption,
         portalSchedule: widget.portalSchedule,
         canEdit: canEdit,
       ),
@@ -469,7 +492,7 @@ class _CalendarState extends State<PmCalendarPage> {
 
   @override
   Widget build(BuildContext c) => SupportWorkspaceShell(
-    pageTitle: widget.pageTitle,
+    pageTitle: _caption,
     activeMenu: widget.routeName,
     menuScope: WorkspaceMenuScope.company,
     child: Padding(
@@ -477,110 +500,144 @@ class _CalendarState extends State<PmCalendarPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            alignment: WrapAlignment.spaceBetween,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              SizedBox(
-                width: 240,
-                child: DropdownButtonFormField<String>(
-                  isExpanded: true,
-                  initialValue: status,
-                  decoration: const InputDecoration(labelText: 'สถานะ'),
-                  items: const [
-                    DropdownMenuItem(value: '', child: Text('ทั้งหมด')),
-                    DropdownMenuItem(
-                      value: 'PENDING',
-                      child: Text('รอดำเนินการ'),
+          Card(
+            margin: EdgeInsets.zero,
+            child: Padding(
+              padding: const EdgeInsets.all(LaooLayout.cardPadding),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.star_border,
+                    color: Theme.of(c).colorScheme.primary,
+                  ),
+                  const SizedBox(width: LaooLayout.cardPadding),
+                  Expanded(
+                    child: Text(
+                      _caption,
+                      style: LaooTypography.screenCaptionStyle,
                     ),
-                    DropdownMenuItem(
-                      value: 'IN_PROGRESS',
-                      child: Text('กำลังดำเนินการ'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'COMPLETED',
-                      child: Text('เสร็จสิ้น'),
-                    ),
-                    DropdownMenuItem(value: 'SKIPPED', child: Text('ข้าม')),
-                  ],
-                  onChanged: (value) {
-                    status = value ?? '';
-                    refresh();
-                  },
-                ),
+                  ),
+                ],
               ),
-              if (canCreate)
-                FilledButton.icon(
-                  onPressed: generating
-                      ? null
-                      : () async {
-                          setState(() {
-                            generating = true;
-                            generateError = null;
-                          });
-                          try {
-                            await api.generate(
-                              portalSchedule: widget.portalSchedule,
-                            );
-                            if (mounted) refresh();
-                          } catch (error) {
-                            if (mounted) {
-                              setState(
-                                () =>
-                                    generateError = _pmErrorDescription(error),
-                              );
-                            }
-                          } finally {
-                            if (mounted) setState(() => generating = false);
-                          }
-                        },
-                  icon: const Icon(Icons.event_available),
-                  label: const Text('สร้างงานตามรอบ'),
-                ),
-            ],
+            ),
+          ),
+          const SizedBox(height: LaooLayout.listSectionSpacing),
+          Card(
+            margin: EdgeInsets.zero,
+            child: Padding(
+              padding: const EdgeInsets.all(LaooLayout.cardPadding),
+              child: Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  SizedBox(
+                    width: 240,
+                    child: DropdownButtonFormField<String>(
+                      isExpanded: true,
+                      initialValue: status,
+                      decoration: const InputDecoration(labelText: 'สถานะ'),
+                      items: const [
+                        DropdownMenuItem(value: '', child: Text('ทั้งหมด')),
+                        DropdownMenuItem(
+                          value: 'PENDING',
+                          child: Text('รอดำเนินการ'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'IN_PROGRESS',
+                          child: Text('กำลังดำเนินการ'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'COMPLETED',
+                          child: Text('เสร็จสิ้น'),
+                        ),
+                        DropdownMenuItem(value: 'SKIPPED', child: Text('ข้าม')),
+                      ],
+                      onChanged: (value) {
+                        status = value ?? '';
+                        refresh();
+                      },
+                    ),
+                  ),
+                  if (canGenerate)
+                    FilledButton.icon(
+                      onPressed: generating
+                          ? null
+                          : () async {
+                              setState(() {
+                                generating = true;
+                                generateError = null;
+                              });
+                              try {
+                                await api.generate(
+                                  portalSchedule: widget.portalSchedule,
+                                );
+                                if (mounted) refresh();
+                              } catch (error) {
+                                if (mounted) {
+                                  setState(
+                                    () => generateError = _pmErrorDescription(
+                                      error,
+                                    ),
+                                  );
+                                }
+                              } finally {
+                                if (mounted) setState(() => generating = false);
+                              }
+                            },
+                      icon: const Icon(Icons.event_available),
+                      label: const Text('สร้างงานตามรอบ'),
+                    ),
+                ],
+              ),
+            ),
           ),
           if (generateError != null)
             Text(
               'ไม่สามารถสร้างงานตามรอบได้\nรายละเอียดเพิ่มเติม: $generateError',
               style: TextStyle(color: Theme.of(c).colorScheme.error),
             ),
-          const SizedBox(height: 12),
+          const SizedBox(height: LaooLayout.listSectionSpacing),
           Expanded(
-            child: FutureBuilder<Map<String, dynamic>>(
-              future: data,
-              builder: (c, s) {
-                if (s.hasError) {
-                  return _PmLoadError(onRetry: refresh);
-                }
-                if (!s.hasData) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                final rows = ((s.data!['items'] as List?) ?? []).cast<Map>();
-                if (rows.isEmpty) {
-                  return const Center(child: Text('ยังไม่มีงาน PM'));
-                }
-                return ListView.separated(
-                  itemCount: rows.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 8),
-                  itemBuilder: (_, i) {
-                    final r = rows[i];
-                    return Card(
-                      child: ListTile(
-                        onTap: () => open(r),
-                        leading: const Icon(Icons.build_circle_outlined),
-                        title: Text(r['planNameSnapshot']?.toString() ?? '-'),
-                        subtitle: Text(
-                          '${r['itemSnapshot'] ?? '-'}\n${r['locationSnapshot'] ?? '-'}${r['residentNames'] == null ? '' : '\nผู้พักอาศัย: ${r['residentNames']}'}\nกำหนด ${r['dueDate'] ?? '-'}',
+            child: Card(
+              margin: EdgeInsets.zero,
+              child: FutureBuilder<Map<String, dynamic>>(
+                future: data,
+                builder: (c, s) {
+                  if (s.hasError) {
+                    return _PmLoadError(onRetry: refresh);
+                  }
+                  if (!s.hasData) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  final rows = ((s.data!['items'] as List?) ?? []).cast<Map>();
+                  if (rows.isEmpty) {
+                    return const Center(child: Text('ยังไม่มีงาน PM'));
+                  }
+                  return ListView.separated(
+                    itemCount: rows.length,
+                    separatorBuilder: (_, _) =>
+                        const SizedBox(height: LaooLayout.listItemSpacing),
+                    itemBuilder: (_, i) {
+                      final r = rows[i];
+                      return Card(
+                        margin: EdgeInsets.zero,
+                        child: ListTile(
+                          onTap: () => open(r),
+                          leading: const Icon(Icons.build_circle_outlined),
+                          title: Text(r['planNameSnapshot']?.toString() ?? '-'),
+                          subtitle: Text(
+                            '${r['itemSnapshot'] ?? '-'}\n${r['locationSnapshot'] ?? '-'}${r['residentNames'] == null ? '' : '\nผู้พักอาศัย: ${r['residentNames']}'}\nกำหนด ${r['dueDate'] ?? '-'}',
+                          ),
+                          isThreeLine: true,
+                          trailing: Text(r['statusCode']?.toString() ?? '-'),
                         ),
-                        isThreeLine: true,
-                        trailing: Text(r['statusCode']?.toString() ?? '-'),
-                      ),
-                    );
-                  },
-                );
-              },
+                      );
+                    },
+                  );
+                },
+              ),
             ),
           ),
         ],
@@ -593,11 +650,13 @@ class _PmWorkDialog extends StatefulWidget {
   const _PmWorkDialog(
     this.api,
     this.id, {
+    required this.caption,
     this.portalSchedule = false,
     required this.canEdit,
   });
   final PmApi api;
   final int id;
+  final String caption;
   final bool portalSchedule;
   final bool canEdit;
   @override
@@ -658,9 +717,19 @@ class _PmWorkDialogState extends State<_PmWorkDialog> {
 
   @override
   Widget build(BuildContext c) => AlertDialog(
-    title: const Text('รายละเอียดงาน PM'),
+    backgroundColor: Colors.white,
+    surfaceTintColor: Colors.transparent,
+    insetPadding: const EdgeInsets.all(LaooLayout.dialogInsetPadding),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(LaooRadius.xs),
+    ),
+    title: _pmPopupTitle(
+      c,
+      '${widget.caption} > รายละเอียด',
+      Icons.build_circle_outlined,
+    ),
     content: SizedBox(
-      width: 620,
+      width: 480,
       child: FutureBuilder<Map<String, dynamic>>(
         future: data,
         builder: (c, s) {
@@ -761,7 +830,8 @@ class _PmWorkDialogState extends State<_PmWorkDialog> {
                     title: Text(x['checkItemSnapshot']?.toString() ?? '-'),
                   ),
                 ),
-                if (status == 'IN_PROGRESS' || status == 'PENDING')
+                if (widget.canEdit &&
+                    (status == 'IN_PROGRESS' || status == 'PENDING'))
                   TextField(
                     controller: result,
                     minLines: 3,
@@ -782,40 +852,87 @@ class _PmWorkDialogState extends State<_PmWorkDialog> {
         },
       ),
     ),
+    actionsPadding: EdgeInsets.zero,
     actions: [
-      TextButton(
-        onPressed: saving ? null : () => Navigator.pop(c),
-        child: const Text('ปิด'),
-      ),
-      FutureBuilder<Map<String, dynamic>>(
-        future: data,
-        builder: (c, s) {
-          if (!widget.canEdit || !s.hasData) return const SizedBox();
-          final st = (s.data!['workOrder'] as Map)['statusCode'];
-          if (st == 'PENDING') {
-            return Row(
-              mainAxisSize: MainAxisSize.min,
+      Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Divider(color: LaooColors.border, height: 1),
+          Padding(
+            padding: const EdgeInsets.all(LaooLayout.cardPadding),
+            child: Wrap(
+              alignment: WrapAlignment.end,
+              spacing: 8,
+              runSpacing: 8,
               children: [
-                TextButton(
-                  onPressed: saving ? null : () => action('skip'),
-                  child: const Text('ข้ามงาน'),
+                OutlinedButton(
+                  onPressed: saving ? null : () => Navigator.pop(c),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(0, 48),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(LaooRadius.xs),
+                    ),
+                  ),
+                  child: const Text('ปิด'),
                 ),
-                const SizedBox(width: 8),
-                FilledButton(
-                  onPressed: saving ? null : () => action('start'),
-                  child: const Text('เริ่มงาน'),
+                FutureBuilder<Map<String, dynamic>>(
+                  future: data,
+                  builder: (c, s) {
+                    if (!widget.canEdit || !s.hasData) {
+                      return const SizedBox.shrink();
+                    }
+                    final st = (s.data!['workOrder'] as Map)['statusCode'];
+                    if (st == 'PENDING') {
+                      return Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          OutlinedButton(
+                            onPressed: saving ? null : () => action('skip'),
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size(0, 48),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(
+                                  LaooRadius.xs,
+                                ),
+                              ),
+                            ),
+                            child: const Text('ข้ามงาน'),
+                          ),
+                          FilledButton(
+                            onPressed: saving ? null : () => action('start'),
+                            style: FilledButton.styleFrom(
+                              minimumSize: const Size(0, 48),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(
+                                  LaooRadius.xs,
+                                ),
+                              ),
+                            ),
+                            child: const Text('เริ่มงาน'),
+                          ),
+                        ],
+                      );
+                    }
+                    if (st == 'IN_PROGRESS') {
+                      return FilledButton(
+                        onPressed: saving ? null : () => action('complete'),
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size(0, 48),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(LaooRadius.xs),
+                          ),
+                        ),
+                        child: const Text('บันทึกปิดงาน'),
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
                 ),
               ],
-            );
-          }
-          if (st == 'IN_PROGRESS') {
-            return FilledButton(
-              onPressed: saving ? null : () => action('complete'),
-              child: const Text('บันทึกปิดงาน'),
-            );
-          }
-          return const SizedBox();
-        },
+            ),
+          ),
+        ],
       ),
     ],
   );

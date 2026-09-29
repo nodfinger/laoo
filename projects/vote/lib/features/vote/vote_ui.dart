@@ -274,6 +274,7 @@ class VoteFilterBar extends StatelessWidget {
       final statusField = statusItems.isEmpty
           ? null
           : DropdownButtonFormField<String>(
+              isExpanded: true,
               initialValue: status,
               style: TextStyle(
                 color: Theme.of(context).colorScheme.onSurface,

@@ -16,6 +16,11 @@ class _HolidayCalendarPageState extends State<HolidayCalendarPage> {
   late final JsonApiClient api;
   late final HolidayCalendarRepository repo;
   Map<String, dynamic>? actions;
+  bool get canCreate =>
+      actions?['screenType'] == 1 && actions?['create'] == true;
+  bool get canEdit => actions?['screenType'] == 1 && actions?['edit'] == true;
+  bool get canDelete =>
+      actions?['screenType'] == 1 && actions?['delete'] == true;
   List<Map<String, dynamic>> items = const [];
   int page = 1;
   int total = 0;
@@ -60,6 +65,7 @@ class _HolidayCalendarPageState extends State<HolidayCalendarPage> {
         search: search.text,
         active: active,
         page: targetPage,
+        pageSize: timePageSize,
       );
       if (!mounted) return;
       setState(() {
@@ -86,6 +92,7 @@ class _HolidayCalendarPageState extends State<HolidayCalendarPage> {
   }
 
   Future<void> edit([Map<String, dynamic>? row]) async {
+    if (row == null ? !canCreate : !canEdit) return;
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
       barrierDismissible: false,
@@ -102,6 +109,7 @@ class _HolidayCalendarPageState extends State<HolidayCalendarPage> {
   }
 
   Future<void> remove(Map<String, dynamic> row) async {
+    if (!canDelete) return;
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => TimeDeleteDialog(
@@ -114,7 +122,7 @@ class _HolidayCalendarPageState extends State<HolidayCalendarPage> {
         (row['holidayCalendarId'] as num).toInt(),
         row['rowVersion'].toString(),
       );
-      await load(targetPage: page);
+      await load(targetPage: page > 1 && items.length == 1 ? page - 1 : page);
       showMessage('ลบข้อมูลสำเร็จ', false);
     } catch (error) {
       showMessage(timeErrorText(error), true);
@@ -139,7 +147,7 @@ class _HolidayCalendarPageState extends State<HolidayCalendarPage> {
                     api: api,
                     menuCode: TimeMenuCodes.holidayCalendars,
                     caption: caption,
-                    trailing: actions?['create'] == true
+                    trailing: canCreate
                         ? FilledButton.icon(
                             onPressed: () => edit(),
                             icon: const Icon(Icons.add),
@@ -210,12 +218,14 @@ class _HolidayCalendarPageState extends State<HolidayCalendarPage> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 6),
                   Expanded(
                     child: Card(
                       margin: EdgeInsets.zero,
                       child: loading
                           ? const Center(child: CircularProgressIndicator())
+                          : items.isEmpty
+                          ? const Center(child: Text('ไม่พบข้อมูล'))
                           : ListView.separated(
                               padding: timeUiTokens.cardPadding,
                               itemCount: items.length,
@@ -233,19 +243,21 @@ class _HolidayCalendarPageState extends State<HolidayCalendarPage> {
                                   ),
                                   trailing: Wrap(
                                     children: [
-                                      if (actions?['edit'] == true)
+                                      if (canEdit)
                                         IconButton(
                                           tooltip: 'แก้ไข',
                                           onPressed: () => edit(row),
                                           icon: const Icon(Icons.edit_outlined),
                                         ),
-                                      if (actions?['delete'] == true)
+                                      if (canDelete)
                                         IconButton(
                                           tooltip: 'ลบ',
                                           onPressed: () => remove(row),
-                                          icon: const Icon(
+                                          icon: Icon(
                                             Icons.delete_outline,
-                                            color: Colors.red,
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.error,
                                           ),
                                         ),
                                     ],
@@ -254,6 +266,20 @@ class _HolidayCalendarPageState extends State<HolidayCalendarPage> {
                               },
                             ),
                     ),
+                  ),
+                  const SizedBox(height: 6),
+                  TimePaginationCard(
+                    tokens: timeUiTokens.workspace,
+                    page: page,
+                    pageCount: total == 0 ? 1 : (total / timePageSize).ceil(),
+                    pageSize: timePageSize,
+                    total: total,
+                    onPrevious: page > 1
+                        ? () => load(targetPage: page - 1)
+                        : null,
+                    onNext: page * timePageSize < total
+                        ? () => load(targetPage: page + 1)
+                        : null,
                   ),
                 ],
               ),

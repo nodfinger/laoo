@@ -20,8 +20,9 @@ public sealed class ServiceComplaintController(IConfiguration configuration, IWe
     public async Task<IActionResult> Actions(CancellationToken token)
     {
         await using var c = await Open(token);
-        if (!await InService(c, token)) return Forbid();
-        return Ok(new { view = await Allowed(c, "VIEW", token), create = await Allowed(c, "CREATE", token), edit = await Allowed(c, "EDIT", token) });
+        if (!await Allowed(c, "VIEW", token)) return Forbid();
+        var screenType = await ScreenType(c, token);
+        return Ok(new { screenType, view = true, create = screenType == 1 && await Allowed(c, "CREATE", token), edit = screenType == 1 && await Allowed(c, "EDIT", token), delete = screenType == 1 && await Allowed(c, "DELETE", token) });
     }
 
     [HttpGet]
@@ -29,7 +30,7 @@ public sealed class ServiceComplaintController(IConfiguration configuration, IWe
     {
         await using var c = await Open(token);
         if (!await InService(c, token)) return Forbid();
-        if (self ? !await Allowed(c, "VIEW", token) : !await Allowed(c, "EDIT", token)) return Forbid();
+        if (!await Allowed(c, "VIEW", token) || (!self && !await Allowed(c, "EDIT", token))) return Forbid();
         page = Math.Max(1, page); pageSize = Math.Clamp(pageSize, 1, 100);
         const string sql = """
 SELECT COUNT_BIG(1) OVER(),ComplaintID,ComplaintNo,ComplainantNameSnapshot,LocationSnapshot,Subject,StatusCode,RequestDate,StartedDate,CompletedDate
@@ -59,7 +60,7 @@ ORDER BY RequestDate DESC,ComplaintID DESC OFFSET @offset ROWS FETCH NEXT @take 
     [HttpPost]
     public async Task<IActionResult> Create(CreateComplaintRequest request, CancellationToken token)
     {
-        await using var c=await Open(token); if(!await InService(c,token) || !await Allowed(c,"CREATE",token)) return Forbid();
+        await using var c=await Open(token); if(!await IsCrud(c,token) || !await Allowed(c,"CREATE",token)) return Forbid();
         if(string.IsNullOrWhiteSpace(request.Subject) || string.IsNullOrWhiteSpace(request.Detail)) return BadRequest(new { message="กรุณาระบุหัวข้อและรายละเอียด",description="หัวข้อและรายละเอียดเป็นข้อมูลบังคับ" });
         if(PersonId is null) return BadRequest(new { message="ไม่พบข้อมูลผู้ร้อง",description="บัญชีผู้ใช้นี้ไม่ผูกกับทะเบียนบุคคลใน Company ปัจจุบัน" });
         var person=await Person(c,token); if(person is null) return BadRequest(new { message="ข้อมูลผู้ร้องไม่ถูกต้อง",description="ไม่พบทะเบียนบุคคลที่ Active ใน Company ปัจจุบัน" });
@@ -76,6 +77,82 @@ ORDER BY RequestDate DESC,ComplaintID DESC OFFSET @offset ROWS FETCH NEXT @take 
         catch { await tx.RollbackAsync(token); throw; }
     }
 
+    [HttpPut("{id:long}")]
+    public async Task<IActionResult> Edit(long id, EditComplaintRequest request, CancellationToken token)
+    {
+        await using var c = await Open(token);
+        if (!await IsCrud(c,token) || !await Allowed(c,"EDIT",token)) return Forbid();
+        if (string.IsNullOrWhiteSpace(request.Subject) || request.Subject.Trim().Length > 200 ||
+            string.IsNullOrWhiteSpace(request.Detail) || request.Detail.Trim().Length > 2000 ||
+            string.IsNullOrWhiteSpace(request.RowVersion)) return BadRequest(new { message = "ข้อมูลเรื่องร้องเรียนไม่ครบหรือยาวเกินกำหนด" });
+        byte[] version;
+        try { version = Convert.FromBase64String(request.RowVersion); }
+        catch (FormatException) { return BadRequest(new { message = "ข้อมูลเวอร์ชันไม่ถูกต้อง" }); }
+        if (version.Length != 8) return BadRequest(new { message = "ข้อมูลเวอร์ชันไม่ถูกต้อง" });
+        await using var q = new SqlCommand("""
+UPDATE dbo.TDADServiceComplaint
+SET Subject=@subject,Detail=@detail,UpdateDate=SYSUTCDATETIME(),UpdateBy=@user
+WHERE CompanyID=@company AND ComplaintID=@id AND IsActive=1
+  AND StatusCode=N'NEW' AND RowVersion=@version;
+""",c);
+        Add(q,"@company",SqlDbType.BigInt,CompanyId); Add(q,"@id",SqlDbType.BigInt,id);
+        Add(q,"@subject",SqlDbType.NVarChar,request.Subject.Trim(),200);
+        Add(q,"@detail",SqlDbType.NVarChar,request.Detail.Trim(),2000);
+        Add(q,"@user",SqlDbType.BigInt,UserId); Add(q,"@version",SqlDbType.Binary,version,8);
+        if (await q.ExecuteNonQueryAsync(token) == 0) return Conflict(new { message = "แก้ไขไม่ได้", description = "รายการอาจไม่ใช่สถานะรอรับเรื่อง หรือข้อมูลถูกเปลี่ยนไปแล้ว" });
+        return Ok(new { complaintId=id,updated=true });
+    }
+
+    [HttpDelete("{id:long}")]
+    public async Task<IActionResult> Delete(long id, [FromQuery] string? rowVersion, CancellationToken token)
+    {
+        await using var c = await Open(token);
+        if (!await IsCrud(c,token) || !await Allowed(c,"DELETE",token)) return Forbid();
+        byte[] version;
+        try { version = Convert.FromBase64String(rowVersion ?? string.Empty); }
+        catch (FormatException) { return BadRequest(new { message = "ข้อมูลเวอร์ชันไม่ถูกต้อง" }); }
+        if (version.Length != 8) return BadRequest(new { message = "ข้อมูลเวอร์ชันไม่ถูกต้อง" });
+        var files = new List<string>();
+        await using var tx = (SqlTransaction)await c.BeginTransactionAsync(IsolationLevel.Serializable,token);
+        try
+        {
+            await using (var current = new SqlCommand("""
+SELECT StatusCode FROM dbo.TDADServiceComplaint WITH(UPDLOCK,HOLDLOCK)
+WHERE CompanyID=@company AND ComplaintID=@id AND IsActive=1 AND RowVersion=@version;
+""",c,tx))
+            {
+                Add(current,"@company",SqlDbType.BigInt,CompanyId); Add(current,"@id",SqlDbType.BigInt,id); Add(current,"@version",SqlDbType.Binary,version,8);
+                var status=Convert.ToString(await current.ExecuteScalarAsync(token));
+                if(status is null) { await tx.RollbackAsync(token); return Conflict(new { message = "รายการถูกแก้ไขหรือลบไปแล้ว", description = "กรุณาโหลดข้อมูลใหม่ก่อนลบ" }); }
+                if(status!="NEW") { await tx.RollbackAsync(token); return Conflict(new { message = "ลบได้เฉพาะเรื่องร้องเรียนที่ยังไม่เริ่มดำเนินงาน", description = "รายการที่เริ่มดำเนินงานหรือปิดแล้วไม่สามารถลบได้" }); }
+            }
+            await using (var paths = new SqlCommand("SELECT StoredPath FROM dbo.TDADServiceComplaintAttachment WHERE CompanyID=@company AND ComplaintID=@id",c,tx))
+            {
+                Add(paths,"@company",SqlDbType.BigInt,CompanyId); Add(paths,"@id",SqlDbType.BigInt,id);
+                await using var r=await paths.ExecuteReaderAsync(token);
+                while(await r.ReadAsync(token)) if(!r.IsDBNull(0)) files.Add(r.GetString(0));
+            }
+            await using (var children=new SqlCommand("DELETE FROM dbo.TDADServiceComplaintAttachment WHERE CompanyID=@company AND ComplaintID=@id",c,tx))
+            {
+                Add(children,"@company",SqlDbType.BigInt,CompanyId); Add(children,"@id",SqlDbType.BigInt,id);
+                await children.ExecuteNonQueryAsync(token);
+            }
+            await using (var parent=new SqlCommand("DELETE FROM dbo.TDADServiceComplaint WHERE CompanyID=@company AND ComplaintID=@id AND IsActive=1 AND StatusCode=N'NEW' AND RowVersion=@version",c,tx))
+            {
+                Add(parent,"@company",SqlDbType.BigInt,CompanyId); Add(parent,"@id",SqlDbType.BigInt,id); Add(parent,"@version",SqlDbType.Binary,version,8);
+                if(await parent.ExecuteNonQueryAsync(token)!=1) throw new DBConcurrencyException();
+            }
+            await tx.CommitAsync(token);
+        }
+        catch (DBConcurrencyException)
+        {
+            await tx.RollbackAsync(token);
+            return Conflict(new { message = "รายการถูกแก้ไขไปแล้ว", description = "กรุณาโหลดข้อมูลใหม่ก่อนลบ" });
+        }
+        foreach(var path in files) TryDelete(path);
+        return NoContent();
+    }
+
     [HttpPost("{id:long}/start")]
     public Task<IActionResult> Start(long id,CancellationToken token) => Change(id,"NEW","IN_PROGRESS",null,token);
     [HttpPost("{id:long}/complete")]
@@ -85,7 +162,7 @@ ORDER BY RequestDate DESC,ComplaintID DESC OFFSET @offset ROWS FETCH NEXT @take 
 
     private async Task<IActionResult> Change(long id,string required,string target,string? note,CancellationToken token)
     {
-        await using var c=await Open(token); if(!await InService(c,token) || !await Allowed(c,"EDIT",token)) return Forbid();
+        await using var c=await Open(token); if(!await IsCrud(c,token) || !await Allowed(c,"EDIT",token)) return Forbid();
         if(target is "COMPLETED" or "CANCELLED" && string.IsNullOrWhiteSpace(note)) return BadRequest(new { message=target=="COMPLETED"?"กรุณาระบุผลการดำเนินการ":"กรุณาระบุเหตุผลการยกเลิก",description="ข้อมูลนี้เป็นข้อมูลบังคับ" });
         var statuses=required=="OPEN" ? new[]{"NEW","IN_PROGRESS"} : new[]{required};
         var sql=target switch { "IN_PROGRESS"=>"UPDATE dbo.TDADServiceComplaint SET StatusCode=N'IN_PROGRESS',StartedDate=SYSUTCDATETIME(),StartedBy=@user,UpdateDate=SYSUTCDATETIME(),UpdateBy=@user WHERE CompanyID=@company AND ComplaintID=@id AND IsActive=1 AND StatusCode=N'NEW'", "COMPLETED"=>"UPDATE dbo.TDADServiceComplaint SET StatusCode=N'COMPLETED',CompletedDate=SYSUTCDATETIME(),CompletedBy=@user,ResolutionDetail=@note,UpdateDate=SYSUTCDATETIME(),UpdateBy=@user WHERE CompanyID=@company AND ComplaintID=@id AND IsActive=1 AND StatusCode=N'IN_PROGRESS'", _=>"UPDATE dbo.TDADServiceComplaint SET StatusCode=N'CANCELLED',CancelledDate=SYSUTCDATETIME(),CancelledBy=@user,CancellationReason=@note,UpdateDate=SYSUTCDATETIME(),UpdateBy=@user WHERE CompanyID=@company AND ComplaintID=@id AND IsActive=1 AND StatusCode IN(N'NEW',N'IN_PROGRESS')" };
@@ -110,7 +187,7 @@ ORDER BY RequestDate DESC,ComplaintID DESC OFFSET @offset ROWS FETCH NEXT @take 
     [HttpPost("{id:long}/attachments"),RequestSizeLimit(MaxAttachmentBytes)]
     public async Task<IActionResult> Upload(long id,IFormFile? file,CancellationToken token)
     {
-        await using var c=await Open(token); if(!await InService(c,token)) return Forbid(); var access=await Access(c,id,token); if(!access.Found) return NotFound(); if(access.Status is "COMPLETED" or "CANCELLED") return Conflict(new { message="ไม่สามารถเพิ่มรูปได้",description="เรื่องร้องเรียนปิดแล้ว" });
+        await using var c=await Open(token); if(!await IsCrud(c,token)) return Forbid(); var access=await Access(c,id,token); if(!access.Found) return NotFound(); if(access.Status is "COMPLETED" or "CANCELLED") return Conflict(new { message="ไม่สามารถเพิ่มรูปได้",description="เรื่องร้องเรียนปิดแล้ว" });
         var canOwner=access.CreatedBy==UserId && await Allowed(c,"CREATE",token); if(!canOwner && !await Allowed(c,"EDIT",token)) return Forbid(); if(file is null || file.Length==0) return BadRequest(new { message="กรุณาเลือกไฟล์รูปภาพ",description="รองรับ JPG, PNG และ WEBP" }); if(file.Length>MaxAttachmentBytes) return BadRequest(new { message="ไฟล์ใหญ่เกินกำหนด",description="รองรับรูปภาพไม่เกิน 5 MB ต่อไฟล์" });
         var ext=Path.GetExtension(file.FileName).ToLowerInvariant(); var type=(file.ContentType??string.Empty).ToLowerInvariant(); if(type is not ("image/jpeg" or "image/png" or "image/webp") && ext is not (".jpg" or ".jpeg" or ".png" or ".webp")) return BadRequest(new { message="ชนิดไฟล์ไม่ถูกต้อง",description="รองรับเฉพาะ JPG, PNG และ WEBP" });
         await using var ms=new MemoryStream(); await file.CopyToAsync(ms,token); await using var tx=(SqlTransaction)await c.BeginTransactionAsync(token); string? relative=null;
@@ -120,7 +197,7 @@ ORDER BY RequestDate DESC,ComplaintID DESC OFFSET @offset ROWS FETCH NEXT @take 
     [HttpDelete("{id:long}/attachments/{attachmentId:long}")]
     public async Task<IActionResult> DeleteAttachment(long id,long attachmentId,CancellationToken token)
     {
-        await using var c=await Open(token); if(!await InService(c,token)) return Forbid(); var access=await Access(c,id,token); if(!access.Found) return NotFound(); if(access.Status is "COMPLETED" or "CANCELLED") return Conflict(new { message="ไม่สามารถลบรูปได้",description="เรื่องร้องเรียนปิดแล้ว" }); var owner=access.CreatedBy==UserId && await Allowed(c,"CREATE",token); if(!owner && !await Allowed(c,"EDIT",token)) return Forbid(); await using var q=new SqlCommand("SELECT StoredPath FROM dbo.TDADServiceComplaintAttachment WHERE CompanyID=@company AND ComplaintID=@id AND ComplaintAttachmentID=@attachment AND IsActive=1",c); Add(q,"@company",SqlDbType.BigInt,CompanyId); Add(q,"@id",SqlDbType.BigInt,id); Add(q,"@attachment",SqlDbType.BigInt,attachmentId); var path=Convert.ToString(await q.ExecuteScalarAsync(token)); if(string.IsNullOrWhiteSpace(path)) return NotFound(); await using var u=new SqlCommand("UPDATE dbo.TDADServiceComplaintAttachment SET IsActive=0,UpdateDate=SYSUTCDATETIME(),UpdateBy=@user WHERE CompanyID=@company AND ComplaintID=@id AND ComplaintAttachmentID=@attachment",c); Add(u,"@user",SqlDbType.BigInt,UserId); Add(u,"@company",SqlDbType.BigInt,CompanyId); Add(u,"@id",SqlDbType.BigInt,id); Add(u,"@attachment",SqlDbType.BigInt,attachmentId); await u.ExecuteNonQueryAsync(token); TryDelete(path); return Ok(new { attachmentId,deleted=true });
+        await using var c=await Open(token); if(!await IsCrud(c,token) || !await Allowed(c,"DELETE",token)) return Forbid(); var access=await Access(c,id,token); if(!access.Found) return NotFound(); if(access.Status is "COMPLETED" or "CANCELLED") return Conflict(new { message="ไม่สามารถลบรูปได้",description="เรื่องร้องเรียนปิดแล้ว" }); await using var q=new SqlCommand("SELECT StoredPath FROM dbo.TDADServiceComplaintAttachment WHERE CompanyID=@company AND ComplaintID=@id AND ComplaintAttachmentID=@attachment AND IsActive=1",c); Add(q,"@company",SqlDbType.BigInt,CompanyId); Add(q,"@id",SqlDbType.BigInt,id); Add(q,"@attachment",SqlDbType.BigInt,attachmentId); var path=Convert.ToString(await q.ExecuteScalarAsync(token)); if(string.IsNullOrWhiteSpace(path)) return NotFound(); await using var u=new SqlCommand("DELETE FROM dbo.TDADServiceComplaintAttachment WHERE CompanyID=@company AND ComplaintID=@id AND ComplaintAttachmentID=@attachment",c); Add(u,"@company",SqlDbType.BigInt,CompanyId); Add(u,"@id",SqlDbType.BigInt,id); Add(u,"@attachment",SqlDbType.BigInt,attachmentId); await u.ExecuteNonQueryAsync(token); TryDelete(path); return Ok(new { attachmentId,deleted=true });
     }
 
     private async Task<PersonInfo?> Person(SqlConnection c,CancellationToken token)
@@ -129,8 +206,10 @@ ORDER BY RequestDate DESC,ComplaintID DESC OFFSET @offset ROWS FETCH NEXT @take 
         await using var q=new SqlCommand(sql,c); Add(q,"@company",SqlDbType.BigInt,CompanyId); Add(q,"@person",SqlDbType.BigInt,PersonId); await using var r=await q.ExecuteReaderAsync(token); return await r.ReadAsync(token)?new(r.GetString(0),Text(r,1),Text(r,2),Text(r,3)):null;
     }
     private async Task<AccessInfo> Access(SqlConnection c,long id,CancellationToken token) { await using var q=new SqlCommand("SELECT StatusCode,CreateBy FROM dbo.TDADServiceComplaint WHERE CompanyID=@company AND ComplaintID=@id AND IsActive=1",c); Add(q,"@company",SqlDbType.BigInt,CompanyId); Add(q,"@id",SqlDbType.BigInt,id); await using var r=await q.ExecuteReaderAsync(token); return await r.ReadAsync(token)?new(true,r.GetString(0),r.IsDBNull(1)?null:r.GetInt64(1)):new(false,string.Empty,null); }
-    private async Task<bool> CanRead(SqlConnection c,AccessInfo a,CancellationToken t) => await Allowed(c,"EDIT",t) || a.CreatedBy==UserId && await Allowed(c,"VIEW",t);
+    private async Task<bool> CanRead(SqlConnection c,AccessInfo a,CancellationToken t) => await Allowed(c,"VIEW",t) && (await Allowed(c,"EDIT",t) || a.CreatedBy==UserId);
     private async Task<bool> InService(SqlConnection c,CancellationToken t) => CompanyId>0 && (await Allowed(c,"VIEW",t) || await Allowed(c,"CREATE",t) || await Allowed(c,"EDIT",t));
+    private async Task<int> ScreenType(SqlConnection c,CancellationToken t) { await using var q=new SqlCommand("SELECT ScreenType FROM dbo.TDADMainMenu WHERE MenuCode=@menu AND IsActive=1 AND IsVisible=1",c); Add(q,"@menu",SqlDbType.VarChar,Menu,20); var value=await q.ExecuteScalarAsync(t); return value is null ? 0 : Convert.ToInt32(value); }
+    private async Task<bool> IsCrud(SqlConnection c,CancellationToken t) => CompanyId>0 && await ScreenType(c,t)==1;
     private Task<bool> Allowed(SqlConnection c,string action,CancellationToken t) => CompanyProjectPermission.IsAllowedAsync(c,User,Menu,action,t);
     private async Task<SqlConnection> Open(CancellationToken t) { var c=new SqlConnection(configuration.GetConnectionString("LaooDatabase")); await c.OpenAsync(t); return c; }
     private string? SafePath(string relative) { var root=environment.WebRootPath; if(string.IsNullOrWhiteSpace(root)) root=Path.Combine(environment.ContentRootPath,"wwwroot"); var rootPath=Path.GetFullPath(root)+Path.DirectorySeparatorChar; var full=Path.GetFullPath(Path.Combine(root,relative.Replace('/',Path.DirectorySeparatorChar))); return full.StartsWith(rootPath,StringComparison.OrdinalIgnoreCase)?full:null; }
@@ -143,6 +222,7 @@ ORDER BY RequestDate DESC,ComplaintID DESC OFFSET @offset ROWS FETCH NEXT @take 
     private static string SafeName(string name) { name=Path.GetFileName(name).Trim(); return string.IsNullOrEmpty(name)?"attachment":name[..Math.Min(name.Length,255)]; }
     private static void Add(SqlCommand c,string n,SqlDbType t,object? v,int size=0) { var p=size==0?c.Parameters.Add(n,t):c.Parameters.Add(n,t,size); p.Value=v??DBNull.Value; }
     public sealed record CreateComplaintRequest(string? Subject,string? Detail);
+    public sealed record EditComplaintRequest(string? Subject,string? Detail,string? RowVersion);
     public sealed record CompleteComplaintRequest(string? ResolutionDetail);
     public sealed record CancelComplaintRequest(string? CancellationReason);
     private sealed record PersonInfo(string Name,string? Phone,string? Email,string? Location);

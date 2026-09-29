@@ -41,7 +41,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('PM create action appears only with CREATE permission', (
+  testWidgets('PM generation appears only with ScreenType 2 EDIT permission', (
     tester,
   ) async {
     final api = _FakePmApi()..canCreate = true;
@@ -58,6 +58,33 @@ void main() {
     final api = _FakePmApi()..canCreate = true;
     await showPage(tester, api, size: const Size(390, 700));
     expect(find.text('สร้างงานตามรอบ'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('portal PM schedule stays read-only with ScreenType 3', (
+    tester,
+  ) async {
+    final api = _FakePmApi()
+      ..canCreate = true
+      ..canEdit = true
+      ..status = 'IN_PROGRESS';
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PmCalendarPage(
+          api: api,
+          menuCode: '20004',
+          routeName: 'portalPmSchedule',
+          pageTitle: 'รอบบำรุงรักษาของห้อง',
+          portalSchedule: true,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('สร้างงานตามรอบ'), findsNothing);
+    await tester.tap(find.text('แผนทดสอบ'));
+    await tester.pumpAndSettle();
+    expect(find.text('บันทึกปิดงาน'), findsNothing);
+    expect(find.byType(TextField), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -446,7 +473,12 @@ class _FakePmApi extends PmApi {
   @override
   Future<Map<String, dynamic>> workOrderActions({
     bool portalSchedule = false,
-  }) async => {'view': true, 'create': canCreate, 'edit': canEdit};
+  }) async => {
+    'view': true,
+    'screenType': portalSchedule ? 3 : 2,
+    'generate': canCreate,
+    'edit': canEdit,
+  };
 
   @override
   Future<Map<String, dynamic>> workOrders({

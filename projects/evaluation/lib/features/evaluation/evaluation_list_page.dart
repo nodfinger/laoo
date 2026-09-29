@@ -229,10 +229,7 @@ class _EvaluationListPageState extends State<EvaluationListPage> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
-                            'ไม่สามารถโหลดข้อมูลได้\n$_error',
-                            textAlign: TextAlign.center,
-                          ),
+                          Text(_error!, textAlign: TextAlign.center),
                           SizedBox(height: evaluationUiTokens.itemSpacing),
                           OutlinedButton.icon(
                             onPressed: _load,
@@ -429,7 +426,10 @@ class _EvaluationListPageState extends State<EvaluationListPage> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final raw = await _api.get(
         widget.path,
@@ -468,7 +468,12 @@ class _EvaluationListPageState extends State<EvaluationListPage> {
         });
       }
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString());
+      if (mounted) {
+        setState(
+          () => _error =
+              'ไม่สามารถโหลดรายการได้\nรายละเอียดเพิ่มเติม: ${evaluationErrorText(e)}',
+        );
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -1046,6 +1051,7 @@ class _EvaluationListPageState extends State<EvaluationListPage> {
                             width: (MediaQuery.sizeOf(context).width - 40)
                                 .clamp(0.0, 220.0),
                             child: DropdownButtonFormField<String>(
+                              isExpanded: true,
                               initialValue: _sourceFilter,
                               decoration: const InputDecoration(
                                 labelText: 'ประเภทงาน',
@@ -1093,6 +1099,7 @@ class _EvaluationListPageState extends State<EvaluationListPage> {
                             width: (MediaQuery.sizeOf(context).width - 40)
                                 .clamp(0.0, 220.0),
                             child: DropdownButtonFormField<String>(
+                              isExpanded: true,
                               initialValue: _roundStatusFilter,
                               decoration: const InputDecoration(
                                 labelText: 'สถานะ',
@@ -1166,10 +1173,7 @@ class _EvaluationListPageState extends State<EvaluationListPage> {
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Text(
-                                  'ไม่สามารถโหลดข้อมูลได้\n$_error',
-                                  textAlign: TextAlign.center,
-                                ),
+                                Text(_error!, textAlign: TextAlign.center),
                                 SizedBox(
                                   height: evaluationUiTokens.itemSpacing,
                                 ),

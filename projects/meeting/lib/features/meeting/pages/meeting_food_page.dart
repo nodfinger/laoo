@@ -349,6 +349,7 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
   );
 
   Future<void> _openForm({Map<String, dynamic>? item}) async {
+    if (_actions[item == null ? 'create' : 'edit'] != true) return;
     final preset = workspaceThemeController.value;
     final code = TextEditingController(text: item?['code'] as String? ?? '');
     final name = TextEditingController(text: item?['nameTh'] as String? ?? '');
@@ -366,7 +367,7 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
         builder: (context, refresh) => MeetingPopup(
           title: MeetingPopupTitle(
             icon: Icons.restaurant_menu_outlined,
-            text: item == null ? 'เพิ่มรายการอาหาร' : 'แก้ไขรายการอาหาร',
+            text: '$_caption > ${item == null ? 'เพิ่ม' : 'แก้ไข'}',
           ),
           content: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 480),
@@ -386,7 +387,7 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
                       errorText: codeError,
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: LaooLayout.popupFieldSpacing),
                   TextField(
                     controller: name,
                     onChanged: (_) => refresh(() => nameError = null),
@@ -397,7 +398,7 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
                       errorText: nameError,
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: LaooLayout.popupFieldSpacing),
                   DropdownButtonFormField<String>(
                     isExpanded: true,
                     initialValue:
@@ -432,7 +433,7 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
                       typeError = null;
                     }),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: LaooLayout.popupFieldSpacing),
                   Text(
                     'รูปอาหาร',
                     style: TextStyle(
@@ -609,10 +610,13 @@ class _MeetingFoodPageState extends State<MeetingFoodPage> {
   }
 
   Future<void> _delete(Map<String, dynamic> item) async {
+    if (_actions['delete'] != true) return;
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (_) =>
-          MeetingDeletePopup(record: '${item['code']} | ${item['nameTh']}'),
+      builder: (_) => MeetingDeletePopup(
+        record: '${item['code']} | ${item['nameTh']}',
+        description: 'ลบถาวรได้เฉพาะรายการที่ยังไม่ถูกใช้ในแผนหรือใบสั่งอาหาร',
+      ),
     );
     if (confirmed != true) return;
     try {

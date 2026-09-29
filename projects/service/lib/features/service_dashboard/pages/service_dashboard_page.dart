@@ -1,32 +1,69 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../app/theme/laoo_design_tokens.dart';
+import '../../../core/api/api_exception.dart';
+import '../../../core/navigation/navigation_menu_repository.dart';
 import '../../support/presentation/widgets/support_workspace_shell.dart';
 import '../data/service_dashboard_api.dart';
 
 class ServiceDashboardPage extends StatefulWidget {
-  const ServiceDashboardPage({super.key});
+  const ServiceDashboardPage({super.key, this.api});
+  final ServiceDashboardApi? api;
   @override
   State<ServiceDashboardPage> createState() => _ServiceDashboardPageState();
 }
 
 class _ServiceDashboardPageState extends State<ServiceDashboardPage> {
-  final _api = ServiceDashboardApi();
+  late final ServiceDashboardApi _api = widget.api ?? ServiceDashboardApi();
   Map<String, dynamic> _data = {};
   bool _loading = true;
+  String? _loadError;
+  String _caption = 'แดชบอร์ดภาพรวมงานบริการ';
+  int _requestNumber = 0;
   late DateTime _to = DateTime.now();
   late DateTime _from = _to.subtract(const Duration(days: 29));
   @override
   void initState() {
     super.initState();
     _load();
+    _loadCaption();
+  }
+
+  Future<void> _loadCaption() async {
+    try {
+      final caption = await NavigationMenuRepository().resolveMenuName(
+        menuCode: '19001',
+        routeName: 'reportsDashboard',
+        fallback: _caption,
+      );
+      if (mounted) setState(() => _caption = caption);
+    } catch (_) {}
   }
 
   Future<void> _load() async {
+    final requestNumber = ++_requestNumber;
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
     try {
-      _data = await _api.load(_from, _to);
+      final data = await _api.load(_from, _to);
+      if (mounted && requestNumber == _requestNumber) {
+        setState(() => _data = data);
+      }
+    } catch (error) {
+      if (mounted && requestNumber == _requestNumber) {
+        setState(() {
+          _data = {};
+          _loadError = error is ApiException
+              ? 'ไม่สามารถโหลดแดชบอร์ดงานบริการได้\nรายละเอียดเพิ่มเติม: ${error.description ?? error.message}'
+              : 'ไม่สามารถโหลดแดชบอร์ดงานบริการได้\nรายละเอียดเพิ่มเติม: กรุณาตรวจสอบการเชื่อมต่อและลองอีกครั้ง';
+        });
+      }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && requestNumber == _requestNumber) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -35,22 +72,41 @@ class _ServiceDashboardPageState extends State<ServiceDashboardPage> {
       .toList();
   @override
   Widget build(BuildContext context) => SupportWorkspaceShell(
-    pageTitle: 'แดชบอร์ดภาพรวมงานบริการ',
+    pageTitle: _caption,
     activeMenu: 'reportsDashboard',
     menuScope: WorkspaceMenuScope.company,
     child: Padding(
       padding: const EdgeInsets.all(LaooLayout.cardMargin),
       child: _loading
           ? const Center(child: CircularProgressIndicator())
+          : _loadError != null
+          ? Card(
+              margin: EdgeInsets.zero,
+              child: Padding(
+                padding: const EdgeInsets.all(LaooLayout.cardPadding),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(_loadError!),
+                    const SizedBox(height: LaooLayout.cardSpacing),
+                    OutlinedButton(
+                      onPressed: _load,
+                      child: const Text('ลองอีกครั้ง'),
+                    ),
+                  ],
+                ),
+              ),
+            )
           : ListView(
               children: [
                 Card(
                   margin: EdgeInsets.zero,
                   child: Padding(
-                    padding: const EdgeInsets.all(10),
+                    padding: const EdgeInsets.all(LaooLayout.cardPadding),
                     child: Wrap(
-                      spacing: 10,
-                      runSpacing: 10,
+                      spacing: LaooLayout.cardSpacing,
+                      runSpacing: LaooLayout.cardSpacing,
                       children: [
                         OutlinedButton.icon(
                           onPressed: () => _pick(true),
@@ -62,31 +118,31 @@ class _ServiceDashboardPageState extends State<ServiceDashboardPage> {
                           icon: const Icon(Icons.calendar_today_outlined),
                           label: Text('ถึง ${_date(_to)}'),
                         ),
-                        FilledButton.icon(
-                          onPressed: () {
-                            setState(() => _loading = true);
-                            _load();
-                          },
-                          icon: const Icon(Icons.refresh),
-                          label: const Text('แสดงผล'),
-                        ),
                       ],
                     ),
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: LaooLayout.listSectionSpacing),
+                if (_rows('statuses').isEmpty)
+                  const Card(
+                    margin: EdgeInsets.zero,
+                    child: Padding(
+                      padding: EdgeInsets.all(LaooLayout.cardPadding),
+                      child: Text('ไม่มีงานบริการในช่วงวันที่ที่เลือก'),
+                    ),
+                  ),
                 Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
+                  spacing: LaooLayout.cardSpacing,
+                  runSpacing: LaooLayout.cardSpacing,
                   children: _rows('statuses').map(_kpi).toList(),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: LaooLayout.listSectionSpacing),
                 LayoutBuilder(
                   builder: (_, box) => box.maxWidth < 900
                       ? Column(
                           children: [
                             _panel('พื้นที่', _rows('locations')),
-                            const SizedBox(height: 10),
+                            const SizedBox(height: LaooLayout.cardSpacing),
                             _panel('ภาระงานช่าง', _rows('technicians')),
                           ],
                         )
@@ -96,7 +152,7 @@ class _ServiceDashboardPageState extends State<ServiceDashboardPage> {
                             Expanded(
                               child: _panel('พื้นที่', _rows('locations')),
                             ),
-                            const SizedBox(width: 10),
+                            const SizedBox(width: LaooLayout.cardSpacing),
                             Expanded(
                               child: _panel(
                                 'ภาระงานช่าง',
@@ -111,7 +167,7 @@ class _ServiceDashboardPageState extends State<ServiceDashboardPage> {
     ),
   );
   Widget _kpi(Map<String, dynamic> row) => SizedBox(
-    width: 180,
+    width: MediaQuery.sizeOf(context).width < 500 ? double.infinity : 180,
     child: InkWell(
       onTap: () => context.go('/jobs/work-orders?status=${row['code']}'),
       child: Card(
@@ -149,6 +205,7 @@ class _ServiceDashboardPageState extends State<ServiceDashboardPage> {
         if (_to.isBefore(_from)) _from = value;
       }
     });
+    await _load();
   }
 
   String _date(DateTime value) =>

@@ -18,7 +18,8 @@ public sealed class WarehouseController(IConfiguration configuration) : Controll
     public async Task<IActionResult> Actions(CancellationToken token)
     {
         await using var connection = await Open(token);
-        return Ok(new { view=await Can(connection,"VIEW",token), create=await Can(connection,"CREATE",token), edit=await Can(connection,"EDIT",token), delete=await Can(connection,"DELETE",token) });
+        if (!await Can(connection,"VIEW",token)) return Forbid();
+        return Ok(new { view=true, create=await Can(connection,"CREATE",token), edit=await Can(connection,"EDIT",token), delete=await Can(connection,"DELETE",token) });
     }
 
     [HttpGet]
@@ -109,10 +110,49 @@ ORDER BY DisplayName,U.Username;
     {
         await using var connection=await Open(token);
         if(!await Can(connection,"DELETE",token)) return Forbid();
-        const string sql="UPDATE dbo.TDIVWarehouse SET IsActive=0,IsDefault=0,UpdateDate=SYSUTCDATETIME(),UpdatedBy=@user WHERE WarehouseID=@id AND CompanyID=@company AND NOT EXISTS(SELECT 1 FROM dbo.TDIVStockBalance B WHERE B.CompanyID=@company AND B.WarehouseID=@id AND B.Quantity<>0)";
-        await using var command=new SqlCommand(sql,connection);
-        Add(command,"@user",SqlDbType.BigInt,UserId()); Add(command,"@id",SqlDbType.BigInt,id); Add(command,"@company",SqlDbType.BigInt,CompanyId());
-        return await command.ExecuteNonQueryAsync(token)==1 ? NoContent() : BadRequest(new {message="ไม่สามารถปิดคลังได้",description="ไม่พบคลังใน Company นี้ หรือคลังยังมียอดคงเหลือ"});
+        await using var tx=(SqlTransaction)await connection.BeginTransactionAsync(IsolationLevel.Serializable,token);
+        try
+        {
+            await using(var current=new SqlCommand("SELECT IsDefault FROM dbo.TDIVWarehouse WITH(UPDLOCK,HOLDLOCK) WHERE WarehouseID=@id AND CompanyID=@company",connection,tx))
+            {
+                Add(current,"@id",SqlDbType.BigInt,id); Add(current,"@company",SqlDbType.BigInt,CompanyId());
+                var value=await current.ExecuteScalarAsync(token);
+                if(value is null) { await tx.RollbackAsync(token); return NotFound(new {message="ไม่พบคลังสินค้า",description="คลังไม่อยู่ใน Company ปัจจุบัน"}); }
+                if(Convert.ToBoolean(value)) { await tx.RollbackAsync(token); return Conflict(new {message="ลบคลังเริ่มต้นไม่ได้",description="กรุณากำหนดคลังอื่นเป็นคลังเริ่มต้นก่อน"}); }
+            }
+            const string references="""
+SELECT CAST(CASE WHEN
+ EXISTS(SELECT 1 FROM dbo.TDIVStockBalance WHERE CompanyID=@company AND WarehouseID=@id)
+ OR EXISTS(SELECT 1 FROM dbo.TDIVStockReceipt WHERE CompanyID=@company AND WarehouseID=@id)
+ OR EXISTS(SELECT 1 FROM dbo.TDIVStockIssue WHERE CompanyID=@company AND WarehouseID=@id)
+ OR EXISTS(SELECT 1 FROM dbo.TDIVInventoryFulfillment WHERE CompanyID=@company AND WarehouseID=@id)
+ OR EXISTS(SELECT 1 FROM dbo.TDADServiceRequestPart WHERE CompanyID=@company AND WarehouseID=@id)
+ OR EXISTS(SELECT 1 FROM dbo.TDIVItemInstance WHERE CompanyID=@company AND WarehouseID=@id)
+ THEN 1 ELSE 0 END AS bit);
+""";
+            await using(var used=new SqlCommand(references,connection,tx))
+            {
+                Add(used,"@id",SqlDbType.BigInt,id); Add(used,"@company",SqlDbType.BigInt,CompanyId());
+                if(Convert.ToBoolean(await used.ExecuteScalarAsync(token))) { await tx.RollbackAsync(token); return Conflict(new {message="ลบคลังสินค้าไม่ได้",description="คลังนี้มีสินค้า ยอดคงเหลือ หรือเอกสารธุรกิจอ้างอิงอยู่"}); }
+            }
+            await using(var links=new SqlCommand("DELETE FROM dbo.TDIVUserWarehouse WHERE CompanyID=@company AND WarehouseID=@id",connection,tx))
+            {
+                Add(links,"@id",SqlDbType.BigInt,id); Add(links,"@company",SqlDbType.BigInt,CompanyId());
+                await links.ExecuteNonQueryAsync(token);
+            }
+            await using(var remove=new SqlCommand("DELETE FROM dbo.TDIVWarehouse WHERE CompanyID=@company AND WarehouseID=@id",connection,tx))
+            {
+                Add(remove,"@id",SqlDbType.BigInt,id); Add(remove,"@company",SqlDbType.BigInt,CompanyId());
+                if(await remove.ExecuteNonQueryAsync(token)!=1) { await tx.RollbackAsync(token); return Conflict(new {message="ลบคลังสินค้าไม่สำเร็จ",description="ข้อมูลเปลี่ยนไปแล้ว กรุณาโหลดรายการใหม่"}); }
+            }
+            await tx.CommitAsync(token);
+            return NoContent();
+        }
+        catch(SqlException ex) when(ex.Number==547)
+        {
+            await tx.RollbackAsync(token);
+            return Conflict(new {message="ลบคลังสินค้าไม่ได้",description="มีข้อมูลอื่นอ้างอิงคลังนี้อยู่"});
+        }
     }
 
     private async Task<IActionResult> Save(long? id,WarehouseUpsertRequest request,CancellationToken token)
@@ -157,7 +197,16 @@ ORDER BY DisplayName,U.Username;
     }
 
     private void Bind(SqlCommand command,WarehouseUpsertRequest request,string code,string name){Add(command,"@company",SqlDbType.BigInt,CompanyId());Add(command,"@branch",SqlDbType.BigInt,request.BranchID);Add(command,"@code",SqlDbType.NVarChar,code,50);Add(command,"@name",SqlDbType.NVarChar,name,200);Add(command,"@default",SqlDbType.Bit,request.IsDefault);Add(command,"@active",SqlDbType.Bit,request.IsActive);Add(command,"@user",SqlDbType.BigInt,UserId());}
-    private Task<bool> Can(SqlConnection c,string action,CancellationToken t)=>InventoryControllerSupport.CanAsync(c,User,ScreenCode,action,t);
+    private async Task<bool> Can(SqlConnection c,string action,CancellationToken t)
+    {
+        if(action!="VIEW")
+        {
+            await using var screen=new SqlCommand("SELECT ScreenType FROM dbo.TDADMainMenu WHERE MenuCode=@menu AND IsActive=1 AND IsVisible=1",c);
+            Add(screen,"@menu",SqlDbType.VarChar,ScreenCode,20);
+            if(Convert.ToInt32(await screen.ExecuteScalarAsync(t)??0)!=1) return false;
+        }
+        return await InventoryControllerSupport.CanAsync(c,User,ScreenCode,action,t);
+    }
     private Task<SqlConnection> Open(CancellationToken t)=>InventoryControllerSupport.OpenAsync(configuration,t);
     private long CompanyId()=>InventoryControllerSupport.ClaimId(User,"company_id");
     private long UserId()=>InventoryControllerSupport.ClaimId(User,"user_id");

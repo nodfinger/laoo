@@ -3,25 +3,30 @@ import '../../../core/api/api_client.dart';
 class ServiceRequestApi {
   ServiceRequestApi({ApiClient? client}) : _client = client ?? ApiClient();
   final ApiClient _client;
+  Map<String, String> _menuCodeQuery(String? menuCode) =>
+      menuCode == null ? const {} : {'menuCode': menuCode};
 
   Future<Map<String, dynamic>> actions() async => Map<String, dynamic>.from(
     await _client.get('/api/service/requests/actions') as Map,
   );
 
-  Future<Map<String, dynamic>> lookup({String search = ''}) async =>
-      Map<String, dynamic>.from(
-        await _client.get(
-              '/api/service/requests/lookup',
-              query: {'search': search},
-            )
-            as Map,
-      );
+  Future<Map<String, dynamic>> lookup({
+    String search = '',
+    bool selfService = false,
+  }) async => Map<String, dynamic>.from(
+    await _client.get(
+          '/api/service/requests/lookup',
+          query: {'search': search, 'self': '$selfService'},
+        )
+        as Map,
+  );
 
   Future<Map<String, dynamic>> list({
     String search = '',
     String status = '',
     bool selfService = false,
     int page = 1,
+    String? menuCode,
   }) async => Map<String, dynamic>.from(
     await _client.get(
           '/api/service/requests',
@@ -31,6 +36,7 @@ class ServiceRequestApi {
             'self': '$selfService',
             'page': '$page',
             'pageSize': '20',
+            ..._menuCodeQuery(menuCode),
           },
         )
         as Map,
@@ -69,9 +75,36 @@ class ServiceRequestApi {
         as Map,
   );
 
-  Future<List<Map<String, dynamic>>> attachments(int requestId) async {
+  Future<void> edit(
+    int id, {
+    required bool selfService,
+    required String subject,
+    required String detail,
+    required String rowVersion,
+  }) => _client.put(
+    selfService
+        ? '/api/service/requests/self/$id'
+        : '/api/service/requests/$id',
+    body: {'subject': subject, 'detail': detail, 'rowVersion': rowVersion},
+  );
+
+  Future<void> delete(int id, String rowVersion, {required bool selfService}) =>
+      _client.delete(
+        selfService
+            ? '/api/service/requests/self/$id'
+            : '/api/service/requests/$id',
+        query: {'rowVersion': rowVersion},
+      );
+
+  Future<List<Map<String, dynamic>>> attachments(
+    int requestId, {
+    String? menuCode,
+  }) async {
     final value =
-        await _client.get('/api/service/requests/$requestId/attachments')
+        await _client.get(
+              '/api/service/requests/$requestId/attachments',
+              query: _menuCodeQuery(menuCode),
+            )
             as Map;
     return ((value['items'] as List?) ?? const [])
         .map((item) => Map<String, dynamic>.from(item as Map))
@@ -97,14 +130,22 @@ class ServiceRequestApi {
     );
   }
 
-  Future<List<int>> downloadAttachment(int requestId, int attachmentId) =>
-      _client.getBytes(
-        '/api/service/requests/$requestId/attachments/$attachmentId',
-      );
+  Future<List<int>> downloadAttachment(
+    int requestId,
+    int attachmentId, {
+    String? menuCode,
+  }) => _client.getBytes(
+    '/api/service/requests/$requestId/attachments/$attachmentId',
+    query: _menuCodeQuery(menuCode),
+  );
 
-  Future<Map<String, dynamic>> detail(int id) async =>
+  Future<Map<String, dynamic>> detail(int id, {String? menuCode}) async =>
       Map<String, dynamic>.from(
-        await _client.get('/api/service/requests/$id') as Map,
+        await _client.get(
+              '/api/service/requests/$id',
+              query: _menuCodeQuery(menuCode),
+            )
+            as Map,
       );
 
   Future<List<Map<String, dynamic>>> technicians() async {

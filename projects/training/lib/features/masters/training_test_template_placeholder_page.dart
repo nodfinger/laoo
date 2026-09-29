@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -144,6 +143,7 @@ class _TrainingTestTemplatePlaceholderPageState
           onSave: (request) async {
             if (item == null) {
               await _api.post(_path, body: request);
+              await _load(targetPage: _page);
             } else {
               await _api.put('$_path/${item['id']}', body: request);
             }
@@ -620,7 +620,7 @@ class _TemplateDialog extends StatefulWidget {
 }
 
 class _TemplateDialogState extends State<_TemplateDialog> {
-  final _formKey = GlobalKey<FormState>();
+  GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   late final TextEditingController _code;
   late final TextEditingController _name;
   late final TextEditingController _questionCount;
@@ -629,8 +629,7 @@ class _TemplateDialogState extends State<_TemplateDialog> {
   late bool _isActive;
   late Map<String, dynamic> _definition;
   bool _saving = false;
-  OverlayEntry? _saveErrorOverlay;
-  Timer? _saveErrorTimer;
+  OverlayEntry? _saveMessageOverlay;
 
   @override
   void initState() {
@@ -817,46 +816,61 @@ class _TemplateDialogState extends State<_TemplateDialog> {
     });
     try {
       await widget.onSave!(request);
-      if (mounted) Navigator.pop(context, request);
+      if (!mounted) return;
+      if (widget.item != null) {
+        Navigator.pop(context, request);
+        return;
+      }
+      setState(() {
+        _formKey = GlobalKey<FormState>();
+        _code.clear();
+        _name.clear();
+        _section = 'PRE';
+        _isActive = true;
+        _definition = {
+          ..._starterDefinition(),
+          'questions': <Map<String, dynamic>>[],
+        };
+        _questionCount.text = '1';
+        _passingPercent.text = '60';
+        _saving = false;
+      });
+      _showSaveMessage('บันทึกข้อมูลสำเร็จ', error: false);
     } catch (error) {
       if (mounted) {
         setState(() {
           _saving = false;
         });
-        _showSaveError(trainingErrorText(error));
+        _showSaveMessage(trainingErrorText(error), error: true);
       }
     }
   }
 
-  void _showSaveError(String message) {
-    _saveErrorTimer?.cancel();
-    _saveErrorOverlay?.remove();
+  void _showSaveMessage(String message, {required bool error}) {
+    _dismissSaveMessage();
     final entry = OverlayEntry(
       builder: (_) => Positioned(
         top: 12,
         right: 12,
         child: buildTrainingMessage(
           message: message,
-          error: true,
-          onClose: _dismissSaveError,
+          error: error,
+          onClose: _dismissSaveMessage,
         ),
       ),
     );
-    _saveErrorOverlay = entry;
+    _saveMessageOverlay = entry;
     Overlay.of(context, rootOverlay: true).insert(entry);
-    _saveErrorTimer = Timer(const Duration(seconds: 6), _dismissSaveError);
   }
 
-  void _dismissSaveError() {
-    _saveErrorTimer?.cancel();
-    _saveErrorTimer = null;
-    _saveErrorOverlay?.remove();
-    _saveErrorOverlay = null;
+  void _dismissSaveMessage() {
+    _saveMessageOverlay?.remove();
+    _saveMessageOverlay = null;
   }
 
   @override
   void dispose() {
-    _dismissSaveError();
+    _dismissSaveMessage();
     _code.dispose();
     _name.dispose();
     _questionCount.dispose();
@@ -902,6 +916,7 @@ class _TemplateDialogState extends State<_TemplateDialog> {
           ),
           SizedBox(height: trainingUiTokens.popupFieldSpacing),
           DropdownButtonFormField<String>(
+            isExpanded: true,
             initialValue: _section,
             decoration: const InputDecoration(labelText: 'ช่วงแบบทดสอบ *'),
             items: const [
@@ -912,6 +927,7 @@ class _TemplateDialogState extends State<_TemplateDialog> {
           ),
           SizedBox(height: trainingUiTokens.popupFieldSpacing),
           DropdownButtonFormField<String>(
+            isExpanded: true,
             initialValue:
                 (_definition['questionType'] as String?) == 'TRUE_FALSE'
                 ? 'TRUE_FALSE'

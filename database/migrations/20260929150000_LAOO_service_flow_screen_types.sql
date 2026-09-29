@@ -1,0 +1,15 @@
+UPDATE dbo.TDADMainMenu
+SET ScreenType = CASE MenuCode
+    WHEN N'16003' THEN 2
+    WHEN N'17001' THEN 2
+    WHEN N'17002' THEN 2
+    ELSE 3
+END,
+    UpdateDate = SYSUTCDATETIME()
+WHERE MenuCode IN (N'16003', N'17001', N'17002', N'20002', N'20003', N'20004')
+  AND ScreenType <> CASE MenuCode
+    WHEN N'16003' THEN 2
+    WHEN N'17001' THEN 2
+    WHEN N'17002' THEN 2
+    ELSE 3
+  END;

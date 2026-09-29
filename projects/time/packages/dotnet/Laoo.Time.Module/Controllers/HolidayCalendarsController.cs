@@ -24,13 +24,31 @@ public sealed class HolidayCalendarsController(IConfiguration configuration) : C
     public sealed record ExceptionRequest(long BranchId, DateOnly HolidayDate, bool IsHoliday, string? HolidayName, string? Reason, bool IsActive, string? RowVersion);
 
     [HttpGet("actions")]
-    public Task<IActionResult> CalendarActions(CancellationToken token) => Actions(CalendarMenu, 1, token);
+    public Task<IActionResult> CalendarActions(CancellationToken token) => Actions(CalendarMenu, token);
     [HttpGet("dates/actions")]
-    public Task<IActionResult> DateActions(CancellationToken token) => Actions(DateMenu, 1, token);
+    public Task<IActionResult> DateActions(CancellationToken token) => Actions(DateMenu, token);
     [HttpGet("assignments/actions")]
-    public Task<IActionResult> AssignmentActions(CancellationToken token) => Actions(AssignmentMenu, 1, token);
+    public Task<IActionResult> AssignmentActions(CancellationToken token) => Actions(AssignmentMenu, token);
     [HttpGet("exceptions/actions")]
-    public Task<IActionResult> ExceptionActions(CancellationToken token) => Actions(ExceptionMenu, 1, token);
+    public Task<IActionResult> ExceptionActions(CancellationToken token) => Actions(ExceptionMenu, token);
+
+    [HttpGet("calendar-options")]
+    public async Task<IActionResult> CalendarOptions(CancellationToken token)
+    {
+        if (!Scope(out var companyId, out _)) return Forbid();
+        await using var c = await Open(token);
+        if (!await Can(c, CalendarMenu, "VIEW", token)
+            && !await Can(c, DateMenu, "VIEW", token)
+            && !await Can(c, AssignmentMenu, "VIEW", token)) return Forbid();
+        await using var q = new SqlCommand(
+            "SELECT HolidayCalendarID,CalendarCode,CalendarName FROM dbo.TDTMHolidayCalendar WHERE CompanyID=@CompanyID AND IsActive=1 ORDER BY CalendarCode,HolidayCalendarID", c);
+        Add(q, "@CompanyID", SqlDbType.BigInt, companyId);
+        await using var r = await q.ExecuteReaderAsync(token);
+        var items = new List<object>();
+        while (await r.ReadAsync(token))
+            items.Add(new { holidayCalendarId = r.GetInt64(0), calendarCode = r.GetString(1), calendarName = r.GetString(2), isActive = true });
+        return Ok(new { items });
+    }
 
     [HttpGet]
     public async Task<IActionResult> Calendars([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] int page = 1, [FromQuery] int pageSize = 30, CancellationToken token = default)
@@ -56,19 +74,20 @@ public sealed class HolidayCalendarsController(IConfiguration configuration) : C
     [HttpDelete("{id:long}")]
     public async Task<IActionResult> DeleteCalendar(long id, [FromQuery] string? rowVersion, CancellationToken token)
     {
-        if (!Scope(out var companyId, out var userId)) return Forbid();
+        if (!Scope(out var companyId, out _)) return Forbid();
         if (!RowVersion(rowVersion)) return BadRequest(new { message = "ไม่พบ Version ของข้อมูล กรุณาโหลดใหม่" });
         await using var c = await Open(token); if (!await Can(c, CalendarMenu, "DELETE", token)) return Forbid();
+        if (!await OwnsRow(c, "TDTMHolidayCalendar", "HolidayCalendarID", companyId, id, token)) return Forbid();
         await using var q = new SqlCommand("""
-IF EXISTS(SELECT 1 FROM dbo.TDTMHolidayDate WHERE CompanyID=@CompanyID AND HolidayCalendarID=@ID AND IsActive=1)
- OR EXISTS(SELECT 1 FROM dbo.TDTMBranchHolidayCalendarAssignment WHERE CompanyID=@CompanyID AND HolidayCalendarID=@ID AND IsActive=1)
- OR EXISTS(SELECT 1 FROM dbo.TDTMDefaultHolidayCalendarVersion WHERE CompanyID=@CompanyID AND HolidayCalendarID=@ID AND IsActive=1)
+IF EXISTS(SELECT 1 FROM dbo.TDTMHolidayDate WHERE CompanyID=@CompanyID AND HolidayCalendarID=@ID)
+ OR EXISTS(SELECT 1 FROM dbo.TDTMBranchHolidayCalendarAssignment WHERE CompanyID=@CompanyID AND HolidayCalendarID=@ID)
+ OR EXISTS(SELECT 1 FROM dbo.TDTMDefaultHolidayCalendarVersion WHERE CompanyID=@CompanyID AND HolidayCalendarID=@ID)
  THROW 52601,N'ปฏิทินนี้มีวันหยุดหรือถูกผูกใช้งานแล้ว ไม่สามารถลบได้',1;
-UPDATE dbo.TDTMHolidayCalendar SET IsActive=0,UpdateDate=SYSDATETIME(),UpdateBy=@UserID WHERE CompanyID=@CompanyID AND HolidayCalendarID=@ID AND RowVersion=CONVERT(binary(8),@RowVersion,2);
+DELETE dbo.TDTMHolidayCalendar WHERE CompanyID=@CompanyID AND HolidayCalendarID=@ID AND RowVersion=CONVERT(binary(8),@RowVersion,2);
 """, c);
-        Add(q, "@CompanyID", SqlDbType.BigInt, companyId); Add(q, "@ID", SqlDbType.BigInt, id); Add(q, "@UserID", SqlDbType.BigInt, userId); Add(q, "@RowVersion", SqlDbType.VarChar, rowVersion, 32);
+        Add(q, "@CompanyID", SqlDbType.BigInt, companyId); Add(q, "@ID", SqlDbType.BigInt, id); Add(q, "@RowVersion", SqlDbType.VarChar, rowVersion, 32);
         try { return await q.ExecuteNonQueryAsync(token) == 1 ? NoContent() : Conflict(new { message = "ข้อมูลถูกแก้ไขแล้ว กรุณาโหลดใหม่" }); }
-        catch (SqlException e) when (e.Number == 52601) { return Conflict(new { message = e.Message }); }
+        catch (SqlException e) when (e.Number is 52601 or 547) { return Conflict(new { message = "ปฏิทินนี้มีวันหยุดหรือถูกผูกใช้งานแล้ว ไม่สามารถลบได้" }); }
     }
 
     [HttpGet("dates")]
@@ -89,7 +108,7 @@ UPDATE dbo.TDTMHolidayCalendar SET IsActive=0,UpdateDate=SYSDATETIME(),UpdateBy=
     [HttpPut("dates/{id:long}")]
     public Task<IActionResult> UpdateDate(long id, HolidayDateRequest request, CancellationToken token) => SaveDate(id, request, token);
     [HttpDelete("dates/{id:long}")]
-    public Task<IActionResult> DeleteDate(long id, [FromQuery] string? rowVersion, CancellationToken token) => SoftDelete(DateMenu, "TDTMHolidayDate", "HolidayDateID", id, rowVersion, token);
+    public Task<IActionResult> DeleteDate(long id, [FromQuery] string? rowVersion, CancellationToken token) => HardDelete(DateMenu, "TDTMHolidayDate", "HolidayDateID", id, rowVersion, token);
 
     [HttpGet("branches")]
     public async Task<IActionResult> Branches(CancellationToken token)
@@ -115,7 +134,7 @@ UPDATE dbo.TDTMHolidayCalendar SET IsActive=0,UpdateDate=SYSDATETIME(),UpdateBy=
     [HttpPut("assignments/{id:long}")]
     public Task<IActionResult> UpdateAssignment(long id, AssignmentRequest request, CancellationToken token) => SaveAssignment(id, request, token);
     [HttpDelete("assignments/{id:long}")]
-    public Task<IActionResult> DeleteAssignment(long id, [FromQuery] string? rowVersion, CancellationToken token) => SoftDelete(AssignmentMenu, "TDTMBranchHolidayCalendarAssignment", "BranchHolidayCalendarAssignmentID", id, rowVersion, token);
+    public Task<IActionResult> DeleteAssignment(long id, [FromQuery] string? rowVersion, CancellationToken token) => HardDelete(AssignmentMenu, "TDTMBranchHolidayCalendarAssignment", "BranchHolidayCalendarAssignmentID", id, rowVersion, token);
 
     [HttpGet("exceptions")]
     public async Task<IActionResult> Exceptions([FromQuery] long? branchId, [FromQuery] DateOnly? from, [FromQuery] DateOnly? to, [FromQuery] int page = 1, [FromQuery] int pageSize = 30, CancellationToken token = default)
@@ -132,7 +151,7 @@ UPDATE dbo.TDTMHolidayCalendar SET IsActive=0,UpdateDate=SYSDATETIME(),UpdateBy=
     [HttpPut("exceptions/{id:long}")]
     public Task<IActionResult> UpdateException(long id, ExceptionRequest request, CancellationToken token) => SaveException(id, request, token);
     [HttpDelete("exceptions/{id:long}")]
-    public Task<IActionResult> DeleteException(long id, [FromQuery] string? rowVersion, CancellationToken token) => SoftDelete(ExceptionMenu, "TDTMBranchHolidayException", "BranchHolidayExceptionID", id, rowVersion, token);
+    public Task<IActionResult> DeleteException(long id, [FromQuery] string? rowVersion, CancellationToken token) => HardDelete(ExceptionMenu, "TDTMBranchHolidayException", "BranchHolidayExceptionID", id, rowVersion, token);
 
     private async Task<IActionResult> SaveCalendar(long? id, CalendarRequest x, CancellationToken token)
     {
@@ -159,15 +178,52 @@ UPDATE dbo.TDTMHolidayCalendar SET IsActive=0,UpdateDate=SYSDATETIME(),UpdateBy=
         try { await using var q = new SqlCommand(id.HasValue ? "UPDATE dbo.TDTMBranchHolidayException SET BranchID=@BranchID,HolidayDate=@Date,IsHoliday=@IsHoliday,HolidayName=@Name,Reason=@Reason,IsActive=@Active,UpdateDate=SYSDATETIME(),UpdateBy=@UserID WHERE CompanyID=@CompanyID AND BranchHolidayExceptionID=@ID AND RowVersion=CONVERT(binary(8),@RowVersion,2)" : "INSERT dbo.TDTMBranchHolidayException(CompanyID,BranchID,HolidayDate,IsHoliday,HolidayName,Reason,IsActive,CreateBy) VALUES(@CompanyID,@BranchID,@Date,@IsHoliday,@Name,@Reason,@Active,@UserID)", c); BindException(q, co, user, x, name, reason); if (id.HasValue) { Add(q, "@ID", SqlDbType.BigInt, id); Add(q, "@RowVersion", SqlDbType.VarChar, x.RowVersion, 32); } return await q.ExecuteNonQueryAsync(token) == 1 ? NoContent() : Conflict(new { message = "ข้อมูลถูกแก้ไขแล้ว กรุณาโหลดใหม่" }); } catch (SqlException e) when (e.Number is 2601 or 2627) { return Conflict(new { message = "สาขานี้มีข้อยกเว้นสำหรับวันดังกล่าวแล้ว" }); }
     }
 
-    private async Task<IActionResult> SoftDelete(string menu, string table, string idColumn, long id, string? rowVersion, CancellationToken token)
-    { if (!Scope(out var co, out var user)) return Forbid(); if (!RowVersion(rowVersion)) return BadRequest(new { message = "ไม่พบ Version ของข้อมูล กรุณาโหลดใหม่" }); await using var c = await Open(token); if (!await Can(c, menu, "DELETE", token)) return Forbid(); await using var q = new SqlCommand($"UPDATE dbo.{table} SET IsActive=0,UpdateDate=SYSDATETIME(),UpdateBy=@UserID WHERE CompanyID=@CompanyID AND {idColumn}=@ID AND RowVersion=CONVERT(binary(8),@RowVersion,2)", c); Add(q, "@CompanyID", SqlDbType.BigInt, co); Add(q, "@UserID", SqlDbType.BigInt, user); Add(q, "@ID", SqlDbType.BigInt, id); Add(q, "@RowVersion", SqlDbType.VarChar, rowVersion, 32); return await q.ExecuteNonQueryAsync(token) == 1 ? NoContent() : Conflict(new { message = "ข้อมูลถูกแก้ไขแล้ว กรุณาโหลดใหม่" }); }
+    private async Task<IActionResult> HardDelete(string menu, string table, string idColumn, long id, string? rowVersion, CancellationToken token)
+    {
+        if (!Scope(out var companyId, out _)) return Forbid();
+        if (!RowVersion(rowVersion)) return BadRequest(new { message = "ไม่พบ Version ของข้อมูล กรุณาโหลดใหม่" });
+        await using var c = await Open(token);
+        if (!await Can(c, menu, "DELETE", token)) return Forbid();
+        if (!await OwnsRow(c, table, idColumn, companyId, id, token)) return Forbid();
+        await using var q = new SqlCommand($"DELETE dbo.{table} WHERE CompanyID=@CompanyID AND {idColumn}=@ID AND RowVersion=CONVERT(binary(8),@RowVersion,2)", c);
+        Add(q, "@CompanyID", SqlDbType.BigInt, companyId);
+        Add(q, "@ID", SqlDbType.BigInt, id);
+        Add(q, "@RowVersion", SqlDbType.VarChar, rowVersion, 32);
+        try { return await q.ExecuteNonQueryAsync(token) == 1 ? NoContent() : Conflict(new { message = "ข้อมูลถูกแก้ไขแล้ว กรุณาโหลดใหม่" }); }
+        catch (SqlException e) when (e.Number == 547) { return Conflict(new { message = "รายการนี้ถูกใช้งานแล้ว ไม่สามารถลบได้" }); }
+    }
 
-    private async Task<IActionResult> Actions(string menu, int screenType, CancellationToken token) { if (!Scope(out _, out _)) return Forbid(); await using var c = await Open(token); return Ok(new { menuCode = menu, caption = await Caption(c, menu, token), screenType, view = await Can(c, menu, "VIEW", token), create = await Can(c, menu, "CREATE", token), edit = await Can(c, menu, "EDIT", token), delete = await Can(c, menu, "DELETE", token) }); }
-    private async Task<bool> Can(SqlConnection c, string menu, string action, CancellationToken token) => await CompanyMenuAccess.IsAllowedAsync(c, User, menu, action, token);
+    private async Task<IActionResult> Actions(string menu, CancellationToken token)
+    {
+        if (!Scope(out _, out _)) return Forbid();
+        await using var c = await Open(token);
+        if (!await Can(c, menu, "VIEW", token)) return Forbid();
+        var screenType = await ScreenType(c, menu, token);
+        return Ok(new { menuCode = menu, caption = await Caption(c, menu, token), screenType, view = true,
+            create = screenType == 1 && await Can(c, menu, "CREATE", token),
+            edit = screenType == 1 && await Can(c, menu, "EDIT", token),
+            delete = screenType == 1 && await Can(c, menu, "DELETE", token) });
+    }
+    private async Task<bool> Can(SqlConnection c, string menu, string action, CancellationToken token) =>
+        (action == "VIEW" || await ScreenType(c, menu, token) == 1)
+        && await CompanyMenuAccess.IsAllowedAsync(c, User, menu, action, token);
+    private static async Task<int> ScreenType(SqlConnection c, string menu, CancellationToken token)
+    {
+        await using var q = new SqlCommand("SELECT ScreenType FROM dbo.TDADMainMenu WHERE MenuCode=@Menu AND IsActive=1", c);
+        Add(q, "@Menu", SqlDbType.Char, menu, 5);
+        return Convert.ToInt32(await q.ExecuteScalarAsync(token));
+    }
+    private static async Task<bool> OwnsRow(SqlConnection c, string table, string idColumn, long companyId, long id, CancellationToken token)
+    {
+        await using var q = new SqlCommand($"SELECT COUNT_BIG(1) FROM dbo.{table} WHERE CompanyID=@CompanyID AND {idColumn}=@ID", c);
+        Add(q, "@CompanyID", SqlDbType.BigInt, companyId);
+        Add(q, "@ID", SqlDbType.BigInt, id);
+        return Convert.ToInt64(await q.ExecuteScalarAsync(token)) == 1;
+    }
     private async Task<SqlConnection> Open(CancellationToken token) { var c = new SqlConnection(configuration.GetConnectionString("LaooDatabase")); await c.OpenAsync(token); return c; }
     private bool Scope(out long companyId, out long userId) { companyId = 0; userId = 0; return string.Equals(User.FindFirstValue("user_type"), "COMPANY_USER", StringComparison.OrdinalIgnoreCase) && long.TryParse(User.FindFirstValue("company_id"), out companyId) && long.TryParse(User.FindFirstValue("user_id"), out userId) && companyId > 0 && userId > 0; }
     private static bool Page(int page, int pageSize) => page > 0 && pageSize is > 0 and <= 100;
-    private static bool RowVersion(string? value) => !string.IsNullOrWhiteSpace(value) && value.Length <= 32;
+    private static bool RowVersion(string? value) => value is { Length: 16 } && value.All(Uri.IsHexDigit);
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     private static string? Text(SqlDataReader r, int i) => r.IsDBNull(i) ? null : r.GetString(i);
     private static DateOnly? Date(SqlDataReader r, int i) => r.IsDBNull(i) ? null : DateOnly.FromDateTime(r.GetDateTime(i));

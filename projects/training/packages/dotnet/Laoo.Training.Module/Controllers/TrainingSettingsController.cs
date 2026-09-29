@@ -1,5 +1,6 @@
 using System.Data;
 using System.Security.Claims;
+using Laoo.Shared.Contracts;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
@@ -24,6 +25,9 @@ public sealed class TrainingSettingsController(IConfiguration configuration)
         await using var connection = new SqlConnection(
             configuration.GetConnectionString("LaooDatabase"));
         await connection.OpenAsync(token);
+
+        if (!await CanViewAsync(connection, token))
+            return Forbid();
 
         if (!await IsEnabledForUserAsync(
                 connection, companyId, partnerId, userId, token))
@@ -53,6 +57,20 @@ public sealed class TrainingSettingsController(IConfiguration configuration)
             && long.TryParse(User.FindFirstValue("company_id"), out companyId)
             && long.TryParse(User.FindFirstValue("partner_id"), out partnerId)
             && long.TryParse(User.FindFirstValue("user_id"), out userId);
+    }
+
+    private async Task<bool> CanViewAsync(SqlConnection connection, CancellationToken token)
+    {
+        if (!long.TryParse(User.FindFirstValue("project_id"), out var activeProjectId))
+            return false;
+        await using var command = new SqlCommand(
+            "SELECT COUNT_BIG(*) FROM dbo.TDADProject WHERE ProjectCode=@ProjectCode AND ProjectID=@ProjectID AND IsActive=1",
+            connection);
+        command.Parameters.Add("@ProjectCode", SqlDbType.NVarChar, 50).Value = ProjectCode;
+        command.Parameters.Add("@ProjectID", SqlDbType.BigInt).Value = activeProjectId;
+        if (Convert.ToInt64(await command.ExecuteScalarAsync(token)) != 1)
+            return false;
+        return await CompanyMenuAccess.IsAllowedAsync(connection, User, "37004", "VIEW", token);
     }
 
     private static async Task<bool> IsEnabledForUserAsync(

@@ -61,6 +61,10 @@ public sealed class TrainingTestTemplateImageController(IConfiguration configura
     }
     async Task<bool> Can(SqlConnection db,string action,CancellationToken token)
     {
+        if(!long.TryParse(User.FindFirstValue("project_id"),out var activeProjectId))return false;
+        await using var project=new SqlCommand("SELECT COUNT_BIG(*) FROM dbo.TDADProject WHERE ProjectCode=N'LAOO_TRAINING' AND ProjectID=@project AND IsActive=1",db);
+        Add(project,"@project",SqlDbType.BigInt,activeProjectId);
+        if(Convert.ToInt64(await project.ExecuteScalarAsync(token))!=1)return false;
         if(action!="VIEW")
         {
             await using var screen=new SqlCommand("SELECT ScreenType FROM dbo.TDADMainMenu WHERE MenuCode=@menu AND IsActive=1",db);

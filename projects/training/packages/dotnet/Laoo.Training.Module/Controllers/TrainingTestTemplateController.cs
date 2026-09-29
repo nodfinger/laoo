@@ -59,7 +59,7 @@ SELECT COUNT_BIG(*) FROM dbo.TDTRTrainingTestTemplate WHERE {where};
         await using var cmd=new SqlCommand("""
 DECLARE @new bigint;
 INSERT dbo.TDTRTrainingTestTemplate(CompanyID,TrainingTestTemplateCode,TrainingTestTemplateName,SectionCode,DefinitionJson,VersionNo,IsActive,CreateBy,UpdateBy)
-SELECT CompanyID,N'__COPY_'+CONVERT(nvarchar(36),NEWID()),TrainingTestTemplateName+N' (สำเนา)',SectionCode,DefinitionJson,VersionNo+1,0,@user,@user
+SELECT CompanyID,N'__COPY_'+LEFT(REPLACE(CONVERT(nvarchar(36),NEWID()),N'-',N''),16),TrainingTestTemplateName+N' (สำเนา)',SectionCode,DefinitionJson,VersionNo+1,0,@user,@user
 FROM dbo.TDTRTrainingTestTemplate WHERE TrainingTestTemplateID=@id AND CompanyID=@company;
 SET @new=SCOPE_IDENTITY();
 IF @new IS NOT NULL UPDATE dbo.TDTRTrainingTestTemplate SET TrainingTestTemplateCode=N'TST'+RIGHT(N'000000'+CONVERT(nvarchar(20),@new),6) WHERE TrainingTestTemplateID=@new;
@@ -83,17 +83,37 @@ SELECT @new;
     async Task<IActionResult> Read(long id,CancellationToken token){if(!Scope(out var company,out _))return Forbid();await using var db=await Open(token);if(!await Allowed(db,"VIEW",token))return Forbid();await using var c=new SqlCommand("SELECT TrainingTestTemplateID,TrainingTestTemplateCode,TrainingTestTemplateName,SectionCode,DefinitionJson,VersionNo,IsActive,RowVersion FROM dbo.TDTRTrainingTestTemplate WHERE TrainingTestTemplateID=@id AND CompanyID=@company",db);Add(c,"@id",SqlDbType.BigInt,id);Add(c,"@company",SqlDbType.BigInt,company);await using var r=await c.ExecuteReaderAsync(token);if(!await r.ReadAsync(token))return NotFound();return Ok(new{id=r.GetInt64(0),code=r.GetString(1),name=r.GetString(2),section=r.GetString(3),definition=JsonSerializer.Deserialize<ExamDefinition>(r.GetString(4),ExamRules.Json),versionNo=r.GetInt32(5),isActive=r.GetBoolean(6),rowVersion=Convert.ToBase64String((byte[])r.GetValue(7))});}
     async Task<IActionResult> Save(long? id,TemplateRequest request,CancellationToken token)
     {
+        byte[]? version=null;
+        if(id is not null && request.RowVersion is not null && !TryRowVersion(request.RowVersion,out version))
+            return BadRequest(new{message="ข้อมูลเวอร์ชันไม่ถูกต้อง",description="กรุณาโหลดชุดแบบทดสอบใหม่ก่อนแก้ไข"});
         if(!Scope(out var company,out var user))return Forbid();var error=ExamRules.Validate(request.Definition);if(error is not null)return BadRequest(new{message="ข้อมูลข้อสอบไม่ถูกต้อง",description=error});var sec=Section(request.Section);if(sec is null)return BadRequest(new{message="ข้อมูลไม่ถูกต้อง",description="ช่วงแบบทดสอบต้องเป็น PRE หรือ POST"});if(string.IsNullOrWhiteSpace(request.Name)||request.Name.Trim().Length>200)return BadRequest(new{message="ข้อมูลไม่ครบ",description="กรุณาระบุชื่อชุดแบบทดสอบ"});await using var db=await Open(token);if(!await Allowed(db,id is null?"CREATE":"EDIT",token))return Forbid();
         var code=string.IsNullOrWhiteSpace(request.Code)?null:request.Code.Trim().ToUpperInvariant();var json=JsonSerializer.Serialize(request.Definition,ExamRules.Json);
         var sql=id is null
-            ? "DECLARE @new bigint;INSERT dbo.TDTRTrainingTestTemplate(CompanyID,TrainingTestTemplateCode,TrainingTestTemplateName,SectionCode,DefinitionJson,IsActive,CreateBy,UpdateBy) VALUES(@company,COALESCE(@code,N'__PENDING_'+CONVERT(nvarchar(36),NEWID())),@name,@section,@json,@active,@user,@user);SET @new=SCOPE_IDENTITY();IF @code IS NULL UPDATE dbo.TDTRTrainingTestTemplate SET TrainingTestTemplateCode=N'TST'+RIGHT(N'000000'+CONVERT(nvarchar(20),@new),6) WHERE TrainingTestTemplateID=@new;SELECT @new;"
+            ? "DECLARE @new bigint;INSERT dbo.TDTRTrainingTestTemplate(CompanyID,TrainingTestTemplateCode,TrainingTestTemplateName,SectionCode,DefinitionJson,IsActive,CreateBy,UpdateBy) VALUES(@company,COALESCE(@code,N'__PENDING_'+LEFT(REPLACE(CONVERT(nvarchar(36),NEWID()),N'-',N''),16)),@name,@section,@json,@active,@user,@user);SET @new=SCOPE_IDENTITY();IF @code IS NULL UPDATE dbo.TDTRTrainingTestTemplate SET TrainingTestTemplateCode=N'TST'+RIGHT(N'000000'+CONVERT(nvarchar(20),@new),6) WHERE TrainingTestTemplateID=@new;SELECT @new;"
             : "UPDATE dbo.TDTRTrainingTestTemplate SET TrainingTestTemplateCode=COALESCE(@code,TrainingTestTemplateCode),TrainingTestTemplateName=@name,SectionCode=@section,DefinitionJson=@json,IsActive=@active,UpdateBy=@user,UpdateDate=SYSUTCDATETIME() WHERE TrainingTestTemplateID=@id AND CompanyID=@company;SELECT @@ROWCOUNT;";
+        if(id is not null && version is not null)
+            sql=sql.Replace("WHERE TrainingTestTemplateID=@id AND CompanyID=@company",
+                "WHERE TrainingTestTemplateID=@id AND CompanyID=@company AND RowVersion=@version",StringComparison.Ordinal);
         await using var c=new SqlCommand(sql,db);
-        Add(c,"@id",SqlDbType.BigInt,id);Add(c,"@company",SqlDbType.BigInt,company);Add(c,"@user",SqlDbType.BigInt,user);Add(c,"@code",SqlDbType.NVarChar,code,30);Add(c,"@name",SqlDbType.NVarChar,request.Name.Trim(),200);Add(c,"@section",SqlDbType.VarChar,sec);Add(c,"@json",SqlDbType.NVarChar,json);Add(c,"@active",SqlDbType.Bit,request.IsActive);try{var saved=Convert.ToInt64(await c.ExecuteScalarAsync(token));return id is null?Ok(new{id=saved}):saved==1?Ok(new{id}):Conflict();}catch(SqlException e)when(e.Number is 2601 or 2627){return Conflict(new{message="รหัสชุดแบบทดสอบซ้ำ",description="กรุณาระบุรหัสใหม่"});}
+        if(id is not null && version is not null)Add(c,"@version",SqlDbType.Timestamp,version);
+        Add(c,"@id",SqlDbType.BigInt,id);Add(c,"@company",SqlDbType.BigInt,company);Add(c,"@user",SqlDbType.BigInt,user);Add(c,"@code",SqlDbType.NVarChar,code,30);Add(c,"@name",SqlDbType.NVarChar,request.Name.Trim(),200);Add(c,"@section",SqlDbType.VarChar,sec);Add(c,"@json",SqlDbType.NVarChar,json);Add(c,"@active",SqlDbType.Bit,request.IsActive);
+        try {
+            var saved=Convert.ToInt64(await c.ExecuteScalarAsync(token));
+            if(id is null || saved==1)return Ok(new{id=id??saved});
+            return Conflict(new{message="แก้ไขชุดแบบทดสอบไม่สำเร็จ",description="รายการอาจถูกลบหรือแก้ไขโดยผู้อื่น กรุณาโหลดข้อมูลล่าสุดแล้วลองอีกครั้ง"});
+        }catch(SqlException e)when(e.Number is 2601 or 2627){
+            return Conflict(new{message="รหัสชุดแบบทดสอบซ้ำ",description="กรุณาระบุรหัสใหม่"});
+        }
     }
-    async Task<bool> Allowed(SqlConnection db,string action,CancellationToken token)=>
-        (action=="VIEW"||await ScreenType(db,token)==1)
-        &&await CompanyMenuAccess.IsAllowedAsync(db,User,Screen,action,token);
+    async Task<bool> Allowed(SqlConnection db,string action,CancellationToken token)
+    {
+        if(!long.TryParse(User.FindFirstValue("project_id"),out var activeProjectId))return false;
+        await using var project=new SqlCommand("SELECT COUNT_BIG(*) FROM dbo.TDADProject WHERE ProjectCode=N'LAOO_TRAINING' AND ProjectID=@project AND IsActive=1",db);
+        Add(project,"@project",SqlDbType.BigInt,activeProjectId);
+        if(Convert.ToInt64(await project.ExecuteScalarAsync(token))!=1)return false;
+        return (action=="VIEW"||await ScreenType(db,token)==1)
+            &&await CompanyMenuAccess.IsAllowedAsync(db,User,Screen,action,token);
+    }
     static async Task<int> ScreenType(SqlConnection db,CancellationToken token)
     {
         await using var q=new SqlCommand("SELECT ScreenType FROM dbo.TDADMainMenu WHERE MenuCode=@menu AND IsActive=1",db);

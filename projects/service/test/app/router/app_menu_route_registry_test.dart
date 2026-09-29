@@ -10,6 +10,12 @@ void main() {
     expect(route.routePath, '/portal/evaluation');
   });
 
+  test('PM and work-order routes use approved ScreenTypes', () {
+    expect(ServiceRoutes.byMenuCode('16003').screenType, 2);
+    expect(ServiceRoutes.byMenuCode('17002').screenType, 2);
+    expect(ServiceRoutes.byMenuCode('20004').screenType, 3);
+  });
+
   test('all active Service menu codes have a routable registry entry', () {
     const activeMenuCodes = {
       '01001',

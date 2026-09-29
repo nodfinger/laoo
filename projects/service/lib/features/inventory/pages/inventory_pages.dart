@@ -4,6 +4,7 @@ import 'dart:math' as math;
 
 import '../../../app/theme/laoo_design_tokens.dart';
 import '../../../app/theme/laoo_typography.dart';
+import '../../../core/api/api_exception.dart';
 import '../../../core/navigation/navigation_menu_repository.dart';
 import '../../../core/widgets/timed_snack_bar.dart';
 import '../../profile/data/user_profile_repository.dart';
@@ -12,6 +13,13 @@ import '../data/inventory_api.dart';
 
 String _inventoryError(String action, Object error) =>
     'ไม่สามารถ$actionได้\nรายละเอียดเพิ่มเติม: ${error.toString()}';
+
+String _warehouseError(String action, Object error) {
+  if (error is ApiException) {
+    return 'ไม่สามารถ$actionได้\nรายละเอียดเพิ่มเติม: ${error.description ?? error.message}';
+  }
+  return 'ไม่สามารถ$actionได้\nรายละเอียดเพิ่มเติม: กรุณาตรวจสอบการเชื่อมต่อแล้วลองใหม่อีกครั้ง';
+}
 
 class WarehousePage extends StatefulWidget {
   const WarehousePage({super.key});
@@ -99,7 +107,7 @@ class _WarehousePageState extends State<WarehousePage> {
         setState(() => _loading = false);
         showTimedSnackBar(
           context,
-          message: _inventoryError('โหลดรายการคลัง', e),
+          message: _warehouseError('โหลดรายการคลัง', e),
           error: true,
         );
       }
@@ -115,6 +123,7 @@ class _WarehousePageState extends State<WarehousePage> {
             .toList();
 
   void _new() {
+    if (_actions['create'] != true) return;
     setState(() {
       _editingId = null;
       _code.clear();
@@ -131,6 +140,7 @@ class _WarehousePageState extends State<WarehousePage> {
   }
 
   void _edit(Map<String, dynamic> row) {
+    if (_actions['edit'] != true) return;
     setState(() {
       _editingId = (row['warehouseID'] as num).toInt();
       _code.text = '${row['warehouseCode']}';
@@ -148,6 +158,11 @@ class _WarehousePageState extends State<WarehousePage> {
     BuildContext dialogContext,
     StateSetter setDialogState,
   ) async {
+    if (_editingId == null
+        ? _actions['create'] != true
+        : _actions['edit'] != true) {
+      return;
+    }
     if (_saving) return;
     setDialogState(() {
       _branchError = _branchId == null ? 'กรุณาเลือกสาขา' : null;
@@ -192,7 +207,7 @@ class _WarehousePageState extends State<WarehousePage> {
         setDialogState(() => _saving = false);
         showTimedSnackBar(
           context,
-          message: _inventoryError('บันทึกคลัง', e),
+          message: _warehouseError('บันทึกคลัง', e),
           error: true,
         );
       }
@@ -200,6 +215,7 @@ class _WarehousePageState extends State<WarehousePage> {
   }
 
   Future<void> _delete(Map<String, dynamic> row) async {
+    if (_actions['delete'] != true) return;
     final name = '${row['warehouseCode']} | ${row['warehouseName']}';
     final confirmed =
         await showDialog<bool>(
@@ -239,6 +255,7 @@ class _WarehousePageState extends State<WarehousePage> {
                 ),
                 const SizedBox(height: 10),
                 const Text('รายการที่ลบแล้วไม่สามารถเรียกคืนได้'),
+                const Divider(color: LaooColors.border),
               ],
             ),
             actions: [
@@ -265,13 +282,13 @@ class _WarehousePageState extends State<WarehousePage> {
     try {
       await _api.deleteWarehouse((row['warehouseID'] as num).toInt());
       if (!mounted) return;
-      showTimedSnackBar(context, message: 'ปิดคลังสินค้าแล้ว');
+      showTimedSnackBar(context, message: 'ลบคลังสินค้าแล้ว');
       await _load();
     } catch (e) {
       if (mounted) {
         showTimedSnackBar(
           context,
-          message: _inventoryError('ปิดคลังสินค้า', e),
+          message: _warehouseError('ลบคลังสินค้า', e),
           error: true,
         );
       }
@@ -799,6 +816,7 @@ class _WarehousePageState extends State<WarehousePage> {
   );
 
   Future<void> _openWarehouseAccess(Map<String, dynamic> row) async {
+    if (_actions['edit'] != true) return;
     Map<String, dynamic> configuration;
     try {
       configuration = await _api.warehouseAccess(

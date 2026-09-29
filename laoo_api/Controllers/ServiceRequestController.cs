@@ -35,25 +35,37 @@ public sealed class ServiceRequestController(
     {
         await using var c = await Open(token);
         if (!await InService(c, token)) return Forbid();
+        var screenType = await ScreenType(c, "15001", token);
+        var selfScreenType = await ScreenType(c, "20001", token);
         return Ok(new
         {
+            screenType,
+            selfScreenType,
             view = await Allowed(c, "15001", "VIEW", token),
-            create = await Allowed(c, "15001", "CREATE", token),
-            edit = await Allowed(c, "15001", "EDIT", token),
-            selfCreate = await Allowed(c, "20001", "CREATE", token)
+            create = screenType == 1 && await Allowed(c, "15001", "CREATE", token),
+            edit = screenType == 1 && await Allowed(c, "15001", "EDIT", token),
+            delete = screenType == 1 && await Allowed(c, "15001", "DELETE", token),
+            selfCreate = selfScreenType == 1 && await Allowed(c, "20001", "CREATE", token),
+            selfEdit = selfScreenType == 1 && await Allowed(c, "20001", "EDIT", token),
+            selfDelete = selfScreenType == 1 && await Allowed(c, "20001", "DELETE", token),
+            dispatchEdit = await ScreenType(c, "17001", token) == 2 && await Allowed(c, "17001", "EDIT", token),
+            workOrderEdit = await ScreenType(c, "17002", token) == 2 && await Allowed(c, "17002", "EDIT", token)
         });
     }
 
     [HttpGet("lookup")]
-    public async Task<IActionResult> Lookup([FromQuery] string? search, CancellationToken token)
+    public async Task<IActionResult> Lookup([FromQuery] string? search, [FromQuery] bool self, CancellationToken token)
     {
         await using var c = await Open(token);
-        if (!await InService(c, token) || !await Allowed(c, "15001", "VIEW", token)) return Forbid();
+        if (!await InService(c, token) ||
+            (self
+                ? await ScreenType(c, "20001", token) != 1 || !await Allowed(c, "20001", "CREATE", token)
+                : !await Allowed(c, "15001", "VIEW", token))) return Forbid();
         var type = await BusinessType(c, token);
         var rows = new List<object>();
         var q = search?.Trim() ?? string.Empty;
 
-        if (type == CompanyBusinessType.Dormitory)
+        if (!self && type == CompanyBusinessType.Dormitory)
         {
             const string sql = """
 SELECT R.ResidentID id,N'RESIDENT' requesterType,P.FullName name,P.Mobile phone,P.Email email,
@@ -67,7 +79,7 @@ AND (@q=N'' OR P.FullName LIKE N'%'+@q+N'%' OR RM.RoomCode LIKE N'%'+@q+N'%') OR
 """;
             rows.AddRange(await ReadRequesterRows(new SqlCommand(sql, c), q, token));
         }
-        else if (type == CompanyBusinessType.RentalOffice)
+        else if (!self && type == CompanyBusinessType.RentalOffice)
         {
             const string sql = """
 SELECT C.TenantContactID id,N'TENANT_CONTACT' requesterType,C.ContactName name,C.Phone phone,C.Email email,
@@ -81,7 +93,7 @@ AND (@q=N'' OR C.ContactName LIKE N'%'+@q+N'%' OR T.TenantCompanyName LIKE N'%'+
 """;
             rows.AddRange(await ReadRequesterRows(new SqlCommand(sql, c), q, token));
         }
-        else if (type == CompanyBusinessType.Village)
+        else if (!self && type == CompanyBusinessType.Village)
         {
             const string sql = """
 SELECT R.ResidentID id,N'RESIDENT' requesterType,P.FullName name,P.Mobile phone,P.Email email,
@@ -102,12 +114,12 @@ FROM dbo.TDADServiceCustomer S JOIN dbo.TDADPerson P ON P.CompanyID=S.CompanyID 
 WHERE S.CompanyID=@company AND S.IsActive=1 AND P.IsActive=1
 AND (@q=N'' OR P.FullName LIKE N'%'+@q+N'%' OR P.Mobile LIKE N'%'+@q+N'%') ORDER BY P.FullName;
 """;
-        if (type is CompanyBusinessType.Company or CompanyBusinessType.ServiceCenter)
+        if (!self && type is CompanyBusinessType.Company or CompanyBusinessType.ServiceCenter)
         {
             const string employeeSql = "SELECT TOP(100) P.PersonID id,N'EMPLOYEE' requesterType,P.FullName name,P.Mobile phone,P.Email email,CONCAT(ISNULL(DV.NameTH,N'-'),N' / ',ISNULL(DP.NameTH,N'-')) locationSnapshot FROM dbo.TDADEmployee E JOIN dbo.TDADPerson P ON P.CompanyID=E.CompanyID AND P.PersonID=E.PersonID LEFT JOIN dbo.TDADOrganizationUnit DV ON DV.OrgUnitID=E.DivisionOrgUnitID AND DV.CompanyID=E.CompanyID LEFT JOIN dbo.TDADOrganizationUnit DP ON DP.OrgUnitID=E.DepartmentOrgUnitID AND DP.CompanyID=E.CompanyID WHERE E.CompanyID=@company AND E.IsActive=1 AND P.IsActive=1 AND (@q=N'' OR P.FullName LIKE N'%'+@q+N'%' OR E.EmployeeCode LIKE N'%'+@q+N'%' OR DP.NameTH LIKE N'%'+@q+N'%') ORDER BY P.FullName";
             rows.AddRange(await ReadRequesterRows(new SqlCommand(employeeSql, c), q, token));
         }
-        rows.AddRange(await ReadRequesterRows(new SqlCommand(customerSql, c), q, token));
+        if (!self) rows.AddRange(await ReadRequesterRows(new SqlCommand(customerSql, c), q, token));
         var equipment = new List<object>();
         const string equipmentSql = "SELECT TOP(100) I.ItemID,I.ItemCode,I.ItemName FROM dbo.TDIVItem I JOIN dbo.TDIVItemUsage U ON U.CompanyID=I.CompanyID AND U.ItemID=I.ItemID AND U.UsageCode=N'EQUIPMENT' WHERE I.CompanyID=@company AND I.IsActive=1 ORDER BY I.ItemCode";
         await using (var equipmentCommand = new SqlCommand(equipmentSql, c))
@@ -137,12 +149,27 @@ ORDER BY CASE WHEN OwnerType=N'L' THEN 0 ELSE 1 END,Seq,Name,MasterCode;
     }
 
     [HttpGet]
-    public async Task<IActionResult> List([FromQuery] string? search, [FromQuery] string? status, [FromQuery] bool self = false, [FromQuery] int page = 1, [FromQuery] int pageSize = 20, CancellationToken token = default)
+    public async Task<IActionResult> List([FromQuery] string? search, [FromQuery] string? status, [FromQuery] bool self = false, [FromQuery] int page = 1, [FromQuery] int pageSize = 20, [FromQuery] string? menuCode = null, CancellationToken token = default)
     {
         await using var c = await Open(token);
-        var canManage = await Allowed(c, "15001", "VIEW", token);
-        var canSelfView = await Allowed(c, "20001", "VIEW", token);
-        if (!await InService(c, token) || (self ? !canManage && !canSelfView : !canManage)) return Forbid();
+        if (!await InService(c, token)) return Forbid();
+        if (menuCode is not null)
+        {
+            if (menuCode is not ("15001" or "17001" or "17002" or "20001" or "20002" or "20003"))
+                return BadRequest(new { message = "เมนูรายการใบแจ้งซ่อมไม่ถูกต้อง" });
+            var expectedType = menuCode is "17001" or "17002" ? 2 : menuCode is "20002" or "20003" ? 3 : 1;
+            if (await ScreenType(c, menuCode, token) != expectedType ||
+                !await Allowed(c, menuCode, "VIEW", token)) return Forbid();
+            self = menuCode is "20001" or "20002" or "20003";
+            if (menuCode == "17001") status = "NEW";
+            if (menuCode == "20003") status = "COMPLETED";
+        }
+        else
+        {
+            var canManage = await Allowed(c, "15001", "VIEW", token);
+            var canSelfView = await Allowed(c, "20001", "VIEW", token);
+            if (self ? !canManage && !canSelfView : !canManage) return Forbid();
+        }
         page = Math.Max(1, page); pageSize = Math.Clamp(pageSize, 1, 100);
         const string sql = """
 SELECT COUNT_BIG(1) OVER(),RequestID,RequestNo,RequesterType,RequesterNameSnapshot,LocationSnapshot,
@@ -238,15 +265,34 @@ ORDER BY R.CompletedDate DESC,R.RequestID DESC OFFSET @offset ROWS FETCH NEXT @t
         return Ok(new { items, total, page, pageSize });
     }
     [HttpGet("{id:long}")]
-    public async Task<IActionResult> Detail(long id, CancellationToken token)
+    public async Task<IActionResult> Detail(long id, [FromQuery] string? menuCode, CancellationToken token)
     {
         await using var c = await Open(token);
-        var canManage = await Allowed(c, "15001", "VIEW", token);
-        var canSelfView = await Allowed(c, "20001", "VIEW", token);
-        var canHistoryView = await Allowed(c, "19002", "VIEW", token);
-        if (!await InService(c, token) || (!canManage && !canSelfView && !canHistoryView)) return Forbid();
-        const string sql = "SELECT RequestID,RequestNo,RequesterType,RequesterID,RequesterNameSnapshot,RequesterPhoneSnapshot,RequesterEmailSnapshot,LocationSnapshot,EquipmentItemID,EquipmentCodeSnapshot,EquipmentNameSnapshot,Subject,Detail,StatusCode,RequestDate,AssignedEmployeeID,AssignedEmployeeNameSnapshot,ReceivedDate,StartedDate,CompletedDate,ResolutionDetail,CancellationReason,RowVersion FROM dbo.TDADServiceRequest WHERE CompanyID=@company AND RequestID=@id AND IsActive=1 AND (@manage=1 OR (@history=1 AND StatusCode=N'COMPLETED') OR CreateBy=@user)";
-        await using var q = new SqlCommand(sql, c); Add(q, "@company", SqlDbType.BigInt, CompanyId); Add(q, "@id", SqlDbType.BigInt, id); Add(q, "@manage", SqlDbType.Bit, canManage); Add(q, "@history", SqlDbType.Bit, canHistoryView); Add(q, "@user", SqlDbType.BigInt, UserId);
+        if (!await InService(c, token)) return Forbid();
+        bool canManage, canSelfView, canHistoryView;
+        string requiredStatus = "";
+        if (menuCode is not null)
+        {
+            if (menuCode is not ("15001" or "17001" or "17002" or "19002" or "20001" or "20002" or "20003"))
+                return BadRequest(new { message = "เมนูรายละเอียดใบแจ้งซ่อมไม่ถูกต้อง" });
+            var expectedType = menuCode is "17001" or "17002" ? 2 : menuCode is "19002" or "20002" or "20003" ? 3 : 1;
+            if (await ScreenType(c, menuCode, token) != expectedType ||
+                !await Allowed(c, menuCode, "VIEW", token)) return Forbid();
+            canManage = menuCode is "15001" or "17001" or "17002";
+            canSelfView = menuCode is "20001" or "20002" or "20003";
+            canHistoryView = menuCode == "19002";
+            if (menuCode == "17001") requiredStatus = "NEW";
+            if (menuCode == "20003") requiredStatus = "COMPLETED";
+        }
+        else
+        {
+            canManage = await Allowed(c, "15001", "VIEW", token);
+            canSelfView = await Allowed(c, "20001", "VIEW", token);
+            canHistoryView = await Allowed(c, "19002", "VIEW", token);
+            if (!canManage && !canSelfView && !canHistoryView) return Forbid();
+        }
+        const string sql = "SELECT RequestID,RequestNo,RequesterType,RequesterID,RequesterNameSnapshot,RequesterPhoneSnapshot,RequesterEmailSnapshot,LocationSnapshot,EquipmentItemID,EquipmentCodeSnapshot,EquipmentNameSnapshot,Subject,Detail,StatusCode,RequestDate,AssignedEmployeeID,AssignedEmployeeNameSnapshot,ReceivedDate,StartedDate,CompletedDate,ResolutionDetail,CancellationReason,RowVersion FROM dbo.TDADServiceRequest WHERE CompanyID=@company AND RequestID=@id AND IsActive=1 AND (@manage=1 OR (@history=1 AND StatusCode=N'COMPLETED') OR (@owner=1 AND CreateBy=@user)) AND (@requiredStatus=N'' OR StatusCode=@requiredStatus)";
+        await using var q = new SqlCommand(sql, c); Add(q, "@company", SqlDbType.BigInt, CompanyId); Add(q, "@id", SqlDbType.BigInt, id); Add(q, "@manage", SqlDbType.Bit, canManage); Add(q, "@history", SqlDbType.Bit, canHistoryView); Add(q, "@owner", SqlDbType.Bit, canSelfView); Add(q, "@user", SqlDbType.BigInt, UserId); Add(q, "@requiredStatus", SqlDbType.NVarChar, requiredStatus, 30);
         await using var r = await q.ExecuteReaderAsync(token);
         if (!await r.ReadAsync(token)) return NotFound();
         var response = new Dictionary<string, object?>
@@ -296,7 +342,9 @@ ORDER BY R.CompletedDate DESC,R.RequestID DESC OFFSET @offset ROWS FETCH NEXT @t
     public async Task<IActionResult> PartsLookup(CancellationToken token)
     {
         await using var c = await Open(token);
-        if (!await InService(c, token) || !await Allowed(c, "15001", "EDIT", token)) return Forbid();
+        if (!await InService(c, token) ||
+            !(await Allowed(c, "15001", "EDIT", token) ||
+              await ScreenType(c, "17002", token) == 2 && await Allowed(c, "17002", "EDIT", token))) return Forbid();
         var warehouses = new List<object>(); var items = new List<object>(); var serials = new List<object>();
         var warehouseSql = $"SELECT W.WarehouseID,W.WarehouseCode,W.WarehouseName,W.IsDefault FROM dbo.TDIVWarehouse W INNER JOIN dbo.TDADBranch B ON B.BranchID=W.BranchID AND B.CompanyID=W.CompanyID AND B.IsActive=1 WHERE W.CompanyID=@company AND W.IsActive=1 AND {InventoryWarehouseAccess.WarehouseAliasPredicate} ORDER BY W.IsDefault DESC,W.WarehouseCode";
         await using (var command = new SqlCommand(warehouseSql, c))
@@ -322,34 +370,28 @@ ORDER BY R.CompletedDate DESC,R.RequestID DESC OFFSET @offset ROWS FETCH NEXT @t
         return Ok(new { warehouses, items, serials });
     }
     [HttpGet("{id:long}/attachments")]
-    public async Task<IActionResult> Attachments(long id, CancellationToken token)
+    public async Task<IActionResult> Attachments(long id, [FromQuery] string? menuCode, CancellationToken token)
     {
         await using var c = await Open(token);
         if (!await InService(c, token)) return Forbid();
         var access = await RequestAccess(c, id, token);
         if (!access.Found) return NotFound();
-        var canManage = await Allowed(c, "15001", "VIEW", token);
-        var canOwnerView = access.CreatedBy == UserId && await Allowed(c, "20001", "VIEW", token);
-        var canHistoryView = access.Status == "COMPLETED" && await Allowed(c, "19002", "VIEW", token);
-        if (!canManage && !canOwnerView && !canHistoryView) return Forbid();
+        if (!await CanReadRequest(c, access, menuCode, token)) return Forbid();
         const string sql = "SELECT AttachmentID,FileName,ContentType,FileSize,ImageWidth,ImageHeight,CreateDate FROM dbo.TDADServiceRequestAttachment WHERE CompanyID=@company AND RequestID=@request AND IsActive=1 ORDER BY CreateDate,AttachmentID";
         await using var q = new SqlCommand(sql, c); Add(q, "@company", SqlDbType.BigInt, CompanyId); Add(q, "@request", SqlDbType.BigInt, id);
         var items = new List<object>(); await using var r = await q.ExecuteReaderAsync(token);
-        while (await r.ReadAsync(token)) items.Add(new { attachmentId = r.GetInt64(0), requestId = id, fileName = r.GetString(1), contentType = r.GetString(2), fileSize = r.GetInt64(3), imageWidth = LongInt(r, 4), imageHeight = LongInt(r, 5), createDate = r.GetDateTime(6), url = $"/api/service/requests/{id}/attachments/{r.GetInt64(0)}" });
+        while (await r.ReadAsync(token)) items.Add(new { attachmentId = r.GetInt64(0), requestId = id, fileName = r.GetString(1), contentType = r.GetString(2), fileSize = r.GetInt64(3), imageWidth = LongInt(r, 4), imageHeight = LongInt(r, 5), createDate = r.GetDateTime(6), url = $"/api/service/requests/{id}/attachments/{r.GetInt64(0)}{(menuCode is null ? "" : $"?menuCode={menuCode}")}" });
         return Ok(new { items });
     }
 
     [HttpGet("{id:long}/attachments/{attachmentId:long}")]
-    public async Task<IActionResult> Attachment(long id, long attachmentId, CancellationToken token)
+    public async Task<IActionResult> Attachment(long id, long attachmentId, [FromQuery] string? menuCode, CancellationToken token)
     {
         await using var c = await Open(token);
         if (!await InService(c, token)) return Forbid();
         var access = await RequestAccess(c, id, token);
         if (!access.Found) return NotFound();
-        var canManage = await Allowed(c, "15001", "VIEW", token);
-        var canOwnerView = access.CreatedBy == UserId && await Allowed(c, "20001", "VIEW", token);
-        var canHistoryView = access.Status == "COMPLETED" && await Allowed(c, "19002", "VIEW", token);
-        if (!canManage && !canOwnerView && !canHistoryView) return Forbid();
+        if (!await CanReadRequest(c, access, menuCode, token)) return Forbid();
         const string sql = "SELECT FileName,StoredPath,ContentType FROM dbo.TDADServiceRequestAttachment WHERE CompanyID=@company AND RequestID=@request AND AttachmentID=@attachment AND IsActive=1";
         await using var q = new SqlCommand(sql, c); Add(q, "@company", SqlDbType.BigInt, CompanyId); Add(q, "@request", SqlDbType.BigInt, id); Add(q, "@attachment", SqlDbType.BigInt, attachmentId);
         await using var r = await q.ExecuteReaderAsync(token); if (!await r.ReadAsync(token)) return NotFound();
@@ -398,19 +440,27 @@ ORDER BY R.CompletedDate DESC,R.RequestID DESC OFFSET @offset ROWS FETCH NEXT @t
     public async Task<IActionResult> DeleteAttachment(long id, long attachmentId, CancellationToken token)
     {
         await using var c = await Open(token);
-        if (!await InService(c, token) || !await Allowed(c, "15001", "EDIT", token)) return Forbid();
+        if (!await InService(c, token) || await ScreenType(c, "15001", token) != 1 || !await Allowed(c, "15001", "EDIT", token)) return Forbid();
         var access = await RequestAccess(c, id, token); if (!access.Found) return NotFound();
         if (access.Status is "COMPLETED" or "CANCELLED") return Conflict(new { message = "ไม่สามารถลบรูปในใบแจ้งซ่อมที่ปิดแล้ว" });
         const string sql = "SELECT StoredPath FROM dbo.TDADServiceRequestAttachment WHERE CompanyID=@company AND RequestID=@request AND AttachmentID=@attachment AND IsActive=1";
         await using var q = new SqlCommand(sql, c); Add(q, "@company", SqlDbType.BigInt, CompanyId); Add(q, "@request", SqlDbType.BigInt, id); Add(q, "@attachment", SqlDbType.BigInt, attachmentId); var path = Convert.ToString(await q.ExecuteScalarAsync(token)); if (string.IsNullOrWhiteSpace(path)) return NotFound();
-        await using var update = new SqlCommand("UPDATE dbo.TDADServiceRequestAttachment SET IsActive=0,UpdateDate=SYSUTCDATETIME(),UpdateBy=@user WHERE CompanyID=@company AND RequestID=@request AND AttachmentID=@attachment AND IsActive=1", c); Add(update, "@user", SqlDbType.BigInt, UserId); Add(update, "@company", SqlDbType.BigInt, CompanyId); Add(update, "@request", SqlDbType.BigInt, id); Add(update, "@attachment", SqlDbType.BigInt, attachmentId); await update.ExecuteNonQueryAsync(token); TryDelete(path!); return Ok(new { attachmentId, deleted = true });
+        await using var delete = new SqlCommand("DELETE FROM dbo.TDADServiceRequestAttachment WHERE CompanyID=@company AND RequestID=@request AND AttachmentID=@attachment AND IsActive=1", c);
+        Add(delete, "@company", SqlDbType.BigInt, CompanyId);
+        Add(delete, "@request", SqlDbType.BigInt, id);
+        Add(delete, "@attachment", SqlDbType.BigInt, attachmentId);
+        if (await delete.ExecuteNonQueryAsync(token) != 1) return NotFound();
+        TryDelete(path!);
+        return Ok(new { attachmentId, deleted = true });
     }
 
     [HttpGet("technicians")]
     public async Task<IActionResult> Technicians(CancellationToken token)
     {
         await using var c = await Open(token);
-        if (!await InService(c, token) || !await Allowed(c, "15001", "EDIT", token)) return Forbid();
+        if (!await InService(c, token) ||
+            !(await ScreenType(c, "17001", token) == 2 && await Allowed(c, "17001", "EDIT", token) ||
+              await ScreenType(c, "15001", token) == 1 && await Allowed(c, "15001", "EDIT", token))) return Forbid();
         const string sql = "SELECT EmployeeID,EmployeeCode,FullName FROM dbo.TDADEmployee WHERE CompanyID=@company AND IsActive=1 AND IsServiceTechnician=1 ORDER BY FullName,EmployeeCode";
         await using var q = new SqlCommand(sql, c); Add(q, "@company", SqlDbType.BigInt, CompanyId); var rows = new List<object>(); await using var r = await q.ExecuteReaderAsync(token);
         while (await r.ReadAsync(token)) rows.Add(new { employeeId = r.GetInt64(0), employeeCode = r.GetString(1), fullName = r.GetString(2) });
@@ -429,7 +479,11 @@ ORDER BY R.CompletedDate DESC,R.RequestID DESC OFFSET @offset ROWS FETCH NEXT @t
     private async Task<IActionResult> Transition(long id, string next, ActionRequest x, CancellationToken token)
     {
         await using var c = await Open(token);
-        if (!await InService(c, token) || !await Allowed(c, "15001", "EDIT", token)) return Forbid();
+        var staffEdit = await ScreenType(c, "15001", token) == 1 && await Allowed(c, "15001", "EDIT", token);
+        var workOrderEdit = await ScreenType(c, "17002", token) == 2 && await Allowed(c, "17002", "EDIT", token);
+        var dispatchEdit = next == "RECEIVED" && await ScreenType(c, "17001", token) == 2 &&
+                           await Allowed(c, "17001", "EDIT", token);
+        if (!await InService(c, token) || !(staffEdit || workOrderEdit || dispatchEdit)) return Forbid();
         await using var tx = (SqlTransaction)await c.BeginTransactionAsync(token);
         try
         {
@@ -548,7 +602,7 @@ WHERE R.CompanyID=@company
                     await using var serial = new SqlCommand("INSERT dbo.TDIVStockIssueSerial(StockIssueDetailID,ItemInstanceID) SELECT @detail,X.ItemInstanceID FROM dbo.TDIVItemInstance X WITH(UPDLOCK,HOLDLOCK) WHERE X.ItemInstanceID=@serial AND X.CompanyID=@company AND X.ItemID=@item AND X.WarehouseID=@warehouse AND X.StatusCode=N'IN_STOCK'; IF @@ROWCOUNT=0 THROW 52330,N'Invalid serial for service repair',1", c, tx);
                     Add(serial, "@detail", SqlDbType.BigInt, detailId); Add(serial, "@serial", SqlDbType.BigInt, serialId); Add(serial, "@company", SqlDbType.BigInt, CompanyId); Add(serial, "@item", SqlDbType.BigInt, line.ItemId); Add(serial, "@warehouse", SqlDbType.BigInt, warehouseGroup.Key); await serial.ExecuteNonQueryAsync(token);
                 }
-                await using (var balance = new SqlCommand("UPDATE dbo.TDIVStockBalance WITH(UPDLOCK,HOLDLOCK) SET Quantity=Quantity-@qty,UpdateDate=SYSUTCDATETIME() WHERE CompanyID=@company AND WarehouseID=@warehouse AND ItemID=@item AND Quantity>=@qty; IF @@ROWCOUNT=0 THROW 52331,N'Insufficient warehouse stock',1; UPDATE dbo.TDIVItem SET StockBalance=StockBalance-@qty,UpdateDate=SYSUTCDATETIME() WHERE CompanyID=@company AND ItemID=@item AND StockBalance>=@qty", c, tx))
+                await using (var balance = new SqlCommand("UPDATE dbo.TDIVStockBalance WITH(UPDLOCK,HOLDLOCK) SET Quantity=Quantity-@qty,UpdateDate=SYSUTCDATETIME() WHERE CompanyID=@company AND WarehouseID=@warehouse AND ItemID=@item AND Quantity>=@qty; IF @@ROWCOUNT=0 THROW 52331,N'Insufficient warehouse stock',1; UPDATE dbo.TDIVItem SET StockBalance=StockBalance-@qty,UpdateDate=SYSUTCDATETIME() WHERE CompanyID=@company AND ItemID=@item AND StockBalance>=@qty; IF @@ROWCOUNT=0 THROW 52331,N'Insufficient item stock',1", c, tx))
                 { Add(balance, "@qty", SqlDbType.Decimal, line.Quantity); Add(balance, "@company", SqlDbType.BigInt, CompanyId); Add(balance, "@warehouse", SqlDbType.BigInt, warehouseGroup.Key); Add(balance, "@item", SqlDbType.BigInt, line.ItemId); await balance.ExecuteNonQueryAsync(token); }
                 await using (var movement = new SqlCommand("INSERT dbo.TDIVStockMovement(CompanyID,WarehouseID,ItemID,DocumentType,DocumentID,DocumentDetailID,MovementType,Quantity,Remark,CreatedBy) VALUES(@company,@warehouse,@item,N'SERVICE_REQUEST',@request,@detail,N'ISSUE',-@qty,N'เบิกอะไหล่ใช้ในงานซ่อม',@user)", c, tx))
                 { Add(movement, "@company", SqlDbType.BigInt, CompanyId); Add(movement, "@warehouse", SqlDbType.BigInt, warehouseGroup.Key); Add(movement, "@item", SqlDbType.BigInt, line.ItemId); Add(movement, "@request", SqlDbType.BigInt, requestId); Add(movement, "@detail", SqlDbType.BigInt, detailId); Add(movement, "@qty", SqlDbType.Decimal, line.Quantity); Add(movement, "@user", SqlDbType.BigInt, UserId); await movement.ExecuteNonQueryAsync(token); }
@@ -576,11 +630,148 @@ WHERE R.CompanyID=@company
     public Task<IActionResult> CreateSelf(CreateRequest request, CancellationToken token) =>
         Save(request, true, token);
 
+    [HttpPut("{id:long}")]
+    public Task<IActionResult> Edit(long id, EditRequest x, CancellationToken token) =>
+        EditCore(id, x, false, token);
+
+    [HttpPut("self/{id:long}")]
+    public Task<IActionResult> EditSelf(long id, EditRequest x, CancellationToken token) =>
+        EditCore(id, x, true, token);
+
+    private async Task<IActionResult> EditCore(long id, EditRequest x, bool self, CancellationToken token)
+    {
+        await using var c = await Open(token);
+        var menu = self ? "20001" : "15001";
+        if (!await InService(c, token) || await ScreenType(c, menu, token) != 1 ||
+            !await Allowed(c, menu, "EDIT", token)) return Forbid();
+        var subject = x.Subject?.Trim();
+        var detail = x.Detail?.Trim();
+        if (string.IsNullOrWhiteSpace(subject) || subject.Length > 200 ||
+            string.IsNullOrWhiteSpace(detail) || detail.Length > 2000)
+            return BadRequest(new { message = "กรุณาระบุหัวข้อและรายละเอียดตามความยาวที่กำหนด" });
+        if (!TryRowVersion(x.RowVersion, out var version))
+            return BadRequest(new { message = "ข้อมูลรุ่นรายการไม่ถูกต้อง" });
+        await using var q = new SqlCommand("""
+UPDATE dbo.TDADServiceRequest SET Subject=@subject,Detail=@detail,
+    UpdateDate=SYSUTCDATETIME(),UpdateBy=@user
+WHERE CompanyID=@company AND RequestID=@id AND IsActive=1 AND StatusCode=N'NEW'
+    AND RowVersion=@version AND (@self=0 OR CreateBy=@user);
+""", c);
+        Add(q, "@subject", SqlDbType.NVarChar, subject, 200);
+        Add(q, "@detail", SqlDbType.NVarChar, detail, 2000);
+        Add(q, "@user", SqlDbType.BigInt, UserId);
+        Add(q, "@company", SqlDbType.BigInt, CompanyId);
+        Add(q, "@id", SqlDbType.BigInt, id);
+        Add(q, "@version", SqlDbType.VarBinary, version, 8);
+        Add(q, "@self", SqlDbType.Bit, self);
+        if (await q.ExecuteNonQueryAsync(token) == 1) return NoContent();
+        return await RequestExists(c, id, self, token)
+            ? Conflict(new { message = "แก้ไขได้เฉพาะใบงานใหม่ที่ยังไม่เปลี่ยนแปลง" })
+            : NotFound();
+    }
+
+    [HttpDelete("{id:long}")]
+    public Task<IActionResult> Delete(long id, [FromQuery] string? rowVersion, CancellationToken token) =>
+        DeleteCore(id, rowVersion, false, token);
+
+    [HttpDelete("self/{id:long}")]
+    public Task<IActionResult> DeleteSelf(long id, [FromQuery] string? rowVersion, CancellationToken token) =>
+        DeleteCore(id, rowVersion, true, token);
+
+    private async Task<IActionResult> DeleteCore(long id, string? rowVersion, bool self, CancellationToken token)
+    {
+        await using var c = await Open(token);
+        var menu = self ? "20001" : "15001";
+        if (!await InService(c, token) || await ScreenType(c, menu, token) != 1 ||
+            !await Allowed(c, menu, "DELETE", token)) return Forbid();
+        if (!TryRowVersion(rowVersion, out var version))
+            return BadRequest(new { message = "ข้อมูลรุ่นรายการไม่ถูกต้อง" });
+        await using var tx = (SqlTransaction)await c.BeginTransactionAsync(IsolationLevel.Serializable, token);
+        var paths = new List<string>();
+        await using (var q = new SqlCommand("""
+SELECT StatusCode,RowVersion FROM dbo.TDADServiceRequest WITH(UPDLOCK,HOLDLOCK)
+WHERE CompanyID=@company AND RequestID=@id AND IsActive=1
+    AND (@self=0 OR CreateBy=@user);
+""", c, tx))
+        {
+            Add(q, "@company", SqlDbType.BigInt, CompanyId);
+            Add(q, "@id", SqlDbType.BigInt, id);
+            Add(q, "@self", SqlDbType.Bit, self);
+            Add(q, "@user", SqlDbType.BigInt, UserId);
+            await using var r = await q.ExecuteReaderAsync(token);
+            if (!await r.ReadAsync(token)) return NotFound();
+            if (r.GetString(0) != "NEW" || !((byte[])r[1]).SequenceEqual(version))
+                return Conflict(new { message = "ลบได้เฉพาะใบงานใหม่ที่ยังไม่เปลี่ยนแปลง" });
+        }
+        await using (var q = new SqlCommand("""
+SELECT COUNT_BIG(*) FROM dbo.TDADServiceRequestPart
+WHERE CompanyID=@company AND RequestID=@id;
+""", c, tx))
+        {
+            Add(q, "@company", SqlDbType.BigInt, CompanyId);
+            Add(q, "@id", SqlDbType.BigInt, id);
+            if (Convert.ToInt64(await q.ExecuteScalarAsync(token)) > 0)
+                return Conflict(new { message = "ใบงานนี้ถูกนำไปใช้แล้ว ไม่สามารถลบได้" });
+        }
+        await using (var q = new SqlCommand("""
+SELECT StoredPath FROM dbo.TDADServiceRequestAttachment
+WHERE CompanyID=@company AND RequestID=@id;
+""", c, tx))
+        {
+            Add(q, "@company", SqlDbType.BigInt, CompanyId);
+            Add(q, "@id", SqlDbType.BigInt, id);
+            await using var r = await q.ExecuteReaderAsync(token);
+            while (await r.ReadAsync(token)) paths.Add(r.GetString(0));
+        }
+        await using (var q = new SqlCommand("""
+DELETE FROM dbo.TDADServiceRequestAttachment WHERE CompanyID=@company AND RequestID=@id;
+DELETE FROM dbo.TDADServiceRequest WHERE CompanyID=@company AND RequestID=@id
+    AND StatusCode=N'NEW' AND RowVersion=@version
+    AND (@self=0 OR CreateBy=@user);
+""", c, tx))
+        {
+            Add(q, "@company", SqlDbType.BigInt, CompanyId);
+            Add(q, "@id", SqlDbType.BigInt, id);
+            Add(q, "@version", SqlDbType.VarBinary, version, 8);
+            Add(q, "@self", SqlDbType.Bit, self);
+            Add(q, "@user", SqlDbType.BigInt, UserId);
+            await q.ExecuteNonQueryAsync(token);
+        }
+        await tx.CommitAsync(token);
+        foreach (var path in paths) TryDelete(path);
+        return NoContent();
+    }
+
+    private async Task<bool> RequestExists(SqlConnection c, long id, bool self, CancellationToken token)
+    {
+        await using var q = new SqlCommand(
+            "SELECT COUNT_BIG(*) FROM dbo.TDADServiceRequest WHERE CompanyID=@company AND RequestID=@id AND IsActive=1 AND (@self=0 OR CreateBy=@user)", c);
+        Add(q, "@company", SqlDbType.BigInt, CompanyId);
+        Add(q, "@id", SqlDbType.BigInt, id);
+        Add(q, "@self", SqlDbType.Bit, self);
+        Add(q, "@user", SqlDbType.BigInt, UserId);
+        return Convert.ToInt64(await q.ExecuteScalarAsync(token)) > 0;
+    }
+
+    private static bool TryRowVersion(string? encoded, out byte[] version)
+    {
+        try
+        {
+            version = Convert.FromBase64String(encoded ?? string.Empty);
+            return version.Length == 8;
+        }
+        catch (FormatException)
+        {
+            version = [];
+            return false;
+        }
+    }
+
     private async Task<IActionResult> Save(CreateRequest x, bool self, CancellationToken token)
     {
         await using var c = await Open(token);
         var screen = self ? "20001" : "15001";
-        if (!await InService(c, token) || !await Allowed(c, screen, "CREATE", token)) return Forbid();
+        if (!await InService(c, token) || await ScreenType(c, screen, token) != 1 || !await Allowed(c, screen, "CREATE", token)) return Forbid();
         var settings = await ReadSettings(c, token);
         if (!settings.ServiceEnabled)
             return BadRequest(new { message = "ระบบบริการปิดใช้งาน", description = "กรุณาติดต่อผู้ดูแลระบบเพื่อเปิดใช้งานระบบบริการ" });
@@ -729,10 +920,45 @@ WHERE C.CompanyID=@company AND (C.TenantContactID=@id OR C.PersonID=@id) AND C.I
     }
 
     private async Task<bool> InService(SqlConnection c, CancellationToken t) =>
-        CompanyId > 0 && await CompanyProjectPermission.IsAllowedAsync(c, User, "15001", "VIEW", t) || CompanyId > 0 && await CompanyProjectPermission.IsAllowedAsync(c, User, "20001", "VIEW", t);
+        CompanyId > 0 &&
+        (await Allowed(c, "15001", "VIEW", t) ||
+         await Allowed(c, "17001", "VIEW", t) ||
+         await Allowed(c, "17002", "VIEW", t) ||
+         await Allowed(c, "19002", "VIEW", t) ||
+         await Allowed(c, "20001", "VIEW", t) ||
+         await Allowed(c, "20002", "VIEW", t) ||
+         await Allowed(c, "20003", "VIEW", t));
 
     private Task<bool> Allowed(SqlConnection c, string screen, string action, CancellationToken t) =>
         CompanyProjectPermission.IsAllowedAsync(c, User, screen, action, t);
+
+    private static async Task<int> ScreenType(SqlConnection c, string menu, CancellationToken token)
+    {
+        await using var q = new SqlCommand("SELECT ScreenType FROM dbo.TDADMainMenu WHERE MenuCode=@menu AND IsActive=1 AND IsVisible=1", c);
+        Add(q, "@menu", SqlDbType.VarChar, menu, 20);
+        return Convert.ToInt32(await q.ExecuteScalarAsync(token) ?? 0);
+    }
+
+    private async Task<bool> CanReadRequest(SqlConnection c, RequestAccessInfo access, string? menuCode, CancellationToken token)
+    {
+        if (menuCode is null)
+            return await Allowed(c, "15001", "VIEW", token) ||
+                   access.CreatedBy == UserId && await Allowed(c, "20001", "VIEW", token) ||
+                   access.Status == "COMPLETED" && await Allowed(c, "19002", "VIEW", token);
+        if (menuCode is not ("15001" or "17001" or "17002" or "19002" or "20001" or "20002" or "20003"))
+            return false;
+        var expectedType = menuCode is "17001" or "17002" ? 2 : menuCode is "19002" or "20002" or "20003" ? 3 : 1;
+        if (await ScreenType(c, menuCode, token) != expectedType ||
+            !await Allowed(c, menuCode, "VIEW", token)) return false;
+        return menuCode switch
+        {
+            "17001" => access.Status == "NEW",
+            "19002" => access.Status == "COMPLETED",
+            "20001" or "20002" => access.CreatedBy == UserId,
+            "20003" => access.CreatedBy == UserId && access.Status == "COMPLETED",
+            _ => true
+        };
+    }
 
     private async Task<string> BusinessType(SqlConnection c, CancellationToken t)
     {
@@ -831,6 +1057,7 @@ WHERE Q.CompanyID=@company AND Q.QrToken=@token AND Q.IsActive=1;
     private static void Add(SqlCommand c, string name, SqlDbType type, object? value, int size = 0) { var p = size == 0 ? c.Parameters.Add(name, type) : c.Parameters.Add(name, type, size); p.Value = value ?? DBNull.Value; }
 
     public sealed record CreateRequest(string? RequesterType, long? RequesterId, long? EquipmentItemId, string? Subject, string? Detail, string? QrToken = null);
+    public sealed record EditRequest(string? Subject, string? Detail, string? RowVersion);
     public sealed record ActionRequest(long? AssignedEmployeeId, string? ResolutionDetail, string? CancellationReason, IReadOnlyList<ServicePartRequest>? Parts = null);
     public sealed record ServicePartRequest(long WarehouseId, long ItemId, decimal Quantity, IReadOnlyList<long>? SerialInstanceIds = null);
     private sealed record RequestAccessInfo(bool Found, string Status, long? CreatedBy);
