@@ -9,7 +9,7 @@ void main() {
     expect(AppConfig.projectCode, 'LAOO_TIME');
     expect(AppConfig.apiBaseUrl, 'http://localhost:5080');
     expect(TimeMenuGroups.setup, '28');
-    expect(TimeRoutes.all, hasLength(29));
+    expect(TimeRoutes.all, hasLength(33));
     expect(TimeRoutes.attendanceEvents.menuCode, '25001');
     expect(TimeRoutes.attendanceEvents.screenType, 3);
     expect(TimeRoutes.attendanceResults.menuCode, '25002');
@@ -54,8 +54,8 @@ void main() {
     expect(TimeRoutes.attendancePeriods.screenType, 3);
     expect(TimeRoutes.attendanceSummaryReport.menuCode, '29004');
     expect(TimeRoutes.attendanceSummaryReport.screenType, 3);
-    expect(TimeRoutes.implemented, hasLength(27));
-    expect(buildTimeFeatureRoutes(), hasLength(29));
+    expect(TimeRoutes.implemented, hasLength(33));
+    expect(buildTimeFeatureRoutes(), hasLength(33));
   });
 
   test(
@@ -366,9 +366,14 @@ void main() {
 
     expect(find.text('กำหนดค่าระบบเวลา'), findsWidgets);
     expect(find.text('รูปแบบการอนุมัติ'), findsOneWidget);
-    expect(find.text('ผู้เริ่มคำขอ'), findsOneWidget);
     expect(find.textContaining('ไม่มี Active Login'), findsOneWidget);
     expect(find.text('ยังมีพนักงานไม่มี Active Login 2 คน'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('ผู้เริ่มคำขอ'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('ผู้เริ่มคำขอ'), findsOneWidget);
     await tester.scrollUntilVisible(
       find.text('บันทึก'),
       500,

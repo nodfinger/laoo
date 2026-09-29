@@ -240,13 +240,13 @@ class _MeetingRoomUsagePageState extends State<MeetingRoomUsagePage> {
               WorkspaceSectionCard(
                 child: WorkspacePageTitle(title: _caption, favoriteKey: _menu),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: LaooLayout.listSectionSpacing),
               WorkspaceSectionCard(child: _filters()),
               if (widget.mode != _UsageMode.usage) ...[
-                const SizedBox(height: LaooLayout.cardSpacing),
+                const SizedBox(height: LaooLayout.listSectionSpacing),
                 _summaryCards(),
               ],
-              const SizedBox(height: LaooLayout.cardSpacing),
+              const SizedBox(height: LaooLayout.listSectionSpacing),
               Expanded(
                 child: WorkspaceSectionCard(
                   child: _loading
@@ -263,7 +263,7 @@ class _MeetingRoomUsagePageState extends State<MeetingRoomUsagePage> {
                         ),
                 ),
               ),
-              const SizedBox(height: LaooLayout.cardSpacing),
+              const SizedBox(height: LaooLayout.listSectionSpacing),
               MeetingPaginationCard(
                 total: _total,
                 pageIndex: _page - 1,

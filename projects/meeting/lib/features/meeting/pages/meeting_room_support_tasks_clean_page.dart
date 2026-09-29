@@ -251,10 +251,10 @@ class _MeetingRoomSupportTasksCleanPageState
                   favoriteKey: MeetingMenuCodes.roomSupportTasks,
                 ),
               ),
-              const SizedBox(height: LaooLayout.cardSpacing),
+              const SizedBox(height: LaooLayout.listSectionSpacing),
               Wrap(
-                spacing: LaooLayout.cardSpacing,
-                runSpacing: LaooLayout.cardSpacing,
+                spacing: LaooLayout.listSectionSpacing,
+                runSpacing: LaooLayout.listSectionSpacing,
                 children: [
                   _summaryCard(
                     'รอดำเนินการ',
@@ -278,9 +278,9 @@ class _MeetingRoomSupportTasksCleanPageState
                   ),
                 ],
               ),
-              const SizedBox(height: LaooLayout.cardSpacing),
+              const SizedBox(height: LaooLayout.listSectionSpacing),
               WorkspaceSectionCard(child: _filters()),
-              const SizedBox(height: LaooLayout.cardSpacing),
+              const SizedBox(height: LaooLayout.listSectionSpacing),
               Expanded(
                 child: WorkspaceSectionCard(
                   child: _loading
@@ -296,7 +296,7 @@ class _MeetingRoomSupportTasksCleanPageState
                         ),
                 ),
               ),
-              const SizedBox(height: LaooLayout.cardSpacing),
+              const SizedBox(height: LaooLayout.listSectionSpacing),
               MeetingPaginationCard(
                 total: _total,
                 pageIndex: _page - 1,

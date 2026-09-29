@@ -40,15 +40,16 @@ public sealed class ShiftTemplatesController(IConfiguration configuration) : Con
     {
         if (!TryScope(out _, out _)) return Forbid();
         await using var connection = await Open(token);
+        var crudScreen = await CrudScreen(connection, token);
         return Ok(new
         {
             menuCode = MenuCode,
             caption = await Caption(connection, token),
-            screenType = 1,
+            screenType = crudScreen ? 1 : 0,
             view = await Can(connection, "VIEW", token),
-            create = await Can(connection, "CREATE", token),
-            edit = await Can(connection, "EDIT", token),
-            delete = await Can(connection, "DELETE", token),
+            create = crudScreen && await Can(connection, "CREATE", token),
+            edit = crudScreen && await Can(connection, "EDIT", token),
+            delete = crudScreen && await Can(connection, "DELETE", token),
         });
     }
 
@@ -154,7 +155,7 @@ WHERE T.CompanyID=@CompanyID AND T.ShiftTemplateID=@ID AND V.IsActive=1 AND V.Ef
         var error = Validate(request);
         if (error is not null) return BadRequest(new { message = error });
         await using var connection = await Open(token);
-        if (!await Can(connection, "CREATE", token)) return Forbid();
+        if (!await CrudScreen(connection, token) || !await Can(connection, "CREATE", token)) return Forbid();
         await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(IsolationLevel.Serializable, token);
         try
         {
@@ -185,7 +186,7 @@ VALUES(@CompanyID,@Code,@Name,@Description,@IsActive,@UserID);
         if (string.IsNullOrWhiteSpace(request.RowVersion))
             return BadRequest(new { message = "ไม่พบ Version ของข้อมูล" });
         await using var connection = await Open(token);
-        if (!await Can(connection, "EDIT", token)) return Forbid();
+        if (!await CrudScreen(connection, token) || !await Can(connection, "EDIT", token)) return Forbid();
         await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(IsolationLevel.Serializable, token);
         try
         {
@@ -221,22 +222,61 @@ WHERE CompanyID=@CompanyID AND ShiftTemplateID=@ID AND RowVersion=CONVERT(binary
     [HttpDelete("{id:long}")]
     public async Task<IActionResult> Delete(long id, [FromQuery] string rowVersion, CancellationToken token)
     {
-        if (!TryScope(out var companyId, out var userId)) return Forbid();
+        if (!TryScope(out var companyId, out _)) return Forbid();
         await using var connection = await Open(token);
-        if (!await Can(connection, "DELETE", token)) return Forbid();
+        if (!await CrudScreen(connection, token) || !await Can(connection, "DELETE", token)) return Forbid();
+        if (rowVersion is not { Length: 16 } || !rowVersion.All(Uri.IsHexDigit))
+            return BadRequest(new { message = "ไม่พบ Version ของข้อมูล กรุณาโหลดใหม่" });
+        await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(IsolationLevel.Serializable, token);
         await using var command = new SqlCommand("""
+IF NOT EXISTS(SELECT 1 FROM dbo.TDTMShiftTemplate WITH(UPDLOCK,HOLDLOCK) WHERE CompanyID=@CompanyID AND ShiftTemplateID=@ID)
+ THROW 52331,N'ไม่พบกะในบริษัทนี้',1;
+IF NOT EXISTS(SELECT 1 FROM dbo.TDTMShiftTemplate WHERE CompanyID=@CompanyID AND ShiftTemplateID=@ID AND RowVersion=CONVERT(binary(8),@RowVersion,2))
+ THROW 52332,N'ข้อมูลถูกแก้ไขแล้ว กรุณาโหลดใหม่',1;
 IF EXISTS(SELECT 1 FROM dbo.TDTMRotationDay WHERE CompanyID=@CompanyID AND ShiftTemplateID=@ID)
  OR EXISTS(SELECT 1 FROM dbo.TDTMScheduleOverride WHERE CompanyID=@CompanyID AND ShiftTemplateID=@ID)
+ OR EXISTS(SELECT 1 FROM dbo.TDTMAttendanceResult R JOIN dbo.TDTMShiftTemplateVersion V ON V.CompanyID=R.CompanyID AND V.ShiftTemplateVersionID=R.ShiftTemplateVersionID WHERE V.CompanyID=@CompanyID AND V.ShiftTemplateID=@ID)
  THROW 52330,N'กะนี้ถูกใช้งานในตารางแล้ว ไม่สามารถลบได้',1;
-UPDATE dbo.TDTMShiftTemplate SET IsActive=0,UpdateDate=SYSDATETIME(),UpdateBy=@UserID
-WHERE CompanyID=@CompanyID AND ShiftTemplateID=@ID AND RowVersion=CONVERT(binary(8),@RowVersion,2);
-""", connection);
+DELETE D FROM dbo.TDTMAttendanceSessionRule D
+ JOIN dbo.TDTMShiftTemplateVersion V ON V.CompanyID=D.CompanyID AND V.ShiftTemplateVersionID=D.ShiftTemplateVersionID
+ WHERE V.CompanyID=@CompanyID AND V.ShiftTemplateID=@ID;
+DELETE D FROM dbo.TDTMShiftSegment D
+ JOIN dbo.TDTMShiftTemplateVersion V ON V.CompanyID=D.CompanyID AND V.ShiftTemplateVersionID=D.ShiftTemplateVersionID
+ WHERE V.CompanyID=@CompanyID AND V.ShiftTemplateID=@ID;
+DELETE FROM dbo.TDTMShiftTemplateVersion WHERE CompanyID=@CompanyID AND ShiftTemplateID=@ID;
+DELETE FROM dbo.TDTMShiftTemplate WHERE CompanyID=@CompanyID AND ShiftTemplateID=@ID AND RowVersion=CONVERT(binary(8),@RowVersion,2);
+SELECT @@ROWCOUNT;
+""", connection, transaction);
         Add(command, "@CompanyID", SqlDbType.BigInt, companyId);
         Add(command, "@ID", SqlDbType.BigInt, id);
-        Add(command, "@UserID", SqlDbType.BigInt, userId);
         Add(command, "@RowVersion", SqlDbType.VarChar, rowVersion, 32);
-        try { return await command.ExecuteNonQueryAsync(token) == 1 ? NoContent() : Conflict(new { message = "ข้อมูลถูกแก้ไขแล้ว กรุณาโหลดใหม่" }); }
-        catch (SqlException exception) when (exception.Number == 52330) { return Conflict(new { message = exception.Message }); }
+        try
+        {
+            if (Convert.ToInt32(await command.ExecuteScalarAsync(token)) != 1)
+            {
+                await transaction.RollbackAsync(token);
+                return Conflict(new { message = "ข้อมูลถูกแก้ไขแล้ว กรุณาโหลดใหม่" });
+            }
+            await transaction.CommitAsync(token);
+            return NoContent();
+        }
+        catch (SqlException exception) when (exception.Number is 52330 or 52332 or 547)
+        {
+            await transaction.RollbackAsync(token);
+            return Conflict(new { message = "ลบกะไม่ได้", description = exception.Number == 547 ? "กะนี้มีข้อมูลอื่นอ้างอิงอยู่" : exception.Message });
+        }
+        catch (SqlException exception) when (exception.Number == 52331)
+        {
+            await transaction.RollbackAsync(token);
+            return Forbid();
+        }
+    }
+
+    private static async Task<bool> CrudScreen(SqlConnection connection, CancellationToken token)
+    {
+        await using var command = new SqlCommand("SELECT COUNT(1) FROM dbo.TDADMainMenu WHERE MenuCode=@MenuCode AND ScreenType=1 AND IsActive=1", connection);
+        Add(command, "@MenuCode", SqlDbType.Char, MenuCode, 5);
+        return Convert.ToInt32(await command.ExecuteScalarAsync(token)) == 1;
     }
 
     private static string? Validate(ShiftTemplateSaveRequest request)

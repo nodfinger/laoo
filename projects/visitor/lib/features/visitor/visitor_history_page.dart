@@ -110,12 +110,15 @@ class _VisitorHistoryPageState extends State<VisitorHistoryPage> {
     pageTitle: _actions?.caption ?? 'ประวัติผู้มาติดต่อ',
     activeMenu: '31005',
     child: ListView(
-      padding: const EdgeInsets.all(10),
+      padding: EdgeInsets.all(visitorUiTokens.cardMargin),
       children: [
         _surface(
           Row(
             children: [
-              const Icon(Icons.history_outlined),
+              Icon(
+                Icons.star_border_rounded,
+                color: Theme.of(context).colorScheme.primary,
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -125,20 +128,24 @@ class _VisitorHistoryPageState extends State<VisitorHistoryPage> {
                   ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
                 ),
               ),
-              IconButton(
-                onPressed: _loading ? null : _load,
-                icon: const Icon(Icons.refresh),
-              ),
             ],
           ),
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: visitorUiTokens.listSectionSpacing),
         _surface(_filters()),
-        const SizedBox(height: 8),
+        SizedBox(height: visitorUiTokens.listSectionSpacing),
         if (_error != null)
-          _surface(Text(_error!, style: const TextStyle(color: Colors.red))),
-        if (_error != null) const SizedBox(height: 8),
+          _surface(
+            Text(
+              _error!,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ),
+        if (_error != null)
+          SizedBox(height: visitorUiTokens.listSectionSpacing),
         _surface(_list()),
+        SizedBox(height: visitorUiTokens.listSectionSpacing),
+        _pagination(),
       ],
     ),
   );
@@ -221,8 +228,6 @@ class _VisitorHistoryPageState extends State<VisitorHistoryPage> {
               padding: EdgeInsets.all(28),
               child: Center(child: Text('ไม่พบประวัติผู้มาติดต่อ')),
             ),
-          const Divider(height: 24),
-          _pagination(),
         ],
       ),
     );
@@ -246,8 +251,12 @@ class _VisitorHistoryPageState extends State<VisitorHistoryPage> {
       ...items.map(
         (item) => Container(
           padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: const BoxDecoration(
-            border: Border(top: BorderSide(color: Color(0xFFD9DDE3))),
+          decoration: BoxDecoration(
+            border: Border(
+              top: BorderSide(
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
+            ),
           ),
           child: Row(
             children: [
@@ -275,8 +284,10 @@ class _VisitorHistoryPageState extends State<VisitorHistoryPage> {
 
   Widget _compactItem(VisitorHistoryItem item) => Container(
     padding: const EdgeInsets.symmetric(vertical: 12),
-    decoration: const BoxDecoration(
-      border: Border(top: BorderSide(color: Color(0xFFD9DDE3))),
+    decoration: BoxDecoration(
+      border: Border(
+        top: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+      ),
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -312,8 +323,8 @@ class _VisitorHistoryPageState extends State<VisitorHistoryPage> {
           text: '${item.outcomeLabel}\n',
           style: TextStyle(
             color: item.outcomeCode == 'MET'
-                ? Colors.green.shade700
-                : Colors.orange.shade800,
+                ? Theme.of(context).colorScheme.primary
+                : Theme.of(context).colorScheme.error,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -328,29 +339,23 @@ class _VisitorHistoryPageState extends State<VisitorHistoryPage> {
     final result = _result;
     final total = result?.total ?? 0;
     final pageCount = total == 0 ? 1 : (total / _pageSize).ceil();
-    return Row(
-      children: [
-        Expanded(child: Text('ทั้งหมด $total รายการ')),
-        IconButton(
-          onPressed: _loading || _page <= 1
-              ? null
-              : () {
-                  setState(() => _page--);
-                  _load();
-                },
-          icon: const Icon(Icons.chevron_left),
-        ),
-        Text('$_page / $pageCount'),
-        IconButton(
-          onPressed: _loading || _page >= pageCount
-              ? null
-              : () {
-                  setState(() => _page++);
-                  _load();
-                },
-          icon: const Icon(Icons.chevron_right),
-        ),
-      ],
+    return VisitorPaginationCard(
+      page: _page,
+      pageCount: pageCount,
+      pageSize: _pageSize,
+      total: total,
+      onPrevious: _loading || _page <= 1
+          ? null
+          : () {
+              setState(() => _page--);
+              _load();
+            },
+      onNext: _loading || _page >= pageCount
+          ? null
+          : () {
+              setState(() => _page++);
+              _load();
+            },
     );
   }
 
@@ -366,9 +371,13 @@ class _VisitorHistoryPageState extends State<VisitorHistoryPage> {
     return '${local.day}/${local.month}/${local.year} ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
   }
 
-  Widget _surface(Widget child) => Material(
-    color: Colors.white,
-    child: Padding(padding: const EdgeInsets.all(16), child: child),
+  Widget _surface(Widget child) => Card(
+    margin: EdgeInsets.zero,
+    elevation: 0,
+    child: Padding(
+      padding: EdgeInsets.all(visitorUiTokens.cardPadding),
+      child: child,
+    ),
   );
 }
 
@@ -378,73 +387,66 @@ class _HistoryDetailDialog extends StatelessWidget {
   final VisitorHistoryItem item;
 
   @override
-  Widget build(BuildContext context) => AlertDialog(
-    insetPadding: const EdgeInsets.all(16),
-    title: const Text('รายละเอียดการเข้าพบ'),
-    content: SizedBox(
-      width: (MediaQuery.sizeOf(context).width - 32)
-          .clamp(280.0, 680.0)
-          .toDouble(),
-      child: FutureBuilder(
-        future: repository.detail(item.id),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Text(snapshot.error.toString());
-          }
-          final detail = snapshot.data!;
-          return SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _section('ข้อมูล Check-in', [
-                  'ผู้มาติดต่อ: ${detail.visit['visitorName'] ?? '-'}',
-                  'ผู้รับรอง: ${detail.visit['hostName'] ?? '-'}',
-                  'จุดติดต่อ: ${detail.visit['contactPointName'] ?? '-'}',
-                  'วัตถุประสงค์: ${detail.visit['visitPurpose'] ?? '-'}',
-                  'เวลาเข้า: ${detail.visit['checkedInDate'] ?? '-'}',
-                ]),
-                _section('ผลและ Check-out', [
-                  'ผลการเข้าพบ: ${detail.visit['visitOutcomeCode'] ?? '-'}',
-                  'ประเภท Check-out: ${detail.visit['checkoutReasonCode'] ?? '-'}',
-                  'หมายเหตุ: ${detail.visit['checkoutNote'] ?? '-'}',
-                  'ผู้ดำเนินการ: ${detail.visit['checkedOutByName'] ?? '-'}',
-                  'เวลาออก: ${detail.visit['checkedOutDate'] ?? '-'}',
-                ]),
-                if (detail.visit['hostConfirmationResultCode'] != null)
-                  _section('การยืนยันจากผู้รับรอง', [
-                    'ผลการยืนยัน: ${detail.visit['hostConfirmationResultCode']}',
-                    'ผู้ยืนยัน: ${detail.visit['hostConfirmedByName'] ?? '-'}',
-                    'เวลา: ${detail.visit['hostConfirmedDate'] ?? '-'}',
-                    if ((detail.visit['hostConfirmationNote']?.toString() ?? '')
-                        .isNotEmpty)
-                      'หมายเหตุ: ${detail.visit['hostConfirmationNote']}',
-                  ]),
-                _section('หลักฐานเดิม', [
-                  if (detail.images.isEmpty)
-                    'ไม่มีหลักฐาน'
-                  else
-                    _HistoryEvidenceList(
-                      repository: repository,
-                      visitId: item.id,
-                      images: detail.images,
-                    ),
-                ]),
-                _section(
-                  'ข้อความเพิ่มเติม',
-                  detail.notes.isEmpty
-                      ? const ['ไม่มีข้อความเพิ่มเติม']
-                      : detail.notes
-                            .map((note) => note['noteText']?.toString() ?? '-')
-                            .toList(growable: false),
+  Widget build(BuildContext context) => VisitorActionDialog(
+    icon: Icons.badge_outlined,
+    title: 'รายละเอียดการเข้าพบ',
+    content: FutureBuilder(
+      future: repository.detail(item.id),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Text(snapshot.error.toString());
+        }
+        final detail = snapshot.data!;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _section('ข้อมูล Check-in', [
+              'ผู้มาติดต่อ: ${detail.visit['visitorName'] ?? '-'}',
+              'ผู้รับรอง: ${detail.visit['hostName'] ?? '-'}',
+              'จุดติดต่อ: ${detail.visit['contactPointName'] ?? '-'}',
+              'วัตถุประสงค์: ${detail.visit['visitPurpose'] ?? '-'}',
+              'เวลาเข้า: ${detail.visit['checkedInDate'] ?? '-'}',
+            ]),
+            _section('ผลและ Check-out', [
+              'ผลการเข้าพบ: ${detail.visit['visitOutcomeCode'] ?? '-'}',
+              'ประเภท Check-out: ${detail.visit['checkoutReasonCode'] ?? '-'}',
+              'หมายเหตุ: ${detail.visit['checkoutNote'] ?? '-'}',
+              'ผู้ดำเนินการ: ${detail.visit['checkedOutByName'] ?? '-'}',
+              'เวลาออก: ${detail.visit['checkedOutDate'] ?? '-'}',
+            ]),
+            if (detail.visit['hostConfirmationResultCode'] != null)
+              _section('การยืนยันจากผู้รับรอง', [
+                'ผลการยืนยัน: ${detail.visit['hostConfirmationResultCode']}',
+                'ผู้ยืนยัน: ${detail.visit['hostConfirmedByName'] ?? '-'}',
+                'เวลา: ${detail.visit['hostConfirmedDate'] ?? '-'}',
+                if ((detail.visit['hostConfirmationNote']?.toString() ?? '')
+                    .isNotEmpty)
+                  'หมายเหตุ: ${detail.visit['hostConfirmationNote']}',
+              ]),
+            _section('หลักฐานเดิม', [
+              if (detail.images.isEmpty)
+                'ไม่มีหลักฐาน'
+              else
+                _HistoryEvidenceList(
+                  repository: repository,
+                  visitId: item.id,
+                  images: detail.images,
                 ),
-              ],
+            ]),
+            _section(
+              'ข้อความเพิ่มเติม',
+              detail.notes.isEmpty
+                  ? const ['ไม่มีข้อความเพิ่มเติม']
+                  : detail.notes
+                        .map((note) => note['noteText']?.toString() ?? '-')
+                        .toList(growable: false),
             ),
-          );
-        },
-      ),
+          ],
+        );
+      },
     ),
     actions: [
       TextButton(
@@ -535,31 +537,29 @@ class _HistoryEvidenceList extends StatelessWidget {
     Future<List<int>> bytes,
   ) => showDialog<void>(
     context: context,
-    builder: (context) => AlertDialog(
-      title: Text(image['originalFileName']?.toString() ?? 'หลักฐานรูปภาพ'),
-      content: SizedBox(
-        width: 560,
-        child: AspectRatio(
-          aspectRatio: 1,
-          child: FutureBuilder<List<int>>(
-            future: bytes,
-            builder: (context, snapshot) {
-              if (snapshot.hasData) {
-                return InteractiveViewer(
-                  child: Image.memory(
-                    Uint8List.fromList(snapshot.data!),
-                    fit: BoxFit.contain,
-                  ),
-                );
-              }
-              if (snapshot.hasError) {
-                return const Center(
-                  child: Icon(Icons.broken_image_outlined, size: 80),
-                );
-              }
-              return const Center(child: CircularProgressIndicator());
-            },
-          ),
+    builder: (context) => VisitorActionDialog(
+      icon: Icons.image_outlined,
+      title: image['originalFileName']?.toString() ?? 'หลักฐานรูปภาพ',
+      content: AspectRatio(
+        aspectRatio: 1,
+        child: FutureBuilder<List<int>>(
+          future: bytes,
+          builder: (context, snapshot) {
+            if (snapshot.hasData) {
+              return InteractiveViewer(
+                child: Image.memory(
+                  Uint8List.fromList(snapshot.data!),
+                  fit: BoxFit.contain,
+                ),
+              );
+            }
+            if (snapshot.hasError) {
+              return const Center(
+                child: Icon(Icons.broken_image_outlined, size: 80),
+              );
+            }
+            return const Center(child: CircularProgressIndicator());
+          },
         ),
       ),
       actions: [

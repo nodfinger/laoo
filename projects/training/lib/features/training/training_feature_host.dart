@@ -28,10 +28,18 @@ class TrainingUiTokens {
     required this.workspace,
     required this.primaryColor,
     required this.borderColor,
+    required this.popupFieldSpacing,
+    required this.popupHeaderMinHeight,
+    required this.paginationButtonSize,
+    required this.dialogInsetPadding,
   });
   final LaooWorkspaceUiTokens workspace;
   final Color primaryColor;
   final Color borderColor;
+  final double popupFieldSpacing;
+  final double popupHeaderMinHeight;
+  final double paginationButtonSize;
+  final double dialogInsetPadding;
 }
 
 TrainingWorkspaceShellBuilder? _shell;
@@ -123,6 +131,7 @@ class TrainingActionDialog extends StatelessWidget {
     required this.content,
     required this.actions,
     this.iconColor,
+    this.destructive = false,
     super.key,
   });
   final IconData icon;
@@ -130,54 +139,152 @@ class TrainingActionDialog extends StatelessWidget {
   final Widget content;
   final List<Widget> actions;
   final Color? iconColor;
+  final bool destructive;
 
   @override
   Widget build(BuildContext context) {
     final tokens = trainingUiTokens;
-    return Dialog(
-      backgroundColor: Colors.white,
-      insetPadding: const EdgeInsets.all(16),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(tokens.workspace.radius),
+    final primary = tokens.primaryColor;
+    final error = Theme.of(context).colorScheme.error;
+    final radius = tokens.workspace.radius;
+    OutlineInputBorder fieldBorder(Color color, {double width = 1}) =>
+        OutlineInputBorder(
+          borderRadius: BorderRadius.circular(radius),
+          borderSide: BorderSide(color: color, width: width),
+        );
+    final base = Theme.of(context);
+    final popupTheme = base.copyWith(
+      colorScheme: base.colorScheme.copyWith(
+        surface: Colors.white,
+        onSurface: Colors.black,
       ),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: math.min(480, MediaQuery.sizeOf(context).width - 32),
-          maxHeight: 720,
+      inputDecorationTheme: base.inputDecorationTheme.copyWith(
+        filled: true,
+        fillColor: Colors.white,
+        border: fieldBorder(tokens.borderColor),
+        enabledBorder: fieldBorder(tokens.borderColor),
+        disabledBorder: fieldBorder(tokens.borderColor),
+        focusedBorder: fieldBorder(primary, width: 1.5),
+        errorBorder: fieldBorder(error),
+        focusedErrorBorder: fieldBorder(error, width: 1.5),
+        floatingLabelStyle: TextStyle(
+          color: primary,
+          fontSize: (tokens.workspace.inputStyle.fontSize ?? 14) / .75,
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-              child: Row(
-                children: [
-                  Icon(icon, color: iconColor ?? tokens.primaryColor),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(title, style: tokens.workspace.captionStyle),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          minimumSize: Size(0, tokens.workspace.buttonHeight),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(radius),
+          ),
+          textStyle: tokens.workspace.buttonStyle,
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          minimumSize: Size(0, tokens.workspace.buttonHeight),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(radius),
+          ),
+          textStyle: tokens.workspace.buttonStyle,
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          minimumSize: Size(0, tokens.workspace.buttonHeight),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(radius),
+          ),
+          textStyle: tokens.workspace.buttonStyle,
+        ),
+      ),
+    );
+    return Theme(
+      data: popupTheme,
+      child: Dialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        insetPadding: EdgeInsets.all(tokens.dialogInsetPadding),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(radius),
+          side: destructive ? BorderSide(color: error) : BorderSide.none,
+        ),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: math.min(
+              480,
+              MediaQuery.sizeOf(context).width - tokens.dialogInsetPadding * 2,
+            ),
+            maxHeight: math.min(
+              720,
+              MediaQuery.sizeOf(context).height - tokens.dialogInsetPadding * 2,
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight: tokens.popupHeaderMinHeight,
                   ),
-                ],
+                  child: Row(
+                    children: [
+                      Icon(
+                        icon,
+                        color: iconColor ?? (destructive ? error : primary),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: tokens.workspace.captionStyle.copyWith(
+                            color: destructive ? error : Colors.black,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ),
-            Divider(height: 1, color: tokens.borderColor),
-            Flexible(
-              child: SingleChildScrollView(
-                padding: tokens.workspace.cardPadding,
-                child: content,
+              Divider(height: 1, color: tokens.borderColor),
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: tokens.workspace.cardPadding,
+                  child: content,
+                ),
               ),
-            ),
-            Divider(height: 1, color: tokens.borderColor),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-              child: Align(
-                alignment: Alignment.centerRight,
-                child: Wrap(spacing: 8, runSpacing: 8, children: actions),
+              Divider(height: 1, color: tokens.borderColor),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Wrap(spacing: 8, runSpacing: 8, children: actions),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
+}
+
+class TrainingFilterField extends StatelessWidget {
+  const TrainingFilterField({
+    super.key,
+    required this.width,
+    required this.child,
+  });
+
+  final double width;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) =>
+        SizedBox(width: math.min(width, constraints.maxWidth), child: child),
+  );
 }

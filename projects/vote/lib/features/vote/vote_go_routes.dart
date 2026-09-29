@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import 'vote_route_contract.dart';
@@ -31,12 +30,3 @@ List<GoRoute> buildVoteFeatureRoutes() => <GoRoute>[
     builder: (context, state) => const VotePage('results'),
   ),
 ];
-
-class _SettingsPreviewPage extends StatelessWidget {
-  const _SettingsPreviewPage();
-
-  @override
-  Widget build(BuildContext context) => const Scaffold(
-    body: Center(child: Text('กำลังเตรียมหน้าตั้งค่าระบบโหวต')),
-  );
-}

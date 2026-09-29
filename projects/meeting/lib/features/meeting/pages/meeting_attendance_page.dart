@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../widgets/meeting_popup.dart';
+import '../widgets/meeting_pagination_card.dart';
 import '../../../app/theme/laoo_design_tokens.dart';
 import '../../../app/theme/workspace_theme_presets.dart';
 import '../../../core/api/api_exception.dart';
@@ -260,8 +262,12 @@ class _State extends State<MeetingAttendancePage> {
     final remark = TextEditingController();
     final accepted = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('คืนห้องและปิดรอบ'),
+      builder: (dialogContext) => MeetingPopup(
+        title: const MeetingPopupTitle(
+          icon: Icons.meeting_room_outlined,
+          text: 'คืนห้องและปิดรอบ',
+        ),
+        scrollable: true,
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -322,15 +328,15 @@ class _State extends State<MeetingAttendancePage> {
                   setState(() => selected = null);
                   load();
                 },
-                icon: const Icon(Icons.arrow_back),
-                label: const Text('กลับ'),
+                icon: const Icon(Icons.close),
+                label: const Text('ปิดรายละเอียด'),
               ),
             ],
           ),
         ),
-        const SizedBox(height: LaooLayout.cardSpacing),
+        const SizedBox(height: LaooLayout.listSectionSpacing),
         WorkspaceSectionCard(child: header(selected!, preset)),
-        const SizedBox(height: LaooLayout.cardSpacing),
+        const SizedBox(height: LaooLayout.listSectionSpacing),
         Expanded(
           child: WorkspaceSectionCard(
             child: SingleChildScrollView(
@@ -347,36 +353,23 @@ class _State extends State<MeetingAttendancePage> {
     ),
   );
   Widget pager() {
-    final pages = (total / 20).ceil();
-    return SizedBox(
-      height: LaooLayout.paginationCardHeight,
-      child: Row(
-        children: [
-          IconButton.filled(
-            onPressed: page > 1
-                ? () {
-                    setState(() => page--);
-                    load();
-                  }
-                : null,
-            icon: const Icon(Icons.chevron_left),
-          ),
-          const SizedBox(width: 8),
-          Text('${pages == 0 ? 0 : page} / $pages'),
-          const SizedBox(width: 8),
-          IconButton.filled(
-            onPressed: page < pages
-                ? () {
-                    setState(() => page++);
-                    load();
-                  }
-                : null,
-            icon: const Icon(Icons.chevron_right),
-          ),
-          const SizedBox(width: 8),
-          Text('ทั้งหมด $total รายการ'),
-        ],
-      ),
+    return MeetingPaginationCard(
+      total: total,
+      pageIndex: page - 1,
+      pageSize: 20,
+      primary: workspaceThemeController.value.primary,
+      onPrevious: page > 1
+          ? () {
+              setState(() => page--);
+              load();
+            }
+          : null,
+      onNext: page * 20 < total
+          ? () {
+              setState(() => page++);
+              load();
+            }
+          : null,
     );
   }
 
@@ -403,9 +396,9 @@ class _State extends State<MeetingAttendancePage> {
                       actions: const [],
                     ),
                   ),
-                  const SizedBox(height: LaooLayout.cardSpacing),
+                  const SizedBox(height: LaooLayout.listSectionSpacing),
                   filterCard(),
-                  const SizedBox(height: LaooLayout.cardSpacing),
+                  const SizedBox(height: LaooLayout.listSectionSpacing),
                   Expanded(
                     child: loading
                         ? const Center(child: CircularProgressIndicator())
@@ -427,11 +420,8 @@ class _State extends State<MeetingAttendancePage> {
                                 itemCard(items[index], preset),
                           ),
                   ),
-                  const SizedBox(height: LaooLayout.cardSpacing),
-                  WorkspaceSectionCard(
-                    padding: EdgeInsets.zero,
-                    child: pager(),
-                  ),
+                  const SizedBox(height: LaooLayout.listSectionSpacing),
+                  pager(),
                 ],
               ),
             ),

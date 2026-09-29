@@ -101,15 +101,16 @@ internal static class TimeReasonStore
     {
         if (!TryScope(user, out _, out _)) return new ForbidResult();
         await using var connection = await Open(configuration, token);
+        var crudScreen = await CrudScreen(connection, menuCode, token);
         return new OkObjectResult(new
         {
             menuCode,
             caption = await Caption(connection, menuCode, fallbackCaption, token),
-            screenType = 1,
+            screenType = crudScreen ? 1 : 0,
             view = await Can(connection, user, menuCode, "VIEW", token),
-            create = await Can(connection, user, menuCode, "CREATE", token),
-            edit = await Can(connection, user, menuCode, "EDIT", token),
-            delete = await Can(connection, user, menuCode, "DELETE", token),
+            create = crudScreen && await Can(connection, user, menuCode, "CREATE", token),
+            edit = crudScreen && await Can(connection, user, menuCode, "EDIT", token),
+            delete = crudScreen && await Can(connection, user, menuCode, "DELETE", token),
         });
     }
 
@@ -156,7 +157,8 @@ internal static class TimeReasonStore
         if (id.HasValue && !ValidRowVersion(request.RowVersion))
             return new BadRequestObjectResult(new { message = "ไม่พบ Version ของข้อมูล กรุณาโหลดใหม่" });
         await using var connection = await Open(configuration, token);
-        if (!await Can(connection, user, menuCode, id.HasValue ? "EDIT" : "CREATE", token))
+        if (!await CrudScreen(connection, menuCode, token)
+            || !await Can(connection, user, menuCode, id.HasValue ? "EDIT" : "CREATE", token))
             return new ForbidResult();
         try
         {
@@ -186,26 +188,41 @@ internal static class TimeReasonStore
         string usedTable, string usedColumn, long id, string rowVersion,
         CancellationToken token)
     {
-        if (!TryScope(user, out var companyId, out var userId)) return new ForbidResult();
-        if (!ValidRowVersion(rowVersion))
-            return new BadRequestObjectResult(new { message = "ไม่พบ Version ของข้อมูล กรุณาโหลดใหม่" });
+        if (!TryScope(user, out var companyId, out _)) return new ForbidResult();
         await using var connection = await Open(configuration, token);
         if (!await Can(connection, user, menuCode, "DELETE", token)) return new ForbidResult();
-        await using var command = new SqlCommand($"IF EXISTS(SELECT 1 FROM dbo.{usedTable} WHERE CompanyID=@CompanyID AND {usedColumn}=@ID) THROW 52521,N'เหตุผลนี้ถูกใช้งานแล้ว ไม่สามารถลบได้',1; UPDATE dbo.{table} SET IsActive=0,UpdateDate=SYSDATETIME(),UpdateBy=@UserID WHERE CompanyID=@CompanyID AND {idColumn}=@ID AND RowVersion=CONVERT(binary(8),@RowVersion,2)", connection);
-        Add(command, "@CompanyID", SqlDbType.BigInt, companyId);
-        Add(command, "@UserID", SqlDbType.BigInt, userId);
-        Add(command, "@ID", SqlDbType.BigInt, id);
-        Add(command, "@RowVersion", SqlDbType.VarChar, rowVersion, 32);
+        if (!ValidRowVersion(rowVersion))
+            return new BadRequestObjectResult(new { message = "ไม่พบ Version ของข้อมูล กรุณาโหลดใหม่" });
+        if (!await CrudScreen(connection, menuCode, token)) return new ForbidResult();
         try
         {
-            return await command.ExecuteNonQueryAsync(token) == 1
-                ? new NoContentResult()
-                : new ConflictObjectResult(new { message = "ข้อมูลถูกแก้ไขแล้ว กรุณาโหลดใหม่" });
+            await using var command = new SqlCommand($"DELETE R FROM dbo.{table} R WHERE R.CompanyID=@C AND R.{idColumn}=@ID AND R.RowVersion=CONVERT(binary(8),@V,2) AND NOT EXISTS(SELECT 1 FROM dbo.{usedTable} U WHERE U.CompanyID=R.CompanyID AND U.{usedColumn}=R.{idColumn})", connection);
+            Add(command, "@C", SqlDbType.BigInt, companyId);
+            Add(command, "@ID", SqlDbType.BigInt, id);
+            Add(command, "@V", SqlDbType.VarChar, rowVersion, 32);
+            if (await command.ExecuteNonQueryAsync(token) == 1) return new NoContentResult();
         }
-        catch (SqlException exception) when (exception.Number == 52521)
+        catch (SqlException exception) when (exception.Number == 547)
         {
-            return new ConflictObjectResult(new { message = exception.Message });
+            return new ConflictObjectResult(new { message = "ลบเหตุผลไม่ได้", description = "เหตุผลนี้ถูกใช้ในคำขอแล้ว" });
         }
+        await using var used = new SqlCommand($"SELECT COUNT_BIG(1) FROM dbo.{usedTable} WHERE CompanyID=@C AND {usedColumn}=@ID", connection);
+        Add(used, "@C", SqlDbType.BigInt, companyId);
+        Add(used, "@ID", SqlDbType.BigInt, id);
+        if (Convert.ToInt64(await used.ExecuteScalarAsync(token)) > 0)
+            return new ConflictObjectResult(new { message = "ลบเหตุผลไม่ได้", description = "เหตุผลนี้ถูกใช้ในคำขอแล้ว" });
+        await using var owned = new SqlCommand($"SELECT COUNT(1) FROM dbo.{table} WHERE CompanyID=@C AND {idColumn}=@ID", connection);
+        Add(owned, "@C", SqlDbType.BigInt, companyId);
+        Add(owned, "@ID", SqlDbType.BigInt, id);
+        if (Convert.ToInt32(await owned.ExecuteScalarAsync(token)) == 0) return new ForbidResult();
+        return new ConflictObjectResult(new { message = "ลบเหตุผลไม่ได้", description = "ข้อมูลถูกแก้ไขหรือลบไปแล้ว กรุณาเปิดหน้าจอใหม่" });
+    }
+
+    private static async Task<bool> CrudScreen(SqlConnection connection, string menuCode, CancellationToken token)
+    {
+        await using var command = new SqlCommand("SELECT COUNT(1) FROM dbo.TDADMainMenu WHERE MenuCode=@M AND ScreenType=1 AND IsActive=1", connection);
+        Add(command, "@M", SqlDbType.Char, menuCode, 5);
+        return Convert.ToInt32(await command.ExecuteScalarAsync(token)) == 1;
     }
 
     private static void Bind(SqlCommand command, long companyId, string? search, bool? active)

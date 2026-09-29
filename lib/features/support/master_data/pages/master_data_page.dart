@@ -283,32 +283,28 @@ class _MasterDataPageState extends State<MasterDataPage> {
   });
 
   Future<void> _delete(_MasterRow row) async {
-    final accent = workspaceThemeController.value.primary;
+    final workspaceTheme = workspaceThemeController.value;
+    final accent = workspaceTheme.primary;
+    final error = Theme.of(context).colorScheme.error;
     final ok = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          backgroundColor: Colors.white,
-          surfaceTintColor: Colors.transparent,
+          backgroundColor: workspaceTheme.surface,
+          surfaceTintColor: workspaceTheme.surface,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-            side: BorderSide(color: accent, width: 1.2),
+            borderRadius: BorderRadius.circular(LaooRadius.xs),
+            side: BorderSide.none,
           ),
           title: Row(
             children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: accent.withValues(alpha: .14),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(Icons.delete_outline, color: accent),
-              ),
+              Icon(Icons.delete_outline, color: error),
               const SizedBox(width: 12),
               Text(
                 'ยืนยันการลบข้อมูล',
-                style: TextStyle(color: accent, fontWeight: FontWeight.w700),
+                style: LaooTypography.popupTitleStyle.copyWith(
+                  color: workspaceTheme.textPrimary,
+                ),
               ),
             ],
           ),
@@ -319,8 +315,8 @@ class _MasterDataPageState extends State<MasterDataPage> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: accent.withValues(alpha: .13),
-                  borderRadius: BorderRadius.circular(10),
+                  color: error.withValues(alpha: .10),
+                  borderRadius: BorderRadius.circular(LaooRadius.xs),
                 ),
                 child: Text('ต้องการลบ ${row.code} - ${row.name} หรือไม่?'),
               ),
@@ -340,8 +336,8 @@ class _MasterDataPageState extends State<MasterDataPage> {
             ),
             FilledButton.icon(
               style: FilledButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
+                backgroundColor: error,
+                foregroundColor: Theme.of(context).colorScheme.onError,
               ),
               onPressed: () => Navigator.pop(dialogContext, true),
               icon: const Icon(Icons.delete_outline),
@@ -481,8 +477,13 @@ class _MasterDataPageState extends State<MasterDataPage> {
         children: [
           _buildList(context),
           if (editing != null) ...[
-            const Positioned.fill(
-              child: ModalBarrier(dismissible: false, color: Colors.black54),
+            Positioned.fill(
+              child: ModalBarrier(
+                dismissible: false,
+                color: Theme.of(
+                  context,
+                ).colorScheme.scrim.withValues(alpha: .54),
+              ),
             ),
             Positioned.fill(child: _buildForm(context, editing)),
           ],
@@ -504,27 +505,25 @@ class _MasterDataPageState extends State<MasterDataPage> {
 
   Widget _buildList(BuildContext context) {
     final theme = Theme.of(context);
-    final accent = workspaceThemeController.value.primary;
+    final workspaceTheme = workspaceThemeController.value;
+    final accent = workspaceTheme.primary;
     return ColoredBox(
-      color: const Color(0xFFF8F9FB),
+      color: theme.scaffoldBackgroundColor,
       child: ListView(
         padding: const EdgeInsets.all(LaooLayout.cardMargin),
         children: [
           Card(
-            color: Colors.white,
+            color: workspaceTheme.surface,
             elevation: 0,
             margin: EdgeInsets.zero,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(4),
+              borderRadius: BorderRadius.circular(LaooRadius.xs),
             ),
             child: Container(
-              decoration: const BoxDecoration(
-                border: Border(bottom: BorderSide(color: Color(0xFFF5F6F7))),
-              ),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               child: LayoutBuilder(
                 builder: (context, constraints) {
-                  final compact = constraints.maxWidth < 600;
+                  final compact = constraints.maxWidth < 900;
                   final title = WorkspacePageTitle(
                     title: 'รหัสพื้นฐาน > ${_group.name}',
                     favoriteKey: '05002',
@@ -562,7 +561,7 @@ class _MasterDataPageState extends State<MasterDataPage> {
                       Expanded(child: title),
                       DecoratedBox(
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(4),
+                          borderRadius: BorderRadius.circular(LaooRadius.xs),
                           color: accent.withValues(alpha: .10),
                         ),
                         child: IconButton(
@@ -570,7 +569,9 @@ class _MasterDataPageState extends State<MasterDataPage> {
                           color: accent,
                           style: IconButton.styleFrom(
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(4),
+                              borderRadius: BorderRadius.circular(
+                                LaooRadius.xs,
+                              ),
                             ),
                           ),
                           onPressed: () => setState(() => _card = !_card),
@@ -591,30 +592,25 @@ class _MasterDataPageState extends State<MasterDataPage> {
               ),
             ),
           ),
-          const SizedBox(height: LaooLayout.cardSpacing),
+          const SizedBox(height: LaooLayout.listSectionSpacing),
           Card(
-            color: Colors.white,
+            color: workspaceTheme.surface,
             elevation: 0,
             margin: EdgeInsets.zero,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(4),
+              borderRadius: BorderRadius.circular(LaooRadius.xs),
             ),
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: LayoutBuilder(
                 builder: (context, constraints) {
-                  final compact = constraints.maxWidth < 600;
+                  final compact = constraints.maxWidth < 900;
                   final search = TextField(
                     controller: _searchController,
                     onSubmitted: (_) => _applySearch(),
                     decoration: InputDecoration(
                       prefixIcon: const Icon(Icons.search),
                       labelText: 'ค้นหารหัสหรือชื่อ',
-                      suffixIcon: IconButton(
-                        tooltip: 'ค้นหา',
-                        onPressed: _applySearch,
-                        icon: const Icon(Icons.arrow_forward),
-                      ),
                     ),
                   );
                   final group = DropdownButtonFormField<String>(
@@ -638,7 +634,12 @@ class _MasterDataPageState extends State<MasterDataPage> {
                     label: const Text('ค้นหา'),
                     style: FilledButton.styleFrom(
                       backgroundColor: accent,
-                      foregroundColor: Colors.white,
+                      foregroundColor: theme.colorScheme.onPrimary,
+                      minimumSize: const Size(0, LaooLayout.filterActionHeight),
+                      maximumSize: const Size(
+                        double.infinity,
+                        LaooLayout.filterActionHeight,
+                      ),
                     ),
                   );
                   final clearButton = OutlinedButton.icon(
@@ -648,6 +649,11 @@ class _MasterDataPageState extends State<MasterDataPage> {
                     style: OutlinedButton.styleFrom(
                       foregroundColor: accent,
                       side: BorderSide(color: accent),
+                      minimumSize: const Size(0, LaooLayout.filterActionHeight),
+                      maximumSize: const Size(
+                        double.infinity,
+                        LaooLayout.filterActionHeight,
+                      ),
                     ),
                   );
                   if (compact) {
@@ -684,20 +690,19 @@ class _MasterDataPageState extends State<MasterDataPage> {
               ),
             ),
           ),
-          const SizedBox(height: LaooLayout.cardSpacing),
+          const SizedBox(height: LaooLayout.listSectionSpacing),
           LayoutBuilder(
             builder: (context, constraints) {
-              if (_card || constraints.maxWidth < 600) {
+              if (_card || constraints.maxWidth < 900) {
                 return _buildMobileCards(context);
               }
 
               return Card(
-                color: Colors.white,
-                surfaceTintColor: Colors.transparent,
-                shadowColor: Colors.transparent,
+                color: workspaceTheme.surface,
+                surfaceTintColor: workspaceTheme.surface,
                 margin: EdgeInsets.zero,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: BorderRadius.circular(LaooRadius.xs),
                   side: BorderSide.none,
                 ),
                 elevation: 0,
@@ -713,8 +718,8 @@ class _MasterDataPageState extends State<MasterDataPage> {
                     left: BorderSide.none,
                     right: BorderSide.none,
                     horizontalInside: BorderSide(
-                      color: const Color(0xFFD1D5DB),
-                      width: .5,
+                      color: workspaceTheme.border,
+                      width: 1,
                     ),
                   ),
                   headingRowColor: WidgetStatePropertyAll(
@@ -769,9 +774,9 @@ class _MasterDataPageState extends State<MasterDataPage> {
                                     IconButton(
                                       tooltip: 'ลบ',
                                       onPressed: () => _delete(row),
-                                      icon: const Icon(
+                                      icon: Icon(
                                         Icons.delete_outline,
-                                        color: Colors.red,
+                                        color: theme.colorScheme.error,
                                       ),
                                     ),
                                 ],
@@ -790,25 +795,28 @@ class _MasterDataPageState extends State<MasterDataPage> {
               );
             },
           ),
-          const SizedBox(height: LaooLayout.cardSpacing),
+          const SizedBox(height: LaooLayout.listSectionSpacing),
           Card(
-            color: Colors.white,
+            color: workspaceTheme.surface,
             elevation: 0,
             margin: EdgeInsets.zero,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(4),
+              borderRadius: BorderRadius.circular(LaooRadius.xs),
             ),
-            child: Container(
-              decoration: const BoxDecoration(
-                border: Border(top: BorderSide(color: Color(0xFFF5F6F7))),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: _PaginationBar(
-                page: _currentPage,
-                totalPages: _totalPages,
-                totalItems: _filteredCount,
-                pageSize: _pageSize,
-                onChanged: (page) => setState(() => _currentPage = page),
+            child: SizedBox(
+              height: LaooLayout.paginationCardHeight,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: _PaginationBar(
+                    page: _currentPage,
+                    totalPages: _totalPages,
+                    totalItems: _filteredCount,
+                    pageSize: _pageSize,
+                    onChanged: (page) => setState(() => _currentPage = page),
+                  ),
+                ),
               ),
             ),
           ),
@@ -819,16 +827,18 @@ class _MasterDataPageState extends State<MasterDataPage> {
 
   Widget _buildMobileCards(BuildContext context) {
     final theme = Theme.of(context);
-    final accent = workspaceThemeController.value.primary;
+    final workspaceTheme = workspaceThemeController.value;
+    final accent = workspaceTheme.primary;
     final rows = _filteredRows;
     if (rows.isEmpty) {
       return Card(
         margin: EdgeInsets.zero,
-        color: Colors.white,
-        elevation: 3,
-        shadowColor: Colors.black.withValues(alpha: .14),
-        surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        color: workspaceTheme.surface,
+        elevation: 0,
+        surfaceTintColor: workspaceTheme.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
+        ),
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Center(
@@ -846,13 +856,16 @@ class _MasterDataPageState extends State<MasterDataPage> {
         final row = entry.value;
         final number = (_currentPage * _pageSize) + entry.key + 1;
         return Card(
-          margin: const EdgeInsets.only(bottom: 8),
-          color: Colors.white,
-          elevation: 3,
-          shadowColor: Colors.black.withValues(alpha: .14),
-          surfaceTintColor: Colors.transparent,
+          margin: EdgeInsets.only(
+            bottom: entry.key == rows.length - 1
+                ? 0
+                : LaooLayout.listItemSpacing,
+          ),
+          color: workspaceTheme.surface,
+          elevation: 0,
+          surfaceTintColor: workspaceTheme.surface,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(LaooRadius.xs),
           ),
           clipBehavior: Clip.antiAlias,
           child: Padding(
@@ -912,9 +925,9 @@ class _MasterDataPageState extends State<MasterDataPage> {
                         IconButton(
                           tooltip: 'ลบ',
                           onPressed: () => _delete(row),
-                          icon: const Icon(
+                          icon: Icon(
                             Icons.delete_outline,
-                            color: Colors.red,
+                            color: theme.colorScheme.error,
                           ),
                         ),
                     ],
@@ -993,6 +1006,7 @@ class _PaginationBar extends StatelessWidget {
           Icons.chevron_right_rounded,
           page + 1 < totalPages ? () => onChanged(page + 1) : null,
         ),
+        const SizedBox(width: 6),
         Text(
           '$start-$end จาก $totalItems',
           style: TextStyle(
@@ -1008,47 +1022,69 @@ class _PaginationBar extends StatelessWidget {
     BuildContext context,
     IconData icon,
     VoidCallback? onPressed,
-  ) => SizedBox(
-    width: 34,
-    height: 34,
-    child: FilledButton(
-      onPressed: onPressed,
-      style: FilledButton.styleFrom(
-        padding: EdgeInsets.zero,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(4)),
+  ) {
+    final workspaceTheme = workspaceThemeController.value;
+    final enabled = onPressed != null;
+    return SizedBox(
+      width: LaooLayout.paginationButtonSize,
+      height: LaooLayout.paginationButtonSize,
+      child: OutlinedButton(
+        onPressed: onPressed,
+        style: OutlinedButton.styleFrom(
+          padding: EdgeInsets.zero,
+          foregroundColor: enabled
+              ? workspaceTheme.primary
+              : workspaceTheme.textSecondary,
+          disabledForegroundColor: workspaceTheme.textSecondary,
+          side: BorderSide(
+            color: enabled ? workspaceTheme.primary : workspaceTheme.border,
+          ),
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(LaooRadius.xs)),
+          ),
         ),
+        child: Icon(icon, size: 20),
       ),
-      child: Icon(icon, size: 20),
-    ),
-  );
+    );
+  }
 
-  Widget _pageButton(BuildContext context, int index, int currentPage) =>
-      SizedBox(
-        width: 34,
-        height: 34,
-        child: index == currentPage
-            ? FilledButton(
-                onPressed: () {},
-                style: FilledButton.styleFrom(
-                  padding: EdgeInsets.zero,
-                  shape: const RoundedRectangleBorder(
-                    borderRadius: BorderRadius.all(Radius.circular(4)),
+  Widget _pageButton(BuildContext context, int index, int currentPage) {
+    final workspaceTheme = workspaceThemeController.value;
+    final current = index == currentPage;
+    return SizedBox(
+      width: LaooLayout.paginationButtonSize,
+      height: LaooLayout.paginationButtonSize,
+      child: current
+          ? FilledButton(
+              onPressed: () {},
+              style: FilledButton.styleFrom(
+                padding: EdgeInsets.zero,
+                backgroundColor: workspaceTheme.primary,
+                foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.all(
+                    Radius.circular(LaooRadius.xs),
                   ),
                 ),
-                child: Text('${index + 1}'),
-              )
-            : OutlinedButton(
-                onPressed: () => onChanged(index),
-                style: OutlinedButton.styleFrom(
-                  padding: EdgeInsets.zero,
-                  shape: const RoundedRectangleBorder(
-                    borderRadius: BorderRadius.all(Radius.circular(4)),
-                  ),
-                ),
-                child: Text('${index + 1}'),
               ),
-      );
+              child: Text('${index + 1}'),
+            )
+          : OutlinedButton(
+              onPressed: () => onChanged(index),
+              style: OutlinedButton.styleFrom(
+                padding: EdgeInsets.zero,
+                foregroundColor: workspaceTheme.primary,
+                side: BorderSide(color: workspaceTheme.primary),
+                shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.all(
+                    Radius.circular(LaooRadius.xs),
+                  ),
+                ),
+              ),
+              child: Text('${index + 1}'),
+            ),
+    );
+  }
 }
 
 class _MasterDataForm extends StatefulWidget {
@@ -1139,7 +1175,8 @@ class _MasterDataFormState extends State<_MasterDataForm> {
 
   @override
   Widget build(BuildContext context) {
-    final primary = Theme.of(context).colorScheme.primary;
+    final workspaceTheme = workspaceThemeController.value;
+    final primary = workspaceTheme.primary;
     final actionStyle = ButtonStyle(
       minimumSize: const WidgetStatePropertyAll(
         Size(0, LaooTypography.buttonHeight),
@@ -1155,9 +1192,9 @@ class _MasterDataFormState extends State<_MasterDataForm> {
     );
     return Center(
       child: Dialog(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.transparent,
-        insetPadding: const EdgeInsets.all(LaooLayout.cardMargin),
+        backgroundColor: workspaceTheme.surface,
+        surfaceTintColor: workspaceTheme.surface,
+        insetPadding: const EdgeInsets.all(LaooLayout.dialogInsetPadding),
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.all(Radius.circular(LaooRadius.xs)),
         ),
@@ -1169,24 +1206,29 @@ class _MasterDataFormState extends State<_MasterDataForm> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Row(
-                    children: [
-                      Icon(Icons.edit_outlined, color: primary),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'รหัสพื้นฐาน > ${widget.groupName} > ${widget.isAdding ? 'เพิ่ม' : 'แก้ไข'}',
-                          style: const TextStyle(
-                            color: Colors.black,
-                            fontSize: LaooTypography.workspaceCaption,
-                            fontWeight: FontWeight.w700,
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      minHeight: LaooLayout.popupHeaderMinHeight,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit_outlined, color: primary),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'รหัสพื้นฐาน > ${widget.groupName} > ${widget.isAdding ? 'เพิ่ม' : 'แก้ไข'}',
+                            style: TextStyle(
+                              color: workspaceTheme.textPrimary,
+                              fontSize: LaooTypography.workspaceCaption,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 10),
-                  const Divider(height: 1, color: LaooColors.border),
+                  Divider(height: 1, color: workspaceTheme.border),
                   const SizedBox(height: 12),
                   TextFormField(
                     initialValue: widget.row.code,
@@ -1197,20 +1239,20 @@ class _MasterDataFormState extends State<_MasterDataForm> {
                       'รหัส (สร้างอัตโนมัติ)',
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: LaooLayout.popupFieldSpacing),
                   TextFormField(
                     controller: _name,
                     style: const TextStyle(fontSize: LaooTypography.inputText),
                     decoration: _inputDecoration(context, 'ชื่อ *'),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: LaooLayout.popupFieldSpacing),
                   TextFormField(
                     controller: _seq,
                     style: const TextStyle(fontSize: LaooTypography.inputText),
                     keyboardType: TextInputType.number,
                     decoration: _inputDecoration(context, 'ลำดับแสดงข้อมูล'),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: LaooLayout.popupFieldSpacing),
                   TextFormField(
                     controller: _shortCode,
                     style: const TextStyle(fontSize: LaooTypography.inputText),
@@ -1218,7 +1260,7 @@ class _MasterDataFormState extends State<_MasterDataForm> {
                     decoration: _inputDecoration(context, 'รหัสย่อ'),
                   ),
                   const SizedBox(height: 12),
-                  const Divider(height: 1, color: LaooColors.border),
+                  Divider(height: 1, color: workspaceTheme.border),
                   const SizedBox(height: 12),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
@@ -1249,7 +1291,9 @@ class _MasterDataFormState extends State<_MasterDataForm> {
   }
 
   InputDecoration _inputDecoration(BuildContext context, String labelText) {
-    final primary = Theme.of(context).colorScheme.primary;
+    final workspaceTheme = workspaceThemeController.value;
+    final primary = workspaceTheme.primary;
+    final error = Theme.of(context).colorScheme.error;
     OutlineInputBorder border(Color color, {double width = 1}) =>
         OutlineInputBorder(
           borderRadius: BorderRadius.circular(LaooRadius.xs),
@@ -1257,13 +1301,18 @@ class _MasterDataFormState extends State<_MasterDataForm> {
         );
     return InputDecoration(
       labelText: labelText,
+      // Flutter scales outlined floating labels to 75% while painting.
+      // The shared source token keeps the visible label at 14px.
+      floatingLabelStyle: const TextStyle(
+        fontSize: LaooTypography.materialFloatingLabelSource,
+      ),
       isDense: true,
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      border: border(LaooColors.border),
-      enabledBorder: border(LaooColors.border),
+      border: border(workspaceTheme.border),
+      enabledBorder: border(workspaceTheme.border),
       focusedBorder: border(primary, width: 1.5),
-      errorBorder: border(LaooColors.error),
-      focusedErrorBorder: border(LaooColors.error, width: 1.5),
+      errorBorder: border(error),
+      focusedErrorBorder: border(error, width: 1.5),
     );
   }
 }

@@ -1006,7 +1006,6 @@ class _MeetingFoodPlanPageState extends State<MeetingFoodPlanPage> {
                     decoration: const InputDecoration(
                       labelText: 'ค้นหาเลขที่จอง/หัวข้อ/ห้อง',
                       prefixIcon: Icon(Icons.search),
-                      suffixIcon: Icon(Icons.arrow_forward),
                     ),
                   ),
                 ),

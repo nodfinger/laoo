@@ -337,7 +337,7 @@ class _TimeCorrectionPageState extends State<TimeCorrectionPage> {
                       ),
                     ),
                   ),
-            pagination: LaooPaginationCard(
+            pagination: TimePaginationCard(
               tokens: timeUiTokens.workspace,
               page: page,
               pageCount: pageCount,

@@ -11,6 +11,7 @@ import '../../../../core/company_setup/company_setup_controller.dart';
 import '../../../../core/api/api_exception.dart';
 import '../../../../core/widgets/timed_snack_bar.dart';
 import '../../../../core/widgets/pinned_data_table.dart';
+import '../../../../core/navigation/navigation_menu_repository.dart';
 import '../../../../features/support/master_data/data/master_data_api.dart';
 import '../../../../features/support/presentation/widgets/support_workspace_shell.dart';
 import '../../../../features/profile/data/user_profile_repository.dart';
@@ -46,10 +47,11 @@ class _ItemPageState extends State<ItemPage> {
   Map<String, dynamic> _codeSettings = const {};
   double _maxItemImageSizeMB = 1;
   String? _group, _type;
+  String _title = 'ข้อมูลสินค้า';
+  String? _loadError;
   String _statusFilter = 'all', _showFilter = 'all';
   bool _card = false, _loading = true, _showImages = true;
   int _currentPage = 0;
-  Map<String, dynamic>? _editing;
   String? _message;
   Timer? _timer;
 
@@ -87,8 +89,21 @@ class _ItemPageState extends State<ItemPage> {
   @override
   void initState() {
     super.initState();
+    _resolveTitle();
     _load();
     _loadDefaultViewMode();
+  }
+
+  Future<void> _resolveTitle() async {
+    try {
+      final title = await NavigationMenuRepository().resolveMenuName(
+        menuCode: _menuCode,
+        fallback: _title,
+      );
+      if (mounted) setState(() => _title = title);
+    } catch (_) {
+      // Keep the known caption if navigation is temporarily unavailable.
+    }
   }
 
   Future<void> _loadDefaultViewMode() async {
@@ -144,12 +159,16 @@ class _ItemPageState extends State<ItemPage> {
         _units = result[6] as List<Map<String, dynamic>>;
         _permissionPoints = result[7] as Set<String>;
         _currentPage = _currentPage.clamp(0, _totalPages - 1);
+        _loadError = null;
         _loading = false;
       });
     } catch (e) {
       if (mounted) {
-        setState(() => _loading = false);
-        _show(_readableError(e));
+        setState(() {
+          _loading = false;
+          _loadError = _readableError(e);
+        });
+        _show(_loadError!);
       }
     }
   }
@@ -280,18 +299,23 @@ class _ItemPageState extends State<ItemPage> {
         builder: (dialogContext, setDialogState) => AlertDialog(
           backgroundColor: Colors.white,
           surfaceTintColor: Colors.transparent,
+          insetPadding: const EdgeInsets.all(LaooLayout.dialogInsetPadding),
           titlePadding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
           contentPadding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
           actionsPadding: const EdgeInsets.fromLTRB(24, 8, 24, 18),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: BorderSide(color: accent, width: 1.2),
+            borderRadius: BorderRadius.circular(LaooRadius.xs),
           ),
           title: Row(
             children: [
               Icon(Icons.inventory_2_outlined, color: accent),
               const SizedBox(width: 8),
-              const Expanded(child: Text('อัตราส่วนการบรรจุสินค้า')),
+              const Expanded(
+                child: Text(
+                  'อัตราส่วนการบรรจุสินค้า',
+                  style: LaooTypography.screenCaptionStyle,
+                ),
+              ),
             ],
           ),
           content: SizedBox(
@@ -931,9 +955,9 @@ class _ItemPageState extends State<ItemPage> {
         builder: (dialogContext) => StatefulBuilder(
           builder: (context, setDialogState) => AlertDialog(
             backgroundColor: Colors.white,
+            insetPadding: const EdgeInsets.all(LaooLayout.dialogInsetPadding),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-              side: BorderSide(color: accent, width: 1.2),
+              borderRadius: BorderRadius.circular(LaooRadius.xs),
             ),
             titlePadding: const EdgeInsets.fromLTRB(22, 20, 22, 0),
             contentPadding: const EdgeInsets.fromLTRB(22, 12, 22, 0),
@@ -944,11 +968,20 @@ class _ItemPageState extends State<ItemPage> {
                   children: [
                     Icon(Icons.sell_outlined, color: accent),
                     const SizedBox(width: 8),
-                    const Expanded(child: Text('ราคาขายตามระดับลูกค้า')),
+                    const Expanded(
+                      child: Text(
+                        'ราคาขายตามระดับลูกค้า',
+                        style: LaooTypography.screenCaptionStyle,
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 12),
-                Divider(height: 1, thickness: 1, color: accent),
+                const Divider(
+                  height: 1,
+                  thickness: 1,
+                  color: LaooColors.border,
+                ),
               ],
             ),
             content: SizedBox(
@@ -1001,14 +1034,22 @@ class _ItemPageState extends State<ItemPage> {
                               labelStyle: TextStyle(color: accent),
                               floatingLabelStyle: TextStyle(color: accent),
                               border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius: BorderRadius.circular(
+                                  LaooRadius.xs,
+                                ),
                               ),
                               enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
-                                borderSide: BorderSide(color: accent),
+                                borderRadius: BorderRadius.circular(
+                                  LaooRadius.xs,
+                                ),
+                                borderSide: const BorderSide(
+                                  color: LaooColors.border,
+                                ),
                               ),
                               focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius: BorderRadius.circular(
+                                  LaooRadius.xs,
+                                ),
                                 borderSide: BorderSide(
                                   color: accent,
                                   width: 1.5,
@@ -1081,12 +1122,37 @@ class _ItemPageState extends State<ItemPage> {
     }
     try {
       final detail = await _api.get((row['itemID'] as num).toInt());
-      if (mounted) setState(() => _editing = detail);
+      if (mounted) _openForm(detail);
     } catch (e) {
       if (mounted) {
         _show('ไม่สามารถเปิดหน้าแก้ไขสินค้าได้: $e');
       }
     }
+  }
+
+  Future<void> _openForm(Map<String, dynamic> initial) async {
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => _ItemForm(
+        title: _title,
+        initial: initial,
+        groups: _groups,
+        types: _types,
+        units: _units,
+        codeSettings: _codeSettings,
+        maxItemImageSizeMB: _maxItemImageSizeMB,
+        onCancel: () => Navigator.pop(dialogContext),
+        onSaved: () {
+          if (initial['itemID'] != null && dialogContext.mounted) {
+            Navigator.pop(dialogContext);
+          }
+          if (!mounted) return;
+          showTimedSnackBar(context, message: 'บันทึกข้อมูลสินค้าสำเร็จ');
+          _load();
+        },
+      ),
+    );
   }
 
   Future<void> _delete(Map<String, dynamic> row) async {
@@ -1095,11 +1161,12 @@ class _ItemPageState extends State<ItemPage> {
           context: context,
           builder: (c) {
             final accent = workspaceThemeController.value.primary;
+            final error = Theme.of(c).colorScheme.error;
             return AlertDialog(
               backgroundColor: Colors.white,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: BorderSide(color: accent, width: 1.2),
+                borderRadius: BorderRadius.circular(LaooRadius.xs),
+                side: BorderSide(color: error),
               ),
               titlePadding: const EdgeInsets.fromLTRB(22, 22, 22, 0),
               contentPadding: const EdgeInsets.fromLTRB(22, 16, 22, 0),
@@ -1110,18 +1177,18 @@ class _ItemPageState extends State<ItemPage> {
                     width: 42,
                     height: 42,
                     decoration: BoxDecoration(
-                      color: accent.withValues(alpha: .15),
-                      borderRadius: BorderRadius.circular(8),
+                      color: error.withValues(alpha: .10),
+                      borderRadius: BorderRadius.circular(LaooRadius.xs),
                     ),
-                    child: Icon(Icons.delete_outline, color: accent),
+                    child: Icon(Icons.delete_outline, color: error),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       'ยืนยันการลบข้อมูล',
                       style: TextStyle(
-                        color: accent,
-                        fontSize: 20,
+                        color: error,
+                        fontSize: LaooTypography.workspaceCaption,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -1131,6 +1198,8 @@ class _ItemPageState extends State<ItemPage> {
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  const Divider(height: 1, color: LaooColors.border),
+                  const SizedBox(height: 12),
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(
@@ -1138,8 +1207,8 @@ class _ItemPageState extends State<ItemPage> {
                       vertical: 12,
                     ),
                     decoration: BoxDecoration(
-                      color: accent.withValues(alpha: .15),
-                      borderRadius: BorderRadius.circular(8),
+                      color: error.withValues(alpha: .10),
+                      borderRadius: BorderRadius.circular(LaooRadius.xs),
                     ),
                     child: Text(
                       'ต้องการลบ ${row['itemCode']} - ${row['itemName']} หรือไม่?',
@@ -1151,6 +1220,8 @@ class _ItemPageState extends State<ItemPage> {
                     alignment: Alignment.centerLeft,
                     child: Text('ข้อมูลที่ลบแล้วไม่สามารถเรียกคืนกลับมาได้'),
                   ),
+                  const SizedBox(height: 12),
+                  const Divider(height: 1, color: LaooColors.border),
                 ],
               ),
               actions: [
@@ -1162,8 +1233,11 @@ class _ItemPageState extends State<ItemPage> {
                 FilledButton.icon(
                   onPressed: () => Navigator.pop(c, true),
                   style: FilledButton.styleFrom(
-                    backgroundColor: Colors.red,
-                    foregroundColor: Colors.white,
+                    backgroundColor: error,
+                    foregroundColor: Theme.of(c).colorScheme.onError,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(LaooRadius.xs),
+                    ),
                   ),
                   icon: const Icon(Icons.delete_outline, size: 18),
                   label: const Text('ลบ'),
@@ -1214,29 +1288,10 @@ class _ItemPageState extends State<ItemPage> {
 
   @override
   Widget build(BuildContext context) => SupportWorkspaceShell(
-    pageTitle: _editing == null
-        ? 'ข้อมูลสินค้า'
-        : 'ข้อมูลสินค้า > ${_editing!['itemID'] == null ? 'เพิ่ม' : 'แก้ไข'}',
+    pageTitle: _title,
     activeMenu: widget.activeMenu,
     menuScope: WorkspaceMenuScope.company,
-    child: _editing == null
-        ? _list()
-        : _ItemForm(
-            initial: _editing,
-            groups: _groups,
-            types: _types,
-            units: _units,
-            codeSettings: _codeSettings,
-            maxItemImageSizeMB: _maxItemImageSizeMB,
-            onCancel: () => setState(() => _editing = null),
-            onSaved: () {
-              if (_editing?['itemID'] != null) {
-                setState(() => _editing = null);
-              }
-              showTimedSnackBar(context, message: 'บันทึกข้อมูลสินค้าสำเร็จ');
-              _load();
-            },
-          ),
+    child: _list(),
   );
 
   Widget _list() => ColoredBox(
@@ -1252,13 +1307,12 @@ class _ItemPageState extends State<ItemPage> {
                 decoration: const BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.all(Radius.circular(4)),
-                  border: Border(bottom: BorderSide(color: Color(0xFFE4EAE6))),
                 ),
                 child: Row(
                   children: [
-                    const Expanded(
+                    Expanded(
                       child: WorkspacePageTitle(
-                        title: 'ข้อมูลสินค้า',
+                        title: _title,
                         favoriteKey: '08001',
                       ),
                     ),
@@ -1285,18 +1339,18 @@ class _ItemPageState extends State<ItemPage> {
                       MediaQuery.sizeOf(context).width < 600
                           ? IconButton.filled(
                               tooltip: 'เพิ่มสินค้า',
-                              onPressed: () => setState(() => _editing = {}),
+                              onPressed: () => _openForm({}),
                               icon: const Icon(Icons.add),
                             )
                           : FilledButton.icon(
-                              onPressed: () => setState(() => _editing = {}),
+                              onPressed: () => _openForm({}),
                               icon: const Icon(Icons.add),
                               label: const Text('เพิ่ม'),
                             ),
                   ],
                 ),
               ),
-              const SizedBox(height: LaooLayout.cardSpacing),
+              const SizedBox(height: LaooLayout.listSectionSpacing),
               Container(
                 padding: const EdgeInsets.all(LaooLayout.cardPadding),
                 decoration: const BoxDecoration(
@@ -1339,14 +1393,47 @@ class _ItemPageState extends State<ItemPage> {
                           child: TextField(
                             controller: _search,
                             onSubmitted: (_) => _load(),
-                            decoration: InputDecoration(
+                            decoration: const InputDecoration(
                               labelText: 'ค้นหารหัส/ชื่อสินค้า',
-                              suffixIcon: IconButton(
-                                onPressed: _load,
-                                icon: const Icon(Icons.arrow_forward),
+                              prefixIcon: Icon(Icons.search),
+                            ),
+                          ),
+                        ),
+                        FilledButton.icon(
+                          onPressed: _load,
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size(
+                              0,
+                              LaooLayout.filterActionHeight,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(
+                                LaooRadius.xs,
                               ),
                             ),
                           ),
+                          icon: const Icon(Icons.search),
+                          label: const Text('ค้นหา'),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: () {
+                            _search.clear();
+                            _currentPage = 0;
+                            _load();
+                          },
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size(
+                              0,
+                              LaooLayout.filterActionHeight,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(
+                                LaooRadius.xs,
+                              ),
+                            ),
+                          ),
+                          icon: const Icon(Icons.filter_alt_off_outlined),
+                          label: const Text('ล้าง Filter'),
                         ),
                         SizedBox(
                           width: filterWidth,
@@ -1417,15 +1504,50 @@ class _ItemPageState extends State<ItemPage> {
                   },
                 ),
               ),
-              const SizedBox(height: LaooLayout.cardSpacing),
+              const SizedBox(height: LaooLayout.listSectionSpacing),
               Expanded(
                 child: _loading
-                    ? const Center(child: CircularProgressIndicator())
+                    ? const Card(
+                        margin: EdgeInsets.zero,
+                        child: Center(child: CircularProgressIndicator()),
+                      )
+                    : _loadError != null
+                    ? Card(
+                        margin: EdgeInsets.zero,
+                        child: Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text('ไม่สามารถโหลดรายการสินค้าได้'),
+                              const SizedBox(
+                                height: LaooLayout.listSectionSpacing,
+                              ),
+                              Text(
+                                'รายละเอียดเพิ่มเติม: $_loadError',
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(
+                                height: LaooLayout.listSectionSpacing,
+                              ),
+                              OutlinedButton.icon(
+                                onPressed: _load,
+                                icon: const Icon(Icons.replay_outlined),
+                                label: const Text('ลองอีกครั้ง'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    : _visibleRows.isEmpty
+                    ? const Card(
+                        margin: EdgeInsets.zero,
+                        child: Center(child: Text('ไม่พบสินค้า')),
+                      )
                     : (_card || MediaQuery.sizeOf(context).width < 1200)
                     ? _cardsV2()
                     : _table(),
               ),
-              const SizedBox(height: LaooLayout.cardSpacing),
+              const SizedBox(height: LaooLayout.listSectionSpacing),
               _paginationBar(),
             ],
           ),
@@ -1911,34 +2033,61 @@ class _ItemPageState extends State<ItemPage> {
     final start = total == 0 ? 0 : _currentPage * _pageSize + 1;
     final end = total == 0 ? 0 : (start + _pageSize - 1).clamp(0, total);
     final accent = workspaceThemeController.value.primary;
-    return Container(
-      padding: const EdgeInsets.all(LaooLayout.cardPadding),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.all(Radius.circular(4)),
+    return Card(
+      margin: EdgeInsets.zero,
+      color: Colors.white,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(LaooRadius.xs),
       ),
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: Wrap(
-          spacing: 6,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            _pageButton(
-              Icons.chevron_left_rounded,
-              _currentPage > 0 ? () => setState(() => _currentPage--) : null,
-              accent,
-            ),
-            for (var page = 0; page < _totalPages; page++)
-              _numberButton(page, accent),
-            _pageButton(
-              Icons.chevron_right_rounded,
-              _currentPage + 1 < _totalPages
-                  ? () => setState(() => _currentPage++)
-                  : null,
-              accent,
-            ),
-            Text('$start-$end จาก $total'),
-          ],
+      child: SizedBox(
+        height: LaooLayout.paginationCardHeight,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Row(
+            children: [
+              _pageButton(
+                Icons.chevron_left_rounded,
+                _currentPage > 0 ? () => setState(() => _currentPage--) : null,
+                accent,
+              ),
+              const SizedBox(width: 6),
+              Semantics(
+                label: 'หน้าปัจจุบัน ${_currentPage + 1}',
+                child: Container(
+                  width: LaooLayout.paginationButtonSize,
+                  height: LaooLayout.paginationButtonSize,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: accent,
+                    border: Border.all(color: accent),
+                    borderRadius: BorderRadius.circular(LaooRadius.xs),
+                  ),
+                  child: Text(
+                    '${_currentPage + 1}',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onPrimary,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              _pageButton(
+                Icons.chevron_right_rounded,
+                _currentPage + 1 < _totalPages
+                    ? () => setState(() => _currentPage++)
+                    : null,
+                accent,
+              ),
+              const SizedBox(width: 12),
+              Flexible(
+                child: Text(
+                  '$start-$end จาก $total',
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1946,52 +2095,24 @@ class _ItemPageState extends State<ItemPage> {
 
   Widget _pageButton(IconData icon, VoidCallback? onPressed, Color accent) {
     return SizedBox(
-      width: 34,
-      height: 34,
-      child: FilledButton(
+      width: LaooLayout.paginationButtonSize,
+      height: LaooLayout.paginationButtonSize,
+      child: OutlinedButton(
         onPressed: onPressed,
-        style: FilledButton.styleFrom(
+        style: OutlinedButton.styleFrom(
           padding: EdgeInsets.zero,
-          backgroundColor: onPressed == null
-              ? Theme.of(context).disabledColor.withValues(alpha: .18)
-              : accent,
           foregroundColor: onPressed == null
               ? Theme.of(context).disabledColor
-              : Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+              : accent,
+          side: BorderSide(
+            color: onPressed == null ? Theme.of(context).disabledColor : accent,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(LaooRadius.xs),
+          ),
         ),
         child: Icon(icon, size: 20),
       ),
-    );
-  }
-
-  Widget _numberButton(int page, Color accent) {
-    final active = page == _currentPage;
-    return SizedBox(
-      width: 34,
-      height: 34,
-      child: active
-          ? FilledButton(
-              onPressed: () {},
-              style: FilledButton.styleFrom(
-                padding: EdgeInsets.zero,
-                backgroundColor: accent,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-              child: Text('${page + 1}'),
-            )
-          : OutlinedButton(
-              onPressed: () => setState(() => _currentPage = page),
-              style: OutlinedButton.styleFrom(
-                padding: EdgeInsets.zero,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-              child: Text('${page + 1}'),
-            ),
     );
   }
 
@@ -2108,7 +2229,7 @@ class _ItemPageState extends State<ItemPage> {
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(4),
-          side: const BorderSide(color: Color(0xFFF8F9FB)),
+          side: BorderSide.none,
         ),
         child: Padding(
           padding: const EdgeInsets.all(LaooLayout.cardPadding),
@@ -2180,14 +2301,14 @@ class _ItemPageState extends State<ItemPage> {
                   'ราคาขาย ${_formatAmount(x['unitPrice'])}  |  หน่วยบรรจุ ${x['unitCode']}  |  สต๊อกขั้นต่ำ ${x['minStock']}',
                   style: TextStyle(
                     fontSize: LaooTypography.tableBody,
-                    color: Colors.black87,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
               Text.rich(
                 TextSpan(
                   style: TextStyle(
                     fontSize: LaooTypography.tableBody,
-                    color: Colors.black87,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                   children: [
                     const TextSpan(text: 'ราคาขาย '),

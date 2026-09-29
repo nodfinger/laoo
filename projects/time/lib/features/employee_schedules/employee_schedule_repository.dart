@@ -5,6 +5,8 @@ class EmployeeScheduleRepository {
   EmployeeScheduleRepository(this.api);
   final JsonApiClient api;
   static const path = '/api/time/employee-schedules';
+  Future<void> deleteAssignment(int id, String rowVersion) =>
+      api.delete('$path/assignments/$id', query: {'rowVersion': rowVersion});
   Future<ScheduleActions> actions() async => ScheduleActions.fromJson(
     Map<String, dynamic>.from(await api.get('$path/actions') as Map),
   );

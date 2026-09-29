@@ -2,10 +2,31 @@ import 'package:flutter/material.dart';
 import 'package:laoo_shared_core/laoo_shared_core.dart';
 
 import 'evaluation_feature_host.dart';
+import 'evaluation_popup_theme.dart';
 import 'evaluation_response_dialog.dart';
 import 'evaluation_results_dialog.dart';
 import 'evaluation_round_dialog.dart';
 import 'evaluation_template_dialog.dart';
+
+ButtonStyle _filterFilledStyle() => FilledButton.styleFrom(
+  minimumSize: const Size(0, 40),
+  maximumSize: const Size(double.infinity, 40),
+  shape: RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(evaluationUiTokens.radius),
+  ),
+  textStyle: evaluationUiTokens.buttonStyle,
+);
+
+ButtonStyle _filterOutlinedStyle() => OutlinedButton.styleFrom(
+  minimumSize: const Size(0, 40),
+  maximumSize: const Size(double.infinity, 40),
+  foregroundColor: evaluationUiTokens.primaryColor,
+  side: BorderSide(color: evaluationUiTokens.primaryColor),
+  shape: RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(evaluationUiTokens.radius),
+  ),
+  textStyle: evaluationUiTokens.buttonStyle,
+);
 
 class EvaluationListPage extends StatefulWidget {
   const EvaluationListPage({
@@ -34,11 +55,19 @@ class _EvaluationListPageState extends State<EvaluationListPage> {
   bool _canSubmit = false;
   bool _canApprove = false;
   String? _error;
+  late String _title;
   @override
   void initState() {
     super.initState();
+    _title = widget.title;
     _api = createEvaluationApiClient();
+    _resolveTitle();
     _load();
+  }
+
+  Future<void> _resolveTitle() async {
+    final title = await resolveEvaluationMenuTitle(widget.menu, widget.title);
+    if (mounted) setState(() => _title = title);
   }
 
   @override
@@ -66,22 +95,33 @@ class _EvaluationListPageState extends State<EvaluationListPage> {
     return Padding(
       padding: const EdgeInsets.all(10),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Card(
+            margin: EdgeInsets.zero,
             child: Padding(
               padding: const EdgeInsets.all(10),
               child: Row(
                 children: [
-                  const Icon(Icons.fact_check_outlined),
+                  Icon(
+                    Icons.star_border,
+                    color: evaluationUiTokens.primaryColor,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Text(
-                      widget.title,
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
+                    child: Text(_title, style: evaluationUiTokens.captionStyle),
                   ),
                   if (_canCreate)
                     FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        minimumSize: Size(100, evaluationUiTokens.buttonHeight),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(
+                            evaluationUiTokens.radius,
+                          ),
+                        ),
+                        textStyle: evaluationUiTokens.buttonStyle,
+                      ),
                       onPressed: _createTemplate,
                       icon: const Icon(Icons.add),
                       label: const Text('เพิ่ม'),
@@ -90,8 +130,9 @@ class _EvaluationListPageState extends State<EvaluationListPage> {
               ),
             ),
           ),
-          const SizedBox(height: 6),
+          SizedBox(height: evaluationUiTokens.sectionSpacing),
           Card(
+            margin: EdgeInsets.zero,
             child: Padding(
               padding: const EdgeInsets.all(10),
               child: Wrap(
@@ -100,7 +141,10 @@ class _EvaluationListPageState extends State<EvaluationListPage> {
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   SizedBox(
-                    width: 260,
+                    width: (MediaQuery.sizeOf(context).width - 40).clamp(
+                      0.0,
+                      260.0,
+                    ),
                     child: TextField(
                       controller: _search,
                       onSubmitted: (_) => setState(() => _page = 1),
@@ -111,7 +155,10 @@ class _EvaluationListPageState extends State<EvaluationListPage> {
                     ),
                   ),
                   SizedBox(
-                    width: 240,
+                    width: (MediaQuery.sizeOf(context).width - 40).clamp(
+                      0.0,
+                      240.0,
+                    ),
                     child: DropdownButtonFormField<String>(
                       initialValue: _sourceFilter,
                       decoration: const InputDecoration(labelText: 'ประเภทงาน'),
@@ -149,11 +196,13 @@ class _EvaluationListPageState extends State<EvaluationListPage> {
                     ),
                   ),
                   FilledButton.icon(
+                    style: _filterFilledStyle(),
                     onPressed: () => setState(() => _page = 1),
                     icon: const Icon(Icons.search),
                     label: const Text('ค้นหา'),
                   ),
                   OutlinedButton.icon(
+                    style: _filterOutlinedStyle(),
                     onPressed: () => setState(() {
                       _search.clear();
                       _sourceFilter = 'ALL';
@@ -166,86 +215,213 @@ class _EvaluationListPageState extends State<EvaluationListPage> {
               ),
             ),
           ),
-          const SizedBox(height: 10),
+          SizedBox(height: evaluationUiTokens.itemSpacing),
           Expanded(
-            child: Card(
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: DataTable(
-                  columns: const [
-                    DataColumn(label: Text('ID')),
-                    DataColumn(label: Text('จัดการ')),
-                    DataColumn(label: Text('รหัส')),
-                    DataColumn(label: Text('ชื่อแบบประเมิน')),
-                    DataColumn(label: Text('ประเภท')),
-                  ],
-                  rows: rows.indexed.map((e) {
-                    final x = e.$2;
-                    return DataRow(
-                      cells: [
-                        DataCell(Text('${start + e.$1 + 1}')),
-                        DataCell(
-                          Row(
-                            children: [
-                              if (_canEdit)
-                                IconButton(
-                                  onPressed: () => _editTemplate(x),
-                                  icon: const Icon(Icons.edit_outlined),
+            child: _loading
+                ? const Card(
+                    margin: EdgeInsets.zero,
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                : _error != null
+                ? Card(
+                    margin: EdgeInsets.zero,
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'ไม่สามารถโหลดข้อมูลได้\n$_error',
+                            textAlign: TextAlign.center,
+                          ),
+                          SizedBox(height: evaluationUiTokens.itemSpacing),
+                          OutlinedButton.icon(
+                            onPressed: _load,
+                            icon: const Icon(Icons.replay_outlined),
+                            label: const Text('ลองอีกครั้ง'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                : LayoutBuilder(
+                    builder: (context, constraints) {
+                      if (constraints.maxWidth <
+                          evaluationUiTokens.compactBreakpoint) {
+                        if (rows.isEmpty) {
+                          return const Card(
+                            margin: EdgeInsets.zero,
+                            child: Center(child: Text('ไม่พบข้อมูล')),
+                          );
+                        }
+                        return ListView.separated(
+                          itemCount: rows.length,
+                          separatorBuilder: (_, _) =>
+                              SizedBox(height: evaluationUiTokens.itemSpacing),
+                          itemBuilder: (context, index) {
+                            final x = rows[index];
+                            return Card(
+                              margin: EdgeInsets.zero,
+                              child: Padding(
+                                padding: evaluationUiTokens.cardPadding,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '${start + index + 1} · ${x['code'] ?? ''}',
+                                      style: evaluationUiTokens.inputStyle
+                                          .copyWith(
+                                            color:
+                                                evaluationUiTokens.primaryColor,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                    ),
+                                    Text(
+                                      '${x['name'] ?? ''}',
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: evaluationUiTokens.inputStyle
+                                          .copyWith(
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                    ),
+                                    Text('${x['sourceType'] ?? ''}'),
+                                    Wrap(
+                                      spacing: evaluationUiTokens.itemSpacing,
+                                      children: [
+                                        IconButton(
+                                          tooltip: 'ดู',
+                                          onPressed: () => _viewTemplate(x),
+                                          icon: const Icon(
+                                            Icons.visibility_outlined,
+                                          ),
+                                        ),
+                                        if (_canEdit)
+                                          IconButton(
+                                            tooltip: 'แก้ไข',
+                                            onPressed: () => _editTemplate(x),
+                                            icon: const Icon(
+                                              Icons.edit_outlined,
+                                            ),
+                                          ),
+                                        if (_canDelete)
+                                          IconButton(
+                                            tooltip: 'ลบ',
+                                            onPressed: () => _deleteTemplate(x),
+                                            icon: Icon(
+                                              Icons.delete_outline,
+                                              color: evaluationUiTokens
+                                                  .dangerColor,
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ],
                                 ),
-                              if (_canDelete)
-                                IconButton(
-                                  onPressed: () => _deleteTemplate(x),
-                                  icon: const Icon(
-                                    Icons.delete_outline,
-                                    color: Colors.red,
+                              ),
+                            );
+                          },
+                        );
+                      }
+                      if (rows.isEmpty) {
+                        return const Card(
+                          margin: EdgeInsets.zero,
+                          child: Center(child: Text('ไม่พบข้อมูล')),
+                        );
+                      }
+                      return Card(
+                        margin: EdgeInsets.zero,
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              minWidth: constraints.maxWidth,
+                            ),
+                            child: DataTable(
+                              headingRowHeight: 56,
+                              dataRowMinHeight: 48,
+                              dataRowMaxHeight: 56,
+                              headingRowColor: WidgetStatePropertyAll(
+                                evaluationUiTokens.primaryColor.withValues(
+                                  alpha: .10,
+                                ),
+                              ),
+                              headingTextStyle: evaluationUiTokens.inputStyle
+                                  .copyWith(
+                                    color: evaluationUiTokens.primaryColor,
+                                    fontWeight: FontWeight.w700,
                                   ),
+                              dataTextStyle: evaluationUiTokens.inputStyle,
+                              border: TableBorder(
+                                horizontalInside: BorderSide(
+                                  color: evaluationUiTokens.borderColor,
                                 ),
-                            ],
+                                bottom: BorderSide(
+                                  color: evaluationUiTokens.borderColor,
+                                ),
+                              ),
+                              columns: const [
+                                DataColumn(label: Text('ID')),
+                                DataColumn(label: Text('จัดการ')),
+                                DataColumn(label: Text('รหัส')),
+                                DataColumn(label: Text('ชื่อแบบประเมิน')),
+                                DataColumn(label: Text('ประเภท')),
+                              ],
+                              rows: rows.indexed.map((e) {
+                                final x = e.$2;
+                                return DataRow(
+                                  cells: [
+                                    DataCell(Text('${start + e.$1 + 1}')),
+                                    DataCell(
+                                      Row(
+                                        children: [
+                                          IconButton(
+                                            tooltip: 'ดู',
+                                            onPressed: () => _viewTemplate(x),
+                                            icon: const Icon(
+                                              Icons.visibility_outlined,
+                                            ),
+                                          ),
+                                          if (_canEdit)
+                                            IconButton(
+                                              tooltip: 'แก้ไข',
+                                              onPressed: () => _editTemplate(x),
+                                              icon: const Icon(
+                                                Icons.edit_outlined,
+                                              ),
+                                            ),
+                                          if (_canDelete)
+                                            IconButton(
+                                              tooltip: 'ลบ',
+                                              onPressed: () =>
+                                                  _deleteTemplate(x),
+                                              icon: Icon(
+                                                Icons.delete_outline,
+                                                color: evaluationUiTokens
+                                                    .dangerColor,
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                    DataCell(Text('${x['code'] ?? ''}')),
+                                    DataCell(Text('${x['name'] ?? ''}')),
+                                    DataCell(Text('${x['sourceType'] ?? ''}')),
+                                  ],
+                                );
+                              }).toList(),
+                            ),
                           ),
                         ),
-                        DataCell(Text('${x['code'] ?? ''}')),
-                        DataCell(Text('${x['name'] ?? ''}')),
-                        DataCell(Text('${x['sourceType'] ?? ''}')),
-                      ],
-                    );
-                  }).toList(),
-                ),
-              ),
-            ),
+                      );
+                    },
+                  ),
           ),
-          const SizedBox(height: 10),
-          Card(
-            child: SizedBox(
-              height: 56,
-              child: Padding(
-                padding: const EdgeInsets.all(8),
-                child: Row(
-                  children: [
-                    OutlinedButton(
-                      onPressed: _page > 1
-                          ? () => setState(() => _page--)
-                          : null,
-                      child: const Text('<'),
-                    ),
-                    const SizedBox(width: 6),
-                    FilledButton(onPressed: null, child: Text('$_page')),
-                    const SizedBox(width: 6),
-                    OutlinedButton(
-                      onPressed: _page < pages
-                          ? () => setState(() => _page++)
-                          : null,
-                      child: const Text('>'),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      filtered.isEmpty
-                          ? '0-0 จาก 0'
-                          : '${start + 1}-${start + rows.length} จาก ${filtered.length}',
-                    ),
-                  ],
-                ),
-              ),
-            ),
+          SizedBox(height: evaluationUiTokens.itemSpacing),
+          _EvaluationPaginationCard(
+            page: _page,
+            pageSize: size,
+            total: filtered.length,
+            onChanged: (value) => setState(() => _page = value),
           ),
         ],
       ),
@@ -276,6 +452,10 @@ class _EvaluationListPageState extends State<EvaluationListPage> {
             (map['items'] ?? []) as List,
           );
           _total = (map['total'] as num?)?.toInt() ?? _items.length;
+          if (_usesLocalPagination) {
+            final pages = (_items.length / 10).ceil().clamp(1, 99999);
+            if (_page > pages) _page = pages;
+          }
           if (widget.menu == '47002' || widget.menu == '47003') {
             _canCreate = permissions['create'] == true;
             _canEdit = permissions['edit'] == true;
@@ -298,7 +478,7 @@ class _EvaluationListPageState extends State<EvaluationListPage> {
     final request = await showDialog<Map<String, dynamic>>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => const EvaluationTemplateDialog(),
+      builder: (_) => EvaluationTemplateDialog(title: _title),
     );
     if (request == null) return;
     try {
@@ -330,7 +510,8 @@ class _EvaluationListPageState extends State<EvaluationListPage> {
       final request = await showDialog<Map<String, dynamic>>(
         context: context,
         barrierDismissible: false,
-        builder: (_) => EvaluationTemplateDialog(initial: initial),
+        builder: (_) =>
+            EvaluationTemplateDialog(title: _title, initial: initial),
       );
       if (request == null) return;
       await _api.put('/api/company/evaluations/templates/$id', body: request);
@@ -360,15 +541,18 @@ class _EvaluationListPageState extends State<EvaluationListPage> {
       if (!mounted) return;
       await showDialog<void>(
         context: context,
-        builder: (_) =>
-            EvaluationTemplateDialog(initial: initial, readOnly: true),
+        builder: (_) => EvaluationTemplateDialog(
+          title: _title,
+          initial: initial,
+          readOnly: true,
+        ),
       );
     } catch (_) {
       if (mounted) {
         showEvaluationMessage(
           context,
           message:
-              'เปิดรายละเอียดแบบประเมินไม่สำเร็จ\nรายละเอียดเพิ่มเติม: กรุณาโหลดข้อมูลล่าสุดแล้วลองอีกครั้ง',
+              'เปิดรายละเอียดแบบประเมินไม่สำเร็จ\nรายละเอียดเพิ่มเติม: กรุณาลองเปิดรายการอีกครั้ง',
           error: true,
         );
       }
@@ -381,41 +565,65 @@ class _EvaluationListPageState extends State<EvaluationListPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-        icon: const Icon(Icons.delete_outline, color: Colors.red),
-        title: const Text('ลบแบบประเมิน', style: TextStyle(color: Colors.red)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              color: Colors.red.shade50,
-              child: Text('${item['code'] ?? item['name'] ?? '-'}'),
+      builder: (_) => Theme(
+        data: evaluationPopupTheme(context),
+        child: AlertDialog(
+          backgroundColor: evaluationUiTokens.popupSurfaceColor,
+          surfaceTintColor: evaluationUiTokens.popupSurfaceColor,
+          insetPadding: const EdgeInsets.all(24),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(evaluationUiTokens.radius),
+            side: BorderSide(color: evaluationUiTokens.dangerColor),
+          ),
+          title: Row(
+            children: [
+              Icon(Icons.delete_outline, color: evaluationUiTokens.dangerColor),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'ยืนยันการลบข้อมูล',
+                  style: evaluationUiTokens.captionStyle.copyWith(
+                    color: evaluationUiTokens.dangerColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                color: evaluationUiTokens.dangerSurfaceColor,
+                child: Text('${item['code'] ?? item['name'] ?? '-'}'),
+              ),
+              const SizedBox(height: 12),
+              const Text('เมื่อลบแล้วจะไม่สามารถเรียกคืนข้อมูลได้'),
+              const SizedBox(height: 12),
+              Divider(height: 1, color: evaluationUiTokens.borderColor),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('ยกเลิก'),
             ),
-            const SizedBox(height: 12),
-            const Text('เมื่อลบแล้วจะไม่สามารถเรียกคืนข้อมูลได้'),
+            FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: evaluationUiTokens.dangerColor,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(
+                    evaluationUiTokens.radius,
+                  ),
+                ),
+              ),
+              onPressed: () => Navigator.pop(context, true),
+              icon: const Icon(Icons.delete_outline),
+              label: const Text('ลบ'),
+            ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('ยกเลิก'),
-          ),
-          FilledButton.icon(
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.red,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(4),
-              ),
-            ),
-            onPressed: () => Navigator.pop(context, true),
-            icon: const Icon(Icons.delete_outline),
-            label: const Text('ลบ'),
-          ),
-        ],
       ),
     );
     if (confirmed != true) return;
@@ -441,7 +649,7 @@ class _EvaluationListPageState extends State<EvaluationListPage> {
     final request = await showDialog<Map<String, dynamic>>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => const EvaluationRoundDialog(),
+      builder: (_) => EvaluationRoundDialog(title: _title),
     );
     if (request == null) return;
     try {
@@ -475,7 +683,7 @@ class _EvaluationListPageState extends State<EvaluationListPage> {
       final request = await showDialog<Map<String, dynamic>>(
         context: context,
         barrierDismissible: false,
-        builder: (_) => EvaluationRoundDialog(initial: document),
+        builder: (_) => EvaluationRoundDialog(title: _title, initial: document),
       );
       if (request == null) return;
       await _api.put('/api/company/evaluations/rounds/$id', body: request);
@@ -501,44 +709,65 @@ class _EvaluationListPageState extends State<EvaluationListPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-        icon: const Icon(Icons.delete_outline, color: Colors.red),
-        title: const Text(
-          'ลบร่างรอบประเมิน',
-          style: TextStyle(color: Colors.red),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              color: Colors.red.shade50,
-              child: Text('${item['roundNo'] ?? item['name']}'),
+      builder: (dialogContext) => Theme(
+        data: evaluationPopupTheme(context),
+        child: AlertDialog(
+          backgroundColor: evaluationUiTokens.popupSurfaceColor,
+          surfaceTintColor: evaluationUiTokens.popupSurfaceColor,
+          insetPadding: const EdgeInsets.all(24),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(evaluationUiTokens.radius),
+            side: BorderSide(color: evaluationUiTokens.dangerColor),
+          ),
+          title: Row(
+            children: [
+              Icon(Icons.delete_outline, color: evaluationUiTokens.dangerColor),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'ยืนยันการลบข้อมูล',
+                  style: evaluationUiTokens.captionStyle.copyWith(
+                    color: evaluationUiTokens.dangerColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                color: evaluationUiTokens.dangerSurfaceColor,
+                child: Text('${item['roundNo'] ?? item['name']}'),
+              ),
+              const SizedBox(height: 12),
+              const Text('เมื่อลบแล้วจะไม่สามารถเรียกคืนข้อมูลได้'),
+              const SizedBox(height: 12),
+              Divider(height: 1, color: evaluationUiTokens.borderColor),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('ยกเลิก'),
             ),
-            const SizedBox(height: 12),
-            const Text('เมื่อลบแล้วจะไม่สามารถเรียกคืนข้อมูลได้'),
+            FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: evaluationUiTokens.dangerColor,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(
+                    evaluationUiTokens.radius,
+                  ),
+                ),
+              ),
+              onPressed: () => Navigator.pop(dialogContext, true),
+              icon: const Icon(Icons.delete_outline),
+              label: const Text('ลบ'),
+            ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('ยกเลิก'),
-          ),
-          FilledButton.icon(
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.red,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(4),
-              ),
-            ),
-            onPressed: () => Navigator.pop(dialogContext, true),
-            icon: const Icon(Icons.delete_outline),
-            label: const Text('ลบ'),
-          ),
-        ],
       ),
     );
     if (confirmed != true) return;
@@ -601,47 +830,66 @@ class _EvaluationListPageState extends State<EvaluationListPage> {
       final confirmed = await showDialog<bool>(
         context: context,
         barrierDismissible: false,
-        builder: (dialogContext) => AlertDialog(
-          backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-          icon: Icon(
-            Icons.verified_outlined,
-            color: Theme.of(context).colorScheme.primary,
-          ),
-          title: const Text('อนุมัติและเผยแพร่รอบประเมิน'),
-          content: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 440),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+        builder: (dialogContext) => Theme(
+          data: evaluationPopupTheme(context),
+          child: AlertDialog(
+            backgroundColor: evaluationUiTokens.popupSurfaceColor,
+            surfaceTintColor: evaluationUiTokens.popupSurfaceColor,
+            insetPadding: const EdgeInsets.all(24),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(evaluationUiTokens.radius),
+            ),
+            title: Row(
               children: [
-                Text(
-                  '${document['roundNo']} | ${document['name']}',
-                  style: Theme.of(context).textTheme.titleMedium,
+                Icon(
+                  Icons.verified_outlined,
+                  color: evaluationUiTokens.primaryColor,
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'Template: ${document['templateCode']} | ${document['templateName']}',
-                ),
-                Text('ผู้ตอบ: ${respondents.length} คน'),
-                const SizedBox(height: 12),
-                const Text(
-                  'เมื่ออนุมัติแล้ว ระบบจะเปิดรอบประเมินตามช่วงเวลาที่กำหนด และแก้ไขร่างนี้ไม่ได้',
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'อนุมัติและเผยแพร่รอบประเมิน',
+                    style: evaluationUiTokens.captionStyle,
+                  ),
                 ),
               ],
             ),
+            content: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 440),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${document['roundNo']} | ${document['name']}',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Template: ${document['templateCode']} | ${document['templateName']}',
+                  ),
+                  Text('ผู้ตอบ: ${respondents.length} คน'),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'เมื่ออนุมัติแล้ว ระบบจะเปิดรอบประเมินตามช่วงเวลาที่กำหนด และแก้ไขร่างนี้ไม่ได้',
+                  ),
+                  const SizedBox(height: 12),
+                  Divider(height: 1, color: evaluationUiTokens.borderColor),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('ยกเลิก'),
+              ),
+              FilledButton.icon(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                icon: const Icon(Icons.verified_outlined),
+                label: const Text('อนุมัติและเผยแพร่'),
+              ),
+            ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('ยกเลิก'),
-            ),
-            FilledButton.icon(
-              onPressed: () => Navigator.pop(dialogContext, true),
-              icon: const Icon(Icons.verified_outlined),
-              label: const Text('อนุมัติและเผยแพร่'),
-            ),
-          ],
         ),
       );
       if (confirmed == true) await _moveRound(item, 'approve');
@@ -650,51 +898,137 @@ class _EvaluationListPageState extends State<EvaluationListPage> {
         showEvaluationMessage(
           context,
           message:
-              'เปิดรายละเอียดรอบประเมินไม่สำเร็จ\nรายละเอียดเพิ่มเติม: กรุณาโหลดข้อมูลล่าสุด',
+              'เปิดรายละเอียดรอบประเมินไม่สำเร็จ\nรายละเอียดเพิ่มเติม: กรุณาลองเปิดรายการอีกครั้ง',
           error: true,
         );
       }
     }
   }
 
+  Widget _itemAction(Map<String, dynamic> x) => widget.menu == '47002'
+      ? Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              tooltip: 'ดู',
+              onPressed: () => _viewTemplate(x),
+              icon: const Icon(Icons.visibility_outlined),
+            ),
+            if (_canEdit)
+              IconButton(
+                tooltip: 'แก้ไข',
+                onPressed: () => _editTemplate(x),
+                icon: Icon(Icons.edit_outlined),
+              ),
+            if (_canDelete)
+              IconButton(
+                tooltip: 'ลบ',
+                onPressed: () => _deleteTemplate(x),
+                icon: Icon(
+                  Icons.delete_outline,
+                  color: evaluationUiTokens.dangerColor,
+                ),
+              ),
+          ],
+        )
+      : widget.menu == '47003' && x['status'] == 'DRAFT'
+      ? Wrap(
+          spacing: 2,
+          children: [
+            if (_canEdit)
+              IconButton(
+                tooltip: 'แก้ไขร่าง',
+                onPressed: () => _editRound(x),
+                icon: const Icon(Icons.edit_outlined),
+              ),
+            if (_canDelete)
+              IconButton(
+                tooltip: 'ลบร่าง',
+                onPressed: () => _deleteRound(x),
+                icon: Icon(
+                  Icons.delete_outline,
+                  color: evaluationUiTokens.dangerColor,
+                ),
+              ),
+            if (_canSubmit)
+              TextButton.icon(
+                onPressed: () => _moveRound(x, 'submit'),
+                icon: const Icon(Icons.send_outlined),
+                label: const Text('ส่งอนุมัติ'),
+              ),
+          ],
+        )
+      : widget.menu == '47004' &&
+            x['status'] == 'PENDING_APPROVAL' &&
+            _canApprove
+      ? FilledButton.icon(
+          onPressed: () => _approveRound(x),
+          icon: const Icon(Icons.verified_outlined),
+          label: const Text('อนุมัติ'),
+        )
+      : Text((x['status'] ?? '').toString());
+
+  bool get _usesLocalPagination =>
+      widget.menu == '47004' || widget.menu == '47005';
+
+  List<Map<String, dynamic>> get _visibleItems => _usesLocalPagination
+      ? _items.skip((_page - 1) * 10).take(10).toList()
+      : _items;
+
   @override
   Widget build(BuildContext context) => buildEvaluationWorkspaceShell(
-    pageTitle: widget.title,
+    pageTitle: _title,
     activeMenu: widget.menu,
     child: widget.menu == '47002'
         ? _templateCrud(context)
         : Padding(
-            padding: const EdgeInsets.all(16),
+            padding: evaluationUiTokens.contentMargin,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        widget.title,
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
+                Card(
+                  margin: EdgeInsets.zero,
+                  child: Padding(
+                    padding: evaluationUiTokens.cardPadding,
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.star_border,
+                          color: evaluationUiTokens.primaryColor,
+                        ),
+                        SizedBox(width: evaluationUiTokens.itemSpacing),
+                        Expanded(
+                          child: Text(
+                            _title,
+                            style: evaluationUiTokens.captionStyle,
+                          ),
+                        ),
+                        if (widget.menu == '47003' && _canCreate)
+                          SizedBox(
+                            height: evaluationUiTokens.buttonHeight,
+                            child: FilledButton.icon(
+                              style: FilledButton.styleFrom(
+                                minimumSize: Size(
+                                  100,
+                                  evaluationUiTokens.buttonHeight,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(
+                                    evaluationUiTokens.radius,
+                                  ),
+                                ),
+                                textStyle: evaluationUiTokens.buttonStyle,
+                              ),
+                              onPressed: _loading ? null : _createRound,
+                              icon: const Icon(Icons.add),
+                              label: const Text('เพิ่ม'),
+                            ),
+                          ),
+                      ],
                     ),
-                    IconButton(
-                      onPressed: _loading ? null : _load,
-                      icon: const Icon(Icons.refresh),
-                    ),
-                    if (widget.menu == '47002')
-                      FilledButton.icon(
-                        onPressed: _loading ? null : _createTemplate,
-                        icon: const Icon(Icons.add),
-                        label: const Text('เพิ่ม'),
-                      ),
-                    if (widget.menu == '47003' && _canCreate)
-                      FilledButton.icon(
-                        onPressed: _loading ? null : _createRound,
-                        icon: const Icon(Icons.add),
-                        label: const Text('เพิ่ม'),
-                      ),
-                  ],
+                  ),
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: evaluationUiTokens.sectionSpacing),
                 if (const {
                   '47003',
                   '47006',
@@ -703,13 +1037,14 @@ class _EvaluationListPageState extends State<EvaluationListPage> {
                   Card(
                     margin: EdgeInsets.zero,
                     child: Padding(
-                      padding: const EdgeInsets.all(10),
+                      padding: evaluationUiTokens.cardPadding,
                       child: Wrap(
                         spacing: 8,
                         runSpacing: 8,
                         children: [
                           SizedBox(
-                            width: 220,
+                            width: (MediaQuery.sizeOf(context).width - 40)
+                                .clamp(0.0, 220.0),
                             child: DropdownButtonFormField<String>(
                               initialValue: _sourceFilter,
                               decoration: const InputDecoration(
@@ -745,14 +1080,18 @@ class _EvaluationListPageState extends State<EvaluationListPage> {
                                   child: Text('งานบริการ'),
                                 ),
                               ],
-                              onChanged: (v) => setState(() {
-                                _sourceFilter = v ?? 'ALL';
-                                _page = 1;
-                              }),
+                              onChanged: (v) {
+                                setState(() {
+                                  _sourceFilter = v ?? 'ALL';
+                                  _page = 1;
+                                });
+                                _load();
+                              },
                             ),
                           ),
                           SizedBox(
-                            width: 220,
+                            width: (MediaQuery.sizeOf(context).width - 40)
+                                .clamp(0.0, 220.0),
                             child: DropdownButtonFormField<String>(
                               initialValue: _roundStatusFilter,
                               decoration: const InputDecoration(
@@ -780,18 +1119,23 @@ class _EvaluationListPageState extends State<EvaluationListPage> {
                                   child: Text('ปิดรอบ'),
                                 ),
                               ],
-                              onChanged: (v) => setState(() {
-                                _roundStatusFilter = v ?? 'ALL';
-                                _page = 1;
-                              }),
+                              onChanged: (v) {
+                                setState(() {
+                                  _roundStatusFilter = v ?? 'ALL';
+                                  _page = 1;
+                                });
+                                _load();
+                              },
                             ),
                           ),
                           FilledButton.icon(
+                            style: _filterFilledStyle(),
                             onPressed: _load,
                             icon: const Icon(Icons.search),
                             label: const Text('ค้นหา'),
                           ),
                           OutlinedButton.icon(
+                            style: _filterOutlinedStyle(),
                             onPressed: () {
                               setState(() {
                                 _sourceFilter = 'ALL';
@@ -807,188 +1151,228 @@ class _EvaluationListPageState extends State<EvaluationListPage> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: evaluationUiTokens.itemSpacing),
                 ],
                 Expanded(
                   child: _loading
-                      ? const Center(child: CircularProgressIndicator())
+                      ? const Card(
+                          margin: EdgeInsets.zero,
+                          child: Center(child: CircularProgressIndicator()),
+                        )
                       : _error != null
-                      ? Center(
-                          child: Text(
-                            'ไม่สามารถโหลดข้อมูลได้\n$_error',
-                            textAlign: TextAlign.center,
+                      ? Card(
+                          margin: EdgeInsets.zero,
+                          child: Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'ไม่สามารถโหลดข้อมูลได้\n$_error',
+                                  textAlign: TextAlign.center,
+                                ),
+                                SizedBox(
+                                  height: evaluationUiTokens.itemSpacing,
+                                ),
+                                OutlinedButton.icon(
+                                  onPressed: _load,
+                                  icon: const Icon(Icons.replay_outlined),
+                                  label: const Text('ลองอีกครั้ง'),
+                                ),
+                              ],
+                            ),
                           ),
                         )
                       : _items.isEmpty
-                      ? const Center(child: Text('ไม่พบรายการ'))
+                      ? const Card(
+                          margin: EdgeInsets.zero,
+                          child: Center(child: Text('ไม่พบรายการ')),
+                        )
                       : ListView.separated(
-                          itemCount: _items.length,
-                          separatorBuilder: (_, _) => const SizedBox(height: 8),
+                          itemCount: _visibleItems.length,
+                          separatorBuilder: (_, _) =>
+                              SizedBox(height: evaluationUiTokens.itemSpacing),
                           itemBuilder: (_, i) {
-                            final x = _items[i];
+                            final x = _visibleItems[i];
                             return Card(
-                              child: ListTile(
-                                onTap: widget.menu == '47002'
-                                    ? () => _editTemplate(x)
-                                    : widget.menu == '47005' &&
-                                          x['roundId'] is num
-                                    ? () async {
-                                        final saved = await showDialog<bool>(
-                                          context: context,
-                                          barrierDismissible: false,
-                                          builder: (_) =>
-                                              EvaluationResponseDialog(
-                                                roundId: (x['roundId'] as num)
-                                                    .toInt(),
-                                              ),
-                                        );
-                                        if (saved == true) _load();
-                                      }
-                                    : (widget.menu == '47006' ||
-                                              widget.menu == '47007') &&
-                                          x['id'] is num
-                                    ? () => showDialog<void>(
-                                        context: context,
-                                        builder: (_) => EvaluationResultsDialog(
-                                          roundId: (x['id'] as num).toInt(),
+                              margin: EdgeInsets.zero,
+                              child: LayoutBuilder(
+                                builder: (context, constraints) {
+                                  final compact =
+                                      constraints.maxWidth <
+                                      evaluationUiTokens.compactBreakpoint;
+                                  final actions = _itemAction(x);
+                                  return Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      ListTile(
+                                        onTap: widget.menu == '47002'
+                                            ? () => _editTemplate(x)
+                                            : widget.menu == '47005' &&
+                                                  x['roundId'] is num
+                                            ? () async {
+                                                final saved =
+                                                    await showDialog<bool>(
+                                                      context: context,
+                                                      barrierDismissible: false,
+                                                      builder: (_) =>
+                                                          EvaluationResponseDialog(
+                                                            roundId:
+                                                                (x['roundId']
+                                                                        as num)
+                                                                    .toInt(),
+                                                          ),
+                                                    );
+                                                if (saved == true) _load();
+                                              }
+                                            : (widget.menu == '47006' ||
+                                                      widget.menu == '47007') &&
+                                                  x['id'] is num
+                                            ? () => showDialog<void>(
+                                                context: context,
+                                                builder: (_) =>
+                                                    EvaluationResultsDialog(
+                                                      roundId: (x['id'] as num)
+                                                          .toInt(),
+                                                    ),
+                                              )
+                                            : null,
+                                        title: Text(
+                                          (x['name'] ??
+                                                  x['roundNo'] ??
+                                                  x['code'] ??
+                                                  '-')
+                                              .toString(),
                                         ),
-                                      )
-                                    : null,
-                                title: Text(
-                                  (x['name'] ??
-                                          x['roundNo'] ??
-                                          x['code'] ??
-                                          '-')
-                                      .toString(),
-                                ),
-                                subtitle: Text(
-                                  (x['sourceType'] ?? x['referenceTitle'] ?? '')
-                                      .toString(),
-                                ),
-                                trailing: widget.menu == '47002'
-                                    ? Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          IconButton(
-                                            tooltip: 'ดู',
-                                            onPressed: () => _viewTemplate(x),
-                                            icon: const Icon(
-                                              Icons.visibility_outlined,
-                                            ),
-                                          ),
-                                          if (_canEdit)
-                                            IconButton(
-                                              tooltip: 'แก้ไข',
-                                              onPressed: () => _editTemplate(x),
-                                              icon: const Icon(
-                                                Icons.edit_outlined,
-                                              ),
-                                            ),
-                                          if (_canDelete)
-                                            IconButton(
-                                              tooltip: 'ลบ',
-                                              onPressed: () =>
-                                                  _deleteTemplate(x),
-                                              icon: const Icon(
-                                                Icons.delete_outline,
-                                                color: Colors.red,
-                                              ),
-                                            ),
-                                        ],
-                                      )
-                                    : widget.menu == '47003' &&
-                                          x['status'] == 'DRAFT'
-                                    ? Wrap(
-                                        spacing: 2,
-                                        children: [
-                                          IconButton(
-                                            tooltip: 'แก้ไขร่าง',
-                                            onPressed: () => _editRound(x),
-                                            icon: const Icon(
-                                              Icons.edit_outlined,
-                                            ),
-                                          ),
-                                          IconButton(
-                                            tooltip: 'ลบร่าง',
-                                            onPressed: () => _deleteRound(x),
-                                            icon: const Icon(
-                                              Icons.delete_outline,
-                                              color: Colors.red,
-                                            ),
-                                          ),
-                                          if (_canSubmit)
-                                            TextButton.icon(
-                                              onPressed: () =>
-                                                  _moveRound(x, 'submit'),
-                                              icon: const Icon(
-                                                Icons.send_outlined,
-                                              ),
-                                              label: const Text('ส่งอนุมัติ'),
-                                            ),
-                                        ],
-                                      )
-                                    : widget.menu == '47004' &&
-                                          x['status'] == 'PENDING_APPROVAL' &&
-                                          _canApprove
-                                    ? FilledButton.icon(
-                                        onPressed: () => _approveRound(x),
-                                        icon: const Icon(
-                                          Icons.verified_outlined,
+                                        subtitle: Text(
+                                          (x['sourceType'] ??
+                                                  x['referenceTitle'] ??
+                                                  '')
+                                              .toString(),
                                         ),
-                                        label: const Text('อนุมัติ'),
-                                      )
-                                    : Text((x['status'] ?? '').toString()),
+                                        trailing: compact ? null : actions,
+                                      ),
+                                      if (compact)
+                                        Padding(
+                                          padding:
+                                              evaluationUiTokens.cardPadding,
+                                          child: Align(
+                                            alignment: Alignment.centerLeft,
+                                            child: actions,
+                                          ),
+                                        ),
+                                    ],
+                                  );
+                                },
                               ),
                             );
                           },
                         ),
                 ),
-                if (const {'47003', '47006', '47007'}.contains(widget.menu))
-                  Card(
-                    margin: const EdgeInsets.only(top: 10),
-                    child: SizedBox(
-                      height: 56,
-                      child: Padding(
-                        padding: const EdgeInsets.all(8),
-                        child: Row(
-                          children: [
-                            OutlinedButton(
-                              onPressed: _page > 1
-                                  ? () {
-                                      setState(() => _page--);
-                                      _load();
-                                    }
-                                  : null,
-                              child: const Text('<'),
-                            ),
-                            const SizedBox(width: 6),
-                            FilledButton(
-                              onPressed: null,
-                              child: Text('$_page'),
-                            ),
-                            const SizedBox(width: 6),
-                            OutlinedButton(
-                              onPressed: _page * 10 < _total
-                                  ? () {
-                                      setState(() => _page++);
-                                      _load();
-                                    }
-                                  : null,
-                              child: const Text('>'),
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              _total == 0
-                                  ? '0-0 จาก 0'
-                                  : '${(_page - 1) * 10 + 1}-${((_page * 10) > _total) ? _total : _page * 10} จาก $_total',
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+                Padding(
+                  padding: EdgeInsets.only(
+                    top: evaluationUiTokens.sectionSpacing,
                   ),
+                  child: _EvaluationPaginationCard(
+                    page: _page,
+                    pageSize: 10,
+                    total: _usesLocalPagination ? _items.length : _total,
+                    onChanged: (value) {
+                      setState(() => _page = value);
+                      if (!_usesLocalPagination) _load();
+                    },
+                  ),
+                ),
               ],
             ),
           ),
   );
+}
+
+class _EvaluationPaginationCard extends StatelessWidget {
+  const _EvaluationPaginationCard({
+    required this.page,
+    required this.pageSize,
+    required this.total,
+    required this.onChanged,
+  });
+
+  final int page;
+  final int pageSize;
+  final int total;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    const buttonSize = 34.0;
+    final tokens = evaluationUiTokens;
+    final theme = Theme.of(context);
+    final pages = total == 0 ? 1 : (total / pageSize).ceil();
+    final start = total == 0 ? 0 : (page - 1) * pageSize + 1;
+    final end = total == 0 ? 0 : (page * pageSize).clamp(0, total);
+
+    Widget arrow(IconData icon, int target, bool enabled) => SizedBox.square(
+      dimension: buttonSize,
+      child: OutlinedButton(
+        onPressed: enabled ? () => onChanged(target) : null,
+        style: OutlinedButton.styleFrom(
+          padding: EdgeInsets.zero,
+          foregroundColor: tokens.primaryColor,
+          disabledForegroundColor: theme.colorScheme.onSurfaceVariant,
+          side: BorderSide(
+            color: enabled ? tokens.primaryColor : tokens.borderColor,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(tokens.radius),
+          ),
+        ),
+        child: Icon(icon, size: 20),
+      ),
+    );
+
+    return Card(
+      margin: EdgeInsets.zero,
+      child: SizedBox(
+        height: tokens.paginationCardHeight,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Row(
+            children: [
+              arrow(Icons.chevron_left, page - 1, page > 1),
+              const SizedBox(width: 6),
+              Semantics(
+                label: 'หน้าปัจจุบัน $page',
+                child: Container(
+                  width: buttonSize,
+                  height: buttonSize,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: tokens.primaryColor,
+                    border: Border.all(color: tokens.primaryColor),
+                    borderRadius: BorderRadius.circular(tokens.radius),
+                  ),
+                  child: Text(
+                    '$page',
+                    style: tokens.buttonStyle.copyWith(
+                      color: theme.colorScheme.onPrimary,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              arrow(Icons.chevron_right, page + 1, page < pages),
+              const SizedBox(width: 12),
+              Flexible(
+                child: Text(
+                  '$start-$end จาก $total',
+                  overflow: TextOverflow.ellipsis,
+                  style: tokens.inputStyle,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

@@ -52,7 +52,7 @@ abstract final class FiveSRoutes {
       screenType: 2,
       routeName: FiveSRouteNames.settings,
       routePath: FiveSRoutePaths.settings,
-      isImplemented: true,
+      isImplemented: false,
     ),
     FeatureRouteContract(
       projectCode: FiveSProject.code,

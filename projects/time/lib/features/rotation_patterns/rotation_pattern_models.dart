@@ -1,15 +1,18 @@
 class RotationActions {
   const RotationActions({
     required this.caption,
+    required this.screenType,
     required this.view,
     required this.create,
     required this.edit,
     required this.delete,
   });
   final String caption;
+  final int screenType;
   final bool view, create, edit, delete;
   factory RotationActions.fromJson(Map<String, dynamic> j) => RotationActions(
     caption: j['caption']?.toString() ?? 'รูปแบบหมุนกะ',
+    screenType: (j['screenType'] as num?)?.toInt() ?? 0,
     view: j['view'] == true,
     create: j['create'] == true,
     edit: j['edit'] == true,

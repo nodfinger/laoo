@@ -63,6 +63,45 @@ public sealed class LeaveEntitlementPoliciesController(IConfiguration configurat
     [HttpPut("{id:long}")]
     public Task<IActionResult> Version(long id, LeaveEntitlementPolicySaveRequest request, CancellationToken token) => Save(id, request, token);
 
+    [HttpDelete("{id:long}")]
+    public async Task<IActionResult> Delete(long id, [FromQuery] string? rowVersion, CancellationToken token)
+    {
+        if (!Scope(out var companyId, out _)) return Forbid();
+        await using var c = await Open(token);
+        if (!await Can(c, "DELETE", token)) return Forbid();
+        if (!RowVersion(rowVersion)) return BadRequest(new { message = "ไม่พบ Version ของข้อมูล กรุณาโหลดใหม่" });
+        await using (var screen = new SqlCommand("SELECT COUNT(1) FROM dbo.TDADMainMenu WHERE MenuCode=@Menu AND ScreenType=1 AND IsActive=1", c))
+        {
+            Add(screen, "@Menu", SqlDbType.Char, MenuCode, 5);
+            if (Convert.ToInt32(await screen.ExecuteScalarAsync(token)) != 1) return Forbid();
+        }
+        try
+        {
+            await using var delete = new SqlCommand(
+                "DELETE P FROM dbo.TDTMLeaveEntitlementPolicyVersion P WHERE P.CompanyID=@C AND P.LeaveEntitlementPolicyVersionID=@ID AND P.RowVersion=CONVERT(binary(8),@V,2) AND NOT EXISTS(SELECT 1 FROM dbo.TDTMLeaveEntitlementLedger L WHERE L.SourcePolicyVersionID=P.LeaveEntitlementPolicyVersionID)", c);
+            Add(delete, "@C", SqlDbType.BigInt, companyId);
+            Add(delete, "@ID", SqlDbType.BigInt, id);
+            Add(delete, "@V", SqlDbType.VarChar, rowVersion, 32);
+            if (await delete.ExecuteNonQueryAsync(token) == 1) return NoContent();
+        }
+        catch (SqlException e) when (e.Number == 547)
+        {
+            return Conflict(new { message = "ลบเกณฑ์สิทธิ์ลาไม่ได้", description = "รายการนี้ถูกใช้คำนวณสิทธิ์ลาแล้ว" });
+        }
+        await using var used = new SqlCommand(
+            "SELECT COUNT_BIG(1) FROM dbo.TDTMLeaveEntitlementLedger WHERE CompanyID=@C AND SourcePolicyVersionID=@ID", c);
+        Add(used, "@C", SqlDbType.BigInt, companyId);
+        Add(used, "@ID", SqlDbType.BigInt, id);
+        if (Convert.ToInt64(await used.ExecuteScalarAsync(token)) > 0)
+            return Conflict(new { message = "ลบเกณฑ์สิทธิ์ลาไม่ได้", description = "รายการนี้ถูกใช้คำนวณสิทธิ์ลาแล้ว" });
+        await using var owned = new SqlCommand(
+            "SELECT COUNT(1) FROM dbo.TDTMLeaveEntitlementPolicyVersion WHERE CompanyID=@C AND LeaveEntitlementPolicyVersionID=@ID", c);
+        Add(owned, "@C", SqlDbType.BigInt, companyId);
+        Add(owned, "@ID", SqlDbType.BigInt, id);
+        if (Convert.ToInt32(await owned.ExecuteScalarAsync(token)) == 0) return Forbid();
+        return Conflict(new { message = "ลบเกณฑ์สิทธิ์ลาไม่ได้", description = "ข้อมูลถูกแก้ไขหรือลบไปแล้ว กรุณาเปิดหน้าจอใหม่" });
+    }
+
     private async Task<IActionResult> Save(long? versionId, LeaveEntitlementPolicySaveRequest request, CancellationToken token)
     {
         if (!Scope(out var companyId, out var userId)) return Forbid();

@@ -1,0 +1,4 @@
+interface:
+  display_name: "LAOO Project Completion Review"
+  short_description: "ตรวจ ปิดงาน และทดสอบ Workflow ทุก Project"
+  default_prompt: "Use $laoo-project-completion-review to inspect, complete, integrate, and verify the selected LAOO project."

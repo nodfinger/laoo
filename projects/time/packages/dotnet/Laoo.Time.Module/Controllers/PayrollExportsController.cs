@@ -31,7 +31,35 @@ public sealed class PayrollExportsController(IConfiguration configuration, IWebH
         var menu = menuCode switch { ProfilesMenu => ProfilesMenu, ExportMenu => ExportMenu, HistoryMenu => HistoryMenu, _ => null };
         if (menu is null) return BadRequest(new { message = "เมนู Export Payroll ไม่ถูกต้อง" });
         await using var c = await Open(token);
-        return Ok(new { menuCode = menu, caption = await Caption(c, menu, token), screenType = menu == ProfilesMenu ? 1 : menu == ExportMenu ? 4 : 3, view = await Can(c, menu, "VIEW", token) });
+        var screenType = await MenuScreenType(c, menu, token);
+        if (screenType is null) return NotFound(new { message = "ไม่พบข้อมูลประเภทหน้าจอของเมนู" });
+        var view = await Can(c, menu, "VIEW", token);
+        return Ok(new
+        {
+            menuCode = menu,
+            caption = await Caption(c, menu, token),
+            screenType,
+            view,
+            create = view && ((menu == ProfilesMenu && screenType == 1) || (menu == ExportMenu && screenType == 4)) && await Can(c, menu, "CREATE", token),
+            edit = view && screenType == 1 && menu == ProfilesMenu && await Can(c, menu, "EDIT", token),
+            delete = view && screenType == 1 && menu == ProfilesMenu && await Can(c, menu, "DELETE", token)
+        });
+    }
+
+    [HttpGet("profiles/lookup")]
+    public async Task<IActionResult> ActiveProfileLookup(CancellationToken token)
+    {
+        if (!Scope(out var companyId, out _)) return Forbid();
+        await using var c = await Open(token);
+        if (!await Can(c, ExportMenu, "VIEW", token)) return Forbid();
+        await using var q = new SqlCommand(
+            "SELECT PayrollExportProfileID,ProfileCode,ProfileName FROM dbo.TDTMPayrollExportProfile WHERE CompanyID=@C AND IsActive=1 ORDER BY ProfileCode", c);
+        Add(q, "@C", SqlDbType.BigInt, companyId);
+        await using var r = await q.ExecuteReaderAsync(token);
+        var items = new List<object>();
+        while (await r.ReadAsync(token))
+            items.Add(new { profileId = r.GetInt64(0), profileCode = r.GetString(1), profileName = r.GetString(2) });
+        return Ok(new { items });
     }
 
     [HttpGet("profiles")]
@@ -57,9 +85,26 @@ public sealed class PayrollExportsController(IConfiguration configuration, IWebH
     [HttpDelete("profiles/{id:long}")]
     public async Task<IActionResult> DeleteProfile(long id, [FromQuery] string rowVersion, CancellationToken token)
     {
-        if (!Scope(out var companyId, out var userId)) return Forbid(); await using var c = await Open(token); if (!await Can(c, ProfilesMenu, "DELETE", token)) return Forbid();
+        if (!Scope(out var companyId, out _)) return Forbid(); await using var c = await Open(token); if (await MenuScreenType(c, ProfilesMenu, token) != 1 || !await Can(c, ProfilesMenu, "DELETE", token)) return Forbid();
         if (!ValidVersion(rowVersion)) return BadRequest(new { message = "กรุณาโหลดข้อมูลล่าสุดก่อนลบ" });
-        await using var q = new SqlCommand("UPDATE dbo.TDTMPayrollExportProfile SET IsActive=0,UpdateDate=SYSDATETIME(),UpdateBy=@U WHERE CompanyID=@C AND PayrollExportProfileID=@ID AND RowVersion=CONVERT(binary(8),@V,2)", c); Add(q, "@C", SqlDbType.BigInt, companyId); Add(q, "@ID", SqlDbType.BigInt, id); Add(q, "@V", SqlDbType.VarChar, rowVersion, 32); Add(q, "@U", SqlDbType.BigInt, userId); return await q.ExecuteNonQueryAsync(token) == 1 ? NoContent() : Conflict(new { message = "ข้อมูลถูกแก้ไขแล้ว กรุณาโหลดใหม่" });
+        try
+        {
+            await using var q = new SqlCommand("DELETE P FROM dbo.TDTMPayrollExportProfile P WHERE P.CompanyID=@C AND P.PayrollExportProfileID=@ID AND P.RowVersion=CONVERT(binary(8),@V,2) AND NOT EXISTS(SELECT 1 FROM dbo.TDTMPayrollExportBatch B WHERE B.CompanyID=P.CompanyID AND B.PayrollExportProfileID=P.PayrollExportProfileID)", c);
+            Add(q, "@C", SqlDbType.BigInt, companyId); Add(q, "@ID", SqlDbType.BigInt, id); Add(q, "@V", SqlDbType.VarChar, rowVersion, 32);
+            if (await q.ExecuteNonQueryAsync(token) == 1) return NoContent();
+        }
+        catch (SqlException e) when (e.Number == 547)
+        {
+            return Conflict(new { message = "ลบรูปแบบ Export ไม่ได้", description = "รูปแบบนี้ถูกใช้ส่งออก Payroll แล้ว" });
+        }
+        await using var used = new SqlCommand("SELECT COUNT_BIG(1) FROM dbo.TDTMPayrollExportBatch WHERE CompanyID=@C AND PayrollExportProfileID=@ID", c);
+        Add(used, "@C", SqlDbType.BigInt, companyId); Add(used, "@ID", SqlDbType.BigInt, id);
+        if (Convert.ToInt64(await used.ExecuteScalarAsync(token)) > 0)
+            return Conflict(new { message = "ลบรูปแบบ Export ไม่ได้", description = "รูปแบบนี้ถูกใช้ส่งออก Payroll แล้ว" });
+        await using var owned = new SqlCommand("SELECT COUNT(1) FROM dbo.TDTMPayrollExportProfile WHERE CompanyID=@C AND PayrollExportProfileID=@ID", c);
+        Add(owned, "@C", SqlDbType.BigInt, companyId); Add(owned, "@ID", SqlDbType.BigInt, id);
+        if (Convert.ToInt32(await owned.ExecuteScalarAsync(token)) == 0) return Forbid();
+        return Conflict(new { message = "ลบรูปแบบ Export ไม่ได้", description = "ข้อมูลถูกแก้ไขหรือลบไปแล้ว กรุณาเปิดหน้าจอใหม่" });
     }
 
     [HttpGet("periods")]
@@ -91,7 +136,7 @@ public sealed class PayrollExportsController(IConfiguration configuration, IWebH
         if (!Scope(out var companyId, out var userId)) return Forbid();
         if (request.AttendancePeriodId <= 0 || request.ProfileId <= 0) return BadRequest(new { message = "กรุณาระบุงวดและรูปแบบ Export" });
         await using var c = await Open(token);
-        if (!await Can(c, ExportMenu, "CREATE", token)) return Forbid();
+        if (await MenuScreenType(c, ExportMenu, token) != 4 || !await Can(c, ExportMenu, "CREATE", token)) return Forbid();
         var profile = await LoadProfile(c, companyId, request.ProfileId, token);
         if (profile is null) return NotFound(new { message = "ไม่พบรูปแบบ Export" });
         var period = await LoadPeriod(c, companyId, request.AttendancePeriodId, token);
@@ -146,7 +191,7 @@ public sealed class PayrollExportsController(IConfiguration configuration, IWebH
         if (!Scope(out var companyId, out var userId)) return Forbid();
         var code = request.ProfileCode?.Trim(); var name = request.ProfileName?.Trim(); var format = request.FormatCode?.Trim().ToUpperInvariant();
         if (string.IsNullOrWhiteSpace(code) || string.IsNullOrWhiteSpace(name) || format is not ("EXCEL" or "TEXT") || (id.HasValue && !ValidVersion(request.RowVersion))) return BadRequest(new { message = "ข้อมูลรูปแบบ Export ไม่ถูกต้อง หรือไม่มี RowVersion" });
-        await using var c = await Open(token); if (!await Can(c, ProfilesMenu, id.HasValue ? "EDIT" : "CREATE", token)) return Forbid();
+        await using var c = await Open(token); if (await MenuScreenType(c, ProfilesMenu, token) != 1 || !await Can(c, ProfilesMenu, id.HasValue ? "EDIT" : "CREATE", token)) return Forbid();
         var sql = id.HasValue ? "UPDATE dbo.TDTMPayrollExportProfile SET ProfileCode=@Code,ProfileName=@Name,FormatCode=@Format,DelimiterCode=@Delimiter,EncodingCode=@Encoding,IncludeHeader=@Header,DateFormat=@Date,ColumnMapJson=@Columns,IsActive=1,UpdateDate=SYSDATETIME(),UpdateBy=@U WHERE CompanyID=@C AND PayrollExportProfileID=@ID AND RowVersion=CONVERT(binary(8),@V,2)" : "INSERT dbo.TDTMPayrollExportProfile(CompanyID,ProfileCode,ProfileName,FormatCode,DelimiterCode,EncodingCode,IncludeHeader,DateFormat,ColumnMapJson,CreateBy) VALUES(@C,@Code,@Name,@Format,@Delimiter,@Encoding,@Header,@Date,@Columns,@U)";
         await using var q = new SqlCommand(sql, c); Add(q, "@C", SqlDbType.BigInt, companyId); Add(q, "@Code", SqlDbType.VarChar, code, 50); Add(q, "@Name", SqlDbType.NVarChar, name, 200); Add(q, "@Format", SqlDbType.VarChar, format, 20); Add(q, "@Delimiter", SqlDbType.VarChar, string.IsNullOrWhiteSpace(request.DelimiterCode) ? "|" : request.DelimiterCode.Trim(), 10); Add(q, "@Encoding", SqlDbType.VarChar, string.IsNullOrWhiteSpace(request.EncodingCode) ? "UTF8" : request.EncodingCode.Trim().ToUpperInvariant(), 20); Add(q, "@Header", SqlDbType.Bit, request.IncludeHeader); Add(q, "@Date", SqlDbType.VarChar, string.IsNullOrWhiteSpace(request.DateFormat) ? "yyyy-MM-dd" : request.DateFormat.Trim(), 30); Add(q, "@Columns", SqlDbType.NVarChar, string.IsNullOrWhiteSpace(request.ColumnMapJson) ? "[]" : request.ColumnMapJson.Trim(), -1); Add(q, "@U", SqlDbType.BigInt, userId); if (id.HasValue) { Add(q, "@ID", SqlDbType.BigInt, id); Add(q, "@V", SqlDbType.VarChar, request.RowVersion, 32); } try { if (await q.ExecuteNonQueryAsync(token) != 1) return Conflict(new { message = "ข้อมูลถูกแก้ไขแล้ว กรุณาโหลดใหม่" }); } catch (SqlException e) when (e.Number is 2601 or 2627) { return Conflict(new { message = "รหัส Profile ซ้ำในบริษัท" }); } return NoContent();
     }
@@ -197,6 +242,13 @@ GROUP BY E.EmployeeID,E.EmployeeCode,E.FullName ORDER BY E.EmployeeCode,E.Employ
     private async Task<SqlConnection> Open(CancellationToken token) { var c = new SqlConnection(configuration.GetConnectionString("LaooDatabase")); await c.OpenAsync(token); return c; }
     private bool Scope(out long company, out long user) { company = 0; user = 0; return string.Equals(User.FindFirstValue("user_type"), "COMPANY_USER", StringComparison.OrdinalIgnoreCase) && long.TryParse(User.FindFirstValue("company_id"), out company) && long.TryParse(User.FindFirstValue("user_id"), out user) && company > 0 && user > 0; }
     private Task<bool> Can(SqlConnection c, string menu, string action, CancellationToken token) => CompanyMenuAccess.IsAllowedAsync(c, User, menu, action, token);
+    private static async Task<int?> MenuScreenType(SqlConnection c, string menu, CancellationToken token)
+    {
+        await using var q = new SqlCommand("SELECT ScreenType FROM dbo.TDADMainMenu WHERE MenuCode=@M AND IsActive=1", c);
+        Add(q, "@M", SqlDbType.Char, menu, 5);
+        var value = await q.ExecuteScalarAsync(token);
+        return value is null or DBNull ? null : Convert.ToInt32(value);
+    }
     private static async Task<string> Caption(SqlConnection c, string menu, CancellationToken token) { await using var q = new SqlCommand("SELECT TOP(1) MenuName FROM dbo.TDADMainMenu WHERE MenuCode=@M", c); Add(q, "@M", SqlDbType.Char, menu, 5); return Convert.ToString(await q.ExecuteScalarAsync(token)) ?? menu; }
     private static void Add(SqlCommand q, string name, SqlDbType type, object? value, int size = 0) { var p = size == 0 ? q.Parameters.Add(name, type) : q.Parameters.Add(name, type, size); p.Value = value ?? DBNull.Value; }
     private static bool ValidVersion(string? value) => value is { Length: 16 } && value.All(Uri.IsHexDigit);

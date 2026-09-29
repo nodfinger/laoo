@@ -171,6 +171,9 @@ class _MeetingFoodReceiptPanelState extends State<MeetingFoodReceiptPanel> {
   @override
   Widget build(BuildContext context) {
     final receipt = _receipt;
+    final actionShape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(LaooRadius.xs),
+    );
     final editable =
         !_loading &&
         !_saving &&
@@ -203,12 +206,24 @@ class _MeetingFoodReceiptPanelState extends State<MeetingFoodReceiptPanel> {
               children: [
                 OutlinedButton(
                   onPressed: _saving ? null : widget.onClose,
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(0, LaooTypography.buttonHeight),
+                    shape: actionShape,
+                    textStyle: const TextStyle(fontSize: LaooTypography.button),
+                  ),
                   child: const Text('ปิดรายการรับอาหาร'),
                 ),
                 if (receipt?.canReceive == true)
                   FilledButton.icon(
                     key: const ValueKey('save-food-receipt'),
                     onPressed: editable ? _save : null,
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(0, LaooTypography.buttonHeight),
+                      shape: actionShape,
+                      textStyle: const TextStyle(
+                        fontSize: LaooTypography.button,
+                      ),
+                    ),
                     icon: const Icon(Icons.restaurant_outlined),
                     label: Text(
                       _saving ? 'กำลังบันทึก...' : 'บันทึกรับอาหารจริง',
@@ -231,6 +246,11 @@ class _MeetingFoodReceiptPanelState extends State<MeetingFoodReceiptPanel> {
               ),
               OutlinedButton(
                 onPressed: _loading || _saving ? null : _load,
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(0, LaooTypography.buttonHeight),
+                  shape: actionShape,
+                  textStyle: const TextStyle(fontSize: LaooTypography.button),
+                ),
                 child: const Text('ลองอีกครั้ง'),
               ),
             ],

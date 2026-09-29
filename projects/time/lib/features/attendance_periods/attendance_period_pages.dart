@@ -23,6 +23,12 @@ class _AttendancePeriodSchemesPageState
   String? _message;
   bool _error = false;
   bool _loading = true;
+  bool get _canCreate =>
+      _actions?['screenType'] == 1 && _actions?['create'] == true;
+  bool get _canEdit =>
+      _actions?['screenType'] == 1 && _actions?['edit'] == true;
+  bool get _canDelete =>
+      _actions?['screenType'] == 1 && _actions?['delete'] == true;
 
   @override
   void initState() {
@@ -62,6 +68,7 @@ class _AttendancePeriodSchemesPageState
   });
 
   Future<void> _edit([Map<String, dynamic>? row]) async {
+    if (row == null ? !_canCreate : !_canEdit) return;
     final request = await showDialog<Map<String, dynamic>>(
       context: context,
       barrierDismissible: false,
@@ -81,6 +88,7 @@ class _AttendancePeriodSchemesPageState
   }
 
   Future<void> _extend(Map<String, dynamic> row) async {
+    if (!_canEdit) return;
     try {
       await _repo.extendScheme(
         (row['attendancePeriodSchemeId'] as num).toInt(),
@@ -93,13 +101,14 @@ class _AttendancePeriodSchemesPageState
   }
 
   Future<void> _delete(Map<String, dynamic> row) async {
+    if (!_canDelete) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => TimeDeleteDialog(
         itemLabel: '${row['schemeCode']} — ${row['schemeName']}',
       ),
     );
-    if (confirmed != true) return;
+    if (confirmed != true || !mounted) return;
     try {
       await _repo.deleteScheme(
         (row['attendancePeriodSchemeId'] as num).toInt(),
@@ -122,18 +131,14 @@ class _AttendancePeriodSchemesPageState
       message: _message,
       error: _error,
       onClose: () => setState(() => _message = null),
-      captionTrailing: _actions?['create'] == true
+      captionTrailing: _canCreate
           ? FilledButton.icon(
               onPressed: () => _edit(),
               icon: const Icon(Icons.add),
               label: const Text('เพิ่ม'),
             )
           : null,
-      filter: FilledButton.icon(
-        onPressed: _loading ? null : _load,
-        icon: const Icon(Icons.refresh),
-        label: const Text('โหลดข้อมูล'),
-      ),
+      filter: const Text('รายการรูปแบบงวดลงเวลา'),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _items.isEmpty
@@ -146,6 +151,7 @@ class _AttendancePeriodSchemesPageState
               itemBuilder: (_, index) {
                 final item = _items[index];
                 return Card(
+                  margin: EdgeInsets.zero,
                   child: ListTile(
                     title: Text(
                       '${item['schemeCode']} — ${item['schemeName']}',
@@ -155,24 +161,25 @@ class _AttendancePeriodSchemesPageState
                     ),
                     trailing: Wrap(
                       children: [
-                        IconButton(
-                          tooltip: 'ขยายงวด 12 เดือน',
-                          onPressed: () => _extend(item),
-                          icon: const Icon(Icons.calendar_month_outlined),
-                        ),
-                        if (_actions?['edit'] == true)
+                        if (_canEdit)
+                          IconButton(
+                            tooltip: 'ขยายงวด 12 เดือน',
+                            onPressed: () => _extend(item),
+                            icon: const Icon(Icons.calendar_month_outlined),
+                          ),
+                        if (_canEdit)
                           IconButton(
                             tooltip: 'แก้ไข',
                             onPressed: () => _edit(item),
                             icon: const Icon(Icons.edit_outlined),
                           ),
-                        if (_actions?['delete'] == true)
+                        if (_canDelete)
                           IconButton(
                             tooltip: 'ลบ',
                             onPressed: () => _delete(item),
-                            icon: const Icon(
+                            icon: Icon(
                               Icons.delete_outline,
-                              color: Colors.red,
+                              color: Theme.of(context).colorScheme.error,
                             ),
                           ),
                       ],
@@ -537,11 +544,7 @@ class _AttendancePeriodsPageState extends State<AttendancePeriodsPage> {
       message: _message,
       error: _error,
       onClose: () => setState(() => _message = null),
-      filter: FilledButton.icon(
-        onPressed: _loading ? null : _load,
-        icon: const Icon(Icons.refresh),
-        label: const Text('โหลดข้อมูล'),
-      ),
+      filter: const Text('รายการงวดลงเวลา'),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : ListView.separated(
@@ -786,7 +789,7 @@ Widget _timePage({
         ),
         filter: filter,
         table: body,
-        pagination: LaooPaginationCard(
+        pagination: TimePaginationCard(
           tokens: timeUiTokens.workspace,
           page: 1,
           pageCount: 1,

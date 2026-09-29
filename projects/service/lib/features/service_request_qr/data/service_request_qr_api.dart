@@ -51,6 +51,9 @@ class ServiceRequestQrApi {
     body: {'isActive': isActive},
   );
 
+  Future<void> delete(int id) =>
+      _client.delete('/api/service/request-qr-portals/$id');
+
   Future<Map<String, dynamic>> scan(String token) async =>
       Map<String, dynamic>.from(
         await _client.get('/api/service/request-qr-portals/scan/$token') as Map,

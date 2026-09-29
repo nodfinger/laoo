@@ -20,6 +20,11 @@ class _LeaveTypePageState extends State<LeaveTypePage> {
   bool? active = true;
   bool loading = true, error = false;
   String? message;
+  bool get canCreate =>
+      actions?['screenType'] == 1 && actions?['create'] == true;
+  bool get canEdit => actions?['screenType'] == 1 && actions?['edit'] == true;
+  bool get canDelete =>
+      actions?['screenType'] == 1 && actions?['delete'] == true;
 
   @override
   void initState() {
@@ -38,10 +43,15 @@ class _LeaveTypePageState extends State<LeaveTypePage> {
 
   Future<void> initialize() async {
     try {
-      actions = await repo.actions();
+      final value = await repo.actions();
+      if (value['view'] != true) {
+        throw StateError('ไม่มีสิทธิ์ดูข้อมูลหน้าจอนี้');
+      }
+      if (mounted) setState(() => actions = value);
       await load();
     } catch (e) {
       notice(timeErrorText(e), true);
+      if (mounted) setState(() => loading = false);
     }
   }
 
@@ -69,11 +79,16 @@ class _LeaveTypePageState extends State<LeaveTypePage> {
     }
   }
 
-  void notice(String value, bool isError) => setState(() {
-    message = value;
-    error = isError;
-  });
+  void notice(String value, bool isError) {
+    if (!mounted) return;
+    setState(() {
+      message = value;
+      error = isError;
+    });
+  }
+
   Future<void> edit([Map<String, dynamic>? item]) async {
+    if (item == null ? !canCreate : !canEdit) return;
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
       barrierDismissible: false,
@@ -93,16 +108,17 @@ class _LeaveTypePageState extends State<LeaveTypePage> {
   }
 
   Future<void> remove(Map<String, dynamic> item) async {
+    if (!canDelete) return;
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => TimeDeleteDialog(
         itemLabel: '${item['leaveTypeCode']} — ${item['leaveTypeName']}',
       ),
     );
-    if (ok != true) return;
+    if (ok != true || !mounted) return;
     try {
       await repo.delete(item['id'] as int, item['rowVersion'] as String);
-      await load(target: page);
+      await load(target: items.length == 1 && page > 1 ? page - 1 : page);
       notice('ลบข้อมูลสำเร็จ', false);
     } catch (e) {
       notice(timeErrorText(e), true);
@@ -124,7 +140,7 @@ class _LeaveTypePageState extends State<LeaveTypePage> {
               api: api,
               menuCode: TimeMenuCodes.leaveTypes,
               caption: caption,
-              trailing: actions?['create'] == true
+              trailing: canCreate
                   ? FilledButton.icon(
                       onPressed: () => edit(),
                       icon: const Icon(Icons.add),
@@ -158,7 +174,10 @@ class _LeaveTypePageState extends State<LeaveTypePage> {
                       DropdownMenuItem(value: false, child: Text('ไม่ใช้งาน')),
                       DropdownMenuItem(value: null, child: Text('ทั้งหมด')),
                     ],
-                    onChanged: (value) => setState(() => active = value),
+                    onChanged: (value) {
+                      setState(() => active = value);
+                      load();
+                    },
                   ),
                 ),
                 FilledButton.icon(
@@ -213,17 +232,19 @@ class _LeaveTypePageState extends State<LeaveTypePage> {
                                   Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      if (actions?['edit'] == true)
+                                      if (canEdit)
                                         IconButton(
                                           onPressed: () => edit(x),
                                           icon: const Icon(Icons.edit_outlined),
                                         ),
-                                      if (actions?['delete'] == true)
+                                      if (canDelete)
                                         IconButton(
                                           onPressed: () => remove(x),
-                                          icon: const Icon(
+                                          icon: Icon(
                                             Icons.delete_outline,
-                                            color: Colors.red,
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.error,
                                           ),
                                         ),
                                     ],
@@ -251,7 +272,7 @@ class _LeaveTypePageState extends State<LeaveTypePage> {
                       ),
                     ),
                   ),
-            pagination: LaooPaginationCard(
+            pagination: TimePaginationCard(
               tokens: timeUiTokens.workspace,
               page: page,
               pageCount: pages,
@@ -332,21 +353,21 @@ class _LeaveTypeDialogState extends State<_LeaveTypeDialog> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: timeUiTokens.popupFieldSpacing),
           TextFormField(
             controller: code,
             decoration: const InputDecoration(labelText: 'รหัสประเภทลา *'),
             validator: (v) =>
                 v == null || v.trim().isEmpty ? 'กรุณาระบุข้อมูล' : null,
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: timeUiTokens.popupFieldSpacing),
           TextFormField(
             controller: name,
             decoration: const InputDecoration(labelText: 'ชื่อประเภทลา *'),
             validator: (v) =>
                 v == null || v.trim().isEmpty ? 'กรุณาระบุข้อมูล' : null,
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: timeUiTokens.popupFieldSpacing),
           DropdownButtonFormField<String>(
             initialValue: unit,
             decoration: const InputDecoration(labelText: 'หน่วยสิทธิ์ลา'),

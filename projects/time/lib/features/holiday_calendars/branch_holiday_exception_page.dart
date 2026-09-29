@@ -297,83 +297,69 @@ class _ExceptionDialogState extends State<_ExceptionDialog> {
   String d() =>
       '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: const Row(
+  Widget build(BuildContext context) => TimeActionDialog(
+    icon: Icons.event_busy_outlined,
+    title: 'ข้อยกเว้นวันหยุดสาขา > ${widget.value == null ? 'เพิ่ม' : 'แก้ไข'}',
+    content: Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(Icons.event_busy_outlined),
-        SizedBox(width: 8),
-        Text('ข้อยกเว้นวันหยุดสาขา'),
-      ],
-    ),
-    content: SizedBox(
-      width: 520,
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('สถานะ'),
-              value: active,
-              onChanged: (v) => setState(() => active = v),
-            ),
-            DropdownButtonFormField<int>(
-              initialValue: branch,
-              isExpanded: true,
-              decoration: const InputDecoration(labelText: 'สาขา *'),
-              items: widget.branches
-                  .map(
-                    (x) => DropdownMenuItem(
-                      value: (x['branchId'] as num).toInt(),
-                      child: Text('${x['branchCode']} — ${x['branchName']}'),
-                    ),
-                  )
-                  .toList(),
-              onChanged: (v) => setState(() => branch = v),
-            ),
-            const SizedBox(height: 12),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('วันที่'),
-              subtitle: Text(d()),
-              trailing: const Icon(Icons.calendar_today_outlined),
-              onTap: () async {
-                final x = await showDatePicker(
-                  context: context,
-                  initialDate: date,
-                  firstDate: DateTime(2000),
-                  lastDate: DateTime(2100),
-                );
-                if (x != null) setState(() => date = x);
-              },
-            ),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(isHoliday ? 'กำหนดเป็นวันหยุด' : 'ยกเลิกวันหยุด'),
-              value: isHoliday,
-              onChanged: (v) => setState(() => isHoliday = v),
-            ),
-            if (isHoliday)
-              TextField(
-                controller: name,
-                decoration: const InputDecoration(labelText: 'ชื่อวันหยุด *'),
-              ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: reason,
-              maxLength: 500,
-              buildCounter:
-                  (
-                    _, {
-                    required currentLength,
-                    required isFocused,
-                    maxLength,
-                  }) => null,
-              decoration: const InputDecoration(labelText: 'เหตุผล *'),
-            ),
-          ],
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('สถานะ'),
+          value: active,
+          onChanged: (v) => setState(() => active = v),
         ),
-      ),
+        DropdownButtonFormField<int>(
+          initialValue: branch,
+          isExpanded: true,
+          decoration: const InputDecoration(labelText: 'สาขา *'),
+          items: widget.branches
+              .map(
+                (x) => DropdownMenuItem(
+                  value: (x['branchId'] as num).toInt(),
+                  child: Text('${x['branchCode']} — ${x['branchName']}'),
+                ),
+              )
+              .toList(),
+          onChanged: (v) => setState(() => branch = v),
+        ),
+        SizedBox(height: timeUiTokens.popupFieldSpacing),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('วันที่'),
+          subtitle: Text(d()),
+          trailing: const Icon(Icons.calendar_today_outlined),
+          onTap: () async {
+            final x = await showDatePicker(
+              context: context,
+              initialDate: date,
+              firstDate: DateTime(2000),
+              lastDate: DateTime(2100),
+            );
+            if (x != null) setState(() => date = x);
+          },
+        ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text(isHoliday ? 'กำหนดเป็นวันหยุด' : 'ยกเลิกวันหยุด'),
+          value: isHoliday,
+          onChanged: (v) => setState(() => isHoliday = v),
+        ),
+        if (isHoliday)
+          TextField(
+            controller: name,
+            decoration: const InputDecoration(labelText: 'ชื่อวันหยุด *'),
+          ),
+        SizedBox(height: timeUiTokens.popupFieldSpacing),
+        TextField(
+          controller: reason,
+          maxLength: 500,
+          buildCounter:
+              (_, {required currentLength, required isFocused, maxLength}) =>
+                  null,
+          decoration: const InputDecoration(labelText: 'เหตุผล *'),
+        ),
+      ],
     ),
     actions: [
       TextButton(

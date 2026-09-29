@@ -22,8 +22,12 @@ public sealed class TrainingTestTemplateController(IConfiguration configuration,
         if (!Scope(out _, out _)) return Forbid();
         await using var db=await Open(token);
         if (!await Allowed(db,"VIEW",token)) return Forbid();
-        return Ok(new { caption="ชุดแบบทดสอบอบรม",screenType=1,view=true,
-            create=await Allowed(db,"CREATE",token),edit=await Allowed(db,"EDIT",token),delete=await Allowed(db,"DELETE",token) });
+        var screenType=await ScreenType(db,token);
+        await using var captionQuery=new SqlCommand("SELECT MenuName FROM dbo.TDADMainMenu WHERE MenuCode=@menu AND IsActive=1",db);
+        Add(captionQuery,"@menu",SqlDbType.Char,Screen,5);
+        var caption=Convert.ToString(await captionQuery.ExecuteScalarAsync(token))??"ชุดแบบทดสอบอบรม";
+        return Ok(new { caption,screenType,view=true,
+            create=screenType==1&&await Allowed(db,"CREATE",token),edit=screenType==1&&await Allowed(db,"EDIT",token),delete=screenType==1&&await Allowed(db,"DELETE",token) });
     }
     [HttpGet]
     public async Task<IActionResult> List([FromQuery]string? search,[FromQuery]string? section,[FromQuery]bool? isActive,[FromQuery]int page=1,[FromQuery]int pageSize=30,CancellationToken token=default)
@@ -70,9 +74,10 @@ SELECT @new;
         var images=new List<Guid>();await using var transaction=await db.BeginTransactionAsync(token);
         try{await using(var read=new SqlCommand("SELECT ImageID FROM dbo.TDTRTrainingTestTemplateImage WHERE CompanyID=@company AND TrainingTestTemplateID=@id",db,(SqlTransaction)transaction)){Add(read,"@company",SqlDbType.BigInt,company);Add(read,"@id",SqlDbType.BigInt,id);await using var rows=await read.ExecuteReaderAsync(token);while(await rows.ReadAsync(token))images.Add(rows.GetGuid(0));}
             await using(var removeImages=new SqlCommand("DELETE dbo.TDTRTrainingTestTemplateImage WHERE CompanyID=@company AND TrainingTestTemplateID=@id",db,(SqlTransaction)transaction)){Add(removeImages,"@company",SqlDbType.BigInt,company);Add(removeImages,"@id",SqlDbType.BigInt,id);await removeImages.ExecuteNonQueryAsync(token);}
-            await using(var remove=new SqlCommand("DELETE dbo.TDTRTrainingTestTemplate WHERE CompanyID=@company AND TrainingTestTemplateID=@id AND RowVersion=@version",db,(SqlTransaction)transaction)){Add(remove,"@company",SqlDbType.BigInt,company);Add(remove,"@id",SqlDbType.BigInt,id);Add(remove,"@version",SqlDbType.Timestamp,version!);if(await remove.ExecuteNonQueryAsync(token)!=1){await transaction.RollbackAsync(token);return Conflict(new{message="ข้อมูลถูกแก้ไขแล้ว",description="กรุณาโหลดรายการใหม่ก่อนลบ"});}}
+            await using(var remove=new SqlCommand("DELETE dbo.TDTRTrainingTestTemplate WHERE CompanyID=@company AND TrainingTestTemplateID=@id AND RowVersion=@version AND NOT EXISTS(SELECT 1 FROM dbo.TDTRBookingExam WHERE CompanyID=@company AND TrainingTestTemplateID=@id)",db,(SqlTransaction)transaction)){Add(remove,"@company",SqlDbType.BigInt,company);Add(remove,"@id",SqlDbType.BigInt,id);Add(remove,"@version",SqlDbType.Timestamp,version!);if(await remove.ExecuteNonQueryAsync(token)!=1){await transaction.RollbackAsync(token);return Conflict(new{message="ลบข้อมูลไม่สำเร็จ",description="ชุดแบบทดสอบอาจถูกใช้ในรอบอบรม หรือข้อมูลถูกแก้ไขแล้ว กรุณาตรวจสอบรายการอีกครั้ง"});}}
             await transaction.CommitAsync(token);
-        }catch{await transaction.RollbackAsync(token);throw;}
+        }catch(SqlException exception) when(exception.Number==547){await transaction.RollbackAsync(token);return Conflict(new{message="ลบข้อมูลไม่สำเร็จ",description="ชุดแบบทดสอบนี้ถูกใช้งานแล้ว จึงลบไม่ได้"});}
+        catch{await transaction.RollbackAsync(token);throw;}
         foreach(var image in images){var file=ImagePath(company,id,image);if(System.IO.File.Exists(file))System.IO.File.Delete(file);}return NoContent();
     }
     async Task<IActionResult> Read(long id,CancellationToken token){if(!Scope(out var company,out _))return Forbid();await using var db=await Open(token);if(!await Allowed(db,"VIEW",token))return Forbid();await using var c=new SqlCommand("SELECT TrainingTestTemplateID,TrainingTestTemplateCode,TrainingTestTemplateName,SectionCode,DefinitionJson,VersionNo,IsActive,RowVersion FROM dbo.TDTRTrainingTestTemplate WHERE TrainingTestTemplateID=@id AND CompanyID=@company",db);Add(c,"@id",SqlDbType.BigInt,id);Add(c,"@company",SqlDbType.BigInt,company);await using var r=await c.ExecuteReaderAsync(token);if(!await r.ReadAsync(token))return NotFound();return Ok(new{id=r.GetInt64(0),code=r.GetString(1),name=r.GetString(2),section=r.GetString(3),definition=JsonSerializer.Deserialize<ExamDefinition>(r.GetString(4),ExamRules.Json),versionNo=r.GetInt32(5),isActive=r.GetBoolean(6),rowVersion=Convert.ToBase64String((byte[])r.GetValue(7))});}
@@ -86,7 +91,15 @@ SELECT @new;
         await using var c=new SqlCommand(sql,db);
         Add(c,"@id",SqlDbType.BigInt,id);Add(c,"@company",SqlDbType.BigInt,company);Add(c,"@user",SqlDbType.BigInt,user);Add(c,"@code",SqlDbType.NVarChar,code,30);Add(c,"@name",SqlDbType.NVarChar,request.Name.Trim(),200);Add(c,"@section",SqlDbType.VarChar,sec);Add(c,"@json",SqlDbType.NVarChar,json);Add(c,"@active",SqlDbType.Bit,request.IsActive);try{var saved=Convert.ToInt64(await c.ExecuteScalarAsync(token));return id is null?Ok(new{id=saved}):saved==1?Ok(new{id}):Conflict();}catch(SqlException e)when(e.Number is 2601 or 2627){return Conflict(new{message="รหัสชุดแบบทดสอบซ้ำ",description="กรุณาระบุรหัสใหม่"});}
     }
-    async Task<bool> Allowed(SqlConnection db,string action,CancellationToken token)=>await CompanyMenuAccess.IsAllowedAsync(db,User,Screen,action,token);
+    async Task<bool> Allowed(SqlConnection db,string action,CancellationToken token)=>
+        (action=="VIEW"||await ScreenType(db,token)==1)
+        &&await CompanyMenuAccess.IsAllowedAsync(db,User,Screen,action,token);
+    static async Task<int> ScreenType(SqlConnection db,CancellationToken token)
+    {
+        await using var q=new SqlCommand("SELECT ScreenType FROM dbo.TDADMainMenu WHERE MenuCode=@menu AND IsActive=1",db);
+        Add(q,"@menu",SqlDbType.Char,Screen,5);
+        return Convert.ToInt32(await q.ExecuteScalarAsync(token));
+    }
     async Task<SqlConnection> Open(CancellationToken token){var db=new SqlConnection(configuration.GetConnectionString("LaooDatabase"));await db.OpenAsync(token);return db;}
     bool Scope(out long company,out long user){company=user=0;return User.FindFirstValue("user_type")=="COMPANY_USER"&&long.TryParse(User.FindFirstValue("company_id"),out company)&&long.TryParse(User.FindFirstValue("user_id"),out user)&&company>0&&user>0;}
     static string? Section(string? value)=>value?.Trim().ToUpperInvariant() is "PRE" or "POST" ? value!.Trim().ToUpperInvariant():null;

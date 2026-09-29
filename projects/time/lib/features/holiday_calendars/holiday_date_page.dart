@@ -298,49 +298,41 @@ class _HolidayDateDialogState extends State<_HolidayDateDialog> {
   }
 
   @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: const Row(
+  Widget build(BuildContext context) => TimeActionDialog(
+    icon: Icons.event_outlined,
+    title: 'วันหยุดในปฏิทิน > ${widget.value == null ? 'เพิ่ม' : 'แก้ไข'}',
+    content: Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(Icons.event_outlined),
-        SizedBox(width: 8),
-        Text('วันหยุดในปฏิทิน'),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('สถานะ'),
+          value: active,
+          onChanged: (v) => setState(() => active = v),
+        ),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('วันที่'),
+          subtitle: Text(
+            '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}',
+          ),
+          trailing: const Icon(Icons.calendar_today_outlined),
+          onTap: () async {
+            final x = await showDatePicker(
+              context: context,
+              initialDate: date,
+              firstDate: DateTime(2000),
+              lastDate: DateTime(2100),
+            );
+            if (x != null) setState(() => date = x);
+          },
+        ),
+        SizedBox(height: timeUiTokens.popupFieldSpacing),
+        TextField(
+          controller: name,
+          decoration: const InputDecoration(labelText: 'ชื่อวันหยุด *'),
+        ),
       ],
-    ),
-    content: SizedBox(
-      width: 460,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('สถานะ'),
-            value: active,
-            onChanged: (v) => setState(() => active = v),
-          ),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('วันที่'),
-            subtitle: Text(
-              '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}',
-            ),
-            trailing: const Icon(Icons.calendar_today_outlined),
-            onTap: () async {
-              final x = await showDatePicker(
-                context: context,
-                initialDate: date,
-                firstDate: DateTime(2000),
-                lastDate: DateTime(2100),
-              );
-              if (x != null) setState(() => date = x);
-            },
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: name,
-            decoration: const InputDecoration(labelText: 'ชื่อวันหยุด *'),
-          ),
-        ],
-      ),
     ),
     actions: [
       TextButton(

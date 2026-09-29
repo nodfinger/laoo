@@ -66,14 +66,15 @@ public sealed class TrainingMasterController(IConfiguration configuration) : Con
         if (!view) return Forbid();
 
         var caption = await Caption(connection, definition.ScreenCode, token);
+        var screenType = await ScreenType(connection, definition.ScreenCode, token);
         return Ok(new
         {
             caption = caption ?? definition.FallbackCaption,
-            screenType = 1,
+            screenType,
             view,
-            create = await Allowed(connection, definition.ScreenCode, "CREATE", token),
-            edit = await Allowed(connection, definition.ScreenCode, "EDIT", token),
-            delete = await Allowed(connection, definition.ScreenCode, "DELETE", token),
+            create = screenType == 1 && await Allowed(connection, definition.ScreenCode, "CREATE", token),
+            edit = screenType == 1 && await Allowed(connection, definition.ScreenCode, "EDIT", token),
+            delete = screenType == 1 && await Allowed(connection, definition.ScreenCode, "DELETE", token),
         });
     }
 
@@ -211,13 +212,25 @@ SELECT @targetId;
             return BadRequest(new { message = "ข้อมูลไม่ครบ", description = "ไม่พบเวอร์ชันข้อมูล กรุณาโหลดรายการใหม่ก่อนลบ" });
         await using var connection = await Open(token);
         if (!await Allowed(connection, definition.ScreenCode, "DELETE", token)) return Forbid();
-        await using var command = new SqlCommand($"DELETE FROM {definition.TableName} WHERE {definition.KeyColumn}=@id AND CompanyID=@company AND RowVersion=@rowVersion", connection);
+        var bookingColumn = definition == Types ? "TrainingTypeID" : "TrainingInstructorID";
+        await using var command = new SqlCommand($"DELETE FROM {definition.TableName} WHERE {definition.KeyColumn}=@id AND CompanyID=@company AND RowVersion=@rowVersion AND NOT EXISTS(SELECT 1 FROM dbo.TDADMeetingRoomBooking B WHERE B.CompanyID=@company AND B.{bookingColumn}=@id)", connection);
         Add(command, "@id", SqlDbType.BigInt, id);
         Add(command, "@company", SqlDbType.BigInt, companyId);
         Add(command, "@rowVersion", SqlDbType.VarBinary, rowVersion, 8);
-        if (await command.ExecuteNonQueryAsync(token) == 0)
-            return Conflict(new { message = "ลบข้อมูลไม่สำเร็จ", description = "ข้อมูลอาจถูกแก้ไขหรือลบไปแล้ว กรุณาโหลดรายการใหม่" });
-        return NoContent();
+        try
+        {
+            if (await command.ExecuteNonQueryAsync(token) == 1) return NoContent();
+        }
+        catch (SqlException exception) when (exception.Number == 547)
+        {
+            return Conflict(new { message = "ลบข้อมูลไม่สำเร็จ", description = "รายการนี้ถูกใช้งานในระบบอื่นแล้ว จึงลบไม่ได้" });
+        }
+        await using var used = new SqlCommand($"SELECT COUNT_BIG(1) FROM dbo.TDADMeetingRoomBooking WHERE CompanyID=@company AND {bookingColumn}=@id", connection);
+        Add(used, "@company", SqlDbType.BigInt, companyId);
+        Add(used, "@id", SqlDbType.BigInt, id);
+        if (Convert.ToInt64(await used.ExecuteScalarAsync(token)) > 0)
+            return Conflict(new { message = "ลบข้อมูลไม่สำเร็จ", description = "รายการนี้ถูกใช้ใน Booking อบรมแล้ว กรุณาปิดสถานะใช้งานแทน" });
+        return Conflict(new { message = "ลบข้อมูลไม่สำเร็จ", description = "ข้อมูลอาจถูกแก้ไขหรือลบไปแล้ว กรุณาโหลดรายการใหม่" });
     }
 
     private static object TypeRow(SqlDataReader reader) => new
@@ -245,7 +258,8 @@ SELECT @targetId;
     };
 
     private async Task<bool> Allowed(SqlConnection connection, string screenCode, string action, CancellationToken token) =>
-        await CompanyMenuAccess.IsAllowedAsync(connection, User, screenCode, action, token);
+        (action == "VIEW" || await ScreenType(connection, screenCode, token) == 1)
+        && await CompanyMenuAccess.IsAllowedAsync(connection, User, screenCode, action, token);
 
     private async Task<SqlConnection> Open(CancellationToken token)
     {
@@ -256,9 +270,16 @@ SELECT @targetId;
 
     private static async Task<string?> Caption(SqlConnection connection, string screenCode, CancellationToken token)
     {
-        await using var command = new SqlCommand("SELECT MenuName FROM dbo.TDADMainMenu WHERE MenuCode=@screen AND ScreenType=1 AND IsActive=1", connection);
+        await using var command = new SqlCommand("SELECT MenuName FROM dbo.TDADMainMenu WHERE MenuCode=@screen AND IsActive=1", connection);
         Add(command, "@screen", SqlDbType.Char, screenCode, 5);
         return Convert.ToString(await command.ExecuteScalarAsync(token));
+    }
+
+    private static async Task<int> ScreenType(SqlConnection connection, string screenCode, CancellationToken token)
+    {
+        await using var command = new SqlCommand("SELECT ScreenType FROM dbo.TDADMainMenu WHERE MenuCode=@screen AND IsActive=1", connection);
+        Add(command, "@screen", SqlDbType.Char, screenCode, 5);
+        return Convert.ToInt32(await command.ExecuteScalarAsync(token));
     }
 
     private bool TryScope(out long companyId, out long userId)

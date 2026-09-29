@@ -26,6 +26,7 @@ class _MeetingFeedbackReportPageState extends State<MeetingFeedbackReportPage> {
   int? _roomId;
   int _page = 1, _total = 0;
   bool _loading = true;
+  String? _loadError;
   String _caption = 'ผลประเมินห้องประชุม';
   String _message = '';
   bool _messageError = false;
@@ -64,7 +65,10 @@ class _MeetingFeedbackReportPageState extends State<MeetingFeedbackReportPage> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
     try {
       final result = await _repo.feedback(
         from: _from,
@@ -84,7 +88,16 @@ class _MeetingFeedbackReportPageState extends State<MeetingFeedbackReportPage> {
         _total = (result['total'] as num?)?.toInt() ?? _items.length;
       });
     } catch (error) {
-      if (mounted) _notify(_error(error), true);
+      if (mounted) {
+        final message = _error(error);
+        setState(() {
+          _items = const [];
+          _summary = const {};
+          _total = 0;
+          _loadError = message;
+        });
+        _notify(message, true);
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -134,13 +147,30 @@ class _MeetingFeedbackReportPageState extends State<MeetingFeedbackReportPage> {
               ),
               const SizedBox(height: 6),
               WorkspaceSectionCard(child: _filters()),
-              const SizedBox(height: LaooLayout.cardSpacing),
+              const SizedBox(height: LaooLayout.listSectionSpacing),
               _summaryCards(),
-              const SizedBox(height: LaooLayout.cardSpacing),
+              const SizedBox(height: LaooLayout.listSectionSpacing),
               Expanded(
                 child: WorkspaceSectionCard(
                   child: _loading
                       ? const Center(child: CircularProgressIndicator())
+                      : _loadError != null
+                      ? Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 420),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(_loadError!, textAlign: TextAlign.center),
+                                const SizedBox(height: 16),
+                                OutlinedButton(
+                                  onPressed: _load,
+                                  child: const Text('ลองอีกครั้ง'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
                       : _items.isEmpty
                       ? const Center(
                           child: Text(
@@ -157,7 +187,7 @@ class _MeetingFeedbackReportPageState extends State<MeetingFeedbackReportPage> {
                         ),
                 ),
               ),
-              const SizedBox(height: LaooLayout.cardSpacing),
+              const SizedBox(height: LaooLayout.listSectionSpacing),
               MeetingPaginationCard(
                 total: _total,
                 pageIndex: _page - 1,
@@ -356,9 +386,9 @@ class _MeetingFeedbackReportPageState extends State<MeetingFeedbackReportPage> {
 
   int _number(String key) => (_summary[key] as num?)?.toInt() ?? 0;
   String _average() =>
-      ((_summary['averageRating'] as num?)?.toDouble() ?? 0).toStringAsFixed(2);
+      (_summary['averageRating'] as num?)?.toStringAsFixed(2) ?? '-';
   String _itemAverage(Map<String, dynamic> item) =>
-      ((item['averageRating'] as num?)?.toDouble() ?? 0).toStringAsFixed(2);
+      (item['averageRating'] as num?)?.toStringAsFixed(2) ?? '-';
   String _status(String? value) => switch (value) {
     'DRAFT' => 'ร่าง',
     'PENDING_APPROVAL' => 'รออนุมัติ',

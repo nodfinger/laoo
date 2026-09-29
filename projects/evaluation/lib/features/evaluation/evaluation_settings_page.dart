@@ -2,10 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:laoo_shared_core/laoo_shared_core.dart';
 
 import 'evaluation_feature_host.dart';
-import 'evaluation_setting_dialog.dart';
+import 'evaluation_popup_theme.dart';
+
+const evaluationSourceLabels = <String, String>{
+  'TRAINING_COURSE': 'หลักสูตรอบรม',
+  'TRAINING_INSTRUCTOR': 'วิทยากร',
+  'MEETING_ROOM': 'ห้องประชุม',
+  'VENDOR': 'Vendor',
+  'SERVICE': 'งานบริการ',
+  'GENERAL': 'ทั่วไป',
+};
 
 class EvaluationSettingsPage extends StatefulWidget {
   const EvaluationSettingsPage({super.key, required this.title});
+
   final String title;
 
   @override
@@ -14,429 +24,273 @@ class EvaluationSettingsPage extends StatefulWidget {
 
 class _EvaluationSettingsPageState extends State<EvaluationSettingsPage> {
   late final JsonApiClient _api;
-  final _search = TextEditingController();
-  List<Map<String, dynamic>> _items = [];
-  String _source = 'ALL';
-  String _status = 'ALL';
-  int _page = 1;
+  final Map<String, _SettingDraft> _drafts = {};
   bool _loading = true;
-  bool _canCreate = false, _canEdit = false, _canDelete = false;
+  bool _saving = false;
+  bool _canEdit = false;
+  String? _loadError;
+  late String _title;
 
   @override
   void initState() {
     super.initState();
+    _title = widget.title;
     _api = createEvaluationApiClient();
+    _resolveTitle();
     _load();
+  }
+
+  Future<void> _resolveTitle() async {
+    final title = await resolveEvaluationMenuTitle('47001', widget.title);
+    if (mounted) setState(() => _title = title);
   }
 
   @override
   void dispose() {
-    _search.dispose();
     disposeEvaluationApiClient(_api);
     super.dispose();
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
     try {
       final raw = Map<String, dynamic>.from(
         await _api.get('/api/company/evaluations/settings') as Map,
       );
+      final settings = List<Map<String, dynamic>>.from(
+        raw['items'] as List? ?? const [],
+      );
       final permissions = Map<String, dynamic>.from(
-        raw['permissions'] as Map? ?? {},
+        raw['permissions'] as Map? ?? const {},
+      );
+      final templateResults = await Future.wait(
+        evaluationSourceLabels.keys.map(
+          (source) => _api.get(
+            '/api/company/evaluations/settings/templates',
+            query: {'sourceType': source},
+          ),
+        ),
       );
       if (!mounted) return;
-      setState(() {
-        _items = List<Map<String, dynamic>>.from(raw['items'] as List? ?? []);
-        _canCreate = permissions['create'] == true;
-        _canEdit = permissions['edit'] == true;
-        _canDelete = permissions['delete'] == true;
-      });
-    } catch (e) {
-      if (mounted) {
-        showEvaluationMessage(
-          context,
-          message: 'ไม่สามารถโหลดข้อมูลได้\nรายละเอียดเพิ่มเติม: $e',
-          error: true,
+      final next = <String, _SettingDraft>{};
+      for (final entry in evaluationSourceLabels.entries.indexed) {
+        final source = entry.$2.key;
+        final current = settings.cast<Map<String, dynamic>?>().firstWhere(
+          (item) => item?['sourceType'] == source,
+          orElse: () => null,
+        );
+        final templateResponse = Map<String, dynamic>.from(
+          templateResults[entry.$1] as Map,
+        );
+        next[source] = _SettingDraft(
+          sourceType: source,
+          isActive: current?['isActive'] == true,
+          templateId: (current?['templateId'] as num?)?.toInt(),
+          templates: List<Map<String, dynamic>>.from(
+            templateResponse['items'] as List? ?? const [],
+          ),
         );
       }
+      setState(() {
+        _drafts
+          ..clear()
+          ..addAll(next);
+        _canEdit = permissions['edit'] == true;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      final detail = evaluationErrorText(error);
+      setState(() => _loadError = detail);
+      showEvaluationMessage(
+        context,
+        message:
+            'ไม่สามารถโหลดข้อมูลตั้งค่าระบบประเมินได้\\nรายละเอียดเพิ่มเติม: $detail',
+        error: true,
+      );
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
-  Future<void> _save([Map<String, dynamic>? item]) async {
-    final request = await showDialog<Map<String, dynamic>>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => EvaluationSettingDialog(initial: item),
+  Future<void> _save() async {
+    final invalid = _drafts.values.where(
+      (draft) => draft.isActive && draft.templateId == null,
     );
-    if (request == null) return;
+    if (invalid.isNotEmpty) {
+      final labels = invalid
+          .map((draft) => evaluationSourceLabels[draft.sourceType])
+          .join(', ');
+      showEvaluationMessage(
+        context,
+        message:
+            'ข้อมูลตั้งค่าไม่ครบ\\nรายละเอียดเพิ่มเติม: กรุณาเลือกแบบประเมินเริ่มต้นสำหรับ $labels',
+        error: true,
+      );
+      return;
+    }
+
+    setState(() => _saving = true);
     try {
-      final id = (item?['id'] as num?)?.toInt();
-      if (id == null) {
-        await _api.post('/api/company/evaluations/settings', body: request);
-      } else {
-        await _api.put('/api/company/evaluations/settings/$id', body: request);
+      for (final draft in _drafts.values) {
+        await _api.put(
+          '/api/company/evaluations/settings/source/${draft.sourceType}',
+          body: {
+            'sourceType': draft.sourceType,
+            'templateId': draft.templateId,
+            'isActive': draft.isActive,
+          },
+        );
       }
       if (!mounted) return;
       showEvaluationMessage(
         context,
-        message: id == null ? 'เพิ่มการตั้งค่าสำเร็จ' : 'แก้ไขการตั้งค่าสำเร็จ',
+        message: 'บันทึกการตั้งค่าระบบประเมินสำเร็จ',
       );
       await _load();
-    } catch (e) {
-      if (mounted) {
-        showEvaluationMessage(
-          context,
-          message: 'บันทึกข้อมูลไม่สำเร็จ\nรายละเอียดเพิ่มเติม: $e',
-          error: true,
-        );
-      }
-    }
-  }
-
-  Future<void> _view(Map<String, dynamic> item) => showDialog<void>(
-    context: context,
-    builder: (_) => EvaluationSettingDialog(initial: item, readOnly: true),
-  );
-
-  Future<void> _delete(Map<String, dynamic> item) async {
-    final label =
-        evaluationSourceLabels[item['sourceType']] ?? '${item['sourceType']}';
-    final confirmed = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-        icon: const Icon(Icons.delete_outline, color: Colors.red),
-        title: const Text(
-          'ลบการตั้งค่าระบบประเมิน',
-          style: TextStyle(color: Colors.red),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              color: Colors.red.shade50,
-              child: Text(label),
-            ),
-            const SizedBox(height: 12),
-            const Text('เมื่อลบแล้วจะไม่สามารถเรียกคืนข้อมูลได้'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('ยกเลิก'),
-          ),
-          FilledButton.icon(
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.red,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(4),
-              ),
-            ),
-            onPressed: () => Navigator.pop(dialogContext, true),
-            icon: const Icon(Icons.delete_outline),
-            label: const Text('ลบ'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-    try {
-      await _api.delete('/api/company/evaluations/settings/${item['id']}');
+    } catch (error) {
       if (!mounted) return;
-      showEvaluationMessage(context, message: 'ลบการตั้งค่าสำเร็จ');
-      await _load();
-    } catch (e) {
-      if (mounted) {
-        showEvaluationMessage(
-          context,
-          message: 'ลบข้อมูลไม่สำเร็จ\nรายละเอียดเพิ่มเติม: $e',
-          error: true,
-        );
-      }
+      showEvaluationMessage(
+        context,
+        message:
+            'บันทึกการตั้งค่าไม่สำเร็จ\\nรายละเอียดเพิ่มเติม: ${evaluationErrorText(error)}',
+        error: true,
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final query = _search.text.trim().toLowerCase();
-    final filtered = _items.where((x) {
-      final active = x['isActive'] == true;
-      return (_source == 'ALL' || x['sourceType'] == _source) &&
-          (_status == 'ALL' || (_status == 'ACTIVE') == active) &&
-          (query.isEmpty ||
-              '${x['sourceType']} ${x['templateName']}'.toLowerCase().contains(
-                query,
-              ));
-    }).toList();
-    const pageSize = 10;
-    final pageCount = (filtered.length / pageSize).ceil().clamp(1, 9999);
-    if (_page > pageCount) _page = pageCount;
-    final start = (_page - 1) * pageSize;
-    final rows = filtered.skip(start).take(pageSize).toList();
+    final tokens = evaluationUiTokens;
     return buildEvaluationWorkspaceShell(
-      pageTitle: widget.title,
+      pageTitle: _title,
       activeMenu: '47001',
+      child: Theme(
+        data: evaluationPopupTheme(context),
+        child: ColoredBox(
+          color: tokens.backgroundColor,
+          child: Padding(
+            padding: tokens.contentMargin,
+            child: Column(
+              children: [
+                _CaptionCard(title: _title),
+                SizedBox(height: tokens.sectionSpacing),
+                Expanded(child: _buildContent()),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContent() {
+    final tokens = evaluationUiTokens;
+    if (_loading) {
+      return Card(
+        margin: EdgeInsets.zero,
+        color: tokens.popupSurfaceColor,
+        child: const Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (_loadError != null) {
+      return Card(
+        margin: EdgeInsets.zero,
+        color: tokens.popupSurfaceColor,
+        child: Center(
+          child: Padding(
+            padding: tokens.cardPadding,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.error_outline,
+                  color: Theme.of(context).colorScheme.error,
+                ),
+                SizedBox(height: tokens.itemSpacing),
+                const Text('ไม่สามารถแสดงการตั้งค่าระบบประเมินได้'),
+                SizedBox(height: tokens.itemSpacing),
+                Text(
+                  'รายละเอียดเพิ่มเติม: $_loadError',
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: tokens.itemSpacing),
+                OutlinedButton.icon(
+                  onPressed: _load,
+                  icon: const Icon(Icons.replay_outlined),
+                  label: const Text('ลองอีกครั้ง'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Card(
+      margin: EdgeInsets.zero,
+      color: tokens.popupSurfaceColor,
       child: Padding(
-        padding: const EdgeInsets.all(10),
+        padding: tokens.cardPadding,
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Card(
-              margin: EdgeInsets.zero,
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.settings_outlined,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        widget.title,
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: _loading ? null : _load,
-                      tooltip: 'โหลดข้อมูลล่าสุด',
-                      icon: const Icon(Icons.refresh),
-                    ),
-                    if (_canCreate)
-                      FilledButton.icon(
-                        onPressed: () => _save(),
-                        icon: const Icon(Icons.add),
-                        label: const Text('เพิ่ม'),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Card(
-              margin: EdgeInsets.zero,
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    SizedBox(
-                      width: 260,
-                      child: TextField(
-                        controller: _search,
-                        decoration: const InputDecoration(
-                          prefixIcon: Icon(Icons.search),
-                          hintText: 'ค้นหาประเภทงานหรือแบบประเมิน',
-                        ),
-                        onSubmitted: (_) => setState(() => _page = 1),
-                      ),
-                    ),
-                    SizedBox(
-                      width: 210,
-                      child: DropdownButtonFormField<String>(
-                        initialValue: _source,
-                        decoration: const InputDecoration(
-                          labelText: 'ประเภทงาน',
-                        ),
-                        items: [
-                          const DropdownMenuItem(
-                            value: 'ALL',
-                            child: Text('ทั้งหมด'),
-                          ),
-                          ...evaluationSourceLabels.entries.map(
-                            (x) => DropdownMenuItem(
-                              value: x.key,
-                              child: Text(x.value),
-                            ),
-                          ),
-                        ],
-                        onChanged: (v) => setState(() {
-                          _source = v ?? 'ALL';
-                          _page = 1;
-                        }),
-                      ),
-                    ),
-                    SizedBox(
-                      width: 160,
-                      child: DropdownButtonFormField<String>(
-                        initialValue: _status,
-                        decoration: const InputDecoration(labelText: 'สถานะ'),
-                        items: const [
-                          DropdownMenuItem(
-                            value: 'ALL',
-                            child: Text('ทั้งหมด'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'ACTIVE',
-                            child: Text('ใช้งาน'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'INACTIVE',
-                            child: Text('ไม่ใช้งาน'),
-                          ),
-                        ],
-                        onChanged: (v) => setState(() {
-                          _status = v ?? 'ALL';
-                          _page = 1;
-                        }),
-                      ),
-                    ),
-                    FilledButton.icon(
-                      onPressed: () => setState(() => _page = 1),
-                      icon: const Icon(Icons.search),
-                      label: const Text('ค้นหา'),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: () => setState(() {
-                        _search.clear();
-                        _source = 'ALL';
-                        _status = 'ALL';
-                        _page = 1;
-                      }),
-                      icon: const Icon(Icons.clear),
-                      label: const Text('ล้าง Filter'),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
             Expanded(
-              child: _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : rows.isEmpty
-                  ? const Center(child: Text('ไม่พบข้อมูลตั้งค่าระบบประเมิน'))
-                  : LayoutBuilder(
-                      builder: (_, box) => box.maxWidth < 850
-                          ? ListView.separated(
-                              itemCount: rows.length,
-                              separatorBuilder: (_, _) =>
-                                  const SizedBox(height: 8),
-                              itemBuilder: (_, i) => _SettingCard(
-                                item: rows[i],
-                                canEdit: _canEdit,
-                                canDelete: _canDelete,
-                                onView: () => _view(rows[i]),
-                                onEdit: () => _save(rows[i]),
-                                onDelete: () => _delete(rows[i]),
-                              ),
-                            )
-                          : Card(
-                              margin: EdgeInsets.zero,
-                              child: SingleChildScrollView(
-                                scrollDirection: Axis.horizontal,
-                                child: DataTable(
-                                  columns: const [
-                                    DataColumn(label: Text('ID')),
-                                    DataColumn(label: Text('จัดการ')),
-                                    DataColumn(label: Text('ประเภทงาน')),
-                                    DataColumn(
-                                      label: Text('แบบประเมินเริ่มต้น'),
-                                    ),
-                                    DataColumn(label: Text('สถานะ')),
-                                  ],
-                                  rows: rows.indexed.map((entry) {
-                                    final x = entry.$2;
-                                    return DataRow(
-                                      cells: [
-                                        DataCell(
-                                          Text('${start + entry.$1 + 1}'),
-                                        ),
-                                        DataCell(
-                                          Row(
-                                            children: [
-                                              IconButton(
-                                                tooltip: 'ดู',
-                                                onPressed: () => _view(x),
-                                                icon: const Icon(
-                                                  Icons.visibility_outlined,
-                                                ),
-                                              ),
-                                              if (_canEdit)
-                                                IconButton(
-                                                  tooltip: 'แก้ไข',
-                                                  onPressed: () => _save(x),
-                                                  icon: const Icon(
-                                                    Icons.edit_outlined,
-                                                  ),
-                                                ),
-                                              if (_canDelete)
-                                                IconButton(
-                                                  tooltip: 'ลบ',
-                                                  onPressed: () => _delete(x),
-                                                  icon: const Icon(
-                                                    Icons.delete_outline,
-                                                    color: Colors.red,
-                                                  ),
-                                                ),
-                                            ],
-                                          ),
-                                        ),
-                                        DataCell(
-                                          Text(
-                                            evaluationSourceLabels[x['sourceType']] ??
-                                                '${x['sourceType']}',
-                                          ),
-                                        ),
-                                        DataCell(
-                                          Text('${x['templateName'] ?? '-'}'),
-                                        ),
-                                        DataCell(
-                                          Text(
-                                            x['isActive'] == true
-                                                ? 'ใช้งาน'
-                                                : 'ไม่ใช้งาน',
-                                          ),
-                                        ),
-                                      ],
-                                    );
-                                  }).toList(),
+              child: Scrollbar(
+                child: SingleChildScrollView(
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final columns = constraints.maxWidth >= 1100
+                          ? 3
+                          : constraints.maxWidth >= 700
+                          ? 2
+                          : 1;
+                      final width = columns == 1
+                          ? constraints.maxWidth
+                          : (constraints.maxWidth -
+                                    tokens.itemSpacing * (columns - 1)) /
+                                columns;
+                      return Wrap(
+                        spacing: tokens.itemSpacing,
+                        runSpacing: tokens.itemSpacing,
+                        children: evaluationSourceLabels.keys
+                            .map(
+                              (source) => SizedBox(
+                                width: width,
+                                child: _SettingSourceCard(
+                                  draft: _drafts[source]!,
+                                  enabled: _canEdit && !_saving,
+                                  onChanged: () => setState(() {}),
                                 ),
                               ),
-                            ),
-                    ),
-            ),
-            const SizedBox(height: 8),
-            Card(
-              margin: EdgeInsets.zero,
-              child: SizedBox(
-                height: 56,
-                child: Padding(
-                  padding: const EdgeInsets.all(8),
-                  child: Row(
-                    children: [
-                      OutlinedButton(
-                        onPressed: _page > 1
-                            ? () => setState(() => _page--)
-                            : null,
-                        child: const Text('<'),
-                      ),
-                      const SizedBox(width: 6),
-                      FilledButton(onPressed: null, child: Text('$_page')),
-                      const SizedBox(width: 6),
-                      OutlinedButton(
-                        onPressed: _page < pageCount
-                            ? () => setState(() => _page++)
-                            : null,
-                        child: const Text('>'),
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        filtered.isEmpty
-                            ? '0-0 จาก 0'
-                            : '${start + 1}-${start + rows.length} จาก ${filtered.length}',
-                      ),
-                    ],
+                            )
+                            .toList(),
+                      );
+                    },
                   ),
+                ),
+              ),
+            ),
+            Divider(height: tokens.sectionSpacing * 2),
+            Align(
+              alignment: Alignment.centerRight,
+              child: SizedBox(
+                height: tokens.buttonHeight,
+                child: FilledButton.icon(
+                  onPressed: _canEdit && !_saving ? _save : null,
+                  icon: _saving
+                      ? const SizedBox.square(
+                          dimension: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.save_outlined),
+                  label: const Text('บันทึก'),
                 ),
               ),
             ),
@@ -447,61 +301,151 @@ class _EvaluationSettingsPageState extends State<EvaluationSettingsPage> {
   }
 }
 
-class _SettingCard extends StatelessWidget {
-  const _SettingCard({
-    required this.item,
-    required this.canEdit,
-    required this.canDelete,
-    required this.onView,
-    required this.onEdit,
-    required this.onDelete,
-  });
-  final Map<String, dynamic> item;
-  final bool canEdit, canDelete;
-  final VoidCallback onView, onEdit, onDelete;
+class _CaptionCard extends StatelessWidget {
+  const _CaptionCard({required this.title});
+
+  final String title;
+
   @override
-  Widget build(BuildContext context) => Card(
-    margin: EdgeInsets.zero,
-    child: Padding(
-      padding: const EdgeInsets.all(12),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+  Widget build(BuildContext context) {
+    final tokens = evaluationUiTokens;
+    return Card(
+      margin: EdgeInsets.zero,
+      color: tokens.popupSurfaceColor,
+      child: Padding(
+        padding: tokens.cardPadding,
+        child: Row(
+          children: [
+            Icon(Icons.star_border, color: tokens.primaryColor),
+            SizedBox(width: tokens.itemSpacing),
+            Expanded(child: Text(title, style: tokens.captionStyle)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SettingSourceCard extends StatelessWidget {
+  const _SettingSourceCard({
+    required this.draft,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final _SettingDraft draft;
+  final bool enabled;
+  final VoidCallback onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = evaluationUiTokens;
+    final selectedExists = draft.templates.any(
+      (item) => (item['id'] as num?)?.toInt() == draft.templateId,
+    );
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: tokens.popupSurfaceColor,
+        border: Border.all(color: tokens.borderColor),
+        borderRadius: BorderRadius.circular(tokens.radius),
+      ),
+      child: Padding(
+        padding: tokens.cardPadding,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
               children: [
-                Text(
-                  evaluationSourceLabels[item['sourceType']] ??
-                      '${item['sourceType']}',
-                  style: Theme.of(context).textTheme.titleMedium,
+                Expanded(
+                  child: Text(
+                    evaluationSourceLabels[draft.sourceType] ??
+                        draft.sourceType,
+                    style: tokens.sectionStyle,
+                  ),
                 ),
-                const SizedBox(height: 4),
-                Text('แบบประเมินเริ่มต้น: ${item['templateName'] ?? '-'}'),
-                Text(
-                  item['isActive'] == true
-                      ? 'สถานะ: ใช้งาน'
-                      : 'สถานะ: ไม่ใช้งาน',
+                Switch(
+                  value: draft.isActive,
+                  onChanged: enabled
+                      ? (value) {
+                          draft.isActive = value;
+                          onChanged();
+                        }
+                      : null,
                 ),
               ],
             ),
-          ),
-          IconButton(
-            onPressed: onView,
-            icon: const Icon(Icons.visibility_outlined),
-            tooltip: 'ดู',
-          ),
-          if (canEdit)
-            IconButton(
-              onPressed: onEdit,
-              icon: const Icon(Icons.edit_outlined),
+            SizedBox(height: tokens.itemSpacing),
+            DropdownButtonFormField<int>(
+              key: ValueKey(
+                '${draft.sourceType}-${draft.templateId}-${draft.templates.length}',
+              ),
+              initialValue: selectedExists ? draft.templateId : null,
+              isExpanded: true,
+              style: tokens.inputStyle,
+              decoration: InputDecoration(
+                labelText: 'แบบประเมินเริ่มต้น',
+                labelStyle: tokens.inputStyle.copyWith(
+                  color: tokens.primaryColor,
+                ),
+                floatingLabelStyle: tokens.inputStyle.copyWith(
+                  color: tokens.primaryColor,
+                  fontSize: 14 / .75,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(tokens.radius),
+                  borderSide: BorderSide(color: tokens.borderColor),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(tokens.radius),
+                  borderSide: BorderSide(color: tokens.borderColor),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(tokens.radius),
+                  borderSide: BorderSide(color: tokens.primaryColor),
+                ),
+              ),
+              items: draft.templates
+                  .map(
+                    (template) => DropdownMenuItem<int>(
+                      value: (template['id'] as num).toInt(),
+                      child: Text(
+                        '${template['code']} | ${template['name']}',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  )
+                  .toList(),
+              onChanged: enabled
+                  ? (value) {
+                      draft.templateId = value;
+                      onChanged();
+                    }
+                  : null,
             ),
-          if (canDelete)
-            IconButton(
-              onPressed: onDelete,
-              icon: const Icon(Icons.delete_outline, color: Colors.red),
-            ),
-        ],
+            if (draft.templates.isEmpty) ...[
+              SizedBox(height: tokens.itemSpacing),
+              Text(
+                'ยังไม่มีแบบประเมินที่เปิดใช้งานสำหรับประเภทนี้',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
+}
+
+class _SettingDraft {
+  _SettingDraft({
+    required this.sourceType,
+    required this.isActive,
+    required this.templateId,
+    required this.templates,
+  });
+
+  final String sourceType;
+  bool isActive;
+  int? templateId;
+  final List<Map<String, dynamic>> templates;
 }

@@ -46,7 +46,7 @@ abstract final class EvaluationRoutes {
     FeatureRouteContract(
       projectCode: EvaluationProject.code,
       menuCode: EvaluationMenuCodes.settings,
-      screenType: 1,
+      screenType: 2,
       routeName: EvaluationRouteNames.settings,
       routePath: EvaluationRoutePaths.settings,
       isImplemented: true,

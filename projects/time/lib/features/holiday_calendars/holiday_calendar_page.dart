@@ -311,51 +311,37 @@ class _CalendarDialogState extends State<_CalendarDialog> {
   }
 
   @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: const Row(
+  Widget build(BuildContext context) => TimeActionDialog(
+    icon: Icons.calendar_month_outlined,
+    title: 'ปฏิทินวันหยุดบริษัท > ${widget.value == null ? 'เพิ่ม' : 'แก้ไข'}',
+    content: Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(Icons.calendar_month_outlined),
-        SizedBox(width: 8),
-        Text('ปฏิทินวันหยุดบริษัท'),
-      ],
-    ),
-    content: SizedBox(
-      width: 520,
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('สถานะ'),
-              value: active,
-              onChanged: (value) => setState(() => active = value),
-            ),
-            TextField(
-              controller: code,
-              decoration: const InputDecoration(labelText: 'รหัสปฏิทิน *'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: name,
-              decoration: const InputDecoration(labelText: 'ชื่อปฏิทิน *'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: description,
-              maxLength: 500,
-              buildCounter:
-                  (
-                    _, {
-                    required currentLength,
-                    required isFocused,
-                    maxLength,
-                  }) => null,
-              decoration: const InputDecoration(labelText: 'รายละเอียด'),
-            ),
-          ],
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('สถานะ'),
+          value: active,
+          onChanged: (value) => setState(() => active = value),
         ),
-      ),
+        TextField(
+          controller: code,
+          decoration: const InputDecoration(labelText: 'รหัสปฏิทิน *'),
+        ),
+        SizedBox(height: timeUiTokens.popupFieldSpacing),
+        TextField(
+          controller: name,
+          decoration: const InputDecoration(labelText: 'ชื่อปฏิทิน *'),
+        ),
+        SizedBox(height: timeUiTokens.popupFieldSpacing),
+        TextField(
+          controller: description,
+          maxLength: 500,
+          buildCounter:
+              (_, {required currentLength, required isFocused, maxLength}) =>
+                  null,
+          decoration: const InputDecoration(labelText: 'รายละเอียด'),
+        ),
+      ],
     ),
     actions: [
       TextButton(

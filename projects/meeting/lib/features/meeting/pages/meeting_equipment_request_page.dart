@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/api/api_exception.dart';
 import '../../../core/widgets/auto_dismiss_message.dart';
 import '../../../core/navigation/navigation_menu_repository.dart';
+import '../../support/presentation/widgets/support_workspace_shell.dart';
 
 import '../../../app/theme/laoo_design_tokens.dart';
 import '../../../app/theme/laoo_typography.dart';
@@ -10,6 +11,7 @@ import '../data/meeting_equipment_request_repository.dart';
 import '../meeting_feature_host.dart';
 import '../meeting_route_contract.dart';
 import '../widgets/meeting_popup.dart';
+import '../widgets/meeting_pagination_card.dart';
 
 class MeetingEquipmentRequestPage extends StatefulWidget {
   const MeetingEquipmentRequestPage({super.key});
@@ -27,6 +29,8 @@ class _MeetingEquipmentRequestPageState
   bool _loading = true;
   String? _error;
   List<Map<String, dynamic>> _items = const [];
+  int _page = 1;
+  static const _pageSize = 10;
 
   @override
   void initState() {
@@ -53,11 +57,13 @@ class _MeetingEquipmentRequestPageState
       final data = await _repository.list(status: _status);
       if (mounted) {
         _canOpenSupportTasks = data['canOpenSupportTasks'] == true;
-        setState(
-          () => _items = List<Map<String, dynamic>>.from(
+        setState(() {
+          _items = List<Map<String, dynamic>>.from(
             data['items'] as List? ?? const [],
-          ),
-        );
+          );
+          final pages = (_items.length / _pageSize).ceil();
+          if (_page > pages) _page = pages < 1 ? 1 : pages;
+        });
       }
     } catch (error) {
       if (mounted) {
@@ -204,17 +210,26 @@ class _MeetingEquipmentRequestPageState
   Widget build(BuildContext context) => buildMeetingWorkspaceShell(
     pageTitle: _caption,
     activeMenu: MeetingRouteNames.equipmentRequests,
-    child: Stack(
-      children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(LaooLayout.cardPadding),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 240,
+    child: Padding(
+      padding: const EdgeInsets.all(LaooLayout.cardMargin),
+      child: Stack(
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              WorkspaceSectionCard(
+                child: WorkspacePageTitle(
+                  title: _caption,
+                  favoriteKey: MeetingMenuCodes.equipmentRequests,
+                ),
+              ),
+              const SizedBox(height: LaooLayout.listSectionSpacing),
+              WorkspaceSectionCard(
+                child: LayoutBuilder(
+                  builder: (context, constraints) => SizedBox(
+                    width: constraints.maxWidth < 280
+                        ? constraints.maxWidth
+                        : 280,
                     child: DropdownButtonFormField<String?>(
                       initialValue: _status,
                       decoration: const InputDecoration(labelText: 'สถานะ'),
@@ -246,37 +261,62 @@ class _MeetingEquipmentRequestPageState
                         ),
                       ],
                       onChanged: (value) {
-                        setState(() => _status = value);
+                        setState(() {
+                          _status = value;
+                          _page = 1;
+                        });
                         _load();
                       },
                     ),
                   ),
-                ],
+                ),
+              ),
+              const SizedBox(height: LaooLayout.listSectionSpacing),
+              Expanded(
+                child: _loading
+                    ? const WorkspaceSectionCard(
+                        child: Center(child: CircularProgressIndicator()),
+                      )
+                    : _items.isEmpty
+                    ? const WorkspaceSectionCard(
+                        child: Center(child: Text('ไม่พบคำขออุปกรณ์เพิ่มเติม')),
+                      )
+                    : ListView.separated(
+                        itemCount: _items
+                            .skip((_page - 1) * _pageSize)
+                            .take(_pageSize)
+                            .length,
+                        separatorBuilder: (_, _) =>
+                            const SizedBox(height: LaooLayout.listItemSpacing),
+                        itemBuilder: (_, index) =>
+                            _card(_items[(_page - 1) * _pageSize + index]),
+                      ),
+              ),
+              const SizedBox(height: LaooLayout.listSectionSpacing),
+              MeetingPaginationCard(
+                total: _items.length,
+                pageIndex: _page - 1,
+                pageSize: _pageSize,
+                primary: Theme.of(context).colorScheme.primary,
+                onPrevious: _page > 1 ? () => setState(() => _page--) : null,
+                onNext: _page * _pageSize < _items.length
+                    ? () => setState(() => _page++)
+                    : null,
+              ),
+            ],
+          ),
+          if (_error != null)
+            Positioned(
+              top: 12,
+              right: 12,
+              child: AutoDismissMessage(
+                message: _error!,
+                error: true,
+                onClose: () => setState(() => _error = null),
               ),
             ),
-            Expanded(
-              child: _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
-                      itemCount: _items.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 6),
-                      itemBuilder: (_, index) => _card(_items[index]),
-                    ),
-            ),
-          ],
-        ),
-        if (_error != null)
-          Positioned(
-            top: 12,
-            right: 12,
-            child: AutoDismissMessage(
-              message: _error!,
-              error: true,
-              onClose: () => setState(() => _error = null),
-            ),
-          ),
-      ],
+        ],
+      ),
     ),
   );
 
@@ -287,12 +327,13 @@ class _MeetingEquipmentRequestPageState
   Widget _card(Map<String, dynamic> item) {
     final status = '${item['statusCode'] ?? ''}';
     return Card(
+      margin: EdgeInsets.zero,
       elevation: 0,
       color: LaooColors.white,
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(LaooRadius.xs),
-        side: const BorderSide(color: LaooColors.border),
+        side: BorderSide.none,
       ),
       child: Padding(
         padding: const EdgeInsets.all(LaooLayout.cardPadding),

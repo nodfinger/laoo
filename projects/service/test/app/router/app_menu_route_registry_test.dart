@@ -1,7 +1,15 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:laoo_service/app/router/app_menu_route_registry.dart';
+import 'package:laoo_service/features/service/service_route_contract.dart';
 
 void main() {
+  test('portal evaluation is a read-only ScreenType 3 route', () {
+    final route = ServiceRoutes.byMenuCode('20005');
+    expect(route.screenType, 3);
+    expect(route.routeName, 'portalEvaluation');
+    expect(route.routePath, '/portal/evaluation');
+  });
+
   test('all active Service menu codes have a routable registry entry', () {
     const activeMenuCodes = {
       '01001',

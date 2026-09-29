@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:laoo_shared_core/laoo_shared_core.dart';
 
 import 'evaluation_feature_host.dart';
+import 'evaluation_popup_theme.dart';
 
 class EvaluationResultsDialog extends StatefulWidget {
   const EvaluationResultsDialog({super.key, required this.roundId});
@@ -19,6 +20,7 @@ class _EvaluationResultsDialogState extends State<EvaluationResultsDialog> {
   Map<String, dynamic>? _result;
   List<Map<String, dynamic>> _distribution = const [];
   bool _loading = true;
+  String? _loadError;
 
   @override
   void initState() {
@@ -34,6 +36,10 @@ class _EvaluationResultsDialogState extends State<EvaluationResultsDialog> {
   }
 
   Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
     try {
       final raw = await _api.get(
         '/api/company/evaluations/rounds/${widget.roundId}/results',
@@ -57,22 +63,81 @@ class _EvaluationResultsDialogState extends State<EvaluationResultsDialog> {
           _distribution = distribution;
         });
       }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _result = null;
+          _loadError =
+              'ไม่สามารถโหลดผลประเมินได้\nรายละเอียดเพิ่มเติม: กรุณาตรวจสอบการเชื่อมต่อหรือสิทธิ์ แล้วลองอีกครั้ง';
+        });
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
   @override
-  Widget build(BuildContext context) => Dialog(
-    child: ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 720, maxHeight: 700),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : _result == null
-            ? const Center(child: Text('ไม่สามารถโหลดผลประเมินได้'))
-            : _ResultBody(result: _result!, distribution: _distribution),
+  Widget build(BuildContext context) => Theme(
+    data: evaluationPopupTheme(context),
+    child: Dialog(
+      backgroundColor: evaluationUiTokens.popupSurfaceColor,
+      surfaceTintColor: evaluationUiTokens.popupSurfaceColor,
+      insetPadding: const EdgeInsets.all(24),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(evaluationUiTokens.radius),
+      ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 720, maxHeight: 700),
+        child: Padding(
+          padding: evaluationUiTokens.cardPadding,
+          child: _loading
+              ? const Center(child: CircularProgressIndicator())
+              : _result == null
+              ? Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.assessment_outlined,
+                          color: evaluationUiTokens.primaryColor,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'ผลประเมิน',
+                            style: evaluationUiTokens.captionStyle,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Divider(color: evaluationUiTokens.borderColor),
+                    const SizedBox(height: 16),
+                    Text(
+                      _loadError ??
+                          'ไม่พบผลประเมิน\nรายละเอียดเพิ่มเติม: กรุณาลองอีกครั้ง',
+                    ),
+                    const SizedBox(height: 16),
+                    Divider(color: evaluationUiTokens.borderColor),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('ปิด'),
+                        ),
+                        const SizedBox(width: 8),
+                        FilledButton(
+                          onPressed: _load,
+                          child: const Text('ลองอีกครั้ง'),
+                        ),
+                      ],
+                    ),
+                  ],
+                )
+              : _ResultBody(result: _result!, distribution: _distribution),
+        ),
       ),
     ),
   );
@@ -110,19 +175,57 @@ class _ResultBody extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          result['name']?.toString() ?? '-',
-          style: Theme.of(context).textTheme.titleLarge,
+        ConstrainedBox(
+          constraints: BoxConstraints(
+            minHeight: evaluationUiTokens.popupHeaderMinHeight,
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.bar_chart_outlined,
+                color: evaluationUiTokens.primaryColor,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  result['name']?.toString() ?? '-',
+                  style: evaluationUiTokens.captionStyle,
+                ),
+              ),
+            ],
+          ),
         ),
         if ((result['referenceTitle']?.toString() ?? '').isNotEmpty)
           Text(result['referenceTitle'].toString()),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            _Metric(label: 'ผู้มีสิทธิ์ตอบ', value: '$assigned'),
-            _Metric(label: 'ตอบแล้ว', value: '$submitted'),
-            _Metric(label: 'อัตราตอบ', value: '$rate%'),
-          ],
+        SizedBox(height: evaluationUiTokens.itemSpacing),
+        Divider(color: evaluationUiTokens.borderColor, height: 1),
+        SizedBox(height: evaluationUiTokens.popupFieldSpacing),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxWidth < 420;
+            final width = compact
+                ? constraints.maxWidth
+                : (constraints.maxWidth - evaluationUiTokens.itemSpacing * 2) /
+                      3;
+            return Wrap(
+              spacing: evaluationUiTokens.itemSpacing,
+              runSpacing: evaluationUiTokens.itemSpacing,
+              children: [
+                SizedBox(
+                  width: width,
+                  child: _Metric(label: 'ผู้มีสิทธิ์ตอบ', value: '$assigned'),
+                ),
+                SizedBox(
+                  width: width,
+                  child: _Metric(label: 'ตอบแล้ว', value: '$submitted'),
+                ),
+                SizedBox(
+                  width: width,
+                  child: _Metric(label: 'อัตราตอบ', value: '$rate%'),
+                ),
+              ],
+            );
+          },
         ),
         const SizedBox(height: 16),
         if (!threshold)
@@ -205,12 +308,17 @@ class _ResultBody extends StatelessWidget {
               ],
             ),
           ),
-        const SizedBox(height: 12),
+        SizedBox(height: evaluationUiTokens.popupFieldSpacing),
+        Divider(color: evaluationUiTokens.borderColor, height: 1),
+        SizedBox(height: evaluationUiTokens.itemSpacing),
         Align(
           alignment: Alignment.centerRight,
-          child: OutlinedButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('ปิด'),
+          child: SizedBox(
+            height: evaluationUiTokens.buttonHeight,
+            child: OutlinedButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('ปิด'),
+            ),
           ),
         ),
       ],
@@ -222,17 +330,16 @@ class _Metric extends StatelessWidget {
   const _Metric({required this.label, required this.value});
   final String label, value;
   @override
-  Widget build(BuildContext context) => Expanded(
-    child: Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          children: [
-            Text(label),
-            const SizedBox(height: 4),
-            Text(value, style: Theme.of(context).textTheme.titleLarge),
-          ],
-        ),
+  Widget build(BuildContext context) => Card(
+    margin: EdgeInsets.zero,
+    child: Padding(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        children: [
+          Text(label),
+          const SizedBox(height: 4),
+          Text(value, style: Theme.of(context).textTheme.titleLarge),
+        ],
       ),
     ),
   );

@@ -897,7 +897,9 @@ class _QuestionEditorState extends State<_QuestionEditor> {
         ...List.generate(
           4,
           (index) => Padding(
-            padding: const EdgeInsets.only(bottom: 12),
+            padding: EdgeInsets.only(
+              bottom: trainingUiTokens.popupFieldSpacing,
+            ),
             child: Row(
               children: [
                 Expanded(
@@ -980,62 +982,38 @@ class _DeleteQuestionDialog extends StatelessWidget {
   final Map<String, dynamic> current;
 
   @override
-  Widget build(BuildContext context) => Dialog(
-    backgroundColor: Colors.white,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(trainingUiTokens.workspace.radius),
-      side: const BorderSide(color: Colors.red),
-    ),
-    child: ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 480),
-      child: Padding(
-        padding: trainingUiTokens.workspace.cardPadding,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Row(
-              children: [
-                Icon(Icons.delete_outline, color: Colors.red),
-                SizedBox(width: 10),
-                Text(
-                  'ยืนยันการลบข้อมูล',
-                  style: TextStyle(
-                    color: Colors.red,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-            const Divider(),
-            Container(
-              width: double.infinity,
-              color: Colors.red.shade50,
-              padding: const EdgeInsets.all(12),
-              child: Text((current['text'] ?? 'ข้อสอบรูปภาพ').toString()),
-            ),
-            const SizedBox(height: 12),
-            const Text('รายการที่ลบแล้วไม่สามารถเรียกคืนได้'),
-            const Divider(),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context, false),
-                  child: const Text('ยกเลิก'),
-                ),
-                const SizedBox(width: 8),
-                FilledButton.icon(
-                  style: FilledButton.styleFrom(backgroundColor: Colors.red),
-                  onPressed: () => Navigator.pop(context, true),
-                  icon: const Icon(Icons.delete_outline),
-                  label: const Text('ลบ'),
-                ),
-              ],
-            ),
-          ],
+  Widget build(BuildContext context) => TrainingActionDialog(
+    icon: Icons.delete_outline,
+    destructive: true,
+    title: 'ยืนยันการลบข้อมูล',
+    content: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          width: double.infinity,
+          color: Theme.of(context).colorScheme.error.withValues(alpha: .08),
+          padding: const EdgeInsets.all(12),
+          child: Text((current['text'] ?? 'ข้อสอบรูปภาพ').toString()),
         ),
-      ),
+        const SizedBox(height: 12),
+        const Text('รายการที่ลบแล้วไม่สามารถเรียกคืนได้'),
+      ],
     ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context, false),
+        child: const Text('ยกเลิก'),
+      ),
+      FilledButton.icon(
+        style: FilledButton.styleFrom(
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+        onPressed: () => Navigator.pop(context, true),
+        icon: const Icon(Icons.delete_outline),
+        label: const Text('ลบ'),
+      ),
+    ],
   );
 }
 

@@ -3,19 +3,21 @@ import 'package:go_router/go_router.dart';
 
 import 'survey_route_contract.dart';
 
-List<GoRoute> buildSurveyFeatureRoutes() => <GoRoute>[
-  GoRoute(
-    path: SurveyRoutePaths.settings,
-    name: SurveyRouteNames.settings,
-    builder: (context, state) => const _SettingsPreviewPage(),
-  ),
-];
+List<GoRoute> buildSurveyFeatureRoutes() => SurveyRoutes.all
+    .map(
+      (route) => GoRoute(
+        path: route.routePath,
+        name: route.routeName,
+        builder: (context, state) => const _SurveyPreviewPage(),
+      ),
+    )
+    .toList(growable: false);
 
-class _SettingsPreviewPage extends StatelessWidget {
-  const _SettingsPreviewPage();
+class _SurveyPreviewPage extends StatelessWidget {
+  const _SurveyPreviewPage();
 
   @override
   Widget build(BuildContext context) => const Scaffold(
-    body: Center(child: Text('กำลังเตรียมหน้าตั้งค่าระบบแบบสอบถาม')),
+    body: Center(child: Text('กำลังเตรียมหน้าจอระบบแบบสอบถาม')),
   );
 }

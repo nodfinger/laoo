@@ -1,18 +1,21 @@
 class ShiftActions {
   const ShiftActions({
     required this.caption,
+    required this.screenType,
     required this.canView,
     required this.canCreate,
     required this.canEdit,
     required this.canDelete,
   });
   final String caption;
+  final int screenType;
   final bool canView;
   final bool canCreate;
   final bool canEdit;
   final bool canDelete;
   factory ShiftActions.fromJson(Map<String, dynamic> j) => ShiftActions(
     caption: j['caption']?.toString() ?? 'Master กะทำงาน',
+    screenType: (j['screenType'] as num?)?.toInt() ?? 0,
     canView: j['view'] == true,
     canCreate: j['create'] == true,
     canEdit: j['edit'] == true,

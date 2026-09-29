@@ -22,7 +22,7 @@ public sealed class ServiceSettingsController(IConfiguration configuration) : Co
         await using var q = new SqlCommand(sql, c); Add(q, "@company", SqlDbType.BigInt, CompanyId); Add(q, "@project", SqlDbType.BigInt, projectId);
         await using var r = await q.ExecuteReaderAsync(token);
         if (!await r.ReadAsync(token)) return Ok(Default(projectId));
-        return Ok(new { companyId = CompanyId, projectId, serviceEnabled = r.GetBoolean(0), allowWalkIn = r.GetBoolean(1), requireEquipment = r.GetBoolean(2), attachmentRequired = r.GetBoolean(3), workflowEnabled = r.GetBoolean(4), attachmentMaxBytes = r.GetInt32(5) });
+        return Ok(new { companyId = CompanyId, projectId, serviceEnabled = Flag(r, 0), allowWalkIn = Flag(r, 1), requireEquipment = Flag(r, 2), attachmentRequired = Flag(r, 3), workflowEnabled = Flag(r, 4), attachmentMaxBytes = r.GetInt32(5) });
     }
 
     [HttpPut]
@@ -48,6 +48,8 @@ WHEN NOT MATCHED THEN INSERT(CompanyID,ProjectID,ServiceEnabled,AllowWalkIn,Requ
     }
 
     private static object Default(long projectId) => new { companyId = 0L, projectId, serviceEnabled = true, allowWalkIn = true, requireEquipment = true, attachmentRequired = false, workflowEnabled = true, attachmentMaxBytes = 1048576 };
+    private static bool Flag(SqlDataReader reader, int ordinal) =>
+        !reader.IsDBNull(ordinal) && Convert.ToInt32(reader.GetValue(ordinal)) != 0;
     private static void Add(SqlCommand command, string name, SqlDbType type, object? value) => command.Parameters.Add(name, type).Value = value ?? DBNull.Value;
 }
 

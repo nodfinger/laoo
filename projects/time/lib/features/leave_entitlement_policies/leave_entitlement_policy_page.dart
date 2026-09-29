@@ -77,6 +77,10 @@ class _LeaveEntitlementPolicyPageState
     error = e;
   });
   Future<void> edit([Map<String, dynamic>? item]) async {
+    if (actions?['screenType'] != 1 ||
+        actions?[item == null ? 'create' : 'edit'] != true) {
+      return;
+    }
     if (types.isEmpty) {
       notice('ยังไม่มีประเภทการลา กรุณาเพิ่มประเภทลาก่อน', true);
       return;
@@ -100,6 +104,24 @@ class _LeaveEntitlementPolicyPageState
     }
   }
 
+  Future<void> remove(Map<String, dynamic> item) async {
+    if (actions?['screenType'] != 1 || actions?['delete'] != true) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => TimeDeleteDialog(
+        itemLabel: "${item['leaveTypeCode']} — ${item['policyName']}",
+      ),
+    );
+    if (ok != true || !mounted) return;
+    try {
+      await repo.delete(item);
+      await load(target: page > 1 && items.length == 1 ? page - 1 : page);
+      notice('ลบเกณฑ์สิทธิ์ลาสำเร็จ', false);
+    } catch (e) {
+      notice(timeErrorText(e), true);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final caption = actions?['caption'] as String? ?? '';
@@ -115,7 +137,8 @@ class _LeaveEntitlementPolicyPageState
               api: api,
               menuCode: TimeMenuCodes.leaveEntitlementPolicies,
               caption: caption,
-              trailing: actions?['create'] == true
+              trailing:
+                  actions?['screenType'] == 1 && actions?['create'] == true
                   ? FilledButton.icon(
                       onPressed: () => edit(),
                       icon: const Icon(Icons.add),
@@ -211,12 +234,30 @@ class _LeaveEntitlementPolicyPageState
                                   ),
                                 ),
                                 DataCell(
-                                  actions?['edit'] == true
-                                      ? IconButton(
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      if (actions?['screenType'] == 1 &&
+                                          actions?['edit'] == true)
+                                        IconButton(
+                                          tooltip: 'สร้าง Version ใหม่',
                                           onPressed: () => edit(x),
                                           icon: const Icon(Icons.edit_outlined),
-                                        )
-                                      : const SizedBox(),
+                                        ),
+                                      if (actions?['screenType'] == 1 &&
+                                          actions?['delete'] == true)
+                                        IconButton(
+                                          tooltip: 'ลบ',
+                                          onPressed: () => remove(x),
+                                          icon: Icon(
+                                            Icons.delete_outline,
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.error,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
                                 ),
                                 DataCell(
                                   Text(
@@ -251,7 +292,7 @@ class _LeaveEntitlementPolicyPageState
                       ),
                     ),
                   ),
-            pagination: LaooPaginationCard(
+            pagination: TimePaginationCard(
               tokens: timeUiTokens.workspace,
               page: page,
               pageCount: pages,
@@ -310,7 +351,9 @@ class _PolicyDialogState extends State<_PolicyDialog> {
     var days = 0;
     try {
       final rules = widget.item?['eligibilityRuleJson'] as String?;
-      if (rules != null) days = (jsonDecode(rules) as Map)['minimumServiceDays'] as int? ?? 0;
+      if (rules != null) {
+        days = (jsonDecode(rules) as Map)['minimumServiceDays'] as int? ?? 0;
+      }
     } catch (_) {}
     minimumServiceDays = TextEditingController(text: '$days');
     effectiveFrom =
@@ -365,7 +408,7 @@ class _PolicyDialogState extends State<_PolicyDialog> {
                 'ระบบจะเก็บ Version เดิมไว้จนถึงวันก่อนวันที่เริ่มใช้ใหม่',
               ),
             ),
-          const SizedBox(height: 12),
+          SizedBox(height: timeUiTokens.popupFieldSpacing),
           Row(
             children: [
               const Text('สถานะ'),
@@ -376,7 +419,7 @@ class _PolicyDialogState extends State<_PolicyDialog> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: timeUiTokens.popupFieldSpacing),
           DropdownButtonFormField<int>(
             initialValue: typeId,
             decoration: const InputDecoration(labelText: 'ประเภทการลา'),
@@ -390,14 +433,14 @@ class _PolicyDialogState extends State<_PolicyDialog> {
                 .toList(),
             onChanged: (v) => setState(() => typeId = v ?? typeId),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: timeUiTokens.popupFieldSpacing),
           TextFormField(
             controller: name,
             decoration: const InputDecoration(labelText: 'ชื่อเกณฑ์ *'),
             validator: (v) =>
                 v == null || v.trim().isEmpty ? 'กรุณาระบุข้อมูล' : null,
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: timeUiTokens.popupFieldSpacing),
           TextFormField(
             controller: quantity,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -406,14 +449,19 @@ class _PolicyDialogState extends State<_PolicyDialog> {
                 ? 'กรุณาระบุจำนวนที่ถูกต้อง'
                 : null,
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: timeUiTokens.popupFieldSpacing),
           TextFormField(
             controller: minimumServiceDays,
             keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: 'อายุงานขั้นต่ำ (วัน)', helperText: '0 = ใช้ได้ตั้งแต่เริ่มงาน'),
-            validator: (v) => int.tryParse(v ?? '') == null || int.parse(v!) < 0 ? 'กรุณาระบุจำนวนวันตั้งแต่ 0 ขึ้นไป' : null,
+            decoration: const InputDecoration(
+              labelText: 'อายุงานขั้นต่ำ (วัน)',
+              helperText: '0 = ใช้ได้ตั้งแต่เริ่มงาน',
+            ),
+            validator: (v) => int.tryParse(v ?? '') == null || int.parse(v!) < 0
+                ? 'กรุณาระบุจำนวนวันตั้งแต่ 0 ขึ้นไป'
+                : null,
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: timeUiTokens.popupFieldSpacing),
           Row(
             children: [
               Expanded(
@@ -453,7 +501,11 @@ class _PolicyDialogState extends State<_PolicyDialog> {
             'leaveTypeId': typeId,
             'policyName': name.text.trim(),
             'entitlementQuantity': num.parse(quantity.text),
-            'eligibilityRuleJson': int.parse(minimumServiceDays.text) == 0 ? null : jsonEncode({'minimumServiceDays': int.parse(minimumServiceDays.text)}),
+            'eligibilityRuleJson': int.parse(minimumServiceDays.text) == 0
+                ? null
+                : jsonEncode({
+                    'minimumServiceDays': int.parse(minimumServiceDays.text),
+                  }),
             'effectiveFrom': _iso(effectiveFrom),
             'effectiveTo': effectiveTo == null ? null : _iso(effectiveTo!),
             'isActive': active,

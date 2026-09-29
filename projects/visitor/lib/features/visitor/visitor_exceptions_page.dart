@@ -98,31 +98,30 @@ class _VisitorExceptionsPageState extends State<VisitorExceptionsPage> {
     pageTitle: _actions?.caption ?? '',
     activeMenu: '34003',
     child: ListView(
-      padding: const EdgeInsets.all(10),
+      padding: EdgeInsets.all(visitorUiTokens.cardMargin),
       children: [
         _surface(
           Row(
             children: [
-              const Icon(Icons.warning_amber_rounded),
+              Icon(
+                Icons.star_border_rounded,
+                color: Theme.of(context).colorScheme.primary,
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   _actions?.caption ?? '',
-                  style: Theme.of(context).textTheme.titleLarge
-                      ?.copyWith(fontWeight: FontWeight.w700),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
                 ),
-              ),
-              IconButton(
-                tooltip: 'โหลดใหม่',
-                onPressed: _loading ? null : _load,
-                icon: const Icon(Icons.refresh),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 6),
+        SizedBox(height: visitorUiTokens.listSectionSpacing),
         _surface(_filters()),
-        const SizedBox(height: 10),
+        SizedBox(height: visitorUiTokens.listSectionSpacing),
         if (_error != null) ...[
           _surface(
             Text(
@@ -130,11 +129,11 @@ class _VisitorExceptionsPageState extends State<VisitorExceptionsPage> {
               style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
           ),
-          const SizedBox(height: 10),
+          SizedBox(height: visitorUiTokens.listSectionSpacing),
         ],
         _surface(_list()),
-        const SizedBox(height: 10),
-        _surface(_pagination()),
+        SizedBox(height: visitorUiTokens.listSectionSpacing),
+        _pagination(),
       ],
     ),
   );
@@ -219,8 +218,9 @@ class _VisitorExceptionsPageState extends State<VisitorExceptionsPage> {
         children: [
           Text(
             'รายการที่ต้องตรวจสอบ',
-            style: Theme.of(context).textTheme.titleMedium
-                ?.copyWith(fontWeight: FontWeight.w700),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 10),
           if (_loading)
@@ -261,8 +261,12 @@ class _VisitorExceptionsPageState extends State<VisitorExceptionsPage> {
       ...items.map(
         (item) => Container(
           padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: const BoxDecoration(
-            border: Border(top: BorderSide(color: Color(0xFFD9DDE3))),
+          decoration: BoxDecoration(
+            border: Border(
+              top: BorderSide(
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
+            ),
           ),
           child: Row(
             children: [
@@ -291,8 +295,10 @@ class _VisitorExceptionsPageState extends State<VisitorExceptionsPage> {
 
   Widget _compactItem(VisitorExceptionItem item) => Container(
     padding: const EdgeInsets.symmetric(vertical: 12),
-    decoration: const BoxDecoration(
-      border: Border(top: BorderSide(color: Color(0xFFD9DDE3))),
+    decoration: BoxDecoration(
+      border: Border(
+        top: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+      ),
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -324,36 +330,23 @@ class _VisitorExceptionsPageState extends State<VisitorExceptionsPage> {
     final result = _result;
     final total = result?.total ?? 0;
     final pageCount = total == 0 ? 1 : (total / _pageSize).ceil();
-    final from = total == 0 ? 0 : ((_page - 1) * _pageSize) + 1;
-    final to = total == 0 ? 0 : (from + _pageSize - 1).clamp(0, total);
-    return SizedBox(
-      height: 56,
-      child: Wrap(
-        crossAxisAlignment: WrapCrossAlignment.center,
-        spacing: 12,
-        children: [
-          Text('$from-$to จาก $total รายการ'),
-          OutlinedButton(
-            onPressed: _loading || _page <= 1
-                ? null
-                : () {
-                    setState(() => _page--);
-                    _load();
-                  },
-            child: const Text('<'),
-          ),
-          FilledButton(onPressed: null, child: Text('$_page')),
-          OutlinedButton(
-            onPressed: _loading || _page >= pageCount
-                ? null
-                : () {
-                    setState(() => _page++);
-                    _load();
-                  },
-            child: const Text('>'),
-          ),
-        ],
-      ),
+    return VisitorPaginationCard(
+      page: _page,
+      pageCount: pageCount,
+      pageSize: _pageSize,
+      total: total,
+      onPrevious: _loading || _page <= 1
+          ? null
+          : () {
+              setState(() => _page--);
+              _load();
+            },
+      onNext: _loading || _page >= pageCount
+          ? null
+          : () {
+              setState(() => _page++);
+              _load();
+            },
     );
   }
 
@@ -376,8 +369,12 @@ class _VisitorExceptionsPageState extends State<VisitorExceptionsPage> {
     return '${_date(local)} ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
   }
 
-  Widget _surface(Widget child) => Material(
-    color: Colors.white,
-    child: Padding(padding: const EdgeInsets.all(10), child: child),
+  Widget _surface(Widget child) => Card(
+    margin: EdgeInsets.zero,
+    elevation: 0,
+    child: Padding(
+      padding: EdgeInsets.all(visitorUiTokens.cardPadding),
+      child: child,
+    ),
   );
 }

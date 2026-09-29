@@ -28,6 +28,9 @@ class _ShiftTemplatePageState extends State<ShiftTemplatePage> {
   bool cards = false;
   String? message;
   bool messageError = false;
+  bool get canCreate => actions?.screenType == 1 && actions?.canCreate == true;
+  bool get canEdit => actions?.screenType == 1 && actions?.canEdit == true;
+  bool get canDelete => actions?.screenType == 1 && actions?.canDelete == true;
   @override
   void initState() {
     super.initState();
@@ -82,6 +85,7 @@ class _ShiftTemplatePageState extends State<ShiftTemplatePage> {
   }
 
   Future<void> edit([ShiftSummary? row]) async {
+    if (row == null ? !canCreate : !canEdit) return;
     ShiftDetail value = ShiftDetail.empty();
     try {
       if (row != null) value = await repo.get(row.id);
@@ -106,15 +110,20 @@ class _ShiftTemplatePageState extends State<ShiftTemplatePage> {
   }
 
   Future<void> remove(ShiftSummary row) async {
+    if (!canDelete) return;
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) =>
           TimeDeleteDialog(itemLabel: '${row.code} — ${row.name}'),
     );
-    if (ok != true) return;
+    if (ok != true || !mounted) return;
     try {
       await repo.delete(row);
-      await load(page: data.page);
+      await load(
+        page: data.items.length == 1 && data.page > 1
+            ? data.page - 1
+            : data.page,
+      );
       show('ลบข้อมูลสำเร็จ', false);
     } catch (e) {
       show(timeErrorText(e), true);
@@ -147,7 +156,7 @@ class _ShiftTemplatePageState extends State<ShiftTemplatePage> {
                           cards: cards,
                           onChanged: (value) => setState(() => cards = value),
                         ),
-                        if (actions?.canCreate == true)
+                        if (canCreate)
                           FilledButton.icon(
                             onPressed: () => edit(),
                             icon: const Icon(Icons.add),
@@ -199,7 +208,10 @@ class _ShiftTemplatePageState extends State<ShiftTemplatePage> {
                                   child: Text('ทั้งหมด'),
                                 ),
                               ],
-                              onChanged: (v) => setState(() => active = v),
+                              onChanged: (v) {
+                                setState(() => active = v);
+                                load();
+                              },
                             ),
                           ),
                           FilledButton.icon(
@@ -211,7 +223,7 @@ class _ShiftTemplatePageState extends State<ShiftTemplatePage> {
                       ),
                     ),
                   ),
-                  SizedBox(height: timeUiTokens.cardSpacing),
+                  SizedBox(height: timeUiTokens.itemSpacing),
                   Expanded(
                     child: Card(
                       margin: EdgeInsets.zero,
@@ -236,35 +248,39 @@ class _ShiftTemplatePageState extends State<ShiftTemplatePage> {
                                   subtitle: Text(
                                     '${r.segmentCount} ช่วงเวลา · ${r.sessionCount} รอบลงเวลา · ${r.active ? 'ใช้งาน' : 'ไม่ใช้งาน'}',
                                   ),
-                                  trailing: Wrap(
-                                    children: [
-                                      IconButton(
-                                        tooltip: 'แก้ไข',
-                                        onPressed: actions?.canEdit == true
-                                            ? () => edit(r)
-                                            : null,
-                                        icon: const Icon(Icons.edit_outlined),
-                                      ),
-                                      IconButton(
-                                        tooltip: 'ลบ',
-                                        onPressed: actions?.canDelete == true
-                                            ? () => remove(r)
-                                            : null,
-                                        icon: const Icon(
-                                          Icons.delete_outline,
-                                          color: Colors.red,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                                  trailing: canEdit || canDelete
+                                      ? Wrap(
+                                          children: [
+                                            if (canEdit)
+                                              IconButton(
+                                                tooltip: 'แก้ไข',
+                                                onPressed: () => edit(r),
+                                                icon: const Icon(
+                                                  Icons.edit_outlined,
+                                                ),
+                                              ),
+                                            if (canDelete)
+                                              IconButton(
+                                                tooltip: 'ลบ',
+                                                onPressed: () => remove(r),
+                                                icon: Icon(
+                                                  Icons.delete_outline,
+                                                  color: Theme.of(
+                                                    context,
+                                                  ).colorScheme.error,
+                                                ),
+                                              ),
+                                          ],
+                                        )
+                                      : null,
                                 );
                               },
                             )
                           : _table(),
                     ),
                   ),
-                  SizedBox(height: timeUiTokens.cardSpacing),
-                  LaooPaginationCard(
+                  SizedBox(height: timeUiTokens.itemSpacing),
+                  TimePaginationCard(
                     tokens: timeUiTokens.workspace,
                     page: data.page,
                     pageCount: data.total == 0
@@ -321,20 +337,21 @@ class _ShiftTemplatePageState extends State<ShiftTemplatePage> {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  IconButton(
-                    tooltip: 'แก้ไข',
-                    onPressed: actions?.canEdit == true
-                        ? () => edit(data.items[index])
-                        : null,
-                    icon: const Icon(Icons.edit_outlined),
-                  ),
-                  IconButton(
-                    tooltip: 'ลบ',
-                    onPressed: actions?.canDelete == true
-                        ? () => remove(data.items[index])
-                        : null,
-                    icon: const Icon(Icons.delete_outline, color: Colors.red),
-                  ),
+                  if (canEdit)
+                    IconButton(
+                      tooltip: 'แก้ไข',
+                      onPressed: () => edit(data.items[index]),
+                      icon: const Icon(Icons.edit_outlined),
+                    ),
+                  if (canDelete)
+                    IconButton(
+                      tooltip: 'ลบ',
+                      onPressed: () => remove(data.items[index]),
+                      icon: Icon(
+                        Icons.delete_outline,
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
                 ],
               ),
             ),

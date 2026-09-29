@@ -3,7 +3,7 @@ import 'package:laoo_gate_pass/gate_pass_feature.dart';
 import 'package:laoo/app/router/app_menu_route_registry.dart';
 
 void main() {
-  test('Gate Pass has all approved route contracts but no active routes', () {
+  test('Gate Pass has all approved route contracts and preview routes', () {
     expect(GatePassProject.code, 'LAOO_GATE_PASS');
     expect(GatePassRoutes.all, hasLength(8));
     expect(
@@ -20,7 +20,18 @@ void main() {
       ]),
     );
     expect(GatePassRoutes.implemented, isEmpty);
-    expect(buildGatePassFeatureRoutes(), isEmpty);
+    final previewRoutes = buildGatePassFeatureRoutes();
+    expect(previewRoutes, hasLength(GatePassRoutes.all.length));
+    for (final route in GatePassRoutes.all) {
+      expect(
+        previewRoutes.where(
+          (preview) =>
+              preview.name == route.routeName &&
+              preview.path == route.routePath,
+        ),
+        hasLength(1),
+      );
+    }
 
     for (final route in GatePassRoutes.all) {
       final mappedRoute = AppMenuRouteRegistry.byMenuCode(route.menuCode);

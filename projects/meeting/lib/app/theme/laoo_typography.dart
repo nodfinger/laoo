@@ -31,6 +31,7 @@ abstract final class LaooTypography {
   // Form / input standard: TextBox and ComboBox 14px, Label 16px.
   static const double inputText = 14;
   static const double inputLabel = 16;
+  static const double materialFloatingLabelSource = 14 / .75;
   static const double inputHint = 12;
   static const double validation = 12;
   static const double comboBox = 14;
@@ -39,8 +40,8 @@ abstract final class LaooTypography {
   static const double tableHeader = 14;
   static const double tableBody = 14;
 
-  // Button standard: 14px.
-  static const double button = 14;
+  // Button standard: 13px.
+  static const double button = 13;
 
   /// Shared button height keeps icon and text buttons visually aligned.
   static const double buttonHeight = 48;

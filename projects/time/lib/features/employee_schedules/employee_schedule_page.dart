@@ -28,6 +28,8 @@ class _State extends State<EmployeeSchedulePage> {
   bool cards = false;
   String? message;
   bool error = false;
+  bool get canEdit => actions?.screenType == 1 && actions?.edit == true;
+  bool get canDelete => actions?.screenType == 1 && actions?.delete == true;
   @override
   void initState() {
     super.initState();
@@ -57,6 +59,9 @@ class _State extends State<EmployeeSchedulePage> {
       final x = await Future.wait([repo.actions(), repo.lookups()]);
       final a = x[0] as ScheduleActions;
       if (!a.view) throw StateError('ไม่มีสิทธิ์ดูข้อมูลหน้าจอนี้');
+      if (a.screenType != 1) {
+        throw StateError('ประเภทหน้าจอไม่ตรงกับเมนู กรุณาติดต่อผู้ดูแลระบบ');
+      }
       setState(() {
         actions = a;
         options = x[1] as ScheduleLookups;
@@ -85,6 +90,7 @@ class _State extends State<EmployeeSchedulePage> {
   }
 
   Future<void> form(String mode, {EmployeeScheduleRow? row}) async {
+    if (!canEdit || options == null) return;
     final o = options!;
     int? employee = row?.employeeId, group = row?.groupId, pattern, shift;
     bool off = false;
@@ -121,7 +127,7 @@ class _State extends State<EmployeeSchedulePage> {
                       (v) => set(() => employee = v),
                     ),
                   if (mode != 'override') ...[
-                    const SizedBox(height: 12),
+                    SizedBox(height: timeUiTokens.popupFieldSpacing),
                     drop(
                       'กลุ่มตาราง *',
                       group,
@@ -130,7 +136,7 @@ class _State extends State<EmployeeSchedulePage> {
                     ),
                   ],
                   if (mode == 'rotate') ...[
-                    const SizedBox(height: 12),
+                    SizedBox(height: timeUiTokens.popupFieldSpacing),
                     drop(
                       'รูปแบบหมุนกะ *',
                       pattern,
@@ -139,7 +145,7 @@ class _State extends State<EmployeeSchedulePage> {
                     ),
                   ],
                   if (mode == 'override') ...[
-                    const SizedBox(height: 12),
+                    SizedBox(height: timeUiTokens.popupFieldSpacing),
                     CheckboxListTile(
                       contentPadding: EdgeInsets.zero,
                       title: const Text('กำหนดเป็นวันหยุด'),
@@ -154,7 +160,7 @@ class _State extends State<EmployeeSchedulePage> {
                         (v) => set(() => shift = v),
                       ),
                   ],
-                  const SizedBox(height: 12),
+                  SizedBox(height: timeUiTokens.popupFieldSpacing),
                   InkWell(
                     onTap: () async {
                       final picked = await showDatePicker(
@@ -177,7 +183,7 @@ class _State extends State<EmployeeSchedulePage> {
                       child: Text(scheduleDate(date)),
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: timeUiTokens.popupFieldSpacing),
                   TextFormField(
                     maxLines: 3,
                     decoration: const InputDecoration(labelText: 'เหตุผล *'),
@@ -239,6 +245,31 @@ class _State extends State<EmployeeSchedulePage> {
     }
   }
 
+  Future<void> remove(EmployeeScheduleRow row) async {
+    if (!canDelete || row.assignmentId == null || row.rowVersion == null) {
+      return;
+    }
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => TimeDeleteDialog(
+        itemLabel:
+            "${row.employeeCode} — ${row.fullName} / ${row.groupName ?? '-'}",
+      ),
+    );
+    if (ok != true || !mounted) return;
+    try {
+      await repo.deleteAssignment(row.assignmentId!, row.rowVersion!);
+      await load(
+        page: data.page > 1 && data.items.length == 1
+            ? data.page - 1
+            : data.page,
+      );
+      notice('ลบการจัดตารางสำเร็จ', false);
+    } catch (e) {
+      notice(timeErrorText(e), true);
+    }
+  }
+
   Widget drop(
     String label,
     int? value,
@@ -269,7 +300,7 @@ class _State extends State<EmployeeSchedulePage> {
     ),
     columns: const [
       LaooWorkspaceTableColumns.id,
-      DataColumn(label: Text('จัดการ'), columnWidth: FixedColumnWidth(76)),
+      DataColumn(label: Text('จัดการ'), columnWidth: FixedColumnWidth(112)),
       DataColumn(label: Text('รหัสพนักงาน')),
       DataColumn(label: Text('ชื่อพนักงาน'), columnWidth: FlexColumnWidth()),
       DataColumn(label: Text('รหัสกลุ่ม')),
@@ -281,12 +312,25 @@ class _State extends State<EmployeeSchedulePage> {
           cells: [
             DataCell(Text('${(data.page - 1) * data.pageSize + index + 1}')),
             DataCell(
-              IconButton(
-                tooltip: 'จัดเข้ากลุ่ม',
-                onPressed: actions?.edit == true
-                    ? () => form('assign', row: data.items[index])
-                    : null,
-                icon: const Icon(Icons.edit_outlined),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (canEdit)
+                    IconButton(
+                      tooltip: 'จัดเข้ากลุ่ม',
+                      onPressed: () => form('assign', row: data.items[index]),
+                      icon: const Icon(Icons.edit_outlined),
+                    ),
+                  if (canDelete && data.items[index].assignmentId != null)
+                    IconButton(
+                      tooltip: 'ลบการจัดกลุ่ม',
+                      onPressed: () => remove(data.items[index]),
+                      icon: Icon(
+                        Icons.delete_outline,
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                ],
               ),
             ),
             DataCell(Text(data.items[index].employeeCode)),
@@ -328,34 +372,29 @@ class _State extends State<EmployeeSchedulePage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Wrap(
-                          spacing: timeUiTokens.itemSpacing,
-                          runSpacing: timeUiTokens.itemSpacing,
-                          children: [
-                            FilledButton.icon(
-                              onPressed: actions?.edit == true
-                                  ? () => form('assign')
-                                  : null,
-                              icon: const Icon(Icons.group_add_outlined),
-                              label: const Text('จัดเข้ากลุ่ม'),
-                            ),
-                            OutlinedButton.icon(
-                              onPressed: actions?.edit == true
-                                  ? () => form('rotate')
-                                  : null,
-                              icon: const Icon(Icons.autorenew),
-                              label: const Text('กำหนด Rotation'),
-                            ),
-                            OutlinedButton.icon(
-                              onPressed: actions?.edit == true
-                                  ? () => form('override')
-                                  : null,
-                              icon: const Icon(Icons.edit_calendar_outlined),
-                              label: const Text('ปรับตารางเฉพาะวัน'),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: timeUiTokens.cardSpacing),
+                        if (canEdit)
+                          Wrap(
+                            spacing: timeUiTokens.itemSpacing,
+                            runSpacing: timeUiTokens.itemSpacing,
+                            children: [
+                              FilledButton.icon(
+                                onPressed: () => form('assign'),
+                                icon: const Icon(Icons.group_add_outlined),
+                                label: const Text('จัดเข้ากลุ่ม'),
+                              ),
+                              OutlinedButton.icon(
+                                onPressed: () => form('rotate'),
+                                icon: const Icon(Icons.autorenew),
+                                label: const Text('กำหนด Rotation'),
+                              ),
+                              OutlinedButton.icon(
+                                onPressed: () => form('override'),
+                                icon: const Icon(Icons.edit_calendar_outlined),
+                                label: const Text('ปรับตารางเฉพาะวัน'),
+                              ),
+                            ],
+                          ),
+                        if (canEdit) SizedBox(height: timeUiTokens.cardSpacing),
                         TextField(
                           controller: search,
                           onSubmitted: (_) => load(),
@@ -371,7 +410,7 @@ class _State extends State<EmployeeSchedulePage> {
                       ],
                     ),
                   ),
-                  SizedBox(height: timeUiTokens.cardSpacing),
+                  SizedBox(height: timeUiTokens.itemSpacing),
                   Expanded(
                     child: Card(
                       child: loading
@@ -399,21 +438,44 @@ class _State extends State<EmployeeSchedulePage> {
                                         ? 'ยังไม่มีกลุ่ม'
                                         : '${x.groupCode} — ${x.groupName}',
                                   ),
-                                  trailing: IconButton(
-                                    tooltip: 'จัดเข้ากลุ่ม',
-                                    onPressed: actions?.edit == true
-                                        ? () => form('assign', row: x)
-                                        : null,
-                                    icon: const Icon(Icons.edit_outlined),
-                                  ),
+                                  trailing:
+                                      canEdit ||
+                                          (canDelete && x.assignmentId != null)
+                                      ? Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            if (canEdit)
+                                              IconButton(
+                                                tooltip: 'จัดเข้ากลุ่ม',
+                                                onPressed: () =>
+                                                    form('assign', row: x),
+                                                icon: const Icon(
+                                                  Icons.edit_outlined,
+                                                ),
+                                              ),
+                                            if (canDelete &&
+                                                x.assignmentId != null)
+                                              IconButton(
+                                                tooltip: 'ลบการจัดกลุ่ม',
+                                                onPressed: () => remove(x),
+                                                icon: Icon(
+                                                  Icons.delete_outline,
+                                                  color: Theme.of(
+                                                    context,
+                                                  ).colorScheme.error,
+                                                ),
+                                              ),
+                                          ],
+                                        )
+                                      : null,
                                 );
                               },
                             )
                           : _table(),
                     ),
                   ),
-                  SizedBox(height: timeUiTokens.cardSpacing),
-                  LaooPaginationCard(
+                  SizedBox(height: timeUiTokens.itemSpacing),
+                  TimePaginationCard(
                     tokens: timeUiTokens.workspace,
                     page: data.page,
                     pageCount: data.total == 0

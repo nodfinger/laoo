@@ -11,6 +11,7 @@ abstract final class SurveyMenuCodes {
   static const delivery = '40004';
   static const results = '40005';
   static const reports = '40006';
+  static const mine = '40007';
 }
 
 abstract final class SurveyRouteNames {
@@ -20,6 +21,7 @@ abstract final class SurveyRouteNames {
   static const delivery = 'surveyDelivery';
   static const results = 'surveyResults';
   static const reports = 'surveyReports';
+  static const mine = 'mySurveys';
 }
 
 abstract final class SurveyRoutePaths {
@@ -29,6 +31,7 @@ abstract final class SurveyRoutePaths {
   static const delivery = '/company/survey-delivery';
   static const results = '/company/survey-results';
   static const reports = '/company/survey-reports';
+  static const mine = '/company/my-surveys';
 }
 
 abstract final class SurveyRoutes {
@@ -79,6 +82,14 @@ abstract final class SurveyRoutes {
       screenType: 3,
       routeName: SurveyRouteNames.reports,
       routePath: SurveyRoutePaths.reports,
+      isImplemented: false,
+    ),
+    FeatureRouteContract(
+      projectCode: SurveyProject.code,
+      menuCode: SurveyMenuCodes.mine,
+      screenType: 3,
+      routeName: SurveyRouteNames.mine,
+      routePath: SurveyRoutePaths.mine,
       isImplemented: false,
     ),
   ];

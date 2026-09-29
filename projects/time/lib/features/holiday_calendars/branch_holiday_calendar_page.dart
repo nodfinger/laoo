@@ -318,75 +318,63 @@ class _AssignmentDialogState extends State<_AssignmentDialog> {
   String d(DateTime x) =>
       '${x.year.toString().padLeft(4, '0')}-${x.month.toString().padLeft(2, '0')}-${x.day.toString().padLeft(2, '0')}';
   @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: const Row(
+  Widget build(BuildContext context) => TimeActionDialog(
+    icon: Icons.account_tree_outlined,
+    title: 'ปฏิทินวันหยุดสาขา > ${widget.value == null ? 'เพิ่ม' : 'แก้ไข'}',
+    content: Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(Icons.account_tree_outlined),
-        SizedBox(width: 8),
-        Text('ปฏิทินวันหยุดสาขา'),
-      ],
-    ),
-    content: SizedBox(
-      width: 520,
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('สถานะ'),
-              value: active,
-              onChanged: (v) => setState(() => active = v),
-            ),
-            DropdownButtonFormField<int>(
-              initialValue: branch,
-              isExpanded: true,
-              decoration: const InputDecoration(labelText: 'สาขา *'),
-              items: widget.branches
-                  .map(
-                    (x) => DropdownMenuItem(
-                      value: (x['branchId'] as num).toInt(),
-                      child: Text('${x['branchCode']} — ${x['branchName']}'),
-                    ),
-                  )
-                  .toList(),
-              onChanged: (v) => setState(() => branch = v),
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<int>(
-              initialValue: calendar,
-              isExpanded: true,
-              decoration: const InputDecoration(labelText: 'ปฏิทินวันหยุด *'),
-              items: widget.calendars
-                  .map(
-                    (x) => DropdownMenuItem(
-                      value: (x['holidayCalendarId'] as num).toInt(),
-                      child: Text(
-                        '${x['calendarCode']} — ${x['calendarName']}',
-                      ),
-                    ),
-                  )
-                  .toList(),
-              onChanged: (v) => setState(() => calendar = v),
-            ),
-            const SizedBox(height: 12),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('วันที่เริ่มใช้'),
-              subtitle: Text(d(from)),
-              trailing: const Icon(Icons.calendar_today_outlined),
-              onTap: () => pick(false),
-            ),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('วันที่สิ้นสุด'),
-              subtitle: Text(to == null ? 'ไม่กำหนด' : d(to!)),
-              trailing: const Icon(Icons.calendar_today_outlined),
-              onTap: () => pick(true),
-            ),
-          ],
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('สถานะ'),
+          value: active,
+          onChanged: (v) => setState(() => active = v),
         ),
-      ),
+        DropdownButtonFormField<int>(
+          initialValue: branch,
+          isExpanded: true,
+          decoration: const InputDecoration(labelText: 'สาขา *'),
+          items: widget.branches
+              .map(
+                (x) => DropdownMenuItem(
+                  value: (x['branchId'] as num).toInt(),
+                  child: Text('${x['branchCode']} — ${x['branchName']}'),
+                ),
+              )
+              .toList(),
+          onChanged: (v) => setState(() => branch = v),
+        ),
+        SizedBox(height: timeUiTokens.popupFieldSpacing),
+        DropdownButtonFormField<int>(
+          initialValue: calendar,
+          isExpanded: true,
+          decoration: const InputDecoration(labelText: 'ปฏิทินวันหยุด *'),
+          items: widget.calendars
+              .map(
+                (x) => DropdownMenuItem(
+                  value: (x['holidayCalendarId'] as num).toInt(),
+                  child: Text('${x['calendarCode']} — ${x['calendarName']}'),
+                ),
+              )
+              .toList(),
+          onChanged: (v) => setState(() => calendar = v),
+        ),
+        SizedBox(height: timeUiTokens.popupFieldSpacing),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('วันที่เริ่มใช้'),
+          subtitle: Text(d(from)),
+          trailing: const Icon(Icons.calendar_today_outlined),
+          onTap: () => pick(false),
+        ),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('วันที่สิ้นสุด'),
+          subtitle: Text(to == null ? 'ไม่กำหนด' : d(to!)),
+          trailing: const Icon(Icons.calendar_today_outlined),
+          onTap: () => pick(true),
+        ),
+      ],
     ),
     actions: [
       TextButton(

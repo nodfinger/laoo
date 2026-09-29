@@ -67,7 +67,11 @@ class _VisitorAppointmentsPageState extends State<VisitorAppointmentsPage> {
   Future<void> _editor([Map<dynamic, dynamic>? item]) async {
     final saved = await showDialog<bool>(
       context: context,
-      builder: (_) => _AppointmentEditor(api: _api, item: item),
+      builder: (_) => _AppointmentEditor(
+        api: _api,
+        item: item,
+        caption: _actions['caption']?.toString() ?? 'นัดหมายล่วงหน้า',
+      ),
     );
     if (saved == true) await _load();
   }
@@ -90,12 +94,12 @@ class _VisitorAppointmentsPageState extends State<VisitorAppointmentsPage> {
 
   @override
   Widget build(BuildContext context) => buildVisitorWorkspaceShell(
-    pageTitle: 'นัดหมายล่วงหน้า',
+    pageTitle: _actions['caption']?.toString() ?? 'นัดหมายล่วงหน้า',
     activeMenu: _appointmentMenu,
     child: _loading
         ? const Center(child: CircularProgressIndicator())
         : ListView(
-            padding: const EdgeInsets.all(12),
+            padding: EdgeInsets.all(visitorUiTokens.cardMargin),
             children: [
               Card(
                 child: Padding(
@@ -110,12 +114,13 @@ class _VisitorAppointmentsPageState extends State<VisitorAppointmentsPage> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            Icons.event_available_outlined,
+                            Icons.star_border_rounded,
                             color: Theme.of(context).colorScheme.primary,
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            'นัดหมายล่วงหน้า',
+                            _actions['caption']?.toString() ??
+                                'นัดหมายล่วงหน้า',
                             style: Theme.of(context).textTheme.titleLarge,
                           ),
                         ],
@@ -130,7 +135,7 @@ class _VisitorAppointmentsPageState extends State<VisitorAppointmentsPage> {
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: visitorUiTokens.listSectionSpacing),
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(12),
@@ -169,7 +174,7 @@ class _VisitorAppointmentsPageState extends State<VisitorAppointmentsPage> {
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: visitorUiTokens.listSectionSpacing),
               if (_error != null)
                 _ErrorCard(_error!)
               else if (_items.isEmpty)
@@ -195,7 +200,7 @@ class _VisitorAppointmentsPageState extends State<VisitorAppointmentsPage> {
                     }).toList(),
                   ),
                 ),
-              const SizedBox(height: 12),
+              SizedBox(height: visitorUiTokens.listSectionSpacing),
               _pagination(),
             ],
           ),
@@ -203,44 +208,23 @@ class _VisitorAppointmentsPageState extends State<VisitorAppointmentsPage> {
 
   Widget _pagination() {
     final pageCount = _total == 0 ? 1 : (_total / _pageSize).ceil();
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        child: Wrap(
-          alignment: WrapAlignment.spaceBetween,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          runSpacing: 4,
-          children: [
-            Text('แสดง ${_items.length} รายการจากทั้งหมด $_total'),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  tooltip: 'หน้าก่อนหน้า',
-                  onPressed: _loading || _page <= 1
-                      ? null
-                      : () {
-                          _page--;
-                          _load();
-                        },
-                  icon: const Icon(Icons.chevron_left),
-                ),
-                Text('$_page / $pageCount'),
-                IconButton(
-                  tooltip: 'หน้าถัดไป',
-                  onPressed: _loading || _page >= pageCount
-                      ? null
-                      : () {
-                          _page++;
-                          _load();
-                        },
-                  icon: const Icon(Icons.chevron_right),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
+    return VisitorPaginationCard(
+      page: _page,
+      pageCount: pageCount,
+      pageSize: _pageSize,
+      total: _total,
+      onPrevious: _loading || _page <= 1
+          ? null
+          : () {
+              _page--;
+              _load();
+            },
+      onNext: _loading || _page >= pageCount
+          ? null
+          : () {
+              _page++;
+              _load();
+            },
     );
   }
 
@@ -298,7 +282,7 @@ class _AppointmentTile extends StatelessWidget {
           IconButton(
             onPressed: onCancel,
             tooltip: 'ยกเลิกนัดหมาย',
-            color: Colors.red,
+            color: Theme.of(context).colorScheme.error,
             icon: const Icon(Icons.delete_outline),
           ),
       ],
@@ -328,8 +312,13 @@ class _AppointmentTile extends StatelessWidget {
 }
 
 class _AppointmentEditor extends StatefulWidget {
-  const _AppointmentEditor({required this.api, this.item});
+  const _AppointmentEditor({
+    required this.api,
+    required this.caption,
+    this.item,
+  });
   final VisitorApiClient api;
+  final String caption;
   final Map<dynamic, dynamic>? item;
   @override
   State<_AppointmentEditor> createState() => _AppointmentEditorState();
@@ -506,114 +495,95 @@ class _AppointmentEditorState extends State<_AppointmentEditor> {
   }
 
   @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: Row(
-      children: [
-        Icon(
-          Icons.event_note_outlined,
-          color: Theme.of(context).colorScheme.primary,
-        ),
-        const SizedBox(width: 8),
-        Text(_editing ? 'นัดหมายล่วงหน้า > แก้ไข' : 'นัดหมายล่วงหน้า > เพิ่ม'),
-      ],
-    ),
-    content: SizedBox(
-      width: 560,
-      child: _loading
-          ? const SizedBox(
-              height: 160,
-              child: Center(child: CircularProgressIndicator()),
-            )
-          : SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (_error != null) _InlineError(_error!),
-                  if (!_editing) ...[
-                    DropdownButtonFormField<Map<String, dynamic>>(
-                      initialValue: _identity,
-                      isExpanded: true,
-                      decoration: const InputDecoration(
-                        labelText: 'ผู้รับรอง *',
-                      ),
-                      items: _identities
-                          .map(
-                            (value) => DropdownMenuItem(
-                              value: value,
-                              child: Text(
-                                _identityLabel(value),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: _saving
-                          ? null
-                          : (value) => setState(() => _identity = value),
-                    ),
-                    const SizedBox(height: 12),
-                  ],
-                  DropdownButtonFormField<int>(
-                    initialValue: _contactPointId,
-                    isExpanded: true,
-                    decoration: const InputDecoration(labelText: 'จุดติดต่อ *'),
-                    items: _contactPoints
-                        .map(
-                          (point) => DropdownMenuItem(
-                            value: (point['contactPointId'] as num).toInt(),
-                            child: Text(
-                              '${point['code'] ?? '-'} — ${point['name'] ?? '-'}',
-                              overflow: TextOverflow.ellipsis,
-                            ),
+  Widget build(BuildContext context) => VisitorActionDialog(
+    icon: Icons.event_note_outlined,
+    title: '${widget.caption} > ${_editing ? 'แก้ไข' : 'เพิ่ม'}',
+    content: _loading
+        ? const SizedBox(
+            height: 160,
+            child: Center(child: CircularProgressIndicator()),
+          )
+        : Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (_error != null) _InlineError(_error!),
+              if (!_editing) ...[
+                DropdownButtonFormField<Map<String, dynamic>>(
+                  initialValue: _identity,
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'ผู้รับรอง *'),
+                  items: _identities
+                      .map(
+                        (value) => DropdownMenuItem(
+                          value: value,
+                          child: Text(
+                            _identityLabel(value),
+                            overflow: TextOverflow.ellipsis,
                           ),
-                        )
-                        .toList(),
-                    onChanged: _saving
-                        ? null
-                        : (value) => setState(() => _contactPointId = value),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _name,
-                    enabled: !_saving,
-                    decoration: const InputDecoration(
-                      labelText: 'ชื่อผู้มาติดต่อ *',
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _phone,
-                    enabled: !_saving,
-                    keyboardType: TextInputType.phone,
-                    decoration: const InputDecoration(
-                      labelText: 'เบอร์โทรศัพท์',
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  InkWell(
-                    onTap: _saving ? null : _dateTimePicker,
-                    child: InputDecorator(
-                      decoration: const InputDecoration(
-                        labelText: 'วันเวลานัดหมาย *',
-                        suffixIcon: Icon(Icons.calendar_today_outlined),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: _saving
+                      ? null
+                      : (value) => setState(() => _identity = value),
+                ),
+                SizedBox(height: visitorUiTokens.popupFieldSpacing),
+              ],
+              DropdownButtonFormField<int>(
+                initialValue: _contactPointId,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'จุดติดต่อ *'),
+                items: _contactPoints
+                    .map(
+                      (point) => DropdownMenuItem(
+                        value: (point['contactPointId'] as num).toInt(),
+                        child: Text(
+                          '${point['code'] ?? '-'} — ${point['name'] ?? '-'}',
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                      child: Text(_dateTime(_date)),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _purpose,
-                    enabled: !_saving,
-                    maxLines: 3,
-                    decoration: const InputDecoration(
-                      labelText: 'วัตถุประสงค์',
-                    ),
-                  ),
-                ],
+                    )
+                    .toList(),
+                onChanged: _saving
+                    ? null
+                    : (value) => setState(() => _contactPointId = value),
               ),
-            ),
-    ),
+              SizedBox(height: visitorUiTokens.popupFieldSpacing),
+              TextField(
+                controller: _name,
+                enabled: !_saving,
+                decoration: const InputDecoration(
+                  labelText: 'ชื่อผู้มาติดต่อ *',
+                ),
+              ),
+              SizedBox(height: visitorUiTokens.popupFieldSpacing),
+              TextField(
+                controller: _phone,
+                enabled: !_saving,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(labelText: 'เบอร์โทรศัพท์'),
+              ),
+              SizedBox(height: visitorUiTokens.popupFieldSpacing),
+              InkWell(
+                onTap: _saving ? null : _dateTimePicker,
+                child: InputDecorator(
+                  decoration: const InputDecoration(
+                    labelText: 'วันเวลานัดหมาย *',
+                    suffixIcon: Icon(Icons.calendar_today_outlined),
+                  ),
+                  child: Text(_dateTime(_date)),
+                ),
+              ),
+              SizedBox(height: visitorUiTokens.popupFieldSpacing),
+              TextField(
+                controller: _purpose,
+                enabled: !_saving,
+                maxLines: 3,
+                decoration: const InputDecoration(labelText: 'วัตถุประสงค์'),
+              ),
+            ],
+          ),
     actions: [
       TextButton(
         onPressed: _saving ? null : () => Navigator.pop(context),
@@ -697,12 +667,12 @@ class _VisitorAppointmentApprovalsPageState
 
   @override
   Widget build(BuildContext context) => buildVisitorWorkspaceShell(
-    pageTitle: 'สถานะการอนุมัติ',
+    pageTitle: _actions['caption']?.toString() ?? 'สถานะการอนุมัติ',
     activeMenu: _approvalMenu,
     child: _loading
         ? const Center(child: CircularProgressIndicator())
         : ListView(
-            padding: const EdgeInsets.all(12),
+            padding: EdgeInsets.all(visitorUiTokens.cardMargin),
             children: [
               Card(
                 child: Padding(
@@ -710,19 +680,19 @@ class _VisitorAppointmentApprovalsPageState
                   child: Row(
                     children: [
                       Icon(
-                        Icons.fact_check_outlined,
+                        Icons.star_border_rounded,
                         color: Theme.of(context).colorScheme.primary,
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        'สถานะการอนุมัติ',
+                        _actions['caption']?.toString() ?? 'สถานะการอนุมัติ',
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: visitorUiTokens.listSectionSpacing),
               if (_error != null)
                 _ErrorCard(_error!)
               else if (_items.isEmpty)
@@ -745,6 +715,15 @@ class _VisitorAppointmentApprovalsPageState
                     }).toList(),
                   ),
                 ),
+              SizedBox(height: visitorUiTokens.listSectionSpacing),
+              VisitorPaginationCard(
+                page: 1,
+                pageCount: 1,
+                pageSize: _items.isEmpty ? 1 : _items.length,
+                total: _items.length,
+                onPrevious: null,
+                onNext: null,
+              ),
             ],
           ),
   );
@@ -830,10 +809,11 @@ class _ApprovalDialog extends StatefulWidget {
 class _ApprovalDialogState extends State<_ApprovalDialog> {
   final _note = TextEditingController();
   @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: Text(
-      widget.approved ? 'ยืนยันการอนุมัตินัดหมาย' : 'ยืนยันการปฏิเสธนัดหมาย',
-    ),
+  Widget build(BuildContext context) => VisitorActionDialog(
+    icon: widget.approved ? Icons.check_circle_outline : Icons.block_outlined,
+    title: widget.approved
+        ? 'ยืนยันการอนุมัตินัดหมาย'
+        : 'ยืนยันการปฏิเสธนัดหมาย',
     content: TextField(
       controller: _note,
       maxLines: 3,
@@ -861,22 +841,18 @@ class _CancelDialog extends StatelessWidget {
   const _CancelDialog({required this.name});
   final String name;
   @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: const Row(
-      children: [
-        Icon(Icons.delete_outline, color: Colors.red),
-        SizedBox(width: 8),
-        Text('ยืนยันการยกเลิกนัดหมาย'),
-      ],
-    ),
+  Widget build(BuildContext context) => VisitorActionDialog(
+    icon: Icons.delete_outline,
+    destructive: true,
+    title: 'ยืนยันการยกเลิกนัดหมาย',
     content: Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(12),
-          color: Colors.red.shade50,
+          padding: EdgeInsets.all(visitorUiTokens.cardPadding),
+          color: Theme.of(context).colorScheme.error.withValues(alpha: .08),
           child: Text(name),
         ),
         const SizedBox(height: 12),
@@ -889,7 +865,9 @@ class _CancelDialog extends StatelessWidget {
         child: const Text('ยกเลิก'),
       ),
       FilledButton.icon(
-        style: FilledButton.styleFrom(backgroundColor: Colors.red),
+        style: FilledButton.styleFrom(
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
         onPressed: () => Navigator.pop(context, true),
         icon: const Icon(Icons.delete_outline),
         label: const Text('ยกเลิกนัดหมาย'),

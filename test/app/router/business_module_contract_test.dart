@@ -48,7 +48,12 @@ void main() {
 
     expect(route, isNotNull);
     expect(route.projectCode, 'LAOO');
-    expect(route.screenType, 1);
+    expect(route.screenType, 3);
+  });
+
+  test('Inventory catalog is ShowOnly and issue is Header-Detail', () {
+    expect(ServiceRoutes.byMenuCode('08002')?.screenType, 3);
+    expect(ServiceRoutes.byMenuCode('08003')?.screenType, 4);
   });
 
   test(
