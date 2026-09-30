@@ -18,7 +18,9 @@
 - Header ของ Popup Action Form สูงขั้นต่ำ `LaooLayout.popupHeaderMinHeight` (`48px`) และ Field แต่ละแถวห่างกัน `LaooLayout.popupFieldSpacing` (`16px`)
 - ใช้เส้น `LaooColors.border` สีเทาอ่อนใต้ Caption และก่อนส่วนปุ่มด้านล่าง
 - Context Bar ที่แสดงรายการแม่/ห้อง/อาคารที่เลือก ใช้พื้น Primary แบบโปร่งแสงและข้อความขนาด `16px`
-- TextBox/ComboBox ทุกช่องต้องใช้ `OutlineInputBorder` ครบทั้ง Normal, Focus, Error และ Disabled มุมโค้ง `4px`; Label และ Focus Border ใช้ Primary
+- TextBox/ComboBox ทุกช่องต้องใช้ `OutlineInputBorder` ครบรอบช่องในสถานะ Normal, Focus, Error และ Disabled พร้อมมุมโค้ง `LaooRadius.xs` (`4px`) เสมอ; ห้ามใช้ Underline, Borderless หรือปล่อยรูปทรงตามค่าเริ่มต้นของ Widget
+- สถานะ Normal ใช้เส้นกรอบสีเทาจางจาก `LaooColors.border`/Neutral Border Token ห้ามใช้สี Primary; สถานะ Focus ใช้กรอบ, Floating Label, Cursor และ Selection สี Primary จาก User Profile Theme; Error ใช้ Error Token และ Disabled ใช้ Disabled/Neutral Token โดยยังคงกรอบเทาจางและมุม `4px`
+- Combo Popup, Dropdown Menu, Selected Item, Icon และ Action Button ต้องใช้ Semantic Color จาก User Profile Theme; ห้าม hardcode สี Primary รายหน้าจอ ส่วนพื้น Popup ยังคงสีขาวและสี Error/Delete/Warning ยังคงใช้ Semantic Status Color ตามมาตรฐาน
 - Floating Label ที่เห็นจริงใช้ `LaooTypography.floatingLabel` (`14px`) ผ่าน `materialFloatingLabelSource`; ข้อความที่กรอกและข้อความที่เลือกใช้ `LaooTypography.inputText` / `LaooTypography.comboBox` ขนาด `14px`
 - ปุ่มด้านล่างใช้ Font `13px`, สูง `48px`, มุมโค้ง `LaooRadius.xs` (`4px`); ต้องกำหนด `RoundedRectangleBorder(borderRadius: BorderRadius.circular(LaooRadius.xs))` ใน Style ของปุ่มโดยตรง ห้ามปล่อยให้รับรูปทรง pill จาก Theme; ยกเลิกใช้ Text/Outlined Primary และบันทึกใช้ Filled Primary
 - เมื่อ Popup แคบต้องจัด Field ลงบรรทัดใหม่โดยไม่ Overflow
@@ -53,5 +55,5 @@
 ## Prompt สำหรับส่งให้ AI
 
 ```text
-ปรับ Popup/Dialog/Alert นี้ตาม docs/standards/UX_UI_STANDARD.md, POPUP_UI_STANDARD.md และ TYPOGRAPHY_STANDARD.md Popup ทั่วไปไม่มีเส้นกรอบรอบนอก แต่ Delete Confirm ต้องมีเส้นกรอบสี Error/Delete ตาม alertdelete.md; พื้นหลังทุก Popup สีขาว Caption ทั่วไปสีดำ 18px Icon ใช้สี Primary ส่วน Delete Confirm ใช้สี Error/Delete ทั้ง Caption และ Icon มีเส้นเทาอ่อนใต้ Caption และก่อนปุ่ม TextBox/ComboBox มุมโค้ง 4px Validation สีแดงใต้ Field ปุ่มด้านล่างสูง 48px มุมโค้ง 4px และใช้สี User Style หลังบันทึก Action เพิ่มให้ล้าง Form และคง Popup ไว้; Action อื่นให้ปิด Popup ทันที Notification ต้องลอยมุมขวาบนและหายตาม TimeAlert ห้ามแก้ API, SQL, Repository หรือ Business Logic ตรวจ Responsive, Overflow, dart format และ dart analyze
+ปรับ Popup/Dialog/Alert นี้ตาม docs/standards/UX_UI_STANDARD.md, POPUP_UI_STANDARD.md และ TYPOGRAPHY_STANDARD.md Popup ทั่วไปไม่มีเส้นกรอบรอบนอก แต่ Delete Confirm ต้องมีเส้นกรอบสี Error/Delete ตาม alertdelete.md; พื้นหลังทุก Popup สีขาว Caption ทั่วไปสีดำ 18px Icon ใช้สี Primary ส่วน Delete Confirm ใช้สี Error/Delete ทั้ง Caption และ Icon มีเส้นเทาอ่อนใต้ Caption และก่อนปุ่ม TextBox/ComboBox ต้องมีกรอบเทาจางแบบ Outline และมุมโค้ง 4px ทุกสถานะ โดย Focus/Label/Cursor/Selection/Icon/Action ใช้สีจาก User Profile Theme Validation สีแดงใต้ Field ปุ่มด้านล่างสูง 48px มุมโค้ง 4px และใช้สี User Style หลังบันทึก Action เพิ่มให้ล้าง Form และคง Popup ไว้; Action อื่นให้ปิด Popup ทันที Notification ต้องลอยมุมขวาบนและหายตาม TimeAlert ห้ามแก้ API, SQL, Repository หรือ Business Logic ตรวจ Responsive, Overflow, dart format และ dart analyze
 ```

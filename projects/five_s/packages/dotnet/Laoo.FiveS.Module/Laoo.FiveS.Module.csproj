@@ -4,9 +4,14 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>LaooFiveSModule</RootNamespace>
+    <AssemblyName>Laoo.FiveS.Module</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.4" />
+    <PackageReference Include="SkiaSharp" Version="4.153.0" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.153.0" />
     <ProjectReference Include="..\..\..\..\..\packages\dotnet\Laoo.Shared.Contracts\Laoo.Shared.Contracts.csproj" />
   </ItemGroup>
 </Project>

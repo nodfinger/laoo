@@ -52,7 +52,7 @@ abstract final class FiveSRoutes {
       screenType: 2,
       routeName: FiveSRouteNames.settings,
       routePath: FiveSRoutePaths.settings,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: FiveSProject.code,
@@ -60,7 +60,7 @@ abstract final class FiveSRoutes {
       screenType: 1,
       routeName: FiveSRouteNames.inspectionAreas,
       routePath: FiveSRoutePaths.inspectionAreas,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: FiveSProject.code,
@@ -68,7 +68,7 @@ abstract final class FiveSRoutes {
       screenType: 1,
       routeName: FiveSRouteNames.templates,
       routePath: FiveSRoutePaths.templates,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: FiveSProject.code,
@@ -76,7 +76,7 @@ abstract final class FiveSRoutes {
       screenType: 1,
       routeName: FiveSRouteNames.inspectionTeams,
       routePath: FiveSRoutePaths.inspectionTeams,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: FiveSProject.code,
@@ -84,7 +84,7 @@ abstract final class FiveSRoutes {
       screenType: 1,
       routeName: FiveSRouteNames.inspectionPlans,
       routePath: FiveSRoutePaths.inspectionPlans,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: FiveSProject.code,
@@ -92,7 +92,7 @@ abstract final class FiveSRoutes {
       screenType: 4,
       routeName: FiveSRouteNames.inspections,
       routePath: FiveSRoutePaths.inspections,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: FiveSProject.code,
@@ -100,7 +100,7 @@ abstract final class FiveSRoutes {
       screenType: 2,
       routeName: FiveSRouteNames.inspectionConfirmations,
       routePath: FiveSRoutePaths.inspectionConfirmations,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: FiveSProject.code,
@@ -108,7 +108,7 @@ abstract final class FiveSRoutes {
       screenType: 2,
       routeName: FiveSRouteNames.findings,
       routePath: FiveSRoutePaths.findings,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: FiveSProject.code,
@@ -116,7 +116,7 @@ abstract final class FiveSRoutes {
       screenType: 3,
       routeName: FiveSRouteNames.inspectionHistory,
       routePath: FiveSRoutePaths.inspectionHistory,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: FiveSProject.code,
@@ -124,7 +124,7 @@ abstract final class FiveSRoutes {
       screenType: 3,
       routeName: FiveSRouteNames.reports,
       routePath: FiveSRoutePaths.reports,
-      isImplemented: false,
+      isImplemented: true,
     ),
   ];
 
