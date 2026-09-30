@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:laoo_shared_workspace_ui/laoo_shared_workspace_ui.dart';
 import '../training/training_feature_host.dart';
+import '../training/training_pagination_card.dart';
 import '../training/training_route_contract.dart';
 
 class MyTrainingPage extends StatefulWidget {
@@ -14,6 +15,7 @@ class _MyTrainingPageState extends State<MyTrainingPage> {
   List<Map<String, dynamic>> _items = [];
   int _page = 1, _total = 0;
   bool _loading = true;
+  String? _loadError;
   String? _message;
   String _caption = 'การอบรมของฉัน';
   final _courseController = TextEditingController();
@@ -44,7 +46,10 @@ class _MyTrainingPageState extends State<MyTrainingPage> {
   }
 
   Future<void> _load({int page = 1}) async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
     try {
       final data = Map<String, dynamic>.from(
         await _api.get(
@@ -66,7 +71,15 @@ class _MyTrainingPageState extends State<MyTrainingPage> {
         _page = page;
       });
     } catch (error) {
-      _notice(trainingErrorText(error));
+      if (mounted) {
+        final message = trainingErrorText(error);
+        setState(() {
+          _items = [];
+          _total = 0;
+          _loadError = message;
+        });
+        _notice(message);
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -83,7 +96,7 @@ class _MyTrainingPageState extends State<MyTrainingPage> {
       if (!mounted) return;
       await showDialog<void>(
         context: context,
-        builder: (_) => _DetailDialog(data: data),
+        builder: (_) => _DetailDialog(data: data, caption: _caption),
       );
     } catch (error) {
       _notice(trainingErrorText(error));
@@ -127,7 +140,7 @@ class _MyTrainingPageState extends State<MyTrainingPage> {
                 runSpacing: 8,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  SizedBox(
+                  TrainingFilterField(
                     width: 280,
                     child: TextField(
                       controller: _courseController,
@@ -140,7 +153,7 @@ class _MyTrainingPageState extends State<MyTrainingPage> {
                       ),
                     ),
                   ),
-                  SizedBox(
+                  TrainingFilterField(
                     width: 220,
                     child: DropdownButtonFormField<String?>(
                       value: _resultStatus,
@@ -189,49 +202,146 @@ class _MyTrainingPageState extends State<MyTrainingPage> {
             ),
             table: _loading
                 ? const Center(child: CircularProgressIndicator())
-                : SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: DataTable(
-                      columns: const [
-                        DataColumn(label: Text('ลำดับ')),
-                        DataColumn(label: Text('หัวข้อการอบรม')),
-                        DataColumn(label: Text('เลขที่จอง')),
-                        DataColumn(label: Text('ห้อง / วันเวลา')),
-                        DataColumn(label: Text('สถานะคำเชิญ')),
-                        DataColumn(label: Text('PRE')),
-                        DataColumn(label: Text('POST')),
-                      ],
-                      rows: _items.asMap().entries.map((entry) {
-                        final x = entry.value;
-                        return DataRow(
-                          onSelectChanged: (_) => _showDetail(x),
-                          cells: [
-                            DataCell(
-                              Text(
-                                ((_page - 1) * trainingPageSize + entry.key + 1)
-                                    .toString(),
-                              ),
-                            ),
-                            DataCell(Text(x['subject']?.toString() ?? '-')),
-                            DataCell(Text(x['bookingNo']?.toString() ?? '-')),
-                            DataCell(
-                              Text(
-                                (x['roomCode']?.toString() ?? '-') +
-                                    ' | ' +
-                                    (x['roomName']?.toString() ?? '-') +
-                                    '\n' +
-                                    (x['startDateTime']?.toString() ?? '-'),
-                              ),
-                            ),
-                            DataCell(Text(_invitation(x['invitationStatus']))),
-                            DataCell(Text(_result(x['pre']))),
-                            DataCell(Text(_result(x['post']))),
-                          ],
-                        );
-                      }).toList(),
+                : _loadError != null
+                ? Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 420),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(_loadError!, textAlign: TextAlign.center),
+                          const SizedBox(height: 16),
+                          OutlinedButton(
+                            onPressed: () => _load(page: _page),
+                            child: const Text('ลองอีกครั้ง'),
+                          ),
+                        ],
+                      ),
                     ),
+                  )
+                : _items.isEmpty
+                ? const Center(child: Text('ไม่พบการอบรมของฉัน'))
+                : LayoutBuilder(
+                    builder: (context, constraints) =>
+                        constraints.maxWidth <
+                            tokens.workspace.compactBreakpoint
+                        ? ListView.separated(
+                            itemCount: _items.length,
+                            separatorBuilder: (_, _) =>
+                                SizedBox(height: tokens.workspace.itemSpacing),
+                            itemBuilder: (context, index) {
+                              final item = _items[index];
+                              return Card(
+                                margin: EdgeInsets.zero,
+                                color: tokens.workspace.surfaceColor,
+                                surfaceTintColor: Colors.transparent,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(
+                                    tokens.workspace.radius,
+                                  ),
+                                ),
+                                child: InkWell(
+                                  onTap: () => _showDetail(item),
+                                  child: Padding(
+                                    padding: tokens.workspace.cardPadding,
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        Text(
+                                          '${(_page - 1) * trainingPageSize + index + 1} · ${item['bookingNo'] ?? '-'}',
+                                          style: tokens.workspace.sectionStyle
+                                              .copyWith(
+                                                color: tokens.primaryColor,
+                                              ),
+                                        ),
+                                        Text(
+                                          '${item['subject'] ?? '-'}',
+                                          style: tokens.workspace.tableStyle,
+                                        ),
+                                        Text(
+                                          '${item['roomCode'] ?? '-'} | ${item['roomName'] ?? '-'} · ${item['startDateTime'] ?? '-'}',
+                                          style: tokens.workspace.tableStyle,
+                                        ),
+                                        Text(
+                                          'คำเชิญ: ${_invitation(item['invitationStatus'])}',
+                                          style: tokens.workspace.tableStyle,
+                                        ),
+                                        Text(
+                                          'PRE: ${_result(item['pre'])} · POST: ${_result(item['post'])}',
+                                          style: tokens.workspace.tableStyle,
+                                        ),
+                                        Align(
+                                          alignment: Alignment.centerRight,
+                                          child: TextButton.icon(
+                                            onPressed: () => _showDetail(item),
+                                            icon: const Icon(
+                                              Icons.visibility_outlined,
+                                            ),
+                                            label: const Text('ดูรายละเอียด'),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          )
+                        : SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: DataTable(
+                              columns: const [
+                                DataColumn(label: Text('ลำดับ')),
+                                DataColumn(label: Text('หัวข้อการอบรม')),
+                                DataColumn(label: Text('เลขที่จอง')),
+                                DataColumn(label: Text('ห้อง / วันเวลา')),
+                                DataColumn(label: Text('สถานะคำเชิญ')),
+                                DataColumn(label: Text('PRE')),
+                                DataColumn(label: Text('POST')),
+                              ],
+                              rows: _items.asMap().entries.map((entry) {
+                                final x = entry.value;
+                                return DataRow(
+                                  onSelectChanged: (_) => _showDetail(x),
+                                  cells: [
+                                    DataCell(
+                                      Text(
+                                        ((_page - 1) * trainingPageSize +
+                                                entry.key +
+                                                1)
+                                            .toString(),
+                                      ),
+                                    ),
+                                    DataCell(
+                                      Text(x['subject']?.toString() ?? '-'),
+                                    ),
+                                    DataCell(
+                                      Text(x['bookingNo']?.toString() ?? '-'),
+                                    ),
+                                    DataCell(
+                                      Text(
+                                        (x['roomCode']?.toString() ?? '-') +
+                                            ' | ' +
+                                            (x['roomName']?.toString() ?? '-') +
+                                            '\n' +
+                                            (x['startDateTime']?.toString() ??
+                                                '-'),
+                                      ),
+                                    ),
+                                    DataCell(
+                                      Text(_invitation(x['invitationStatus'])),
+                                    ),
+                                    DataCell(Text(_result(x['pre']))),
+                                    DataCell(Text(_result(x['post']))),
+                                  ],
+                                );
+                              }).toList(),
+                            ),
+                          ),
                   ),
-            pagination: LaooPaginationCard(
+            pagination: TrainingPaginationCard(
               tokens: tokens.workspace,
               page: _page,
               pageCount: pages,
@@ -301,42 +411,49 @@ class _MyTrainingPageState extends State<MyTrainingPage> {
 }
 
 class _DetailDialog extends StatelessWidget {
-  const _DetailDialog({required this.data});
+  const _DetailDialog({required this.data, required this.caption});
   final Map<String, dynamic> data;
+  final String caption;
   @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: Text(data['subject']?.toString() ?? 'รายละเอียดการอบรม'),
-    content: SizedBox(
-      width: 520,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text('เลขที่จอง: ' + (data['bookingNo']?.toString() ?? '-')),
-          Text('สถานะคำเชิญ: ' + (data['invitationStatus']?.toString() ?? '-')),
-          const SizedBox(height: 12),
-          for (final raw in (data['results'] as List? ?? const []))
-            Builder(
-              builder: (_) {
-                final item = Map<String, dynamic>.from(raw as Map);
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 6),
-                  child: ListTile(
-                    title: Text(
-                      '${item['section']?.toString() ?? '-'} ${item['sequenceNo'] ?? '-'} · ${item['templateName'] ?? '-'}',
-                    ),
-                    subtitle: Text(item['status']?.toString() ?? '-'),
-                    trailing: Text(
-                      (item['score']?.toString() ?? '-') +
-                          ' / ' +
-                          (item['maxScore']?.toString() ?? '-'),
-                    ),
+  Widget build(BuildContext context) => TrainingActionDialog(
+    icon: Icons.school_outlined,
+    title: '$caption > รายละเอียด',
+    content: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          data['subject']?.toString() ?? '-',
+          style: trainingUiTokens.workspace.sectionStyle,
+        ),
+        const SizedBox(height: 16),
+        Text('เลขที่จอง: ' + (data['bookingNo']?.toString() ?? '-')),
+        Text('สถานะคำเชิญ: ' + (data['invitationStatus']?.toString() ?? '-')),
+        const SizedBox(height: 12),
+        for (final raw in (data['results'] as List? ?? const []))
+          Builder(
+            builder: (_) {
+              final item = Map<String, dynamic>.from(raw as Map);
+              return Card(
+                margin: const EdgeInsets.only(bottom: 6),
+                color: Colors.white,
+                surfaceTintColor: Colors.transparent,
+                elevation: 0,
+                child: ListTile(
+                  title: Text(
+                    '${item['section']?.toString() ?? '-'} ${item['sequenceNo'] ?? '-'} · ${item['templateName'] ?? '-'}',
                   ),
-                );
-              },
-            ),
-        ],
-      ),
+                  subtitle: Text(item['status']?.toString() ?? '-'),
+                  trailing: Text(
+                    (item['score']?.toString() ?? '-') +
+                        ' / ' +
+                        (item['maxScore']?.toString() ?? '-'),
+                  ),
+                ),
+              );
+            },
+          ),
+      ],
     ),
     actions: [
       TextButton(

@@ -13,6 +13,7 @@ import '../../support/presentation/widgets/support_workspace_shell.dart';
 import '../data/meeting_room_booking_repository.dart';
 import '../meeting_feature_host.dart';
 import 'meeting_food_plan_page.dart';
+import '../widgets/meeting_pagination_card.dart';
 
 class MeetingRoomApprovalPage extends StatefulWidget {
   const MeetingRoomApprovalPage({super.key});
@@ -500,44 +501,23 @@ class _MeetingRoomApprovalPageState extends State<MeetingRoomApprovalPage> {
   );
 
   Widget _pagination(WorkspaceThemePreset preset) {
-    final pages = (_total / _pageSize).ceil();
-    final start = _total == 0 ? 0 : (_page - 1) * _pageSize + 1;
-    final end = (_page * _pageSize).clamp(0, _total);
-    return SizedBox(
-      height: LaooLayout.paginationCardHeight,
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            IconButton.filled(
-              onPressed: _page > 1
-                  ? () async {
-                      setState(() => _page--);
-                      await _load();
-                    }
-                  : null,
-              icon: const Icon(Icons.chevron_left),
-            ),
-            FilledButton(
-              onPressed: null,
-              child: Text('${pages == 0 ? 0 : _page}'),
-            ),
-            IconButton.filled(
-              onPressed: _page < pages
-                  ? () async {
-                      setState(() => _page++);
-                      await _load();
-                    }
-                  : null,
-              icon: const Icon(Icons.chevron_right),
-            ),
-            Text('$start-$end จาก $_total'),
-          ],
-        ),
-      ),
+    return MeetingPaginationCard(
+      total: _total,
+      pageIndex: _page - 1,
+      pageSize: _pageSize,
+      primary: preset.primary,
+      onPrevious: _page > 1
+          ? () async {
+              setState(() => _page--);
+              await _load();
+            }
+          : null,
+      onNext: _page * _pageSize < _total
+          ? () async {
+              setState(() => _page++);
+              await _load();
+            }
+          : null,
     );
   }
 
@@ -772,18 +752,12 @@ class _MeetingRoomApprovalPageState extends State<MeetingRoomApprovalPage> {
                         child: WorkspaceActionHeader(
                           title: _caption,
                           favoriteKey: '21004',
-                          actions: [
-                            IconButton(
-                              tooltip: 'รีเฟรช',
-                              onPressed: _load,
-                              icon: Icon(Icons.refresh, color: preset.primary),
-                            ),
-                          ],
+                          actions: const [],
                         ),
                       ),
-                      const SizedBox(height: LaooLayout.cardSpacing),
+                      const SizedBox(height: LaooLayout.listSectionSpacing),
                       _filterCard(preset),
-                      const SizedBox(height: LaooLayout.cardSpacing),
+                      const SizedBox(height: LaooLayout.listSectionSpacing),
                       Expanded(
                         child: _loading
                             ? const Center(child: CircularProgressIndicator())
@@ -793,17 +767,14 @@ class _MeetingRoomApprovalPageState extends State<MeetingRoomApprovalPage> {
                                 padding: EdgeInsets.zero,
                                 itemCount: _items.length,
                                 separatorBuilder: (_, _) => const SizedBox(
-                                  height: LaooLayout.cardSpacing,
+                                  height: LaooLayout.listItemSpacing,
                                 ),
                                 itemBuilder: (_, index) =>
                                     _itemCard(_items[index], preset),
                               ),
                       ),
-                      const SizedBox(height: LaooLayout.cardSpacing),
-                      WorkspaceSectionCard(
-                        padding: EdgeInsets.zero,
-                        child: _pagination(preset),
-                      ),
+                      const SizedBox(height: LaooLayout.listSectionSpacing),
+                      _pagination(preset),
                     ],
                   ),
                 ),

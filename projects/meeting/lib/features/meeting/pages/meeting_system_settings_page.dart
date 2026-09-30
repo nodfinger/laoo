@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../app/theme/laoo_design_tokens.dart';
+import '../../../app/theme/laoo_typography.dart';
 import '../../../app/theme/workspace_theme_presets.dart';
 import '../../../core/api/api_exception.dart';
 import '../../../core/navigation/navigation_menu_repository.dart';
@@ -87,98 +88,118 @@ class _MeetingSystemSettingsPageState extends State<MeetingSystemSettingsPage> {
         padding: const EdgeInsets.all(LaooLayout.cardMargin),
         child: Stack(
           children: [
-            WorkspaceSectionCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: WorkspacePageTitle(
-                          title: _caption,
-                          favoriteKey: MeetingMenuCodes.systemSettings,
-                        ),
-                      ),
-                      FilledButton.icon(
-                        onPressed: _loading || _saving ? null : _save,
-                        icon: _saving
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(Icons.save_outlined),
-                        label: const Text('บันทึก'),
-                      ),
-                    ],
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                WorkspaceSectionCard(
+                  child: WorkspacePageTitle(
+                    title: _caption,
+                    favoriteKey: MeetingMenuCodes.systemSettings,
                   ),
-                  const SizedBox(height: LaooLayout.cardSpacing),
-                  if (_loading)
-                    const Expanded(
-                      child: Center(child: CircularProgressIndicator()),
-                    )
-                  else
-                    Expanded(
-                      child: Align(
-                        alignment: Alignment.topLeft,
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 720),
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              border: Border.all(
-                                color: preset.primary.withValues(alpha: .24),
-                              ),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(
-                                LaooLayout.cardSpacing,
-                              ),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'คำขออุปกรณ์เพิ่มเติม',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleMedium
-                                        ?.copyWith(fontWeight: FontWeight.w700),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  SwitchListTile.adaptive(
-                                    contentPadding: EdgeInsets.zero,
-                                    title: const Text('ต้องตรวจสอบก่อนส่งแผนก'),
-                                    subtitle: Text(
-                                      _requireReview
-                                          ? 'คำขอใหม่จะรอเจ้าของประชุม, Admin ห้อง หรือ Company Admin ตรวจสอบก่อน'
-                                          : 'คำขอใหม่จะส่งถึงแผนกรับผิดชอบทันที',
-                                    ),
-                                    value: _requireReview,
-                                    onChanged: _saving
-                                        ? null
-                                        : (value) => setState(
-                                            () => _requireReview = value,
+                ),
+                const SizedBox(height: LaooLayout.cardSpacing),
+                Expanded(
+                  child: WorkspaceSectionCard(
+                    child: _loading
+                        ? const Center(child: CircularProgressIndicator())
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Expanded(
+                                child: SingleChildScrollView(
+                                  child: Align(
+                                    alignment: Alignment.topLeft,
+                                    child: ConstrainedBox(
+                                      constraints: const BoxConstraints(
+                                        maxWidth: 720,
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.stretch,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Icon(
+                                                Icons.inventory_2_outlined,
+                                                color: preset.primary,
+                                              ),
+                                              const SizedBox(
+                                                width: LaooLayout.cardSpacing,
+                                              ),
+                                              Expanded(
+                                                child: Text(
+                                                  'คำขออุปกรณ์เพิ่มเติม',
+                                                  style: Theme.of(context)
+                                                      .textTheme
+                                                      .titleMedium
+                                                      ?.copyWith(
+                                                        fontWeight:
+                                                            FontWeight.w700,
+                                                      ),
+                                                ),
+                                              ),
+                                            ],
                                           ),
+                                          const SizedBox(
+                                            height: LaooLayout.cardSpacing,
+                                          ),
+                                          SwitchListTile.adaptive(
+                                            contentPadding: EdgeInsets.zero,
+                                            title: const Text(
+                                              'ต้องตรวจสอบก่อนส่งแผนก',
+                                            ),
+                                            subtitle: Text(
+                                              _requireReview
+                                                  ? 'คำขอใหม่จะรอเจ้าของประชุม, Admin ห้อง หรือ Company Admin ตรวจสอบก่อน'
+                                                  : 'คำขอใหม่จะส่งถึงแผนกรับผิดชอบทันที',
+                                            ),
+                                            value: _requireReview,
+                                            onChanged: _saving
+                                                ? null
+                                                : (value) => setState(
+                                                    () =>
+                                                        _requireReview = value,
+                                                  ),
+                                          ),
+                                          const Divider(
+                                            color: LaooColors.border,
+                                          ),
+                                          Text(
+                                            'การเปลี่ยนค่านี้มีผลเฉพาะคำขอที่สร้างใหม่ คำขอเดิมจะใช้ Flow เดิมที่บันทึกไว้',
+                                            style: Theme.of(
+                                              context,
+                                            ).textTheme.bodySmall,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                   ),
-                                  const Divider(),
-                                  Text(
-                                    'การเปลี่ยนค่านี้มีผลเฉพาะคำขอที่สร้างใหม่ คำขอเดิมจะใช้ Flow เดิมที่บันทึกไว้',
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.bodySmall,
-                                  ),
-                                ],
+                                ),
                               ),
-                            ),
+                              const Divider(color: LaooColors.border),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: SizedBox(
+                                  height: LaooTypography.buttonHeight,
+                                  child: FilledButton.icon(
+                                    onPressed: _saving ? null : _save,
+                                    icon: _saving
+                                        ? const SizedBox.square(
+                                            dimension: 16,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                            ),
+                                          )
+                                        : const Icon(Icons.save_outlined),
+                                    label: const Text('บันทึก'),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
+                  ),
+                ),
+              ],
             ),
             if (_message != null)
               AutoDismissMessage(

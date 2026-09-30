@@ -107,12 +107,24 @@ class InventoryApi {
   Future<Map<String, dynamic>> issueLookup() async => Map<String, dynamic>.from(
     await _client.get('/api/company/inventory-issues/lookup') as Map,
   );
+  Future<List<Map<String, dynamic>>> catalogItems() async =>
+      List<Map<String, dynamic>>.from(
+        await _client.get('/api/company/inventory-issues/catalog') as List,
+      );
   Future<List<Map<String, dynamic>>> issues() async =>
       List<Map<String, dynamic>>.from(
         await _client.get('/api/company/inventory-issues') as List,
       );
+  Future<Map<String, dynamic>> issueDetail(int id) async =>
+      Map<String, dynamic>.from(
+        await _client.get('/api/company/inventory-issues/$id') as Map,
+      );
   Future<void> createIssue(Map<String, dynamic> body) =>
       _client.post('/api/company/inventory-issues', body: body);
+  Future<void> updateIssue(int id, Map<String, dynamic> body) =>
+      _client.put('/api/company/inventory-issues/$id', body: body);
+  Future<void> deleteIssue(int id) =>
+      _client.delete('/api/company/inventory-issues/$id');
   Future<void> confirmIssue(int id) =>
       _client.post('/api/company/inventory-issues/$id/confirm');
   Future<void> voidIssue(int id) =>

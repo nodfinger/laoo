@@ -23,7 +23,10 @@ import 'app/theme/workspace_theme_presets.dart';
 import 'core/api/api_client.dart';
 import 'core/api/api_exception.dart';
 import 'core/company_setup/company_setup_controller.dart';
+import 'core/company_setup/company_date_formatter.dart';
+import 'core/navigation/navigation_menu_repository.dart';
 import 'core/widgets/auto_dismiss_message.dart';
+import 'core/widgets/timed_snack_bar.dart';
 import 'features/support/presentation/widgets/support_workspace_shell.dart';
 
 void main() {
@@ -43,10 +46,126 @@ void main() {
     _buildMeetingWorkspaceShell,
     apiClientFactory: ApiClient.new,
     apiClientDisposer: (client) => (client as ApiClient).dispose(),
+    errorText: (error) =>
+        error is ApiException ? error.message : 'กรุณาลองใหม่อีกครั้ง',
+    dateTimeText: (value) {
+      final setup = companySetupController.current;
+      final date = setup == null
+          ? CompanyDateFormatter.formatDateByYearFormat(value, 'AD')
+          : CompanyDateFormatter.formatDate(value, setup);
+      final hour = value.hour.toString().padLeft(2, '0');
+      final minute = value.minute.toString().padLeft(2, '0');
+      return '$date $hour:$minute';
+    },
+    menuTitleResolver: (menuCode, fallback) => NavigationMenuRepository()
+        .resolveMenuName(menuCode: menuCode, fallback: fallback),
+    messagePresenter: (context, {required message, required error}) =>
+        showTimedSnackBar(context, message: message, error: error),
+    uiTokensProvider: () {
+      final theme = workspaceThemeController.value;
+      return EvaluationUiTokens(
+        contentMargin: const EdgeInsets.all(LaooLayout.cardMargin),
+        cardPadding: const EdgeInsets.all(LaooLayout.cardPadding),
+        sectionSpacing: LaooLayout.listSectionSpacing,
+        itemSpacing: LaooLayout.listItemSpacing,
+        radius: LaooRadius.xs,
+        popupHeaderMinHeight: LaooLayout.popupHeaderMinHeight,
+        popupFieldSpacing: LaooLayout.popupFieldSpacing,
+        buttonHeight: LaooTypography.buttonHeight,
+        paginationCardHeight: LaooLayout.paginationCardHeight,
+        compactBreakpoint: 900,
+        captionStyle: LaooTypography.screenCaptionStyle,
+        sectionStyle: const TextStyle(
+          fontFamily: LaooTypography.fontFamily,
+          fontFamilyFallback: LaooTypography.fontFallback,
+          fontSize: LaooTypography.sectionTitle,
+          height: LaooTypography.titleLineHeight,
+          fontWeight: LaooTypography.emphasizedWeight,
+          color: LaooColors.textPrimary,
+        ),
+        inputStyle: const TextStyle(
+          fontFamily: LaooTypography.fontFamily,
+          fontFamilyFallback: LaooTypography.fontFallback,
+          fontSize: LaooTypography.inputText,
+          height: LaooTypography.inputLineHeight,
+          color: LaooColors.textPrimary,
+        ),
+        buttonStyle: const TextStyle(
+          fontFamily: LaooTypography.fontFamily,
+          fontFamilyFallback: LaooTypography.fontFallback,
+          fontSize: LaooTypography.button,
+          fontWeight: LaooTypography.emphasizedWeight,
+        ),
+        primaryColor: theme.primary,
+        borderColor: theme.border,
+        backgroundColor: LaooColors.background,
+        popupSurfaceColor: LaooColors.white,
+        dangerColor: LaooColors.error,
+        dangerSurfaceColor: LaooColors.error.withValues(alpha: 0.08),
+      );
+    },
   );
   configureMeetingFeatureHost(_buildMeetingWorkspaceShell);
   configureServiceWorkspaceShell(_buildMeetingWorkspaceShell);
-  configureGatePassFeatureHost(_buildMeetingWorkspaceShell);
+  configureGatePassFeatureHost(
+    _buildMeetingWorkspaceShell,
+    apiClientFactory: ApiClient.new,
+    apiClientDisposer: (client) => (client as ApiClient).dispose(),
+    menuTitleResolver: (menuCode, fallback) => NavigationMenuRepository()
+        .resolveMenuName(menuCode: menuCode, fallback: fallback),
+    messagePresenter: (context, {required message, required error}) =>
+        showTimedSnackBar(context, message: message, error: error),
+    upload: (path, {required fileName, required bytes}) {
+      final client = ApiClient();
+      return client
+          .upload(path, fileName: fileName, bytes: bytes)
+          .whenComplete(client.dispose);
+    },
+    uiTokensProvider: () {
+      final theme = workspaceThemeController.value;
+      return GatePassUiTokens(
+        contentMargin: const EdgeInsets.all(LaooLayout.cardMargin),
+        cardPadding: const EdgeInsets.all(LaooLayout.cardPadding),
+        sectionSpacing: LaooLayout.listSectionSpacing,
+        itemSpacing: LaooLayout.listItemSpacing,
+        radius: LaooRadius.xs,
+        buttonHeight: LaooTypography.buttonHeight,
+        paginationCardHeight: LaooLayout.paginationCardHeight,
+        compactBreakpoint: 900,
+        captionStyle: LaooTypography.screenCaptionStyle,
+        sectionStyle: const TextStyle(
+          fontFamily: LaooTypography.fontFamily,
+          fontFamilyFallback: LaooTypography.fontFallback,
+          fontSize: LaooTypography.sectionTitle,
+          height: LaooTypography.titleLineHeight,
+          fontWeight: LaooTypography.emphasizedWeight,
+          color: LaooColors.textPrimary,
+        ),
+        inputStyle: const TextStyle(
+          fontFamily: LaooTypography.fontFamily,
+          fontFamilyFallback: LaooTypography.fontFallback,
+          fontSize: LaooTypography.inputText,
+          height: LaooTypography.inputLineHeight,
+          color: LaooColors.textPrimary,
+        ),
+        tableStyle: const TextStyle(
+          fontFamily: LaooTypography.fontFamily,
+          fontFamilyFallback: LaooTypography.fontFallback,
+          fontSize: LaooTypography.tableBody,
+          height: LaooTypography.bodyLineHeight,
+          color: LaooColors.textPrimary,
+        ),
+        buttonStyle: const TextStyle(
+          fontFamily: LaooTypography.fontFamily,
+          fontFamilyFallback: LaooTypography.fontFallback,
+          fontSize: LaooTypography.button,
+          fontWeight: LaooTypography.emphasizedWeight,
+        ),
+        primaryColor: theme.primary,
+        borderColor: theme.border,
+      );
+    },
+  );
   configureTimeFeatureHost(
     _buildMeetingWorkspaceShell,
     apiClientFactory: ApiClient.new,
@@ -66,6 +185,10 @@ void main() {
     uiTokensProvider: () {
       final theme = workspaceThemeController.value;
       return TimeUiTokens(
+        paginationButtonSize: LaooLayout.paginationButtonSize,
+        dialogInsetPadding: LaooLayout.dialogInsetPadding,
+        popupHeaderMinHeight: LaooLayout.popupHeaderMinHeight,
+        popupFieldSpacing: LaooLayout.popupFieldSpacing,
         contentMargin: const EdgeInsets.all(LaooLayout.cardMargin),
         cardPadding: const EdgeInsets.all(LaooLayout.cardPadding),
         cardSpacing: LaooLayout.cardSpacing,
@@ -92,7 +215,7 @@ void main() {
         inputLabelStyle: TextStyle(
           fontFamily: LaooTypography.fontFamily,
           fontFamilyFallback: LaooTypography.fontFallback,
-          fontSize: LaooTypography.inputLabel,
+          fontSize: LaooTypography.materialFloatingLabelSource,
           height: LaooTypography.bodyLineHeight,
           color: theme.primary,
         ),
@@ -129,10 +252,14 @@ void main() {
     uiTokensProvider: () {
       final theme = workspaceThemeController.value;
       return TrainingUiTokens(
+        popupFieldSpacing: LaooLayout.popupFieldSpacing,
+        popupHeaderMinHeight: LaooLayout.popupHeaderMinHeight,
+        paginationButtonSize: LaooLayout.paginationButtonSize,
+        dialogInsetPadding: LaooLayout.dialogInsetPadding,
         workspace: LaooWorkspaceUiTokens(
           contentMargin: const EdgeInsets.all(LaooLayout.cardMargin),
           cardPadding: const EdgeInsets.all(LaooLayout.cardPadding),
-          sectionSpacing: LaooLayout.cardSpacing,
+          sectionSpacing: LaooLayout.listSectionSpacing,
           captionFilterSpacing: 6,
           itemSpacing: 6,
           radius: LaooRadius.xs,
@@ -177,7 +304,26 @@ void main() {
       );
     },
   );
-  configureVisitorFeatureHost(_buildMeetingWorkspaceShell);
+  configureVisitorFeatureHost(
+    _buildMeetingWorkspaceShell,
+    uiTokensProvider: () => const VisitorUiTokens(
+      cardMargin: LaooLayout.cardMargin,
+      cardPadding: LaooLayout.cardPadding,
+      cardSpacing: LaooLayout.cardSpacing,
+      listSectionSpacing: LaooLayout.listSectionSpacing,
+      listItemSpacing: LaooLayout.listItemSpacing,
+      paginationCardHeight: LaooLayout.paginationCardHeight,
+      paginationButtonSize: LaooLayout.paginationButtonSize,
+      popupFieldSpacing: LaooLayout.popupFieldSpacing,
+      dialogInsetPadding: LaooLayout.dialogInsetPadding,
+      popupHeaderMinHeight: LaooLayout.popupHeaderMinHeight,
+      radius: LaooRadius.xs,
+      buttonHeight: LaooTypography.buttonHeight,
+      buttonFontSize: LaooTypography.button,
+      floatingLabelSource: LaooTypography.materialFloatingLabelSource,
+      captionStyle: LaooTypography.screenCaptionStyle,
+    ),
+  );
   runApp(const LaooApp());
 }
 

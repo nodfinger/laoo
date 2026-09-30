@@ -10,14 +10,62 @@ namespace LaooApi.Controllers;
 public sealed class ServicePmController(IConfiguration configuration) : ControllerBase
 {
     long CompanyId => RegistryControllerSupport.ClaimLong(User,"company_id");
+    long PartnerId => RegistryControllerSupport.ClaimLong(User,"partner_id");
     long UserId => RegistryControllerSupport.ClaimLong(User,"user_id");
+    long PersonId => RegistryControllerSupport.ClaimLong(User,"person_id");
     async Task<SqlConnection> Open(CancellationToken t) => await RegistryControllerSupport.Open(configuration,t);
     async Task<bool> Allow(SqlConnection c,string menu,string action,CancellationToken t) => await CompanyProjectPermission.IsAllowedAsync(c,User,menu,action,t);
     static void Add(SqlCommand q,string n,SqlDbType t,object? v) => q.Parameters.Add(n,t).Value=v??DBNull.Value;
-    async Task<bool> Enabled(SqlConnection c,CancellationToken t) { await using var q=new SqlCommand("SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADCompanyProject CP JOIN dbo.TDADProject P ON P.ProjectID=CP.ProjectID AND P.ProjectCode=N'LAOO_SERVICE' AND P.IsActive=1 WHERE CP.CompanyID=@c AND CP.IsActive=1) THEN 1 ELSE 0 END",c);Add(q,"@c",SqlDbType.BigInt,CompanyId);return Convert.ToBoolean(await q.ExecuteScalarAsync(t)); }
-    async Task<IActionResult?> Guard(SqlConnection c,string menu,string action,CancellationToken t) => !await Enabled(c,t)||!await Allow(c,menu,action,t)?Forbid():null;
-    async Task<IActionResult?> WorkGuard(SqlConnection c,bool portal,string action,CancellationToken t) => !await Enabled(c,t)||!await Allow(c,portal ? "20004" : "16003",action,t)?Forbid():null;
+    async Task<bool> Enabled(SqlConnection c,CancellationToken t)
+    {
+        const string sql = "SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.TDSTCompanySetUp C JOIN dbo.TDADProject P ON P.ProjectCode=N'LAOO_SERVICE' AND P.IsActive=1 JOIN dbo.TDADCompanyProject CP ON CP.ProjectID=P.ProjectID AND CP.CompanyID=C.CompanyID AND CP.PartnerID=C.PartnerID AND CP.IsEnabled=1 WHERE C.CompanyID=@c AND C.PartnerID=@p AND C.IsActive=1 AND (CP.StartDate IS NULL OR CP.StartDate<=CONVERT(date,SYSUTCDATETIME())) AND (CP.ExpireDate IS NULL OR CP.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))) THEN 1 ELSE 0 END";
+        await using var q = new SqlCommand(sql,c);
+        Add(q,"@c",SqlDbType.BigInt,CompanyId);
+        Add(q,"@p",SqlDbType.BigInt,PartnerId);
+        return Convert.ToBoolean(await q.ExecuteScalarAsync(t));
+    }
+    async Task<IActionResult?> Guard(SqlConnection c,string menu,string action,CancellationToken t)
+    {
+        if ((menu is "16001" or "16002") && (action is "CREATE" or "EDIT" or "DELETE") && await ScreenType(c,menu,t)!=1) return Forbid();
+        return !await Enabled(c,t)||!await Allow(c,menu,action,t)?Forbid():null;
+    }
+    static async Task<int> ScreenType(SqlConnection c,string menu,CancellationToken t)
+    {
+        await using var q=new SqlCommand("SELECT ScreenType FROM dbo.TDADMainMenu WHERE MenuCode=@m AND IsActive=1",c);
+        Add(q,"@m",SqlDbType.Char,menu);
+        return Convert.ToInt32(await q.ExecuteScalarAsync(t));
+    }
+    async Task<IActionResult?> WorkGuard(SqlConnection c,bool portal,string action,CancellationToken t)
+    {
+        var menu = portal ? "20004" : "16003";
+        if (await ScreenType(c, menu, t) != (portal ? 3 : 2) ||
+            (portal && action != "VIEW") ||
+            (!portal && action is not ("VIEW" or "EDIT")) ||
+            !await Enabled(c, t) || !await Allow(c, menu, action, t)) return Forbid();
+        return null;
+    }
     static async Task<List<Dictionary<string,object?>>> Rows(SqlCommand q,CancellationToken t) { var x=new List<Dictionary<string,object?>>();await using var r=await q.ExecuteReaderAsync(t);while(await r.ReadAsync(t)){var d=new Dictionary<string,object?>();for(var i=0;i<r.FieldCount;i++)d[char.ToLowerInvariant(r.GetName(i)[0])+r.GetName(i)[1..]]=r.IsDBNull(i)?null:r.GetValue(i);x.Add(d);}return x; }
+
+    async Task<IActionResult> MenuActions(string menu, CancellationToken t)
+    {
+        await using var c = await Open(t);
+        if (await Guard(c, menu, "VIEW", t) is { } bad) return bad;
+        var screenType = await ScreenType(c, menu, t);
+        return Ok(new
+        {
+            view = true,
+            screenType,
+            create = screenType == 1 && await Allow(c, menu, "CREATE", t),
+            edit = screenType == 1 && await Allow(c, menu, "EDIT", t),
+            delete = screenType == 1 && await Allow(c, menu, "DELETE", t)
+        });
+    }
+
+    [HttpGet("plans/actions")]
+    public Task<IActionResult> PlanActions(CancellationToken t) => MenuActions("16001", t);
+
+    [HttpGet("checklists/actions")]
+    public Task<IActionResult> ChecklistActions(CancellationToken t) => MenuActions("16002", t);
 
     [HttpGet("plans")]
     public async Task<IActionResult> Plans([FromQuery]string? search,CancellationToken t){await using var c=await Open(t);if(await Guard(c,"16001","VIEW",t)is { } bad)return bad;await using var q=new SqlCommand("SELECT P.PmPlanID,P.PlanName,P.ItemTypeCode,P.IntervalUnit,P.IntervalValue,P.StartDate,P.IsActive,COUNT(A.PmPlanAssignmentID) AssetCount FROM dbo.TDADServicePmPlan P LEFT JOIN dbo.TDADServicePmPlanAssignment A ON A.PmPlanID=P.PmPlanID AND A.CompanyID=P.CompanyID AND A.IsActive=1 WHERE P.CompanyID=@c AND (@s=N'' OR P.PlanName LIKE N'%'+@s+N'%' OR P.ItemTypeCode LIKE N'%'+@s+N'%') GROUP BY P.PmPlanID,P.PlanName,P.ItemTypeCode,P.IntervalUnit,P.IntervalValue,P.StartDate,P.IsActive ORDER BY P.IsActive DESC,P.PlanName",c);Add(q,"@c",SqlDbType.BigInt,CompanyId);Add(q,"@s",SqlDbType.NVarChar,search?.Trim()??"");return Ok(new{items=await Rows(q,t)});}
@@ -39,10 +87,147 @@ public sealed class ServicePmController(IConfiguration configuration) : Controll
     public async Task<IActionResult> UpdatePlan(long id,[FromBody] PmPlanInput x,CancellationToken t)=>await SavePlan(id,x,t);
     async Task<IActionResult> SavePlan(long? id,PmPlanInput x,CancellationToken t){if(string.IsNullOrWhiteSpace(x.PlanName)||string.IsNullOrWhiteSpace(x.ItemTypeCode)||x.IntervalValue<1||!(x.IntervalUnit=="DAY"||x.IntervalUnit=="MONTH"))return BadRequest(new{message="ข้อมูลแผน PM ไม่ครบถ้วน"});await using var c=await Open(t);if(await Guard(c,"16001",id is null?"CREATE":"EDIT",t)is{} bad)return bad;await using var tx=await c.BeginTransactionAsync(t);try{long plan=id??0;if(id is null){await using var q=new SqlCommand("INSERT dbo.TDADServicePmPlan(CompanyID,PlanName,ItemTypeCode,IntervalUnit,IntervalValue,StartDate,IsActive,CreateBy) OUTPUT INSERTED.PmPlanID VALUES(@c,@n,@type,@u,@v,@d,@a,@by)",c,(SqlTransaction)tx);P(q,x);plan=Convert.ToInt64(await q.ExecuteScalarAsync(t));}else{await using var q=new SqlCommand("UPDATE dbo.TDADServicePmPlan SET PlanName=@n,ItemTypeCode=@type,IntervalUnit=@u,IntervalValue=@v,StartDate=@d,IsActive=@a,UpdateBy=@by,UpdateDate=SYSUTCDATETIME() WHERE CompanyID=@c AND PmPlanID=@id",c,(SqlTransaction)tx);P(q,x);Add(q,"@id",SqlDbType.BigInt,id);if(await q.ExecuteNonQueryAsync(t)==0){await tx.RollbackAsync(t);return NotFound();}}
 foreach(var asset in x.ItemInstanceIds.Distinct()){await using var q=new SqlCommand("IF EXISTS(SELECT 1 FROM dbo.TDIVItemInstance X JOIN dbo.TDIVItem I ON I.ItemID=X.ItemID AND I.CompanyID=X.CompanyID JOIN dbo.TDIVItemUsage U ON U.ItemID=I.ItemID AND U.CompanyID=I.CompanyID AND U.UsageCode=N'EQUIPMENT' WHERE X.CompanyID=@c AND X.ItemInstanceID=@asset AND X.StatusCode=N'INSTALLED' AND I.IsActive=1 AND I.ItemTypeCode=@type) MERGE dbo.TDADServicePmPlanAssignment AS T USING(SELECT @c CompanyID,@plan PmPlanID,@asset ItemInstanceID) S ON T.CompanyID=S.CompanyID AND T.PmPlanID=S.PmPlanID AND T.ItemInstanceID=S.ItemInstanceID WHEN MATCHED THEN UPDATE SET IsActive=1,StartDate=@d,NextDueDate=COALESCE(T.NextDueDate,@d),UpdateDate=SYSUTCDATETIME(),UpdateBy=@by WHEN NOT MATCHED THEN INSERT(CompanyID,PmPlanID,ItemInstanceID,StartDate,NextDueDate,CreateBy) VALUES(@c,@plan,@asset,@d,@d,@by);",c,(SqlTransaction)tx);Add(q,"@c",SqlDbType.BigInt,CompanyId);Add(q,"@plan",SqlDbType.BigInt,plan);Add(q,"@asset",SqlDbType.BigInt,asset);Add(q,"@type",SqlDbType.NVarChar,x.ItemTypeCode);Add(q,"@d",SqlDbType.Date,x.StartDate.Date);Add(q,"@by",SqlDbType.BigInt,UserId);await q.ExecuteNonQueryAsync(t);}await tx.CommitAsync(t);return Ok(new{pmPlanId=plan});}catch{await tx.RollbackAsync(t);throw;}}
+    [HttpDelete("plans/{id:long}")]
+    public async Task<IActionResult> DeletePlan(long id, CancellationToken t)
+    {
+        await using var c = await Open(t);
+        if (await Guard(c, "16001", "DELETE", t) is { } bad) return bad;
+        await using var tx = (SqlTransaction)await c.BeginTransactionAsync(IsolationLevel.Serializable, t);
+        await using var q = new SqlCommand(
+            """
+IF NOT EXISTS(SELECT 1 FROM dbo.TDADServicePmPlan WITH(UPDLOCK,HOLDLOCK) WHERE CompanyID=@c AND PmPlanID=@id)
+ THROW 52651,N'ไม่พบแผน PM ในบริษัทนี้',1;
+IF EXISTS(SELECT 1 FROM dbo.TDADServicePmWorkOrder W JOIN dbo.TDADServicePmPlanAssignment A ON A.CompanyID=W.CompanyID AND A.PmPlanAssignmentID=W.PmPlanAssignmentID WHERE A.CompanyID=@c AND A.PmPlanID=@id)
+ THROW 52652,N'แผน PM นี้มีใบงานแล้ว ไม่สามารถลบได้',1;
+DELETE FROM dbo.TDADServicePmPlanChecklist WHERE CompanyID=@c AND PmPlanID=@id;
+DELETE FROM dbo.TDADServicePmPlanAssignment WHERE CompanyID=@c AND PmPlanID=@id;
+DELETE FROM dbo.TDADServicePmPlan WHERE CompanyID=@c AND PmPlanID=@id;
+SELECT @@ROWCOUNT;
+""", c, tx);
+        Add(q, "@c", SqlDbType.BigInt, CompanyId);
+        Add(q, "@id", SqlDbType.BigInt, id);
+        try
+        {
+            if (Convert.ToInt32(await q.ExecuteScalarAsync(t)) != 1)
+            {
+                await tx.RollbackAsync(t);
+                return Conflict(new { message = "ลบแผน PM ไม่สำเร็จ", description = "ข้อมูลเปลี่ยนไปแล้ว กรุณาโหลดใหม่" });
+            }
+            await tx.CommitAsync(t);
+            return NoContent();
+        }
+        catch (SqlException e) when (e.Number is 52651 or 52652 or 547)
+        {
+            await tx.RollbackAsync(t);
+            return e.Number == 52651 ? NotFound() : Conflict(new { message = "ลบแผน PM ไม่ได้", description = e.Number == 547 ? "มีข้อมูลอื่นอ้างอิงแผนนี้อยู่" : e.Message });
+        }
+    }
+
     void P(SqlCommand q,PmPlanInput x){Add(q,"@c",SqlDbType.BigInt,CompanyId);Add(q,"@n",SqlDbType.NVarChar,x.PlanName.Trim());Add(q,"@type",SqlDbType.NVarChar,x.ItemTypeCode.Trim());Add(q,"@u",SqlDbType.NVarChar,x.IntervalUnit);Add(q,"@v",SqlDbType.Int,x.IntervalValue);Add(q,"@d",SqlDbType.Date,x.StartDate.Date);Add(q,"@a",SqlDbType.Bit,x.IsActive);Add(q,"@by",SqlDbType.BigInt,UserId);}
 
     [HttpGet("checklists")]
     public async Task<IActionResult> Checklists(CancellationToken t){await using var c=await Open(t);if(await Guard(c,"16002","VIEW",t)is{} bad)return bad;await using var q=new SqlCommand("SELECT C.PmChecklistID,C.ChecklistName,C.IsActive,COUNT(I.PmChecklistItemID) ItemCount FROM dbo.TDADServicePmChecklist C LEFT JOIN dbo.TDADServicePmChecklistItem I ON I.PmChecklistID=C.PmChecklistID AND I.CompanyID=C.CompanyID AND I.IsActive=1 WHERE C.CompanyID=@c GROUP BY C.PmChecklistID,C.ChecklistName,C.IsActive ORDER BY C.ChecklistName",c);Add(q,"@c",SqlDbType.BigInt,CompanyId);return Ok(new{items=await Rows(q,t)});}
+    [HttpGet("checklists/{id:long}")]
+    public async Task<IActionResult> Checklist(long id, CancellationToken t)
+    {
+        await using var c = await Open(t);
+        if (await Guard(c, "16002", "VIEW", t) is { } bad) return bad;
+        await using var h = new SqlCommand(
+            "SELECT PmChecklistID,ChecklistName,IsActive FROM dbo.TDADServicePmChecklist WHERE CompanyID=@c AND PmChecklistID=@id", c);
+        Add(h, "@c", SqlDbType.BigInt, CompanyId);
+        Add(h, "@id", SqlDbType.BigInt, id);
+        var header = await Rows(h, t);
+        if (header.Count == 0) return NotFound();
+        await using var q = new SqlCommand(
+            "SELECT PmChecklistItemID,SequenceNo,CheckItem,IsRequired FROM dbo.TDADServicePmChecklistItem WHERE CompanyID=@c AND PmChecklistID=@id AND IsActive=1 ORDER BY SequenceNo,PmChecklistItemID", c);
+        Add(q, "@c", SqlDbType.BigInt, CompanyId);
+        Add(q, "@id", SqlDbType.BigInt, id);
+        return Ok(new { checklist = header[0], items = await Rows(q, t) });
+    }
+
+    [HttpPut("checklists/{id:long}")]
+    public async Task<IActionResult> UpdateChecklist(long id, [FromBody] ChecklistInput x, CancellationToken t)
+    {
+        if (string.IsNullOrWhiteSpace(x.ChecklistName) || x.Items is null || x.Items.Count == 0
+            || x.Items.Any(item => string.IsNullOrWhiteSpace(item.Text)))
+            return BadRequest(new { message = "กรุณาระบุชื่อและรายการตรวจให้ครบทุกข้อ" });
+        await using var c = await Open(t);
+        if (await Guard(c, "16002", "EDIT", t) is { } bad) return bad;
+        await using var tx = await c.BeginTransactionAsync(t);
+        await using var h = new SqlCommand(
+            "UPDATE dbo.TDADServicePmChecklist SET ChecklistName=@name,IsActive=@active,UpdateBy=@by,UpdateDate=SYSUTCDATETIME() WHERE CompanyID=@c AND PmChecklistID=@id",
+            c, (SqlTransaction)tx);
+        Add(h, "@name", SqlDbType.NVarChar, x.ChecklistName.Trim());
+        Add(h, "@active", SqlDbType.Bit, x.IsActive);
+        Add(h, "@by", SqlDbType.BigInt, UserId);
+        Add(h, "@c", SqlDbType.BigInt, CompanyId);
+        Add(h, "@id", SqlDbType.BigInt, id);
+        if (await h.ExecuteNonQueryAsync(t) == 0)
+        {
+            await tx.RollbackAsync(t);
+            return NotFound();
+        }
+        await using var archive = new SqlCommand(
+            "UPDATE dbo.TDADServicePmChecklistItem SET IsActive=0 WHERE CompanyID=@c AND PmChecklistID=@id AND IsActive=1",
+            c, (SqlTransaction)tx);
+        Add(archive, "@c", SqlDbType.BigInt, CompanyId);
+        Add(archive, "@id", SqlDbType.BigInt, id);
+        await archive.ExecuteNonQueryAsync(t);
+        for (var sequence = 0; sequence < x.Items.Count; sequence++)
+        {
+            await using var q = new SqlCommand(
+                "INSERT dbo.TDADServicePmChecklistItem(CompanyID,PmChecklistID,SequenceNo,CheckItem,IsRequired,IsActive) VALUES(@c,@id,@sequence,@text,@required,@active)",
+                c, (SqlTransaction)tx);
+            Add(q, "@c", SqlDbType.BigInt, CompanyId);
+            Add(q, "@id", SqlDbType.BigInt, id);
+            Add(q, "@sequence", SqlDbType.Int, sequence + 1);
+            Add(q, "@text", SqlDbType.NVarChar, x.Items[sequence].Text.Trim());
+            Add(q, "@required", SqlDbType.Bit, x.Items[sequence].Required);
+            Add(q, "@active", SqlDbType.Bit, x.IsActive);
+            await q.ExecuteNonQueryAsync(t);
+        }
+        await tx.CommitAsync(t);
+        return Ok(new { pmChecklistId = id });
+    }
+
+    [HttpDelete("checklists/{id:long}")]
+    public async Task<IActionResult> DeleteChecklist(long id, CancellationToken t)
+    {
+        await using var c = await Open(t);
+        if (await Guard(c, "16002", "DELETE", t) is { } bad) return bad;
+        await using var tx = (SqlTransaction)await c.BeginTransactionAsync(IsolationLevel.Serializable,t);
+        await using var q = new SqlCommand(
+            """
+IF NOT EXISTS(SELECT 1 FROM dbo.TDADServicePmChecklist WITH(UPDLOCK,HOLDLOCK) WHERE CompanyID=@c AND PmChecklistID=@id)
+ THROW 52653,N'ไม่พบ Checklist ในบริษัทนี้',1;
+IF EXISTS(SELECT 1 FROM dbo.TDADServicePmWorkOrderCheck W JOIN dbo.TDADServicePmChecklistItem I ON I.CompanyID=W.CompanyID AND I.PmChecklistItemID=W.PmChecklistItemID WHERE I.CompanyID=@c AND I.PmChecklistID=@id)
+ THROW 52654,N'Checklist นี้ถูกใช้ในใบงาน PM แล้ว ไม่สามารถลบได้',1;
+IF EXISTS(SELECT 1 FROM dbo.TDADServicePmPlanChecklist PC JOIN dbo.TDADServicePmPlanAssignment A ON A.CompanyID=PC.CompanyID AND A.PmPlanID=PC.PmPlanID JOIN dbo.TDADServicePmWorkOrder W ON W.CompanyID=A.CompanyID AND W.PmPlanAssignmentID=A.PmPlanAssignmentID WHERE PC.CompanyID=@c AND PC.PmChecklistID=@id)
+ THROW 52654,N'Checklist นี้ผูกกับแผนที่มีใบงาน PM แล้ว ไม่สามารถลบได้',1;
+DELETE FROM dbo.TDADServicePmPlanChecklist WHERE CompanyID=@c AND PmChecklistID=@id;
+DELETE FROM dbo.TDADServicePmChecklistItem WHERE CompanyID=@c AND PmChecklistID=@id;
+DELETE FROM dbo.TDADServicePmChecklist WHERE CompanyID=@c AND PmChecklistID=@id;
+SELECT @@ROWCOUNT;
+""", c, tx);
+        Add(q, "@c", SqlDbType.BigInt, CompanyId);
+        Add(q, "@id", SqlDbType.BigInt, id);
+        try
+        {
+            if (Convert.ToInt32(await q.ExecuteScalarAsync(t)) != 1)
+            {
+                await tx.RollbackAsync(t);
+                return Conflict(new { message = "ลบ Checklist ไม่สำเร็จ", description = "ข้อมูลเปลี่ยนไปแล้ว กรุณาโหลดใหม่" });
+            }
+            await tx.CommitAsync(t);
+            return NoContent();
+        }
+        catch (SqlException e) when (e.Number is 52653 or 52654 or 547)
+        {
+            await tx.RollbackAsync(t);
+            return e.Number == 52653 ? NotFound() : Conflict(new { message = "ลบ Checklist ไม่ได้", description = e.Number == 547 ? "มีข้อมูลอื่นอ้างอิง Checklist นี้อยู่" : e.Message });
+        }
+    }
+
     [HttpPost("checklists")]
     public async Task<IActionResult> CreateChecklist([FromBody] ChecklistInput x,CancellationToken t){if(string.IsNullOrWhiteSpace(x.ChecklistName)||x.Items.Count==0)return BadRequest(new{message="กรุณาระบุชื่อและรายการตรวจ"});await using var c=await Open(t);if(await Guard(c,"16002","CREATE",t)is{} bad)return bad;await using var tx=await c.BeginTransactionAsync(t);await using var h=new SqlCommand("INSERT dbo.TDADServicePmChecklist(CompanyID,ChecklistName,IsActive,CreateBy) OUTPUT INSERTED.PmChecklistID VALUES(@c,@n,@a,@by)",c,(SqlTransaction)tx);Add(h,"@c",SqlDbType.BigInt,CompanyId);Add(h,"@n",SqlDbType.NVarChar,x.ChecklistName.Trim());Add(h,"@a",SqlDbType.Bit,x.IsActive);Add(h,"@by",SqlDbType.BigInt,UserId);var id=Convert.ToInt64(await h.ExecuteScalarAsync(t));var n=1;foreach(var item in x.Items.Where(z=>!string.IsNullOrWhiteSpace(z.Text))){await using var q=new SqlCommand("INSERT dbo.TDADServicePmChecklistItem(CompanyID,PmChecklistID,SequenceNo,CheckItem,IsRequired,IsActive) VALUES(@c,@id,@n,@x,@r,1)",c,(SqlTransaction)tx);Add(q,"@c",SqlDbType.BigInt,CompanyId);Add(q,"@id",SqlDbType.BigInt,id);Add(q,"@n",SqlDbType.Int,n++);Add(q,"@x",SqlDbType.NVarChar,item.Text.Trim());Add(q,"@r",SqlDbType.Bit,item.Required);await q.ExecuteNonQueryAsync(t);}await tx.CommitAsync(t);return Ok(new{pmChecklistId=id});}
 
@@ -51,27 +236,57 @@ foreach(var asset in x.ItemInstanceIds.Distinct()){await using var q=new SqlComm
     {
         await using var c=await Open(t);
         var menu=portal ? "20004" : "16003";
-        if(!await Enabled(c,t)||!await Allow(c,menu,"VIEW",t))return Forbid();
-        return Ok(new { view=true, create=await Allow(c,menu,"CREATE",t), edit=await Allow(c,menu,"EDIT",t) });
+        if (await WorkGuard(c, portal, "VIEW", t) is { } bad) return bad;
+        var canEdit = !portal && await Allow(c, menu, "EDIT", t);
+        return Ok(new { view = true, screenType = portal ? 3 : 2, generate = canEdit, edit = canEdit });
     }
     [HttpGet("work-orders")]
     public async Task<IActionResult> WorkOrders([FromQuery]string? status,[FromQuery]DateTime? from,[FromQuery]DateTime? to,[FromQuery]bool portal=false,CancellationToken t=default)
     {
         await using var c=await Open(t); if(await WorkGuard(c,portal,"VIEW",t)is{} bad)return bad;
-        const string sql="SELECT W.PmWorkOrderID,W.DueDate,W.StatusCode,W.PlanNameSnapshot,W.ItemSnapshot,W.LocationSnapshot,W.StartedDate,W.CompletedDate,W.ResultDetail,W.SkipReason,Residents.ResidentNames FROM dbo.TDADServicePmWorkOrder W LEFT JOIN dbo.TDIVItemInstance X ON X.CompanyID=W.CompanyID AND X.ItemInstanceID=W.ItemInstanceID OUTER APPLY(SELECT STRING_AGG(P.FullName,N', ') ResidentNames FROM dbo.TDADResident R JOIN dbo.TDADPerson P ON P.CompanyID=R.CompanyID AND P.PersonID=R.PersonID AND P.IsActive=1 WHERE R.CompanyID=W.CompanyID AND R.RoomID=X.RoomID AND R.IsActive=1) Residents WHERE W.CompanyID=@c AND (@s=N'' OR W.StatusCode=@s) AND W.DueDate>=@f AND W.DueDate<=@t ORDER BY W.DueDate,W.PmWorkOrderID";
-        await using var q=new SqlCommand(sql,c);Add(q,"@c",SqlDbType.BigInt,CompanyId);Add(q,"@s",SqlDbType.NVarChar,status?.Trim()??"");Add(q,"@f",SqlDbType.Date,(from??DateTime.Today.AddDays(-30)).Date);Add(q,"@t",SqlDbType.Date,(to??DateTime.Today.AddMonths(3)).Date);return Ok(new{items=await Rows(q,t)});
+        if (portal && PersonId <= 0) return Forbid();
+const string sql="SELECT W.PmWorkOrderID,W.DueDate,W.StatusCode,W.PlanNameSnapshot,W.ItemSnapshot,W.LocationSnapshot,W.StartedDate,W.CompletedDate,W.ResultDetail,W.SkipReason,CASE WHEN @portal=1 THEN NULL ELSE Residents.ResidentNames END ResidentNames FROM dbo.TDADServicePmWorkOrder W LEFT JOIN dbo.TDIVItemInstance X ON X.CompanyID=W.CompanyID AND X.ItemInstanceID=W.ItemInstanceID OUTER APPLY(SELECT STRING_AGG(P.FullName,N', ') ResidentNames FROM dbo.TDADResident R JOIN dbo.TDADPerson P ON P.CompanyID=R.CompanyID AND P.PersonID=R.PersonID AND P.IsActive=1 WHERE R.CompanyID=W.CompanyID AND R.RoomID=X.RoomID AND R.IsActive=1) Residents WHERE W.CompanyID=@c AND (@portal=0 OR EXISTS(SELECT 1 FROM dbo.TDADResident OwnerR JOIN dbo.TDADPerson OwnerP ON OwnerP.CompanyID=OwnerR.CompanyID AND OwnerP.PersonID=OwnerR.PersonID AND OwnerP.IsActive=1 WHERE OwnerR.CompanyID=W.CompanyID AND OwnerR.PersonID=@person AND OwnerR.RoomID=X.RoomID AND OwnerR.IsActive=1)) AND (@s=N'' OR W.StatusCode=@s) AND W.DueDate>=@f AND W.DueDate<=@t ORDER BY W.DueDate,W.PmWorkOrderID";
+await using var q=new SqlCommand(sql,c);Add(q,"@c",SqlDbType.BigInt,CompanyId);Add(q,"@portal",SqlDbType.Bit,portal);Add(q,"@person",SqlDbType.BigInt,PersonId);Add(q,"@s",SqlDbType.NVarChar,status?.Trim()??"");Add(q,"@f",SqlDbType.Date,(from??DateTime.Today.AddDays(-30)).Date);Add(q,"@t",SqlDbType.Date,(to??DateTime.Today.AddMonths(3)).Date);return Ok(new{items=await Rows(q,t)});
     }
     [HttpGet("work-orders/{id:long}")]
     public async Task<IActionResult> WorkOrder(long id,[FromQuery]bool portal=false,CancellationToken t=default)
     {
         await using var c=await Open(t);if(await WorkGuard(c,portal,"VIEW",t)is{} bad)return bad;
-        const string headSql="SELECT W.PmWorkOrderID,W.DueDate,W.StatusCode,W.PlanNameSnapshot,W.ItemSnapshot,W.LocationSnapshot,W.StartedDate,W.CompletedDate,W.ResultDetail,W.SkipReason,Residents.ResidentNames FROM dbo.TDADServicePmWorkOrder W LEFT JOIN dbo.TDIVItemInstance X ON X.CompanyID=W.CompanyID AND X.ItemInstanceID=W.ItemInstanceID OUTER APPLY(SELECT STRING_AGG(P.FullName,N', ') ResidentNames FROM dbo.TDADResident R JOIN dbo.TDADPerson P ON P.CompanyID=R.CompanyID AND P.PersonID=R.PersonID AND P.IsActive=1 WHERE R.CompanyID=W.CompanyID AND R.RoomID=X.RoomID AND R.IsActive=1) Residents WHERE W.CompanyID=@c AND W.PmWorkOrderID=@id";
-        await using var h=new SqlCommand(headSql,c);Add(h,"@c",SqlDbType.BigInt,CompanyId);Add(h,"@id",SqlDbType.BigInt,id);var head=await Rows(h,t);if(head.Count==0)return NotFound();await using var q=new SqlCommand("SELECT PmWorkOrderCheckID,SequenceNo,CheckItemSnapshot,IsRequired,IsChecked,ResultNote FROM dbo.TDADServicePmWorkOrderCheck WHERE CompanyID=@c AND PmWorkOrderID=@id ORDER BY SequenceNo,PmWorkOrderCheckID",c);Add(q,"@c",SqlDbType.BigInt,CompanyId);Add(q,"@id",SqlDbType.BigInt,id);return Ok(new{workOrder=head[0],checks=await Rows(q,t)});
+        if (portal && PersonId <= 0) return Forbid();
+const string headSql="SELECT W.PmWorkOrderID,W.DueDate,W.StatusCode,W.PlanNameSnapshot,W.ItemSnapshot,W.LocationSnapshot,W.StartedDate,W.CompletedDate,W.ResultDetail,W.SkipReason,CASE WHEN @portal=1 THEN NULL ELSE Residents.ResidentNames END ResidentNames FROM dbo.TDADServicePmWorkOrder W LEFT JOIN dbo.TDIVItemInstance X ON X.CompanyID=W.CompanyID AND X.ItemInstanceID=W.ItemInstanceID OUTER APPLY(SELECT STRING_AGG(P.FullName,N', ') ResidentNames FROM dbo.TDADResident R JOIN dbo.TDADPerson P ON P.CompanyID=R.CompanyID AND P.PersonID=R.PersonID AND P.IsActive=1 WHERE R.CompanyID=W.CompanyID AND R.RoomID=X.RoomID AND R.IsActive=1) Residents WHERE W.CompanyID=@c AND (@portal=0 OR EXISTS(SELECT 1 FROM dbo.TDADResident OwnerR JOIN dbo.TDADPerson OwnerP ON OwnerP.CompanyID=OwnerR.CompanyID AND OwnerP.PersonID=OwnerR.PersonID AND OwnerP.IsActive=1 WHERE OwnerR.CompanyID=W.CompanyID AND OwnerR.PersonID=@person AND OwnerR.RoomID=X.RoomID AND OwnerR.IsActive=1)) AND W.PmWorkOrderID=@id";
+await using var h=new SqlCommand(headSql,c);Add(h,"@c",SqlDbType.BigInt,CompanyId);Add(h,"@portal",SqlDbType.Bit,portal);Add(h,"@person",SqlDbType.BigInt,PersonId);Add(h,"@id",SqlDbType.BigInt,id);var head=await Rows(h,t);if(head.Count==0)return NotFound();await using var q=new SqlCommand("SELECT PmWorkOrderCheckID,SequenceNo,CheckItemSnapshot,IsRequired,IsChecked,ResultNote FROM dbo.TDADServicePmWorkOrderCheck WHERE CompanyID=@c AND PmWorkOrderID=@id ORDER BY SequenceNo,PmWorkOrderCheckID",c);Add(q,"@c",SqlDbType.BigInt,CompanyId);Add(q,"@id",SqlDbType.BigInt,id);return Ok(new{workOrder=head[0],checks=await Rows(q,t)});
     }
     [HttpPut("work-orders/{id:long}/checks")]
-    public async Task<IActionResult> SaveChecks(long id,[FromBody] PmCheckResultInput x,[FromQuery]bool portal=false,CancellationToken t=default){await using var c=await Open(t);if(await WorkGuard(c,portal,"EDIT",t)is{} bad)return bad;await using var tx=await c.BeginTransactionAsync(t);foreach(var line in x.Items){await using var q=new SqlCommand("UPDATE C SET IsChecked=@checked,ResultNote=@note FROM dbo.TDADServicePmWorkOrderCheck C JOIN dbo.TDADServicePmWorkOrder W ON W.PmWorkOrderID=C.PmWorkOrderID AND W.CompanyID=C.CompanyID WHERE C.CompanyID=@c AND C.PmWorkOrderID=@id AND C.PmWorkOrderCheckID=@check AND W.StatusCode=N'IN_PROGRESS'",c,(SqlTransaction)tx);Add(q,"@checked",SqlDbType.Bit,line.IsChecked);Add(q,"@note",SqlDbType.NVarChar,line.ResultNote?.Trim());Add(q,"@c",SqlDbType.BigInt,CompanyId);Add(q,"@id",SqlDbType.BigInt,id);Add(q,"@check",SqlDbType.BigInt,line.PmWorkOrderCheckId);await q.ExecuteNonQueryAsync(t);}await tx.CommitAsync(t);return Ok(new{saved=true});}
+    public async Task<IActionResult> SaveChecks(long id,[FromBody] PmCheckResultInput x,[FromQuery]bool portal=false,CancellationToken t=default)
+    {
+        await using var c=await Open(t);
+        if(await WorkGuard(c,portal,"EDIT",t)is{} bad)return bad;
+        await using var tx=await c.BeginTransactionAsync(t);
+        await using var state=new SqlCommand("SELECT StatusCode FROM dbo.TDADServicePmWorkOrder WHERE CompanyID=@c AND PmWorkOrderID=@id",c,(SqlTransaction)tx);
+        Add(state,"@c",SqlDbType.BigInt,CompanyId);
+        Add(state,"@id",SqlDbType.BigInt,id);
+        var status=await state.ExecuteScalarAsync(t) as string;
+        if(status is null){await tx.RollbackAsync(t);return NotFound();}
+        if(status!="IN_PROGRESS"){await tx.RollbackAsync(t);return Conflict(new{message="แก้ไขรายการตรวจได้เฉพาะงานที่กำลังดำเนินการ"});}
+        foreach(var line in x.Items)
+        {
+            await using var q=new SqlCommand("UPDATE C SET IsChecked=@checked,ResultNote=@note FROM dbo.TDADServicePmWorkOrderCheck C JOIN dbo.TDADServicePmWorkOrder W ON W.PmWorkOrderID=C.PmWorkOrderID AND W.CompanyID=C.CompanyID WHERE C.CompanyID=@c AND C.PmWorkOrderID=@id AND C.PmWorkOrderCheckID=@check AND W.StatusCode=N'IN_PROGRESS'",c,(SqlTransaction)tx);
+            Add(q,"@checked",SqlDbType.Bit,line.IsChecked);
+            Add(q,"@note",SqlDbType.NVarChar,line.ResultNote?.Trim());
+            Add(q,"@c",SqlDbType.BigInt,CompanyId);
+            Add(q,"@id",SqlDbType.BigInt,id);
+            Add(q,"@check",SqlDbType.BigInt,line.PmWorkOrderCheckId);
+            if(await q.ExecuteNonQueryAsync(t)!=1)
+            {
+                await tx.RollbackAsync(t);
+                return Conflict(new{message="รายการตรวจหรือสถานะงานเปลี่ยนไป กรุณาโหลดข้อมูลใหม่"});
+            }
+        }
+        await tx.CommitAsync(t);
+        return Ok(new{saved=true});
+    }
     [HttpPost("work-orders/generate")]
-    public async Task<IActionResult> Generate([FromQuery]bool portal=false,CancellationToken t=default){await using var c=await Open(t);if(await WorkGuard(c,portal,"CREATE",t)is{} bad)return bad;const string sql="INSERT dbo.TDADServicePmWorkOrder(CompanyID,PmPlanAssignmentID,ItemInstanceID,DueDate,PlanNameSnapshot,ItemSnapshot,LocationSnapshot,CreateBy) SELECT A.CompanyID,A.PmPlanAssignmentID,A.ItemInstanceID,A.NextDueDate,P.PlanName,CONCAT(I.ItemCode,N' / ',I.ItemName,N' / ',X.SerialNo),CONCAT_WS(N' / ',B.BuildingNameTH,F.FloorNameTH,R.RoomCode),@by FROM dbo.TDADServicePmPlanAssignment A JOIN dbo.TDADServicePmPlan P ON P.PmPlanID=A.PmPlanID AND P.CompanyID=A.CompanyID AND P.IsActive=1 JOIN dbo.TDIVItemInstance X ON X.ItemInstanceID=A.ItemInstanceID AND X.CompanyID=A.CompanyID AND X.StatusCode=N'INSTALLED' JOIN dbo.TDIVItem I ON I.ItemID=X.ItemID AND I.CompanyID=X.CompanyID AND I.IsActive=1 JOIN dbo.TDIVItemUsage U ON U.ItemID=I.ItemID AND U.CompanyID=I.CompanyID AND U.UsageCode=N'EQUIPMENT' LEFT JOIN dbo.TDADBuilding B ON B.BuildingID=X.BuildingID AND B.CompanyID=X.CompanyID LEFT JOIN dbo.TDADFloor F ON F.FloorID=X.FloorID AND F.BuildingID=X.BuildingID LEFT JOIN dbo.TDADRoom R ON R.RoomID=X.RoomID AND R.CompanyID=X.CompanyID WHERE A.CompanyID=@c AND A.IsActive=1 AND A.NextDueDate<=CAST(SYSUTCDATETIME() AS date) AND NOT EXISTS(SELECT 1 FROM dbo.TDADServicePmWorkOrder W WHERE W.CompanyID=A.CompanyID AND W.PmPlanAssignmentID=A.PmPlanAssignmentID AND W.DueDate=A.NextDueDate)";await using var q=new SqlCommand(sql,c);Add(q,"@c",SqlDbType.BigInt,CompanyId);Add(q,"@by",SqlDbType.BigInt,UserId);var count=await q.ExecuteNonQueryAsync(t);const string checks="INSERT dbo.TDADServicePmWorkOrderCheck(CompanyID,PmWorkOrderID,PmChecklistItemID,SequenceNo,CheckItemSnapshot,IsRequired) SELECT W.CompanyID,W.PmWorkOrderID,I.PmChecklistItemID,I.SequenceNo,I.CheckItem,I.IsRequired FROM dbo.TDADServicePmWorkOrder W JOIN dbo.TDADServicePmPlanAssignment A ON A.PmPlanAssignmentID=W.PmPlanAssignmentID JOIN dbo.TDADServicePmPlanChecklist PC ON PC.CompanyID=W.CompanyID AND PC.PmPlanID=A.PmPlanID JOIN dbo.TDADServicePmChecklistItem I ON I.CompanyID=W.CompanyID AND I.PmChecklistID=PC.PmChecklistID AND I.IsActive=1 WHERE W.CompanyID=@c AND NOT EXISTS(SELECT 1 FROM dbo.TDADServicePmWorkOrderCheck C WHERE C.PmWorkOrderID=W.PmWorkOrderID)";await using var copy=new SqlCommand(checks,c);Add(copy,"@c",SqlDbType.BigInt,CompanyId);await copy.ExecuteNonQueryAsync(t);return Ok(new{generated=count});}
+    public async Task<IActionResult> Generate([FromQuery]bool portal=false,CancellationToken t=default){await using var c=await Open(t);if(await WorkGuard(c,portal,"EDIT",t)is{} bad)return bad;const string sql="INSERT dbo.TDADServicePmWorkOrder(CompanyID,PmPlanAssignmentID,ItemInstanceID,DueDate,PlanNameSnapshot,ItemSnapshot,LocationSnapshot,CreateBy) SELECT A.CompanyID,A.PmPlanAssignmentID,A.ItemInstanceID,A.NextDueDate,P.PlanName,CONCAT(I.ItemCode,N' / ',I.ItemName,N' / ',X.SerialNo),CONCAT_WS(N' / ',B.BuildingNameTH,F.FloorNameTH,R.RoomCode),@by FROM dbo.TDADServicePmPlanAssignment A JOIN dbo.TDADServicePmPlan P ON P.PmPlanID=A.PmPlanID AND P.CompanyID=A.CompanyID AND P.IsActive=1 JOIN dbo.TDIVItemInstance X ON X.ItemInstanceID=A.ItemInstanceID AND X.CompanyID=A.CompanyID AND X.StatusCode=N'INSTALLED' JOIN dbo.TDIVItem I ON I.ItemID=X.ItemID AND I.CompanyID=X.CompanyID AND I.IsActive=1 JOIN dbo.TDIVItemUsage U ON U.ItemID=I.ItemID AND U.CompanyID=I.CompanyID AND U.UsageCode=N'EQUIPMENT' LEFT JOIN dbo.TDADBuilding B ON B.BuildingID=X.BuildingID AND B.CompanyID=X.CompanyID LEFT JOIN dbo.TDADFloor F ON F.FloorID=X.FloorID AND F.BuildingID=X.BuildingID LEFT JOIN dbo.TDADRoom R ON R.RoomID=X.RoomID AND R.CompanyID=X.CompanyID WHERE A.CompanyID=@c AND A.IsActive=1 AND A.NextDueDate<=CAST(SYSUTCDATETIME() AS date) AND NOT EXISTS(SELECT 1 FROM dbo.TDADServicePmWorkOrder W WHERE W.CompanyID=A.CompanyID AND W.PmPlanAssignmentID=A.PmPlanAssignmentID AND W.DueDate=A.NextDueDate)";await using var q=new SqlCommand(sql,c);Add(q,"@c",SqlDbType.BigInt,CompanyId);Add(q,"@by",SqlDbType.BigInt,UserId);var count=await q.ExecuteNonQueryAsync(t);const string checks="INSERT dbo.TDADServicePmWorkOrderCheck(CompanyID,PmWorkOrderID,PmChecklistItemID,SequenceNo,CheckItemSnapshot,IsRequired) SELECT W.CompanyID,W.PmWorkOrderID,I.PmChecklistItemID,I.SequenceNo,I.CheckItem,I.IsRequired FROM dbo.TDADServicePmWorkOrder W JOIN dbo.TDADServicePmPlanAssignment A ON A.PmPlanAssignmentID=W.PmPlanAssignmentID JOIN dbo.TDADServicePmPlanChecklist PC ON PC.CompanyID=W.CompanyID AND PC.PmPlanID=A.PmPlanID JOIN dbo.TDADServicePmChecklistItem I ON I.CompanyID=W.CompanyID AND I.PmChecklistID=PC.PmChecklistID AND I.IsActive=1 WHERE W.CompanyID=@c AND NOT EXISTS(SELECT 1 FROM dbo.TDADServicePmWorkOrderCheck C WHERE C.PmWorkOrderID=W.PmWorkOrderID)";await using var copy=new SqlCommand(checks,c);Add(copy,"@c",SqlDbType.BigInt,CompanyId);await copy.ExecuteNonQueryAsync(t);return Ok(new{generated=count});}
     [HttpPost("work-orders/{id:long}/start")]
     public async Task<IActionResult> Start(long id,[FromQuery]bool portal=false,CancellationToken t=default)=>await Status(id,"PENDING","IN_PROGRESS",null,portal,t);
     [HttpPost("work-orders/{id:long}/complete")]

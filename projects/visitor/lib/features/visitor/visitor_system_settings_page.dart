@@ -176,13 +176,14 @@ class _VisitorSystemSettingsPageState extends State<VisitorSystemSettingsPage> {
       );
     }
     return ListView(
-      padding: const EdgeInsets.all(10),
+      padding: EdgeInsets.all(visitorUiTokens.cardMargin),
       children: [
         _captionCard(context),
-        const SizedBox(height: 6),
+        SizedBox(height: visitorUiTokens.cardSpacing),
         if (_companyContext != null)
           _companyTypeCard(context, _companyContext!),
-        if (_companyContext != null) const SizedBox(height: 6),
+        if (_companyContext != null)
+          SizedBox(height: visitorUiTokens.cardSpacing),
         _section(
           context,
           title: 'วิธีบันทึกผู้มาติดต่อ',
@@ -208,7 +209,7 @@ class _VisitorSystemSettingsPageState extends State<VisitorSystemSettingsPage> {
             ),
           ],
         ),
-        const SizedBox(height: 6),
+        SizedBox(height: visitorUiTokens.cardSpacing),
         _section(
           context,
           title: 'ข้อมูลที่ต้องกรอก',
@@ -247,7 +248,7 @@ class _VisitorSystemSettingsPageState extends State<VisitorSystemSettingsPage> {
             ),
           ],
         ),
-        const SizedBox(height: 6),
+        SizedBox(height: visitorUiTokens.cardSpacing),
         _section(
           context,
           title: 'กติกา Check-in และ Check-out',
@@ -267,7 +268,7 @@ class _VisitorSystemSettingsPageState extends State<VisitorSystemSettingsPage> {
             ),
           ],
         ),
-        const SizedBox(height: 6),
+        SizedBox(height: visitorUiTokens.cardSpacing),
         _section(
           context,
           title: 'การเก็บหลักฐานและ Audit',
@@ -311,18 +312,24 @@ class _VisitorSystemSettingsPageState extends State<VisitorSystemSettingsPage> {
             ),
           ],
         ),
-        const SizedBox(height: 12),
-        Align(
-          alignment: Alignment.centerRight,
-          child: FilledButton.icon(
-            onPressed: _actions?.canEdit == true && !_saving ? _save : null,
-            icon: _saving
-                ? const SizedBox.square(
-                    dimension: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.save_outlined),
-            label: const Text('บันทึก'),
+        SizedBox(height: visitorUiTokens.cardSpacing),
+        Card(
+          margin: EdgeInsets.zero,
+          child: Padding(
+            padding: EdgeInsets.all(visitorUiTokens.cardPadding),
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: FilledButton.icon(
+                onPressed: _actions?.canEdit == true && !_saving ? _save : null,
+                icon: _saving
+                    ? const SizedBox.square(
+                        dimension: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.save_outlined),
+                label: const Text('บันทึก'),
+              ),
+            ),
           ),
         ),
       ],

@@ -26,7 +26,8 @@ public sealed class RequireCompanyProjectFilter(
         if (!string.Equals(user.FindFirstValue("user_type"), "COMPANY_USER", StringComparison.OrdinalIgnoreCase) ||
             !TryLong(user, "user_id", out var userId) ||
             !TryLong(user, "partner_id", out var partnerId) ||
-            !TryLong(user, "company_id", out var companyId))
+            !TryLong(user, "company_id", out var companyId) ||
+            !TryLong(user, "project_id", out var activeProjectId))
         {
             Deny(context, "บัญชีนี้ไม่มีขอบเขต Company สำหรับระบบที่ร้องขอ");
             return;
@@ -41,6 +42,16 @@ SELECT CASE WHEN EXISTS
     SELECT 1
     FROM dbo.TDSTCompanySetUp C
     INNER JOIN dbo.TDADProject P ON P.ProjectCode=@ProjectCode AND P.IsActive=1
+    INNER JOIN dbo.TDADProject AP
+      ON AP.ProjectID=@ActiveProjectID AND AP.IsActive=1
+     AND (AP.ProjectID=P.ProjectID OR AP.ProjectCode=N'LAOO')
+    INNER JOIN dbo.TDADCompanyProject ACP
+      ON ACP.ProjectID=AP.ProjectID AND ACP.CompanyID=C.CompanyID AND ACP.PartnerID=C.PartnerID
+     AND ACP.IsEnabled=1
+     AND (ACP.StartDate IS NULL OR ACP.StartDate<=CONVERT(date,SYSUTCDATETIME()))
+     AND (ACP.ExpireDate IS NULL OR ACP.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))
+    INNER JOIN dbo.TDADUserProject AUP
+      ON AUP.ProjectID=AP.ProjectID AND AUP.CompanyID=C.CompanyID AND AUP.UserID=@UserID AND AUP.IsActive=1
     INNER JOIN dbo.TDADCompanyProject CP
       ON CP.ProjectID=P.ProjectID AND CP.CompanyID=C.CompanyID AND CP.PartnerID=C.PartnerID
      AND CP.IsEnabled=1
@@ -57,6 +68,8 @@ SELECT CASE WHEN EXISTS
         command.Parameters.Add("@UserID", SqlDbType.BigInt).Value = userId;
         command.Parameters.Add("@PartnerID", SqlDbType.BigInt).Value = partnerId;
         command.Parameters.Add("@CompanyID", SqlDbType.BigInt).Value = companyId;
+        command.Parameters.Add("@ActiveProjectID", SqlDbType.BigInt).Value =
+            activeProjectId;
         if (!Convert.ToBoolean(
                 await command.ExecuteScalarAsync(context.HttpContext.RequestAborted)))
             Deny(context, $"ระบบ {projectCode.Trim().ToUpperInvariant()} ยังไม่ได้เปิดใช้งานสำหรับผู้ใช้นี้");

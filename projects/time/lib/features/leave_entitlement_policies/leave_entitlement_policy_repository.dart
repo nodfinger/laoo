@@ -40,4 +40,11 @@ class LeaveEntitlementPolicyRepository {
       await api.put('$_path/$id', body: item);
     }
   }
+
+  Future<void> delete(Map<String, dynamic> item) async {
+    await api.delete(
+      '$_path/${item['id']}',
+      query: {'rowVersion': item['rowVersion'].toString()},
+    );
+  }
 }

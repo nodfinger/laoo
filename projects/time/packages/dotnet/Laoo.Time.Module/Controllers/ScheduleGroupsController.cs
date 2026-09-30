@@ -38,7 +38,7 @@ public sealed class ScheduleGroupsController(IConfiguration configuration) : Con
     [HttpPost]
     public async Task<IActionResult> Create(ScheduleGroupSaveRequest request,CancellationToken token)
     {
-        if(!Scope(out var companyId,out var userId))return Forbid();var error=Validate(request);if(error!=null)return BadRequest(new{message=error});await using var c=await Open(token);if(!await Can(c,"CREATE",token))return Forbid();
+        if(!Scope(out var companyId,out var userId))return Forbid();var error=Validate(request);if(error!=null)return BadRequest(new{message=error});await using var c=await Open(token);if(!await CrudScreen(c,token)||!await Can(c,"CREATE",token))return Forbid();
         await using var cmd=new SqlCommand("INSERT dbo.TDTMWorkScheduleGroup(CompanyID,GroupCode,GroupName,DescriptionText,IsActive,CreateBy) OUTPUT INSERTED.WorkScheduleGroupID VALUES(@CompanyID,@Code,@Name,@Description,@Active,@UserID)",c);BindSave(cmd,companyId,userId,request);
         try{var id=Convert.ToInt64(await cmd.ExecuteScalarAsync(token));return Created(string.Empty,new{workScheduleGroupId=id});}catch(SqlException e)when(e.Number is 2601 or 2627){return Conflict(new{message="รหัสกลุ่มซ้ำกับข้อมูลเดิม"});}
     }
@@ -46,18 +46,45 @@ public sealed class ScheduleGroupsController(IConfiguration configuration) : Con
     [HttpPut("{id:long}")]
     public async Task<IActionResult> Update(long id,ScheduleGroupSaveRequest request,CancellationToken token)
     {
-        if(!Scope(out var companyId,out var userId))return Forbid();var error=Validate(request);if(error!=null)return BadRequest(new{message=error});if(string.IsNullOrWhiteSpace(request.RowVersion))return BadRequest(new{message="ไม่พบ Version ของข้อมูล"});await using var c=await Open(token);if(!await Can(c,"EDIT",token))return Forbid();
+        if(!Scope(out var companyId,out var userId))return Forbid();var error=Validate(request);if(error!=null)return BadRequest(new{message=error});if(string.IsNullOrWhiteSpace(request.RowVersion))return BadRequest(new{message="ไม่พบ Version ของข้อมูล"});await using var c=await Open(token);if(!await CrudScreen(c,token)||!await Can(c,"EDIT",token))return Forbid();
         await using var cmd=new SqlCommand("UPDATE dbo.TDTMWorkScheduleGroup SET GroupCode=@Code,GroupName=@Name,DescriptionText=@Description,IsActive=@Active,UpdateDate=SYSDATETIME(),UpdateBy=@UserID WHERE CompanyID=@CompanyID AND WorkScheduleGroupID=@ID AND RowVersion=CONVERT(binary(8),@RowVersion,2)",c);BindSave(cmd,companyId,userId,request);Add(cmd,"@ID",SqlDbType.BigInt,id);Add(cmd,"@RowVersion",SqlDbType.VarChar,request.RowVersion,32);
         try{return await cmd.ExecuteNonQueryAsync(token)==1?NoContent():Conflict(new{message="ข้อมูลถูกแก้ไขแล้ว กรุณาโหลดใหม่"});}catch(SqlException e)when(e.Number is 2601 or 2627){return Conflict(new{message="รหัสกลุ่มซ้ำกับข้อมูลเดิม"});}
     }
 
     [HttpDelete("{id:long}")]
-    public async Task<IActionResult> Delete(long id,[FromQuery]string rowVersion,CancellationToken token)
+    public async Task<IActionResult> Delete(long id,[FromQuery]string? rowVersion,CancellationToken token)
     {
-        if(!Scope(out var companyId,out var userId))return Forbid();await using var c=await Open(token);if(!await Can(c,"DELETE",token))return Forbid();await using var cmd=new SqlCommand("IF EXISTS(SELECT 1 FROM dbo.TDTMWorkScheduleGroupAssignment WHERE CompanyID=@CompanyID AND WorkScheduleGroupID=@ID) OR EXISTS(SELECT 1 FROM dbo.TDTMGroupShiftRotation WHERE CompanyID=@CompanyID AND WorkScheduleGroupID=@ID) THROW 52331,N'กลุ่มนี้ถูกใช้งานในตารางแล้ว ไม่สามารถลบได้',1; UPDATE dbo.TDTMWorkScheduleGroup SET IsActive=0,UpdateDate=SYSDATETIME(),UpdateBy=@UserID WHERE CompanyID=@CompanyID AND WorkScheduleGroupID=@ID AND RowVersion=CONVERT(binary(8),@RowVersion,2)",c);Add(cmd,"@CompanyID",SqlDbType.BigInt,companyId);Add(cmd,"@ID",SqlDbType.BigInt,id);Add(cmd,"@UserID",SqlDbType.BigInt,userId);Add(cmd,"@RowVersion",SqlDbType.VarChar,rowVersion,32);try{return await cmd.ExecuteNonQueryAsync(token)==1?NoContent():Conflict(new{message="ข้อมูลถูกแก้ไขแล้ว กรุณาโหลดใหม่"});}catch(SqlException e)when(e.Number==52331){return Conflict(new{message=e.Message});}
+        if(!Scope(out var companyId,out _))return Forbid();
+        await using var c=await Open(token);
+        if(!await Can(c,"DELETE",token))return Forbid();
+        if(rowVersion is not {Length:16}||!rowVersion.All(Uri.IsHexDigit))return BadRequest(new{message="ไม่พบ Version ของข้อมูล กรุณาโหลดใหม่"});
+        if(!await CrudScreen(c,token))return Forbid();
+        try
+        {
+            await using var cmd=new SqlCommand("DELETE G FROM dbo.TDTMWorkScheduleGroup G WHERE G.CompanyID=@C AND G.WorkScheduleGroupID=@ID AND G.RowVersion=CONVERT(binary(8),@V,2) AND NOT EXISTS(SELECT 1 FROM dbo.TDTMWorkScheduleGroupAssignment A WHERE A.CompanyID=G.CompanyID AND A.WorkScheduleGroupID=G.WorkScheduleGroupID) AND NOT EXISTS(SELECT 1 FROM dbo.TDTMGroupShiftRotation R WHERE R.CompanyID=G.CompanyID AND R.WorkScheduleGroupID=G.WorkScheduleGroupID)",c);
+            Add(cmd,"@C",SqlDbType.BigInt,companyId);Add(cmd,"@ID",SqlDbType.BigInt,id);Add(cmd,"@V",SqlDbType.VarChar,rowVersion,32);
+            if(await cmd.ExecuteNonQueryAsync(token)==1)return NoContent();
+        }
+        catch(SqlException e)when(e.Number==547)
+        {
+            return Conflict(new{message="ลบกลุ่มตารางไม่ได้",description="กลุ่มนี้ถูกใช้จัดตารางแล้ว"});
+        }
+        await using var used=new SqlCommand("SELECT (SELECT COUNT_BIG(*) FROM dbo.TDTMWorkScheduleGroupAssignment WHERE CompanyID=@C AND WorkScheduleGroupID=@ID)+(SELECT COUNT_BIG(*) FROM dbo.TDTMGroupShiftRotation WHERE CompanyID=@C AND WorkScheduleGroupID=@ID)",c);
+        Add(used,"@C",SqlDbType.BigInt,companyId);Add(used,"@ID",SqlDbType.BigInt,id);
+        if(Convert.ToInt64(await used.ExecuteScalarAsync(token))>0)return Conflict(new{message="ลบกลุ่มตารางไม่ได้",description="กลุ่มนี้ถูกใช้จัดตารางแล้ว"});
+        await using var owned=new SqlCommand("SELECT COUNT(1) FROM dbo.TDTMWorkScheduleGroup WHERE CompanyID=@C AND WorkScheduleGroupID=@ID",c);
+        Add(owned,"@C",SqlDbType.BigInt,companyId);Add(owned,"@ID",SqlDbType.BigInt,id);
+        if(Convert.ToInt32(await owned.ExecuteScalarAsync(token))==0)return Forbid();
+        return Conflict(new{message="ลบกลุ่มตารางไม่ได้",description="ข้อมูลถูกแก้ไขหรือลบไปแล้ว กรุณาเปิดหน้าจอใหม่"});
     }
 
     private static string? Validate(ScheduleGroupSaveRequest r){if(Clean(r.GroupCode)is null||r.GroupCode.Trim().Length>30)return"กรุณาระบุรหัสกลุ่มไม่เกิน 30 ตัวอักษร";if(Clean(r.GroupName)is null||r.GroupName.Trim().Length>150)return"กรุณาระบุชื่อกลุ่มไม่เกิน 150 ตัวอักษร";if(Clean(r.DescriptionText)?.Length>500)return"รายละเอียดต้องไม่เกิน 500 ตัวอักษร";return null;}
+    private static async Task<bool> CrudScreen(SqlConnection c,CancellationToken token)
+    {
+        await using var q=new SqlCommand("SELECT COUNT(1) FROM dbo.TDADMainMenu WHERE MenuCode=@M AND ScreenType=1 AND IsActive=1",c);
+        Add(q,"@M",SqlDbType.Char,MenuCode,5);
+        return Convert.ToInt32(await q.ExecuteScalarAsync(token))==1;
+    }
     private async Task<bool> Can(SqlConnection c,string a,CancellationToken t)=>await CompanyMenuAccess.IsAllowedAsync(c,User,MenuCode,a,t);private async Task<SqlConnection> Open(CancellationToken t){var c=new SqlConnection(configuration.GetConnectionString("LaooDatabase"));await c.OpenAsync(t);return c;}
     private bool Scope(out long companyId,out long userId){companyId=0;userId=0;return string.Equals(User.FindFirstValue("user_type"),"COMPANY_USER",StringComparison.OrdinalIgnoreCase)&&long.TryParse(User.FindFirstValue("company_id"),out companyId)&&long.TryParse(User.FindFirstValue("user_id"),out userId)&&companyId>0&&userId>0;}
     private static async Task<string> Caption(SqlConnection c,CancellationToken t){await using var q=new SqlCommand("SELECT TOP(1) MenuName FROM dbo.TDADMainMenu WHERE MenuCode=@Code",c);Add(q,"@Code",SqlDbType.Char,MenuCode,5);return Convert.ToString(await q.ExecuteScalarAsync(t))??"กลุ่มตารางทำงาน";}

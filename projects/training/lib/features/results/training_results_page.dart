@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:laoo_shared_workspace_ui/laoo_shared_workspace_ui.dart';
 
 import '../training/training_feature_host.dart';
+import '../training/training_pagination_card.dart';
 import '../training/training_route_contract.dart';
 
 class TrainingResultsPage extends StatefulWidget {
@@ -25,6 +26,10 @@ class _TrainingResultsPageState extends State<TrainingResultsPage>
   int _page = 1, _total = 0;
   bool _loading = true;
   String? _message;
+  String? _listError;
+  String? _sectionError;
+  String? _evaluationError;
+  int _sectionLoadEpoch = 0;
   String _status = '';
   String _examResultFilter = '';
   String _caption = 'ผลการอบรม';
@@ -62,7 +67,10 @@ class _TrainingResultsPageState extends State<TrainingResultsPage>
   }
 
   Future<void> _load({int page = 1}) async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _listError = null;
+    });
     try {
       final data = Map<String, dynamic>.from(
         await _api.get(
@@ -84,7 +92,13 @@ class _TrainingResultsPageState extends State<TrainingResultsPage>
         _page = page;
       });
     } catch (error) {
-      _notice(trainingErrorText(error));
+      if (mounted) {
+        setState(() {
+          _items = [];
+          _total = 0;
+          _listError = trainingErrorText(error);
+        });
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -99,6 +113,10 @@ class _TrainingResultsPageState extends State<TrainingResultsPage>
       if (!mounted) return;
       setState(() {
         _detail = detail;
+        _section = null;
+        _sectionError = null;
+        _evaluations = [];
+        _evaluationError = null;
         _examResultFilter = '';
       });
       await _loadSection();
@@ -113,12 +131,22 @@ class _TrainingResultsPageState extends State<TrainingResultsPage>
   Future<void> _loadEvaluations() async {
     final id = (_detail?['bookingId'] as num?)?.toInt();
     if (id == null) return;
+    setState(() {
+      _evaluations = [];
+      _evaluationError = null;
+    });
     try {
       final data = Map<String, dynamic>.from(
         await _api.get('/api/company/training/results/$id/evaluations') as Map,
       );
-      if (mounted) setState(() => _evaluations = _maps(data['items']));
-    } catch (_) {}
+      if (mounted && (_detail?['bookingId'] as num?)?.toInt() == id) {
+        setState(() => _evaluations = _maps(data['items']));
+      }
+    } catch (error) {
+      if (mounted && (_detail?['bookingId'] as num?)?.toInt() == id) {
+        setState(() => _evaluationError = trainingErrorText(error));
+      }
+    }
   }
 
   Future<void> _loadSection() async {
@@ -126,14 +154,23 @@ class _TrainingResultsPageState extends State<TrainingResultsPage>
     if (id == null) {
       return;
     }
+    final sectionCode = _sectionCode;
+    final epoch = ++_sectionLoadEpoch;
+    setState(() {
+      _section = null;
+      _sectionError = null;
+    });
     try {
       final data = Map<String, dynamic>.from(
-        await _api.get('/api/company/training/results/$id/$_sectionCode')
-            as Map,
+        await _api.get('/api/company/training/results/$id/$sectionCode') as Map,
       );
-      if (mounted) setState(() => _section = data);
+      if (mounted && epoch == _sectionLoadEpoch) {
+        setState(() => _section = data);
+      }
     } catch (error) {
-      _notice(trainingErrorText(error));
+      if (mounted && epoch == _sectionLoadEpoch) {
+        setState(() => _sectionError = trainingErrorText(error));
+      }
     }
   }
 
@@ -183,7 +220,7 @@ class _TrainingResultsPageState extends State<TrainingResultsPage>
         runSpacing: 6,
         crossAxisAlignment: WrapCrossAlignment.end,
         children: [
-          SizedBox(
+          TrainingFilterField(
             width: 220,
             child: TextField(
               controller: _search,
@@ -194,7 +231,7 @@ class _TrainingResultsPageState extends State<TrainingResultsPage>
               ),
             ),
           ),
-          SizedBox(
+          TrainingFilterField(
             width: 240,
             child: TextField(
               controller: _course,
@@ -205,9 +242,10 @@ class _TrainingResultsPageState extends State<TrainingResultsPage>
               ),
             ),
           ),
-          SizedBox(
+          TrainingFilterField(
             width: 180,
             child: DropdownButtonFormField<String>(
+              isExpanded: true,
               key: ValueKey(_status),
               initialValue: _status,
               decoration: const InputDecoration(labelText: 'สถานะ'),
@@ -241,53 +279,118 @@ class _TrainingResultsPageState extends State<TrainingResultsPage>
       ),
       table: _loading
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: DataTable(
-                columns: const [
-                  DataColumn(label: Text('ลำดับ')),
-                  DataColumn(label: Text('จัดการ')),
-                  DataColumn(label: Text('เลขที่จอง / หัวข้ออบรม')),
-                  DataColumn(label: Text('ห้อง / วันเวลา')),
-                  DataColumn(label: Text('คำเชิญ')),
-                ],
-                rows: _items.asMap().entries.map((entry) {
-                  final x = entry.value;
-                  return DataRow(
-                    cells: [
-                      DataCell(
-                        Text(
-                          '${(_page - 1) * trainingPageSize + entry.key + 1}',
-                        ),
-                      ),
-                      DataCell(
-                        IconButton(
-                          tooltip: 'ดูผลการอบรม',
-                          onPressed: () =>
-                              _open((x['bookingId'] as num).toInt()),
-                          icon: Icon(
-                            Icons.visibility_outlined,
-                            color: tokens.primaryColor,
+          : _listError != null
+          ? _errorCard(tokens, _listError!, () => _load(page: _page))
+          : _items.isEmpty
+          ? const Center(child: Text('ไม่พบผลการอบรม'))
+          : LayoutBuilder(
+              builder: (context, constraints) =>
+                  constraints.maxWidth < tokens.workspace.compactBreakpoint
+                  ? ListView.separated(
+                      itemCount: _items.length,
+                      separatorBuilder: (_, _) =>
+                          SizedBox(height: tokens.workspace.itemSpacing),
+                      itemBuilder: (context, index) {
+                        final item = _items[index];
+                        return Card(
+                          margin: EdgeInsets.zero,
+                          color: tokens.workspace.surfaceColor,
+                          surfaceTintColor: Colors.transparent,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(
+                              tokens.workspace.radius,
+                            ),
                           ),
-                        ),
+                          child: Padding(
+                            padding: tokens.workspace.cardPadding,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Text(
+                                  '${(_page - 1) * trainingPageSize + index + 1} · ${item['bookingNo'] ?? '-'}',
+                                  style: tokens.workspace.sectionStyle.copyWith(
+                                    color: tokens.primaryColor,
+                                  ),
+                                ),
+                                Text(
+                                  '${item['subject'] ?? '-'}',
+                                  style: tokens.workspace.tableStyle,
+                                ),
+                                Text(
+                                  '${item['roomCode'] ?? '-'} | ${item['roomName'] ?? '-'} · ${item['startDateTime'] ?? '-'}',
+                                  style: tokens.workspace.tableStyle,
+                                ),
+                                Text(
+                                  'เชิญ ${item['invited']} | รับ ${item['accepted']} | รอ ${item['pending']}',
+                                  style: tokens.workspace.tableStyle,
+                                ),
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: TextButton.icon(
+                                    onPressed: () => _open(
+                                      (item['bookingId'] as num).toInt(),
+                                    ),
+                                    icon: const Icon(Icons.visibility_outlined),
+                                    label: const Text('ดูผลการอบรม'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    )
+                  : SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: DataTable(
+                        columns: const [
+                          DataColumn(label: Text('ลำดับ')),
+                          DataColumn(label: Text('จัดการ')),
+                          DataColumn(label: Text('เลขที่จอง / หัวข้ออบรม')),
+                          DataColumn(label: Text('ห้อง / วันเวลา')),
+                          DataColumn(label: Text('คำเชิญ')),
+                        ],
+                        rows: _items.asMap().entries.map((entry) {
+                          final x = entry.value;
+                          return DataRow(
+                            cells: [
+                              DataCell(
+                                Text(
+                                  '${(_page - 1) * trainingPageSize + entry.key + 1}',
+                                ),
+                              ),
+                              DataCell(
+                                IconButton(
+                                  tooltip: 'ดูผลการอบรม',
+                                  onPressed: () =>
+                                      _open((x['bookingId'] as num).toInt()),
+                                  icon: Icon(
+                                    Icons.visibility_outlined,
+                                    color: tokens.primaryColor,
+                                  ),
+                                ),
+                              ),
+                              DataCell(
+                                Text('${x['bookingNo']}\n${x['subject']}'),
+                              ),
+                              DataCell(
+                                Text(
+                                  '${x['roomCode']} | ${x['roomName']}\n${x['startDateTime'] ?? '-'}',
+                                ),
+                              ),
+                              DataCell(
+                                Text(
+                                  'เชิญ ${x['invited']} | รับ ${x['accepted']} | รับภายหลัง ${x['lateAccepted']} | รอ ${x['pending']} | ปฏิเสธ ${x['declined']}',
+                                ),
+                              ),
+                            ],
+                          );
+                        }).toList(),
                       ),
-                      DataCell(Text('${x['bookingNo']}\n${x['subject']}')),
-                      DataCell(
-                        Text(
-                          '${x['roomCode']} | ${x['roomName']}\n${x['startDateTime'] ?? '-'}',
-                        ),
-                      ),
-                      DataCell(
-                        Text(
-                          'เชิญ ${x['invited']} | รับ ${x['accepted']} | รับภายหลัง ${x['lateAccepted']} | รอ ${x['pending']} | ปฏิเสธ ${x['declined']}',
-                        ),
-                      ),
-                    ],
-                  );
-                }).toList(),
-              ),
+                    ),
             ),
-      pagination: LaooPaginationCard(
+      pagination: TrainingPaginationCard(
         tokens: tokens.workspace,
         page: _page,
         pageCount: pages,
@@ -321,12 +424,12 @@ class _TrainingResultsPageState extends State<TrainingResultsPage>
             Row(
               children: [
                 IconButton(
-                  tooltip: 'กลับรายการผลการอบรม',
+                  tooltip: 'ปิดรายละเอียดผลการอบรม',
                   onPressed: () => setState(() {
                     _detail = null;
                     _section = null;
                   }),
-                  icon: const Icon(Icons.arrow_back_outlined),
+                  icon: const Icon(Icons.close),
                 ),
                 const SizedBox(width: 4),
                 Expanded(
@@ -351,24 +454,28 @@ class _TrainingResultsPageState extends State<TrainingResultsPage>
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Expanded(
-                      child: Text(
-                        'รอบประเมินที่เกี่ยวข้อง',
-                        style: tokens.workspace.sectionStyle,
-                      ),
+                    Text(
+                      'รอบประเมินที่เกี่ยวข้อง',
+                      style: tokens.workspace.sectionStyle,
                     ),
-                    TextButton.icon(
-                      onPressed: () =>
-                          context.go('/company/evaluation-results'),
-                      icon: const Icon(Icons.open_in_new),
-                      label: const Text('ดูผลประเมิน'),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton.icon(
+                        onPressed: () =>
+                            context.go('/company/evaluation-results'),
+                        icon: const Icon(Icons.open_in_new),
+                        label: const Text('ดูผลประเมิน'),
+                      ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 8),
-                if (_evaluations.isEmpty)
+                if (_evaluationError != null)
+                  _errorContent(_evaluationError!, _loadEvaluations)
+                else if (_evaluations.isEmpty)
                   const Text(
                     'ยังไม่มีรอบประเมิน หรือรอคืนห้องเพื่อสร้างร่างประเมิน',
                   )
@@ -442,7 +549,26 @@ class _TrainingResultsPageState extends State<TrainingResultsPage>
   Widget _count(String label, dynamic value) =>
       Chip(label: Text('$label: ${value ?? 0}'));
 
+  Widget _errorContent(String message, VoidCallback retry) => Column(
+    mainAxisSize: MainAxisSize.min,
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(message),
+      const SizedBox(height: 12),
+      OutlinedButton(onPressed: retry, child: const Text('ลองอีกครั้ง')),
+    ],
+  );
+
+  Widget _errorCard(
+    TrainingUiTokens tokens,
+    String message,
+    VoidCallback retry,
+  ) => _surfaceCard(tokens, _errorContent(message, retry));
+
   Widget _sectionTable(TrainingUiTokens tokens, Map<String, dynamic>? section) {
+    if (_sectionError != null) {
+      return _errorCard(tokens, _sectionError!, _loadSection);
+    }
     if (section == null) {
       return const Center(child: CircularProgressIndicator());
     }

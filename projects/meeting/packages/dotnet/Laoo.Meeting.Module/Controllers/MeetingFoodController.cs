@@ -177,7 +177,19 @@ ORDER BY ISNULL(Seq,0),Name";
         await using var command = new SqlCommand("DELETE FROM dbo.TDADMeetingFood OUTPUT DELETED.FoodImageUrl WHERE FoodID=@id AND CompanyID=@company", connection);
         Add(command, "@id", id);
         Add(command, "@company", company);
-        var deletedValue = await command.ExecuteScalarAsync(token);
+        object? deletedValue;
+        try
+        {
+            deletedValue = await command.ExecuteScalarAsync(token);
+        }
+        catch (SqlException error) when (error.Number == 547)
+        {
+            return Conflict(new
+            {
+                message = "ลบรายการอาหารไม่ได้",
+                description = "รายการอาหารนี้ถูกใช้ในแผนหรือใบสั่งอาหารแล้ว กรุณาตรวจสอบรายการที่เชื่อมโยงก่อนลบ",
+            });
+        }
         if (deletedValue is null)
             return NotFound(new { message = "ไม่พบรายการอาหารที่ต้องการลบ", description = $"FoodID {id} ไม่อยู่ในขอบเขตบริษัทของผู้ใช้งาน" });
         var imageUrl = deletedValue is DBNull ? null : Convert.ToString(deletedValue);

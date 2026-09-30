@@ -630,7 +630,8 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
                             labelStyle: TextStyle(color: preset.primary),
                             floatingLabelStyle: TextStyle(
                               color: preset.primary,
-                              fontSize: LaooTypography.inputLabel,
+                              fontSize:
+                                  LaooTypography.materialFloatingLabelSource,
                             ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(
@@ -1961,6 +1962,8 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
         context: context,
         builder: (dialogContext) => StatefulBuilder(
           builder: (context, setDialogState) => AlertDialog(
+            backgroundColor: LaooColors.white,
+            surfaceTintColor: Colors.transparent,
             insetPadding: const EdgeInsets.symmetric(
               horizontal: 18,
               vertical: 24,
@@ -2246,7 +2249,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       _captionCard(preset),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: LaooLayout.listSectionSpacing),
                       if (_loading)
                         const LinearProgressIndicator()
                       else if (_workspaceMode == 'CALENDAR')
@@ -2266,9 +2269,9 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
                         _bookingList(preset)
                       else ...[
                         _filterCard(preset),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: LaooLayout.listSectionSpacing),
                         _bookingSelector(preset),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: LaooLayout.listSectionSpacing),
                         _bookingList(preset),
                       ],
                     ],
@@ -2313,11 +2316,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
                   ),
                 ),
                 onPressed: _toggleMyBookings,
-                icon: Icon(
-                  _myBookingsOnly
-                      ? Icons.arrow_back_outlined
-                      : Icons.person_outline,
-                ),
+                icon: const Icon(Icons.person_outline),
                 label: Text(_myBookingsOnly ? 'กลับหน้าจอง' : 'การจองของฉัน'),
               ),
             ],
@@ -3008,11 +3007,6 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
                 fontWeight: FontWeight.w700,
               ),
             ),
-          ),
-          IconButton(
-            tooltip: 'รีเฟรชรายการจองและสิทธิ์',
-            onPressed: _searching || _loading ? null : _load,
-            icon: Icon(Icons.refresh, color: preset.primary),
           ),
         ],
       ),

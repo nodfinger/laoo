@@ -11,7 +11,14 @@ import '../meeting_route_contract.dart';
 import '../widgets/meeting_pagination_card.dart';
 
 class MeetingFeedbackReportPage extends StatefulWidget {
-  const MeetingFeedbackReportPage({super.key});
+  const MeetingFeedbackReportPage({
+    super.key,
+    this.repository,
+    this.captionResolver,
+  });
+
+  final MeetingRoomUsageRepository? repository;
+  final Future<String> Function()? captionResolver;
 
   @override
   State<MeetingFeedbackReportPage> createState() =>
@@ -19,13 +26,14 @@ class MeetingFeedbackReportPage extends StatefulWidget {
 }
 
 class _MeetingFeedbackReportPageState extends State<MeetingFeedbackReportPage> {
-  final _repo = MeetingRoomUsageRepository();
+  late final MeetingRoomUsageRepository _repo;
   final _search = TextEditingController();
   DateTime _from = DateTime.now().subtract(const Duration(days: 30));
   DateTime _to = DateTime.now();
   int? _roomId;
   int _page = 1, _total = 0;
   bool _loading = true;
+  String? _loadError;
   String _caption = 'ผลประเมินห้องประชุม';
   String _message = '';
   bool _messageError = false;
@@ -36,6 +44,7 @@ class _MeetingFeedbackReportPageState extends State<MeetingFeedbackReportPage> {
   @override
   void initState() {
     super.initState();
+    _repo = widget.repository ?? MeetingRoomUsageRepository();
     _loadCaption();
     _loadRooms();
     _load();
@@ -48,11 +57,13 @@ class _MeetingFeedbackReportPageState extends State<MeetingFeedbackReportPage> {
   }
 
   Future<void> _loadCaption() async {
-    final caption = await NavigationMenuRepository().resolveMenuName(
-      menuCode: MeetingMenuCodes.feedbackReport,
-      routeName: MeetingRouteNames.feedbackReport,
-      fallback: _caption,
-    );
+    final caption =
+        await (widget.captionResolver?.call() ??
+            NavigationMenuRepository().resolveMenuName(
+              menuCode: MeetingMenuCodes.feedbackReport,
+              routeName: MeetingRouteNames.feedbackReport,
+              fallback: _caption,
+            ));
     if (mounted) setState(() => _caption = caption);
   }
 
@@ -64,7 +75,10 @@ class _MeetingFeedbackReportPageState extends State<MeetingFeedbackReportPage> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
     try {
       final result = await _repo.feedback(
         from: _from,
@@ -84,7 +98,16 @@ class _MeetingFeedbackReportPageState extends State<MeetingFeedbackReportPage> {
         _total = (result['total'] as num?)?.toInt() ?? _items.length;
       });
     } catch (error) {
-      if (mounted) _notify(_error(error), true);
+      if (mounted) {
+        final message = _error(error);
+        setState(() {
+          _items = const [];
+          _summary = const {};
+          _total = 0;
+          _loadError = message;
+        });
+        _notify(message, true);
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -123,60 +146,102 @@ class _MeetingFeedbackReportPageState extends State<MeetingFeedbackReportPage> {
       padding: const EdgeInsets.all(LaooLayout.cardMargin),
       child: Stack(
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              WorkspaceSectionCard(
-                child: WorkspacePageTitle(
-                  title: _caption,
-                  favoriteKey: MeetingMenuCodes.feedbackReport,
-                ),
-              ),
-              const SizedBox(height: 6),
-              WorkspaceSectionCard(child: _filters()),
-              const SizedBox(height: LaooLayout.cardSpacing),
-              _summaryCards(),
-              const SizedBox(height: LaooLayout.cardSpacing),
-              Expanded(
-                child: WorkspaceSectionCard(
-                  child: _loading
-                      ? const Center(child: CircularProgressIndicator())
-                      : _items.isEmpty
-                      ? const Center(
-                          child: Text(
-                            'ยังไม่มีผลประเมินห้องประชุมในช่วงเวลาที่เลือก',
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 900;
+              final report = WorkspaceSectionCard(
+                child: _loading
+                    ? const Padding(
+                        padding: EdgeInsets.all(28),
+                        child: Center(child: CircularProgressIndicator()),
+                      )
+                    : _loadError != null
+                    ? Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 420),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(_loadError!, textAlign: TextAlign.center),
+                              const SizedBox(height: 16),
+                              OutlinedButton(
+                                onPressed: _load,
+                                child: const Text('ลองอีกครั้ง'),
+                              ),
+                            ],
                           ),
-                        )
-                      : ListView.separated(
-                          itemCount: _items.length,
-                          separatorBuilder: (_, _) => const Divider(
-                            height: 1,
-                            color: LaooColors.border,
-                          ),
-                          itemBuilder: (_, index) => _item(_items[index]),
                         ),
+                      )
+                    : _items.isEmpty
+                    ? const Center(
+                        child: Text(
+                          'ยังไม่มีผลประเมินห้องประชุมในช่วงเวลาที่เลือก',
+                        ),
+                      )
+                    : compact
+                    ? Column(
+                        children: [
+                          for (
+                            var index = 0;
+                            index < _items.length;
+                            index++
+                          ) ...[
+                            if (index > 0)
+                              const Divider(
+                                height: 1,
+                                color: LaooColors.border,
+                              ),
+                            _item(_items[index]),
+                          ],
+                        ],
+                      )
+                    : ListView.separated(
+                        itemCount: _items.length,
+                        separatorBuilder: (_, _) =>
+                            const Divider(height: 1, color: LaooColors.border),
+                        itemBuilder: (_, index) => _item(_items[index]),
+                      ),
+              );
+              final sections = <Widget>[
+                WorkspaceSectionCard(
+                  child: WorkspacePageTitle(
+                    title: _caption,
+                    favoriteKey: MeetingMenuCodes.feedbackReport,
+                  ),
                 ),
-              ),
-              const SizedBox(height: LaooLayout.cardSpacing),
-              MeetingPaginationCard(
-                total: _total,
-                pageIndex: _page - 1,
-                pageSize: 20,
-                primary: Theme.of(context).colorScheme.primary,
-                onPrevious: _page > 1 && !_loading
-                    ? () {
-                        setState(() => _page--);
-                        _load();
-                      }
-                    : null,
-                onNext: _page * 20 < _total && !_loading
-                    ? () {
-                        setState(() => _page++);
-                        _load();
-                      }
-                    : null,
-              ),
-            ],
+                const SizedBox(height: LaooLayout.listSectionSpacing),
+                WorkspaceSectionCard(child: _filters()),
+                const SizedBox(height: LaooLayout.listSectionSpacing),
+                _summaryCards(),
+                const SizedBox(height: LaooLayout.listSectionSpacing),
+                if (compact) report else Expanded(child: report),
+                const SizedBox(height: LaooLayout.listSectionSpacing),
+                MeetingPaginationCard(
+                  total: _total,
+                  pageIndex: _page - 1,
+                  pageSize: 20,
+                  primary: Theme.of(context).colorScheme.primary,
+                  onPrevious: _page > 1 && !_loading
+                      ? () {
+                          setState(() => _page--);
+                          _load();
+                        }
+                      : null,
+                  onNext: _page * 20 < _total && !_loading
+                      ? () {
+                          setState(() => _page++);
+                          _load();
+                        }
+                      : null,
+                ),
+              ];
+              return compact
+                  ? ListView(children: sections)
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: sections,
+                    );
+            },
           ),
           if (_message.isNotEmpty)
             Positioned(
@@ -193,86 +258,84 @@ class _MeetingFeedbackReportPageState extends State<MeetingFeedbackReportPage> {
     ),
   );
 
-  Widget _filters() => Wrap(
-    spacing: 8,
-    runSpacing: 8,
-    crossAxisAlignment: WrapCrossAlignment.center,
-    children: [
-      OutlinedButton.icon(
-        onPressed: () => _pickDate(true),
-        icon: const Icon(Icons.calendar_today_outlined),
-        label: Text('จาก ${_date(_from)}'),
-      ),
-      OutlinedButton.icon(
-        onPressed: () => _pickDate(false),
-        icon: const Icon(Icons.calendar_today_outlined),
-        label: Text('ถึง ${_date(_to)}'),
-      ),
-      SizedBox(
-        width: 280,
-        child: TextField(
-          controller: _search,
-          onSubmitted: (_) {
-            setState(() => _page = 1);
-            _load();
-          },
-          decoration: const InputDecoration(
-            labelText: 'เลขที่จอง / หัวข้อ / รอบประเมิน',
-            prefixIcon: Icon(Icons.search),
+  Widget _filters() => LayoutBuilder(
+    builder: (context, constraints) => Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        OutlinedButton.icon(
+          onPressed: () => _pickDate(true),
+          icon: const Icon(Icons.calendar_today_outlined),
+          label: Text('จาก ${_date(_from)}'),
+        ),
+        OutlinedButton.icon(
+          onPressed: () => _pickDate(false),
+          icon: const Icon(Icons.calendar_today_outlined),
+          label: Text('ถึง ${_date(_to)}'),
+        ),
+        SizedBox(
+          width: constraints.maxWidth < 280 ? constraints.maxWidth : 280,
+          child: TextField(
+            controller: _search,
+            onSubmitted: (_) {
+              setState(() => _page = 1);
+              _load();
+            },
+            decoration: const InputDecoration(
+              labelText: 'เลขที่จอง / หัวข้อ / รอบประเมิน',
+              prefixIcon: Icon(Icons.search),
+            ),
           ),
         ),
-      ),
-      SizedBox(
-        width: 220,
-        child: DropdownButtonFormField<int?>(
-          key: ValueKey('room-${_roomId ?? 'all'}'),
-          initialValue: _roomId,
-          decoration: const InputDecoration(labelText: 'ห้อง'),
-          items: [
-            const DropdownMenuItem(value: null, child: Text('ทุกห้อง')),
-            ..._rooms.map(
-              (room) => DropdownMenuItem(
-                value: (room['roomId'] as num).toInt(),
-                child: Text('${room['code']} | ${room['name']}'),
+        SizedBox(
+          width: constraints.maxWidth < 220 ? constraints.maxWidth : 220,
+          child: DropdownButtonFormField<int?>(
+            isExpanded: true,
+            key: ValueKey('room-${_roomId ?? 'all'}'),
+            initialValue: _roomId,
+            decoration: const InputDecoration(labelText: 'ห้อง'),
+            items: [
+              const DropdownMenuItem(value: null, child: Text('ทุกห้อง')),
+              ..._rooms.map(
+                (room) => DropdownMenuItem(
+                  value: (room['roomId'] as num).toInt(),
+                  child: Text('${room['code']} | ${room['name']}'),
+                ),
               ),
-            ),
-          ],
-          onChanged: (value) => setState(() {
-            _roomId = value;
-            _page = 1;
-          }),
+            ],
+            onChanged: (value) => setState(() {
+              _roomId = value;
+              _page = 1;
+            }),
+          ),
         ),
-      ),
-      FilledButton.icon(
-        onPressed: _loading
-            ? null
-            : () {
-                setState(() => _page = 1);
-                _load();
-              },
-        icon: const Icon(Icons.search),
-        label: const Text('ค้นหา'),
-      ),
-      OutlinedButton.icon(
-        onPressed: _loading
-            ? null
-            : () {
-                setState(() {
-                  _search.clear();
-                  _roomId = null;
-                  _page = 1;
-                });
-                _load();
-              },
-        icon: const Icon(Icons.clear),
-        label: const Text('ล้าง Filter'),
-      ),
-      IconButton(
-        tooltip: 'โหลดข้อมูลล่าสุด',
-        onPressed: _loading ? null : _load,
-        icon: const Icon(Icons.refresh),
-      ),
-    ],
+        FilledButton.icon(
+          onPressed: _loading
+              ? null
+              : () {
+                  setState(() => _page = 1);
+                  _load();
+                },
+          icon: const Icon(Icons.search),
+          label: const Text('ค้นหา'),
+        ),
+        OutlinedButton.icon(
+          onPressed: _loading
+              ? null
+              : () {
+                  setState(() {
+                    _search.clear();
+                    _roomId = null;
+                    _page = 1;
+                  });
+                  _load();
+                },
+          icon: const Icon(Icons.clear),
+          label: const Text('ล้าง Filter'),
+        ),
+      ],
+    ),
   );
 
   Widget _summaryCards() {
@@ -361,9 +424,9 @@ class _MeetingFeedbackReportPageState extends State<MeetingFeedbackReportPage> {
 
   int _number(String key) => (_summary[key] as num?)?.toInt() ?? 0;
   String _average() =>
-      ((_summary['averageRating'] as num?)?.toDouble() ?? 0).toStringAsFixed(2);
+      (_summary['averageRating'] as num?)?.toStringAsFixed(2) ?? '-';
   String _itemAverage(Map<String, dynamic> item) =>
-      ((item['averageRating'] as num?)?.toDouble() ?? 0).toStringAsFixed(2);
+      (item['averageRating'] as num?)?.toStringAsFixed(2) ?? '-';
   String _status(String? value) => switch (value) {
     'DRAFT' => 'ร่าง',
     'PENDING_APPROVAL' => 'รออนุมัติ',

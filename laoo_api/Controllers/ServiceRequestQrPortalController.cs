@@ -20,8 +20,9 @@ public sealed class ServiceRequestQrPortalController(IConfiguration configuratio
     public async Task<IActionResult> Actions(CancellationToken token)
     {
         await using var c = await Open(token);
-        if (!await ServiceEnabled(c, token)) return Forbid();
-        return Ok(new { view = await Allowed(c, "VIEW", token), create = await Allowed(c, "CREATE", token), edit = await Allowed(c, "EDIT", token) });
+        if (!await ServiceEnabled(c, token) || !await Allowed(c, "VIEW", token)) return Forbid();
+        var screenType = await ScreenType(c, token);
+        return Ok(new { view = true, screenType, create = screenType == 1 && await Allowed(c, "CREATE", token), edit = screenType == 1 && await Allowed(c, "EDIT", token), delete = screenType == 1 && await Allowed(c, "DELETE", token) });
     }
 
     [HttpGet]
@@ -74,6 +75,7 @@ JOIN dbo.TDADBuilding B ON B.BuildingID=X.BuildingID AND B.CompanyID=X.CompanyID
 JOIN dbo.TDADFloor F ON F.FloorID=X.FloorID AND F.BuildingID=X.BuildingID AND F.IsActive=1
 JOIN dbo.TDADRoom R ON R.RoomID=X.RoomID AND R.CompanyID=X.CompanyID AND R.IsActive=1
 WHERE X.CompanyID=@company AND X.StatusCode IN(N'INSTALLED',N'REPAIR')
+  AND NOT EXISTS(SELECT 1 FROM dbo.TDADServiceRequestQrPortal Q WHERE Q.CompanyID=X.CompanyID AND Q.ItemInstanceID=X.ItemInstanceID)
   AND (@q=N'' OR X.SerialNo LIKE N'%'+@q+N'%' OR I.ItemCode LIKE N'%'+@q+N'%' OR I.ItemName LIKE N'%'+@q+N'%')
 ORDER BY I.ItemCode,X.SerialNo;
 """;
@@ -90,23 +92,25 @@ ORDER BY I.ItemCode,X.SerialNo;
         if (!await ServiceEnabled(c, token) || !await Allowed(c, "CREATE", token)) return Forbid();
         if (!request.ItemInstanceId.HasValue) return BadRequest(new { message = "กรุณาเลือกอุปกรณ์", description = "QR แจ้งซ่อมต้องผูกกับ Asset/Serial ที่ติดตั้งพร้อมสถานที่" });
         if (!await ValidInstance(c, request.ItemInstanceId.Value, token)) return BadRequest(new { message = "อุปกรณ์ไม่ถูกต้อง", description = "เลือกได้เฉพาะอุปกรณ์ Service ที่ติดตั้งและมีอาคาร ชั้น ห้องครบ" });
-        await using var tx = (SqlTransaction)await c.BeginTransactionAsync(token);
+        await using var tx = (SqlTransaction)await c.BeginTransactionAsync(IsolationLevel.Serializable, token);
         try
         {
             var id = await ExistingPortalId(c, tx, request.ItemInstanceId.Value, token);
-            var qrToken = NewToken();
             if (id.HasValue)
             {
-                await using var update = new SqlCommand("UPDATE dbo.TDADServiceRequestQrPortal SET QrToken=@token,IsActive=1,UpdateDate=SYSUTCDATETIME(),UpdateBy=@user WHERE CompanyID=@company AND ServiceRequestQrPortalID=@id", c, tx);
-                Add(update, "@token", SqlDbType.NVarChar, qrToken, 100); Add(update, "@user", SqlDbType.BigInt, UserId); Add(update, "@company", SqlDbType.BigInt, CompanyId); Add(update, "@id", SqlDbType.BigInt, id.Value); await update.ExecuteNonQueryAsync(token);
+                await tx.RollbackAsync(token);
+                return Conflict(new { message = "อุปกรณ์นี้มี QR Code แล้ว", description = "เปิดรายการ QR เดิมเพื่อดูรหัสหรือแก้ไขสถานะ หากต้องการรหัสใหม่ให้ลบรายการเดิมก่อน" });
             }
-            else
-            {
-                await using var insert = new SqlCommand("INSERT dbo.TDADServiceRequestQrPortal(CompanyID,ItemInstanceID,QrToken,CreateBy) OUTPUT INSERTED.ServiceRequestQrPortalID VALUES(@company,@instance,@token,@user)", c, tx);
-                Add(insert, "@company", SqlDbType.BigInt, CompanyId); Add(insert, "@instance", SqlDbType.BigInt, request.ItemInstanceId.Value); Add(insert, "@token", SqlDbType.NVarChar, qrToken, 100); Add(insert, "@user", SqlDbType.BigInt, UserId); id = Convert.ToInt64(await insert.ExecuteScalarAsync(token));
-            }
+            var qrToken = NewToken();
+            await using var insert = new SqlCommand("INSERT dbo.TDADServiceRequestQrPortal(CompanyID,ItemInstanceID,QrToken,CreateBy) OUTPUT INSERTED.ServiceRequestQrPortalID VALUES(@company,@instance,@token,@user)", c, tx);
+            Add(insert, "@company", SqlDbType.BigInt, CompanyId); Add(insert, "@instance", SqlDbType.BigInt, request.ItemInstanceId.Value); Add(insert, "@token", SqlDbType.NVarChar, qrToken, 100); Add(insert, "@user", SqlDbType.BigInt, UserId); id = Convert.ToInt64(await insert.ExecuteScalarAsync(token));
             await tx.CommitAsync(token);
             return Ok(new { qrPortalId = id, qrToken });
+        }
+        catch (SqlException error) when (error.Number is 2601 or 2627)
+        {
+            await tx.RollbackAsync(token);
+            return Conflict(new { message = "อุปกรณ์นี้มี QR Code แล้ว", description = "มีรายการ QR ของอุปกรณ์นี้อยู่แล้ว กรุณาเปิดรายการเดิมหรือโหลดข้อมูลใหม่" });
         }
         catch { await tx.RollbackAsync(token); throw; }
     }
@@ -119,6 +123,19 @@ ORDER BY I.ItemCode,X.SerialNo;
         await using var q = new SqlCommand("UPDATE dbo.TDADServiceRequestQrPortal SET IsActive=@active,UpdateDate=SYSUTCDATETIME(),UpdateBy=@user WHERE CompanyID=@company AND ServiceRequestQrPortalID=@id", c);
         Add(q, "@active", SqlDbType.Bit, request.IsActive); Add(q, "@user", SqlDbType.BigInt, UserId); Add(q, "@company", SqlDbType.BigInt, CompanyId); Add(q, "@id", SqlDbType.BigInt, id);
         return await q.ExecuteNonQueryAsync(token) == 0 ? NotFound() : Ok(new { saved = true });
+    }
+
+    [HttpDelete("{id:long}")]
+    public async Task<IActionResult> Delete(long id, CancellationToken token)
+    {
+        await using var c = await Open(token);
+        if (!await ServiceEnabled(c, token) || !await Allowed(c, "DELETE", token)) return Forbid();
+        await using var q = new SqlCommand("DELETE FROM dbo.TDADServiceRequestQrPortal WHERE CompanyID=@company AND ServiceRequestQrPortalID=@id", c);
+        Add(q, "@company", SqlDbType.BigInt, CompanyId);
+        Add(q, "@id", SqlDbType.BigInt, id);
+        return await q.ExecuteNonQueryAsync(token) == 0
+            ? NotFound(new { message = "ไม่พบ QR Code", description = "รายการนี้อาจถูกลบไปแล้วหรือไม่ได้อยู่ในบริษัทปัจจุบัน" })
+            : NoContent();
     }
 
     [HttpGet("scan/{tokenValue}")]
@@ -148,7 +165,17 @@ WHERE Q.CompanyID=@company AND Q.QrToken=@token AND Q.IsActive=1;
         const string sql = "SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.TDSTCompanySetUp C JOIN dbo.TDADProject P ON P.ProjectCode=N'LAOO_SERVICE' AND P.IsActive=1 JOIN dbo.TDADCompanyProject CP ON CP.ProjectID=P.ProjectID AND CP.CompanyID=C.CompanyID AND CP.PartnerID=C.PartnerID AND CP.IsEnabled=1 WHERE C.CompanyID=@company AND C.PartnerID=@partner AND C.IsActive=1 AND (CP.StartDate IS NULL OR CP.StartDate<=CONVERT(date,SYSUTCDATETIME())) AND (CP.ExpireDate IS NULL OR CP.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))) THEN 1 ELSE 0 END";
         await using var q = new SqlCommand(sql, c); Add(q, "@company", SqlDbType.BigInt, CompanyId); Add(q, "@partner", SqlDbType.BigInt, PartnerId); return Convert.ToBoolean(await q.ExecuteScalarAsync(token));
     }
-    private Task<bool> Allowed(SqlConnection c, string action, CancellationToken token) => CompanyProjectPermission.IsAllowedAsync(c, User, ScreenCode, action, token);
+    private async Task<bool> Allowed(SqlConnection c, string action, CancellationToken token)
+    {
+        if (action != "VIEW" && await ScreenType(c, token) != 1) return false;
+        return await CompanyProjectPermission.IsAllowedAsync(c, User, ScreenCode, action, token);
+    }
+    private static async Task<int> ScreenType(SqlConnection c, CancellationToken token)
+    {
+        await using var q = new SqlCommand("SELECT ScreenType FROM dbo.TDADMainMenu WHERE MenuCode=@menu AND IsActive=1", c);
+        Add(q, "@menu", SqlDbType.Char, ScreenCode, 5);
+        return Convert.ToInt32(await q.ExecuteScalarAsync(token));
+    }
     private async Task<bool> CanCreateRequest(SqlConnection c, CancellationToken token) => await CompanyProjectPermission.IsAllowedAsync(c, User, "15001", "CREATE", token) || await CompanyProjectPermission.IsAllowedAsync(c, User, "20001", "CREATE", token);
     private async Task<bool> ValidInstance(SqlConnection c, long id, CancellationToken token)
     {

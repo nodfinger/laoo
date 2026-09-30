@@ -1,15 +1,20 @@
 class ScheduleActions {
   const ScheduleActions({
     required this.caption,
+    required this.screenType,
     required this.view,
     required this.edit,
+    required this.delete,
   });
   final String caption;
-  final bool view, edit;
+  final int screenType;
+  final bool view, edit, delete;
   factory ScheduleActions.fromJson(Map<String, dynamic> j) => ScheduleActions(
     caption: j['caption']?.toString() ?? 'จัดตารางพนักงาน',
+    screenType: (j['screenType'] as num?)?.toInt() ?? 0,
     view: j['view'] == true,
     edit: j['edit'] == true,
+    delete: j['delete'] == true,
   );
 }
 
@@ -51,12 +56,16 @@ class EmployeeScheduleRow {
     required this.employeeId,
     required this.employeeCode,
     required this.fullName,
+    this.assignmentId,
+    this.rowVersion,
     this.groupId,
     this.groupCode,
     this.groupName,
   });
   final int employeeId;
   final String employeeCode, fullName;
+  final int? assignmentId;
+  final String? rowVersion;
   final int? groupId;
   final String? groupCode, groupName;
   factory EmployeeScheduleRow.fromJson(Map<String, dynamic> j) =>
@@ -64,6 +73,8 @@ class EmployeeScheduleRow {
         employeeId: (j['employeeId'] as num).toInt(),
         employeeCode: j['employeeCode'].toString(),
         fullName: j['fullName'].toString(),
+        assignmentId: (j['assignmentId'] as num?)?.toInt(),
+        rowVersion: j['rowVersion']?.toString(),
         groupId: (j['workScheduleGroupId'] as num?)?.toInt(),
         groupCode: j['groupCode']?.toString(),
         groupName: j['groupName']?.toString(),

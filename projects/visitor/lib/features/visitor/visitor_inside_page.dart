@@ -193,71 +193,70 @@ class _CheckoutFormState extends State<_CheckoutForm> {
   );
 
   @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: const Text('ผลการเข้าพบและ Check-out'),
-    content: SingleChildScrollView(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('ผู้มาติดต่อ: ${widget.visitorName}'),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<String>(
-            key: ValueKey(_outcome),
-            initialValue: _outcome,
-            decoration: const InputDecoration(labelText: 'ผลการเข้าพบ'),
-            items: const [
-              DropdownMenuItem(value: 'MET', child: Text('เข้าพบสำเร็จ')),
-              DropdownMenuItem(value: 'NOT_MET', child: Text('ไม่ได้เข้าพบ')),
-              DropdownMenuItem(value: 'CANCELLED', child: Text('ยกเลิก')),
-            ],
-            onChanged: (value) => setState(() => _outcome = value ?? 'MET'),
-          ),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<String>(
-            key: ValueKey(_reason),
-            initialValue: _reason,
-            decoration: const InputDecoration(labelText: 'ประเภท Check-out'),
-            items: const [
-              DropdownMenuItem(value: 'NORMAL', child: Text('ออกตามปกติ')),
-              DropdownMenuItem(
-                value: 'HOST_ABSENT',
-                child: Text('ไม่พบผู้รับรอง'),
-              ),
-              DropdownMenuItem(
-                value: 'VISITOR_LEFT',
-                child: Text('ผู้มาติดต่อออกก่อน'),
-              ),
-              DropdownMenuItem(
-                value: 'FORGOT_MEETING_CONFIRMATION',
-                child: Text('ลืมยืนยันการเข้าพบ'),
-              ),
-              DropdownMenuItem(value: 'OTHER', child: Text('อื่น ๆ')),
-            ],
-            onChanged: (value) => setState(() => _reason = value ?? 'NORMAL'),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _note,
-            maxLines: 3,
-            decoration: InputDecoration(
-              labelText: _reason == 'OTHER' ? 'หมายเหตุ *' : 'หมายเหตุ',
-              hintText: 'บันทึกข้อความขาออกหรือข้อความของ รปภ',
-            ),
-          ),
-          const SizedBox(height: 16),
-          _evidenceSection('รูปรถขาออก', _vehicleImages),
-          const SizedBox(height: 16),
-          _evidenceSection('รูปอื่นขาออก', _otherImages),
-          if (_error != null) ...[
-            const SizedBox(height: 12),
-            Text(
-              _error!,
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
-            ),
+  Widget build(BuildContext context) => VisitorActionDialog(
+    icon: Icons.logout_outlined,
+    title: 'ผลการเข้าพบและ Check-out',
+    content: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('ผู้มาติดต่อ: ${widget.visitorName}'),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String>(
+          key: ValueKey(_outcome),
+          initialValue: _outcome,
+          decoration: const InputDecoration(labelText: 'ผลการเข้าพบ'),
+          items: const [
+            DropdownMenuItem(value: 'MET', child: Text('เข้าพบสำเร็จ')),
+            DropdownMenuItem(value: 'NOT_MET', child: Text('ไม่ได้เข้าพบ')),
+            DropdownMenuItem(value: 'CANCELLED', child: Text('ยกเลิก')),
           ],
+          onChanged: (value) => setState(() => _outcome = value ?? 'MET'),
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String>(
+          key: ValueKey(_reason),
+          initialValue: _reason,
+          decoration: const InputDecoration(labelText: 'ประเภท Check-out'),
+          items: const [
+            DropdownMenuItem(value: 'NORMAL', child: Text('ออกตามปกติ')),
+            DropdownMenuItem(
+              value: 'HOST_ABSENT',
+              child: Text('ไม่พบผู้รับรอง'),
+            ),
+            DropdownMenuItem(
+              value: 'VISITOR_LEFT',
+              child: Text('ผู้มาติดต่อออกก่อน'),
+            ),
+            DropdownMenuItem(
+              value: 'FORGOT_MEETING_CONFIRMATION',
+              child: Text('ลืมยืนยันการเข้าพบ'),
+            ),
+            DropdownMenuItem(value: 'OTHER', child: Text('อื่น ๆ')),
+          ],
+          onChanged: (value) => setState(() => _reason = value ?? 'NORMAL'),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _note,
+          maxLines: 3,
+          decoration: InputDecoration(
+            labelText: _reason == 'OTHER' ? 'หมายเหตุ *' : 'หมายเหตุ',
+            hintText: 'บันทึกข้อความขาออกหรือข้อความของ รปภ',
+          ),
+        ),
+        const SizedBox(height: 16),
+        _evidenceSection('รูปรถขาออก', _vehicleImages),
+        const SizedBox(height: 16),
+        _evidenceSection('รูปอื่นขาออก', _otherImages),
+        if (_error != null) ...[
+          const SizedBox(height: 12),
+          Text(
+            _error!,
+            style: TextStyle(color: Theme.of(context).colorScheme.error),
+          ),
         ],
-      ),
+      ],
     ),
     actions: [
       TextButton(onPressed: widget.onCancel, child: const Text('ยกเลิก')),
@@ -410,11 +409,6 @@ class _VisitorInsidePageState extends State<VisitorInsidePage> {
                       icon: const Icon(Icons.person_add_alt_1),
                       label: const Text('รับผู้มาติดต่อ'),
                     ),
-                  IconButton(
-                    tooltip: 'รีเฟรช',
-                    onPressed: _loading ? null : _load,
-                    icon: const Icon(Icons.refresh),
-                  ),
                 ],
               );
               if (compact) {
@@ -482,7 +476,12 @@ class _VisitorInsidePageState extends State<VisitorInsidePage> {
         ),
         const SizedBox(height: 6),
         if (_error != null)
-          _card(Text(_error!, style: const TextStyle(color: Colors.red))),
+          _card(
+            Text(
+              _error!,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ),
         if (_error != null) const SizedBox(height: 6),
         _card(
           _loading
@@ -560,8 +559,10 @@ class _VisitorInsidePageState extends State<VisitorInsidePage> {
   );
 
   Widget _dataRow(VisitorInside row) => Container(
-    decoration: const BoxDecoration(
-      border: Border(top: BorderSide(color: Color(0xFFD9DDE3))),
+    decoration: BoxDecoration(
+      border: Border(
+        top: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+      ),
     ),
     padding: const EdgeInsets.symmetric(vertical: 8),
     child: Row(
@@ -576,8 +577,10 @@ class _VisitorInsidePageState extends State<VisitorInsidePage> {
   );
 
   Widget _compactRow(VisitorInside row) => Container(
-    decoration: const BoxDecoration(
-      border: Border(top: BorderSide(color: Color(0xFFD9DDE3))),
+    decoration: BoxDecoration(
+      border: Border(
+        top: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+      ),
     ),
     padding: const EdgeInsets.symmetric(vertical: 10),
     child: Column(
@@ -648,39 +651,23 @@ class _VisitorInsidePageState extends State<VisitorInsidePage> {
     final result = _result;
     final total = result?.total ?? 0;
     final pageCount = total == 0 ? 1 : (total / _pageSize).ceil();
-    return _card(
-      Wrap(
-        alignment: WrapAlignment.spaceBetween,
-        runSpacing: 4,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          Text('แสดง ${result?.items.length ?? 0} รายการจากทั้งหมด $total'),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton(
-                onPressed: _page > 1 && !_loading
-                    ? () {
-                        _page--;
-                        _load();
-                      }
-                    : null,
-                icon: const Icon(Icons.chevron_left),
-              ),
-              Text('$_page / $pageCount'),
-              IconButton(
-                onPressed: _page < pageCount && !_loading
-                    ? () {
-                        _page++;
-                        _load();
-                      }
-                    : null,
-                icon: const Icon(Icons.chevron_right),
-              ),
-            ],
-          ),
-        ],
-      ),
+    return VisitorPaginationCard(
+      page: _page,
+      pageCount: pageCount,
+      pageSize: _pageSize,
+      total: total,
+      onPrevious: _page > 1 && !_loading
+          ? () {
+              _page--;
+              _load();
+            }
+          : null,
+      onNext: _page < pageCount && !_loading
+          ? () {
+              _page++;
+              _load();
+            }
+          : null,
     );
   }
 
@@ -693,6 +680,9 @@ class _VisitorInsidePageState extends State<VisitorInsidePage> {
 
   Widget _card(Widget child) => Card(
     margin: EdgeInsets.zero,
-    child: Padding(padding: const EdgeInsets.all(10), child: child),
+    child: Padding(
+      padding: EdgeInsets.all(visitorUiTokens.cardPadding),
+      child: child,
+    ),
   );
 }

@@ -9,6 +9,7 @@ import '../data/meeting_food_distribution_repository.dart';
 import '../meeting_feature_host.dart';
 import '../meeting_route_contract.dart';
 import '../widgets/meeting_pagination_card.dart';
+import '../widgets/meeting_popup.dart';
 
 class MeetingFoodDistributionPage extends StatefulWidget {
   const MeetingFoodDistributionPage({super.key});
@@ -310,13 +311,7 @@ class _State extends State<MeetingFoodDistributionPage> {
                   child: WorkspaceActionHeader(
                     title: caption,
                     favoriteKey: MeetingMenuCodes.foodDistribution,
-                    actions: [
-                      OutlinedButton.icon(
-                        onPressed: loading ? null : load,
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('โหลดข้อมูลล่าสุด'),
-                      ),
-                    ],
+                    actions: const [],
                   ),
                 ),
                 const SizedBox(height: LaooLayout.cardSpacing),
@@ -395,10 +390,13 @@ class _DistributionDialogState extends State<_DistributionDialog> {
       widget.data['items'] as List? ?? const [],
     );
     final canReceive = widget.data['canReceive'] == true;
-    return AlertDialog(
-      title: Text('แจกอาหาร · ${header['participantName'] ?? '-'}'),
+    return MeetingPopup(
+      title: MeetingPopupTitle(
+        icon: Icons.restaurant_outlined,
+        text: 'แจกอาหาร · ${header['participantName'] ?? '-'}',
+      ),
       content: SizedBox(
-        width: 540,
+        width: 480,
         child: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,

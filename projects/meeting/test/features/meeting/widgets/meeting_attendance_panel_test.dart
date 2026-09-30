@@ -424,7 +424,7 @@ void main() {
       isNull,
     );
     api.onGet = (_) => receipt(received: 2);
-    await tester.tap(find.text('โหลดข้อมูลรับอาหารล่าสุด'));
+    await tester.tap(find.text('ลองอีกครั้ง'));
     await tester.pumpAndSettle();
     expect(find.text('สั่ง 3 · รับแล้ว 2 · คงเหลือ 1'), findsOneWidget);
     expect(

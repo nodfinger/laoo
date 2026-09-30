@@ -21,6 +21,7 @@ class ServiceRequestPage extends StatefulWidget {
     this.menuCode,
     this.routeName,
     this.fixedStatus,
+    this.api,
   });
   final bool selfService;
   final String? qrToken;
@@ -28,20 +29,24 @@ class ServiceRequestPage extends StatefulWidget {
   final String? menuCode;
   final String? routeName;
   final String? fixedStatus;
+  final ServiceRequestApi? api;
   @override
   State<ServiceRequestPage> createState() => _ServiceRequestPageState();
 }
 
 class _ServiceRequestPageState extends State<ServiceRequestPage> {
-  final _api = ServiceRequestApi();
+  late final ServiceRequestApi _api = widget.api ?? ServiceRequestApi();
   final _search = TextEditingController();
   String _status = '';
   int _page = 1;
   bool _loading = true;
   bool _canCreate = false;
   bool _canEdit = false;
+  bool _canDelete = false;
   String _menuName = 'รายการแจ้งซ่อมทั้งหมด';
   Map<String, dynamic> _data = const {'items': <dynamic>[], 'total': 0};
+  String get _menuCode =>
+      widget.menuCode ?? (widget.selfService ? '20001' : '15001');
 
   @override
   void initState() {
@@ -67,6 +72,7 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
         status: _status,
         selfService: widget.selfService,
         page: _page,
+        menuCode: _menuCode,
       );
       if (mounted) setState(() => _data = value);
     } catch (error) {
@@ -84,10 +90,17 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
           _canCreate = !widget.readOnly && widget.selfService
               ? actions['selfCreate'] == true
               : !widget.readOnly && actions['create'] == true;
+          final screenType = widget.selfService
+              ? actions['selfScreenType']
+              : actions['screenType'];
           _canEdit =
               !widget.readOnly &&
-              !widget.selfService &&
-              actions['edit'] == true;
+              screenType == 1 &&
+              actions[widget.selfService ? 'selfEdit' : 'edit'] == true;
+          _canDelete =
+              !widget.readOnly &&
+              screenType == 1 &&
+              actions[widget.selfService ? 'selfDelete' : 'delete'] == true;
         });
       }
     } catch (_) {}
@@ -96,7 +109,7 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
   Future<void> _loadMenuName() async {
     try {
       final name = await NavigationMenuRepository().resolveMenuName(
-        menuCode: widget.menuCode ?? (widget.selfService ? '20001' : '15001'),
+        menuCode: _menuCode,
         routeName:
             widget.routeName ??
             (widget.selfService ? 'portalRequest' : 'cmTickets'),
@@ -114,7 +127,8 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
   }
 
   Future<void> _create() async {
-    final lookup = await _api.lookup();
+    if (!_canCreate) return;
+    final lookup = await _api.lookup(selfService: widget.selfService);
     if (!mounted) return;
     final saved = await showDialog<bool>(
       context: context,
@@ -133,13 +147,171 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
     }
   }
 
+  Future<void> _edit(Map<String, dynamic> row) async {
+    if (!_canEdit || row['statusCode'] != 'NEW') return;
+    final id = (row['requestId'] as num?)?.toInt();
+    if (id == null) return;
+    try {
+      final detail = await _api.detail(id, menuCode: _menuCode);
+      if (!mounted) return;
+      if (detail['statusCode'] != 'NEW') {
+        await _load();
+        return;
+      }
+      final saved = await showDialog<bool>(
+        context: context,
+        builder: (_) => _RequestEditDialog(
+          api: _api,
+          requestId: id,
+          data: detail,
+          caption: _menuName,
+          selfService: widget.selfService,
+        ),
+      );
+      if (saved == true && mounted) {
+        await _load();
+        if (mounted) showTimedSnackBar(context, message: 'บันทึกการแก้ไขแล้ว');
+      }
+    } catch (error) {
+      if (mounted) _message(error);
+    }
+  }
+
+  Future<void> _delete(Map<String, dynamic> row) async {
+    if (!_canDelete || row['statusCode'] != 'NEW') return;
+    final id = (row['requestId'] as num?)?.toInt();
+    if (id == null) return;
+    try {
+      final detail = await _api.detail(id, menuCode: _menuCode);
+      if (!mounted) return;
+      if (detail['statusCode'] != 'NEW') {
+        await _load();
+        return;
+      }
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) {
+          final colors = Theme.of(dialogContext).colorScheme;
+          return Dialog(
+            backgroundColor: Colors.white,
+            insetPadding: const EdgeInsets.all(LaooLayout.dialogInsetPadding),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(LaooRadius.xs),
+              side: BorderSide(color: colors.error),
+            ),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 440),
+              child: Padding(
+                padding: const EdgeInsets.all(LaooLayout.cardPadding),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.delete_outline, color: colors.error),
+                        const SizedBox(width: 8),
+                        Text(
+                          'ลบใบแจ้งซ่อม',
+                          style: TextStyle(
+                            color: colors.error,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Divider(color: colors.outlineVariant),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      color: colors.errorContainer,
+                      child: Text(
+                        '${detail['requestNo']} — ${detail['subject']}',
+                        style: TextStyle(color: colors.onErrorContainer),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text('ลบแล้วไม่สามารถเรียกคืนได้'),
+                    const SizedBox(height: 12),
+                    Divider(color: colors.outlineVariant),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(dialogContext, false),
+                          child: const Text('ยกเลิก'),
+                        ),
+                        const SizedBox(width: 8),
+                        FilledButton.icon(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: colors.error,
+                            foregroundColor: colors.onError,
+                          ),
+                          onPressed: () => Navigator.pop(dialogContext, true),
+                          icon: const Icon(Icons.delete_outline),
+                          label: const Text('ลบ'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      );
+      if (confirmed != true || !mounted) return;
+      await _api.delete(
+        id,
+        detail['rowVersion'].toString(),
+        selfService: widget.selfService,
+      );
+      if (_page > 1 && ((_data['items'] as List?)?.length ?? 0) == 1) _page--;
+      await _load();
+      if (mounted) showTimedSnackBar(context, message: 'ลบใบแจ้งซ่อมแล้ว');
+    } catch (error) {
+      if (mounted) _message(error);
+    }
+  }
+
+  Widget _rowActions(Map<String, dynamic> row) {
+    if (row['statusCode'] != 'NEW' || (!_canEdit && !_canDelete)) {
+      return const SizedBox.shrink();
+    }
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (_canEdit)
+          IconButton(
+            tooltip: 'แก้ไข',
+            onPressed: () => _edit(row),
+            icon: Icon(
+              Icons.edit_outlined,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
+        if (_canDelete)
+          IconButton(
+            tooltip: 'ลบ',
+            onPressed: () => _delete(row),
+            icon: Icon(
+              Icons.delete_outline,
+              color: Theme.of(context).colorScheme.error,
+            ),
+          ),
+      ],
+    );
+  }
+
   Future<void> _openDetail(Map<String, dynamic> row) async {
     final id = (row['requestId'] as num?)?.toInt();
     if (id == null) return;
     try {
-      final detail = await _api.detail(id);
+      final detail = await _api.detail(id, menuCode: _menuCode);
       if (!mounted) return;
-      final attachments = await _api.attachments(id);
+      final attachments = await _api.attachments(id, menuCode: _menuCode);
       if (!mounted) return;
       final changed = await showDialog<bool>(
         context: context,
@@ -147,7 +319,8 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
           api: _api,
           data: detail,
           attachments: attachments,
-          canEdit: _canEdit,
+          canEdit: !widget.selfService && _canEdit,
+          menuCode: _menuCode,
         ),
       );
       if (changed == true) await _load();
@@ -187,11 +360,15 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
                   children: [
                     const Icon(Icons.build_outlined),
                     const SizedBox(width: 10),
-                    Text(
-                      _menuName,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
+                    Flexible(
+                      child: Text(
+                        _menuName,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                   ],
@@ -229,6 +406,7 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
                   SizedBox(
                     width: 180,
                     child: DropdownButtonFormField<String>(
+                      isExpanded: true,
                       initialValue: _status,
                       decoration: _input(label: 'สถานะ'),
                       items: const [
@@ -284,49 +462,135 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
             ),
             const SizedBox(height: 16),
             if (_loading) const LinearProgressIndicator(),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: DataTable(
-                columns: const [
-                  DataColumn(label: Text('เลขที่')),
-                  DataColumn(label: Text('ผู้แจ้ง')),
-                  DataColumn(label: Text('สถานที่')),
-                  DataColumn(label: Text('หัวข้อ')),
-                  DataColumn(label: Text('สถานะ')),
-                  DataColumn(label: Text('วันที่')),
-                ],
-                rows: [
-                  for (final row in items)
-                    DataRow(
-                      cells: [
-                        DataCell(
-                          InkWell(
-                            onTap: () => _openDetail(row),
-                            child: Text(
-                              row['requestNo']?.toString() ?? '-',
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.primary,
-                                decoration: TextDecoration.underline,
+            if (!_loading && items.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 36),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.inbox_outlined,
+                      size: 40,
+                      color: Theme.of(context).colorScheme.outline,
+                    ),
+                    const SizedBox(height: 8),
+                    const Text('ไม่พบใบแจ้งซ่อมตามเงื่อนไขที่เลือก'),
+                  ],
+                ),
+              ),
+            if (items.isNotEmpty)
+              LayoutBuilder(
+                builder: (context, constraints) => constraints.maxWidth < 720
+                    ? Column(
+                        children: [
+                          for (final row in items)
+                            Card(
+                              child: Padding(
+                                padding: const EdgeInsets.all(
+                                  LaooLayout.cardPadding,
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            row['requestNo']?.toString() ?? '-',
+                                            style: TextStyle(
+                                              color: Theme.of(
+                                                context,
+                                              ).colorScheme.primary,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                        ),
+                                        _rowActions(row),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(row['subject']?.toString() ?? '-'),
+                                    Text(
+                                      row['requesterName']?.toString() ?? '-',
+                                    ),
+                                    Text(
+                                      _statusText(
+                                        row['statusCode']?.toString() ?? '',
+                                      ),
+                                    ),
+                                    Align(
+                                      alignment: Alignment.centerRight,
+                                      child: TextButton(
+                                        onPressed: () => _openDetail(row),
+                                        child: const Text('ดูรายละเอียด'),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
-                          ),
+                        ],
+                      )
+                    : SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: DataTable(
+                          columns: [
+                            const DataColumn(label: Text('Action')),
+                            DataColumn(label: Text('เลขที่')),
+                            DataColumn(label: Text('ผู้แจ้ง')),
+                            DataColumn(label: Text('สถานที่')),
+                            DataColumn(label: Text('หัวข้อ')),
+                            DataColumn(label: Text('สถานะ')),
+                            DataColumn(label: Text('วันที่')),
+                          ],
+                          rows: [
+                            for (final row in items)
+                              DataRow(
+                                cells: [
+                                  DataCell(_rowActions(row)),
+                                  DataCell(
+                                    InkWell(
+                                      onTap: () => _openDetail(row),
+                                      child: Text(
+                                        row['requestNo']?.toString() ?? '-',
+                                        style: TextStyle(
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.primary,
+                                          decoration: TextDecoration.underline,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  DataCell(
+                                    Text(
+                                      row['requesterName']?.toString() ?? '-',
+                                    ),
+                                  ),
+                                  DataCell(
+                                    Text(
+                                      row['locationSnapshot']?.toString() ??
+                                          '-',
+                                    ),
+                                  ),
+                                  DataCell(
+                                    Text(row['subject']?.toString() ?? '-'),
+                                  ),
+                                  DataCell(
+                                    Text(
+                                      _statusText(
+                                        row['statusCode']?.toString() ?? '',
+                                      ),
+                                    ),
+                                  ),
+                                  DataCell(
+                                    Text(row['requestDate']?.toString() ?? '-'),
+                                  ),
+                                ],
+                              ),
+                          ],
                         ),
-                        DataCell(Text(row['requesterName']?.toString() ?? '-')),
-                        DataCell(
-                          Text(row['locationSnapshot']?.toString() ?? '-'),
-                        ),
-                        DataCell(Text(row['subject']?.toString() ?? '-')),
-                        DataCell(
-                          Text(
-                            _statusText(row['statusCode']?.toString() ?? ''),
-                          ),
-                        ),
-                        DataCell(Text(row['requestDate']?.toString() ?? '-')),
-                      ],
-                    ),
-                ],
+                      ),
               ),
-            ),
             const SizedBox(height: 12),
             _pagination(total),
           ],
@@ -392,6 +656,152 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
         'CANCELLED': 'ยกเลิก',
       }[code] ??
       code;
+}
+
+class _RequestEditDialog extends StatefulWidget {
+  const _RequestEditDialog({
+    required this.api,
+    required this.requestId,
+    required this.data,
+    required this.caption,
+    required this.selfService,
+  });
+  final ServiceRequestApi api;
+  final int requestId;
+  final Map<String, dynamic> data;
+  final String caption;
+  final bool selfService;
+
+  @override
+  State<_RequestEditDialog> createState() => _RequestEditDialogState();
+}
+
+class _RequestEditDialogState extends State<_RequestEditDialog> {
+  final _form = GlobalKey<FormState>();
+  late final TextEditingController _subject = TextEditingController(
+    text: widget.data['subject']?.toString() ?? '',
+  );
+  late final TextEditingController _detail = TextEditingController(
+    text: widget.data['detail']?.toString() ?? '',
+  );
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _subject.dispose();
+    _detail.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (_saving || !_form.currentState!.validate()) return;
+    setState(() => _saving = true);
+    try {
+      await widget.api.edit(
+        widget.requestId,
+        selfService: widget.selfService,
+        subject: _subject.text.trim(),
+        detail: _detail.text.trim(),
+        rowVersion: widget.data['rowVersion'].toString(),
+      );
+      if (mounted) Navigator.pop(context, true);
+    } catch (error) {
+      if (mounted) {
+        final message = error is ApiException
+            ? error.message
+            : 'บันทึกไม่สำเร็จ';
+        showTimedSnackBar(context, message: message, error: true);
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Dialog(
+      backgroundColor: Colors.white,
+      insetPadding: const EdgeInsets.all(LaooLayout.dialogInsetPadding),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(LaooRadius.xs),
+      ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 520),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(LaooLayout.cardPadding),
+          child: Form(
+            key: _form,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  '${widget.caption} > แก้ไข',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Divider(color: colors.outlineVariant),
+                const SizedBox(height: 16),
+                Text('เลขที่ ${widget.data['requestNo']}'),
+                const SizedBox(height: LaooLayout.popupFieldSpacing),
+                Text('ผู้แจ้ง ${widget.data['requesterName']}'),
+                const SizedBox(height: LaooLayout.popupFieldSpacing),
+                TextFormField(
+                  controller: _subject,
+                  maxLength: 200,
+                  decoration: const InputDecoration(
+                    labelText: 'หัวข้อ *',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? 'กรุณาระบุหัวข้อ'
+                      : null,
+                ),
+                const SizedBox(height: LaooLayout.popupFieldSpacing),
+                TextFormField(
+                  controller: _detail,
+                  maxLength: 2000,
+                  minLines: 3,
+                  maxLines: 6,
+                  decoration: const InputDecoration(
+                    labelText: 'รายละเอียด *',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? 'กรุณาระบุรายละเอียด'
+                      : null,
+                ),
+                const SizedBox(height: 12),
+                Divider(color: colors.outlineVariant),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: _saving
+                          ? null
+                          : () => Navigator.pop(context, false),
+                      child: const Text('ยกเลิก'),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton.icon(
+                      onPressed: _saving ? null : _save,
+                      icon: const Icon(Icons.save_outlined),
+                      label: const Text('บันทึก'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _RequestDialog extends StatefulWidget {
@@ -904,11 +1314,13 @@ class _RequestDetailDialog extends StatefulWidget {
     required this.data,
     required this.attachments,
     required this.canEdit,
+    required this.menuCode,
   });
   final ServiceRequestApi api;
   final Map<String, dynamic> data;
   final List<Map<String, dynamic>> attachments;
   final bool canEdit;
+  final String menuCode;
 
   @override
   State<_RequestDetailDialog> createState() => _RequestDetailDialogState();
@@ -1066,6 +1478,7 @@ class _RequestDetailDialogState extends State<_RequestDetailDialog> {
                         api: widget.api,
                         requestId: _id,
                         item: item,
+                        menuCode: widget.menuCode,
                         canDelete:
                             widget.canEdit &&
                             status != 'COMPLETED' &&
@@ -1110,12 +1523,14 @@ class _RemoteAttachmentTile extends StatelessWidget {
     required this.api,
     required this.requestId,
     required this.item,
+    required this.menuCode,
     required this.canDelete,
     required this.onDelete,
   });
   final ServiceRequestApi api;
   final int requestId;
   final Map<String, dynamic> item;
+  final String menuCode;
   final bool canDelete;
   final VoidCallback onDelete;
 
@@ -1127,7 +1542,11 @@ class _RemoteAttachmentTile extends StatelessWidget {
       child: Column(
         children: [
           FutureBuilder<List<int>>(
-            future: api.downloadAttachment(requestId, attachmentId),
+            future: api.downloadAttachment(
+              requestId,
+              attachmentId,
+              menuCode: menuCode,
+            ),
             builder: (context, snapshot) => InkWell(
               onTap: snapshot.hasData
                   ? () => showDialog<void>(

@@ -32,6 +32,11 @@ class _TimeReasonPageState extends State<TimeReasonPage> {
   bool loading = true;
   String? message;
   bool messageError = false;
+  bool get canCreate =>
+      actions?['screenType'] == 1 && actions?['create'] == true;
+  bool get canEdit => actions?['screenType'] == 1 && actions?['edit'] == true;
+  bool get canDelete =>
+      actions?['screenType'] == 1 && actions?['delete'] == true;
 
   @override
   void initState() {
@@ -92,6 +97,7 @@ class _TimeReasonPageState extends State<TimeReasonPage> {
   });
 
   Future<void> edit([Map<String, dynamic>? row]) async {
+    if (row == null ? !canCreate : !canEdit) return;
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
       barrierDismissible: false,
@@ -114,13 +120,14 @@ class _TimeReasonPageState extends State<TimeReasonPage> {
   }
 
   Future<void> remove(Map<String, dynamic> row) async {
+    if (!canDelete) return;
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => TimeDeleteDialog(
         itemLabel: '${row['reasonCode']} — ${row['reasonName']}',
       ),
     );
-    if (ok != true) return;
+    if (ok != true || !mounted) return;
     try {
       await repo.delete(row['id'] as int, row['rowVersion'] as String);
       await load(targetPage: page);
@@ -137,6 +144,7 @@ class _TimeReasonPageState extends State<TimeReasonPage> {
     itemBuilder: (context, index) {
       final row = items[index];
       return Card(
+        margin: EdgeInsets.zero,
         child: ListTile(
           leading: CircleAvatar(
             backgroundColor: timeUiTokens.primaryColor.withValues(alpha: .1),
@@ -148,22 +156,27 @@ class _TimeReasonPageState extends State<TimeReasonPage> {
             '${row['requireRemark'] == true ? 'ต้องระบุหมายเหตุ' : 'ไม่บังคับหมายเหตุ'} · '
             '${row['requireEvidence'] == true ? 'ต้องแนบหลักฐาน' : 'ไม่บังคับหลักฐาน'}',
           ),
-          trailing: Wrap(
-            children: [
-              if (actions?['edit'] == true)
-                IconButton(
-                  tooltip: 'แก้ไข',
-                  onPressed: () => edit(row),
-                  icon: const Icon(Icons.edit_outlined),
-                ),
-              if (actions?['delete'] == true)
-                IconButton(
-                  tooltip: 'ลบ',
-                  onPressed: () => remove(row),
-                  icon: const Icon(Icons.delete_outline, color: Colors.red),
-                ),
-            ],
-          ),
+          trailing: canEdit || canDelete
+              ? Wrap(
+                  children: [
+                    if (canEdit)
+                      IconButton(
+                        tooltip: 'แก้ไข',
+                        onPressed: () => edit(row),
+                        icon: const Icon(Icons.edit_outlined),
+                      ),
+                    if (canDelete)
+                      IconButton(
+                        tooltip: 'ลบ',
+                        onPressed: () => remove(row),
+                        icon: Icon(
+                          Icons.delete_outline,
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                  ],
+                )
+              : null,
         ),
       );
     },
@@ -192,7 +205,7 @@ class _TimeReasonPageState extends State<TimeReasonPage> {
                     cards: cards,
                     onChanged: (value) => setState(() => cards = value),
                   ),
-                  if (actions?['create'] == true)
+                  if (canCreate)
                     FilledButton.icon(
                       onPressed: () => edit(),
                       icon: const Icon(Icons.add),
@@ -227,7 +240,10 @@ class _TimeReasonPageState extends State<TimeReasonPage> {
                       DropdownMenuItem(value: false, child: Text('ไม่ใช้งาน')),
                       DropdownMenuItem(value: null, child: Text('ทั้งหมด')),
                     ],
-                    onChanged: (value) => setState(() => active = value),
+                    onChanged: (value) {
+                      setState(() => active = value);
+                      load();
+                    },
                   ),
                 ),
                 FilledButton.icon(
@@ -286,19 +302,21 @@ class _TimeReasonPageState extends State<TimeReasonPage> {
                                       Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          if (actions?['edit'] == true)
+                                          if (canEdit)
                                             IconButton(
                                               onPressed: () => edit(row),
                                               icon: const Icon(
                                                 Icons.edit_outlined,
                                               ),
                                             ),
-                                          if (actions?['delete'] == true)
+                                          if (canDelete)
                                             IconButton(
                                               onPressed: () => remove(row),
-                                              icon: const Icon(
+                                              icon: Icon(
                                                 Icons.delete_outline,
-                                                color: Colors.red,
+                                                color: Theme.of(
+                                                  context,
+                                                ).colorScheme.error,
                                               ),
                                             ),
                                         ],
@@ -335,7 +353,7 @@ class _TimeReasonPageState extends State<TimeReasonPage> {
                       ),
                     ),
                   ),
-            pagination: LaooPaginationCard(
+            pagination: TimePaginationCard(
               tokens: timeUiTokens.workspace,
               page: page,
               pageCount: pageCount,
@@ -416,13 +434,13 @@ class _ReasonDialogState extends State<_ReasonDialog> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: timeUiTokens.popupFieldSpacing),
           TextFormField(
             controller: code,
             decoration: const InputDecoration(labelText: 'รหัส *'),
             validator: requiredText,
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: timeUiTokens.popupFieldSpacing),
           TextFormField(
             controller: name,
             decoration: const InputDecoration(labelText: 'ชื่อเหตุผล *'),

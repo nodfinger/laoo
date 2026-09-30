@@ -661,7 +661,7 @@ class _StockReceiptWorkspaceState extends State<StockReceiptWorkspace> {
             ),
             key: const ValueKey('stock-receipt-filter-card'),
           ),
-          const SizedBox(height: LaooLayout.cardSpacing),
+          const SizedBox(height: LaooLayout.listSectionSpacing),
           Expanded(
             child: _rows.isEmpty
                 ? _surface(
@@ -768,7 +768,7 @@ class _StockReceiptWorkspaceState extends State<StockReceiptWorkspace> {
                     key: const ValueKey('stock-receipt-table-card'),
                   ),
           ),
-          const SizedBox(height: LaooLayout.cardSpacing),
+          const SizedBox(height: LaooLayout.listSectionSpacing),
           SizedBox(
             height: LaooLayout.paginationCardHeight,
             child: _surface(
@@ -779,7 +779,7 @@ class _StockReceiptWorkspaceState extends State<StockReceiptWorkspace> {
                     _page > 0 ? () => setState(() => _page--) : null,
                   ),
                   const SizedBox(width: 6),
-                  _pageButton(Text('${_page + 1}'), () {}, current: true),
+                  _pageButton(Text('${_page + 1}'), null, current: true),
                   const SizedBox(width: 6),
                   _pageButton(
                     const Icon(Icons.chevron_right, size: 18),
@@ -822,24 +822,44 @@ class _StockReceiptWorkspaceState extends State<StockReceiptWorkspace> {
     Widget child,
     VoidCallback? onPressed, {
     bool current = false,
-  }) => SizedBox(
-    width: 34,
-    height: 34,
-    child: OutlinedButton(
-      onPressed: onPressed,
-      style: OutlinedButton.styleFrom(
-        padding: EdgeInsets.zero,
-        minimumSize: Size.zero,
-        backgroundColor: current ? _primary : Colors.white,
-        foregroundColor: current ? Colors.white : _primary,
-        side: BorderSide(color: onPressed == null ? Colors.grey : _primary),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(LaooRadius.xs),
-        ),
-      ),
-      child: child,
-    ),
-  );
+  }) => current
+      ? Semantics(
+          label: 'หน้าปัจจุบัน ${_page + 1}',
+          child: Container(
+            width: LaooLayout.paginationButtonSize,
+            height: LaooLayout.paginationButtonSize,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: _primary,
+              border: Border.all(color: _primary),
+              borderRadius: BorderRadius.circular(LaooRadius.xs),
+            ),
+            child: DefaultTextStyle(
+              style: TextStyle(color: Theme.of(context).colorScheme.onPrimary),
+              child: child,
+            ),
+          ),
+        )
+      : SizedBox(
+          width: LaooLayout.paginationButtonSize,
+          height: LaooLayout.paginationButtonSize,
+          child: OutlinedButton(
+            onPressed: onPressed,
+            style: OutlinedButton.styleFrom(
+              padding: EdgeInsets.zero,
+              minimumSize: Size.zero,
+              backgroundColor: current ? _primary : Colors.white,
+              foregroundColor: current ? Colors.white : _primary,
+              side: BorderSide(
+                color: onPressed == null ? Colors.grey : _primary,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(LaooRadius.xs),
+              ),
+            ),
+            child: child,
+          ),
+        );
 
   Future<void> _pickReceiptDate() async {
     final theme = Theme.of(context);

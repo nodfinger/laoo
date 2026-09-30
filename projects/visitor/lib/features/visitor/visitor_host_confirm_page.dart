@@ -91,8 +91,9 @@ class _VisitorHostConfirmPageState extends State<VisitorHostConfirmPage> {
   Future<void> _confirm() async {
     final accepted = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('ยืนยันการเข้าพบ'),
+      builder: (context) => VisitorActionDialog(
+        icon: Icons.fact_check_outlined,
+        title: 'ยืนยันการเข้าพบ',
         content: Text(
           _result == 'MET'
               ? 'ยืนยันว่าผู้มาติดต่อเข้าพบแล้ว'
@@ -135,10 +136,8 @@ class _VisitorHostConfirmPageState extends State<VisitorHostConfirmPage> {
           if (!_loading && _error == null && _visits.isNotEmpty)
             Align(
               alignment: Alignment.bottomCenter,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: Theme.of(context).scaffoldBackgroundColor,
-                ),
+              child: Card(
+                margin: EdgeInsets.zero,
                 child: Padding(
                   padding: const EdgeInsets.all(12),
                   child: SizedBox(
@@ -197,25 +196,59 @@ class _VisitorHostConfirmPageState extends State<VisitorHostConfirmPage> {
     final visit = _visits[_selected];
     final detail = _detail;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 92),
+      padding: EdgeInsets.fromLTRB(
+        visitorUiTokens.cardMargin,
+        visitorUiTokens.cardMargin,
+        visitorUiTokens.cardMargin,
+        92,
+      ),
       children: [
-        Text(
-          _actions?.caption ?? 'ยืนยันการเข้าพบ',
-          style: Theme.of(context).textTheme.titleLarge,
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'รอการยืนยัน ${_visits.length} รายการ',
-          style: Theme.of(context).textTheme.bodyMedium,
-        ),
-        const SizedBox(height: 12),
-        if (_visits.length > 1)
-          OutlinedButton(
-            onPressed: () => _pick(),
-            child: Text(
-              'รอเข้าพบอีก: ${_visits.where((v) => v.id != visit.id).map((v) => v.visitorName).join(' | ')}',
+        Card(
+          margin: EdgeInsets.zero,
+          child: Padding(
+            padding: EdgeInsets.all(visitorUiTokens.cardPadding),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.star_border_rounded,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _actions?.caption ?? 'ยืนยันการเข้าพบ',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'รอการยืนยัน ${_visits.length} รายการ',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ],
             ),
           ),
+        ),
+        SizedBox(height: visitorUiTokens.cardSpacing),
+        if (_visits.length > 1)
+          Card(
+            margin: EdgeInsets.zero,
+            child: Padding(
+              padding: EdgeInsets.all(visitorUiTokens.cardPadding),
+              child: OutlinedButton(
+                onPressed: () => _pick(),
+                child: Text(
+                  'รอเข้าพบอีก: ${_visits.where((v) => v.id != visit.id).map((v) => v.visitorName).join(' | ')}',
+                ),
+              ),
+            ),
+          ),
+        if (_visits.length > 1) SizedBox(height: visitorUiTokens.cardSpacing),
         _section('ผู้มาติดต่อ', [
           Chip(
             avatar: const Icon(Icons.schedule_outlined, size: 18),
@@ -227,6 +260,7 @@ class _VisitorHostConfirmPageState extends State<VisitorHostConfirmPage> {
           'เวลาเข้า: ${visit.checkedInDate}',
           if (visit.purpose.isNotEmpty) 'วัตถุประสงค์: ${visit.purpose}',
         ]),
+        SizedBox(height: visitorUiTokens.cardSpacing),
         _section(
           'หลักฐานจาก รปภ',
           detail == null
@@ -235,6 +269,7 @@ class _VisitorHostConfirmPageState extends State<VisitorHostConfirmPage> {
               ? [const Text('ไม่มีรูปหลักฐาน')]
               : [_evidenceGrid(detail.images)],
         ),
+        SizedBox(height: visitorUiTokens.cardSpacing),
         _section('ผลการเข้าพบ', [
           RadioGroup<String>(
             groupValue: _result,
@@ -271,7 +306,7 @@ class _VisitorHostConfirmPageState extends State<VisitorHostConfirmPage> {
 
   Widget _section(String title, List<Object> children) => Card(
     child: Padding(
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.all(visitorUiTokens.cardPadding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -398,36 +433,32 @@ class _VisitorHostConfirmPageState extends State<VisitorHostConfirmPage> {
     final id = (image['visitorVisitImageId'] as num?)?.toInt();
     showDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(_evidenceLabel(image)),
-        content: SizedBox(
-          width: 520,
-          child: AspectRatio(
-            aspectRatio: 1,
-            child: id == null
-                ? const Center(
-                    child: Icon(Icons.broken_image_outlined, size: 96),
-                  )
-                : FutureBuilder<Uint8List>(
-                    future: _imageBytes(id),
-                    builder: (context, snapshot) {
-                      if (snapshot.hasData) {
-                        return InteractiveViewer(
-                          child: Image.memory(
-                            snapshot.data!,
-                            fit: BoxFit.contain,
-                          ),
-                        );
-                      }
-                      if (snapshot.hasError) {
-                        return const Center(
-                          child: Icon(Icons.broken_image_outlined, size: 96),
-                        );
-                      }
-                      return const Center(child: CircularProgressIndicator());
-                    },
-                  ),
-          ),
+      builder: (context) => VisitorActionDialog(
+        icon: Icons.image_outlined,
+        title: _evidenceLabel(image),
+        content: AspectRatio(
+          aspectRatio: 1,
+          child: id == null
+              ? const Center(child: Icon(Icons.broken_image_outlined, size: 96))
+              : FutureBuilder<Uint8List>(
+                  future: _imageBytes(id),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasData) {
+                      return InteractiveViewer(
+                        child: Image.memory(
+                          snapshot.data!,
+                          fit: BoxFit.contain,
+                        ),
+                      );
+                    }
+                    if (snapshot.hasError) {
+                      return const Center(
+                        child: Icon(Icons.broken_image_outlined, size: 96),
+                      );
+                    }
+                    return const Center(child: CircularProgressIndicator());
+                  },
+                ),
         ),
         actions: [
           TextButton(

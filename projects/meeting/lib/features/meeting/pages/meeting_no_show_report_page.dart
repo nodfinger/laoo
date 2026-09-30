@@ -9,6 +9,7 @@ import '../../support/presentation/widgets/support_workspace_shell.dart';
 import '../data/meeting_attendance_repository.dart';
 import '../meeting_feature_host.dart';
 import '../meeting_route_contract.dart';
+import '../widgets/meeting_pagination_card.dart';
 
 class MeetingNoShowReportPage extends StatefulWidget {
   const MeetingNoShowReportPage({super.key});
@@ -200,36 +201,23 @@ class _MeetingNoShowReportPageState extends State<MeetingNoShowReportPage> {
   );
 
   Widget _pager() {
-    final pages = (_total / _pageSize).ceil();
-    return SizedBox(
-      height: LaooLayout.paginationCardHeight,
-      child: Row(
-        children: [
-          IconButton.filled(
-            onPressed: _page > 1
-                ? () {
-                    setState(() => _page--);
-                    _load();
-                  }
-                : null,
-            icon: const Icon(Icons.chevron_left),
-          ),
-          const SizedBox(width: 8),
-          Text('${pages == 0 ? 0 : _page} / $pages'),
-          const SizedBox(width: 8),
-          IconButton.filled(
-            onPressed: _page < pages
-                ? () {
-                    setState(() => _page++);
-                    _load();
-                  }
-                : null,
-            icon: const Icon(Icons.chevron_right),
-          ),
-          const SizedBox(width: 8),
-          Text('ทั้งหมด $_total คน'),
-        ],
-      ),
+    return MeetingPaginationCard(
+      total: _total,
+      pageIndex: _page - 1,
+      pageSize: _pageSize,
+      primary: workspaceThemeController.value.primary,
+      onPrevious: _page > 1
+          ? () {
+              setState(() => _page--);
+              _load();
+            }
+          : null,
+      onNext: _page * _pageSize < _total
+          ? () {
+              setState(() => _page++);
+              _load();
+            }
+          : null,
     );
   }
 
@@ -250,16 +238,10 @@ class _MeetingNoShowReportPageState extends State<MeetingNoShowReportPage> {
                   child: WorkspaceActionHeader(
                     title: _caption,
                     favoriteKey: MeetingMenuCodes.noShowReport,
-                    actions: [
-                      IconButton(
-                        tooltip: 'โหลดข้อมูลล่าสุด',
-                        onPressed: _load,
-                        icon: Icon(Icons.refresh, color: preset.primary),
-                      ),
-                    ],
+                    actions: const [],
                   ),
                 ),
-                const SizedBox(height: LaooLayout.cardSpacing),
+                const SizedBox(height: LaooLayout.listSectionSpacing),
                 WorkspaceSectionCard(
                   child: Row(
                     children: [
@@ -275,9 +257,9 @@ class _MeetingNoShowReportPageState extends State<MeetingNoShowReportPage> {
                     ],
                   ),
                 ),
-                const SizedBox(height: LaooLayout.cardSpacing),
+                const SizedBox(height: LaooLayout.listSectionSpacing),
                 _filters(),
-                const SizedBox(height: LaooLayout.cardSpacing),
+                const SizedBox(height: LaooLayout.listSectionSpacing),
                 Expanded(
                   child: _loading
                       ? const Center(child: CircularProgressIndicator())
@@ -287,14 +269,15 @@ class _MeetingNoShowReportPageState extends State<MeetingNoShowReportPage> {
                         )
                       : ListView.separated(
                           itemCount: _items.length,
-                          separatorBuilder: (_, _) =>
-                              const SizedBox(height: LaooLayout.cardSpacing),
+                          separatorBuilder: (_, _) => const SizedBox(
+                            height: LaooLayout.listItemSpacing,
+                          ),
                           itemBuilder: (_, index) =>
                               _itemCard(_items[index], preset),
                         ),
                 ),
-                const SizedBox(height: LaooLayout.cardSpacing),
-                WorkspaceSectionCard(padding: EdgeInsets.zero, child: _pager()),
+                const SizedBox(height: LaooLayout.listSectionSpacing),
+                _pager(),
               ],
             ),
           ),

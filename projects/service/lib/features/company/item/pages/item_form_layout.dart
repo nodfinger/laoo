@@ -11,7 +11,6 @@ import '../../../../app/theme/laoo_design_tokens.dart';
 import '../../../../app/theme/laoo_typography.dart';
 import '../../../../app/theme/workspace_theme_presets.dart';
 import '../../../../core/widgets/timed_snack_bar.dart';
-import '../../../../features/support/presentation/widgets/support_workspace_shell.dart';
 import '../data/item_api.dart';
 
 class _UpperCaseTextFormatter extends TextInputFormatter {
@@ -41,6 +40,7 @@ class _DecimalTextFormatter extends TextInputFormatter {
 class ItemFormLayout extends StatefulWidget {
   const ItemFormLayout({
     super.key,
+    required this.title,
     this.initial,
     required this.groups,
     required this.types,
@@ -51,6 +51,7 @@ class ItemFormLayout extends StatefulWidget {
     required this.onSaved,
   });
 
+  final String title;
   final Map<String, dynamic>? initial;
   final List<Map<String, dynamic>> groups;
   final List<Map<String, dynamic>> types;
@@ -362,124 +363,187 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
   Widget build(BuildContext context) {
     final accent = workspaceThemeController.value.primary;
     final title =
-        'ข้อมูลสินค้า > ${_data['itemID'] == null ? 'เพิ่ม' : 'แก้ไข'}';
-    return Form(
-      key: _form,
-      child: Container(
-        margin: EdgeInsets.zero,
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-        color: const Color(0xFFF8F9FB),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final wide = constraints.maxWidth >= 720;
-            final contentWidth = (constraints.maxWidth - 32)
-                .clamp(0.0, double.infinity)
-                .toDouble();
-            return ListView(
+        '${widget.title} > ${_data['itemID'] == null ? 'เพิ่ม' : 'แก้ไข'}';
+    return Dialog(
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.white,
+      insetPadding: const EdgeInsets.all(LaooLayout.dialogInsetPadding),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(LaooRadius.xs),
+      ),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 1100,
+          maxHeight:
+              MediaQuery.sizeOf(context).height -
+              LaooLayout.dialogInsetPadding * 2,
+        ),
+        child: Form(
+          key: _form,
+          child: Padding(
+            padding: const EdgeInsets.all(LaooLayout.cardPadding),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Card(
-                  margin: EdgeInsets.zero,
-                  color: Colors.white,
-                  elevation: 0,
-                  surfaceTintColor: Colors.transparent,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(4),
-                    side: BorderSide.none,
+                ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    minHeight: LaooLayout.popupHeaderMinHeight,
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 14,
-                    ),
-                    child: WorkspaceActionHeader(
-                      title: title,
-                      actions: [
-                        const Text('สถานะใช้งาน'),
-                        Switch(
-                          value: _active,
-                          onChanged: (v) => setState(() => _active = v),
+                  child: Row(
+                    children: [
+                      Icon(Icons.inventory_2_outlined, color: accent),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: LaooTypography.screenCaptionStyle,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        const Text('แสดงหน้า Online'),
-                        Switch(
-                          value: _showShop,
-                          onChanged: _usageCodes.contains('SALE')
-                              ? (v) => setState(() => _showShop = v)
-                              : null,
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: widget.onCancel,
-                          style: OutlinedButton.styleFrom(
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(4),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1, color: LaooColors.border),
+                const SizedBox(height: 12),
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final wide = constraints.maxWidth >= 720;
+                        final contentWidth = (constraints.maxWidth - 32)
+                            .clamp(0.0, double.infinity)
+                            .toDouble();
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                const Text('สถานะใช้งาน'),
+                                Switch(
+                                  value: _active,
+                                  onChanged: (v) => setState(() => _active = v),
+                                ),
+                                const Text('แสดงหน้า Online'),
+                                Switch(
+                                  value: _showShop,
+                                  onChanged: _usageCodes.contains('SALE')
+                                      ? (v) => setState(() => _showShop = v)
+                                      : null,
+                                ),
+                              ],
                             ),
-                          ),
-                          icon: const Icon(Icons.close),
-                          label: const Text('ยกเลิก'),
-                        ),
-                        FilledButton.icon(
-                          onPressed: _saving ? null : _save,
-                          icon: const Icon(Icons.save_outlined),
-                          label: const Text('บันทึก'),
-                        ),
-                      ],
+                            const SizedBox(
+                              height: LaooLayout.popupFieldSpacing,
+                            ),
+                            Card(
+                              margin: EdgeInsets.zero,
+                              color: Colors.white,
+                              elevation: 0,
+                              shadowColor: Colors.transparent,
+                              surfaceTintColor: Colors.transparent,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(4),
+                                side: BorderSide.none,
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Wrap(
+                                  textDirection: TextDirection.rtl,
+                                  spacing: wide ? contentWidth * .02 : 0,
+                                  runSpacing: 12,
+                                  children: [
+                                    SizedBox(
+                                      width: wide
+                                          ? contentWidth * .75
+                                          : contentWidth,
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.stretch,
+                                        children: [
+                                          _row(wide, [
+                                            _drop(
+                                              'กลุ่มสินค้า',
+                                              _group,
+                                              widget.groups,
+                                              (v) {
+                                                setState(() => _group = v);
+                                                _previewCode();
+                                              },
+                                            ),
+                                            _drop(
+                                              'ประเภทสินค้า',
+                                              _type,
+                                              widget.types,
+                                              (v) {
+                                                setState(() => _type = v);
+                                                _previewCode();
+                                              },
+                                            ),
+                                          ]),
+                                          const SizedBox(height: 12),
+                                          _inventoryClassification(wide),
+                                          const SizedBox(height: 16),
+                                          _compactFields(wide),
+                                          const SizedBox(height: 16),
+                                          _additionalPanel(accent, wide),
+                                        ],
+                                      ),
+                                    ),
+                                    SizedBox(
+                                      width: wide
+                                          ? contentWidth * .23
+                                          : contentWidth,
+                                      child: _imageCard(accent),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
                     ),
                   ),
                 ),
-                const SizedBox(height: 8),
-                Card(
-                  margin: EdgeInsets.zero,
-                  color: Colors.white,
-                  elevation: 0,
-                  shadowColor: Colors.transparent,
-                  surfaceTintColor: Colors.transparent,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(4),
-                    side: BorderSide.none,
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Wrap(
-                      textDirection: TextDirection.rtl,
-                      spacing: wide ? contentWidth * .02 : 0,
-                      runSpacing: 12,
-                      children: [
-                        SizedBox(
-                          width: wide ? contentWidth * .75 : contentWidth,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              _row(wide, [
-                                _drop('กลุ่มสินค้า', _group, widget.groups, (
-                                  v,
-                                ) {
-                                  setState(() => _group = v);
-                                  _previewCode();
-                                }),
-                                _drop('ประเภทสินค้า', _type, widget.types, (v) {
-                                  setState(() => _type = v);
-                                  _previewCode();
-                                }),
-                              ]),
-                              const SizedBox(height: 12),
-                              _inventoryClassification(wide),
-                              const SizedBox(height: 16),
-                              _compactFields(wide),
-                              const SizedBox(height: 16),
-                              _additionalPanel(accent, wide),
-                            ],
-                          ),
+                const SizedBox(height: 12),
+                const Divider(height: 1, color: LaooColors.border),
+                const SizedBox(height: 12),
+                Wrap(
+                  alignment: WrapAlignment.end,
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: _saving ? null : widget.onCancel,
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(0, LaooTypography.buttonHeight),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(LaooRadius.xs),
                         ),
-                        SizedBox(
-                          width: wide ? contentWidth * .23 : contentWidth,
-                          child: _imageCard(accent),
-                        ),
-                      ],
+                      ),
+                      icon: const Icon(Icons.close),
+                      label: const Text('ยกเลิก'),
                     ),
-                  ),
+                    FilledButton.icon(
+                      onPressed: _saving ? null : _save,
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size(0, LaooTypography.buttonHeight),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(LaooRadius.xs),
+                        ),
+                      ),
+                      icon: const Icon(Icons.save_outlined),
+                      label: Text(_saving ? 'กำลังบันทึก...' : 'บันทึก'),
+                    ),
+                  ],
                 ),
               ],
-            );
-          },
+            ),
+          ),
         ),
       ),
     );

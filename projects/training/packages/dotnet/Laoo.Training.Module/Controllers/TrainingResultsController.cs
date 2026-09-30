@@ -1,5 +1,6 @@
 using System.Data;
 using System.Security.Claims;
+using Laoo.Shared.Contracts;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
@@ -16,6 +17,7 @@ public sealed class TrainingResultsController(IConfiguration configuration) : Co
     {
         if(!Scope(out var company,out var partner,out var user)) return Forbid();
         page=Math.Max(1,page); pageSize=Math.Clamp(pageSize,1,100); await using var db=await Open(token);
+        if(!await CanView(db,token)) return Forbid();
         const string where="""
 WHERE B.CompanyID=@company AND B.ActivityTypeCode=N'TRAINING'
 AND EXISTS(SELECT 1 FROM dbo.TDADProject PR JOIN dbo.TDADCompanyProject CP ON CP.ProjectID=PR.ProjectID AND CP.CompanyID=C.CompanyID AND CP.PartnerID=C.PartnerID AND CP.IsEnabled=1 WHERE PR.ProjectCode=N'LAOO_TRAINING' AND PR.IsActive=1 AND (CP.StartDate IS NULL OR CP.StartDate<=CONVERT(date,SYSUTCDATETIME())) AND (CP.ExpireDate IS NULL OR CP.ExpireDate>=CONVERT(date,SYSUTCDATETIME())))
@@ -111,13 +113,22 @@ ORDER BY X.SequenceNo,CASE WHEN A.Score IS NULL THEN 1 ELSE 0 END,A.Score DESC,A
     {
         if(!Scope(out var company,out var partner,out var user))return Forbid();await using var db=await Open(token);
         if(!await Allowed(db,company,partner,user,bookingId,token))return Forbid();
-        var rows=await Rows("""SELECT R.EvaluationRoundID,R.RoundNo,R.RoundName,R.SourceType,R.StatusCode,COUNT(RS.EvaluationRoundRespondentID) Eligible,SUM(CASE WHEN RS.AssignmentStatus='SUBMITTED' THEN 1 ELSE 0 END) Submitted FROM dbo.TDEVRound R LEFT JOIN dbo.TDEVRoundRespondent RS ON RS.CompanyID=R.CompanyID AND RS.EvaluationRoundID=R.EvaluationRoundID WHERE R.CompanyID=@company AND R.SourceProjectCode='LAOO_TRAINING' AND R.ReferenceEntityID=@booking AND R.SourceType IN('TRAINING_COURSE','TRAINING_INSTRUCTOR') GROUP BY R.EvaluationRoundID,R.RoundNo,R.RoundName,R.SourceType,R.StatusCode ORDER BY R.SourceType,R.CreateDate DESC""",db,company,partner,user,null,token,("@booking",bookingId));
+        var rows=await Rows("""SELECT R.EvaluationRoundID,R.RoundNo,R.RoundName,R.SourceType,R.StatusCode,COUNT(RS.EvaluationRoundRespondentID) Eligible,SUM(CASE WHEN RS.AssignmentStatus='SUBMITTED' THEN 1 ELSE 0 END) Submitted FROM dbo.TDEVRound R LEFT JOIN dbo.TDEVRoundRespondent RS ON RS.CompanyID=R.CompanyID AND RS.EvaluationRoundID=R.EvaluationRoundID WHERE R.CompanyID=@company AND R.SourceProjectCode='LAOO_TRAINING' AND R.ReferenceEntityID=@booking AND R.SourceType IN('TRAINING_COURSE','TRAINING_INSTRUCTOR') GROUP BY R.EvaluationRoundID,R.RoundNo,R.RoundName,R.SourceType,R.StatusCode ORDER BY R.SourceType,MAX(R.CreateDate) DESC""",db,company,partner,user,null,token,("@booking",bookingId));
         return Ok(new{items=rows.Select(r=>new{id=r["EvaluationRoundID"],roundNo=r["RoundNo"],name=r["RoundName"],sourceType=r["SourceType"],status=r["StatusCode"],eligible=Convert.ToInt32(r["Eligible"]),submitted=Convert.ToInt32(r["Submitted"])})});
     }
 
     private static object Booking(Dictionary<string,object?> r)=>new {bookingId=r["BookingID"],bookingNo=r["BookingNo"],subject=r["Subject"],status=r["BookingStatus"],roomCode=r["RoomCode"],roomName=r["RoomNameTH"],startDateTime=r["StartDateTime"],endDateTime=r["EndDateTime"],invited=Convert.ToInt32(r["Invited"]),accepted=Convert.ToInt32(r["Accepted"]),lateAccepted=Convert.ToInt32(r["LateAccepted"]),pending=Convert.ToInt32(r["Pending"]),declined=Convert.ToInt32(r["Declined"])};
+    private async Task<bool> CanView(SqlConnection db,CancellationToken token)
+    {
+        if(!long.TryParse(User.FindFirstValue("project_id"),out var activeProjectId)) return false;
+        await using var command=new SqlCommand("SELECT COUNT_BIG(*) FROM dbo.TDADProject WHERE ProjectCode=N'LAOO_TRAINING' AND ProjectID=@project AND IsActive=1",db);
+        command.Parameters.AddWithValue("@project",activeProjectId);
+        if(Convert.ToInt64(await command.ExecuteScalarAsync(token))!=1) return false;
+        return await CompanyMenuAccess.IsAllowedAsync(db,User,"37005","VIEW",token);
+    }
+
     private bool Scope(out long company,out long partner,out long user){company=partner=user=0;return long.TryParse(User.FindFirstValue("company_id"),out company)&&long.TryParse(User.FindFirstValue("partner_id"),out partner)&&long.TryParse(User.FindFirstValue("user_id"),out user)&&User.FindFirstValue("user_type")=="COMPANY_USER";}
-    private async Task<bool> Allowed(SqlConnection db,long company,long partner,long user,long booking,CancellationToken token)=>Convert.ToInt32(await Scalar("""SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADMeetingRoomBooking B JOIN dbo.TDADUser U ON U.UserID=@user AND U.CompanyID=B.CompanyID AND U.IsActive=1 JOIN dbo.TDSTCompanySetUp C ON C.CompanyID=B.CompanyID AND C.PartnerID=@partner AND C.IsActive=1 WHERE B.CompanyID=@company AND B.BookingID=@booking AND B.ActivityTypeCode=N'TRAINING' AND EXISTS(SELECT 1 FROM dbo.TDADProject PR JOIN dbo.TDADCompanyProject CP ON CP.ProjectID=PR.ProjectID AND CP.CompanyID=C.CompanyID AND CP.PartnerID=C.PartnerID AND CP.IsEnabled=1 WHERE PR.ProjectCode=N'LAOO_TRAINING' AND PR.IsActive=1) AND (U.IsCompanyAdmin=1 OR B.RequesterUserID=@user OR EXISTS(SELECT 1 FROM dbo.TDADMeetingRoomContact RC JOIN dbo.TDADUserEmployee UE ON UE.CompanyID=B.CompanyID AND UE.EmployeeID=RC.EmployeeID AND UE.UserID=@user AND UE.IsActive=1 WHERE RC.RoomID=B.RoomID AND RC.IsActive=1))) THEN 1 ELSE 0 END""",db,company,partner,user,null,token,("@booking",booking)))==1;
+    private async Task<bool> Allowed(SqlConnection db,long company,long partner,long user,long booking,CancellationToken token)=>await CanView(db,token)&&Convert.ToInt32(await Scalar("""SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADMeetingRoomBooking B JOIN dbo.TDADUser U ON U.UserID=@user AND U.CompanyID=B.CompanyID AND U.IsActive=1 JOIN dbo.TDSTCompanySetUp C ON C.CompanyID=B.CompanyID AND C.PartnerID=@partner AND C.IsActive=1 WHERE B.CompanyID=@company AND B.BookingID=@booking AND B.ActivityTypeCode=N'TRAINING' AND EXISTS(SELECT 1 FROM dbo.TDADProject PR JOIN dbo.TDADCompanyProject CP ON CP.ProjectID=PR.ProjectID AND CP.CompanyID=C.CompanyID AND CP.PartnerID=C.PartnerID AND CP.IsEnabled=1 WHERE PR.ProjectCode=N'LAOO_TRAINING' AND PR.IsActive=1) AND (U.IsCompanyAdmin=1 OR B.RequesterUserID=@user OR EXISTS(SELECT 1 FROM dbo.TDADMeetingRoomContact RC JOIN dbo.TDADUserEmployee UE ON UE.CompanyID=B.CompanyID AND UE.EmployeeID=RC.EmployeeID AND UE.UserID=@user AND UE.IsActive=1 WHERE RC.RoomID=B.RoomID AND RC.IsActive=1))) THEN 1 ELSE 0 END""",db,company,partner,user,null,token,("@booking",booking)))==1;
     private async Task<SqlConnection> Open(CancellationToken token){var db=new SqlConnection(configuration.GetConnectionString("LaooDatabase"));await db.OpenAsync(token);return db;}
     private static async Task<object?> Scalar(string sql,SqlConnection db,long company,long partner,long user,string? search,CancellationToken token,params (string,object?)[] args){await using var c=Command(sql,db,company,partner,user,search,args);return await c.ExecuteScalarAsync(token);}
     private static async Task<List<Dictionary<string,object?>>> Rows(string sql,SqlConnection db,long company,long partner,long user,string? search,CancellationToken token,params (string,object?)[] args){await using var c=Command(sql,db,company,partner,user,search,args);await using var reader=await c.ExecuteReaderAsync(token);var rows=new List<Dictionary<string,object?>>();while(await reader.ReadAsync(token)){var r=new Dictionary<string,object?>();for(var i=0;i<reader.FieldCount;i++)r[reader.GetName(i)]=reader.IsDBNull(i)?null:reader.GetValue(i);rows.Add(r);}return rows;}

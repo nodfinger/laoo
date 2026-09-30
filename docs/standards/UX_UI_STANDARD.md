@@ -5,6 +5,7 @@
 ## Required Reading by Screen Type
 
 - หน้า List หรือ Card: อ่าน `LIST_CARD_UI_STANDARD.md` และ `PAGINATION_UI_STANDARD.md`
+- หน้าจอ CRUD ที่ต้องการเทียบต้นแบบ: อ่าน `MASTER_DATA_CRUD_UI_STANDARD.md` เพิ่มเติม โดยใช้หน้า `05002 รหัสพื้นฐาน` เป็น Visual Reference
 - หน้า Action (Add/Edit/View): อ่าน `ACTION_UI_STANDARD.md`; สำหรับ `ScreenType = 1` (CRUD) ต้องใช้ Action Style ตามเอกสารนี้เสมอ ทั้งพื้นผิวสีขาว มุมกรอบและปุ่ม `4px`, Caption สีดำ, Icon ตาม User Style และ TextBox/ComboBox มีกรอบมุมโค้ง `4px`
 - Popup, Dialog, Alert และ Confirm: อ่าน `POPUP_UI_STANDARD.md`
 - งานที่เกี่ยวกับข้อความหรือขนาดตัวอักษร: อ่าน `TYPOGRAPHY_STANDARD.md`
@@ -17,9 +18,9 @@
 - Card ใช้พื้นสีขาว ไม่มีเส้นกรอบสี และมุมโค้ง `LaooRadius.xs` (`4px`)
 - Margin รอบ Content ใช้ `LaooLayout.cardMargin` (`10px`)
 - Padding ภายใน Card ใช้ `LaooLayout.cardPadding` (`10px`)
-- ระยะทั่วไประหว่าง Card/Section ใช้ `LaooLayout.cardSpacing` (`10px`) ยกเว้น Card รายการใน Card Mode ซึ่งกำหนดไว้ที่ `6px`
+- ระยะทั่วไประหว่าง Card/Section ใช้ `LaooLayout.cardSpacing` (`10px`); หน้าจอ List/CRUD ใช้ `LaooLayout.listSectionSpacing` (`6px`) และ Card รายการใช้ `LaooLayout.listItemSpacing` (`6px`)
 - เส้นคั่นใช้ `LaooColors.border` สีเทาอ่อนและบาง
-- Caption หลักของหน้า `List`, `Card`, `Action` และ `Popup/Dialog` ใช้ `fontSize: 18`, `fontWeight: FontWeight.w700` และ `LaooColors.pageCaption` ซึ่งต้องเป็นสีดำ ส่วน Icon ใช้สีหลักของ User Style
+- Caption หลักของหน้า `List`, `Card`, `Action` และ `Popup/Dialog` ใช้ `fontSize: 18`, `fontWeight: FontWeight.w700` และ `LaooColors.pageCaption` ซึ่งต้องเป็นสีดำ ส่วน Icon ใช้สีหลักของ User Style; ยกเว้น Popup ยืนยันลบ ให้ Caption และ Icon ใช้สี Error/Delete ตาม `alertdelete.md`
 - ห้ามใช้ `Colors.green`, `Colors.blue` หรือสีหลักแบบ hardcode; สีแดงใช้ได้เฉพาะ Error, Delete, Offline หรือสถานะไม่ใช้งานตามข้อกำหนด
 - เมื่อ User เปลี่ยน Style สีทุกส่วนที่อิง User Styleต้องเปลี่ยนทันทีและต้องไม่กระทบ User คนอื่น
 

@@ -451,7 +451,7 @@ class _EmployeeTimeSettingsPageState extends State<EmployeeTimeSettingsPage> {
 
   Widget _pagination(int pages) {
     final tokens = timeUiTokens;
-    return LaooPaginationCard(
+    return TimePaginationCard(
       tokens: tokens.workspace,
       page: _page,
       pageCount: pages,

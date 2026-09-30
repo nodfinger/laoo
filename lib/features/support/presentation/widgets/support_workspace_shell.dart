@@ -246,13 +246,6 @@ class SupportWorkspaceShell extends StatelessWidget {
           cardTheme: baseTheme.cardTheme.copyWith(
             color: preset.surface,
             surfaceTintColor: Colors.transparent,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: BorderSide(
-                color: preset.primary.withValues(alpha: 0.55),
-                width: 1,
-              ),
-            ),
           ),
         );
         return Theme(

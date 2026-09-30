@@ -84,11 +84,6 @@ class _TrainingSettingsPageState extends State<TrainingSettingsPage> {
                     Icons.settings_outlined,
                     color: tokens.primaryColor,
                   ),
-                  trailing: IconButton(
-                    tooltip: 'โหลดข้อมูลล่าสุด',
-                    onPressed: _loading ? null : _load,
-                    icon: const Icon(Icons.refresh),
-                  ),
                 ),
                 SizedBox(height: tokens.workspace.sectionSpacing),
                 Expanded(

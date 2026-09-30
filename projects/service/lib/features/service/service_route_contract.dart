@@ -122,7 +122,7 @@ abstract final class ServiceRoutes {
     FeatureRouteContract(
       projectCode: ServiceProject.code,
       menuCode: '16003',
-      screenType: 1,
+      screenType: 2,
       routeName: 'pmCalendar',
       routePath: '/pm/calendar',
     ),
@@ -136,7 +136,7 @@ abstract final class ServiceRoutes {
     FeatureRouteContract(
       projectCode: ServiceProject.code,
       menuCode: '17002',
-      screenType: 1,
+      screenType: 2,
       routeName: 'jobWorkOrders',
       routePath: '/jobs/work-orders',
     ),
@@ -150,14 +150,14 @@ abstract final class ServiceRoutes {
     FeatureRouteContract(
       projectCode: ServiceProject.code,
       menuCode: '08002',
-      screenType: 1,
+      screenType: 3,
       routeName: 'inventoryItems',
       routePath: '/inventory/items',
     ),
     FeatureRouteContract(
       projectCode: ServiceProject.code,
       menuCode: '08003',
-      screenType: 1,
+      screenType: 4,
       routeName: 'inventoryUsage',
       routePath: '/inventory/usage',
     ),
@@ -178,7 +178,7 @@ abstract final class ServiceRoutes {
     FeatureRouteContract(
       projectCode: 'LAOO',
       menuCode: '08006',
-      screenType: 1,
+      screenType: 3,
       routeName: 'itemInstances',
       routePath: '/inventory/item-instances',
     ),
@@ -227,14 +227,14 @@ abstract final class ServiceRoutes {
     FeatureRouteContract(
       projectCode: ServiceProject.code,
       menuCode: '20004',
-      screenType: 1,
+      screenType: 3,
       routeName: 'portalPmSchedule',
       routePath: '/portal/pm-schedule',
     ),
     FeatureRouteContract(
       projectCode: ServiceProject.code,
       menuCode: '20005',
-      screenType: 2,
+      screenType: 3,
       routeName: 'portalEvaluation',
       routePath: '/portal/evaluation',
     ),

@@ -1,16 +1,19 @@
 class ScheduleGroupActions {
   const ScheduleGroupActions({
     required this.caption,
+    required this.screenType,
     required this.view,
     required this.create,
     required this.edit,
     required this.delete,
   });
   final String caption;
+  final int screenType;
   final bool view, create, edit, delete;
   factory ScheduleGroupActions.fromJson(Map<String, dynamic> j) =>
       ScheduleGroupActions(
         caption: j['caption']?.toString() ?? 'กลุ่มตารางทำงาน',
+        screenType: (j['screenType'] as num?)?.toInt() ?? 0,
         view: j['view'] == true,
         create: j['create'] == true,
         edit: j['edit'] == true,

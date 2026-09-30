@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:laoo_shared_core/laoo_shared_core.dart';
 
 import 'evaluation_feature_host.dart';
+import 'evaluation_popup_theme.dart';
 
 class EvaluationRoundDialog extends StatefulWidget {
-  const EvaluationRoundDialog({super.key, this.initial});
+  const EvaluationRoundDialog({super.key, required this.title, this.initial});
+  final String title;
   final Map<String, dynamic>? initial;
   @override
   State<EvaluationRoundDialog> createState() => _EvaluationRoundDialogState();
@@ -140,153 +142,193 @@ class _EvaluationRoundDialogState extends State<EvaluationRoundDialog> {
   }
 
   @override
-  Widget build(BuildContext context) => Dialog(
-    child: ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 760, maxHeight: 760),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : Form(
-                key: _form,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      'รอบประเมิน > ${widget.initial == null ? 'เพิ่ม' : 'แก้ไข'}',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    const SizedBox(height: 12),
-                    if (_error != null) _RoundError(text: _error!),
-                    TextFormField(
-                      controller: _name,
-                      maxLength: 200,
-                      decoration: const InputDecoration(
-                        labelText: 'ชื่อรอบประเมิน *',
-                      ),
-                      validator: (value) =>
-                          value == null || value.trim().isEmpty
-                          ? 'กรุณาระบุชื่อรอบ'
-                          : null,
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      initialValue: _source,
-                      decoration: const InputDecoration(
-                        labelText: 'ประเภทงาน *',
-                      ),
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'GENERAL',
-                          child: Text('ทั่วไป'),
+  Widget build(BuildContext context) => Theme(
+    data: evaluationPopupTheme(context),
+    child: Dialog(
+      backgroundColor: evaluationUiTokens.popupSurfaceColor,
+      surfaceTintColor: evaluationUiTokens.popupSurfaceColor,
+      insetPadding: const EdgeInsets.all(24),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(evaluationUiTokens.radius),
+      ),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 480,
+          maxHeight: MediaQuery.sizeOf(context).height - 48,
+        ),
+        child: Padding(
+          padding: evaluationUiTokens.cardPadding,
+          child: _loading
+              ? const Center(child: CircularProgressIndicator())
+              : Form(
+                  key: _form,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minHeight: evaluationUiTokens.popupHeaderMinHeight,
                         ),
-                        DropdownMenuItem(
-                          value: 'VENDOR',
-                          child: Text('Vendor'),
-                        ),
-                      ],
-                      onChanged: widget.initial != null
-                          ? null
-                          : (value) {
-                              if (value != null && value != _source) {
-                                setState(() => _source = value);
-                                _load();
-                              }
-                            },
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<int>(
-                      initialValue: _templateId,
-                      decoration: const InputDecoration(
-                        labelText: 'Template *',
-                      ),
-                      items: _templates
-                          .map(
-                            (item) => DropdownMenuItem(
-                              value: (item['id'] as num).toInt(),
-                              child: Text('${item['code']} | ${item['name']}'),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.assignment_outlined,
+                              color: evaluationUiTokens.primaryColor,
                             ),
-                          )
-                          .toList(),
-                      onChanged: (value) => setState(() => _templateId = value),
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _reference,
-                      maxLength: 500,
-                      decoration: const InputDecoration(
-                        labelText: 'หัวข้ออ้างอิง',
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 10,
-                      runSpacing: 6,
-                      children: [
-                        OutlinedButton.icon(
-                          onPressed: () => _pickDate(true),
-                          icon: const Icon(Icons.calendar_today_outlined),
-                          label: Text('เปิด: ${_dateText(_openAt)}'),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: () => _pickDate(false),
-                          icon: const Icon(Icons.calendar_today_outlined),
-                          label: Text('ปิด: ${_dateText(_closeAt)}'),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'ผู้ตอบ (${_respondents.length}) *',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    if (_isSourceBound)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 4),
-                        child: Text(
-                          'ผู้ตอบอ้างอิงจากผู้เข้าร่วมที่ตอบรับและเช็กอินแล้ว จึงแก้ไขไม่ได้',
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                '${widget.title} > ${widget.initial == null ? 'เพิ่ม' : 'แก้ไข'}',
+                                style: evaluationUiTokens.captionStyle,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    Expanded(
-                      child: ListView.builder(
-                        itemCount: _users.length,
-                        itemBuilder: (_, index) {
-                          final user = _users[index];
-                          final id = (user['id'] as num).toInt();
-                          return CheckboxListTile(
-                            value: _respondents.contains(id),
-                            onChanged: _isSourceBound
-                                ? null
-                                : (checked) => setState(() {
-                                    checked == true
-                                        ? _respondents.add(id)
-                                        : _respondents.remove(id);
-                                  }),
-                            title: Text(user['name'] as String),
-                            subtitle: Text(user['username'] as String),
-                          );
-                        },
+                      Divider(color: evaluationUiTokens.borderColor, height: 1),
+                      SizedBox(height: evaluationUiTokens.popupFieldSpacing),
+                      if (_error != null) _RoundError(text: _error!),
+                      TextFormField(
+                        controller: _name,
+                        maxLength: 200,
+                        decoration: const InputDecoration(
+                          labelText: 'ชื่อรอบประเมิน *',
+                        ),
+                        validator: (value) =>
+                            value == null || value.trim().isEmpty
+                            ? 'กรุณาระบุชื่อรอบ'
+                            : null,
                       ),
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        OutlinedButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text('ยกเลิก'),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        initialValue: _source,
+                        decoration: const InputDecoration(
+                          labelText: 'ประเภทงาน *',
                         ),
-                        const SizedBox(width: 8),
-                        FilledButton.icon(
-                          onPressed: _save,
-                          icon: const Icon(Icons.save_outlined),
-                          label: const Text('บันทึกร่าง'),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'GENERAL',
+                            child: Text('ทั่วไป'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'VENDOR',
+                            child: Text('Vendor'),
+                          ),
+                        ],
+                        onChanged: widget.initial != null
+                            ? null
+                            : (value) {
+                                if (value != null && value != _source) {
+                                  setState(() => _source = value);
+                                  _load();
+                                }
+                              },
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<int>(
+                        initialValue: _templateId,
+                        decoration: const InputDecoration(
+                          labelText: 'Template *',
                         ),
-                      ],
-                    ),
-                  ],
+                        items: _templates
+                            .map(
+                              (item) => DropdownMenuItem(
+                                value: (item['id'] as num).toInt(),
+                                child: Text(
+                                  '${item['code']} | ${item['name']}',
+                                ),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (value) =>
+                            setState(() => _templateId = value),
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _reference,
+                        maxLength: 500,
+                        decoration: const InputDecoration(
+                          labelText: 'หัวข้ออ้างอิง',
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 6,
+                        children: [
+                          OutlinedButton.icon(
+                            onPressed: () => _pickDate(true),
+                            icon: const Icon(Icons.calendar_today_outlined),
+                            label: Text('เปิด: ${_dateText(_openAt)}'),
+                          ),
+                          OutlinedButton.icon(
+                            onPressed: () => _pickDate(false),
+                            icon: const Icon(Icons.calendar_today_outlined),
+                            label: Text('ปิด: ${_dateText(_closeAt)}'),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'ผู้ตอบ (${_respondents.length}) *',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      if (_isSourceBound)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 4),
+                          child: Text(
+                            'ผู้ตอบอ้างอิงจากผู้เข้าร่วมที่ตอบรับและเช็กอินแล้ว จึงแก้ไขไม่ได้',
+                          ),
+                        ),
+                      Expanded(
+                        child: ListView.builder(
+                          itemCount: _users.length,
+                          itemBuilder: (_, index) {
+                            final user = _users[index];
+                            final id = (user['id'] as num).toInt();
+                            return CheckboxListTile(
+                              value: _respondents.contains(id),
+                              onChanged: _isSourceBound
+                                  ? null
+                                  : (checked) => setState(() {
+                                      checked == true
+                                          ? _respondents.add(id)
+                                          : _respondents.remove(id);
+                                    }),
+                              title: Text(user['name'] as String),
+                              subtitle: Text(user['username'] as String),
+                            );
+                          },
+                        ),
+                      ),
+                      SizedBox(height: evaluationUiTokens.popupFieldSpacing),
+                      Divider(color: evaluationUiTokens.borderColor, height: 1),
+                      SizedBox(height: evaluationUiTokens.itemSpacing),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          SizedBox(
+                            height: evaluationUiTokens.buttonHeight,
+                            child: OutlinedButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('ยกเลิก'),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          SizedBox(
+                            height: evaluationUiTokens.buttonHeight,
+                            child: FilledButton.icon(
+                              onPressed: _save,
+                              icon: const Icon(Icons.save_outlined),
+                              label: const Text('บันทึกร่าง'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
+        ),
       ),
     ),
   );
@@ -294,8 +336,7 @@ class _EvaluationRoundDialogState extends State<EvaluationRoundDialog> {
   bool get _isSourceBound =>
       widget.initial != null && _source != 'GENERAL' && _source != 'VENDOR';
 
-  String _dateText(DateTime value) =>
-      '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year} ${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
+  String _dateText(DateTime value) => evaluationDateTimeText(value);
 }
 
 class _RoundError extends StatelessWidget {

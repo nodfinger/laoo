@@ -809,6 +809,13 @@ abstract final class AppMenuRouteRegistry {
       path: SurveyRoutePaths.reports,
       scope: AppMenuScope.company,
     ),
+    SurveyMenuCodes.mine: AppMenuRouteSpec(
+      menuCode: SurveyMenuCodes.mine,
+      databaseRouteName: SurveyRouteNames.mine,
+      goRouteName: SurveyRouteNames.mine,
+      path: SurveyRoutePaths.mine,
+      scope: AppMenuScope.company,
+    ),
     IntranetMenuCodes.settings: AppMenuRouteSpec(
       menuCode: IntranetMenuCodes.settings,
       databaseRouteName: IntranetRouteNames.settings,

@@ -2448,7 +2448,6 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                               onSubmitted: (_) => setState(() => _page = 0),
                               decoration: InputDecoration(
                                 prefixIcon: const Icon(Icons.search),
-                                suffixIcon: const Icon(Icons.arrow_forward),
                                 labelText: 'ค้นหารหัสหรือชื่อ',
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(

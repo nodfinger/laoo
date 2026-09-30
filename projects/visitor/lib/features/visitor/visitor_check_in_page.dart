@@ -9,6 +9,10 @@ import '../../core/api/visitor_api_client.dart';
 import 'visitor_feature_host.dart';
 import 'visitor_settings_repository.dart';
 
+const _checkInCaption = 'รับผู้มาติดต่อ';
+
+/// Menu 31002 is an approved full-page exception to ScreenType 1 popup layout.
+/// The camera, appointment lookup, and check-in form remain in one workspace.
 class VisitorCheckInPage extends StatefulWidget {
   const VisitorCheckInPage({super.key});
 
@@ -454,7 +458,7 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
 
   @override
   Widget build(BuildContext context) => buildVisitorWorkspaceShell(
-    pageTitle: 'รับผู้มาติดต่อ',
+    pageTitle: _checkInCaption,
     activeMenu: '31002',
     child: Stack(
       children: [
@@ -478,8 +482,38 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
       );
     }
     return ListView(
-      padding: const EdgeInsets.all(10),
+      padding: EdgeInsets.all(visitorUiTokens.cardMargin),
       children: [
+        Card(
+          margin: EdgeInsets.zero,
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: visitorUiTokens.cardPadding,
+              vertical: visitorUiTokens.cardPadding,
+            ),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: visitorUiTokens.popupHeaderMinHeight,
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.star_border_rounded,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _checkInCaption,
+                      style: visitorUiTokens.captionStyle,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        SizedBox(height: visitorUiTokens.cardSpacing),
         _card(
           context,
           'ข้อมูลผู้มาติดต่อ',
@@ -533,7 +567,7 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
             ],
           ),
         ),
-        const SizedBox(height: 6),
+        SizedBox(height: visitorUiTokens.cardSpacing),
         _card(
           context,
           'ผู้รับรองและวัตถุประสงค์',
@@ -557,7 +591,7 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
           ),
         ),
         if (settings.allowCameraCapture) ...[
-          const SizedBox(height: 6),
+          SizedBox(height: visitorUiTokens.cardSpacing),
           _card(
             context,
             'หลักฐานภาพบัตร',
@@ -603,22 +637,28 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
             ),
           ),
         ],
-        const SizedBox(height: 6),
+        SizedBox(height: visitorUiTokens.cardSpacing),
         _card(context, 'รูปรถขาเข้า', _evidenceImagesField(_vehicleImages)),
-        const SizedBox(height: 6),
+        SizedBox(height: visitorUiTokens.cardSpacing),
         _card(context, 'รูปอื่นขาเข้า', _evidenceImagesField(_otherImages)),
-        const SizedBox(height: 12),
-        Align(
-          alignment: Alignment.centerRight,
-          child: FilledButton.icon(
-            onPressed: !_saving ? _save : null,
-            icon: _saving
-                ? const SizedBox.square(
-                    dimension: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.login),
-            label: const Text('บันทึก Check-in'),
+        SizedBox(height: visitorUiTokens.cardSpacing),
+        Card(
+          margin: EdgeInsets.zero,
+          child: Padding(
+            padding: EdgeInsets.all(visitorUiTokens.cardPadding),
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: FilledButton.icon(
+                onPressed: !_saving ? _save : null,
+                icon: _saving
+                    ? const SizedBox.square(
+                        dimension: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.login),
+                label: const Text('บันทึก Check-in'),
+              ),
+            ),
           ),
         ),
       ],
@@ -628,23 +668,33 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
   Widget _appointmentLookup(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: _appointmentSearch,
-              decoration: const InputDecoration(
-                prefixIcon: Icon(Icons.event_available_outlined),
-                hintText: 'ค้นหานัดหมายที่อนุมัติแล้ว',
-              ),
+      LayoutBuilder(
+        builder: (context, constraints) {
+          final searchField = TextField(
+            controller: _appointmentSearch,
+            decoration: const InputDecoration(
+              prefixIcon: Icon(Icons.event_available_outlined),
+              hintText: 'ค้นหานัดหมายที่อนุมัติแล้ว',
             ),
-          ),
-          const SizedBox(width: 8),
-          FilledButton(
+          );
+          final searchButton = FilledButton(
             onPressed: _findAppointments,
             child: const Text('ค้นหา'),
-          ),
-        ],
+          );
+          if (constraints.maxWidth < 390) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [searchField, const SizedBox(height: 8), searchButton],
+            );
+          }
+          return Row(
+            children: [
+              Expanded(child: searchField),
+              const SizedBox(width: 8),
+              searchButton,
+            ],
+          );
+        },
       ),
       if (_appointmentOptions.isNotEmpty) ...[
         const SizedBox(height: 8),
@@ -683,13 +733,13 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
           ),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            child: Row(
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 const Icon(Icons.lock_outline, size: 18),
-                const SizedBox(width: 8),
-                const Expanded(
-                  child: Text('กำลังใช้ข้อมูลจากนัดหมายที่อนุมัติแล้ว'),
-                ),
+                const Text('กำลังใช้ข้อมูลจากนัดหมายที่อนุมัติแล้ว'),
                 TextButton(
                   onPressed: _clearAppointment,
                   child: const Text('ไม่ใช้นัดนี้'),
@@ -967,7 +1017,7 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
   Widget _contactPointField(BuildContext context) {
     final point = _checkInContext;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: EdgeInsets.only(bottom: visitorUiTokens.popupFieldSpacing),
       child: InputDecorator(
         decoration: const InputDecoration(
           labelText: 'ประจำจุด',
@@ -990,7 +1040,7 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
   }) {
     if (identical(controller, _host)) return const SizedBox.shrink();
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: EdgeInsets.only(bottom: visitorUiTokens.popupFieldSpacing),
       child: TextField(
         controller: controller,
         keyboardType: keyboard,
@@ -1004,7 +1054,7 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
     margin: EdgeInsets.zero,
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
     child: Padding(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(visitorUiTokens.cardPadding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

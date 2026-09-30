@@ -25,6 +25,7 @@ class _ServiceComplaintPageState extends State<ServiceComplaintPage> {
   bool _loading = true;
   bool _canCreate = false;
   bool _canEdit = false;
+  bool _canDelete = false;
   int _page = 1;
   int _total = 0;
   List<Map<String, dynamic>> _items = const [];
@@ -59,8 +60,10 @@ class _ServiceComplaintPageState extends State<ServiceComplaintPage> {
       final actions = await _api.actions();
       if (mounted) {
         setState(() {
-          _canCreate = actions['create'] == true;
-          _canEdit = actions['edit'] == true;
+          final isCrud = actions['screenType'] == 1;
+          _canCreate = isCrud && actions['create'] == true;
+          _canEdit = isCrud && actions['edit'] == true;
+          _canDelete = isCrud && actions['delete'] == true;
         });
       }
     } catch (_) {}
@@ -104,7 +107,7 @@ class _ServiceComplaintPageState extends State<ServiceComplaintPage> {
   Future<void> _create() async {
     final saved = await showDialog<bool>(
       context: context,
-      builder: (_) => _ComplaintCreateDialog(api: _api),
+      builder: (_) => _ComplaintCreateDialog(api: _api, caption: _caption),
     );
     if (saved == true && mounted) {
       await _refresh();
@@ -134,6 +137,107 @@ class _ServiceComplaintPageState extends State<ServiceComplaintPage> {
     }
   }
 
+  Future<void> _edit(Map<String, dynamic> row) async {
+    if (!_canEdit || row['statusCode'] != 'NEW') return;
+    final id = (row['complaintId'] as num?)?.toInt();
+    if (id == null) return;
+    try {
+      final detail = await _api.detail(id);
+      if (!mounted) return;
+      final saved = await showDialog<bool>(
+        context: context,
+        builder: (_) => _ComplaintCreateDialog(
+          api: _api,
+          caption: _caption,
+          original: detail,
+        ),
+      );
+      if (saved == true && mounted) await _load();
+    } catch (error) {
+      if (mounted) _message(error);
+    }
+  }
+
+  Future<void> _delete(Map<String, dynamic> row) async {
+    if (!_canDelete || row['statusCode'] != 'NEW') return;
+    final id = (row['complaintId'] as num?)?.toInt();
+    if (id == null) return;
+    try {
+      final detail = await _api.detail(id);
+      if (!mounted) return;
+      final errorColor = Theme.of(context).colorScheme.error;
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            side: BorderSide(color: errorColor),
+            borderRadius: BorderRadius.circular(LaooRadius.xs),
+          ),
+          title: Row(
+            children: [
+              Icon(Icons.delete_outline, color: errorColor),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'ยืนยันการลบข้อมูล',
+                  style: TextStyle(
+                    color: errorColor,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Divider(),
+              Container(
+                padding: const EdgeInsets.all(LaooLayout.cardPadding),
+                decoration: BoxDecoration(
+                  color: errorColor.withValues(alpha: .08),
+                  borderRadius: BorderRadius.circular(LaooRadius.xs),
+                ),
+                child: Text('${detail['complaintNo']} — ${detail['subject']}'),
+              ),
+              const SizedBox(height: 10),
+              const Text('รายการที่ลบแล้วไม่สามารถเรียกคืนได้'),
+              const Divider(),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('ยกเลิก'),
+            ),
+            FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: errorColor,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(LaooRadius.xs),
+                ),
+              ),
+              onPressed: () => Navigator.pop(dialogContext, true),
+              icon: const Icon(Icons.delete_outline),
+              label: const Text('ลบ'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+      await _api.delete(id, detail['rowVersion']?.toString() ?? '');
+      if (!mounted) return;
+      if (_page > 1 && _items.length == 1) _page--;
+      await _load();
+      if (mounted) showTimedSnackBar(context, message: 'ลบเรื่องร้องเรียนแล้ว');
+    } catch (error) {
+      if (mounted) _message(error);
+    }
+  }
+
   @override
   Widget build(BuildContext context) => SupportWorkspaceShell(
     pageTitle: _caption,
@@ -144,28 +248,86 @@ class _ServiceComplaintPageState extends State<ServiceComplaintPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _toolbar(),
-          const SizedBox(height: LaooLayout.cardSpacing),
-          Expanded(
-            child: _loading
-                ? const Center(child: CircularProgressIndicator())
-                : _items.isEmpty
-                ? const Center(child: Text('ไม่พบเรื่องร้องเรียน'))
-                : LayoutBuilder(
-                    builder: (context, box) => box.maxWidth < 900
-                        ? ListView.separated(
-                            itemCount: _items.length,
-                            separatorBuilder: (_, _) =>
-                                const SizedBox(height: 6),
-                            itemBuilder: (_, index) => _ComplaintCard(
-                              row: _items[index],
-                              onTap: () => _open(_items[index]),
-                            ),
-                          )
-                        : _ComplaintTable(items: _items, onOpen: _open),
+          Card(
+            margin: EdgeInsets.zero,
+            child: Padding(
+              padding: const EdgeInsets.all(LaooLayout.cardPadding),
+              child: Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 12,
+                runSpacing: 8,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.star_border,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        _caption,
+                        style: const TextStyle(
+                          color: LaooColors.pageCaption,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
                   ),
+                  if (_canCreate)
+                    FilledButton.icon(
+                      onPressed: _create,
+                      icon: const Icon(Icons.add),
+                      label: const Text('เพิ่ม'),
+                    ),
+                ],
+              ),
+            ),
           ),
-          if (!_loading && _total > 20) _pagination(),
+          const SizedBox(height: LaooLayout.listSectionSpacing),
+          _toolbar(),
+          const SizedBox(height: LaooLayout.listSectionSpacing),
+          Expanded(
+            child: Card(
+              margin: EdgeInsets.zero,
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _items.isEmpty
+                  ? const Center(child: Text('ไม่พบเรื่องร้องเรียน'))
+                  : LayoutBuilder(
+                      builder: (context, box) => box.maxWidth < 900
+                          ? ListView.separated(
+                              itemCount: _items.length,
+                              separatorBuilder: (_, _) =>
+                                  const SizedBox(height: 6),
+                              itemBuilder: (_, index) => _ComplaintCard(
+                                row: _items[index],
+                                onTap: () => _open(_items[index]),
+                                onEdit:
+                                    _canEdit &&
+                                        _items[index]['statusCode'] == 'NEW'
+                                    ? () => _edit(_items[index])
+                                    : null,
+                                onDelete:
+                                    _canDelete &&
+                                        _items[index]['statusCode'] == 'NEW'
+                                    ? () => _delete(_items[index])
+                                    : null,
+                              ),
+                            )
+                          : _ComplaintTable(
+                              items: _items,
+                              onOpen: _open,
+                              onEdit: _canEdit ? _edit : null,
+                              onDelete: _canDelete ? _delete : null,
+                            ),
+                    ),
+            ),
+          ),
+          const SizedBox(height: LaooLayout.listSectionSpacing),
+          _pagination(),
         ],
       ),
     ),
@@ -181,7 +343,9 @@ class _ServiceComplaintPageState extends State<ServiceComplaintPage> {
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           SizedBox(
-            width: 330,
+            width: MediaQuery.sizeOf(context).width < 380
+                ? MediaQuery.sizeOf(context).width - 4 * LaooLayout.cardMargin
+                : 330,
             child: TextField(
               controller: _search,
               onSubmitted: (_) => _refresh(),
@@ -226,59 +390,110 @@ class _ServiceComplaintPageState extends State<ServiceComplaintPage> {
             icon: const Icon(Icons.search),
             label: const Text('ค้นหา'),
           ),
-          if (_canCreate)
-            FilledButton.icon(
-              onPressed: _create,
-              icon: const Icon(Icons.add),
-              label: const Text('แจ้งเรื่องร้องเรียน'),
-            ),
         ],
       ),
     ),
   );
 
-  Widget _pagination() => SizedBox(
-    height: LaooLayout.paginationCardHeight,
-    child: Row(
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: [
-        Text('พบ $_total รายการ'),
-        const SizedBox(width: 12),
-        IconButton(
-          tooltip: 'หน้าก่อน',
-          onPressed: _page <= 1
-              ? null
-              : () {
-                  setState(() => _page--);
-                  _load();
-                },
-          icon: const Icon(Icons.chevron_left),
+  Widget _pagination() => Card(
+    margin: EdgeInsets.zero,
+    child: SizedBox(
+      height: LaooLayout.paginationCardHeight,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: LaooLayout.cardPadding),
+        child: Row(
+          children: [
+            _pageButton(
+              Icons.chevron_left,
+              _page <= 1
+                  ? null
+                  : () {
+                      setState(() => _page--);
+                      _load();
+                    },
+            ),
+            const SizedBox(width: LaooLayout.listSectionSpacing),
+            SizedBox(
+              width: LaooLayout.paginationButtonSize,
+              height: LaooLayout.paginationButtonSize,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary,
+                  borderRadius: BorderRadius.circular(LaooRadius.xs),
+                ),
+                child: Center(
+                  child: Text(
+                    '$_page',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onPrimary,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: LaooLayout.listSectionSpacing),
+            _pageButton(
+              Icons.chevron_right,
+              _page * 20 >= _total
+                  ? null
+                  : () {
+                      setState(() => _page++);
+                      _load();
+                    },
+            ),
+            const SizedBox(width: 12),
+            Flexible(
+              child: Text(
+                '${_total == 0 ? 0 : (_page - 1) * 20 + 1}-'
+                '${_total == 0 ? 0 : (_page * 20 < _total ? _page * 20 : _total)} '
+                'จาก $_total',
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
         ),
-        Text('$_page'),
-        IconButton(
-          tooltip: 'หน้าถัดไป',
-          onPressed: _page * 20 >= _total
-              ? null
-              : () {
-                  setState(() => _page++);
-                  _load();
-                },
-          icon: const Icon(Icons.chevron_right),
-        ),
-      ],
+      ),
     ),
   );
+
+  Widget _pageButton(IconData icon, VoidCallback? onPressed) {
+    final color = onPressed == null
+        ? Theme.of(context).colorScheme.outline
+        : Theme.of(context).colorScheme.primary;
+    return SizedBox(
+      width: LaooLayout.paginationButtonSize,
+      height: LaooLayout.paginationButtonSize,
+      child: OutlinedButton(
+        onPressed: onPressed,
+        style: OutlinedButton.styleFrom(
+          padding: EdgeInsets.zero,
+          side: BorderSide(color: color),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(LaooRadius.xs),
+          ),
+        ),
+        child: Icon(icon, size: 18, color: color),
+      ),
+    );
+  }
 }
 
 class _ComplaintTable extends StatelessWidget {
-  const _ComplaintTable({required this.items, required this.onOpen});
+  const _ComplaintTable({
+    required this.items,
+    required this.onOpen,
+    this.onEdit,
+    this.onDelete,
+  });
   final List<Map<String, dynamic>> items;
   final ValueChanged<Map<String, dynamic>> onOpen;
+  final ValueChanged<Map<String, dynamic>>? onEdit;
+  final ValueChanged<Map<String, dynamic>>? onDelete;
   @override
   Widget build(BuildContext context) => SingleChildScrollView(
     scrollDirection: Axis.horizontal,
     child: SizedBox(
-      width: 1000,
+      width: 1120,
       child: Table(
         border: TableBorder(bottom: BorderSide(color: LaooColors.border)),
         columnWidths: const {
@@ -287,7 +502,7 @@ class _ComplaintTable extends StatelessWidget {
           2: FlexColumnWidth(1.5),
           3: FlexColumnWidth(2.4),
           4: FlexColumnWidth(1.3),
-          5: FlexColumnWidth(.65),
+          5: FlexColumnWidth(1.6),
         },
         children: [
           const TableRow(
@@ -308,12 +523,30 @@ class _ComplaintTable extends StatelessWidget {
                 _Cell(item['locationSnapshot']?.toString() ?? '-'),
                 _Cell(item['subject']?.toString() ?? '-'),
                 _Cell(_statusLabel(item['statusCode']?.toString() ?? '')),
-                Center(
-                  child: IconButton(
-                    onPressed: () => onOpen(item),
-                    icon: const Icon(Icons.open_in_new),
-                    tooltip: 'ดูรายละเอียด',
-                  ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      onPressed: () => onOpen(item),
+                      icon: const Icon(Icons.visibility_outlined),
+                      tooltip: 'ดูรายละเอียด',
+                    ),
+                    if (onEdit != null && item['statusCode'] == 'NEW')
+                      IconButton(
+                        onPressed: () => onEdit!(item),
+                        icon: const Icon(Icons.edit_outlined),
+                        tooltip: 'แก้ไข',
+                      ),
+                    if (onDelete != null && item['statusCode'] == 'NEW')
+                      IconButton(
+                        onPressed: () => onDelete!(item),
+                        icon: Icon(
+                          Icons.delete_outline,
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                        tooltip: 'ลบ',
+                      ),
+                  ],
                 ),
               ],
             ),
@@ -324,9 +557,16 @@ class _ComplaintTable extends StatelessWidget {
 }
 
 class _ComplaintCard extends StatelessWidget {
-  const _ComplaintCard({required this.row, required this.onTap});
+  const _ComplaintCard({
+    required this.row,
+    required this.onTap,
+    this.onEdit,
+    this.onDelete,
+  });
   final Map<String, dynamic> row;
   final VoidCallback onTap;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
   @override
   Widget build(BuildContext context) => Card(
     margin: EdgeInsets.zero,
@@ -334,10 +574,29 @@ class _ComplaintCard extends StatelessWidget {
       onTap: onTap,
       title: Text(row['subject']?.toString() ?? '-'),
       subtitle: Text(
-        '${row['complaintNo'] ?? '-'}\n${row['complainantName'] ?? '-'} • ${row['locationSnapshot'] ?? '-'}',
+        '${row['complaintNo'] ?? '-'}\n${row['complainantName'] ?? '-'} • ${row['locationSnapshot'] ?? '-'}\n${_statusLabel(row['statusCode']?.toString() ?? '')}',
       ),
       isThreeLine: true,
-      trailing: Text(_statusLabel(row['statusCode']?.toString() ?? '')),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (onEdit != null)
+            IconButton(
+              onPressed: onEdit,
+              icon: const Icon(Icons.edit_outlined),
+              tooltip: 'แก้ไข',
+            ),
+          if (onDelete != null)
+            IconButton(
+              onPressed: onDelete,
+              icon: Icon(
+                Icons.delete_outline,
+                color: Theme.of(context).colorScheme.error,
+              ),
+              tooltip: 'ลบ',
+            ),
+        ],
+      ),
     ),
   );
 }
@@ -371,19 +630,36 @@ String _statusLabel(String value) => switch (value) {
 };
 
 class _ComplaintCreateDialog extends StatefulWidget {
-  const _ComplaintCreateDialog({required this.api});
+  const _ComplaintCreateDialog({
+    required this.api,
+    required this.caption,
+    this.original,
+  });
   final ServiceComplaintApi api;
+  final String caption;
+  final Map<String, dynamic>? original;
   @override
   State<_ComplaintCreateDialog> createState() => _ComplaintCreateDialogState();
 }
 
 class _ComplaintCreateDialogState extends State<_ComplaintCreateDialog> {
   final _form = GlobalKey<FormState>();
-  final _subject = TextEditingController();
-  final _detail = TextEditingController();
+  late final TextEditingController _subject;
+  late final TextEditingController _detail;
   List<PlatformFile> _files = const [];
   bool _saving = false;
   String? _error;
+  @override
+  void initState() {
+    super.initState();
+    _subject = TextEditingController(
+      text: widget.original?['subject']?.toString() ?? '',
+    );
+    _detail = TextEditingController(
+      text: widget.original?['detail']?.toString() ?? '',
+    );
+  }
+
   @override
   void dispose() {
     _subject.dispose();
@@ -409,11 +685,23 @@ class _ComplaintCreateDialogState extends State<_ComplaintCreateDialog> {
       _error = null;
     });
     try {
-      final saved = await widget.api.create(
-        subject: _subject.text.trim(),
-        detail: _detail.text.trim(),
-      );
-      final id = (saved['complaintId'] as num).toInt();
+      final original = widget.original;
+      final int id;
+      if (original == null) {
+        final saved = await widget.api.create(
+          subject: _subject.text.trim(),
+          detail: _detail.text.trim(),
+        );
+        id = (saved['complaintId'] as num).toInt();
+      } else {
+        id = (original['complaintId'] as num).toInt();
+        await widget.api.edit(
+          id,
+          subject: _subject.text.trim(),
+          detail: _detail.text.trim(),
+          rowVersion: original['rowVersion']?.toString() ?? '',
+        );
+      }
       final failed = <String>[];
       for (final file in _files) {
         if (file.bytes == null) {
@@ -451,18 +739,23 @@ class _ComplaintCreateDialogState extends State<_ComplaintCreateDialog> {
 
   @override
   Widget build(BuildContext context) => Dialog(
+    backgroundColor: Colors.white,
+    insetPadding: const EdgeInsets.all(LaooLayout.dialogInsetPadding),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(LaooRadius.xs),
+    ),
     child: ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 760, maxHeight: 720),
+      constraints: const BoxConstraints(maxWidth: 480, maxHeight: 720),
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(LaooLayout.cardPadding),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text(
-              'แจ้งเรื่องร้องเรียน',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+            Text(
+              '${widget.caption} > ${widget.original == null ? 'เพิ่ม' : 'แก้ไข'}',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
             ),
-            const Divider(),
+            const Divider(color: LaooColors.border),
             Expanded(
               child: SingleChildScrollView(
                 child: Form(
@@ -479,7 +772,7 @@ class _ComplaintCreateDialogState extends State<_ComplaintCreateDialog> {
                             ? 'กรุณาระบุหัวข้อ'
                             : null,
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: LaooLayout.popupFieldSpacing),
                       TextFormField(
                         controller: _detail,
                         maxLines: 6,
@@ -539,7 +832,7 @@ class _ComplaintCreateDialogState extends State<_ComplaintCreateDialog> {
                 ),
               ),
             ),
-            const SizedBox(height: 12),
+            const Divider(color: LaooColors.border),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
@@ -687,10 +980,15 @@ class _ComplaintDetailDialogState extends State<_ComplaintDetailDialog> {
 
   @override
   Widget build(BuildContext context) => Dialog(
+    backgroundColor: Colors.white,
+    insetPadding: const EdgeInsets.all(LaooLayout.dialogInsetPadding),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(LaooRadius.xs),
+    ),
     child: ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 780, maxHeight: 760),
+      constraints: const BoxConstraints(maxWidth: 480, maxHeight: 760),
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(LaooLayout.cardPadding),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -699,7 +997,7 @@ class _ComplaintDetailDialogState extends State<_ComplaintDetailDialog> {
                   'รายละเอียดเรื่องร้องเรียน',
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
             ),
-            const Divider(),
+            const Divider(color: LaooColors.border),
             Expanded(
               child: SingleChildScrollView(
                 child: Column(

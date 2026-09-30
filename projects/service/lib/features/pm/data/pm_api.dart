@@ -2,6 +2,8 @@ import '../../../core/api/api_client.dart';
 
 class PmApi {
   final _client = ApiClient();
+  Future<Map<String, dynamic>> get planActions async =>
+      _object(await _client.get('/api/service/pm/plans/actions'));
   Future<Map<String, dynamic>> get plans async =>
       _object(await _client.get('/api/service/pm/plans'));
   Future<Map<String, dynamic>> get types async =>
@@ -27,10 +29,26 @@ class PmApi {
     }
   }
 
+  Future<void> deletePlan(int id) async {
+    await _client.delete('/api/service/pm/plans/$id');
+  }
+
+  Future<Map<String, dynamic>> get checklistActions async =>
+      _object(await _client.get('/api/service/pm/checklists/actions'));
   Future<Map<String, dynamic>> get checklists async =>
       _object(await _client.get('/api/service/pm/checklists'));
+  Future<Map<String, dynamic>> checklist(int id) async =>
+      _object(await _client.get('/api/service/pm/checklists/$id'));
   Future<void> createChecklist(Map<String, dynamic> body) =>
       _client.post('/api/service/pm/checklists', body: body);
+  Future<void> updateChecklist(int id, Map<String, dynamic> body) async {
+    await _client.put('/api/service/pm/checklists/$id', body: body);
+  }
+
+  Future<void> deleteChecklist(int id) async {
+    await _client.delete('/api/service/pm/checklists/$id');
+  }
+
   Future<Map<String, dynamic>> workOrderActions({
     bool portalSchedule = false,
   }) async => _object(

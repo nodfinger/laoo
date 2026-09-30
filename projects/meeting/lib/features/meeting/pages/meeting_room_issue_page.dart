@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../../app/theme/laoo_design_tokens.dart';
-import '../../../app/theme/laoo_typography.dart';
 import '../../../app/theme/workspace_theme_presets.dart';
 import '../../../core/api/api_exception.dart';
 import '../../../core/navigation/navigation_menu_repository.dart';
@@ -10,6 +9,8 @@ import '../../support/presentation/widgets/support_workspace_shell.dart';
 import '../data/meeting_room_issue_repository.dart';
 import '../data/meeting_room_repository.dart';
 import '../meeting_feature_host.dart';
+import '../widgets/meeting_pagination_card.dart';
+import '../widgets/meeting_popup.dart';
 
 class MeetingRoomIssuePage extends StatefulWidget {
   const MeetingRoomIssuePage({super.key});
@@ -27,6 +28,22 @@ class _MeetingRoomIssuePageState extends State<MeetingRoomIssuePage> {
   String _caption = 'แจ้งส่งซ่อมอุปกรณ์';
   String? _message;
   bool _loading = true;
+  String _query = '';
+  int _pageIndex = 0;
+  static const _pageSize = 10;
+
+  List<Map<String, dynamic>> get _filteredItems {
+    final query = _query.trim().toLowerCase();
+    if (query.isEmpty) return _items;
+    return _items
+        .where(
+          (item) =>
+              '${item['itemName']} ${item['itemCode']} ${item['roomCode']} ${item['roomNameTh']} ${item['description']} ${item['statusCode']}'
+                  .toLowerCase()
+                  .contains(query),
+        )
+        .toList();
+  }
 
   @override
   void initState() {
@@ -57,6 +74,7 @@ class _MeetingRoomIssuePageState extends State<MeetingRoomIssuePage> {
         _items = List<Map<String, dynamic>>.from(result[0] as List);
         _actions = Map<String, bool>.from(result[1] as Map);
         _roomsData = List<Map<String, dynamic>>.from(result[2] as List);
+        _pageIndex = 0;
         _loading = false;
       });
     } catch (error) {
@@ -74,6 +92,7 @@ class _MeetingRoomIssuePageState extends State<MeetingRoomIssuePage> {
       : '$fallback\n$error';
 
   Future<void> _createIssue() async {
+    if (_actions['create'] != true) return;
     final rooms = _roomsData
         .where((room) => (room['itemItems'] as List? ?? const []).isNotEmpty)
         .toList();
@@ -88,13 +107,14 @@ class _MeetingRoomIssuePageState extends State<MeetingRoomIssuePage> {
     final value = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
-        builder: (context, refresh) => AlertDialog(
-          title: Text(
-            'แจ้งส่งซ่อมอุปกรณ์',
-            style: LaooTypography.popupTitleStyle,
+        builder: (context, refresh) => MeetingPopup(
+          title: MeetingPopupTitle(
+            icon: Icons.handyman_outlined,
+            text: '$_caption > เพิ่ม',
           ),
-          content: SizedBox(
-            width: 520,
+          scrollable: true,
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -126,7 +146,7 @@ class _MeetingRoomIssuePageState extends State<MeetingRoomIssuePage> {
                     });
                   },
                 ),
-                const SizedBox(height: LaooLayout.cardSpacing),
+                const SizedBox(height: LaooLayout.popupFieldSpacing),
                 DropdownButtonFormField<int>(
                   initialValue: itemId,
                   isExpanded: true,
@@ -148,7 +168,7 @@ class _MeetingRoomIssuePageState extends State<MeetingRoomIssuePage> {
                   }(),
                   onChanged: (value) => refresh(() => itemId = value),
                 ),
-                const SizedBox(height: LaooLayout.cardSpacing),
+                const SizedBox(height: LaooLayout.popupFieldSpacing),
                 TextField(
                   controller: description,
                   maxLines: 4,
@@ -199,10 +219,13 @@ class _MeetingRoomIssuePageState extends State<MeetingRoomIssuePage> {
 
   Future<void> _viewIssue(Map<String, dynamic> item) => showDialog<void>(
     context: context,
-    builder: (context) => AlertDialog(
-      title: const Text('รายละเอียดแจ้งปัญหา'),
-      content: SizedBox(
-        width: 480,
+    builder: (context) => MeetingPopup(
+      title: MeetingPopupTitle(
+        icon: Icons.info_outline,
+        text: '$_caption > ดู',
+      ),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480),
         child: Text(
           '${item['roomCode']} | ${item['roomNameTh']}\n${item['itemName']} (${item['itemCode']})\n\n${item['description']}\n\nสถานะ: ${item['statusCode']}',
         ),
@@ -217,6 +240,7 @@ class _MeetingRoomIssuePageState extends State<MeetingRoomIssuePage> {
   );
 
   Future<void> _editIssue(Map<String, dynamic> item) async {
+    if (_actions['edit'] != true) return;
     if (item['statusCode'] != 'OPEN') {
       setState(() => _message = 'แก้ไขได้เฉพาะรายการสถานะ OPEN');
       return;
@@ -226,8 +250,11 @@ class _MeetingRoomIssuePageState extends State<MeetingRoomIssuePage> {
     );
     final saved = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('แก้ไขแจ้งปัญหา'),
+      builder: (context) => MeetingPopup(
+        title: MeetingPopupTitle(
+          icon: Icons.edit_outlined,
+          text: '$_caption > แก้ไข',
+        ),
         content: TextField(
           controller: description,
           maxLines: 4,
@@ -256,33 +283,23 @@ class _MeetingRoomIssuePageState extends State<MeetingRoomIssuePage> {
         await _load();
       }
     } catch (error) {
-      if (mounted)
+      if (mounted) {
         setState(() => _message = _error(error, 'แก้ไขรายการไม่สำเร็จ'));
+      }
     }
   }
 
   Future<void> _deleteIssue(Map<String, dynamic> item) async {
+    if (_actions['delete'] != true) return;
     if (item['statusCode'] != 'OPEN') {
       setState(() => _message = 'ลบได้เฉพาะรายการสถานะ OPEN');
       return;
     }
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        icon: const Icon(Icons.delete_outline, color: Colors.red),
-        title: const Text('ลบรายการแจ้งปัญหา'),
-        content: Text('รายการ: ${item['itemName']}\nไม่สามารถเรียกคืนได้'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('ยกเลิก'),
-          ),
-          FilledButton.icon(
-            onPressed: () => Navigator.pop(context, true),
-            icon: const Icon(Icons.delete_outline),
-            label: const Text('ลบ'),
-          ),
-        ],
+      builder: (_) => MeetingDeletePopup(
+        record: '${item['itemName']} (${item['itemCode']})',
+        description: 'รายการสถานะ OPEN จะถูกลบถาวรและเรียกคืนไม่ได้',
       ),
     );
     if (confirmed != true) return;
@@ -293,8 +310,9 @@ class _MeetingRoomIssuePageState extends State<MeetingRoomIssuePage> {
         await _load();
       }
     } catch (error) {
-      if (mounted)
+      if (mounted) {
         setState(() => _message = _error(error, 'ลบรายการไม่สำเร็จ'));
+      }
     }
   }
 
@@ -306,85 +324,144 @@ class _MeetingRoomIssuePageState extends State<MeetingRoomIssuePage> {
       activeMenu: '22003',
       child: Padding(
         padding: const EdgeInsets.all(LaooLayout.cardMargin),
-        child: WorkspaceSectionCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: WorkspacePageTitle(
-                      title: _caption,
-                      favoriteKey: '22003',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            WorkspaceSectionCard(
+              child: LayoutBuilder(
+                builder: (context, constraints) => Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: constraints.maxWidth < 540
+                          ? constraints.maxWidth
+                          : constraints.maxWidth - 210,
+                      child: WorkspacePageTitle(
+                        title: _caption,
+                        favoriteKey: '22003',
+                      ),
                     ),
-                  ),
-                  if (_actions['create'] == true)
-                    FilledButton.icon(
-                      onPressed: _createIssue,
-                      icon: const Icon(Icons.build_outlined),
-                      label: const Text('แจ้งส่งซ่อม'),
-                    ),
-                ],
+                    if (_actions['create'] == true)
+                      FilledButton.icon(
+                        onPressed: _createIssue,
+                        icon: const Icon(Icons.build_outlined),
+                        label: const Text('แจ้งส่งซ่อม'),
+                      ),
+                  ],
+                ),
               ),
-              const SizedBox(height: LaooLayout.cardSpacing),
-              if (_loading) const LinearProgressIndicator(),
-              Expanded(
-                child: _items.isEmpty
+            ),
+            const SizedBox(height: LaooLayout.listSectionSpacing),
+            WorkspaceSectionCard(
+              child: TextField(
+                decoration: const InputDecoration(
+                  labelText: 'ค้นหารายการ ห้อง หรือสถานะ',
+                  prefixIcon: Icon(Icons.search),
+                  border: OutlineInputBorder(),
+                ),
+                onChanged: (value) => setState(() {
+                  _query = value;
+                  _pageIndex = 0;
+                }),
+              ),
+            ),
+            const SizedBox(height: LaooLayout.listSectionSpacing),
+            if (_loading) const LinearProgressIndicator(),
+            Expanded(
+              child: WorkspaceSectionCard(
+                child: _filteredItems.isEmpty
                     ? const Center(child: Text('ยังไม่มีรายการแจ้งซ่อม'))
                     : ListView.separated(
-                        itemCount: _items.length,
-                        separatorBuilder: (_, _) => const SizedBox(height: 8),
+                        itemCount: _filteredItems
+                            .skip(_pageIndex * _pageSize)
+                            .take(_pageSize)
+                            .length,
+                        separatorBuilder: (_, _) =>
+                            const SizedBox(height: LaooLayout.listItemSpacing),
                         itemBuilder: (context, index) {
-                          final item = _items[index];
-                          return ListTile(
-                            tileColor: preset.primary.withValues(alpha: .06),
-                            title: Text(
-                              '${item['itemName']} (${item['itemCode']})',
-                            ),
-                            subtitle: Text(
-                              '${item['roomCode']} | ${item['roomNameTh']}\n${item['description']}',
-                            ),
-                            trailing: Wrap(
-                              spacing: 2,
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              children: [
-                                Text('${item['statusCode']}'),
+                          final item =
+                              _filteredItems[_pageIndex * _pageSize + index];
+                          final actions = Wrap(
+                            spacing: 2,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              Text('${item['statusCode']}'),
+                              IconButton(
+                                tooltip: 'ดู',
+                                onPressed: () => _viewIssue(item),
+                                icon: const Icon(Icons.visibility_outlined),
+                              ),
+                              if (_actions['edit'] == true &&
+                                  item['statusCode'] == 'OPEN')
                                 IconButton(
-                                  tooltip: 'ดู',
-                                  onPressed: () => _viewIssue(item),
-                                  icon: const Icon(Icons.visibility_outlined),
+                                  tooltip: 'แก้ไข',
+                                  onPressed: () => _editIssue(item),
+                                  icon: const Icon(Icons.edit_outlined),
                                 ),
-                                if (_actions['edit'] == true)
-                                  IconButton(
-                                    tooltip: 'แก้ไข',
-                                    onPressed: () => _editIssue(item),
-                                    icon: const Icon(Icons.edit_outlined),
+                              if (_actions['delete'] == true &&
+                                  item['statusCode'] == 'OPEN')
+                                IconButton(
+                                  tooltip: 'ลบ',
+                                  onPressed: () => _deleteIssue(item),
+                                  icon: const Icon(
+                                    Icons.delete_outline,
+                                    color: LaooColors.error,
                                   ),
-                                if (_actions['delete'] == true)
-                                  IconButton(
-                                    tooltip: 'ลบ',
-                                    onPressed: () => _deleteIssue(item),
-                                    icon: const Icon(
-                                      Icons.delete_outline,
-                                      color: Colors.red,
-                                    ),
-                                  ),
-                              ],
-                            ),
+                                ),
+                            ],
+                          );
+                          final compact =
+                              MediaQuery.sizeOf(context).width < 600;
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              ListTile(
+                                tileColor: preset.primary.withValues(
+                                  alpha: .06,
+                                ),
+                                title: Text(
+                                  '${item['itemName']} (${item['itemCode']})',
+                                ),
+                                subtitle: Text(
+                                  '${item['roomCode']} | ${item['roomNameTh']}\n${item['description']}',
+                                ),
+                                trailing: compact ? null : actions,
+                              ),
+                              if (compact)
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: actions,
+                                ),
+                            ],
                           );
                         },
                       ),
               ),
-              if (_message != null)
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: AutoDismissMessage(
-                    message: _message!,
-                    onClose: () => setState(() => _message = null),
-                  ),
+            ),
+            const SizedBox(height: LaooLayout.listSectionSpacing),
+            MeetingPaginationCard(
+              total: _filteredItems.length,
+              pageIndex: _pageIndex,
+              pageSize: _pageSize,
+              primary: preset.primary,
+              onPrevious: _pageIndex > 0
+                  ? () => setState(() => _pageIndex--)
+                  : null,
+              onNext: (_pageIndex + 1) * _pageSize < _filteredItems.length
+                  ? () => setState(() => _pageIndex++)
+                  : null,
+            ),
+            if (_message != null)
+              Align(
+                alignment: Alignment.centerRight,
+                child: AutoDismissMessage(
+                  message: _message!,
+                  onClose: () => setState(() => _message = null),
                 ),
-            ],
-          ),
+              ),
+          ],
         ),
       ),
     );

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'laoo_design_tokens.dart';
 
 /// Central typography tokens for Laoo Solutions.
 ///
@@ -67,4 +68,13 @@ abstract final class LaooTypography {
   static const FontWeight strongWeight = FontWeight.w800;
   static const FontWeight emphasizedWeight = FontWeight.w700;
   static const FontWeight normalWeight = FontWeight.w400;
+
+  static const TextStyle screenCaptionStyle = TextStyle(
+    fontFamily: fontFamily,
+    fontFamilyFallback: fontFallback,
+    fontSize: workspaceCaption,
+    height: titleLineHeight,
+    fontWeight: workspaceCaptionWeight,
+    color: LaooColors.pageCaption,
+  );
 }

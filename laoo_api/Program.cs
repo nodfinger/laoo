@@ -136,6 +136,7 @@ builder.Services.AddScoped<PasswordResetService>();
 builder.Services.AddScoped<CompanyPersonService>();
 builder.Services.AddScoped<IEvaluationSourceCompletedPublisher, EvaluationSourceCompletedPublisher>();
 builder.Services.AddHostedService<MeetingEvaluationCompletionWorker>();
+builder.Services.AddHostedService<EvaluationRoundClosingWorker>();
 
 var jwtOptions = builder.Configuration
     .GetSection(JwtOptions.SectionName)

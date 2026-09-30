@@ -159,11 +159,16 @@ class _AttendanceSummaryPageState extends State<AttendanceSummaryPage> {
                     isExpanded: true,
                     decoration: const InputDecoration(labelText: 'สาขา'),
                     items: [
-                      const DropdownMenuItem<int?>(value: null, child: Text('ทั้งหมด')),
+                      const DropdownMenuItem<int?>(
+                        value: null,
+                        child: Text('ทั้งหมด'),
+                      ),
                       for (final branch in _branches)
                         DropdownMenuItem<int?>(
                           value: (branch['branchId'] as num).toInt(),
-                          child: Text('${branch['branchCode']} - ${branch['branchName']}'),
+                          child: Text(
+                            '${branch['branchCode']} - ${branch['branchName']}',
+                          ),
                         ),
                     ],
                     onChanged: (value) => setState(() => _branchId = value),
@@ -188,7 +193,8 @@ class _AttendanceSummaryPageState extends State<AttendanceSummaryPage> {
                           child: Text('${unit['unitCode']} - ${unit['name']}'),
                         ),
                     ],
-                    onChanged: (value) => setState(() => _divisionOrgUnitId = value),
+                    onChanged: (value) =>
+                        setState(() => _divisionOrgUnitId = value),
                   ),
                 ),
                 SizedBox(
@@ -210,9 +216,8 @@ class _AttendanceSummaryPageState extends State<AttendanceSummaryPage> {
                           child: Text('${unit['unitCode']} - ${unit['name']}'),
                         ),
                     ],
-                    onChanged: (value) => setState(
-                      () => _departmentOrgUnitId = value,
-                    ),
+                    onChanged: (value) =>
+                        setState(() => _departmentOrgUnitId = value),
                   ),
                 ),
                 FilledButton.icon(
@@ -225,20 +230,28 @@ class _AttendanceSummaryPageState extends State<AttendanceSummaryPage> {
             table: _loading
                 ? const Center(child: CircularProgressIndicator())
                 : _items.isEmpty
-                    ? const Center(child: Text('ไม่พบผลลงเวลาจากงวดที่ปิดแล้ว'))
-                    : LayoutBuilder(
-                        builder: (context, constraints) => constraints.maxWidth < 900
-                            ? _cards()
-                            : _table(constraints.maxWidth),
-                      ),
-            pagination: LaooPaginationCard(
+                ? const Center(child: Text('ไม่พบผลลงเวลาจากงวดที่ปิดแล้ว'))
+                : LayoutBuilder(
+                    builder: (context, constraints) =>
+                        constraints.maxWidth < 900
+                        ? _cards()
+                        : _table(constraints.maxWidth),
+                  ),
+            pagination: TimePaginationCard(
               tokens: timeUiTokens.workspace,
               page: _page,
-              pageCount: _total == 0 ? 1 : ((_total + _pageSize - 1) ~/ _pageSize),
+              pageCount: _total == 0
+                  ? 1
+                  : ((_total + _pageSize - 1) ~/ _pageSize),
               pageSize: _pageSize,
               total: _total,
-              onPrevious: _loading || _page <= 1 ? null : () => _load(page: _page - 1),
-              onNext: _loading || _page >= ((_total + _pageSize - 1) ~/ _pageSize) ? null : () => _load(page: _page + 1),
+              onPrevious: _loading || _page <= 1
+                  ? null
+                  : () => _load(page: _page - 1),
+              onNext:
+                  _loading || _page >= ((_total + _pageSize - 1) ~/ _pageSize)
+                  ? null
+                  : () => _load(page: _page + 1),
             ),
           ),
           if (_message != null)
@@ -256,7 +269,8 @@ class _AttendanceSummaryPageState extends State<AttendanceSummaryPage> {
     );
   }
 
-  Widget _dateField(String label, DateTime value, VoidCallback onTap) => SizedBox(
+  Widget _dateField(String label, DateTime value, VoidCallback onTap) =>
+      SizedBox(
         width: 170,
         child: TextFormField(
           key: ValueKey('$label-${value.toIso8601String()}'),
@@ -271,69 +285,72 @@ class _AttendanceSummaryPageState extends State<AttendanceSummaryPage> {
       );
 
   Widget _cards() => ListView.separated(
-        padding: timeUiTokens.cardPadding,
-        itemCount: _items.length,
-        separatorBuilder: (_, _) => SizedBox(height: timeUiTokens.itemSpacing),
-        itemBuilder: (_, index) {
-          final item = _items[index];
-          return Card(
-            child: ListTile(
-              title: Text('${item['employeeCode']} - ${item['fullName']}'),
-              subtitle: Text(
-                'วันทำงาน ${item['workDayCount']} วัน | ครบ ${item['completeDayCount']} | ค้าง ${item['unresolvedDayCount']} | ลา ${item['leaveDayCount']} | ลาบางช่วง ${item['partialLeaveDayCount']}\n'
-                'ตามกะ ${_minutes(item['scheduledWorkMinutes'])} | ทำงาน ${_minutes(item['actualWorkMinutes'])} | สาย ${_minutes(item['lateMinutes'])} | ออกก่อน ${_minutes(item['earlyMinutes'])}',
-              ),
-            ),
-          );
-        },
-      );
-
-  Widget _table(double width) => SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(minWidth: width),
-          child: LaooWorkspaceDataTable(
-            tokens: timeUiTokens.workspace,
-            headingRowColor: WidgetStatePropertyAll(
-              timeUiTokens.primaryColor.withValues(alpha: .10),
-            ),
-            columns: const [
-              DataColumn(label: Text('ลำดับ')),
-              DataColumn(label: Text('รหัสพนักงาน')),
-              DataColumn(label: Text('ชื่อพนักงาน')),
-              DataColumn(label: Text('วันทำงาน')),
-              DataColumn(label: Text('ครบ')),
-              DataColumn(label: Text('ค้าง')),
-              DataColumn(label: Text('ลา')),
-              DataColumn(label: Text('ลาบางช่วง')),
-              DataColumn(label: Text('ตามกะ')),
-              DataColumn(label: Text('ทำงาน')),
-              DataColumn(label: Text('สาย')),
-              DataColumn(label: Text('ออกก่อน')),
-            ],
-            rows: [
-              for (var index = 0; index < _items.length; index++)
-                DataRow(cells: [
-                  DataCell(Text('${index + 1}')),
-                  DataCell(Text('${_items[index]['employeeCode']}')),
-                  DataCell(Text('${_items[index]['fullName']}')),
-                  DataCell(Text('${_items[index]['workDayCount']}')),
-                  DataCell(Text('${_items[index]['completeDayCount']}')),
-                  DataCell(Text('${_items[index]['unresolvedDayCount']}')),
-                  DataCell(Text('${_items[index]['leaveDayCount']}')),
-                  DataCell(Text('${_items[index]['partialLeaveDayCount']}')),
-                  DataCell(Text(_minutes(_items[index]['scheduledWorkMinutes']))),
-                  DataCell(Text(_minutes(_items[index]['actualWorkMinutes']))),
-                  DataCell(Text(_minutes(_items[index]['lateMinutes']))),
-                  DataCell(Text(_minutes(_items[index]['earlyMinutes']))),
-                ]),
-            ],
+    padding: timeUiTokens.cardPadding,
+    itemCount: _items.length,
+    separatorBuilder: (_, _) => SizedBox(height: timeUiTokens.itemSpacing),
+    itemBuilder: (_, index) {
+      final item = _items[index];
+      return Card(
+        child: ListTile(
+          title: Text('${item['employeeCode']} - ${item['fullName']}'),
+          subtitle: Text(
+            'วันทำงาน ${item['workDayCount']} วัน | ครบ ${item['completeDayCount']} | ค้าง ${item['unresolvedDayCount']} | ลา ${item['leaveDayCount']} | ลาบางช่วง ${item['partialLeaveDayCount']}\n'
+            'ตามกะ ${_minutes(item['scheduledWorkMinutes'])} | ทำงาน ${_minutes(item['actualWorkMinutes'])} | สาย ${_minutes(item['lateMinutes'])} | ออกก่อน ${_minutes(item['earlyMinutes'])}',
           ),
         ),
       );
+    },
+  );
+
+  Widget _table(double width) => SingleChildScrollView(
+    scrollDirection: Axis.horizontal,
+    child: ConstrainedBox(
+      constraints: BoxConstraints(minWidth: width),
+      child: LaooWorkspaceDataTable(
+        tokens: timeUiTokens.workspace,
+        headingRowColor: WidgetStatePropertyAll(
+          timeUiTokens.primaryColor.withValues(alpha: .10),
+        ),
+        columns: const [
+          DataColumn(label: Text('ลำดับ')),
+          DataColumn(label: Text('รหัสพนักงาน')),
+          DataColumn(label: Text('ชื่อพนักงาน')),
+          DataColumn(label: Text('วันทำงาน')),
+          DataColumn(label: Text('ครบ')),
+          DataColumn(label: Text('ค้าง')),
+          DataColumn(label: Text('ลา')),
+          DataColumn(label: Text('ลาบางช่วง')),
+          DataColumn(label: Text('ตามกะ')),
+          DataColumn(label: Text('ทำงาน')),
+          DataColumn(label: Text('สาย')),
+          DataColumn(label: Text('ออกก่อน')),
+        ],
+        rows: [
+          for (var index = 0; index < _items.length; index++)
+            DataRow(
+              cells: [
+                DataCell(Text('${index + 1}')),
+                DataCell(Text('${_items[index]['employeeCode']}')),
+                DataCell(Text('${_items[index]['fullName']}')),
+                DataCell(Text('${_items[index]['workDayCount']}')),
+                DataCell(Text('${_items[index]['completeDayCount']}')),
+                DataCell(Text('${_items[index]['unresolvedDayCount']}')),
+                DataCell(Text('${_items[index]['leaveDayCount']}')),
+                DataCell(Text('${_items[index]['partialLeaveDayCount']}')),
+                DataCell(Text(_minutes(_items[index]['scheduledWorkMinutes']))),
+                DataCell(Text(_minutes(_items[index]['actualWorkMinutes']))),
+                DataCell(Text(_minutes(_items[index]['lateMinutes']))),
+                DataCell(Text(_minutes(_items[index]['earlyMinutes']))),
+              ],
+            ),
+        ],
+      ),
+    ),
+  );
 
   static String _date(DateTime value) =>
       '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
 
-  static String _minutes(Object? value) => '${(value as num?)?.toInt() ?? 0} นาที';
+  static String _minutes(Object? value) =>
+      '${(value as num?)?.toInt() ?? 0} นาที';
 }

@@ -14,7 +14,7 @@ namespace LaooTrainingModule.Controllers;
 [Route("api/company/training/bookings/{bookingId:long}/tests")]
 public sealed class TrainingExamController(IConfiguration configuration, IWebHostEnvironment environment) : ControllerBase
 {
-    private long company, user, partner;
+    private long company, user, partner, activeProject;
     private SqlConnection db = null!;
     private SqlTransaction tx = null!;
     private Access access = null!;
@@ -251,7 +251,8 @@ WHERE E.CompanyID=@company AND E.BookingID=@booking
         if (User.FindFirstValue("user_type")!="COMPANY_USER" ||
             !long.TryParse(User.FindFirstValue("company_id"),out company) ||
             !long.TryParse(User.FindFirstValue("partner_id"),out partner) ||
-            !long.TryParse(User.FindFirstValue("user_id"),out user))
+            !long.TryParse(User.FindFirstValue("user_id"),out user) ||
+            !long.TryParse(User.FindFirstValue("project_id"),out activeProject))
             return StatusCode(403,Error("ไม่มีสิทธิ์ใช้งาน","กรุณาเข้าสู่ระบบด้วยบัญชีบริษัท"));
         await using var connection=new SqlConnection(configuration.GetConnectionString("LaooDatabase"));
         await connection.OpenAsync(token); db=connection;
@@ -309,11 +310,19 @@ WHERE B.CompanyID=@company AND B.BookingID=@booking AND B.ActivityTypeCode='TRAI
 AND EXISTS (
  SELECT 1 FROM dbo.TDADProject PR
  JOIN dbo.TDADCompanyProject CP ON CP.ProjectID=PR.ProjectID AND CP.CompanyID=C.CompanyID AND CP.PartnerID=C.PartnerID AND CP.IsEnabled=1
-LEFT JOIN dbo.TDADUserProject UP ON UP.ProjectID=PR.ProjectID AND UP.CompanyID=C.CompanyID AND UP.UserID=@user AND UP.IsActive=1
+JOIN dbo.TDADUserProject UP ON UP.ProjectID=PR.ProjectID AND UP.CompanyID=C.CompanyID AND UP.UserID=@user AND UP.IsActive=1
  WHERE PR.ProjectCode='LAOO_TRAINING' AND PR.IsActive=1
 AND (CP.StartDate IS NULL OR CP.StartDate<=CONVERT(date,SYSUTCDATETIME()))
 AND (CP.ExpireDate IS NULL OR CP.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))
-AND (UP.UserID IS NOT NULL OR U.IsCompanyAdmin=1 OR B.RequesterUserID=@user OR
+AND EXISTS (
+ SELECT 1 FROM dbo.TDADProject AP
+ JOIN dbo.TDADUserProject AUP ON AUP.ProjectID=AP.ProjectID AND AUP.CompanyID=C.CompanyID AND AUP.UserID=@user AND AUP.IsActive=1
+ JOIN dbo.TDADCompanyProject ACP ON ACP.ProjectID=AP.ProjectID AND ACP.CompanyID=C.CompanyID AND ACP.PartnerID=C.PartnerID AND ACP.IsEnabled=1
+ WHERE AP.ProjectID=@activeProject AND AP.ProjectCode IN ('LAOO_MEETING','LAOO_TRAINING') AND AP.IsActive=1
+ AND (ACP.StartDate IS NULL OR ACP.StartDate<=CONVERT(date,SYSUTCDATETIME()))
+ AND (ACP.ExpireDate IS NULL OR ACP.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))
+)
+AND (U.IsCompanyAdmin=1 OR B.RequesterUserID=@user OR
      EXISTS(SELECT 1 FROM dbo.TDADMeetingRoomContact RC JOIN dbo.TDADUserEmployee UE ON UE.CompanyID=B.CompanyID AND UE.EmployeeID=RC.EmployeeID AND UE.UserID=@user AND UE.IsActive=1 WHERE RC.RoomID=B.RoomID AND RC.IsActive=1) OR
      P.BookingParticipantID IS NOT NULL)
 )
@@ -404,6 +413,7 @@ AND (UP.UserID IS NOT NULL OR U.IsCompanyAdmin=1 OR B.RequesterUserID=@user OR
         var command=new SqlCommand(sql,db,tx);
         command.Parameters.AddWithValue("@company",company); command.Parameters.AddWithValue("@booking",currentBooking);
         command.Parameters.AddWithValue("@user",user); command.Parameters.AddWithValue("@partner",partner);
+        command.Parameters.AddWithValue("@activeProject",activeProject);
         foreach (var (name,value) in args) command.Parameters.AddWithValue(name,value??DBNull.Value);
         return command;
     }

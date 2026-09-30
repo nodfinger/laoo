@@ -59,7 +59,20 @@ public sealed class TrainingTestTemplateImageController(IConfiguration configura
         await using var q=new SqlCommand("SELECT COUNT_BIG(*) FROM dbo.TDTRTrainingTestTemplate WHERE CompanyID=@company AND TrainingTestTemplateID=@template",db);
         Add(q,"@company",SqlDbType.BigInt,company); Add(q,"@template",SqlDbType.BigInt,template); return Convert.ToInt64(await q.ExecuteScalarAsync(token))==1;
     }
-    Task<bool> Can(SqlConnection db,string action,CancellationToken token)=>CompanyMenuAccess.IsAllowedAsync(db,User,MenuCode,action,token);
+    async Task<bool> Can(SqlConnection db,string action,CancellationToken token)
+    {
+        if(!long.TryParse(User.FindFirstValue("project_id"),out var activeProjectId))return false;
+        await using var project=new SqlCommand("SELECT COUNT_BIG(*) FROM dbo.TDADProject WHERE ProjectCode=N'LAOO_TRAINING' AND ProjectID=@project AND IsActive=1",db);
+        Add(project,"@project",SqlDbType.BigInt,activeProjectId);
+        if(Convert.ToInt64(await project.ExecuteScalarAsync(token))!=1)return false;
+        if(action!="VIEW")
+        {
+            await using var screen=new SqlCommand("SELECT ScreenType FROM dbo.TDADMainMenu WHERE MenuCode=@menu AND IsActive=1",db);
+            Add(screen,"@menu",SqlDbType.Char,MenuCode,5);
+            if(Convert.ToInt32(await screen.ExecuteScalarAsync(token))!=1)return false;
+        }
+        return await CompanyMenuAccess.IsAllowedAsync(db,User,MenuCode,action,token);
+    }
     async Task<SqlConnection> Open(CancellationToken token){var db=new SqlConnection(configuration.GetConnectionString("LaooDatabase"));await db.OpenAsync(token);return db;}
     bool Scope(out long company,out long user){company=user=0;return User.FindFirstValue("user_type")=="COMPANY_USER"&&long.TryParse(User.FindFirstValue("company_id"),out company)&&long.TryParse(User.FindFirstValue("user_id"),out user)&&company>0&&user>0;}
     string PathFor(long company,long template,Guid image)=>Path.Combine(environment.ContentRootPath,"App_Data","training-test-templates",company.ToString(),template.ToString(),image.ToString("N"));

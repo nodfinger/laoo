@@ -12,6 +12,7 @@ class HolidayCalendarRepository {
     required String search,
     required bool? active,
     required int page,
+    required int pageSize,
   }) async => Map<String, dynamic>.from(
     await api.get(
           path,
@@ -19,7 +20,7 @@ class HolidayCalendarRepository {
             if (search.trim().isNotEmpty) 'search': search.trim(),
             if (active != null) 'isActive': '$active',
             'page': '$page',
-            'pageSize': '30',
+            'pageSize': '$pageSize',
           },
         )
         as Map,

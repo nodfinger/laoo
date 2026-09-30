@@ -33,13 +33,13 @@ public sealed class AttendancePeriodsController(IConfiguration configuration) : 
     public sealed record ReopenRequest(string Reason);
 
     [HttpGet("schemes/actions")]
-    public Task<IActionResult> SchemeActions(CancellationToken token) => Actions(SchemeMenu, 1, token);
+    public Task<IActionResult> SchemeActions(CancellationToken token) => Actions(SchemeMenu, token);
 
     [HttpGet("assignments/actions")]
-    public Task<IActionResult> AssignmentActions(CancellationToken token) => Actions(AssignmentMenu, 4, token);
+    public Task<IActionResult> AssignmentActions(CancellationToken token) => Actions(AssignmentMenu, token);
 
     [HttpGet("actions")]
-    public Task<IActionResult> PeriodActions(CancellationToken token) => Actions(PeriodMenu, 3, token);
+    public Task<IActionResult> PeriodActions(CancellationToken token) => Actions(PeriodMenu, token);
 
     [HttpGet("schemes")]
     public async Task<IActionResult> Schemes([FromQuery] bool? active, CancellationToken token)
@@ -320,11 +320,12 @@ WHERE AttendancePeriodID=@PeriodID AND CompanyID=@CompanyID AND PeriodStatusCode
         await transaction.CommitAsync(token); return NoContent();
     }
 
-    private async Task<IActionResult> Actions(string menuCode, int screenType, CancellationToken token)
+    private async Task<IActionResult> Actions(string menuCode, CancellationToken token)
     {
         if (!Scope(out _, out _)) return Forbid(); await using var connection = await Open(token);
         var view = await Can(connection, menuCode, "VIEW", token); if (!view) return Forbid();
-        return Ok(new { menuCode, caption = await Caption(connection, menuCode, token), screenType, view, create = await Can(connection, menuCode, "CREATE", token), edit = await Can(connection, menuCode, "EDIT", token), delete = await Can(connection, menuCode, "DELETE", token), approve = await Can(connection, menuCode, "APPROVE", token), finalize = await Can(connection, menuCode, "FINALIZE", token), reopen = await Can(connection, menuCode, "REOPEN", token) });
+        var actualScreenType = await ScreenType(connection, menuCode, token);
+        return Ok(new { menuCode, caption = await Caption(connection, menuCode, token), screenType = actualScreenType, view, create = await Can(connection, menuCode, "CREATE", token), edit = await Can(connection, menuCode, "EDIT", token), delete = await Can(connection, menuCode, "DELETE", token), approve = await Can(connection, menuCode, "APPROVE", token), finalize = await Can(connection, menuCode, "FINALIZE", token), reopen = await Can(connection, menuCode, "REOPEN", token) });
     }
 
     private async Task<IActionResult> SaveScheme(SchemeRequest request, bool create, CancellationToken token)
@@ -384,7 +385,17 @@ WHERE AttendancePeriodID=@PeriodID AND CompanyID=@CompanyID AND PeriodStatusCode
     private static async Task<long> AssignmentGapCount(SqlConnection c,SqlTransaction tx,long company,(long Scheme,DateOnly Start,DateOnly End,string Status) p,CancellationToken t){await using var q=new SqlCommand("SELECT COUNT_BIG(1) FROM dbo.TDADEmployee E JOIN dbo.TDTMAttendanceRequirement R ON R.CompanyID=E.CompanyID AND R.EmployeeID=E.EmployeeID AND R.RequirementCode='REQUIRED' AND R.EffectiveFrom<=@T AND (R.EffectiveTo IS NULL OR R.EffectiveTo>=@F) WHERE E.CompanyID=@C AND E.IsActive=1 AND NOT EXISTS(SELECT 1 FROM dbo.TDTMEmployeeAttendancePeriodAssignment A WHERE A.CompanyID=E.CompanyID AND A.EmployeeID=E.EmployeeID AND A.AttendancePeriodSchemeID=@S AND A.EffectiveFrom<=@F AND (A.EffectiveTo IS NULL OR A.EffectiveTo>=@T))",c,tx);Add(q,"@C",SqlDbType.BigInt,company);Add(q,"@S",SqlDbType.BigInt,p.Scheme);Add(q,"@F",SqlDbType.Date,p.Start.ToDateTime(TimeOnly.MinValue));Add(q,"@T",SqlDbType.Date,p.End.ToDateTime(TimeOnly.MinValue));return Convert.ToInt64(await q.ExecuteScalarAsync(t));}
     private static async Task<bool> OwnerOperated(SqlConnection c,SqlTransaction tx,long company,DateOnly date,CancellationToken t){await using var q=new SqlCommand("SELECT TOP(1) COALESCE(P.ProfileCode,D.ProfileCode,'OWNER_OPERATED') FROM dbo.TDTMApprovalProfileVersion D LEFT JOIN dbo.TDTMProcessApprovalPolicyVersion P ON P.CompanyID=D.CompanyID AND P.ProcessCode='PERIOD' AND P.IsActive=1 AND P.EffectiveFrom<=@D AND (P.EffectiveTo IS NULL OR P.EffectiveTo>=@D) WHERE D.CompanyID=@C AND D.IsActive=1 AND D.EffectiveFrom<=@D AND (D.EffectiveTo IS NULL OR D.EffectiveTo>=@D) ORDER BY D.EffectiveFrom DESC",c,tx);Add(q,"@C",SqlDbType.BigInt,company);Add(q,"@D",SqlDbType.Date,date.ToDateTime(TimeOnly.MinValue));return string.Equals(Convert.ToString(await q.ExecuteScalarAsync(t)),"OWNER_OPERATED",StringComparison.OrdinalIgnoreCase);}
     private static async Task Audit(SqlConnection c,SqlTransaction tx,long company,long? period,string action,object? before,object? after,string? reason,long user,CancellationToken t){await using var q=new SqlCommand("INSERT dbo.TDTMAttendancePeriodAudit(CompanyID,AttendancePeriodID,ActionCode,BeforeJson,AfterJson,Reason,ActorUserID) VALUES(@C,@P,@A,@B,@F,@R,@U)",c,tx);Add(q,"@C",SqlDbType.BigInt,company);Add(q,"@P",SqlDbType.BigInt,period);Add(q,"@A",SqlDbType.VarChar,action,30);Add(q,"@B",SqlDbType.NVarChar,before is null?null:JsonSerializer.Serialize(before),-1);Add(q,"@F",SqlDbType.NVarChar,after is null?null:JsonSerializer.Serialize(after),-1);Add(q,"@R",SqlDbType.NVarChar,reason,1000);Add(q,"@U",SqlDbType.BigInt,user);await q.ExecuteNonQueryAsync(t);}
-    private async Task<bool> Can(SqlConnection c,string menu,string action,CancellationToken t)=>await CompanyMenuAccess.IsAllowedAsync(c,User,menu,action,t);
+    private async Task<bool> Can(SqlConnection c,string menu,string action,CancellationToken t)
+    {
+        if(menu==SchemeMenu && (action is "CREATE" or "EDIT" or "DELETE") && await ScreenType(c,menu,t)!=1) return false;
+        return await CompanyMenuAccess.IsAllowedAsync(c,User,menu,action,t);
+    }
+    private static async Task<int> ScreenType(SqlConnection c,string menu,CancellationToken t)
+    {
+        await using var q=new SqlCommand("SELECT ScreenType FROM dbo.TDADMainMenu WHERE MenuCode=@M AND IsActive=1",c);
+        Add(q,"@M",SqlDbType.Char,menu,5);
+        return Convert.ToInt32(await q.ExecuteScalarAsync(t));
+    }
     private async Task<SqlConnection> Open(CancellationToken t){var c=new SqlConnection(configuration.GetConnectionString("LaooDatabase"));await c.OpenAsync(t);return c;}
     private bool Scope(out long company,out long user){company=0;user=0;return string.Equals(User.FindFirstValue("user_type"),"COMPANY_USER",StringComparison.OrdinalIgnoreCase)&&long.TryParse(User.FindFirstValue("company_id"),out company)&&long.TryParse(User.FindFirstValue("user_id"),out user)&&company>0&&user>0;}
     private static async Task<string> Caption(SqlConnection c,string menu,CancellationToken t){await using var q=new SqlCommand("SELECT MenuName FROM dbo.TDADMainMenu WHERE MenuCode=@M",c);Add(q,"@M",SqlDbType.Char,menu,5);return Convert.ToString(await q.ExecuteScalarAsync(t))??menu;}

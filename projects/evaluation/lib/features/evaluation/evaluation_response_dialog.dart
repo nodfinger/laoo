@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:laoo_shared_core/laoo_shared_core.dart';
 
 import 'evaluation_feature_host.dart';
+import 'evaluation_popup_theme.dart';
 
 class EvaluationResponseDialog extends StatefulWidget {
   const EvaluationResponseDialog({super.key, required this.roundId});
@@ -37,6 +38,10 @@ class _EvaluationResponseDialogState extends State<EvaluationResponseDialog> {
   }
 
   Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final round = Map<String, dynamic>.from(
         await _api.get('/api/company/evaluations/mine/${widget.roundId}')
@@ -82,8 +87,12 @@ class _EvaluationResponseDialogState extends State<EvaluationResponseDialog> {
         }
       });
     } catch (_) {
-      _error =
-          'ไม่สามารถเปิดแบบประเมินได้\nรายละเอียดเพิ่มเติม: งานอาจปิดแล้วหรือไม่ได้มอบหมายให้บัญชีนี้';
+      if (mounted) {
+        setState(() {
+          _error =
+              'ไม่สามารถเปิดแบบประเมินได้\nรายละเอียดเพิ่มเติม: งานอาจปิดแล้ว ไม่ได้มอบหมายให้บัญชีนี้ หรือการเชื่อมต่อขัดข้อง กรุณาลองอีกครั้ง';
+        });
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -149,62 +158,142 @@ class _EvaluationResponseDialogState extends State<EvaluationResponseDialog> {
   }
 
   @override
-  Widget build(BuildContext context) => Dialog(
-    child: ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 760, maxHeight: 760),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : _round == null
-            ? Text(_error ?? 'ไม่พบแบบประเมิน')
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    _round!['name'] as String,
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  if ((_round!['referenceTitle'] as String?)?.isNotEmpty ??
-                      false)
-                    Text(_round!['referenceTitle'] as String),
-                  const SizedBox(height: 12),
-                  if (_error != null) _ErrorText(text: _error!),
-                  Expanded(
-                    child: ListView.separated(
-                      itemCount: _questions.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 12),
-                      itemBuilder: (_, index) => _QuestionCard(
-                        index: index + 1,
-                        question: _questions[index],
-                        value: _answers[_questions[index]['id']],
-                        onChanged: (value) => setState(
-                          () => _answers[_questions[index]['id'] as String] =
-                              value,
+  Widget build(BuildContext context) => Theme(
+    data: evaluationPopupTheme(context),
+    child: Dialog(
+      backgroundColor: evaluationUiTokens.popupSurfaceColor,
+      surfaceTintColor: evaluationUiTokens.popupSurfaceColor,
+      insetPadding: const EdgeInsets.all(24),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(evaluationUiTokens.radius),
+      ),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 480,
+          maxHeight: MediaQuery.sizeOf(context).height - 48,
+        ),
+        child: Padding(
+          padding: evaluationUiTokens.cardPadding,
+          child: _loading
+              ? const Center(child: CircularProgressIndicator())
+              : _round == null
+              ? Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.rate_review_outlined,
+                          color: evaluationUiTokens.primaryColor,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'ตอบแบบประเมิน',
+                            style: evaluationUiTokens.captionStyle,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Divider(color: evaluationUiTokens.borderColor),
+                    const SizedBox(height: 16),
+                    Text(
+                      _error ??
+                          'ไม่พบแบบประเมิน\nรายละเอียดเพิ่มเติม: กรุณาลองเปิดรายการอีกครั้ง',
+                    ),
+                    const SizedBox(height: 16),
+                    Divider(color: evaluationUiTokens.borderColor),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('ปิด'),
+                        ),
+                        const SizedBox(width: 8),
+                        FilledButton(
+                          onPressed: _load,
+                          child: const Text('ลองอีกครั้ง'),
+                        ),
+                      ],
+                    ),
+                  ],
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: evaluationUiTokens.popupHeaderMinHeight,
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.rate_review_outlined,
+                            color: evaluationUiTokens.primaryColor,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              _round!['name'] as String,
+                              style: evaluationUiTokens.captionStyle,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if ((_round!['referenceTitle'] as String?)?.isNotEmpty ??
+                        false)
+                      Text(_round!['referenceTitle'] as String),
+                    SizedBox(height: evaluationUiTokens.itemSpacing),
+                    Divider(color: evaluationUiTokens.borderColor, height: 1),
+                    SizedBox(height: evaluationUiTokens.popupFieldSpacing),
+                    if (_error != null) _ErrorText(text: _error!),
+                    Expanded(
+                      child: ListView.separated(
+                        itemCount: _questions.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 12),
+                        itemBuilder: (_, index) => _QuestionCard(
+                          index: index + 1,
+                          question: _questions[index],
+                          value: _answers[_questions[index]['id']],
+                          onChanged: (value) => setState(
+                            () => _answers[_questions[index]['id'] as String] =
+                                value,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      OutlinedButton(
-                        onPressed: _saving
-                            ? null
-                            : () => Navigator.pop(context),
-                        child: const Text('ยกเลิก'),
-                      ),
-                      const SizedBox(width: 8),
-                      FilledButton.icon(
-                        onPressed: _saving ? null : _save,
-                        icon: const Icon(Icons.save_outlined),
-                        label: const Text('บันทึกคำตอบ'),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+                    SizedBox(height: evaluationUiTokens.popupFieldSpacing),
+                    Divider(color: evaluationUiTokens.borderColor, height: 1),
+                    SizedBox(height: evaluationUiTokens.itemSpacing),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        SizedBox(
+                          height: evaluationUiTokens.buttonHeight,
+                          child: OutlinedButton(
+                            onPressed: _saving
+                                ? null
+                                : () => Navigator.pop(context),
+                            child: const Text('ยกเลิก'),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        SizedBox(
+                          height: evaluationUiTokens.buttonHeight,
+                          child: FilledButton.icon(
+                            onPressed: _saving ? null : _save,
+                            icon: const Icon(Icons.save_outlined),
+                            label: const Text('บันทึกคำตอบ'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+        ),
       ),
     ),
   );

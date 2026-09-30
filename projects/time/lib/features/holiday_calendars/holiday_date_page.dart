@@ -13,10 +13,16 @@ class HolidayDatePage extends StatefulWidget {
 class _HolidayDatePageState extends State<HolidayDatePage> {
   late final JsonApiClient api;
   Map<String, dynamic>? actions;
+  bool get canCreate =>
+      actions?['screenType'] == 1 && actions?['create'] == true;
+  bool get canEdit => actions?['screenType'] == 1 && actions?['edit'] == true;
+  bool get canDelete =>
+      actions?['screenType'] == 1 && actions?['delete'] == true;
   List<Map<String, dynamic>> calendars = [];
   List<Map<String, dynamic>> items = [];
   int? calendarId;
   int page = 1;
+  int total = 0;
   bool loading = true;
   String? message;
   bool messageError = false;
@@ -39,7 +45,7 @@ class _HolidayDatePageState extends State<HolidayDatePage> {
         await api.get('/api/time/holiday-calendars/dates/actions') as Map,
       );
       final c = Map<String, dynamic>.from(
-        await api.get('/api/time/holiday-calendars') as Map,
+        await api.get('/api/time/holiday-calendars/calendar-options') as Map,
       );
       if (a['view'] != true) throw StateError('ไม่มีสิทธิ์ดูข้อมูลหน้าจอนี้');
       calendars = (c['items'] as List? ?? const [])
@@ -59,7 +65,14 @@ class _HolidayDatePageState extends State<HolidayDatePage> {
 
   Future<void> load({int targetPage = 1}) async {
     if (calendarId == null) {
-      if (mounted) setState(() => loading = false);
+      if (mounted) {
+        setState(() {
+          loading = false;
+          page = 1;
+          total = 0;
+          items = [];
+        });
+      }
       return;
     }
     setState(() => loading = true);
@@ -70,7 +83,7 @@ class _HolidayDatePageState extends State<HolidayDatePage> {
               query: {
                 'holidayCalendarId': '$calendarId',
                 'page': '$targetPage',
-                'pageSize': '30',
+                'pageSize': '$timePageSize',
               },
             )
             as Map,
@@ -78,6 +91,7 @@ class _HolidayDatePageState extends State<HolidayDatePage> {
       if (mounted) {
         setState(() {
           page = (x['page'] as num?)?.toInt() ?? targetPage;
+          total = (x['total'] as num?)?.toInt() ?? 0;
           items = (x['items'] as List? ?? const [])
               .map((e) => Map<String, dynamic>.from(e as Map))
               .toList();
@@ -100,6 +114,7 @@ class _HolidayDatePageState extends State<HolidayDatePage> {
   }
 
   Future<void> edit([Map<String, dynamic>? row]) async {
+    if (row == null ? !canCreate : !canEdit) return;
     if (calendarId == null) return;
     final x = await showDialog<Map<String, dynamic>>(
       context: context,
@@ -124,6 +139,7 @@ class _HolidayDatePageState extends State<HolidayDatePage> {
   }
 
   Future<void> remove(Map<String, dynamic> row) async {
+    if (!canDelete) return;
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => TimeDeleteDialog(
@@ -136,7 +152,7 @@ class _HolidayDatePageState extends State<HolidayDatePage> {
         '/api/time/holiday-calendars/dates/${row['holidayDateId']}',
         query: {'rowVersion': row['rowVersion'].toString()},
       );
-      await load(targetPage: page);
+      await load(targetPage: page > 1 && items.length == 1 ? page - 1 : page);
       showMessage('ลบข้อมูลสำเร็จ', false);
     } catch (e) {
       showMessage(timeErrorText(e), true);
@@ -161,7 +177,7 @@ class _HolidayDatePageState extends State<HolidayDatePage> {
                     api: api,
                     menuCode: TimeMenuCodes.holidayDates,
                     caption: caption,
-                    trailing: actions?['create'] == true
+                    trailing: canCreate
                         ? FilledButton.icon(
                             onPressed: () => edit(),
                             icon: const Icon(Icons.add),
@@ -201,12 +217,14 @@ class _HolidayDatePageState extends State<HolidayDatePage> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 6),
                   Expanded(
                     child: Card(
                       margin: EdgeInsets.zero,
                       child: loading
                           ? const Center(child: CircularProgressIndicator())
+                          : items.isEmpty
+                          ? const Center(child: Text('ไม่พบข้อมูล'))
                           : ListView.separated(
                               padding: timeUiTokens.cardPadding,
                               itemCount: items.length,
@@ -225,19 +243,21 @@ class _HolidayDatePageState extends State<HolidayDatePage> {
                                   ),
                                   trailing: Wrap(
                                     children: [
-                                      if (actions?['edit'] == true)
+                                      if (canEdit)
                                         IconButton(
                                           onPressed: () => edit(x),
                                           tooltip: 'แก้ไข',
                                           icon: const Icon(Icons.edit_outlined),
                                         ),
-                                      if (actions?['delete'] == true)
+                                      if (canDelete)
                                         IconButton(
                                           onPressed: () => remove(x),
                                           tooltip: 'ลบ',
-                                          icon: const Icon(
+                                          icon: Icon(
                                             Icons.delete_outline,
-                                            color: Colors.red,
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.error,
                                           ),
                                         ),
                                     ],
@@ -246,6 +266,20 @@ class _HolidayDatePageState extends State<HolidayDatePage> {
                               },
                             ),
                     ),
+                  ),
+                  const SizedBox(height: 6),
+                  TimePaginationCard(
+                    tokens: timeUiTokens.workspace,
+                    page: page,
+                    pageCount: total == 0 ? 1 : (total / timePageSize).ceil(),
+                    pageSize: timePageSize,
+                    total: total,
+                    onPrevious: page > 1
+                        ? () => load(targetPage: page - 1)
+                        : null,
+                    onNext: page * timePageSize < total
+                        ? () => load(targetPage: page + 1)
+                        : null,
                   ),
                 ],
               ),
@@ -298,49 +332,41 @@ class _HolidayDateDialogState extends State<_HolidayDateDialog> {
   }
 
   @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: const Row(
+  Widget build(BuildContext context) => TimeActionDialog(
+    icon: Icons.event_outlined,
+    title: 'วันหยุดในปฏิทิน > ${widget.value == null ? 'เพิ่ม' : 'แก้ไข'}',
+    content: Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(Icons.event_outlined),
-        SizedBox(width: 8),
-        Text('วันหยุดในปฏิทิน'),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('สถานะ'),
+          value: active,
+          onChanged: (v) => setState(() => active = v),
+        ),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('วันที่'),
+          subtitle: Text(
+            '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}',
+          ),
+          trailing: const Icon(Icons.calendar_today_outlined),
+          onTap: () async {
+            final x = await showDatePicker(
+              context: context,
+              initialDate: date,
+              firstDate: DateTime(2000),
+              lastDate: DateTime(2100),
+            );
+            if (x != null) setState(() => date = x);
+          },
+        ),
+        SizedBox(height: timeUiTokens.popupFieldSpacing),
+        TextField(
+          controller: name,
+          decoration: const InputDecoration(labelText: 'ชื่อวันหยุด *'),
+        ),
       ],
-    ),
-    content: SizedBox(
-      width: 460,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('สถานะ'),
-            value: active,
-            onChanged: (v) => setState(() => active = v),
-          ),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('วันที่'),
-            subtitle: Text(
-              '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}',
-            ),
-            trailing: const Icon(Icons.calendar_today_outlined),
-            onTap: () async {
-              final x = await showDatePicker(
-                context: context,
-                initialDate: date,
-                firstDate: DateTime(2000),
-                lastDate: DateTime(2100),
-              );
-              if (x != null) setState(() => date = x);
-            },
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: name,
-            decoration: const InputDecoration(labelText: 'ชื่อวันหยุด *'),
-          ),
-        ],
-      ),
     ),
     actions: [
       TextButton(

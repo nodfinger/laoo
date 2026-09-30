@@ -9,8 +9,8 @@
 - ใช้พื้นหลังและ Design Token จากส่วนกลางเท่านั้น
 - ส่วน Caption, Filter, Table/List และ Pagination เป็น Card สีขาวเต็มความกว้างของ Content Area
 - Card เชิงโครงสร้างของหน้า List ได้แก่ Caption, Filter, Table/List, Pagination, Empty และ Error ต้องกว้างเท่ากันเสมอ โดย Stretch เต็ม Content Area เดียวกันและขอบซ้าย/ขวาต้องตรงกัน; ห้ามใช้ `Center`, `IntrinsicWidth`, `SizedBox(width: ...)` หรือ `maxWidth` กับตัว Card จน Filter Card หดตามจำนวน Control (กำหนดความกว้างได้เฉพาะ TextBox, ComboBox และปุ่มภายใน Card)
-- Caption Card และ Filter Card ต้องแยกเป็นคนละ Card และเว้นระยะห่าง `6px` พอดี
-- Filter, Table/List และ Pagination ต้องแยกเป็น Card คนละ Section โดยใช้ `LaooLayout.cardSpacing` ระหว่าง Section และใช้เส้น `LaooColors.border` ภายในจุดที่มาตรฐานกำหนด ห้ามใช้กรอบสีสร้างขอบซ้ำ
+- Caption Card, Filter, Table/List และ Pagination ต้องแยกเป็น Card คนละ Section และเว้นระยะ `LaooLayout.listSectionSpacing` (`6px`) พอดีทุกช่วง
+- ใช้เส้น Border จาก User Style ภายในจุดที่มาตรฐานกำหนด ห้ามใช้กรอบสีสร้างขอบซ้ำ
 - Pagination Card ต้องวางใต้ Table/List และแสดงเสมอ แม้มีข้อมูลเพียงหน้าเดียวหรือไม่มีข้อมูล โดยใช้รายละเอียดตาม `PAGINATION_UI_STANDARD.md`
 - Margin ซ้าย บน ขวาของ Content ใช้ `LaooLayout.cardMargin`
 - Card ทุกตัวไม่มีเส้นกรอบสีและใช้มุมโค้ง `LaooRadius.xs`
@@ -26,11 +26,11 @@
 ## Filter Card
 
 - Filter Card ใช้พื้นสีขาวเต็มความกว้าง ไม่มีเส้นกรอบสี และมุมโค้ง `LaooRadius.xs` (`4px`); Responsive โดยใช้ `Wrap` หรือ Layout ที่ไม่ Overflow
-- TextBox ทุกช่องใน Filter Card รวมช่องค้นหา ต้องมี `OutlineInputBorder` เส้นสี `LaooColors.border` และมุมโค้ง `LaooRadius.xs` (`4px`); เมื่อ Focus ใช้เส้นสี Primary ตาม User Style
-- ช่องค้นหากว้างประมาณ `260px`, มี Icon ค้นหาด้านซ้าย และไม่มีปุ่มลูกศรย้อนกลับ/โหลดใหม่ภายในชุด Filter
+- TextBox ทุกช่องใน Filter Card รวมช่องค้นหา ต้องมี `OutlineInputBorder` เส้น Border จาก User Style และมุมโค้ง `LaooRadius.xs` (`4px`); เมื่อ Focus ใช้เส้นสี Primary ตาม User Style
+- ช่องค้นหากว้างประมาณ `280px`, มี Icon ค้นหาด้านซ้าย และไม่มีปุ่มลูกศรย้อนกลับ/โหลดใหม่ภายในชุด Filter
 - ไม่ Auto Search; ค้นหาเมื่อกด Enter หรือปุ่ม `ค้นหา`
 - ปุ่ม `ค้นหา` เป็น Filled สี Primary และปุ่ม `ล้าง Filter` เป็น Outlined สี Primary; ปุ่มสองรายการนี้เป็น Compact Filter Action สูง `40px` เพื่อให้แถบ Filter กระชับ (ปุ่ม Action Form และ Popup ยังคงสูง `48px`)
-- ComboBox ทุกช่องใน Filter Card มี `OutlineInputBorder` เส้นสี `LaooColors.border` มุมโค้ง `LaooRadius.xs` (`4px`) และเมื่อ Focus ใช้เส้นสี Primary ตาม User Style; ความกว้างประมาณ `280px` และแสดงข้อความขนาดตาม Typography กลาง
+- ComboBox ทุกช่องใน Filter Card มี `OutlineInputBorder` เส้น Border จาก User Style มุมโค้ง `LaooRadius.xs` (`4px`) และเมื่อ Focus ใช้เส้นสี Primary ตาม User Style; ความกว้างประมาณ `280px` และแสดงข้อความขนาดตาม Typography กลาง
 - ชุดช่องค้นหา, ปุ่ม `ค้นหา` และปุ่ม `ล้าง Filter` ต้องเป็นกลุ่มเดียวกัน; เมื่อพื้นที่ไม่พอให้ย้ายทั้งชุดพร้อมกัน ห้ามแยกปุ่มไปคนละบรรทัดกับช่องค้นหา
 - ปุ่มทุกปุ่มใช้ Font `13px` และมุมโค้ง `4px`
 
@@ -38,8 +38,8 @@
 
 - ตารางเต็มความกว้างและ Scroll แนวนอนได้เมื่อจำเป็น
 - ไม่มีกรอบสีรอบนอก
-- หัวตารางใช้พื้น Primary ความทึบประมาณ `10%`; ข้อความหัวตารางใช้ Primary ขนาด `13px` น้ำหนัก `700`
-- ข้อความข้อมูลใช้ `13px`; เส้นคั่นแต่ละแถวใช้ `LaooColors.border` แบบบางและอ่อน
+- หัวตารางใช้พื้น Primary ความทึบประมาณ `10%`; ข้อความหัวตารางใช้ Primary ขนาด `14px` น้ำหนัก `700`
+- ข้อความข้อมูลใช้ `14px`; เส้นคั่นแต่ละแถวใช้ Border จาก User Style แบบบางและอ่อน
 - Table/List ต้องมีเส้นคั่นแนวนอนระหว่างหัวตารางและข้อมูล และใต้ข้อมูลทุกแถวรวมแถวสุดท้ายเสมอ โดยใช้ `LaooColors.border` ขนาด `1px` ซึ่งเป็นสีเทาจางมาก; ห้ามใช้เส้นเข้ม, เส้นสี Primary หรือเส้นแนวตั้งเพื่อแบ่งคอลัมน์ และห้ามสร้างกรอบรอบนอกของตาราง
 - คอลัมน์แรกเป็น `ID` เรียงตามลำดับรายการ และคอลัมน์ที่สองเป็น `Action`
 - Action และ Icon จัดกึ่งกลาง; Edit ใช้ Primary, Delete ใช้สีแดง และแสดงตาม Permission
@@ -49,7 +49,7 @@
 
 - เมื่อ Content Area กว้างน้อยกว่า `900px` ให้เปลี่ยนเป็น Card Mode อัตโนมัติ
 - Card Mode ใช้ Card สีขาว ไม่มีเส้นกรอบสี และข้อมูล/Action ต้องไม่ Overflow
-- ระยะห่างระหว่าง Card แต่ละรายการต้องเท่ากับ `6px` พอดี
+- ระยะห่างระหว่าง Card แต่ละรายการต้องใช้ `LaooLayout.listItemSpacing` (`6px`) พอดี
 - ให้ใช้ `ListView.separated`, `GridView` หรือ Layout ที่ได้ระยะเท่ากัน และตั้ง `Card.margin` เป็นศูนย์เมื่อจำเป็น
 - ห้ามพึ่ง `Card` default margin เพราะจะทำให้ระยะจริงคลาดเคลื่อน
 - ถ้าหน้าจอแคบจนบังคับ Card Mode ต้องซ่อนปุ่มสลับ List/Card; ปุ่มสลับแสดงเฉพาะหน้าจอกว้างปกติ
@@ -57,5 +57,5 @@
 ## Prompt สำหรับส่งให้ AI
 
 ```text
-ปรับหน้า List/Card นี้ตาม docs/standards/UX_UI_STANDARD.md, LIST_CARD_UI_STANDARD.md, PAGINATION_UI_STANDARD.md และ TYPOGRAPHY_STANDARD.md ใช้ Caption จาก MenuName, Caption Card กับ Filter Card ห่างกัน 6px, Card สีขาวไม่มีกรอบสี, Caption/Filter/Table/Pagination/Empty/Error ต้อง Stretch เต็ม Content Area เดียวกันและขอบซ้าย-ขวาตรงกัน ห้ามให้ Filter Card หดหรืออยู่กึ่งกลางตามจำนวน Control, Table/List ต้องมีเส้นคั่นแนวนอนสี LaooColors.border ขนาด 1px ระหว่างหัวตารางและทุกแถว โดยไม่มีเส้นแนวตั้งหรือกรอบรอบนอก, TextBox และ ComboBox ใน Filter ใช้ OutlineInputBorder สี LaooColors.border มุมโค้ง 4px และ Focus สี Primary, ชุดค้นหา/ค้นหา/ล้าง Filter ห้ามแยกคนละบรรทัด, Filter/Table/Pagination เต็มความกว้าง, Action ตาม Permission และ User Style เมื่อหน้าจอแคบกว่า 900px ให้เป็น Card Mode อัตโนมัติ โดย Card รายการแต่ละใบห่างกัน 6px พอดี ห้ามพึ่ง Card default margin ห้ามแก้ API, SQL, Repository หรือ Business Logic และต้องตรวจ Responsive, Overflow, dart format และ dart analyze
+ปรับหน้า List/Card นี้ตาม docs/standards/UX_UI_STANDARD.md, LIST_CARD_UI_STANDARD.md, PAGINATION_UI_STANDARD.md และ TYPOGRAPHY_STANDARD.md ใช้ Caption จาก MenuName, Card ทุก Section ห่างกัน 6px, Surface/Primary/Text/Border อ่านจาก User Style, Caption/Filter/Table/Pagination/Empty/Error ต้อง Stretch เต็ม Content Area เดียวกันและขอบซ้าย-ขวาตรงกัน ห้ามให้ Filter Card หดหรืออยู่กึ่งกลางตามจำนวน Control, Table/List ต้องมีเส้นคั่นแนวนอน Border จาก User Style ขนาด 1px ระหว่างหัวตารางและทุกแถว โดยไม่มีเส้นแนวตั้งหรือกรอบรอบนอก, TextBox และ ComboBox ใน Filter ใช้ OutlineInputBorder มุมโค้ง 4px และ Focus สี Primary, ชุดค้นหา/ค้นหา/ล้าง Filter ห้ามแยกคนละบรรทัด, Filter/Table/Pagination เต็มความกว้าง, Action ตาม Permission และ User Style เมื่อหน้าจอแคบกว่า 900px ให้เป็น Card Mode อัตโนมัติ โดย Card รายการแต่ละใบห่างกัน 6px พอดี ห้ามพึ่ง Card default margin ห้ามแก้ API, SQL, Repository หรือ Business Logic และต้องตรวจ Responsive, Overflow, dart format และ dart analyze
 ```

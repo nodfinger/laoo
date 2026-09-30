@@ -3,26 +3,33 @@ import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../../app/theme/laoo_design_tokens.dart';
+import '../../../app/theme/laoo_typography.dart';
 import '../../../core/api/api_exception.dart';
+import '../../../core/navigation/navigation_menu_repository.dart';
 import '../../../core/widgets/timed_snack_bar.dart';
 import '../../support/presentation/widgets/support_workspace_shell.dart';
 import '../data/service_request_qr_api.dart';
 
 class ServiceRequestQrPage extends StatefulWidget {
-  const ServiceRequestQrPage({super.key});
+  const ServiceRequestQrPage({super.key, this.api, this.menuName});
+  final ServiceRequestQrApi? api;
+  final String? menuName;
 
   @override
   State<ServiceRequestQrPage> createState() => _ServiceRequestQrPageState();
 }
 
 class _ServiceRequestQrPageState extends State<ServiceRequestQrPage> {
-  final _api = ServiceRequestQrApi();
+  late final ServiceRequestQrApi _api = widget.api ?? ServiceRequestQrApi();
   final _search = TextEditingController();
   String _status = '';
   int _page = 1;
   bool _loading = true;
+  String? _error;
   bool _canCreate = false;
   bool _canEdit = false;
+  bool _canDelete = false;
+  String _menuName = 'จัดการ QR Code แจ้งซ่อม';
   Map<String, dynamic> _data = const {'items': <dynamic>[], 'total': 0};
 
   @override
@@ -30,6 +37,16 @@ class _ServiceRequestQrPageState extends State<ServiceRequestQrPage> {
     super.initState();
     _load();
     _loadActions();
+    if (widget.menuName != null) {
+      _menuName = widget.menuName!;
+    } else {
+      NavigationMenuRepository()
+          .resolveMenuName(menuCode: '15002', fallback: _menuName)
+          .then((name) {
+            if (mounted) setState(() => _menuName = name);
+          })
+          .catchError((Object _) {});
+    }
   }
 
   @override
@@ -39,7 +56,10 @@ class _ServiceRequestQrPageState extends State<ServiceRequestQrPage> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final value = await _api.list(
         search: _search.text.trim(),
@@ -48,7 +68,13 @@ class _ServiceRequestQrPageState extends State<ServiceRequestQrPage> {
       );
       if (mounted) setState(() => _data = value);
     } catch (error) {
-      if (mounted) _message(error);
+      if (mounted) {
+        setState(
+          () => _error = error is ApiException
+              ? '${error.message}\nรายละเอียดเพิ่มเติม: ${error.description ?? 'กรุณาตรวจสอบข้อมูลและลองอีกครั้ง'}'
+              : 'โหลดรายการ QR Code ไม่สำเร็จ\nรายละเอียดเพิ่มเติม: กรุณาตรวจสอบการเชื่อมต่อและลองอีกครั้ง',
+        );
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -59,8 +85,10 @@ class _ServiceRequestQrPageState extends State<ServiceRequestQrPage> {
       final actions = await _api.actions();
       if (mounted) {
         setState(() {
-          _canCreate = actions['create'] == true;
-          _canEdit = actions['edit'] == true;
+          final isCrud = actions['screenType'] == 1;
+          _canCreate = isCrud && actions['create'] == true;
+          _canEdit = isCrud && actions['edit'] == true;
+          _canDelete = isCrud && actions['delete'] == true;
         });
       }
     } catch (_) {}
@@ -77,9 +105,18 @@ class _ServiceRequestQrPageState extends State<ServiceRequestQrPage> {
     try {
       final choices = await _api.lookup();
       if (!mounted) return;
+      if (choices.isEmpty) {
+        showTimedSnackBar(
+          context,
+          message:
+              'ไม่มีอุปกรณ์ที่สร้าง QR Code ใหม่ได้ กรุณาตรวจสอบรายการ QR เดิมหรือสถานะอุปกรณ์',
+        );
+        return;
+      }
       final created = await showDialog<Map<String, dynamic>>(
         context: context,
-        builder: (_) => _CreateQrDialog(api: _api, choices: choices),
+        builder: (_) =>
+            _CreateQrDialog(api: _api, choices: choices, menuName: _menuName),
       );
       if (created == null || !mounted) return;
       await _load();
@@ -98,18 +135,37 @@ class _ServiceRequestQrPageState extends State<ServiceRequestQrPage> {
     );
   }
 
-  Future<void> _setActive(Map<String, dynamic> row) async {
+  Future<void> _edit(Map<String, dynamic> row) async {
     final id = (row['qrPortalId'] as num?)?.toInt();
-    if (id == null) return;
+    if (id == null || !_canEdit) return;
+    final active = await showDialog<bool>(
+      context: context,
+      builder: (_) => _EditQrDialog(row: row, menuName: _menuName),
+    );
+    if (active == null || !mounted) return;
     try {
-      await _api.setActive(id, row['isActive'] != true);
+      await _api.setActive(id, active);
       if (!mounted) return;
-      showTimedSnackBar(
-        context,
-        message: row['isActive'] == true
-            ? 'ปิดใช้งาน QR Code แล้ว'
-            : 'เปิดใช้งาน QR Code แล้ว',
-      );
+      showTimedSnackBar(context, message: 'แก้ไขสถานะ QR Code แล้ว');
+      await _load();
+    } catch (error) {
+      if (mounted) _message(error);
+    }
+  }
+
+  Future<void> _delete(Map<String, dynamic> row) async {
+    final id = (row['qrPortalId'] as num?)?.toInt();
+    if (id == null || !_canDelete) return;
+    final confirmed = await _confirmQrDelete(
+      context,
+      '${row['itemCode'] ?? '-'} / ${row['serialNo'] ?? '-'}',
+    );
+    if (!confirmed || !mounted) return;
+    try {
+      await _api.delete(id);
+      if (!mounted) return;
+      showTimedSnackBar(context, message: 'ลบ QR Code แล้ว');
+      if (_page > 1 && ((_data['items'] as List?)?.length ?? 0) == 1) _page--;
       await _load();
     } catch (error) {
       if (mounted) _message(error);
@@ -123,7 +179,7 @@ class _ServiceRequestQrPageState extends State<ServiceRequestQrPage> {
         .toList();
     final total = (_data['total'] as num?)?.toInt() ?? 0;
     return SupportWorkspaceShell(
-      pageTitle: 'จัดการ QR Code แจ้งซ่อม',
+      pageTitle: _menuName,
       activeMenu: 'cmQrPortal',
       menuScope: WorkspaceMenuScope.company,
       child: Padding(
@@ -131,38 +187,92 @@ class _ServiceRequestQrPageState extends State<ServiceRequestQrPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            Card(
+              margin: EdgeInsets.zero,
+              child: Padding(
+                padding: const EdgeInsets.all(LaooLayout.cardPadding),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.star_border,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(width: LaooLayout.cardPadding),
+                    Expanded(
+                      child: Text(
+                        _menuName,
+                        style: LaooTypography.screenCaptionStyle,
+                      ),
+                    ),
+                    if (_canCreate)
+                      FilledButton.icon(
+                        onPressed: _loading ? null : _create,
+                        icon: const Icon(Icons.add),
+                        label: const Text('เพิ่ม'),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: LaooLayout.listSectionSpacing),
             _toolbar(total),
-            const SizedBox(height: LaooLayout.cardSpacing),
+            const SizedBox(height: LaooLayout.listSectionSpacing),
             Expanded(
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
+                  : _error != null
+                  ? Card(
+                      margin: EdgeInsets.zero,
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(_error!, textAlign: TextAlign.center),
+                            const SizedBox(height: LaooLayout.cardPadding),
+                            OutlinedButton(
+                              onPressed: _load,
+                              child: const Text('ลองอีกครั้ง'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
                   : items.isEmpty
-                  ? const Center(child: Text('ยังไม่มี QR Code แจ้งซ่อม'))
+                  ? const Card(
+                      margin: EdgeInsets.zero,
+                      child: Center(child: Text('ยังไม่มี QR Code แจ้งซ่อม')),
+                    )
                   : LayoutBuilder(
                       builder: (context, constraints) =>
                           constraints.maxWidth < 900
                           ? ListView.separated(
                               itemCount: items.length,
-                              separatorBuilder: (_, _) =>
-                                  const SizedBox(height: 8),
+                              separatorBuilder: (_, _) => const SizedBox(
+                                height: LaooLayout.listItemSpacing,
+                              ),
                               itemBuilder: (_, index) => _QrCard(
                                 row: items[index],
                                 canEdit: _canEdit,
+                                canDelete: _canDelete,
                                 onShow: () => _showQr(
                                   items[index]['qrToken']?.toString() ?? '',
                                 ),
-                                onToggle: () => _setActive(items[index]),
+                                onEdit: () => _edit(items[index]),
+                                onDelete: () => _delete(items[index]),
                               ),
                             )
                           : _QrTable(
                               items: items,
                               canEdit: _canEdit,
+                              canDelete: _canDelete,
                               onShow: (row) =>
                                   _showQr(row['qrToken']?.toString() ?? ''),
-                              onToggle: _setActive,
+                              onEdit: _edit,
+                              onDelete: _delete,
                             ),
                     ),
             ),
+            const SizedBox(height: LaooLayout.listSectionSpacing),
             _Pagination(
               page: _page,
               total: total,
@@ -172,7 +282,7 @@ class _ServiceRequestQrPageState extends State<ServiceRequestQrPage> {
                       _load();
                     }
                   : null,
-              onNext: items.length >= 20
+              onNext: _page * 20 < total
                   ? () {
                       setState(() => _page++);
                       _load();
@@ -211,6 +321,7 @@ class _ServiceRequestQrPageState extends State<ServiceRequestQrPage> {
           SizedBox(
             width: 170,
             child: DropdownButtonFormField<String>(
+              isExpanded: true,
               initialValue: _status,
               decoration: const InputDecoration(labelText: 'สถานะ'),
               items: const [
@@ -245,12 +356,6 @@ class _ServiceRequestQrPageState extends State<ServiceRequestQrPage> {
             icon: const Icon(Icons.filter_alt_off_outlined),
             label: const Text('ล้าง Filter'),
           ),
-          if (_canCreate)
-            FilledButton.icon(
-              onPressed: _loading ? null : _create,
-              icon: const Icon(Icons.qr_code_2),
-              label: const Text('สร้าง QR Code'),
-            ),
           Text('ทั้งหมด $total รายการ'),
         ],
       ),
@@ -262,13 +367,17 @@ class _QrTable extends StatelessWidget {
   const _QrTable({
     required this.items,
     required this.canEdit,
+    required this.canDelete,
     required this.onShow,
-    required this.onToggle,
+    required this.onEdit,
+    required this.onDelete,
   });
   final List<Map<String, dynamic>> items;
   final bool canEdit;
+  final bool canDelete;
   final ValueChanged<Map<String, dynamic>> onShow;
-  final ValueChanged<Map<String, dynamic>> onToggle;
+  final ValueChanged<Map<String, dynamic>> onEdit;
+  final ValueChanged<Map<String, dynamic>> onDelete;
 
   @override
   Widget build(BuildContext context) => Card(
@@ -277,16 +386,48 @@ class _QrTable extends StatelessWidget {
       scrollDirection: Axis.horizontal,
       child: DataTable(
         columns: const [
+          DataColumn(label: Text('ID')),
+          DataColumn(label: Text('Action')),
           DataColumn(label: Text('QR Code')),
           DataColumn(label: Text('อุปกรณ์ / Serial')),
           DataColumn(label: Text('สถานที่')),
           DataColumn(label: Text('สถานะ')),
-          DataColumn(label: Text('Action')),
         ],
         rows: [
           for (final row in items)
             DataRow(
               cells: [
+                DataCell(Text('${row['qrPortalId']}')),
+                DataCell(
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        tooltip: 'แสดง QR Code',
+                        onPressed: () => onShow(row),
+                        icon: const Icon(Icons.qr_code_2),
+                      ),
+                      if (canEdit)
+                        IconButton(
+                          tooltip: 'แก้ไข QR Code',
+                          onPressed: () => onEdit(row),
+                          icon: Icon(
+                            Icons.edit_outlined,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
+                      if (canDelete)
+                        IconButton(
+                          tooltip: 'ลบ QR Code',
+                          onPressed: () => onDelete(row),
+                          icon: Icon(
+                            Icons.delete_outline,
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
                 DataCell(Text(_tokenLabel(row['qrToken']))),
                 DataCell(
                   SizedBox(
@@ -308,30 +449,6 @@ class _QrTable extends StatelessWidget {
                   ),
                 ),
                 DataCell(_StatusChip(active: row['isActive'] == true)),
-                DataCell(
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        tooltip: 'แสดง QR Code',
-                        onPressed: () => onShow(row),
-                        icon: const Icon(Icons.qr_code_2),
-                      ),
-                      if (canEdit)
-                        IconButton(
-                          tooltip: row['isActive'] == true
-                              ? 'ปิดใช้งาน'
-                              : 'เปิดใช้งาน',
-                          onPressed: () => onToggle(row),
-                          icon: Icon(
-                            row['isActive'] == true
-                                ? Icons.toggle_on_outlined
-                                : Icons.toggle_off_outlined,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
               ],
             ),
         ],
@@ -344,13 +461,17 @@ class _QrCard extends StatelessWidget {
   const _QrCard({
     required this.row,
     required this.canEdit,
+    required this.canDelete,
     required this.onShow,
-    required this.onToggle,
+    required this.onEdit,
+    required this.onDelete,
   });
   final Map<String, dynamic> row;
   final bool canEdit;
+  final bool canDelete;
   final VoidCallback onShow;
-  final VoidCallback onToggle;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
   @override
   Widget build(BuildContext context) => Card(
     margin: EdgeInsets.zero,
@@ -386,15 +507,23 @@ class _QrCard extends StatelessWidget {
                 label: const Text('แสดง QR'),
               ),
               if (canEdit)
-                FilledButton.icon(
-                  onPressed: onToggle,
+                OutlinedButton.icon(
+                  onPressed: onEdit,
+                  icon: const Icon(Icons.edit_outlined),
+                  label: const Text('แก้ไข'),
+                ),
+              if (canDelete)
+                OutlinedButton.icon(
+                  onPressed: onDelete,
                   icon: Icon(
-                    row['isActive'] == true
-                        ? Icons.block_outlined
-                        : Icons.check_circle_outline,
+                    Icons.delete_outline,
+                    color: Theme.of(context).colorScheme.error,
                   ),
                   label: Text(
-                    row['isActive'] == true ? 'ปิดใช้งาน' : 'เปิดใช้งาน',
+                    'ลบ',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
                   ),
                 ),
             ],
@@ -430,22 +559,260 @@ class _Pagination extends StatelessWidget {
   final VoidCallback? onPrevious;
   final VoidCallback? onNext;
   @override
-  Widget build(BuildContext context) => SizedBox(
-    height: LaooLayout.paginationCardHeight,
-    child: Row(
-      children: [
-        IconButton(onPressed: onPrevious, icon: const Icon(Icons.chevron_left)),
-        Text('หน้า $page · $total รายการ'),
-        IconButton(onPressed: onNext, icon: const Icon(Icons.chevron_right)),
+  Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
+    final first = total == 0 ? 0 : (page - 1) * 20 + 1;
+    final last = total == 0 ? 0 : (page * 20).clamp(0, total);
+    return Card(
+      margin: EdgeInsets.zero,
+      child: SizedBox(
+        height: LaooLayout.paginationCardHeight,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: LaooLayout.cardPadding,
+          ),
+          child: Row(
+            children: [
+              _pageButton(
+                context,
+                icon: Icons.chevron_left,
+                onPressed: onPrevious,
+              ),
+              const SizedBox(width: LaooLayout.listSectionSpacing),
+              SizedBox(
+                width: LaooLayout.paginationButtonSize,
+                height: LaooLayout.paginationButtonSize,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: primary,
+                    borderRadius: BorderRadius.circular(LaooRadius.xs),
+                  ),
+                  child: Center(
+                    child: Text(
+                      '$page',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onPrimary,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: LaooLayout.listSectionSpacing),
+              _pageButton(
+                context,
+                icon: Icons.chevron_right,
+                onPressed: onNext,
+              ),
+              const SizedBox(width: 12),
+              Flexible(
+                child: Text(
+                  '$first-$last จาก $total',
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _pageButton(
+    BuildContext context, {
+    required IconData icon,
+    VoidCallback? onPressed,
+  }) {
+    final color = onPressed == null
+        ? Theme.of(context).colorScheme.outline
+        : Theme.of(context).colorScheme.primary;
+    return SizedBox(
+      width: LaooLayout.paginationButtonSize,
+      height: LaooLayout.paginationButtonSize,
+      child: OutlinedButton(
+        onPressed: onPressed,
+        style: OutlinedButton.styleFrom(
+          padding: EdgeInsets.zero,
+          side: BorderSide(color: color),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(LaooRadius.xs),
+          ),
+        ),
+        child: Icon(icon, size: 18, color: color),
+      ),
+    );
+  }
+}
+
+class _EditQrDialog extends StatefulWidget {
+  const _EditQrDialog({required this.row, required this.menuName});
+  final Map<String, dynamic> row;
+  final String menuName;
+
+  @override
+  State<_EditQrDialog> createState() => _EditQrDialogState();
+}
+
+class _EditQrDialogState extends State<_EditQrDialog> {
+  late bool _active = widget.row['isActive'] == true;
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
+    return AlertDialog(
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      insetPadding: const EdgeInsets.all(LaooLayout.dialogInsetPadding),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(LaooRadius.xs),
+      ),
+      title: Column(
+        children: [
+          SizedBox(
+            height: LaooLayout.popupHeaderMinHeight,
+            child: Row(
+              children: [
+                Icon(Icons.edit_outlined, color: primary),
+                const SizedBox(width: LaooLayout.cardPadding),
+                Expanded(
+                  child: Text(
+                    '${widget.menuName} > แก้ไข',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(color: LaooColors.border, height: 1),
+        ],
+      ),
+      content: SizedBox(
+        width: 440,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Text('สถานะ'),
+                Switch(
+                  value: _active,
+                  onChanged: (value) => setState(() => _active = value),
+                ),
+              ],
+            ),
+            const SizedBox(height: LaooLayout.popupFieldSpacing),
+            Text(
+              'อุปกรณ์: ${widget.row['itemCode'] ?? '-'} | ${widget.row['itemName'] ?? '-'}',
+            ),
+            const SizedBox(height: LaooLayout.popupFieldSpacing),
+            Text('Serial: ${widget.row['serialNo'] ?? '-'}'),
+            const SizedBox(height: LaooLayout.popupFieldSpacing),
+            Text('สถานที่: ${widget.row['locationSnapshot'] ?? '-'}'),
+            const SizedBox(height: LaooLayout.popupFieldSpacing),
+            const Text(
+              'QR Code ผูกกับอุปกรณ์เดิม หากต้องการเปลี่ยนอุปกรณ์ให้ลบรายการนี้แล้วสร้างใหม่',
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        const SizedBox(
+          width: double.infinity,
+          child: Divider(color: LaooColors.border, height: 1),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('ยกเลิก'),
+        ),
+        FilledButton.icon(
+          onPressed: () => Navigator.pop(context, _active),
+          icon: const Icon(Icons.save_outlined),
+          label: const Text('บันทึก'),
+        ),
       ],
-    ),
-  );
+    );
+  }
+}
+
+Future<bool> _confirmQrDelete(BuildContext context, String name) async {
+  final error = Theme.of(context).colorScheme.error;
+  return await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+          insetPadding: const EdgeInsets.all(LaooLayout.dialogInsetPadding),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(LaooRadius.xs),
+            side: BorderSide(color: error),
+          ),
+          title: Column(
+            children: [
+              SizedBox(
+                height: LaooLayout.popupHeaderMinHeight,
+                child: Row(
+                  children: [
+                    Icon(Icons.delete_outline, color: error),
+                    const SizedBox(width: LaooLayout.cardPadding),
+                    Expanded(
+                      child: Text(
+                        'ยืนยันการลบข้อมูล',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: error,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(color: LaooColors.border, height: 1),
+            ],
+          ),
+          content: Container(
+            padding: const EdgeInsets.all(LaooLayout.cardPadding),
+            decoration: BoxDecoration(
+              color: error.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(LaooRadius.xs),
+            ),
+            child: Text(
+              'ลบ QR Code ของ $name ถาวรใช่หรือไม่? QR ที่ลบแล้วจะสแกนใช้งานไม่ได้และไม่สามารถเรียกคืนได้',
+            ),
+          ),
+          actions: [
+            const SizedBox(
+              width: double.infinity,
+              child: Divider(color: LaooColors.border, height: 1),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('ยกเลิก'),
+            ),
+            FilledButton.icon(
+              style: FilledButton.styleFrom(backgroundColor: error),
+              onPressed: () => Navigator.pop(dialogContext, true),
+              icon: const Icon(Icons.delete_outline),
+              label: const Text('ลบ'),
+            ),
+          ],
+        ),
+      ) ??
+      false;
 }
 
 class _CreateQrDialog extends StatefulWidget {
-  const _CreateQrDialog({required this.api, required this.choices});
+  const _CreateQrDialog({
+    required this.api,
+    required this.choices,
+    required this.menuName,
+  });
   final ServiceRequestQrApi api;
   final List<Map<String, dynamic>> choices;
+  final String menuName;
   @override
   State<_CreateQrDialog> createState() => _CreateQrDialogState();
 }
@@ -455,21 +822,41 @@ class _CreateQrDialogState extends State<_CreateQrDialog> {
   bool _saving = false;
   @override
   Widget build(BuildContext context) => AlertDialog(
-    insetPadding: const EdgeInsets.all(16),
-    title: const Row(
+    backgroundColor: Colors.white,
+    surfaceTintColor: Colors.transparent,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(LaooRadius.xs),
+    ),
+    insetPadding: const EdgeInsets.all(LaooLayout.dialogInsetPadding),
+    title: Column(
       children: [
-        Icon(Icons.qr_code_2),
-        SizedBox(width: 8),
-        Expanded(child: Text('สร้าง QR Code แจ้งซ่อม')),
+        SizedBox(
+          height: LaooLayout.popupHeaderMinHeight,
+          child: Row(
+            children: [
+              Icon(
+                Icons.qr_code_2,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(width: LaooLayout.cardPadding),
+              Expanded(
+                child: Text(
+                  '${widget.menuName} > เพิ่ม',
+                  style: LaooTypography.screenCaptionStyle,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const Divider(color: LaooColors.border, height: 1),
       ],
     ),
     content: SizedBox(
-      width: 520,
+      width: 440,
       child: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Divider(),
             DropdownButtonFormField<int>(
               isExpanded: true,
               decoration: const InputDecoration(
@@ -500,6 +887,10 @@ class _CreateQrDialogState extends State<_CreateQrDialog> {
       ),
     ),
     actions: [
+      const SizedBox(
+        width: double.infinity,
+        child: Divider(color: LaooColors.border, height: 1),
+      ),
       TextButton(
         onPressed: _saving ? null : () => Navigator.pop(context),
         child: const Text('ยกเลิก'),
@@ -553,12 +944,33 @@ class _QrDialog extends StatelessWidget {
       '${Uri.base.scheme}://${Uri.base.authority}/#/portal/request?qr=$token';
   @override
   Widget build(BuildContext context) => AlertDialog(
-    insetPadding: const EdgeInsets.all(16),
-    title: const Row(
+    backgroundColor: Colors.white,
+    surfaceTintColor: Colors.transparent,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(LaooRadius.xs),
+    ),
+    insetPadding: const EdgeInsets.all(LaooLayout.dialogInsetPadding),
+    title: Column(
       children: [
-        Icon(Icons.qr_code_2),
-        SizedBox(width: 8),
-        Expanded(child: Text('QR Code แจ้งซ่อม')),
+        SizedBox(
+          height: LaooLayout.popupHeaderMinHeight,
+          child: Row(
+            children: [
+              Icon(
+                Icons.qr_code_2,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(width: LaooLayout.cardPadding),
+              Expanded(
+                child: Text(
+                  'QR Code แจ้งซ่อม',
+                  style: LaooTypography.screenCaptionStyle,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const Divider(color: LaooColors.border, height: 1),
       ],
     ),
     content: SizedBox(
@@ -567,7 +979,6 @@ class _QrDialog extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Divider(),
             Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 300),
@@ -588,6 +999,10 @@ class _QrDialog extends StatelessWidget {
       ),
     ),
     actions: [
+      const SizedBox(
+        width: double.infinity,
+        child: Divider(color: LaooColors.border, height: 1),
+      ),
       TextButton(
         onPressed: () => Navigator.pop(context),
         child: const Text('ปิด'),

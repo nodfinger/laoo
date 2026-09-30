@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 
+import 'evaluation_feature_host.dart';
+import 'evaluation_popup_theme.dart';
+
 class EvaluationTemplateDialog extends StatefulWidget {
   const EvaluationTemplateDialog({
     super.key,
+    required this.title,
     this.initial,
     this.readOnly = false,
   });
+  final String title;
   final Map<String, dynamic>? initial;
   final bool readOnly;
 
@@ -86,137 +91,180 @@ class _EvaluationTemplateDialogState extends State<EvaluationTemplateDialog> {
   }
 
   @override
-  Widget build(BuildContext context) => Dialog(
-    child: ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 760, maxHeight: 760),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'แบบประเมิน > ${widget.readOnly
-                    ? 'ดู'
-                    : widget.initial == null
-                    ? 'เพิ่ม'
-                    : 'แก้ไข'}',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _code,
-                maxLength: 30,
-                decoration: const InputDecoration(
-                  labelText: 'รหัสแบบประเมิน *',
+  Widget build(BuildContext context) => Theme(
+    data: evaluationPopupTheme(context),
+    child: Dialog(
+      backgroundColor: evaluationUiTokens.popupSurfaceColor,
+      surfaceTintColor: evaluationUiTokens.popupSurfaceColor,
+      insetPadding: const EdgeInsets.all(24),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(evaluationUiTokens.radius),
+      ),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 480,
+          maxHeight: MediaQuery.sizeOf(context).height - 48,
+        ),
+        child: Padding(
+          padding: evaluationUiTokens.cardPadding,
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight: evaluationUiTokens.popupHeaderMinHeight,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.fact_check_outlined,
+                        color: evaluationUiTokens.primaryColor,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          '${widget.title} > ${widget.readOnly
+                              ? 'ดู'
+                              : widget.initial == null
+                              ? 'เพิ่ม'
+                              : 'แก้ไข'}',
+                          style: evaluationUiTokens.captionStyle,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                readOnly: widget.readOnly,
-                validator: widget.readOnly
-                    ? null
-                    : (value) => value == null || value.trim().isEmpty
-                          ? 'กรุณาระบุรหัส'
-                          : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _name,
-                maxLength: 200,
-                decoration: const InputDecoration(
-                  labelText: 'ชื่อแบบประเมิน *',
+                Divider(color: evaluationUiTokens.borderColor, height: 1),
+                SizedBox(height: evaluationUiTokens.popupFieldSpacing),
+                TextFormField(
+                  controller: _code,
+                  maxLength: 30,
+                  decoration: const InputDecoration(
+                    labelText: 'รหัสแบบประเมิน *',
+                  ),
+                  readOnly: widget.readOnly,
+                  validator: widget.readOnly
+                      ? null
+                      : (value) => value == null || value.trim().isEmpty
+                            ? 'กรุณาระบุรหัส'
+                            : null,
                 ),
-                readOnly: widget.readOnly,
-                validator: widget.readOnly
-                    ? null
-                    : (value) => value == null || value.trim().isEmpty
-                          ? 'กรุณาระบุชื่อ'
-                          : null,
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                initialValue: _source,
-                decoration: const InputDecoration(labelText: 'ประเภทงาน *'),
-                items: const [
-                  DropdownMenuItem(
-                    value: 'TRAINING_COURSE',
-                    child: Text('หลักสูตรอบรม'),
+                SizedBox(height: evaluationUiTokens.popupFieldSpacing),
+                TextFormField(
+                  controller: _name,
+                  maxLength: 200,
+                  decoration: const InputDecoration(
+                    labelText: 'ชื่อแบบประเมิน *',
                   ),
-                  DropdownMenuItem(
-                    value: 'TRAINING_INSTRUCTOR',
-                    child: Text('วิทยากร'),
-                  ),
-                  DropdownMenuItem(
-                    value: 'MEETING_ROOM',
-                    child: Text('ห้องประชุม'),
-                  ),
-                  DropdownMenuItem(value: 'VENDOR', child: Text('Vendor')),
-                  DropdownMenuItem(value: 'SERVICE', child: Text('งานบริการ')),
-                  DropdownMenuItem(value: 'GENERAL', child: Text('ทั่วไป')),
-                ],
-                onChanged: widget.readOnly
-                    ? null
-                    : (value) => setState(() => _source = value ?? _source),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'คำถาม',
-                      style: Theme.of(context).textTheme.titleMedium,
+                  readOnly: widget.readOnly,
+                  validator: widget.readOnly
+                      ? null
+                      : (value) => value == null || value.trim().isEmpty
+                            ? 'กรุณาระบุชื่อ'
+                            : null,
+                ),
+                SizedBox(height: evaluationUiTokens.popupFieldSpacing),
+                DropdownButtonFormField<String>(
+                  initialValue: _source,
+                  decoration: const InputDecoration(labelText: 'ประเภทงาน *'),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'TRAINING_COURSE',
+                      child: Text('หลักสูตรอบรม'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'TRAINING_INSTRUCTOR',
+                      child: Text('วิทยากร'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'MEETING_ROOM',
+                      child: Text('ห้องประชุม'),
+                    ),
+                    DropdownMenuItem(value: 'VENDOR', child: Text('Vendor')),
+                    DropdownMenuItem(
+                      value: 'SERVICE',
+                      child: Text('งานบริการ'),
+                    ),
+                    DropdownMenuItem(value: 'GENERAL', child: Text('ทั่วไป')),
+                  ],
+                  onChanged: widget.readOnly
+                      ? null
+                      : (value) => setState(() => _source = value ?? _source),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'คำถาม',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: widget.readOnly
+                          ? null
+                          : () => setState(
+                              () => _questions.add(_QuestionDraft()),
+                            ),
+                      icon: const Icon(Icons.add),
+                      label: const Text('เพิ่มคำถาม'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: ListView.separated(
+                    itemCount: _questions.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 10),
+                    itemBuilder: (_, index) => _QuestionEditor(
+                      index: index,
+                      draft: _questions[index],
+                      readOnly: widget.readOnly,
+                      canDelete: !widget.readOnly && _questions.length > 1,
+                      onDelete: () => setState(() {
+                        _questions[index].dispose();
+                        _questions.removeAt(index);
+                      }),
+                      onChanged: () => setState(() {}),
                     ),
                   ),
-                  OutlinedButton.icon(
-                    onPressed: widget.readOnly
-                        ? null
-                        : () =>
-                              setState(() => _questions.add(_QuestionDraft())),
-                    icon: const Icon(Icons.add),
-                    label: const Text('เพิ่มคำถาม'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Expanded(
-                child: ListView.separated(
-                  itemCount: _questions.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 10),
-                  itemBuilder: (_, index) => _QuestionEditor(
-                    index: index,
-                    draft: _questions[index],
-                    readOnly: widget.readOnly,
-                    canDelete: !widget.readOnly && _questions.length > 1,
-                    onDelete: () => setState(() {
-                      _questions[index].dispose();
-                      _questions.removeAt(index);
-                    }),
-                    onChanged: () => setState(() {}),
-                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  OutlinedButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('ยกเลิก'),
-                  ),
-                  const SizedBox(width: 8),
-                  if (widget.readOnly)
-                    OutlinedButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('ปิด'),
-                    )
-                  else
-                    FilledButton.icon(
-                      onPressed: _save,
-                      icon: const Icon(Icons.save_outlined),
-                      label: const Text('บันทึก'),
-                    ),
-                ],
-              ),
-            ],
+                SizedBox(height: evaluationUiTokens.popupFieldSpacing),
+                Divider(color: evaluationUiTokens.borderColor, height: 1),
+                SizedBox(height: evaluationUiTokens.itemSpacing),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    if (!widget.readOnly)
+                      SizedBox(
+                        height: evaluationUiTokens.buttonHeight,
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('ยกเลิก'),
+                        ),
+                      ),
+                    if (!widget.readOnly)
+                      SizedBox(width: evaluationUiTokens.itemSpacing),
+                    if (widget.readOnly)
+                      OutlinedButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('ปิด'),
+                      )
+                    else
+                      SizedBox(
+                        height: evaluationUiTokens.buttonHeight,
+                        child: FilledButton.icon(
+                          onPressed: _save,
+                          icon: const Icon(Icons.save_outlined),
+                          label: const Text('บันทึก'),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -298,7 +346,10 @@ class _QuestionEditor extends StatelessWidget {
               if (canDelete)
                 IconButton(
                   onPressed: onDelete,
-                  icon: const Icon(Icons.delete_outline, color: Colors.red),
+                  icon: Icon(
+                    Icons.delete_outline,
+                    color: evaluationUiTokens.dangerColor,
+                  ),
                 ),
             ],
           ),

@@ -12,7 +12,7 @@ class MeetingPaginationCard extends StatelessWidget {
     required this.primary,
     required this.onPrevious,
     required this.onNext,
-    this.showDivider = true,
+    this.showDivider = false,
   });
 
   final int total;
@@ -42,7 +42,7 @@ class MeetingPaginationCard extends StatelessWidget {
     }) => Tooltip(
       message: tooltip,
       child: SizedBox.square(
-        dimension: 40,
+        dimension: LaooLayout.paginationButtonSize,
         child: OutlinedButton(
           style: OutlinedButton.styleFrom(
             padding: EdgeInsets.zero,
@@ -50,7 +50,9 @@ class MeetingPaginationCard extends StatelessWidget {
             disabledBackgroundColor: LaooColors.white,
             foregroundColor: onPressed == null ? mutedText : primary,
             disabledForegroundColor: mutedText,
-            side: const BorderSide(color: LaooColors.white),
+            side: BorderSide(
+              color: onPressed == null ? LaooColors.border : primary,
+            ),
             shape: shape,
           ),
           onPressed: onPressed,
@@ -92,9 +94,9 @@ class MeetingPaginationCard extends StatelessWidget {
                           onPressed: onPrevious,
                           tooltip: 'หน้าก่อนหน้า',
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 6),
                         SizedBox.square(
-                          dimension: 40,
+                          dimension: LaooLayout.paginationButtonSize,
                           child: FilledButton(
                             style: FilledButton.styleFrom(
                               padding: EdgeInsets.zero,
@@ -102,6 +104,7 @@ class MeetingPaginationCard extends StatelessWidget {
                               disabledBackgroundColor: primary,
                               foregroundColor: onPrimary,
                               disabledForegroundColor: onPrimary,
+                              side: BorderSide(color: primary),
                               shape: shape,
                             ),
                             onPressed: null,
@@ -114,13 +117,13 @@ class MeetingPaginationCard extends StatelessWidget {
                             ),
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 6),
                         navigationButton(
                           icon: Icons.chevron_right,
                           onPressed: onNext,
                           tooltip: 'หน้าถัดไป',
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 12),
                         Text(
                           '$start-$end จาก $total',
                           style: const TextStyle(

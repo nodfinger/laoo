@@ -1,4 +1,5 @@
 ﻿using System.Security.Claims;
+using Laoo.Shared.Contracts;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
@@ -19,6 +20,7 @@ public sealed class MyTrainingController(IConfiguration configuration) : Control
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 100);
         await using var db = await Open(token);
+        if (!await CanView(db, token)) return Forbid();
         var employee = await Employee(db, company, user, token);
         if (employee is null) return Ok(new { total = 0, page, pageSize, items = Array.Empty<object>() });
         if (employee is not null)
@@ -136,6 +138,7 @@ WHERE X.CompanyID=@company AND X.BookingID=@booking ORDER BY X.SectionCode,X.Seq
     {
         if (!Scope(out var company, out var user)) return Forbid();
         await using var db = await Open(token);
+        if (!await CanView(db, token)) return Forbid();
         var employee = await Employee(db, company, user, token);
         if (employee is null) return Forbid();
         var header = await Rows("""
@@ -225,6 +228,16 @@ ORDER BY UE.EmployeeID
         command.Parameters.AddWithValue("@company", company);
         var value = await command.ExecuteScalarAsync(token);
         return value is null || value == DBNull.Value ? null : Convert.ToInt64(value);
+    }
+
+    private async Task<bool> CanView(SqlConnection db, CancellationToken token)
+    {
+        if (!long.TryParse(User.FindFirstValue("project_id"), out var activeProjectId)) return false;
+        await using var command = new SqlCommand(
+            "SELECT COUNT_BIG(*) FROM dbo.TDADProject WHERE ProjectCode=N'LAOO_TRAINING' AND ProjectID=@project AND IsActive=1", db);
+        command.Parameters.AddWithValue("@project", activeProjectId);
+        if (Convert.ToInt64(await command.ExecuteScalarAsync(token)) != 1) return false;
+        return await CompanyMenuAccess.IsAllowedAsync(db, User, "37006", "VIEW", token);
     }
 
     private bool Scope(out long company, out long user)

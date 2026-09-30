@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../widgets/meeting_popup.dart';
+import '../widgets/meeting_pagination_card.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image/image.dart' as img;
@@ -45,7 +46,10 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
   Map<String, bool> _actions = {};
   int? _branchId;
   bool _loading = true;
+  int _pageIndex = 0;
+  static const _pageSize = 10;
   String? _message;
+  bool _messageIsError = false;
   final _contactName = TextEditingController();
   final _contactPhone = TextEditingController();
   final _contactEmail = TextEditingController();
@@ -76,10 +80,12 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
 
   String _errorText(Object error, String fallback) {
     if (error is ApiException) {
-      final detail = error.description;
-      return detail == null ? error.message : '${error.message}\n$detail';
+      final detail =
+          error.description ??
+          'กรุณาตรวจสอบข้อมูลและสิทธิ์ แล้วลองใหม่อีกครั้ง';
+      return '${error.message}\nรายละเอียดเพิ่มเติม: $detail';
     }
-    return '$fallback\n${error.toString()}';
+    return '$fallback\nรายละเอียดเพิ่มเติม: กรุณาตรวจสอบการเชื่อมต่อแล้วลองใหม่อีกครั้ง';
   }
 
   @override
@@ -107,6 +113,7 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
       if (!mounted) return;
       setState(() {
         _items = List<Map<String, dynamic>>.from(results[0] as List);
+        _pageIndex = 0;
         _branches = List<Map<String, dynamic>>.from(
           (results[1] as Map)['branches'] as List,
         );
@@ -114,9 +121,10 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
       });
     } catch (error) {
       if (mounted) {
-        setState(
-          () => _message = _errorText(error, 'ไม่สามารถโหลดข้อมูลหน้าอาคารได้'),
-        );
+        setState(() {
+          _message = _errorText(error, 'ไม่สามารถโหลดข้อมูลหน้าอาคารได้');
+          _messageIsError = true;
+        });
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -171,6 +179,9 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
             insetPadding: const EdgeInsets.all(LaooLayout.dialogInsetPadding),
             backgroundColor: LaooColors.white,
             surfaceTintColor: Colors.transparent,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(LaooRadius.xs),
+            ),
             titlePadding: EdgeInsets.zero,
             actionsPadding: EdgeInsets.zero,
             contentPadding: const EdgeInsets.all(LaooLayout.cardPadding),
@@ -207,7 +218,7 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
             ),
             content: SizedBox(
               width: (MediaQuery.sizeOf(context).width - 48)
-                  .clamp(0.0, 720.0)
+                  .clamp(0.0, 480.0)
                   .toDouble(),
               child: Theme(
                 data: Theme.of(context).copyWith(
@@ -226,7 +237,7 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
                         ),
                         floatingLabelStyle: TextStyle(
                           color: preset.primary,
-                          fontSize: LaooTypography.inputLabel,
+                          fontSize: LaooTypography.materialFloatingLabelSource,
                         ),
                         filled: true,
                         fillColor: preset.surface,
@@ -248,7 +259,7 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
                       ),
                 ),
                 child: SizedBox(
-                  width: 620,
+                  width: double.infinity,
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -274,33 +285,45 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
                         }),
                       ),
                       const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          SizedBox(
-                            width: 170,
-                            child: TextField(
-                              controller: code,
-                              onChanged: (_) => refresh(() => codeError = null),
-                              textCapitalization: TextCapitalization.characters,
-                              inputFormatters: [UpperCaseTextFormatter()],
-                              decoration: InputDecoration(
-                                labelText: 'รหัสอาคาร *',
-                                errorText: codeError,
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final compact = constraints.maxWidth < 420;
+                          return Wrap(
+                            spacing: 12,
+                            runSpacing: 12,
+                            children: [
+                              SizedBox(
+                                width: compact ? constraints.maxWidth : 170,
+                                child: TextField(
+                                  controller: code,
+                                  onChanged: (_) =>
+                                      refresh(() => codeError = null),
+                                  textCapitalization:
+                                      TextCapitalization.characters,
+                                  inputFormatters: [UpperCaseTextFormatter()],
+                                  decoration: InputDecoration(
+                                    labelText: 'รหัสอาคาร *',
+                                    errorText: codeError,
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: TextField(
-                              controller: name,
-                              onChanged: (_) => refresh(() => nameError = null),
-                              decoration: InputDecoration(
-                                labelText: 'ชื่ออาคาร *',
-                                errorText: nameError,
+                              SizedBox(
+                                width: compact
+                                    ? constraints.maxWidth
+                                    : constraints.maxWidth - 182,
+                                child: TextField(
+                                  controller: name,
+                                  onChanged: (_) =>
+                                      refresh(() => nameError = null),
+                                  decoration: InputDecoration(
+                                    labelText: 'ชื่ออาคาร *',
+                                    errorText: nameError,
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
-                        ],
+                            ],
+                          );
+                        },
                       ),
                       const SizedBox(height: 12),
                       ValueListenableBuilder<List<int>?>(
@@ -322,13 +345,12 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
                                         child: Image.memory(
                                           Uint8List.fromList(bytes),
                                           fit: BoxFit.contain,
-                                          errorBuilder: (_, _, _) =>
-                                              const Padding(
-                                                padding: EdgeInsets.all(24),
-                                                child: Text(
-                                                  'ไม่สามารถอ่านไฟล์รูปนี้ได้ กรุณาเลือก JPG, PNG หรือ WebP',
-                                                ),
-                                              ),
+                                          errorBuilder: (_, _, _) => const Padding(
+                                            padding: EdgeInsets.all(24),
+                                            child: Text(
+                                              'ไม่สามารถอ่านไฟล์รูปนี้ได้ กรุณาเลือก JPG, PNG หรือ WebP',
+                                            ),
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -414,36 +436,47 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _contactName,
-                              decoration: const InputDecoration(
-                                labelText: 'ชื่อผู้ดูแล',
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final compact = constraints.maxWidth < 480;
+                          final fieldWidth = compact
+                              ? constraints.maxWidth
+                              : (constraints.maxWidth - 24) / 3;
+                          return Wrap(
+                            spacing: 12,
+                            runSpacing: 12,
+                            children: [
+                              SizedBox(
+                                width: fieldWidth,
+                                child: TextField(
+                                  controller: _contactName,
+                                  decoration: const InputDecoration(
+                                    labelText: 'ชื่อผู้ดูแล',
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: TextField(
-                              controller: _contactPhone,
-                              decoration: const InputDecoration(
-                                labelText: 'โทรศัพท์',
+                              SizedBox(
+                                width: fieldWidth,
+                                child: TextField(
+                                  controller: _contactPhone,
+                                  decoration: const InputDecoration(
+                                    labelText: 'โทรศัพท์',
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: TextField(
-                              controller: _contactEmail,
-                              decoration: const InputDecoration(
-                                labelText: 'Email',
+                              SizedBox(
+                                width: fieldWidth,
+                                child: TextField(
+                                  controller: _contactEmail,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Email',
+                                  ),
+                                  keyboardType: TextInputType.emailAddress,
+                                ),
                               ),
-                              keyboardType: TextInputType.emailAddress,
-                            ),
-                          ),
-                        ],
+                            ],
+                          );
+                        },
                       ),
                     ],
                   ),
@@ -546,14 +579,16 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
             item['imageUrl'] = uploadedImageUrl;
           }
           _message = 'บันทึกข้อมูลอาคารสำเร็จ';
+          _messageIsError = false;
         });
         await _load();
       }
     } catch (error) {
       if (mounted) {
-        setState(
-          () => _message = _errorText(error, 'บันทึกข้อมูลอาคารไม่สำเร็จ'),
-        );
+        setState(() {
+          _message = _errorText(error, 'บันทึกข้อมูลอาคารไม่สำเร็จ');
+          _messageIsError = true;
+        });
       }
     }
   }
@@ -582,6 +617,11 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
           return AlertDialog(
             scrollable: true,
             insetPadding: const EdgeInsets.all(LaooLayout.dialogInsetPadding),
+            backgroundColor: LaooColors.white,
+            surfaceTintColor: Colors.transparent,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(LaooRadius.xs),
+            ),
             titlePadding: EdgeInsets.zero,
             actionsPadding: EdgeInsets.zero,
             contentPadding: const EdgeInsets.all(LaooLayout.cardPadding),
@@ -617,7 +657,7 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
             ),
             content: SizedBox(
               width: (MediaQuery.sizeOf(context).width - 48)
-                  .clamp(0.0, 720.0)
+                  .clamp(0.0, 480.0)
                   .toDouble(),
               child: Theme(
                 data: Theme.of(context).copyWith(
@@ -635,7 +675,7 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
                     ),
                     floatingLabelStyle: TextStyle(
                       color: preset.primary,
-                      fontSize: LaooTypography.inputLabel,
+                      fontSize: LaooTypography.materialFloatingLabelSource,
                       fontWeight: FontWeight.w600,
                     ),
                     helperStyle: const TextStyle(
@@ -789,14 +829,18 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
     try {
       await _repo.saveFloor(value, id: item?['floorId'] as int?);
       if (mounted) {
-        setState(() => _message = 'บันทึกข้อมูลชั้นสำเร็จ');
+        setState(() {
+          _message = 'บันทึกข้อมูลชั้นสำเร็จ';
+          _messageIsError = false;
+        });
         _load();
       }
     } catch (error) {
       if (mounted) {
-        setState(
-          () => _message = _errorText(error, 'บันทึกข้อมูลชั้นไม่สำเร็จ'),
-        );
+        setState(() {
+          _message = _errorText(error, 'บันทึกข้อมูลชั้นไม่สำเร็จ');
+          _messageIsError = true;
+        });
       }
     }
   }
@@ -813,7 +857,39 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
       await _load();
     } catch (error) {
       if (mounted) {
-        setState(() => _message = _errorText(error, 'ลบข้อมูลชั้นไม่สำเร็จ'));
+        setState(() {
+          _message = _errorText(error, 'ลบข้อมูลชั้นไม่สำเร็จ');
+          _messageIsError = true;
+        });
+      }
+    }
+  }
+
+  Future<void> _confirmDeleteBuilding(Map<String, dynamic> building) async {
+    if (_actions['delete'] != true) return;
+    final floors = building['floors'] as List? ?? const [];
+    if (floors.isNotEmpty) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => MeetingDeletePopup(
+        record: '${building['code']} - ${building['nameTh']}',
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await _repo.deleteBuilding((building['buildingId'] as num).toInt());
+      if (!mounted) return;
+      setState(() {
+        _message = 'ลบข้อมูลอาคารสำเร็จ';
+        _messageIsError = false;
+      });
+      await _load();
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _message = _errorText(error, 'ลบข้อมูลอาคารไม่สำเร็จ');
+          _messageIsError = true;
+        });
       }
     }
   }
@@ -894,127 +970,215 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
                   const SizedBox(height: 6),
                   if (_loading) const LinearProgressIndicator(),
                   Expanded(
-                    child: ListView.separated(
-                      itemCount: _items.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 6),
-                      itemBuilder: (context, index) {
-                        final building = _items[index];
-                        final floors = List<Map<String, dynamic>>.from(
-                          building['floors'] as List? ?? const [],
-                        );
-                        return Card(
-                          margin: EdgeInsets.zero,
-                          color: LaooColors.white,
-                          surfaceTintColor: Colors.transparent,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(LaooRadius.xs),
-                            side: BorderSide.none,
-                          ),
-                          child: ExpansionTile(
-                            tilePadding: const EdgeInsets.all(
-                              LaooLayout.cardPadding,
-                            ),
-                            shape: const Border(),
-                            collapsedShape: const Border(),
-                            leading:
-                                (building['imageUrl'] as String?)?.isNotEmpty ==
-                                    true
-                                ? GestureDetector(
-                                    onTap: () => _showBuildingImage(
-                                      building['imageUrl'] as String,
-                                    ),
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: Image.network(
-                                        _buildingImageUrl(
-                                          building['imageUrl'] as String,
+                    child: _items.isEmpty && !_loading
+                        ? const Center(child: Text('ไม่พบข้อมูลอาคาร'))
+                        : ListView.separated(
+                            itemCount: _items
+                                .skip(_pageIndex * _pageSize)
+                                .take(_pageSize)
+                                .length,
+                            separatorBuilder: (_, _) =>
+                                const SizedBox(height: 6),
+                            itemBuilder: (context, index) {
+                              final building =
+                                  _items[_pageIndex * _pageSize + index];
+                              final floors = List<Map<String, dynamic>>.from(
+                                building['floors'] as List? ?? const [],
+                              );
+                              return Card(
+                                margin: EdgeInsets.zero,
+                                color: LaooColors.white,
+                                surfaceTintColor: Colors.transparent,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(
+                                    LaooRadius.xs,
+                                  ),
+                                  side: BorderSide.none,
+                                ),
+                                child: ExpansionTile(
+                                  tilePadding: const EdgeInsets.all(
+                                    LaooLayout.cardPadding,
+                                  ),
+                                  shape: const Border(),
+                                  collapsedShape: const Border(),
+                                  leading:
+                                      (building['imageUrl'] as String?)
+                                              ?.isNotEmpty ==
+                                          true
+                                      ? GestureDetector(
+                                          onTap: () => _showBuildingImage(
+                                            building['imageUrl'] as String,
+                                          ),
+                                          child: ClipRRect(
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                            child: Image.network(
+                                              _buildingImageUrl(
+                                                building['imageUrl'] as String,
+                                              ),
+                                              width: 56,
+                                              height: 56,
+                                              fit: BoxFit.cover,
+                                              errorBuilder: (_, _, _) =>
+                                                  const Icon(
+                                                    Icons.broken_image_outlined,
+                                                  ),
+                                            ),
+                                          ),
+                                        )
+                                      : const Icon(Icons.business),
+                                  title: Text(
+                                    '${building['code']} ${building['nameTh']}',
+                                  ),
+                                  subtitle: Text('ชั้น ${floors.length}'),
+                                  trailing:
+                                      MediaQuery.sizeOf(context).width < 600 &&
+                                          (_actions['edit'] == true ||
+                                              _actions['delete'] == true ||
+                                              _actions['create'] == true)
+                                      ? PopupMenuButton<String>(
+                                          tooltip: 'การดำเนินการอาคาร',
+                                          onSelected: (action) {
+                                            if (action == 'edit') {
+                                              _saveBuilding(item: building);
+                                            } else if (action == 'delete') {
+                                              _confirmDeleteBuilding(building);
+                                            } else if (action == 'addFloor') {
+                                              _saveFloor(building);
+                                            }
+                                          },
+                                          itemBuilder: (_) => [
+                                            if (_actions['edit'] == true)
+                                              const PopupMenuItem(
+                                                value: 'edit',
+                                                child: Text('แก้ไขอาคาร'),
+                                              ),
+                                            if (_actions['delete'] == true)
+                                              PopupMenuItem(
+                                                value: 'delete',
+                                                enabled: floors.isEmpty,
+                                                child: Text(
+                                                  floors.isEmpty
+                                                      ? 'ลบอาคาร'
+                                                      : 'ลบอาคารไม่ได้ เพราะยังมีชั้น',
+                                                ),
+                                              ),
+                                            if (_actions['create'] == true)
+                                              const PopupMenuItem(
+                                                value: 'addFloor',
+                                                child: Text('เพิ่มชั้น'),
+                                              ),
+                                          ],
+                                        )
+                                      : Wrap(
+                                          children: [
+                                            if (_actions['edit'] == true)
+                                              IconButton(
+                                                onPressed: () => _saveBuilding(
+                                                  item: building,
+                                                ),
+                                                tooltip: 'แก้ไขอาคาร',
+                                                icon: Icon(
+                                                  Icons.edit_outlined,
+                                                  color: preset.primary,
+                                                ),
+                                              ),
+                                            if (_actions['delete'] == true)
+                                              IconButton(
+                                                onPressed: floors.isEmpty
+                                                    ? () =>
+                                                          _confirmDeleteBuilding(
+                                                            building,
+                                                          )
+                                                    : null,
+                                                tooltip: floors.isEmpty
+                                                    ? 'ลบอาคาร'
+                                                    : 'ลบอาคารไม่ได้ เพราะยังมีชั้น',
+                                                icon: const Icon(
+                                                  Icons.delete_outline,
+                                                  color: LaooColors.error,
+                                                ),
+                                              ),
+                                            if (_actions['create'] == true)
+                                              IconButton(
+                                                onPressed: () =>
+                                                    _saveFloor(building),
+                                                tooltip: 'เพิ่มชั้น',
+                                                icon: Icon(
+                                                  Icons.add,
+                                                  color: preset.primary,
+                                                ),
+                                              ),
+                                          ],
                                         ),
-                                        width: 56,
-                                        height: 56,
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (_, _, _) =>
-                                            const Icon(
-                                              Icons.broken_image_outlined,
+                                  children: floors
+                                      .map(
+                                        (floor) => Container(
+                                          decoration: BoxDecoration(
+                                            border: Border(
+                                              bottom: BorderSide(
+                                                color: preset.border,
+                                              ),
                                             ),
-                                      ),
-                                    ),
-                                  )
-                                : const Icon(Icons.business),
-                            title: Text(
-                              '${building['code']} ${building['nameTh']}',
-                            ),
-                            subtitle: Text('ชั้น ${floors.length}'),
-                            trailing: Wrap(
-                              children: [
-                                if (_actions['edit'] == true)
-                                  IconButton(
-                                    onPressed: () =>
-                                        _saveBuilding(item: building),
-                                    icon: Icon(
-                                      Icons.edit_outlined,
-                                      color: preset.primary,
-                                    ),
-                                  ),
-                                if (_actions['create'] == true)
-                                  IconButton(
-                                    onPressed: () => _saveFloor(building),
-                                    icon: Icon(
-                                      Icons.add,
-                                      color: preset.primary,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                            children: floors
-                                .map(
-                                  (floor) => Container(
-                                    decoration: BoxDecoration(
-                                      border: Border(
-                                        bottom: BorderSide(
-                                          color: preset.border,
+                                          ),
+                                          child: ListTile(
+                                            title: Text(
+                                              '${floor['code']} ${floor['nameTh']}',
+                                            ),
+                                            subtitle: Text(
+                                              'เลขชั้น ${floor['number'] ?? '-'}',
+                                            ),
+                                            trailing: Wrap(
+                                              children: [
+                                                if (_actions['edit'] == true)
+                                                  IconButton(
+                                                    onPressed: () => _saveFloor(
+                                                      building,
+                                                      item: floor,
+                                                    ),
+                                                    icon: Icon(
+                                                      Icons.edit_outlined,
+                                                      color: preset.primary,
+                                                    ),
+                                                    tooltip: 'แก้ไขชั้น',
+                                                  ),
+                                                if (_actions['delete'] == true)
+                                                  IconButton(
+                                                    onPressed: () =>
+                                                        _confirmDeleteFloor(
+                                                          floor,
+                                                        ),
+                                                    icon: const Icon(
+                                                      Icons.delete_outline,
+                                                      color: LaooColors.error,
+                                                    ),
+                                                    tooltip: 'ลบชั้น',
+                                                  ),
+                                              ],
+                                            ),
+                                          ),
                                         ),
-                                      ),
-                                    ),
-                                    child: ListTile(
-                                      title: Text(
-                                        '${floor['code']} ${floor['nameTh']}',
-                                      ),
-                                      subtitle: Text(
-                                        'เลขชั้น ${floor['number'] ?? '-'}',
-                                      ),
-                                      trailing: Wrap(
-                                        children: [
-                                          if (_actions['edit'] == true)
-                                            IconButton(
-                                              onPressed: () => _saveFloor(
-                                                building,
-                                                item: floor,
-                                              ),
-                                              icon: Icon(
-                                                Icons.edit_outlined,
-                                                color: preset.primary,
-                                              ),
-                                            ),
-                                          if (_actions['delete'] == true)
-                                            IconButton(
-                                              onPressed: () =>
-                                                  _confirmDeleteFloor(floor),
-                                              icon: const Icon(
-                                                Icons.delete_outline,
-                                                color: Colors.red,
-                                              ),
-                                            ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                )
-                                .toList(),
+                                      )
+                                      .toList(),
+                                ),
+                              );
+                            },
                           ),
-                        );
-                      },
-                    ),
+                  ),
+                  const SizedBox(height: LaooLayout.listSectionSpacing),
+                  MeetingPaginationCard(
+                    total: _items.length,
+                    pageIndex: _pageIndex,
+                    pageSize: _pageSize,
+                    primary: preset.primary,
+                    onPrevious: _pageIndex > 0
+                        ? () => setState(() => _pageIndex--)
+                        : null,
+                    onNext: (_pageIndex + 1) * _pageSize < _items.length
+                        ? () => setState(() => _pageIndex++)
+                        : null,
                   ),
                 ],
               ),
@@ -1025,6 +1189,7 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
                 right: 24,
                 child: AutoDismissMessage(
                   message: _message!,
+                  error: _messageIsError,
                   onClose: () => setState(() => _message = null),
                 ),
               ),

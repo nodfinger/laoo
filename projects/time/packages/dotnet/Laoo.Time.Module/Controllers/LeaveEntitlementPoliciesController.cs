@@ -25,9 +25,12 @@ public sealed class LeaveEntitlementPoliciesController(IConfiguration configurat
     {
         if (!Scope(out _, out _)) return Forbid();
         await using var c = await Open(token);
-        return Ok(new { menuCode = MenuCode, caption = await Caption(c, token), screenType = 1,
-            view = await Can(c, "VIEW", token), create = await Can(c, "CREATE", token),
-            edit = await Can(c, "EDIT", token), delete = await Can(c, "DELETE", token) });
+        if (!await Can(c, "VIEW", token)) return Forbid();
+        var screenType = await ScreenType(c, token);
+        return Ok(new { menuCode = MenuCode, caption = await Caption(c, token), screenType,
+            view = true, create = screenType == 1 && await Can(c, "CREATE", token),
+            edit = screenType == 1 && await Can(c, "EDIT", token),
+            delete = screenType == 1 && await Can(c, "DELETE", token) });
     }
 
     [HttpGet("leave-types")]
@@ -63,6 +66,40 @@ public sealed class LeaveEntitlementPoliciesController(IConfiguration configurat
     [HttpPut("{id:long}")]
     public Task<IActionResult> Version(long id, LeaveEntitlementPolicySaveRequest request, CancellationToken token) => Save(id, request, token);
 
+    [HttpDelete("{id:long}")]
+    public async Task<IActionResult> Delete(long id, [FromQuery] string? rowVersion, CancellationToken token)
+    {
+        if (!Scope(out var companyId, out _)) return Forbid();
+        await using var c = await Open(token);
+        if (!await Can(c, "DELETE", token)) return Forbid();
+        if (!RowVersion(rowVersion)) return BadRequest(new { message = "ไม่พบ Version ของข้อมูล กรุณาโหลดใหม่" });
+        try
+        {
+            await using var delete = new SqlCommand(
+                "DELETE P FROM dbo.TDTMLeaveEntitlementPolicyVersion P WHERE P.CompanyID=@C AND P.LeaveEntitlementPolicyVersionID=@ID AND P.RowVersion=CONVERT(binary(8),@V,2) AND NOT EXISTS(SELECT 1 FROM dbo.TDTMLeaveEntitlementLedger L WHERE L.SourcePolicyVersionID=P.LeaveEntitlementPolicyVersionID)", c);
+            Add(delete, "@C", SqlDbType.BigInt, companyId);
+            Add(delete, "@ID", SqlDbType.BigInt, id);
+            Add(delete, "@V", SqlDbType.VarChar, rowVersion, 32);
+            if (await delete.ExecuteNonQueryAsync(token) == 1) return NoContent();
+        }
+        catch (SqlException e) when (e.Number == 547)
+        {
+            return Conflict(new { message = "ลบเกณฑ์สิทธิ์ลาไม่ได้", description = "รายการนี้ถูกใช้คำนวณสิทธิ์ลาแล้ว" });
+        }
+        await using var used = new SqlCommand(
+            "SELECT COUNT_BIG(1) FROM dbo.TDTMLeaveEntitlementLedger WHERE CompanyID=@C AND SourcePolicyVersionID=@ID", c);
+        Add(used, "@C", SqlDbType.BigInt, companyId);
+        Add(used, "@ID", SqlDbType.BigInt, id);
+        if (Convert.ToInt64(await used.ExecuteScalarAsync(token)) > 0)
+            return Conflict(new { message = "ลบเกณฑ์สิทธิ์ลาไม่ได้", description = "รายการนี้ถูกใช้คำนวณสิทธิ์ลาแล้ว" });
+        await using var owned = new SqlCommand(
+            "SELECT COUNT(1) FROM dbo.TDTMLeaveEntitlementPolicyVersion WHERE CompanyID=@C AND LeaveEntitlementPolicyVersionID=@ID", c);
+        Add(owned, "@C", SqlDbType.BigInt, companyId);
+        Add(owned, "@ID", SqlDbType.BigInt, id);
+        if (Convert.ToInt32(await owned.ExecuteScalarAsync(token)) == 0) return Forbid();
+        return Conflict(new { message = "ลบเกณฑ์สิทธิ์ลาไม่ได้", description = "ข้อมูลถูกแก้ไขหรือลบไปแล้ว กรุณาเปิดหน้าจอใหม่" });
+    }
+
     private async Task<IActionResult> Save(long? versionId, LeaveEntitlementPolicySaveRequest request, CancellationToken token)
     {
         if (!Scope(out var companyId, out var userId)) return Forbid();
@@ -92,7 +129,15 @@ public sealed class LeaveEntitlementPoliciesController(IConfiguration configurat
     private static async Task<string?> LeaveTypeUnit(SqlConnection c, SqlTransaction tx, long companyId, long id, CancellationToken token) { await using var q = new SqlCommand("SELECT UnitCode FROM dbo.TDTMLeaveType WHERE CompanyID=@C AND LeaveTypeID=@ID AND IsActive=1", c, tx); Add(q, "@C", SqlDbType.BigInt, companyId); Add(q, "@ID", SqlDbType.BigInt, id); return Convert.ToString(await q.ExecuteScalarAsync(token)); }
     private async Task<SqlConnection> Open(CancellationToken t) { var c = new SqlConnection(configuration.GetConnectionString("LaooDatabase")); await c.OpenAsync(t); return c; }
     private bool Scope(out long c, out long u) { c=0;u=0; return string.Equals(User.FindFirstValue("user_type"),"COMPANY_USER",StringComparison.OrdinalIgnoreCase)&&long.TryParse(User.FindFirstValue("company_id"),out c)&&long.TryParse(User.FindFirstValue("user_id"),out u)&&c>0&&u>0; }
-    private Task<bool> Can(SqlConnection c,string a,CancellationToken t)=>CompanyMenuAccess.IsAllowedAsync(c,User,MenuCode,a,t);
+    private async Task<bool> Can(SqlConnection c,string a,CancellationToken t)=>
+        (a == "VIEW" || await ScreenType(c,t) == 1)
+        && await CompanyMenuAccess.IsAllowedAsync(c,User,MenuCode,a,t);
+    private static async Task<int> ScreenType(SqlConnection c,CancellationToken t)
+    {
+        await using var q = new SqlCommand("SELECT ScreenType FROM dbo.TDADMainMenu WHERE MenuCode=@Menu AND IsActive=1",c);
+        Add(q,"@Menu",SqlDbType.Char,MenuCode,5);
+        return Convert.ToInt32(await q.ExecuteScalarAsync(t));
+    }
     private static async Task<string> Caption(SqlConnection c,CancellationToken t){await using var q=new SqlCommand("SELECT TOP(1) MenuName FROM dbo.TDADMainMenu WHERE MenuCode='28010'",c);return Convert.ToString(await q.ExecuteScalarAsync(t))??"เกณฑ์สิทธิ์การลา";}
     private static string? Clean(string? x)=>string.IsNullOrWhiteSpace(x)?null:x.Trim(); private static bool RowVersion(string? x)=>x is {Length:16}&&x.All(Uri.IsHexDigit); private static bool IsJson(string value){try{System.Text.Json.JsonDocument.Parse(value);return true;}catch{return false;}}
     private static void Bind(SqlCommand q,long c,long? type,bool? a){Add(q,"@C",SqlDbType.BigInt,c);Add(q,"@Type",SqlDbType.BigInt,type);Add(q,"@A",SqlDbType.Bit,a);} private static void Add(SqlCommand q,string n,SqlDbType t,object? v,int size=0){var p=size==0?q.Parameters.Add(n,t):q.Parameters.Add(n,t,size);p.Value=v??DBNull.Value;}

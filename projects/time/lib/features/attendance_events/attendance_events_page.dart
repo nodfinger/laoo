@@ -86,9 +86,9 @@ class _AttendanceEventsPageState extends State<AttendanceEventsPage> {
     try {
       final value = await _repository.list(
         fromDateTime: _fromDate,
-        toDateTime: _toDate.add(const Duration(days: 1)).subtract(
-          const Duration(microseconds: 1),
-        ),
+        toDateTime: _toDate
+            .add(const Duration(days: 1))
+            .subtract(const Duration(microseconds: 1)),
         employee: _employee.text,
         deviceCode: _deviceCode.text,
         sourceCode: _sourceCode.text,
@@ -171,7 +171,11 @@ class _AttendanceEventsPageState extends State<AttendanceEventsPage> {
               runSpacing: timeUiTokens.itemSpacing,
               crossAxisAlignment: WrapCrossAlignment.end,
               children: [
-                _dateField('ตั้งแต่วันที่', _fromDate, () => _pickDate(from: true)),
+                _dateField(
+                  'ตั้งแต่วันที่',
+                  _fromDate,
+                  () => _pickDate(from: true),
+                ),
                 _dateField('ถึงวันที่', _toDate, () => _pickDate(from: false)),
                 SizedBox(
                   width: 260,
@@ -189,7 +193,9 @@ class _AttendanceEventsPageState extends State<AttendanceEventsPage> {
                   child: TextField(
                     controller: _deviceCode,
                     onSubmitted: (_) => _load(),
-                    decoration: const InputDecoration(labelText: 'รหัสที่เครื่อง'),
+                    decoration: const InputDecoration(
+                      labelText: 'รหัสที่เครื่อง',
+                    ),
                   ),
                 ),
                 SizedBox(
@@ -197,7 +203,9 @@ class _AttendanceEventsPageState extends State<AttendanceEventsPage> {
                   child: TextField(
                     controller: _sourceCode,
                     onSubmitted: (_) => _load(),
-                    decoration: const InputDecoration(labelText: 'รหัสแหล่งข้อมูล'),
+                    decoration: const InputDecoration(
+                      labelText: 'รหัสแหล่งข้อมูล',
+                    ),
                   ),
                 ),
                 Wrap(
@@ -221,11 +229,12 @@ class _AttendanceEventsPageState extends State<AttendanceEventsPage> {
                 : _items.isEmpty
                 ? const Center(child: Text('ไม่พบข้อมูล'))
                 : LayoutBuilder(
-                    builder: (context, constraints) => constraints.maxWidth < 900
+                    builder: (context, constraints) =>
+                        constraints.maxWidth < 900
                         ? _cards()
                         : _table(constraints.maxWidth),
                   ),
-            pagination: LaooPaginationCard(
+            pagination: TimePaginationCard(
               tokens: timeUiTokens.workspace,
               page: _page,
               pageCount: pageCount,
@@ -250,19 +259,20 @@ class _AttendanceEventsPageState extends State<AttendanceEventsPage> {
     );
   }
 
-  Widget _dateField(String label, DateTime value, VoidCallback onTap) => SizedBox(
-    width: 170,
-    child: TextFormField(
-      key: ValueKey('${label}_${value.toIso8601String()}'),
-      readOnly: true,
-      initialValue: _dateText(value),
-      onTap: onTap,
-      decoration: InputDecoration(
-        labelText: label,
-        suffixIcon: const Icon(Icons.calendar_month_outlined),
-      ),
-    ),
-  );
+  Widget _dateField(String label, DateTime value, VoidCallback onTap) =>
+      SizedBox(
+        width: 170,
+        child: TextFormField(
+          key: ValueKey('${label}_${value.toIso8601String()}'),
+          readOnly: true,
+          initialValue: _dateText(value),
+          onTap: onTap,
+          decoration: InputDecoration(
+            labelText: label,
+            suffixIcon: const Icon(Icons.calendar_month_outlined),
+          ),
+        ),
+      );
 
   Widget _cards() => ListView.separated(
     padding: timeUiTokens.cardPadding,
@@ -313,7 +323,9 @@ class _AttendanceEventsPageState extends State<AttendanceEventsPage> {
                 DataCell(Text('${_items[index]['fullName']}')),
                 DataCell(Text('${_items[index]['sourceCode']}')),
                 DataCell(Text('${_items[index]['sourceEventId']}')),
-                DataCell(Text(_dateTimeText(_items[index]['importedDateTime']))),
+                DataCell(
+                  Text(_dateTimeText(_items[index]['importedDateTime'])),
+                ),
               ],
             ),
         ],

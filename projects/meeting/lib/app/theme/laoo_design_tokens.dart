@@ -30,12 +30,17 @@ abstract final class LaooColors {
 /// Shared spacing and Card layout values for application screens.
 abstract final class LaooLayout {
   static const double cardSpacing = 10;
+  static const double listSectionSpacing = 6;
+  static const double listItemSpacing = 6;
   static const double cardMargin = 10;
   static const double cardPadding = 10;
   static const double captionFilterSpacing = 6;
   static const double captionCardPaddingVertical = 12;
   static const double dialogInsetPadding = 24;
+  static const double popupHeaderMinHeight = 48;
+  static const double popupFieldSpacing = 16;
   static const double paginationCardHeight = 56;
+  static const double paginationButtonSize = 34;
 }
 
 abstract final class LaooRadius {

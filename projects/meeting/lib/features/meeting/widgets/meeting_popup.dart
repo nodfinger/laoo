@@ -4,6 +4,61 @@ import '../../../app/theme/laoo_design_tokens.dart';
 import '../../../app/theme/laoo_typography.dart';
 import '../../../app/theme/workspace_theme_presets.dart';
 
+ThemeData meetingPopupTheme(BuildContext context) {
+  final base = Theme.of(context);
+  final primary = workspaceThemeController.value.primary;
+  final shape = RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(LaooRadius.xs),
+  );
+  OutlineInputBorder fieldBorder(Color color, {double width = 1}) =>
+      OutlineInputBorder(
+        borderRadius: BorderRadius.circular(LaooRadius.xs),
+        borderSide: BorderSide(color: color, width: width),
+      );
+  ButtonStyle buttonStyle(ButtonStyle? source) =>
+      (source ?? const ButtonStyle()).copyWith(
+        shape: WidgetStatePropertyAll<OutlinedBorder>(shape),
+        minimumSize: const WidgetStatePropertyAll<Size>(
+          Size(0, LaooTypography.buttonHeight),
+        ),
+        textStyle: const WidgetStatePropertyAll<TextStyle>(
+          TextStyle(fontSize: LaooTypography.button),
+        ),
+      );
+  return base.copyWith(
+    colorScheme: base.colorScheme.copyWith(
+      surface: LaooColors.white,
+      onSurface: LaooColors.pageCaption,
+      onSurfaceVariant: LaooColors.textSecondary,
+    ),
+    textTheme: base.textTheme.apply(
+      bodyColor: LaooColors.pageCaption,
+      displayColor: LaooColors.pageCaption,
+    ),
+    filledButtonTheme: FilledButtonThemeData(
+      style: buttonStyle(base.filledButtonTheme.style),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: buttonStyle(base.outlinedButtonTheme.style),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: buttonStyle(base.textButtonTheme.style),
+    ),
+    inputDecorationTheme: base.inputDecorationTheme.copyWith(
+      border: fieldBorder(LaooColors.border),
+      enabledBorder: fieldBorder(LaooColors.border),
+      disabledBorder: fieldBorder(LaooColors.border),
+      focusedBorder: fieldBorder(primary, width: 1.5),
+      errorBorder: fieldBorder(LaooColors.error),
+      focusedErrorBorder: fieldBorder(LaooColors.error, width: 1.5),
+      floatingLabelStyle: TextStyle(
+        color: primary,
+        fontSize: LaooTypography.materialFloatingLabelSource,
+      ),
+    ),
+  );
+}
+
 /// Standard layout for Meeting popups without existing header/footer dividers.
 class MeetingPopup extends StatelessWidget {
   const MeetingPopup({
@@ -22,48 +77,56 @@ class MeetingPopup extends StatelessWidget {
   final bool footerDivider;
 
   @override
-  Widget build(BuildContext context) => AlertDialog(
-    backgroundColor: LaooColors.white,
-    surfaceTintColor: Colors.transparent,
-    insetPadding: const EdgeInsets.all(LaooLayout.dialogInsetPadding),
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(LaooRadius.xs),
-      side: BorderSide.none,
-    ),
-    titlePadding: const EdgeInsets.all(LaooLayout.cardPadding),
-    contentPadding: const EdgeInsets.symmetric(
-      horizontal: LaooLayout.cardPadding,
-    ),
-    actionsPadding: const EdgeInsets.all(LaooLayout.cardPadding),
-    titleTextStyle: LaooTypography.popupTitleStyle,
-    scrollable: scrollable,
-    title: Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        title,
-        const Divider(color: LaooColors.border),
+  Widget build(BuildContext context) => Theme(
+    data: meetingPopupTheme(context),
+    child: AlertDialog(
+      backgroundColor: LaooColors.white,
+      surfaceTintColor: Colors.transparent,
+      insetPadding: const EdgeInsets.all(LaooLayout.dialogInsetPadding),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(LaooRadius.xs),
+        side: BorderSide.none,
+      ),
+      titlePadding: const EdgeInsets.all(LaooLayout.cardPadding),
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: LaooLayout.cardPadding,
+      ),
+      actionsPadding: const EdgeInsets.all(LaooLayout.cardPadding),
+      titleTextStyle: LaooTypography.popupTitleStyle,
+      scrollable: scrollable,
+      title: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ConstrainedBox(
+            constraints: const BoxConstraints(
+              minHeight: LaooLayout.popupHeaderMinHeight,
+            ),
+            child: Align(alignment: Alignment.centerLeft, child: title),
+          ),
+          const Divider(color: LaooColors.border),
+        ],
+      ),
+      content: content,
+      actions: [
+        SizedBox(
+          width: double.infinity,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (footerDivider) const Divider(color: LaooColors.border),
+              Wrap(
+                alignment: WrapAlignment.end,
+                spacing: 8,
+                runSpacing: 8,
+                children: actions,
+              ),
+            ],
+          ),
+        ),
       ],
     ),
-    content: content,
-    actions: [
-      SizedBox(
-        width: double.infinity,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (footerDivider) const Divider(color: LaooColors.border),
-            Wrap(
-              alignment: WrapAlignment.end,
-              spacing: 8,
-              runSpacing: 8,
-              children: actions,
-            ),
-          ],
-        ),
-      ),
-    ],
   );
 }
 
@@ -85,116 +148,124 @@ class MeetingDeletePopup extends StatelessWidget {
     final buttonShape = RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(LaooRadius.xs),
     );
-    return AlertDialog(
-      backgroundColor: LaooColors.white,
-      surfaceTintColor: Colors.transparent,
-      insetPadding: const EdgeInsets.all(LaooLayout.dialogInsetPadding),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(LaooRadius.xs),
-        side: const BorderSide(color: LaooColors.error),
-      ),
-      titlePadding: const EdgeInsets.all(LaooLayout.cardPadding),
-      contentPadding: const EdgeInsets.symmetric(
-        horizontal: LaooLayout.cardPadding,
-      ),
-      actionsPadding: const EdgeInsets.all(LaooLayout.cardPadding),
-      scrollable: true,
-      title: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.delete_outline, color: LaooColors.error),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(title, style: LaooTypography.popupTitleStyle),
-              ),
-            ],
-          ),
-          const Divider(color: LaooColors.border),
-        ],
-      ),
-      content: SizedBox(
-        width: 460,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+    return Theme(
+      data: meetingPopupTheme(context),
+      child: AlertDialog(
+        backgroundColor: LaooColors.white,
+        surfaceTintColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(LaooLayout.dialogInsetPadding),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
+          side: const BorderSide(color: LaooColors.error),
+        ),
+        titlePadding: const EdgeInsets.all(LaooLayout.cardPadding),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: LaooLayout.cardPadding,
+        ),
+        actionsPadding: const EdgeInsets.all(LaooLayout.cardPadding),
+        scrollable: true,
+        title: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              padding: const EdgeInsets.all(LaooLayout.cardPadding),
-              decoration: BoxDecoration(
-                color: LaooColors.error.withValues(alpha: .08),
-                borderRadius: BorderRadius.circular(LaooRadius.xs),
-              ),
-              child: Text(
-                record,
-                style: const TextStyle(color: LaooColors.error),
-              ),
+            Row(
+              children: [
+                const Icon(Icons.delete_outline, color: LaooColors.error),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: LaooTypography.popupTitleStyle.copyWith(
+                      color: LaooColors.error,
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
-            if (description != null) ...[
-              Text(description!),
-              const SizedBox(height: 8),
-            ],
-            const Text('ข้อมูลที่ลบแล้วไม่สามารถเรียกคืนกลับมาได้'),
+            const Divider(color: LaooColors.border),
           ],
         ),
-      ),
-      actions: [
-        SizedBox(
-          width: double.infinity,
+        content: SizedBox(
+          width: 460,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Divider(color: LaooColors.border),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  Flexible(
-                    child: TextButton(
-                      style: TextButton.styleFrom(
-                        foregroundColor: primary,
-                        minimumSize: const Size(
-                          80,
-                          LaooTypography.buttonHeight,
-                        ),
-                        shape: buttonShape,
-                        textStyle: const TextStyle(
-                          fontSize: LaooTypography.button,
-                        ),
-                      ),
-                      onPressed: () => Navigator.pop(context, false),
-                      child: const Text('ยกเลิก'),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: FilledButton.icon(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: LaooColors.error,
-                        foregroundColor: LaooColors.white,
-                        minimumSize: const Size(
-                          80,
-                          LaooTypography.buttonHeight,
-                        ),
-                        shape: buttonShape,
-                        textStyle: const TextStyle(
-                          fontSize: LaooTypography.button,
-                        ),
-                      ),
-                      onPressed: () => Navigator.pop(context, true),
-                      icon: const Icon(Icons.delete_outline),
-                      label: const Text('ลบ'),
-                    ),
-                  ),
-                ],
+              Container(
+                padding: const EdgeInsets.all(LaooLayout.cardPadding),
+                decoration: BoxDecoration(
+                  color: LaooColors.error.withValues(alpha: .08),
+                  borderRadius: BorderRadius.circular(LaooRadius.xs),
+                ),
+                child: Text(
+                  record,
+                  style: const TextStyle(color: LaooColors.error),
+                ),
               ),
+              const SizedBox(height: 12),
+              if (description != null) ...[
+                Text(description!),
+                const SizedBox(height: 8),
+              ],
+              const Text('ข้อมูลที่ลบแล้วไม่สามารถเรียกคืนกลับมาได้'),
             ],
           ),
         ),
-      ],
+        actions: [
+          SizedBox(
+            width: double.infinity,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Divider(color: LaooColors.border),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Flexible(
+                      child: TextButton(
+                        style: TextButton.styleFrom(
+                          foregroundColor: primary,
+                          minimumSize: const Size(
+                            80,
+                            LaooTypography.buttonHeight,
+                          ),
+                          shape: buttonShape,
+                          textStyle: const TextStyle(
+                            fontSize: LaooTypography.button,
+                          ),
+                        ),
+                        onPressed: () => Navigator.pop(context, false),
+                        child: const Text('ยกเลิก'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: FilledButton.icon(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: LaooColors.error,
+                          foregroundColor: LaooColors.white,
+                          minimumSize: const Size(
+                            80,
+                            LaooTypography.buttonHeight,
+                          ),
+                          shape: buttonShape,
+                          textStyle: const TextStyle(
+                            fontSize: LaooTypography.button,
+                          ),
+                        ),
+                        onPressed: () => Navigator.pop(context, true),
+                        icon: const Icon(Icons.delete_outline),
+                        label: const Text('ลบ'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

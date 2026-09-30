@@ -15,7 +15,7 @@ public sealed class MeetingRoomIssueController(IConfiguration configuration) : C
     [HttpGet("actions")]
     public async Task<IActionResult> Actions(CancellationToken token)
     {
-        await using var db = await Open(token);
+        if (!await Permission("VIEW", token)) return Forbid();
         return Ok(new
         {
             view = await Permission("VIEW", token),
@@ -134,7 +134,9 @@ WHERE IssueID=@id AND CompanyID=@company
         await using var db = await Open(token);
         await using var command = new SqlCommand("UPDATE dbo.TDADMeetingRoomIssue SET Description=@description,ImageUrl=@image,UpdateDate=SYSUTCDATETIME() WHERE IssueID=@id AND CompanyID=@company AND StatusCode='OPEN'", db);
         Add(command, "@description", description); Add(command, "@image", request.ImageUrl?.Trim()); Add(command, "@id", id); Add(command, "@company", company);
-        return await command.ExecuteNonQueryAsync(token) == 1 ? NoContent() : Conflict(new { message = "แก้ไขได้เฉพาะรายการสถานะ OPEN" });
+        return await command.ExecuteNonQueryAsync(token) == 1
+            ? NoContent()
+            : Conflict(new { message = "แก้ไขรายการแจ้งปัญหาไม่ได้", description = "รายการอาจไม่อยู่ในบริษัทปัจจุบันหรือพ้นสถานะ OPEN แล้ว กรุณาเปิดรายการใหม่" });
     }
 
     [HttpDelete("{id:long}")]
@@ -144,12 +146,22 @@ WHERE IssueID=@id AND CompanyID=@company
         await using var db = await Open(token);
         await using var command = new SqlCommand("DELETE dbo.TDADMeetingRoomIssue WHERE IssueID=@id AND CompanyID=@company AND StatusCode='OPEN'", db);
         Add(command, "@id", id); Add(command, "@company", company);
-        return await command.ExecuteNonQueryAsync(token) == 1 ? NoContent() : Conflict(new { message = "ลบได้เฉพาะรายการสถานะ OPEN" });
+        return await command.ExecuteNonQueryAsync(token) == 1
+            ? NoContent()
+            : Conflict(new { message = "ลบรายการแจ้งปัญหาไม่ได้", description = "รายการอาจไม่อยู่ในบริษัทปัจจุบันหรือพ้นสถานะ OPEN แล้ว กรุณาเปิดรายการใหม่" });
     }
 
     private async Task<bool> Permission(string action, CancellationToken token)
     {
+        if (!long.TryParse(User.FindFirstValue("project_id"), out var activeProjectId))
+            return false;
         await using var db = await Open(token);
+        await using var activeProject = new SqlCommand(
+            "SELECT COUNT(1) FROM dbo.TDADProject WHERE ProjectID=@project AND ProjectCode=N'LAOO_MEETING' AND IsActive=1",
+            db);
+        activeProject.Parameters.AddWithValue("@project", activeProjectId);
+        if (Convert.ToInt32(await activeProject.ExecuteScalarAsync(token)) != 1)
+            return false;
         return await LaooMeetingApi.Security.MeetingFoodPlanAccess
             .Allowed(db, User, action, token, ScreenCode);
     }

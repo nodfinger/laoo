@@ -37,8 +37,8 @@
 
 ## Form Card
 
-- Form อยู่ใน Card สีขาว มุมโค้ง `LaooRadius.xs` (`4px`) เต็มความกว้างและจัดติดกับ Header Card โดยใช้เส้นสีเทาอ่อนคั่น
-- Padding ใช้ `LaooLayout.cardPadding`; ระยะห่างระหว่างแถว Field เท่ากับ `12px`
+- Form อยู่ใน Card สีขาว มุมโค้ง `LaooRadius.xs` (`4px`) เต็มความกว้างและจัดติดกับ Header Card โดยใช้เส้น Border จาก User Style คั่น
+- Padding ใช้ `LaooLayout.cardPadding`; ระยะห่างระหว่างแถว Field ใช้ `LaooLayout.popupFieldSpacing` (`16px`)
 - หัวข้อย่อยเป็นสีดำ ส่วน Icon ของหัวข้อใช้ Primary ตาม User Style
 - ช่อง `สถานะ` อยู่บนสุดก่อน Field อื่น และข้อความกับ Switch อยู่ติดกัน
 - TextBox/ComboBox ทุกช่องใช้ `OutlineInputBorder` ตาม Required Action Style ด้านบน ไม่ใช้เพียงเส้นใต้
@@ -55,5 +55,5 @@
 ## Prompt สำหรับส่งให้ AI
 
 ```text
-ปรับหน้า Action ของ ScreenType = 1 เป็น Popup สีขาว แบ่ง Panel เมื่อมีหลาย Field ตาม ACTION_UI_STANDARD.md และ POPUP_UI_STANDARD.md Caption เป็น {MenuName} > {Action} สีดำ 18px Icon ตาม User Style ปุ่มยกเลิก/บันทึกอยู่ด้านล่างขวาชุดเดียว Font ปุ่ม 13px สูง 48px ช่องกรอก 14px TextBox/ComboBox และปุ่มมุมโค้ง 4px ระยะระหว่างแถว 12px ตรวจ Responsive, Overflow, dart format และ dart analyze ไม่เปลี่ยน Business Logic เว้นแต่ได้รับคำสั่ง
+ปรับหน้า Action ของ ScreenType = 1 เป็น Popup สีขาว แบ่ง Panel เมื่อมีหลาย Field ตาม ACTION_UI_STANDARD.md และ POPUP_UI_STANDARD.md Caption เป็น {MenuName} > {Action} สีดำ 18px Icon ตาม User Style ปุ่มยกเลิก/บันทึกอยู่ด้านล่างขวาชุดเดียว Font ปุ่ม 13px สูง 48px ช่องกรอก 14px TextBox/ComboBox และปุ่มมุมโค้ง 4px ระยะระหว่างแถว 16px ตรวจ Responsive, Overflow, dart format และ dart analyze ไม่เปลี่ยน Business Logic เว้นแต่ได้รับคำสั่ง
 ```

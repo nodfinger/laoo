@@ -27,6 +27,9 @@ class _State extends State<RotationPatternPage> {
   bool cards = false;
   String? message;
   bool error = false;
+  bool get canCreate => actions?.screenType == 1 && actions?.create == true;
+  bool get canEdit => actions?.screenType == 1 && actions?.edit == true;
+  bool get canDelete => actions?.screenType == 1 && actions?.delete == true;
   @override
   void initState() {
     super.initState();
@@ -79,6 +82,7 @@ class _State extends State<RotationPatternPage> {
   }
 
   Future<void> edit([RotationPattern? row]) async {
+    if (row == null ? !canCreate : !canEdit) return;
     var x = RotationPattern.empty();
     if (row != null) {
       try {
@@ -105,15 +109,20 @@ class _State extends State<RotationPatternPage> {
   }
 
   Future<void> remove(RotationPattern x) async {
+    if (!canDelete) return;
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) =>
           TimeDeleteDialog(itemLabel: '${x.code} — ${x.name}'),
     );
-    if (ok == true) {
+    if (ok == true && mounted) {
       try {
         await repo.delete(x);
-        await load(page: data.page);
+        await load(
+          page: data.items.length == 1 && data.page > 1
+              ? data.page - 1
+              : data.page,
+        );
         notice('ลบข้อมูลสำเร็จ', false);
       } catch (e) {
         notice(timeErrorText(e), true);
@@ -143,20 +152,21 @@ class _State extends State<RotationPatternPage> {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  IconButton(
-                    tooltip: 'แก้ไข',
-                    onPressed: actions?.edit == true
-                        ? () => edit(data.items[index])
-                        : null,
-                    icon: const Icon(Icons.edit_outlined),
-                  ),
-                  IconButton(
-                    tooltip: 'ลบ',
-                    onPressed: actions?.delete == true
-                        ? () => remove(data.items[index])
-                        : null,
-                    icon: const Icon(Icons.delete_outline, color: Colors.red),
-                  ),
+                  if (canEdit)
+                    IconButton(
+                      tooltip: 'แก้ไข',
+                      onPressed: () => edit(data.items[index]),
+                      icon: const Icon(Icons.edit_outlined),
+                    ),
+                  if (canDelete)
+                    IconButton(
+                      tooltip: 'ลบ',
+                      onPressed: () => remove(data.items[index]),
+                      icon: Icon(
+                        Icons.delete_outline,
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -195,7 +205,7 @@ class _State extends State<RotationPatternPage> {
                           cards: cards,
                           onChanged: (value) => setState(() => cards = value),
                         ),
-                        if (actions?.create == true)
+                        if (canCreate)
                           FilledButton.icon(
                             onPressed: () => edit(),
                             icon: const Icon(Icons.add),
@@ -204,7 +214,7 @@ class _State extends State<RotationPatternPage> {
                       ],
                     ),
                   ),
-                  SizedBox(height: timeUiTokens.cardSpacing),
+                  SizedBox(height: timeUiTokens.itemSpacing),
                   Expanded(
                     child: Card(
                       child: loading
@@ -226,35 +236,39 @@ class _State extends State<RotationPatternPage> {
                                   ),
                                   title: Text('${x.code} — ${x.name}'),
                                   subtitle: Text('วงรอบ ${x.cycleDays} วัน'),
-                                  trailing: Wrap(
-                                    children: [
-                                      IconButton(
-                                        tooltip: 'แก้ไข',
-                                        onPressed: actions?.edit == true
-                                            ? () => edit(x)
-                                            : null,
-                                        icon: const Icon(Icons.edit_outlined),
-                                      ),
-                                      IconButton(
-                                        tooltip: 'ลบ',
-                                        onPressed: actions?.delete == true
-                                            ? () => remove(x)
-                                            : null,
-                                        icon: const Icon(
-                                          Icons.delete_outline,
-                                          color: Colors.red,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                                  trailing: canEdit || canDelete
+                                      ? Wrap(
+                                          children: [
+                                            if (canEdit)
+                                              IconButton(
+                                                tooltip: 'แก้ไข',
+                                                onPressed: () => edit(x),
+                                                icon: const Icon(
+                                                  Icons.edit_outlined,
+                                                ),
+                                              ),
+                                            if (canDelete)
+                                              IconButton(
+                                                tooltip: 'ลบ',
+                                                onPressed: () => remove(x),
+                                                icon: Icon(
+                                                  Icons.delete_outline,
+                                                  color: Theme.of(
+                                                    context,
+                                                  ).colorScheme.error,
+                                                ),
+                                              ),
+                                          ],
+                                        )
+                                      : null,
                                 );
                               },
                             )
                           : _table(),
                     ),
                   ),
-                  SizedBox(height: timeUiTokens.cardSpacing),
-                  LaooPaginationCard(
+                  SizedBox(height: timeUiTokens.itemSpacing),
+                  TimePaginationCard(
                     tokens: timeUiTokens.workspace,
                     page: data.page,
                     pageCount: data.total == 0

@@ -2,7 +2,7 @@
 
 ## Fixed pagination card height
 
-- Pagination ต้องอยู่ใน Pagination Card แยกจาก Table/List เสมอ และวางใต้ Table/List โดยเว้นระยะ `LaooLayout.cardSpacing`; ต้องแสดง Card นี้แม้มีข้อมูลเพียงหน้าเดียวหรือไม่มีข้อมูล
+- Pagination ต้องอยู่ใน Pagination Card แยกจาก Table/List เสมอ และวางใต้ Table/List โดยเว้นระยะ `LaooLayout.listSectionSpacing` (`6px`); ต้องแสดง Card นี้แม้มีข้อมูลเพียงหน้าเดียวหรือไม่มีข้อมูล
 - Pagination Card ใช้พื้นสีขาว เต็มความกว้าง Content Area ไม่มีเส้นกรอบสีและไม่มีเส้นคั่นภายใน Card มุมโค้ง `LaooRadius.xs` (`4px`)
 - The outer pagination card height must be exactly `56px` on all standard list/document screens.
 - In Flutter, use the shared constant `LaooLayout.paginationCardHeight`; do not hardcode the value per page.
@@ -10,7 +10,7 @@
 - Keep the existing pagination behavior, page size, current page, and API/business logic unchanged.
 
 - ส่วนเนื้อหา Pagination ภายใน Card ใช้ `LaooLayout.cardPadding` โดยต้องไม่ทำให้ความสูงรวมเกิน `56px`
-- ปุ่มก่อนหน้าและถัดไปใช้ Icon `<` และ `>`
+- ปุ่มก่อนหน้า, เลขหน้า และถัดไปใช้ขนาด `LaooLayout.paginationButtonSize` (`34px`); ปุ่มก่อนหน้าและถัดไปใช้ Icon `<` และ `>`
 - ชุด Pagination เรียงเป็น `<`, เลขหน้าปัจจุบัน, `>` โดยเว้นระยะระหว่างปุ่ม `6px`; ข้อความสรุปจำนวนรายการอยู่ถัดจากชุดปุ่มและเว้นระยะ `12px` ห้ามใช้ `Spacer` ดันข้อความไปชิดขวาสุด
 - ปุ่มทุกปุ่มมีเส้นกรอบ `1px` สี Primary ตาม User Style และมุมโค้ง `LaooRadius.xs` (`4px`) ห้ามใช้ทรงวงกลม
 - ปุ่มหน้าปัจจุบันใช้พื้น Primary ตาม User Style พร้อมเส้นกรอบ Primary และข้อความสีที่อ่านชัด

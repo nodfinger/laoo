@@ -7,7 +7,9 @@ import 'visitor_inside_repository.dart';
 import 'visitor_visit_detail_dialog.dart';
 
 class VisitorExceptionsPage extends StatefulWidget {
-  const VisitorExceptionsPage({super.key});
+  const VisitorExceptionsPage({super.key, this.apiClient});
+
+  final VisitorApiClient? apiClient;
 
   @override
   State<VisitorExceptionsPage> createState() => _VisitorExceptionsPageState();
@@ -30,7 +32,7 @@ class _VisitorExceptionsPageState extends State<VisitorExceptionsPage> {
   @override
   void initState() {
     super.initState();
-    _api = VisitorApiClient();
+    _api = widget.apiClient ?? VisitorApiClient();
     _repository = VisitorExceptionsRepository(_api);
     _detailRepository = VisitorInsideRepository(_api);
     _load();
@@ -39,7 +41,7 @@ class _VisitorExceptionsPageState extends State<VisitorExceptionsPage> {
   @override
   void dispose() {
     _search.dispose();
-    _api.dispose();
+    if (widget.apiClient == null) _api.dispose();
     super.dispose();
   }
 
@@ -68,7 +70,15 @@ class _VisitorExceptionsPageState extends State<VisitorExceptionsPage> {
         _result = result;
       });
     } catch (error) {
-      if (mounted) setState(() => _error = error.toString());
+      if (mounted) {
+        final detail = error is VisitorApiException
+            ? error.message
+            : 'กรุณาตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง';
+        setState(
+          () => _error =
+              'ไม่สามารถโหลดรายการผิดปกติได้\nรายละเอียดเพิ่มเติม: $detail',
+        );
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -98,111 +108,122 @@ class _VisitorExceptionsPageState extends State<VisitorExceptionsPage> {
     pageTitle: _actions?.caption ?? '',
     activeMenu: '34003',
     child: ListView(
-      padding: const EdgeInsets.all(10),
+      padding: EdgeInsets.all(visitorUiTokens.cardMargin),
       children: [
         _surface(
           Row(
             children: [
-              const Icon(Icons.warning_amber_rounded),
+              Icon(
+                Icons.star_border_rounded,
+                color: Theme.of(context).colorScheme.primary,
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   _actions?.caption ?? '',
-                  style: Theme.of(context).textTheme.titleLarge
-                      ?.copyWith(fontWeight: FontWeight.w700),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
                 ),
-              ),
-              IconButton(
-                tooltip: 'โหลดใหม่',
-                onPressed: _loading ? null : _load,
-                icon: const Icon(Icons.refresh),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 6),
+        SizedBox(height: visitorUiTokens.listSectionSpacing),
         _surface(_filters()),
-        const SizedBox(height: 10),
+        SizedBox(height: visitorUiTokens.listSectionSpacing),
         if (_error != null) ...[
           _surface(
-            Text(
-              _error!,
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _error!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton(
+                  onPressed: _loading ? null : _load,
+                  child: const Text('ลองอีกครั้ง'),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 10),
+          SizedBox(height: visitorUiTokens.listSectionSpacing),
         ],
-        _surface(_list()),
-        const SizedBox(height: 10),
-        _surface(_pagination()),
+        if (_error == null) _surface(_list()),
+        SizedBox(height: visitorUiTokens.listSectionSpacing),
+        _pagination(),
       ],
     ),
   );
 
-  Widget _filters() => Wrap(
-    spacing: 8,
-    runSpacing: 8,
-    crossAxisAlignment: WrapCrossAlignment.center,
-    children: [
-      SizedBox(
-        width: 280,
-        child: TextField(
-          controller: _search,
-          onSubmitted: (_) => _load(resetPage: true),
-          decoration: const InputDecoration(
-            labelText: 'ค้นหาชื่อ / ผู้รับรอง / จุดติดต่อ',
-            prefixIcon: Icon(Icons.search),
+  Widget _filters() => LayoutBuilder(
+    builder: (context, constraints) => Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        SizedBox(
+          width: constraints.maxWidth < 280 ? constraints.maxWidth : 280,
+          child: TextField(
+            controller: _search,
+            onSubmitted: (_) => _load(resetPage: true),
+            decoration: const InputDecoration(
+              labelText: 'ค้นหาชื่อ / ผู้รับรอง / จุดติดต่อ',
+              prefixIcon: Icon(Icons.search),
+            ),
           ),
         ),
-      ),
-      SizedBox(
-        width: 250,
-        child: DropdownButtonFormField<String>(
-          key: ValueKey(_type),
-          initialValue: _type,
-          isExpanded: true,
-          decoration: const InputDecoration(labelText: 'ประเภทผิดปกติ'),
-          items: const [
-            DropdownMenuItem(value: 'ALL', child: Text('ทั้งหมด')),
-            DropdownMenuItem(
-              value: 'HOST_CONFIRMATION_PENDING',
-              child: Text('รอยืนยันการเข้าพบ'),
-            ),
-            DropdownMenuItem(
-              value: 'CHECKOUT_OTHER',
-              child: Text('Check-out เหตุผลอื่น ๆ'),
-            ),
-            DropdownMenuItem(
-              value: 'NOTIFICATION_FAILED',
-              child: Text('แจ้งเตือนส่งไม่สำเร็จ'),
-            ),
-            DropdownMenuItem(
-              value: 'NOTIFICATION_NO_CHANNEL',
-              child: Text('ไม่มีช่องทางแจ้งเตือน'),
-            ),
-            DropdownMenuItem(
-              value: 'CHECKOUT_RULE_MISMATCH',
-              child: Text('ผลและเหตุผลไม่สัมพันธ์กัน'),
-            ),
-          ],
-          onChanged: (value) => setState(() => _type = value ?? 'ALL'),
+        SizedBox(
+          width: constraints.maxWidth < 250 ? constraints.maxWidth : 250,
+          child: DropdownButtonFormField<String>(
+            key: ValueKey(_type),
+            initialValue: _type,
+            isExpanded: true,
+            decoration: const InputDecoration(labelText: 'ประเภทผิดปกติ'),
+            items: const [
+              DropdownMenuItem(value: 'ALL', child: Text('ทั้งหมด')),
+              DropdownMenuItem(
+                value: 'HOST_CONFIRMATION_PENDING',
+                child: Text('รอยืนยันการเข้าพบ'),
+              ),
+              DropdownMenuItem(
+                value: 'CHECKOUT_OTHER',
+                child: Text('Check-out เหตุผลอื่น ๆ'),
+              ),
+              DropdownMenuItem(
+                value: 'NOTIFICATION_FAILED',
+                child: Text('แจ้งเตือนส่งไม่สำเร็จ'),
+              ),
+              DropdownMenuItem(
+                value: 'NOTIFICATION_NO_CHANNEL',
+                child: Text('ไม่มีช่องทางแจ้งเตือน'),
+              ),
+              DropdownMenuItem(
+                value: 'CHECKOUT_RULE_MISMATCH',
+                child: Text('ผลและเหตุผลไม่สัมพันธ์กัน'),
+              ),
+            ],
+            onChanged: (value) => setState(() => _type = value ?? 'ALL'),
+          ),
         ),
-      ),
-      OutlinedButton.icon(
-        onPressed: _loading ? null : _pickPeriod,
-        icon: const Icon(Icons.date_range_outlined),
-        label: Text(_periodText),
-      ),
-      FilledButton.icon(
-        onPressed: _loading ? null : () => _load(resetPage: true),
-        icon: const Icon(Icons.search),
-        label: const Text('ค้นหา'),
-      ),
-      OutlinedButton(
-        onPressed: _loading ? null : _clear,
-        child: const Text('ล้าง Filter'),
-      ),
-    ],
+        OutlinedButton.icon(
+          onPressed: _loading ? null : _pickPeriod,
+          icon: const Icon(Icons.date_range_outlined),
+          label: Text(_periodText),
+        ),
+        FilledButton.icon(
+          onPressed: _loading ? null : () => _load(resetPage: true),
+          icon: const Icon(Icons.search),
+          label: const Text('ค้นหา'),
+        ),
+        OutlinedButton(
+          onPressed: _loading ? null : _clear,
+          child: const Text('ล้าง Filter'),
+        ),
+      ],
+    ),
   );
 
   String get _periodText {
@@ -219,8 +240,9 @@ class _VisitorExceptionsPageState extends State<VisitorExceptionsPage> {
         children: [
           Text(
             'รายการที่ต้องตรวจสอบ',
-            style: Theme.of(context).textTheme.titleMedium
-                ?.copyWith(fontWeight: FontWeight.w700),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 10),
           if (_loading)
@@ -261,8 +283,12 @@ class _VisitorExceptionsPageState extends State<VisitorExceptionsPage> {
       ...items.map(
         (item) => Container(
           padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: const BoxDecoration(
-            border: Border(top: BorderSide(color: Color(0xFFD9DDE3))),
+          decoration: BoxDecoration(
+            border: Border(
+              top: BorderSide(
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
+            ),
           ),
           child: Row(
             children: [
@@ -291,8 +317,10 @@ class _VisitorExceptionsPageState extends State<VisitorExceptionsPage> {
 
   Widget _compactItem(VisitorExceptionItem item) => Container(
     padding: const EdgeInsets.symmetric(vertical: 12),
-    decoration: const BoxDecoration(
-      border: Border(top: BorderSide(color: Color(0xFFD9DDE3))),
+    decoration: BoxDecoration(
+      border: Border(
+        top: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+      ),
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -324,36 +352,23 @@ class _VisitorExceptionsPageState extends State<VisitorExceptionsPage> {
     final result = _result;
     final total = result?.total ?? 0;
     final pageCount = total == 0 ? 1 : (total / _pageSize).ceil();
-    final from = total == 0 ? 0 : ((_page - 1) * _pageSize) + 1;
-    final to = total == 0 ? 0 : (from + _pageSize - 1).clamp(0, total);
-    return SizedBox(
-      height: 56,
-      child: Wrap(
-        crossAxisAlignment: WrapCrossAlignment.center,
-        spacing: 12,
-        children: [
-          Text('$from-$to จาก $total รายการ'),
-          OutlinedButton(
-            onPressed: _loading || _page <= 1
-                ? null
-                : () {
-                    setState(() => _page--);
-                    _load();
-                  },
-            child: const Text('<'),
-          ),
-          FilledButton(onPressed: null, child: Text('$_page')),
-          OutlinedButton(
-            onPressed: _loading || _page >= pageCount
-                ? null
-                : () {
-                    setState(() => _page++);
-                    _load();
-                  },
-            child: const Text('>'),
-          ),
-        ],
-      ),
+    return VisitorPaginationCard(
+      page: _page,
+      pageCount: pageCount,
+      pageSize: _pageSize,
+      total: total,
+      onPrevious: _loading || _page <= 1
+          ? null
+          : () {
+              setState(() => _page--);
+              _load();
+            },
+      onNext: _loading || _page >= pageCount
+          ? null
+          : () {
+              setState(() => _page++);
+              _load();
+            },
     );
   }
 
@@ -376,8 +391,12 @@ class _VisitorExceptionsPageState extends State<VisitorExceptionsPage> {
     return '${_date(local)} ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
   }
 
-  Widget _surface(Widget child) => Material(
-    color: Colors.white,
-    child: Padding(padding: const EdgeInsets.all(10), child: child),
+  Widget _surface(Widget child) => Card(
+    margin: EdgeInsets.zero,
+    elevation: 0,
+    child: Padding(
+      padding: EdgeInsets.all(visitorUiTokens.cardPadding),
+      child: child,
+    ),
   );
 }

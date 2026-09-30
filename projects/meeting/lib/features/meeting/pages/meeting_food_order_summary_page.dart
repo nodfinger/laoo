@@ -1165,9 +1165,9 @@ class _State extends State<MeetingFoodOrderSummaryPage> {
                     ],
                   ),
                 ),
-                const SizedBox(height: LaooLayout.cardSpacing),
+                const SizedBox(height: LaooLayout.listSectionSpacing),
                 filterCard(),
-                const SizedBox(height: LaooLayout.cardSpacing),
+                const SizedBox(height: LaooLayout.listSectionSpacing),
                 Expanded(
                   child: loading
                       ? const Center(child: CircularProgressIndicator())
@@ -1183,7 +1183,7 @@ class _State extends State<MeetingFoodOrderSummaryPage> {
                         )
                       : resultList(preset),
                 ),
-                const SizedBox(height: LaooLayout.cardSpacing),
+                const SizedBox(height: LaooLayout.listSectionSpacing),
                 pager(),
               ],
             ),

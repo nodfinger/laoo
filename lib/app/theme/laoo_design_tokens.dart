@@ -39,10 +39,16 @@ abstract final class LaooLayout {
   static const cardMargin = 10.0;
   static const cardPadding = 10.0;
   static const cardSpacing = 10.0;
+  static const listSectionSpacing = 6.0;
+  static const listItemSpacing = 6.0;
+  static const filterActionHeight = 40.0;
+  static const popupFieldSpacing = 16.0;
+  static const popupHeaderMinHeight = 48.0;
   static const dialogInsetPadding = 24.0;
 
   /// Standard total height for pagination cards across document/list screens.
   static const paginationCardHeight = 56.0;
+  static const paginationButtonSize = 34.0;
 }
 
 abstract final class LaooShadows {

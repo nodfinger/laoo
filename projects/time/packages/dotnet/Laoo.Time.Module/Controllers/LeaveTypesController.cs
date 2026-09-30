@@ -24,9 +24,10 @@ public sealed class LeaveTypesController(IConfiguration configuration) : Control
     {
         if (!Scope(out _, out _)) return Forbid();
         await using var c = await Open(token);
-        return Ok(new { menuCode = MenuCode, caption = await Caption(c, token), screenType = 1,
-            view = await Can(c, "VIEW", token), create = await Can(c, "CREATE", token),
-            edit = await Can(c, "EDIT", token), delete = await Can(c, "DELETE", token) });
+        var crudScreen = await CrudScreen(c, token);
+        return Ok(new { menuCode = MenuCode, caption = await Caption(c, token), screenType = crudScreen ? 1 : 0,
+            view = await Can(c, "VIEW", token), create = crudScreen && await Can(c, "CREATE", token),
+            edit = crudScreen && await Can(c, "EDIT", token), delete = crudScreen && await Can(c, "DELETE", token) });
     }
 
     [HttpGet]
@@ -55,13 +56,35 @@ public sealed class LeaveTypesController(IConfiguration configuration) : Control
     [HttpDelete("{id:long}")]
     public async Task<IActionResult> Delete(long id, [FromQuery] string rowVersion, CancellationToken token)
     {
-        if (!Scope(out var companyId, out var userId)) return Forbid();
+        if (!Scope(out var companyId, out _)) return Forbid();
         if (!RowVersion(rowVersion)) return BadRequest(new { message = "ไม่พบ Version ของข้อมูล กรุณาโหลดใหม่" });
-        await using var c = await Open(token); if (!await Can(c, "DELETE", token)) return Forbid();
-        await using var q = new SqlCommand("IF EXISTS(SELECT 1 FROM dbo.TDTMLeaveRequest WHERE CompanyID=@C AND LeaveTypeID=@ID) THROW 52620,N'ประเภทลานี้ถูกใช้งานแล้ว ไม่สามารถลบได้',1; UPDATE dbo.TDTMLeaveType SET IsActive=0,UpdateDate=SYSDATETIME(),UpdateBy=@U WHERE CompanyID=@C AND LeaveTypeID=@ID AND RowVersion=CONVERT(binary(8),@V,2)", c);
-        Add(q, "@C", SqlDbType.BigInt, companyId); Add(q, "@U", SqlDbType.BigInt, userId); Add(q, "@ID", SqlDbType.BigInt, id); Add(q, "@V", SqlDbType.VarChar, rowVersion, 32);
-        try { return await q.ExecuteNonQueryAsync(token) == 1 ? NoContent() : Conflict(new { message = "ข้อมูลถูกแก้ไขแล้ว กรุณาโหลดใหม่" }); }
-        catch (SqlException e) when (e.Number == 52620) { return Conflict(new { message = e.Message }); }
+        await using var c = await Open(token);
+        if (!await CrudScreen(c, token) || !await Can(c, "DELETE", token)) return Forbid();
+        await using var q = new SqlCommand("""
+DELETE L FROM dbo.TDTMLeaveType L
+WHERE L.CompanyID=@C AND L.LeaveTypeID=@ID AND L.RowVersion=CONVERT(binary(8),@V,2)
+ AND NOT EXISTS(SELECT 1 FROM dbo.TDTMLeaveRequest R WHERE R.CompanyID=L.CompanyID AND R.LeaveTypeID=L.LeaveTypeID)
+ AND NOT EXISTS(SELECT 1 FROM dbo.TDTMLeaveEntitlementPolicyVersion R WHERE R.CompanyID=L.CompanyID AND R.LeaveTypeID=L.LeaveTypeID)
+ AND NOT EXISTS(SELECT 1 FROM dbo.TDTMLeaveEntitlementLedger R WHERE R.CompanyID=L.CompanyID AND R.LeaveTypeID=L.LeaveTypeID)
+ AND NOT EXISTS(SELECT 1 FROM dbo.TDTMLeaveReservation R WHERE R.CompanyID=L.CompanyID AND R.LeaveTypeID=L.LeaveTypeID)
+ AND NOT EXISTS(SELECT 1 FROM dbo.TDTMLeaveUsage R WHERE R.CompanyID=L.CompanyID AND R.LeaveTypeID=L.LeaveTypeID);
+""", c);
+        Add(q, "@C", SqlDbType.BigInt, companyId);
+        Add(q, "@ID", SqlDbType.BigInt, id);
+        Add(q, "@V", SqlDbType.VarChar, rowVersion, 32);
+        try
+        {
+            if (await q.ExecuteNonQueryAsync(token) == 1) return NoContent();
+        }
+        catch (SqlException e) when (e.Number == 547)
+        {
+            return Conflict(new { message = "ลบประเภทลาไม่ได้", description = "ประเภทลานี้มีข้อมูลอื่นอ้างอิงอยู่" });
+        }
+        await using var owned = new SqlCommand("SELECT COUNT(1) FROM dbo.TDTMLeaveType WHERE CompanyID=@C AND LeaveTypeID=@ID", c);
+        Add(owned, "@C", SqlDbType.BigInt, companyId);
+        Add(owned, "@ID", SqlDbType.BigInt, id);
+        if (Convert.ToInt32(await owned.ExecuteScalarAsync(token)) == 0) return Forbid();
+        return Conflict(new { message = "ลบประเภทลาไม่ได้", description = "รายการถูกใช้งานอยู่ หรือข้อมูลเปลี่ยนไปแล้ว กรุณาโหลดหน้าใหม่" });
     }
 
     private async Task<IActionResult> Save(long? id, LeaveTypeSaveRequest request, CancellationToken token)
@@ -70,7 +93,7 @@ public sealed class LeaveTypesController(IConfiguration configuration) : Control
         var code = Clean(request.LeaveTypeCode)?.ToUpperInvariant(); var name = Clean(request.LeaveTypeName); var unit = Clean(request.UnitCode)?.ToUpperInvariant();
         if (code is null || code.Length > 50 || name is null || name.Length > 200 || unit is not ("DAY" or "MINUTE")) return BadRequest(new { message = "กรุณาระบุรหัส ชื่อ และหน่วยสิทธิ์ลาให้ถูกต้อง" });
         if (id.HasValue && !RowVersion(request.RowVersion)) return BadRequest(new { message = "ไม่พบ Version ของข้อมูล กรุณาโหลดใหม่" });
-        await using var c = await Open(token); if (!await Can(c, id.HasValue ? "EDIT" : "CREATE", token)) return Forbid();
+        await using var c = await Open(token); if (!await CrudScreen(c, token) || !await Can(c, id.HasValue ? "EDIT" : "CREATE", token)) return Forbid();
         try
         {
             var sql = id.HasValue
@@ -86,6 +109,12 @@ public sealed class LeaveTypesController(IConfiguration configuration) : Control
     private async Task<SqlConnection> Open(CancellationToken t) { var c = new SqlConnection(configuration.GetConnectionString("LaooDatabase")); await c.OpenAsync(t); return c; }
     private bool Scope(out long c, out long u) { c = 0; u = 0; return string.Equals(User.FindFirstValue("user_type"), "COMPANY_USER", StringComparison.OrdinalIgnoreCase) && long.TryParse(User.FindFirstValue("company_id"), out c) && long.TryParse(User.FindFirstValue("user_id"), out u) && c > 0 && u > 0; }
     private Task<bool> Can(SqlConnection c, string action, CancellationToken t) => CompanyMenuAccess.IsAllowedAsync(c, User, MenuCode, action, t);
+    private static async Task<bool> CrudScreen(SqlConnection c, CancellationToken t)
+    {
+        await using var q = new SqlCommand("SELECT COUNT(1) FROM dbo.TDADMainMenu WHERE MenuCode=@M AND ScreenType=1 AND IsActive=1", c);
+        Add(q, "@M", SqlDbType.Char, MenuCode, 5);
+        return Convert.ToInt32(await q.ExecuteScalarAsync(t)) == 1;
+    }
     private static async Task<string> Caption(SqlConnection c, CancellationToken t) { await using var q = new SqlCommand("SELECT TOP(1) MenuName FROM dbo.TDADMainMenu WHERE MenuCode='28009'", c); return Convert.ToString(await q.ExecuteScalarAsync(t)) ?? "ประเภทการลา"; }
     private static string? Clean(string? x) => string.IsNullOrWhiteSpace(x) ? null : x.Trim();
     private static bool RowVersion(string? x) => x is { Length: 16 } && x.All(Uri.IsHexDigit);

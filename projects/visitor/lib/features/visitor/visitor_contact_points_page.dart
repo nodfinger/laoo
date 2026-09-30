@@ -74,27 +74,45 @@ class _VisitorContactPointsPageState extends State<VisitorContactPointsPage> {
       return const Center(child: CircularProgressIndicator());
     }
     return ListView(
-      padding: const EdgeInsets.all(10),
+      padding: EdgeInsets.all(visitorUiTokens.cardMargin),
       children: [
         _header(c),
-        const SizedBox(height: 6),
+        SizedBox(height: visitorUiTokens.listSectionSpacing),
         _filter(c),
-        const SizedBox(height: 6),
+        SizedBox(height: visitorUiTokens.listSectionSpacing),
         Card(
+          margin: EdgeInsets.zero,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
           child: _table(c, l),
+        ),
+        SizedBox(height: visitorUiTokens.listSectionSpacing),
+        VisitorPaginationCard(
+          page: l?.page ?? 1,
+          pageCount: l == null || l.total == 0 ? 1 : (l.total / 30).ceil(),
+          pageSize: 30,
+          total: l?.total ?? 0,
+          onPrevious: l != null && !_loading && l.page > 1
+              ? () => _load(l.page - 1)
+              : null,
+          onNext: l != null && !_loading && l.items.length == 30
+              ? () => _load(l.page + 1)
+              : null,
         ),
       ],
     );
   }
 
   Widget _header(BuildContext c) => Card(
+    margin: EdgeInsets.zero,
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
     child: Padding(
       padding: const EdgeInsets.all(16),
       child: Row(
         children: [
-          const Icon(Icons.location_on_outlined),
+          Icon(
+            Icons.star_border_rounded,
+            color: Theme.of(c).colorScheme.primary,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -113,36 +131,41 @@ class _VisitorContactPointsPageState extends State<VisitorContactPointsPage> {
     ),
   );
   Widget _filter(BuildContext c) => Card(
+    margin: EdgeInsets.zero,
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
     child: Padding(
       padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: _search,
-              onSubmitted: (_) => _load(),
-              decoration: const InputDecoration(
-                labelText: 'ค้นหารหัสหรือชื่อจุดติดต่อ',
-                prefixIcon: Icon(Icons.search),
+      child: LayoutBuilder(
+        builder: (context, constraints) => Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            SizedBox(
+              width: constraints.maxWidth < 280 ? constraints.maxWidth : 280,
+              child: TextField(
+                controller: _search,
+                onSubmitted: (_) => _load(),
+                decoration: const InputDecoration(
+                  labelText: 'ค้นหารหัสหรือชื่อจุดติดต่อ',
+                  prefixIcon: Icon(Icons.search),
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 8),
-          FilledButton.icon(
-            onPressed: _loading ? null : _load,
-            icon: const Icon(Icons.search),
-            label: const Text('ค้นหา'),
-          ),
-          const SizedBox(width: 8),
-          OutlinedButton(
-            onPressed: () {
-              _search.clear();
-              _load();
-            },
-            child: const Text('ล้าง Filter'),
-          ),
-        ],
+            FilledButton.icon(
+              onPressed: _loading ? null : _load,
+              icon: const Icon(Icons.search),
+              label: const Text('ค้นหา'),
+            ),
+            OutlinedButton(
+              onPressed: () {
+                _search.clear();
+                _load();
+              },
+              child: const Text('ล้าง Filter'),
+            ),
+          ],
+        ),
       ),
     ),
   );
@@ -171,7 +194,9 @@ class _VisitorContactPointsPageState extends State<VisitorContactPointsPage> {
               children: [
                 Icon(
                   x.isActive ? Icons.check_circle : Icons.cancel,
-                  color: x.isActive ? Colors.green : Colors.grey,
+                  color: x.isActive
+                      ? Theme.of(c).colorScheme.primary
+                      : Theme.of(c).colorScheme.onSurfaceVariant,
                 ),
                 if (_actions?.edit == true)
                   IconButton(
@@ -180,7 +205,10 @@ class _VisitorContactPointsPageState extends State<VisitorContactPointsPage> {
                   ),
                 if (_actions?.delete == true)
                   IconButton(
-                    icon: const Icon(Icons.delete_outline, color: Colors.red),
+                    icon: Icon(
+                      Icons.delete_outline,
+                      color: Theme.of(c).colorScheme.error,
+                    ),
                     onPressed: () => _delete(x),
                   ),
               ],
@@ -191,27 +219,6 @@ class _VisitorContactPointsPageState extends State<VisitorContactPointsPage> {
             padding: EdgeInsets.all(32),
             child: Text('ไม่พบจุดติดต่อ'),
           ),
-        const Divider(height: 1),
-        Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              Text('ทั้งหมด ${l.total} รายการ'),
-              IconButton(
-                onPressed: l.page > 1 ? () => _load(l.page - 1) : null,
-                icon: const Icon(Icons.chevron_left),
-              ),
-              Text('${l.page}'),
-              IconButton(
-                onPressed: l.items.length == 30
-                    ? () => _load(l.page + 1)
-                    : null,
-                icon: const Icon(Icons.chevron_right),
-              ),
-            ],
-          ),
-        ),
       ],
     );
   }
@@ -219,7 +226,11 @@ class _VisitorContactPointsPageState extends State<VisitorContactPointsPage> {
   Future<void> _edit([VisitorContactPoint? x]) async {
     final saved = await showDialog<bool>(
       context: context,
-      builder: (_) => _PointDialog(api: _api, initial: x),
+      builder: (_) => _PointDialog(
+        api: _api,
+        initial: x,
+        caption: _actions?.caption ?? 'กำหนดจุดติดต่อ',
+      ),
     );
     if (saved == true) _load(_list?.page ?? 1);
   }
@@ -227,18 +238,35 @@ class _VisitorContactPointsPageState extends State<VisitorContactPointsPage> {
   Future<void> _delete(VisitorContactPoint x) async {
     final yes = await showDialog<bool>(
       context: context,
-      builder: (c) => AlertDialog(
-        icon: const Icon(Icons.delete_forever, color: Colors.red),
-        title: const Text('ลบจุดติดต่อ'),
-        content: Text('${x.code} — ${x.name}\nไม่สามารถเรียกคืนได้'),
+      builder: (c) => VisitorActionDialog(
+        icon: Icons.delete_outline,
+        destructive: true,
+        title: 'ยืนยันการลบข้อมูล',
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              padding: EdgeInsets.all(visitorUiTokens.cardPadding),
+              color: Theme.of(c).colorScheme.error.withValues(alpha: .08),
+              child: Text('${x.code} — ${x.name}'),
+            ),
+            SizedBox(height: visitorUiTokens.popupFieldSpacing),
+            const Text('รายการที่ลบแล้วไม่สามารถเรียกคืนได้'),
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(c, false),
             child: const Text('ยกเลิก'),
           ),
-          FilledButton(
+          FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(c).colorScheme.error,
+            ),
             onPressed: () => Navigator.pop(c, true),
-            child: const Text('ลบ'),
+            icon: const Icon(Icons.delete_outline),
+            label: const Text('ลบ'),
           ),
         ],
       ),
@@ -274,8 +302,9 @@ class _VisitorContactPointsPageState extends State<VisitorContactPointsPage> {
 }
 
 class _PointDialog extends StatefulWidget {
-  const _PointDialog({required this.api, this.initial});
+  const _PointDialog({required this.api, required this.caption, this.initial});
   final VisitorApiClient api;
+  final String caption;
   final VisitorContactPoint? initial;
   @override
   State<_PointDialog> createState() => _PointDialogState();
@@ -355,73 +384,66 @@ class _PointDialogState extends State<_PointDialog> {
   }
 
   @override
-  Widget build(BuildContext c) => AlertDialog(
-    title: Text(widget.initial == null ? 'เพิ่มจุดติดต่อ' : 'แก้ไขจุดติดต่อ'),
-    content: ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 560),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('สถานะ'),
-              value: _active,
-              onChanged: (v) => setState(() => _active = v),
-            ),
-            TextField(
-              controller: _code,
-              decoration: const InputDecoration(labelText: 'รหัสจุดติดต่อ *'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _name,
-              decoration: const InputDecoration(labelText: 'ชื่อจุดติดต่อ *'),
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<int>(
-              key: ValueKey(_branch),
-              initialValue: _branch,
-              decoration: const InputDecoration(labelText: 'สาขา *'),
-              items: _lookups?.branches
-                  .map(
-                    (b) => DropdownMenuItem(
-                      value: b.id,
-                      child: Text('${b.code} — ${b.name}'),
-                    ),
-                  )
-                  .toList(),
-              onChanged: (v) => setState(() => _branch = v),
-            ),
-            const SizedBox(height: 12),
-            Text('พนักงานประจำจุด', style: Theme.of(c).textTheme.titleMedium),
-            if (_lookups == null)
-              const Center(child: CircularProgressIndicator())
-            else
-              for (final e in _lookups!.employees)
-                CheckboxListTile(
-                  contentPadding: EdgeInsets.zero,
-                  value: _employees.contains(e.id),
-                  enabled: e.available || _employees.contains(e.id),
-                  title: Text('${e.code} — ${e.name}'),
-                  subtitle: e.available ? null : const Text('ประจำจุดอื่นแล้ว'),
-                  onChanged: (v) => setState(() {
-                    if (v == true) {
-                      _employees.add(e.id);
-                    } else {
-                      _employees.remove(e.id);
-                    }
-                  }),
-                ),
-            if (_error != null)
-              Text(
-                _error!,
-                style: TextStyle(color: Theme.of(c).colorScheme.error),
-              ),
-          ],
+  Widget build(BuildContext c) => VisitorActionDialog(
+    icon: Icons.place_outlined,
+    title: '${widget.caption} > ${widget.initial == null ? 'เพิ่ม' : 'แก้ไข'}',
+    content: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('สถานะ'),
+          value: _active,
+          onChanged: (v) => setState(() => _active = v),
         ),
-      ),
+        TextField(
+          controller: _code,
+          decoration: const InputDecoration(labelText: 'รหัสจุดติดต่อ *'),
+        ),
+        SizedBox(height: visitorUiTokens.popupFieldSpacing),
+        TextField(
+          controller: _name,
+          decoration: const InputDecoration(labelText: 'ชื่อจุดติดต่อ *'),
+        ),
+        SizedBox(height: visitorUiTokens.popupFieldSpacing),
+        DropdownButtonFormField<int>(
+          key: ValueKey(_branch),
+          initialValue: _branch,
+          decoration: const InputDecoration(labelText: 'สาขา *'),
+          items: _lookups?.branches
+              .map(
+                (b) => DropdownMenuItem(
+                  value: b.id,
+                  child: Text('${b.code} — ${b.name}'),
+                ),
+              )
+              .toList(),
+          onChanged: (v) => setState(() => _branch = v),
+        ),
+        SizedBox(height: visitorUiTokens.popupFieldSpacing),
+        Text('พนักงานประจำจุด', style: Theme.of(c).textTheme.titleMedium),
+        if (_lookups == null)
+          const Center(child: CircularProgressIndicator())
+        else
+          for (final e in _lookups!.employees)
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              value: _employees.contains(e.id),
+              enabled: e.available || _employees.contains(e.id),
+              title: Text('${e.code} — ${e.name}'),
+              subtitle: e.available ? null : const Text('ประจำจุดอื่นแล้ว'),
+              onChanged: (v) => setState(() {
+                if (v == true) {
+                  _employees.add(e.id);
+                } else {
+                  _employees.remove(e.id);
+                }
+              }),
+            ),
+        if (_error != null)
+          Text(_error!, style: TextStyle(color: Theme.of(c).colorScheme.error)),
+      ],
     ),
     actions: [
       TextButton(

@@ -77,6 +77,10 @@ class _LeaveEntitlementPolicyPageState
     error = e;
   });
   Future<void> edit([Map<String, dynamic>? item]) async {
+    if (actions?['screenType'] != 1 ||
+        actions?[item == null ? 'create' : 'edit'] != true) {
+      return;
+    }
     if (types.isEmpty) {
       notice('ยังไม่มีประเภทการลา กรุณาเพิ่มประเภทลาก่อน', true);
       return;
@@ -100,10 +104,31 @@ class _LeaveEntitlementPolicyPageState
     }
   }
 
+  Future<void> remove(Map<String, dynamic> item) async {
+    if (actions?['screenType'] != 1 || actions?['delete'] != true) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => TimeDeleteDialog(
+        itemLabel: "${item['leaveTypeCode']} — ${item['policyName']}",
+      ),
+    );
+    if (ok != true || !mounted) return;
+    try {
+      await repo.delete(item);
+      await load(target: page > 1 && items.length == 1 ? page - 1 : page);
+      notice('ลบเกณฑ์สิทธิ์ลาสำเร็จ', false);
+    } catch (e) {
+      notice(timeErrorText(e), true);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final caption = actions?['caption'] as String? ?? '';
     final pages = total == 0 ? 1 : (total / timePageSize).ceil();
+    final showActions =
+        actions?['screenType'] == 1 &&
+        (actions?['edit'] == true || actions?['delete'] == true);
     return buildTimeWorkspaceShell(
       pageTitle: caption,
       activeMenu: TimeMenuCodes.leaveEntitlementPolicies,
@@ -115,7 +140,8 @@ class _LeaveEntitlementPolicyPageState
               api: api,
               menuCode: TimeMenuCodes.leaveEntitlementPolicies,
               caption: caption,
-              trailing: actions?['create'] == true
+              trailing:
+                  actions?['screenType'] == 1 && actions?['create'] == true
                   ? FilledButton.icon(
                       onPressed: () => edit(),
                       icon: const Icon(Icons.add),
@@ -180,78 +206,110 @@ class _LeaveEntitlementPolicyPageState
             ),
             table: loading
                 ? const Center(child: CircularProgressIndicator())
+                : items.isEmpty
+                ? const Center(child: Text('ไม่พบข้อมูล'))
                 : LayoutBuilder(
-                    builder: (context, c) => SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(minWidth: c.maxWidth),
-                        child: DataTable(
-                          headingTextStyle: timeUiTokens.tableStyle.copyWith(
-                            color: timeUiTokens.primaryColor,
-                            fontWeight: FontWeight.w700,
+                    builder: (context, c) =>
+                        c.maxWidth < timeUiTokens.workspace.compactBreakpoint
+                        ? Column(
+                            children: items.asMap().entries.map((entry) {
+                              return _mobileCard(entry.value, entry.key);
+                            }).toList(),
+                          )
+                        : SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(minWidth: c.maxWidth),
+                              child: DataTable(
+                                headingTextStyle: timeUiTokens.tableStyle
+                                    .copyWith(
+                                      color: timeUiTokens.primaryColor,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                dataTextStyle: timeUiTokens.tableStyle,
+                                columns: [
+                                  LaooWorkspaceTableColumns.id,
+                                  if (showActions)
+                                    const DataColumn(label: Text('จัดการ')),
+                                  const DataColumn(label: Text('ประเภทการลา')),
+                                  const DataColumn(label: Text('เกณฑ์')),
+                                  const DataColumn(label: Text('สิทธิ์')),
+                                  const DataColumn(label: Text('เริ่มใช้')),
+                                  const DataColumn(label: Text('สิ้นสุด')),
+                                  const DataColumn(label: Text('สถานะ')),
+                                ],
+                                rows: items.asMap().entries.map((e) {
+                                  final x = e.value;
+                                  return DataRow(
+                                    cells: [
+                                      DataCell(
+                                        Text(
+                                          '${(page - 1) * timePageSize + e.key + 1}',
+                                        ),
+                                      ),
+                                      if (showActions)
+                                        DataCell(
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              if (actions?['screenType'] == 1 &&
+                                                  actions?['edit'] == true)
+                                                IconButton(
+                                                  tooltip: 'สร้าง Version ใหม่',
+                                                  onPressed: () => edit(x),
+                                                  icon: const Icon(
+                                                    Icons.edit_outlined,
+                                                  ),
+                                                ),
+                                              if (actions?['screenType'] == 1 &&
+                                                  actions?['delete'] == true)
+                                                IconButton(
+                                                  tooltip: 'ลบ',
+                                                  onPressed: () => remove(x),
+                                                  icon: Icon(
+                                                    Icons.delete_outline,
+                                                    color: Theme.of(
+                                                      context,
+                                                    ).colorScheme.error,
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                        ),
+                                      DataCell(
+                                        Text(
+                                          '${x['leaveTypeCode']} - ${x['leaveTypeName']}',
+                                        ),
+                                      ),
+                                      DataCell(Text('${x['policyName']}')),
+                                      DataCell(
+                                        Text(
+                                          '${x['entitlementQuantity']} ${x['unitCode'] == 'DAY' ? 'วัน' : 'นาที'}',
+                                        ),
+                                      ),
+                                      DataCell(Text(_date(x['effectiveFrom']))),
+                                      DataCell(
+                                        Text(
+                                          x['effectiveTo'] == null
+                                              ? '-'
+                                              : _date(x['effectiveTo']),
+                                        ),
+                                      ),
+                                      DataCell(
+                                        Text(
+                                          x['isActive'] == true
+                                              ? 'ใช้งาน'
+                                              : 'ไม่ใช้งาน',
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                }).toList(),
+                              ),
+                            ),
                           ),
-                          dataTextStyle: timeUiTokens.tableStyle,
-                          columns: const [
-                            LaooWorkspaceTableColumns.id,
-                            DataColumn(label: Text('จัดการ')),
-                            DataColumn(label: Text('ประเภทการลา')),
-                            DataColumn(label: Text('เกณฑ์')),
-                            DataColumn(label: Text('สิทธิ์')),
-                            DataColumn(label: Text('เริ่มใช้')),
-                            DataColumn(label: Text('สิ้นสุด')),
-                            DataColumn(label: Text('สถานะ')),
-                          ],
-                          rows: items.asMap().entries.map((e) {
-                            final x = e.value;
-                            return DataRow(
-                              cells: [
-                                DataCell(
-                                  Text(
-                                    '${(page - 1) * timePageSize + e.key + 1}',
-                                  ),
-                                ),
-                                DataCell(
-                                  actions?['edit'] == true
-                                      ? IconButton(
-                                          onPressed: () => edit(x),
-                                          icon: const Icon(Icons.edit_outlined),
-                                        )
-                                      : const SizedBox(),
-                                ),
-                                DataCell(
-                                  Text(
-                                    '${x['leaveTypeCode']} - ${x['leaveTypeName']}',
-                                  ),
-                                ),
-                                DataCell(Text('${x['policyName']}')),
-                                DataCell(
-                                  Text(
-                                    '${x['entitlementQuantity']} ${x['unitCode'] == 'DAY' ? 'วัน' : 'นาที'}',
-                                  ),
-                                ),
-                                DataCell(Text(_date(x['effectiveFrom']))),
-                                DataCell(
-                                  Text(
-                                    x['effectiveTo'] == null
-                                        ? '-'
-                                        : _date(x['effectiveTo']),
-                                  ),
-                                ),
-                                DataCell(
-                                  Text(
-                                    x['isActive'] == true
-                                        ? 'ใช้งาน'
-                                        : 'ไม่ใช้งาน',
-                                  ),
-                                ),
-                              ],
-                            );
-                          }).toList(),
-                        ),
-                      ),
-                    ),
                   ),
-            pagination: LaooPaginationCard(
+            pagination: TimePaginationCard(
               tokens: timeUiTokens.workspace,
               page: page,
               pageCount: pages,
@@ -279,6 +337,64 @@ class _LeaveEntitlementPolicyPageState
   String _date(dynamic v) {
     if (v is String) return v.split('T').first;
     return '$v';
+  }
+
+  Widget _mobileCard(Map<String, dynamic> item, int index) {
+    final theme = Theme.of(context);
+    final canEdit = actions?['screenType'] == 1 && actions?['edit'] == true;
+    final canDelete = actions?['screenType'] == 1 && actions?['delete'] == true;
+    return Card(
+      margin: EdgeInsets.only(bottom: timeUiTokens.workspace.sectionSpacing),
+      color: theme.colorScheme.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(timeUiTokens.workspace.radius),
+        side: BorderSide(color: timeUiTokens.borderColor),
+      ),
+      child: Padding(
+        padding: timeUiTokens.workspace.cardPadding,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${(page - 1) * timePageSize + index + 1}. ${item['policyName']}',
+              style: theme.textTheme.titleMedium,
+            ),
+            SizedBox(height: timeUiTokens.itemSpacing),
+            Text('${item['leaveTypeCode']} - ${item['leaveTypeName']}'),
+            Text(
+              '${item['entitlementQuantity']} ${item['unitCode'] == 'DAY' ? 'วัน' : 'นาที'}',
+            ),
+            Text(
+              '${_date(item['effectiveFrom'])} - ${item['effectiveTo'] == null ? '-' : _date(item['effectiveTo'])}',
+            ),
+            Text(item['isActive'] == true ? 'ใช้งาน' : 'ไม่ใช้งาน'),
+            if (canEdit || canDelete)
+              Align(
+                alignment: Alignment.centerRight,
+                child: Wrap(
+                  children: [
+                    if (canEdit)
+                      IconButton(
+                        tooltip: 'สร้าง Version ใหม่',
+                        onPressed: () => edit(item),
+                        icon: const Icon(Icons.edit_outlined),
+                      ),
+                    if (canDelete)
+                      IconButton(
+                        tooltip: 'ลบ',
+                        onPressed: () => remove(item),
+                        icon: Icon(
+                          Icons.delete_outline,
+                          color: theme.colorScheme.error,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -310,7 +426,9 @@ class _PolicyDialogState extends State<_PolicyDialog> {
     var days = 0;
     try {
       final rules = widget.item?['eligibilityRuleJson'] as String?;
-      if (rules != null) days = (jsonDecode(rules) as Map)['minimumServiceDays'] as int? ?? 0;
+      if (rules != null) {
+        days = (jsonDecode(rules) as Map)['minimumServiceDays'] as int? ?? 0;
+      }
     } catch (_) {}
     minimumServiceDays = TextEditingController(text: '$days');
     effectiveFrom =
@@ -365,7 +483,7 @@ class _PolicyDialogState extends State<_PolicyDialog> {
                 'ระบบจะเก็บ Version เดิมไว้จนถึงวันก่อนวันที่เริ่มใช้ใหม่',
               ),
             ),
-          const SizedBox(height: 12),
+          SizedBox(height: timeUiTokens.popupFieldSpacing),
           Row(
             children: [
               const Text('สถานะ'),
@@ -376,7 +494,7 @@ class _PolicyDialogState extends State<_PolicyDialog> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: timeUiTokens.popupFieldSpacing),
           DropdownButtonFormField<int>(
             initialValue: typeId,
             decoration: const InputDecoration(labelText: 'ประเภทการลา'),
@@ -390,14 +508,14 @@ class _PolicyDialogState extends State<_PolicyDialog> {
                 .toList(),
             onChanged: (v) => setState(() => typeId = v ?? typeId),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: timeUiTokens.popupFieldSpacing),
           TextFormField(
             controller: name,
             decoration: const InputDecoration(labelText: 'ชื่อเกณฑ์ *'),
             validator: (v) =>
                 v == null || v.trim().isEmpty ? 'กรุณาระบุข้อมูล' : null,
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: timeUiTokens.popupFieldSpacing),
           TextFormField(
             controller: quantity,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -406,14 +524,19 @@ class _PolicyDialogState extends State<_PolicyDialog> {
                 ? 'กรุณาระบุจำนวนที่ถูกต้อง'
                 : null,
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: timeUiTokens.popupFieldSpacing),
           TextFormField(
             controller: minimumServiceDays,
             keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: 'อายุงานขั้นต่ำ (วัน)', helperText: '0 = ใช้ได้ตั้งแต่เริ่มงาน'),
-            validator: (v) => int.tryParse(v ?? '') == null || int.parse(v!) < 0 ? 'กรุณาระบุจำนวนวันตั้งแต่ 0 ขึ้นไป' : null,
+            decoration: const InputDecoration(
+              labelText: 'อายุงานขั้นต่ำ (วัน)',
+              helperText: '0 = ใช้ได้ตั้งแต่เริ่มงาน',
+            ),
+            validator: (v) => int.tryParse(v ?? '') == null || int.parse(v!) < 0
+                ? 'กรุณาระบุจำนวนวันตั้งแต่ 0 ขึ้นไป'
+                : null,
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: timeUiTokens.popupFieldSpacing),
           Row(
             children: [
               Expanded(
@@ -453,7 +576,11 @@ class _PolicyDialogState extends State<_PolicyDialog> {
             'leaveTypeId': typeId,
             'policyName': name.text.trim(),
             'entitlementQuantity': num.parse(quantity.text),
-            'eligibilityRuleJson': int.parse(minimumServiceDays.text) == 0 ? null : jsonEncode({'minimumServiceDays': int.parse(minimumServiceDays.text)}),
+            'eligibilityRuleJson': int.parse(minimumServiceDays.text) == 0
+                ? null
+                : jsonEncode({
+                    'minimumServiceDays': int.parse(minimumServiceDays.text),
+                  }),
             'effectiveFrom': _iso(effectiveFrom),
             'effectiveTo': effectiveTo == null ? null : _iso(effectiveTo!),
             'isActive': active,

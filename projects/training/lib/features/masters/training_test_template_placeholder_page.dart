@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -9,6 +8,7 @@ import 'package:image/image.dart' as image;
 import 'package:laoo_shared_workspace_ui/laoo_shared_workspace_ui.dart';
 
 import '../training/training_feature_host.dart';
+import '../training/training_pagination_card.dart';
 import '../training/training_route_contract.dart';
 
 class TrainingTestTemplatePlaceholderPage extends StatefulWidget {
@@ -34,6 +34,12 @@ class _TrainingTestTemplatePlaceholderPageState
   String? _error;
   String? _message;
   bool _messageError = false;
+  bool get _canCreate =>
+      _actions?['screenType'] == 1 && _actions?['create'] == true;
+  bool get _canEdit =>
+      _actions?['screenType'] == 1 && _actions?['edit'] == true;
+  bool get _canDelete =>
+      _actions?['screenType'] == 1 && _actions?['delete'] == true;
 
   @override
   void initState() {
@@ -50,6 +56,11 @@ class _TrainingTestTemplatePlaceholderPageState
   }
 
   Future<void> _initialize() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+      _actions = null;
+    });
     try {
       _actions = Map<String, dynamic>.from(
         await _api.get('$_path/actions') as Map,
@@ -110,6 +121,7 @@ class _TrainingTestTemplatePlaceholderPageState
   }
 
   Future<void> _edit([Map<String, dynamic>? item]) async {
+    if (item == null ? !_canCreate : !_canEdit) return;
     Map<String, dynamic>? detail;
     try {
       if (item != null) {
@@ -131,6 +143,7 @@ class _TrainingTestTemplatePlaceholderPageState
           onSave: (request) async {
             if (item == null) {
               await _api.post(_path, body: request);
+              await _load(targetPage: _page);
             } else {
               await _api.put('$_path/${item['id']}', body: request);
             }
@@ -151,6 +164,7 @@ class _TrainingTestTemplatePlaceholderPageState
   }
 
   Future<void> _clone(Map<String, dynamic> item) async {
+    if (!_canCreate) return;
     try {
       await _api.post('$_path/${item['id']}/clone');
       await _load(targetPage: _page);
@@ -160,18 +174,19 @@ class _TrainingTestTemplatePlaceholderPageState
   }
 
   Future<void> _delete(Map<String, dynamic> item) async {
+    if (!_canDelete) return;
     final accepted = await showDialog<bool>(
       context: context,
       builder: (_) => TrainingActionDialog(
         icon: Icons.delete_outline,
-        iconColor: Colors.red,
+        destructive: true,
         title: 'ยืนยันการลบข้อมูล',
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Container(
-              color: Colors.red.shade50,
+              color: Theme.of(context).colorScheme.error.withValues(alpha: .08),
               padding: const EdgeInsets.all(12),
               child: Text('${item['code']} — ${item['name']}'),
             ),
@@ -185,7 +200,9 @@ class _TrainingTestTemplatePlaceholderPageState
             child: const Text('ยกเลิก'),
           ),
           FilledButton.icon(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
             onPressed: () => Navigator.pop(context, true),
             icon: const Icon(Icons.delete_outline),
             label: const Text('ลบ'),
@@ -292,7 +309,7 @@ class _TrainingTestTemplatePlaceholderPageState
               tokens: tokens.workspace,
               caption: _caption,
               leading: Icon(Icons.quiz_outlined, color: tokens.primaryColor),
-              trailing: _actions?['create'] == true
+              trailing: _canCreate
                   ? FilledButton.icon(
                       onPressed: _loading ? null : _edit,
                       icon: const Icon(Icons.add),
@@ -305,7 +322,7 @@ class _TrainingTestTemplatePlaceholderPageState
               runSpacing: 6,
               crossAxisAlignment: WrapCrossAlignment.end,
               children: [
-                SizedBox(
+                TrainingFilterField(
                   width: 260,
                   child: TextField(
                     controller: _search,
@@ -316,9 +333,10 @@ class _TrainingTestTemplatePlaceholderPageState
                     ),
                   ),
                 ),
-                SizedBox(
-                  width: 160,
+                TrainingFilterField(
+                  width: 280,
                   child: DropdownButtonFormField<String?>(
+                    isExpanded: true,
                     initialValue: _section,
                     decoration: const InputDecoration(
                       labelText: 'ช่วงแบบทดสอบ',
@@ -331,9 +349,10 @@ class _TrainingTestTemplatePlaceholderPageState
                     onChanged: (value) => setState(() => _section = value),
                   ),
                 ),
-                SizedBox(
-                  width: 150,
+                TrainingFilterField(
+                  width: 280,
                   child: DropdownButtonFormField<bool?>(
+                    isExpanded: true,
                     initialValue: _isActive,
                     decoration: const InputDecoration(labelText: 'สถานะ'),
                     items: const [
@@ -356,8 +375,16 @@ class _TrainingTestTemplatePlaceholderPageState
                 ),
               ],
             ),
-            table: _buildTable(tokens.primaryColor),
-            pagination: LaooPaginationCard(
+            table: LayoutBuilder(
+              builder: (context, constraints) =>
+                  constraints.maxWidth < tokens.workspace.compactBreakpoint &&
+                      !_loading &&
+                      _error == null &&
+                      _items.isNotEmpty
+                  ? _buildCards(tokens)
+                  : _buildTable(tokens.primaryColor),
+            ),
+            pagination: TrainingPaginationCard(
               tokens: tokens.workspace,
               page: _page,
               pageCount: pageCount,
@@ -384,14 +411,113 @@ class _TrainingTestTemplatePlaceholderPageState
     );
   }
 
+  Widget _buildCards(TrainingUiTokens tokens) => ListView.separated(
+    itemCount: _items.length,
+    separatorBuilder: (_, _) => SizedBox(height: tokens.workspace.itemSpacing),
+    itemBuilder: (context, index) {
+      final item = _items[index];
+      return Card(
+        margin: EdgeInsets.zero,
+        color: tokens.workspace.surfaceColor,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(tokens.workspace.radius),
+        ),
+        child: Padding(
+          padding: tokens.workspace.cardPadding,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                '${(_page - 1) * trainingPageSize + index + 1} · ${item['code'] ?? '-'}',
+                style: tokens.workspace.sectionStyle.copyWith(
+                  color: tokens.primaryColor,
+                ),
+              ),
+              Text(
+                '${item['name'] ?? '-'}',
+                style: tokens.workspace.tableStyle,
+              ),
+              Text(
+                '${item['section'] == 'POST' ? 'หลังอบรม' : 'ก่อนอบรม'} · ${item['questionCount'] ?? 0} ข้อ · เกณฑ์ผ่าน ${item['passingPercent'] ?? 0}%',
+                style: tokens.workspace.tableStyle,
+              ),
+              Text(
+                'คลัง ${item['bankCount'] ?? 0} ข้อ · v${item['versionNo'] ?? 1} · ${item['isActive'] == true ? 'ใช้งาน' : 'ไม่ใช้งาน'}',
+                style: tokens.workspace.tableStyle,
+              ),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Wrap(
+                  children: [
+                    if (_canEdit)
+                      IconButton(
+                        tooltip: 'แก้ไข',
+                        onPressed: () => _edit(item),
+                        icon: Icon(
+                          Icons.edit_outlined,
+                          color: tokens.primaryColor,
+                        ),
+                      ),
+                    if (_canCreate)
+                      IconButton(
+                        tooltip: 'ทำสำเนา',
+                        onPressed: () => _clone(item),
+                        icon: Icon(
+                          Icons.copy_outlined,
+                          color: tokens.primaryColor,
+                        ),
+                      ),
+                    if (_canDelete)
+                      IconButton(
+                        tooltip: 'ลบ',
+                        onPressed: () => _delete(item),
+                        icon: Icon(
+                          Icons.delete_outline,
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+
   Widget _buildTable(Color primaryColor) {
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_error != null) {
       return Center(
-        child: TextButton.icon(
-          onPressed: _load,
-          icon: const Icon(Icons.refresh),
-          label: Text(_error!),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.error_outline,
+              color: Theme.of(context).colorScheme.error,
+            ),
+            const SizedBox(height: 8),
+            Text(_error!, textAlign: TextAlign.center),
+            const SizedBox(height: 8),
+            OutlinedButton(
+              onPressed: _initialize,
+              style: OutlinedButton.styleFrom(
+                minimumSize: Size(0, trainingUiTokens.workspace.buttonHeight),
+                foregroundColor: trainingUiTokens.primaryColor,
+                side: BorderSide(color: trainingUiTokens.primaryColor),
+                textStyle: trainingUiTokens.workspace.buttonStyle,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(
+                    trainingUiTokens.workspace.radius,
+                  ),
+                ),
+              ),
+              child: const Text('ลองอีกครั้ง'),
+            ),
+          ],
         ),
       );
     }
@@ -435,19 +561,19 @@ class _TrainingTestTemplatePlaceholderPageState
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (_actions?['edit'] == true)
+                    if (_canEdit)
                       IconButton(
                         tooltip: 'แก้ไข',
                         onPressed: () => _edit(item),
                         icon: const Icon(Icons.edit_outlined),
                       ),
-                    if (_actions?['create'] == true)
+                    if (_canCreate)
                       IconButton(
                         tooltip: 'ทำสำเนา',
                         onPressed: () => _clone(item),
                         icon: const Icon(Icons.copy_outlined),
                       ),
-                    if (_actions?['delete'] == true)
+                    if (_canDelete)
                       IconButton(
                         tooltip: 'ลบ',
                         onPressed: () => _delete(item),
@@ -494,7 +620,7 @@ class _TemplateDialog extends StatefulWidget {
 }
 
 class _TemplateDialogState extends State<_TemplateDialog> {
-  final _formKey = GlobalKey<FormState>();
+  GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   late final TextEditingController _code;
   late final TextEditingController _name;
   late final TextEditingController _questionCount;
@@ -503,8 +629,7 @@ class _TemplateDialogState extends State<_TemplateDialog> {
   late bool _isActive;
   late Map<String, dynamic> _definition;
   bool _saving = false;
-  OverlayEntry? _saveErrorOverlay;
-  Timer? _saveErrorTimer;
+  OverlayEntry? _saveMessageOverlay;
 
   @override
   void initState() {
@@ -626,6 +751,7 @@ class _TemplateDialogState extends State<_TemplateDialog> {
       context: context,
       barrierDismissible: false,
       builder: (_) => _QuestionDialog(
+        caption: widget.caption,
         question: index == null ? null : questions[index],
         trueFalse: _definition['questionType'] == 'TRUE_FALSE',
         onUploadImage: widget.onUploadImage,
@@ -690,46 +816,61 @@ class _TemplateDialogState extends State<_TemplateDialog> {
     });
     try {
       await widget.onSave!(request);
-      if (mounted) Navigator.pop(context, request);
+      if (!mounted) return;
+      if (widget.item != null) {
+        Navigator.pop(context, request);
+        return;
+      }
+      setState(() {
+        _formKey = GlobalKey<FormState>();
+        _code.clear();
+        _name.clear();
+        _section = 'PRE';
+        _isActive = true;
+        _definition = {
+          ..._starterDefinition(),
+          'questions': <Map<String, dynamic>>[],
+        };
+        _questionCount.text = '1';
+        _passingPercent.text = '60';
+        _saving = false;
+      });
+      _showSaveMessage('บันทึกข้อมูลสำเร็จ', error: false);
     } catch (error) {
       if (mounted) {
         setState(() {
           _saving = false;
         });
-        _showSaveError(trainingErrorText(error));
+        _showSaveMessage(trainingErrorText(error), error: true);
       }
     }
   }
 
-  void _showSaveError(String message) {
-    _saveErrorTimer?.cancel();
-    _saveErrorOverlay?.remove();
+  void _showSaveMessage(String message, {required bool error}) {
+    _dismissSaveMessage();
     final entry = OverlayEntry(
       builder: (_) => Positioned(
         top: 12,
         right: 12,
         child: buildTrainingMessage(
           message: message,
-          error: true,
-          onClose: _dismissSaveError,
+          error: error,
+          onClose: _dismissSaveMessage,
         ),
       ),
     );
-    _saveErrorOverlay = entry;
+    _saveMessageOverlay = entry;
     Overlay.of(context, rootOverlay: true).insert(entry);
-    _saveErrorTimer = Timer(const Duration(seconds: 6), _dismissSaveError);
   }
 
-  void _dismissSaveError() {
-    _saveErrorTimer?.cancel();
-    _saveErrorTimer = null;
-    _saveErrorOverlay?.remove();
-    _saveErrorOverlay = null;
+  void _dismissSaveMessage() {
+    _saveMessageOverlay?.remove();
+    _saveMessageOverlay = null;
   }
 
   @override
   void dispose() {
-    _dismissSaveError();
+    _dismissSaveMessage();
     _code.dispose();
     _name.dispose();
     _questionCount.dispose();
@@ -757,7 +898,7 @@ class _TemplateDialogState extends State<_TemplateDialog> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: trainingUiTokens.popupFieldSpacing),
           TextFormField(
             controller: _code,
             maxLength: 30,
@@ -765,7 +906,7 @@ class _TemplateDialogState extends State<_TemplateDialog> {
               labelText: 'รหัส (เว้นว่างให้ระบบสร้าง)',
             ),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: trainingUiTokens.popupFieldSpacing),
           TextFormField(
             controller: _name,
             decoration: const InputDecoration(labelText: 'ชื่อชุดแบบทดสอบ *'),
@@ -773,8 +914,9 @@ class _TemplateDialogState extends State<_TemplateDialog> {
                 ? 'กรุณาระบุชื่อชุดแบบทดสอบ'
                 : null,
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: trainingUiTokens.popupFieldSpacing),
           DropdownButtonFormField<String>(
+            isExpanded: true,
             initialValue: _section,
             decoration: const InputDecoration(labelText: 'ช่วงแบบทดสอบ *'),
             items: const [
@@ -783,8 +925,9 @@ class _TemplateDialogState extends State<_TemplateDialog> {
             ],
             onChanged: (value) => setState(() => _section = value ?? 'PRE'),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: trainingUiTokens.popupFieldSpacing),
           DropdownButtonFormField<String>(
+            isExpanded: true,
             initialValue:
                 (_definition['questionType'] as String?) == 'TRUE_FALSE'
                 ? 'TRUE_FALSE'
@@ -838,7 +981,7 @@ class _TemplateDialogState extends State<_TemplateDialog> {
                     );
                   },
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: trainingUiTokens.popupFieldSpacing),
           TextFormField(
             controller: _questionCount,
             keyboardType: TextInputType.number,
@@ -856,7 +999,7 @@ class _TemplateDialogState extends State<_TemplateDialog> {
                   : null;
             },
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: trainingUiTokens.popupFieldSpacing),
           TextFormField(
             controller: _passingPercent,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -1043,12 +1186,14 @@ class _QuestionCard extends StatelessWidget {
 
 class _QuestionDialog extends StatefulWidget {
   const _QuestionDialog({
+    required this.caption,
     this.question,
     this.onUploadImage,
     this.templateId,
     this.trueFalse = false,
   });
 
+  final String caption;
   final Map<String, dynamic>? question;
   final Future<_UploadedTemplateImage?> Function(ValueChanged<Uint8List>)?
   onUploadImage;
@@ -1167,8 +1312,9 @@ class _QuestionDialogState extends State<_QuestionDialog> {
   void _showError(String text) {
     showDialog<void>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('ข้อมูลไม่ครบ'),
+      builder: (_) => TrainingActionDialog(
+        icon: Icons.error_outline,
+        title: 'ข้อมูลไม่ครบ',
         content: Text(text),
         actions: [
           TextButton(
@@ -1271,6 +1417,13 @@ class _QuestionDialogState extends State<_QuestionDialog> {
                       : () => showDialog<void>(
                           context: context,
                           builder: (_) => Dialog(
+                            backgroundColor: Colors.white,
+                            surfaceTintColor: Colors.transparent,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(
+                                trainingUiTokens.workspace.radius,
+                              ),
+                            ),
                             child: _ImagePreview(
                               previewBytes: previewBytes,
                               templateId: widget.templateId!,
@@ -1296,7 +1449,8 @@ class _QuestionDialogState extends State<_QuestionDialog> {
   @override
   Widget build(BuildContext context) => TrainingActionDialog(
     icon: Icons.help_outline,
-    title: widget.question == null ? 'เพิ่มข้อสอบ' : 'แก้ไขข้อสอบ',
+    title:
+        '${widget.caption} > ข้อสอบ > ${widget.question == null ? 'เพิ่ม' : 'แก้ไข'}',
     content: Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1422,57 +1576,41 @@ class _QuestionDeleteDialog extends StatelessWidget {
   final String? text;
 
   @override
-  Widget build(BuildContext context) => Dialog(
-    backgroundColor: Colors.white,
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-    child: ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 420),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Icon(Icons.delete_outline, color: Colors.red, size: 34),
-            const SizedBox(height: 10),
-            const Text(
-              'ลบข้อสอบ',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontWeight: FontWeight.w700, color: Colors.red),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              color: const Color(0xffffebee),
-              child: Text(
-                'ข้อ $number${(text?.trim().isNotEmpty ?? false) ? ': ${text!.trim()}' : ''}',
-              ),
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'เมื่อลบแล้ว ข้อสอบนี้จะไม่อยู่ในชุดข้อสอบและไม่สามารถเรียกคืนได้',
-            ),
-            const SizedBox(height: 18),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context, false),
-                  child: const Text('ยกเลิก'),
-                ),
-                const SizedBox(width: 8),
-                FilledButton.icon(
-                  style: FilledButton.styleFrom(backgroundColor: Colors.red),
-                  onPressed: () => Navigator.pop(context, true),
-                  icon: const Icon(Icons.delete_outline),
-                  label: const Text('ลบ'),
-                ),
-              ],
-            ),
-          ],
+  Widget build(BuildContext context) => TrainingActionDialog(
+    icon: Icons.delete_outline,
+    destructive: true,
+    title: 'ยืนยันการลบข้อมูล',
+    content: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          color: Theme.of(context).colorScheme.error.withValues(alpha: .08),
+          child: Text(
+            'ข้อ $number${(text?.trim().isNotEmpty ?? false) ? ': ${text!.trim()}' : ''}',
+          ),
         ),
-      ),
+        const SizedBox(height: 12),
+        const Text(
+          'เมื่อลบแล้ว ข้อสอบนี้จะไม่อยู่ในชุดข้อสอบและไม่สามารถเรียกคืนได้',
+        ),
+      ],
     ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context, false),
+        child: const Text('ยกเลิก'),
+      ),
+      FilledButton.icon(
+        style: FilledButton.styleFrom(
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+        onPressed: () => Navigator.pop(context, true),
+        icon: const Icon(Icons.delete_outline),
+        label: const Text('ลบ'),
+      ),
+    ],
   );
 }
 

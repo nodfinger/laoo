@@ -43,6 +43,21 @@ class ServiceComplaintApi {
         as Map,
   );
 
+  Future<void> edit(
+    int id, {
+    required String subject,
+    required String detail,
+    required String rowVersion,
+  }) => _client.put(
+    '/api/service/complaints/$id',
+    body: {'subject': subject, 'detail': detail, 'rowVersion': rowVersion},
+  );
+
+  Future<void> delete(int id, String rowVersion) => _client.delete(
+    '/api/service/complaints/$id',
+    query: {'rowVersion': rowVersion},
+  );
+
   Future<void> start(int id) =>
       _client.post('/api/service/complaints/$id/start', body: {});
   Future<void> complete(int id, String resolutionDetail) => _client.post(

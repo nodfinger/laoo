@@ -208,7 +208,7 @@ class _MyAttendanceHistoryPageState extends State<MyAttendanceHistoryPage> {
                         ? _cards()
                         : _table(constraints.maxWidth),
                   ),
-            pagination: LaooPaginationCard(
+            pagination: TimePaginationCard(
               tokens: timeUiTokens.workspace,
               page: _page,
               pageCount: pageCount,
