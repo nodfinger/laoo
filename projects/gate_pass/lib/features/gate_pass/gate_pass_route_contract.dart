@@ -45,7 +45,7 @@ abstract final class GatePassRoutes {
       screenType: 2,
       routeName: GatePassRouteNames.settings,
       routePath: GatePassRoutePaths.settings,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: GatePassProject.code,
@@ -53,7 +53,7 @@ abstract final class GatePassRoutes {
       screenType: 1,
       routeName: GatePassRouteNames.purposes,
       routePath: GatePassRoutePaths.purposes,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: GatePassProject.code,
@@ -61,7 +61,7 @@ abstract final class GatePassRoutes {
       screenType: 4,
       routeName: GatePassRouteNames.requests,
       routePath: GatePassRoutePaths.requests,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: GatePassProject.code,
@@ -69,7 +69,7 @@ abstract final class GatePassRoutes {
       screenType: 3,
       routeName: GatePassRouteNames.approvalInbox,
       routePath: GatePassRoutePaths.approvalInbox,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: GatePassProject.code,
@@ -77,7 +77,7 @@ abstract final class GatePassRoutes {
       screenType: 2,
       routeName: GatePassRouteNames.exitCheck,
       routePath: GatePassRoutePaths.exitCheck,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: GatePassProject.code,
@@ -85,7 +85,7 @@ abstract final class GatePassRoutes {
       screenType: 2,
       routeName: GatePassRouteNames.returnTracking,
       routePath: GatePassRoutePaths.returnTracking,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: GatePassProject.code,
@@ -93,7 +93,7 @@ abstract final class GatePassRoutes {
       screenType: 4,
       routeName: GatePassRouteNames.myGatePasses,
       routePath: GatePassRoutePaths.myGatePasses,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: GatePassProject.code,
@@ -101,7 +101,7 @@ abstract final class GatePassRoutes {
       screenType: 3,
       routeName: GatePassRouteNames.reports,
       routePath: GatePassRoutePaths.reports,
-      isImplemented: false,
+      isImplemented: true,
     ),
   ];
 

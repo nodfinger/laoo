@@ -9,10 +9,7 @@ using InventoryItemProjectDeniedException = LaooServiceModule.Infrastructure.Ite
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats.Jpeg;
-using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp.Processing;
+using SkiaSharp;
 
 namespace LaooApi.Controllers;
 
@@ -1013,21 +1010,28 @@ WHERE Q.CompanyID=@company AND Q.QrToken=@token AND Q.IsActive=1;
         var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
         var supported = contentType is "image/jpeg" or "image/png" or "image/webp" || extension is ".jpg" or ".jpeg" or ".png" or ".webp";
         if (!supported) return ProcessedImage.Rejected("รองรับเฉพาะไฟล์ JPG, PNG และ WEBP");
-        await using var input = new MemoryStream(); await file.CopyToAsync(input, token); var original = input.ToArray(); input.Position = 0;
+        await using var input = new MemoryStream(); await file.CopyToAsync(input, token); var original = input.ToArray();
         try
         {
-            using var image = await Image.LoadAsync(input, token);
+            using var encoded = SKData.CreateCopy(original); using var codec = SKCodec.Create(encoded);
+            if (codec is null) return ProcessedImage.Rejected("ไฟล์รูปภาพไม่ถูกต้องหรือไม่สามารถอ่านได้");
+            var info = codec.Info;
+            if (info.Width <= 0 || info.Height <= 0 || (long)info.Width * info.Height > 50_000_000) return ProcessedImage.Rejected("ความละเอียดรูปสูงเกินกำหนด");
+            using var image = new SKBitmap(new SKImageInfo(info.Width, info.Height, SKColorType.Rgba8888, SKAlphaType.Premul));
+            var decode = codec.GetPixels(image.Info, image.GetPixels());
+            if (decode is not (SKCodecResult.Success or SKCodecResult.IncompleteInput)) return ProcessedImage.Rejected("ไฟล์รูปภาพไม่ถูกต้องหรือไม่สามารถอ่านได้");
             if (original.Length <= MaxAttachmentBytes)
                 return new(original, NormalizeContentType(contentType, extension), NormalizeExtension(contentType, extension), image.Width, image.Height, null);
             foreach (var maxDimension in new[] { 2400, 2000, 1600, 1200, 900, 700, 500 })
             {
-                using var candidate = image.CloneAs<Rgba32>();
-                if (image.Width > maxDimension || image.Height > maxDimension)
-                    candidate.Mutate(ctx => ctx.Resize(new ResizeOptions { Mode = ResizeMode.Max, Size = new Size(maxDimension, maxDimension) }));
+                var scale = Math.Min(1d, Math.Min((double)maxDimension / image.Width, (double)maxDimension / image.Height));
+                var width = Math.Max(1, (int)Math.Round(image.Width * scale)); var height = Math.Max(1, (int)Math.Round(image.Height * scale));
+                using var candidate = image.Resize(new SKImageInfo(width, height, SKColorType.Rgba8888, SKAlphaType.Premul), new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear));
+                if (candidate is null) continue;
                 foreach (var quality in new[] { 88, 78, 68, 58, 48, 38, 30 })
                 {
-                    await using var output = new MemoryStream(); candidate.SaveAsJpeg(output, new JpegEncoder { Quality = quality });
-                    if (output.Length <= MaxAttachmentBytes) return new(output.ToArray(), "image/jpeg", ".jpg", candidate.Width, candidate.Height, null);
+                    using var rendered = SKImage.FromBitmap(candidate); using var output = rendered.Encode(SKEncodedImageFormat.Jpeg, quality); var bytes = output.ToArray();
+                    if (bytes.LongLength <= MaxAttachmentBytes) return new(bytes, "image/jpeg", ".jpg", candidate.Width, candidate.Height, null);
                 }
             }
             return ProcessedImage.Rejected("ระบบลดขนาดรูปแล้ว แต่ไฟล์ยังเกิน 1 MB");
