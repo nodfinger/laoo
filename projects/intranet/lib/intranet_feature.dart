@@ -40,7 +40,7 @@ abstract final class IntranetRoutes {
       screenType: 2,
       routeName: IntranetRouteNames.settings,
       routePath: IntranetRoutePaths.settings,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: IntranetProject.code,
@@ -48,15 +48,15 @@ abstract final class IntranetRoutes {
       screenType: 4,
       routeName: IntranetRouteNames.content,
       routePath: IntranetRoutePaths.content,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: IntranetProject.code,
       menuCode: IntranetMenuCodes.approvalInbox,
-      screenType: 3,
+      screenType: 2,
       routeName: IntranetRouteNames.approvalInbox,
       routePath: IntranetRoutePaths.approvalInbox,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: IntranetProject.code,
@@ -64,7 +64,7 @@ abstract final class IntranetRoutes {
       screenType: 3,
       routeName: IntranetRouteNames.myIntranet,
       routePath: IntranetRoutePaths.myIntranet,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: IntranetProject.code,
@@ -72,7 +72,7 @@ abstract final class IntranetRoutes {
       screenType: 3,
       routeName: IntranetRouteNames.reports,
       routePath: IntranetRoutePaths.reports,
-      isImplemented: false,
+      isImplemented: true,
     ),
   ];
 

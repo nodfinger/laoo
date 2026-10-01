@@ -46,7 +46,7 @@ abstract final class PosRoutes {
       screenType: 2,
       routeName: PosRouteNames.settings,
       routePath: PosRoutePaths.settings,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: PosProject.code,
@@ -54,7 +54,7 @@ abstract final class PosRoutes {
       screenType: 1,
       routeName: PosRouteNames.outletsAndTerminals,
       routePath: PosRoutePaths.outletsAndTerminals,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: PosProject.code,
@@ -62,7 +62,7 @@ abstract final class PosRoutes {
       screenType: 1,
       routeName: PosRouteNames.outletItems,
       routePath: PosRoutePaths.outletItems,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: PosProject.code,
@@ -70,7 +70,7 @@ abstract final class PosRoutes {
       screenType: 4,
       routeName: PosRouteNames.sales,
       routePath: PosRoutePaths.sales,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: PosProject.code,
@@ -78,7 +78,7 @@ abstract final class PosRoutes {
       screenType: 4,
       routeName: PosRouteNames.cashShifts,
       routePath: PosRoutePaths.cashShifts,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: PosProject.code,
@@ -86,7 +86,7 @@ abstract final class PosRoutes {
       screenType: 4,
       routeName: PosRouteNames.returns,
       routePath: PosRoutePaths.returns,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: PosProject.code,
@@ -94,7 +94,7 @@ abstract final class PosRoutes {
       screenType: 3,
       routeName: PosRouteNames.reports,
       routePath: PosRoutePaths.reports,
-      isImplemented: false,
+      isImplemented: true,
     ),
   ];
 

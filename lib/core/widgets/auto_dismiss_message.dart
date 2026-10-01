@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../company_setup/company_setup_controller.dart';
 import '../../app/theme/workspace_theme_presets.dart';
 
+const double _alertBackgroundOpacity = .50;
+
 class AutoDismissMessage extends StatefulWidget {
   const AutoDismissMessage({
     super.key,
@@ -63,9 +65,9 @@ class _AutoDismissMessageState extends State<AutoDismissMessage> {
         child: Card(
           elevation: 8,
           margin: EdgeInsets.zero,
-          color: widget.error
-              ? scheme.error.withValues(alpha: .50)
-              : color.withValues(alpha: .62),
+          color: (widget.error ? scheme.error : color).withValues(
+            alpha: _alertBackgroundOpacity,
+          ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),

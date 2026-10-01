@@ -103,7 +103,7 @@ class _LoginPageState extends State<LoginPage> {
         return;
       }
 
-      appRouter.goNamed(RouteNames.authenticatedHome);
+      appRouter.goNamed(RouteNames.landing);
       return;
     } on ApiException catch (error) {
       if (!mounted) {

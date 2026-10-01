@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900">
+<rect width="1440" height="900" fill="#f5f7f6"/>
+<rect width="1440" height="56" fill="white"/>
+<rect x="16" y="10" width="36" height="36" rx="4" fill="#157a5c"/>
+<text x="34" y="34" text-anchor="middle">L</text>
+<text x="64" y="28">LAOO Platform</text>
+<text x="280" y="34">ขายหน้าร้าน</text>
+<text x="390" y="34" fill="#66746b">กะเงินสด</text><text x="480" y="34" fill="#66746b">คืนสินค้า</text>
+<rect x="1250" y="10" width="174" height="36" rx="4" fill="white" stroke="#d5dcd8"/><text x="1292" y="33" font-weight="700">c111 · Admin</text>
+<rect x="12" y="68" width="1416" height="66" rx="4" fill="white"/><text x="30" y="108" font-size="25" fill="#157a5c">▣</text><text x="66" y="107" font-size="20" font-weight="700">ขายหน้าร้าน</text>
+<text x="290" y="88" font-size="12" fill="#66746b">สาขา</text><text x="290" y="111" font-size="14" font-weight="700">HO · สำนักงานใหญ่</text>
+<text x="500" y="88" font-size="12" fill="#66746b">จุดขาย</text><text x="500" y="111" font-size="14" font-weight="700">หน้าร้านสำนักงานใหญ่</text>
+<text x="710" y="88" font-size="12" fill="#66746b">เครื่องขาย</text><text x="710" y="111" font-size="14" font-weight="700">POS-HO-01</text>
+<text x="880" y="88" font-size="12" fill="#66746b">กะ</text><text x="880" y="111" font-size="14" font-weight="700">SHIFT-20261001-01</text>
+<rect x="1292" y="83" width="118" height="38" rx="4" fill="#e7f3ef"/><text x="1351" y="107" text-anchor="middle" fill="#157a5c" font-weight="700">พร้อมขาย</text>
+<rect x="12" y="144" width="850" height="744" rx="4" fill="white"/>
+<rect x="28" y="160" width="554" height="56" rx="4" fill="white" stroke="#d5dcd8"/><text x="50" y="194" font-size="16" fill="#66746b">ค้นหา / สแกนบาร์โค้ด</text>
+<rect x="594" y="160" width="120" height="56" rx="4" fill="#157a5c"/><text x="654" y="194" text-anchor="middle" fill="white" font-weight="700">ค้นหา</text>
+<rect x="726" y="160" width="120" height="56" rx="4" fill="white" stroke="#d5dcd8"/><text x="786" y="194" text-anchor="middle" fill="#157a5c" font-weight="700">ล้าง</text>
+<rect x="28" y="230" width="98" height="46" rx="23" fill="#157a5c"/><text x="77" y="258" text-anchor="middle" fill="white" font-weight="700">ทั้งหมด</text>
+<rect x="136" y="230" width="98" height="46" rx="23" fill="#f3f7f5"/><text x="185" y="258" text-anchor="middle">อุปกรณ์</text>
+<rect x="244" y="230" width="108" height="46" rx="23" fill="#f3f7f5"/><text x="298" y="258" text-anchor="middle">ระบบเสียง</text>
+<rect x="28" y="292" width="250" height="166" rx="4" fill="white" stroke="#d5dcd8"/><text x="44" y="322" font-size="12" fill="#66746b">NM001</text><text x="44" y="350" font-weight="700">Card Mifare 13.56 MHz 0.8 mm</text><text x="44" y="414" fill="#157a5c" font-size="20" font-weight="700">฿7.00</text><text x="256" y="414" text-anchor="end" fill="#66746b">เหลือ 3</text><rect x="44" y="426" width="218" height="20" rx="4" fill="#e7f3ef"/><text x="153" y="441" text-anchor="middle" fill="#157a5c" font-size="12">แตะเพื่อเพิ่ม</text>
+<rect x="290" y="292" width="250" height="166" rx="4" fill="#f1f3f2"/><text x="306" y="322" fill="#66746b">NZ001</text><text x="306" y="350" font-weight="700">Siren สีแดง 12v</text><text x="306" y="414" font-size="20" font-weight="700">฿100.00</text><text x="518" y="414" text-anchor="end" fill="#c93636">สินค้าหมด</text>
+<rect x="552" y="292" width="294" height="166" rx="4" fill="#f1f3f2"/><text x="568" y="322" fill="#66746b">NK001</text><text x="568" y="350" font-weight="700">กลอนแม่เหล็กไฟฟ้า 180 ปอนด์</text><text x="568" y="414" font-size="20" font-weight="700">฿1,000.00</text><text x="824" y="414" text-anchor="end" fill="#c93636">สินค้าหมด</text>
+<rect x="28" y="470" width="250" height="166" rx="4" fill="#f1f3f2"/><text x="44" y="502" fill="#66746b">NW001</text><text x="44" y="530" font-weight="700">Keytag R/W 125 Khz</text><text x="44" y="592" font-size="20" font-weight="700">฿17.00</text><text x="256" y="592" text-anchor="end" fill="#c93636">สินค้าหมด</text>
+<rect x="290" y="470" width="250" height="166" rx="4" fill="white" stroke="#d5dcd8"/><text x="306" y="502" fill="#66746b">NA001</text><text x="306" y="530" font-weight="700">Keytag ID 125 Khz</text><text x="306" y="592" fill="#9a6100" font-weight="700">ยังไม่มีราคา</text><text x="518" y="592" text-anchor="end">เหลือ 7</text><rect x="306" y="604" width="218" height="20" rx="4" fill="#fff0d5"/><text x="415" y="619" text-anchor="middle" fill="#9a6100" font-size="12">ต้องกำหนดราคาก่อนขาย</text>
+<rect x="552" y="470" width="294" height="166" rx="4" fill="#f1f3f2"/><text x="568" y="502" fill="#66746b">MT001</text><text x="568" y="530" font-weight="700">ไมค์ไร้สาย</text><text x="568" y="592" fill="#9a6100">ยังไม่มีราคา</text><text x="824" y="592" text-anchor="end" fill="#c93636">สินค้าหมด</text>
+<rect x="28" y="654" width="818" height="50" rx="4" fill="#f8faf9"/><text x="44" y="685" fill="#66746b">1–6 จาก 7 · คลัง HO-A · อัปเดต 14:35</text>
+<rect x="874" y="144" width="554" height="744" rx="4" fill="white"/><text x="894" y="181" font-size="20" font-weight="700">รายการขาย</text><rect x="1282" y="158" width="126" height="40" rx="4" fill="white" stroke="#d5dcd8"/><text x="1345" y="184" text-anchor="middle" fill="#c93636">ล้างตะกร้า</text>
+<line x1="894" y1="212" x2="1408" y2="212" stroke="#e0e5e2"/><text x="894" y="242" fill="#66746b">Card Mifare 13.56 MHz 0.8 mm</text><text x="894" y="266" font-weight="700">NM001 · ฿7.00</text>
+<rect x="1172" y="228" width="48" height="48" rx="4" fill="white" stroke="#d5dcd8"/><text x="1196" y="258" text-anchor="middle" font-size="20">−</text><rect x="1228" y="228" width="62" height="48" rx="4" fill="white" stroke="#d5dcd8"/><text x="1259" y="258" text-anchor="middle">3</text><rect x="1298" y="228" width="48" height="48" rx="4" fill="white" stroke="#d5dcd8"/><text x="1322" y="258" text-anchor="middle" font-size="20">+</text><text x="1408" y="259" text-anchor="end" fill="#157a5c" font-weight="700">฿21.00</text>
+<line x1="894" y1="292" x2="1408" y2="292" stroke="#e0e5e2"/><text x="894" y="322" fill="#66746b">ค่าบริการติดตั้งและทดสอบระบบหน้าร้าน</text><text x="894" y="346" font-weight="700">SERVICE-POS · ฿1,200.00</text><text x="1408" y="346" text-anchor="end" fill="#157a5c" font-weight="700">฿1,200.00</text>
+<rect x="894" y="390" width="246" height="56" rx="4" fill="white" stroke="#d5dcd8"/><text x="912" y="424" fill="#66746b">ลูกค้าทั่วไป</text><rect x="1150" y="390" width="258" height="56" rx="4" fill="white" stroke="#d5dcd8"/><text x="1168" y="424" fill="#66746b">ส่วนลดบิล 45.00</text>
+<rect x="894" y="544" width="514" height="180" rx="4" fill="#f6f9f7"/><text x="914" y="580" fill="#66746b">ยอดก่อนส่วนลด</text><text x="1388" y="580" text-anchor="end" font-weight="700">฿1,245.00</text><text x="914" y="614" fill="#66746b">ส่วนลด</text><text x="1388" y="614" text-anchor="end" fill="#c93636" font-weight="700">−฿45.00</text><text x="914" y="648" fill="#66746b">ภาษีมูลค่าเพิ่ม</text><text x="1388" y="648" text-anchor="end" font-weight="700">฿78.50</text>
+<line x1="914" y1="666" x2="1388" y2="666" stroke="#e0e5e2"/><text x="914" y="704" font-size="20" font-weight="700">ยอดสุทธิ</text><text x="1388" y="708" text-anchor="end" fill="#157a5c" font-size="40" font-weight="700">฿1,278.50</text>
+<rect x="894" y="738" width="514" height="64" rx="4" fill="#157a5c"/><text x="914" y="777" fill="white" font-size="20" font-weight="700">ชำระเงิน</text><text x="1388" y="780" text-anchor="end" fill="white" font-size="30" font-weight="700">฿1,278.50</text>
+<rect x="894" y="812" width="252" height="56" rx="4" fill="white" stroke="#d5dcd8"/><text x="1020" y="846" text-anchor="middle" fill="#157a5c" font-weight="700">พักบิล</text><rect x="1156" y="812" width="252" height="56" rx="4" fill="white" stroke="#d5dcd8"/><text x="1282" y="846" text-anchor="middle" fill="#157a5c" font-weight="700">พิมพ์ใบล่าสุด</text>
+</svg>

@@ -91,7 +91,9 @@ final GoRouter appRouter = GoRouter(
 
     if (!isAuthenticated) {
       _navigationRouteAuthorization.clear();
-    } else if (AppMenuRouteRegistry.containsPath(path)) {
+    } else if (AppMenuRouteRegistry.containsPath(path) ||
+        path == RoutePaths.landing ||
+        path == RoutePaths.login) {
       final session = appAuthController.session;
       if (session != null) {
         final requestedSessionKey = _navigationSessionKey(session);
@@ -303,6 +305,10 @@ String? resolveAppRouteRedirect({
   }
 
   if (path == RoutePaths.landing || path == RoutePaths.login) {
+    if (isCompanyUser &&
+        allowedMenuCodes.contains(IntranetMenuCodes.myIntranet)) {
+      return IntranetRoutePaths.myIntranet;
+    }
     return isLaooSupport
         ? RoutePaths.supportHome
         : RoutePaths.authenticatedHome;
