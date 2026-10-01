@@ -3,9 +3,9 @@ import 'package:laoo/app/router/app_menu_route_registry.dart';
 import 'package:laoo_expense/expense_feature.dart';
 
 void main() {
-  test('Expense has approved contracts but no active routes', () {
+  test('Expense has approved contracts and active routes', () {
     expect(ExpenseProject.code, 'LAOO_EXPENSE');
-    expect(ExpenseRoutes.all, hasLength(8));
+    expect(ExpenseRoutes.all, hasLength(9));
     expect(
       ExpenseRoutes.all.map((route) => route.menuCode),
       orderedEquals(const <String>[
@@ -17,10 +17,11 @@ void main() {
         '41006',
         '41007',
         '41008',
+        '41009',
       ]),
     );
-    expect(ExpenseRoutes.implemented, isEmpty);
-    expect(buildExpenseFeatureRoutes(), isEmpty);
+    expect(ExpenseRoutes.implemented, hasLength(9));
+    expect(buildExpenseFeatureRoutes(), hasLength(9));
     for (final route in ExpenseRoutes.all) {
       final mapped = AppMenuRouteRegistry.byMenuCode(route.menuCode);
       expect(mapped, isNotNull);

@@ -101,8 +101,26 @@ void main() {
         showTimedSnackBar(context, message: message, error: error),
     uiTokensProvider: _surveyWorkspaceTokens,
   );
-  configureExpenseFeatureHost(_buildMeetingWorkspaceShell);
-  configureProjectFeatureHost(_buildMeetingWorkspaceShell);
+  configureExpenseFeatureHost(
+    _buildMeetingWorkspaceShell,
+    apiClientFactory: ApiClient.new,
+    apiClientDisposer: (client) => (client as ApiClient).dispose(),
+    menuTitleResolver: (menuCode, fallback) => NavigationMenuRepository()
+        .resolveMenuName(menuCode: menuCode, fallback: fallback),
+    messagePresenter: (context, {required message, required error}) =>
+        showTimedSnackBar(context, message: message, error: error),
+    uiTokensProvider: _surveyWorkspaceTokens,
+  );
+  configureProjectFeatureHost(
+    _buildMeetingWorkspaceShell,
+    apiClientFactory: ApiClient.new,
+    apiClientDisposer: (client) => (client as ApiClient).dispose(),
+    menuTitleResolver: (menuCode, fallback) => NavigationMenuRepository()
+        .resolveMenuName(menuCode: menuCode, fallback: fallback),
+    messagePresenter: (context, {required message, required error}) =>
+        showTimedSnackBar(context, message: message, error: error),
+    uiTokensProvider: _surveyWorkspaceTokens,
+  );
   configureIntranetFeatureHost(_buildMeetingWorkspaceShell);
   configureVoteFeatureHost(
     _buildMeetingWorkspaceShell,

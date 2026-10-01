@@ -23,7 +23,7 @@
 ## Flow
 
 - Action Screen ต้องสืบทอด `MenuCode`, `ScreenType` และ Permission Context จากหน้าจอแม่
-- งาน Form หลาย Field ของ `ScreenType = 1` อยู่ใน Popup เดียว ไม่สร้าง Shell หรือ Route ใหม่; Popup ต้อง Responsive และเลื่อนเฉพาะเนื้อหาภายในเมื่อพื้นที่ไม่พอ
+- งาน Form หลาย Field ของ `ScreenType = 1` อยู่ใน Popup เดียว ไม่สร้าง Shell หรือ Route ใหม่; Popup ต้องแบ่งเป็น Header, Scrollable Content และ Footer โดยเลื่อนเฉพาะ Content เมื่อพื้นที่ไม่พอ ห้ามให้ Footer บัง Field หรือ ComboBox ด้านล่าง
 - ตรวจ ActionCode, Flow และปลายทางหลัง Save/Cancel จาก Feature Specification ก่อนแก้ไข
 - ปุ่มและความสามารถต้องแสดงตาม ScreenType และ Permission
 
@@ -39,7 +39,7 @@
 
 ## Form Card
 
-- Form อยู่ใน Card สีขาว มุมโค้ง `LaooRadius.xs` (`4px`) เต็มความกว้างและจัดติดกับ Header Card โดยใช้เส้น Border จาก User Style คั่น
+- Form อยู่บนพื้นสีขาวภายใน Popup มุมโค้ง `LaooRadius.xs` (`4px`) เต็มความกว้างและใช้เส้น `LaooColors.border` สีเทาจางคั่น Header/Content/Footer; Popup ทั่วไปไม่มีเส้นกรอบรอบนอก
 - Padding ใช้ `LaooLayout.cardPadding`; ระยะห่างระหว่างแถว Field ใช้ `LaooLayout.popupFieldSpacing` (`16px`)
 - หัวข้อย่อยเป็นสีดำ ส่วน Icon ของหัวข้อใช้ Primary ตาม User Style
 - ช่อง `สถานะ` อยู่บนสุดก่อน Field อื่น และข้อความกับ Switch อยู่ติดกัน

@@ -2434,6 +2434,14 @@ class _CustomerFormState extends State<CustomerForm> {
     int? departmentId;
     String query = '';
     final search = TextEditingController();
+    final departmentsById = <int, Map<String, dynamic>>{};
+    for (final department in _departments) {
+      final id = (department['departmentId'] as num?)?.toInt();
+      if (id != null && id > 0) {
+        departmentsById.putIfAbsent(id, () => department);
+      }
+    }
+    final departmentOptions = departmentsById.values.toList();
     final selected = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
@@ -2486,18 +2494,30 @@ class _CustomerFormState extends State<CustomerForm> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   DropdownButtonFormField<int?>(
-                    initialValue: departmentId,
+                    initialValue:
+                        departmentOptions.any(
+                          (department) =>
+                              (department['departmentId'] as num?)?.toInt() ==
+                              departmentId,
+                        )
+                        ? departmentId
+                        : null,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
                     decoration: const InputDecoration(labelText: 'แผนก'),
                     items: [
                       const DropdownMenuItem<int?>(
                         value: null,
                         child: Text('ทุกแผนก'),
                       ),
-                      ..._departments.map(
+                      ...departmentOptions.map(
                         (department) => DropdownMenuItem<int?>(
                           value: (department['departmentId'] as num?)?.toInt(),
                           child: Text(
                             '${department['departmentName'] ?? department['departmentCode'] ?? ''}',
+                            style: const TextStyle(fontSize: 14),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -2756,9 +2776,20 @@ class _CustomerFormState extends State<CustomerForm> {
     ValueChanged<String?> onChanged, {
     double? width,
   }) {
+    final optionsByCode = <String, Map<String, dynamic>>{};
+    for (final option in options) {
+      final code = '${option['code'] ?? option['masterCode'] ?? ''}'.trim();
+      if (code.isNotEmpty) {
+        optionsByCode.putIfAbsent(code, () => option);
+      }
+    }
+    final normalizedOptions = optionsByCode.entries.toList();
+    final normalizedValue = value?.trim();
     final valid =
-        options.any((x) => '${x['code'] ?? x['masterCode'] ?? ''}' == value)
-        ? value
+        normalizedValue != null &&
+            normalizedValue.isNotEmpty &&
+            optionsByCode.containsKey(normalizedValue)
+        ? normalizedValue
         : null;
     final comboWidth = ((MediaQuery.sizeOf(context).width - 80) / 3).clamp(
       180.0,
@@ -2777,8 +2808,9 @@ class _CustomerFormState extends State<CustomerForm> {
           labelText: '* $label',
           labelStyle: const TextStyle(fontSize: 14),
         ),
-        items: options.map((x) {
-          final code = '${x['code'] ?? x['masterCode'] ?? ''}';
+        items: normalizedOptions.map((entry) {
+          final code = entry.key;
+          final x = entry.value;
           final name = '${x['name'] ?? x['masterName'] ?? code}';
           return DropdownMenuItem(
             value: code,
@@ -2790,7 +2822,7 @@ class _CustomerFormState extends State<CustomerForm> {
           );
         }).toList(),
         validator: (v) => v == null || v.isEmpty ? 'กรุณาเลือก$label' : null,
-        onChanged: options.isEmpty ? null : onChanged,
+        onChanged: normalizedOptions.isEmpty ? null : onChanged,
       ),
     );
   }

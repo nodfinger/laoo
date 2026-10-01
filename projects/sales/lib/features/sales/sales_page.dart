@@ -229,9 +229,25 @@ class _SalesPageState extends State<SalesPage> {
               DataCell(Text('${e.key + 1 + (page - 1) * 10}')),
               DataCell(rowActions(e.value, actions, options)),
               DataCell(Text(first(e.value, ['code']))),
-              DataCell(Text(first(e.value, ['name', 'title']))),
-              DataCell(Text(first(e.value, ['stage', 'type', 'customer']))),
-              DataCell(Text(first(e.value, ['status', 'active']))),
+              DataCell(
+                _tableCellText(
+                  first(e.value, ['name', 'title']),
+                  width: 320,
+                  maxLines: 2,
+                ),
+              ),
+              DataCell(
+                _tableCellText(
+                  first(e.value, ['stage', 'type', 'customer']),
+                  width: 180,
+                ),
+              ),
+              DataCell(
+                _tableCellText(
+                  first(e.value, ['status', 'active']),
+                  width: 140,
+                ),
+              ),
             ],
           ),
         )
@@ -281,45 +297,78 @@ class _SalesPageState extends State<SalesPage> {
           .toList(),
     ),
   );
+  Widget _tableCellText(
+    String value, {
+    required double width,
+    int maxLines = 1,
+  }) => SizedBox(
+    width: width,
+    child: Text(
+      value,
+      maxLines: maxLines,
+      overflow: TextOverflow.ellipsis,
+      softWrap: maxLines > 1,
+    ),
+  );
+
   Widget rowActions(
     Map<String, dynamic> item,
     Map<String, dynamic> actions,
     Map<String, dynamic> options,
-  ) => Wrap(
-    spacing: 2,
-    children: [
+  ) {
+    final buttons = <Widget>[
       if (actions['edit'] == true && (!myTasks || item['status'] != 'DONE'))
-        IconButton(
+        _actionButton(
           tooltip: 'แก้ไข',
           onPressed: () => edit(item, options),
-          icon: Icon(Icons.edit_outlined, color: salesUiTokens.primaryColor),
+          icon: Icons.edit_outlined,
+          color: salesUiTokens.primaryColor,
         ),
       if (!myTasks && actions['delete'] == true)
-        IconButton(
+        _actionButton(
           tooltip: 'ลบ',
           onPressed: () => remove(item),
-          icon: const Icon(Icons.delete_outline, color: Colors.red),
+          icon: Icons.delete_outline,
+          color: Theme.of(context).colorScheme.error,
         ),
       if (widget.endpoint == 'leads' &&
           item['status'] != 'CONVERTED' &&
           actions['convert'] == true)
-        IconButton(
+        _actionButton(
           tooltip: 'เปลี่ยนเป็นลูกค้า',
           onPressed: () => convert(item, options),
-          icon: Icon(
-            Icons.person_add_alt_outlined,
-            color: salesUiTokens.primaryColor,
-          ),
+          icon: Icons.person_add_alt_outlined,
+          color: salesUiTokens.primaryColor,
         ),
       if (widget.endpoint == 'opportunities' &&
           item['status'] == 'OPEN' &&
           actions['close'] == true)
-        IconButton(
+        _actionButton(
           tooltip: 'ปิดการขาย',
           onPressed: () => closeOpportunity(item),
-          icon: Icon(Icons.task_alt, color: salesUiTokens.primaryColor),
+          icon: Icons.task_alt,
+          color: salesUiTokens.primaryColor,
         ),
-    ],
+    ];
+    if (buttons.isEmpty) return const SizedBox.shrink();
+    return SizedBox(
+      width: buttons.length * 36,
+      child: Row(mainAxisSize: MainAxisSize.min, children: buttons),
+    );
+  }
+
+  Widget _actionButton({
+    required String tooltip,
+    required VoidCallback onPressed,
+    required IconData icon,
+    required Color color,
+  }) => IconButton(
+    tooltip: tooltip,
+    onPressed: onPressed,
+    constraints: const BoxConstraints.tightFor(width: 36, height: 36),
+    padding: EdgeInsets.zero,
+    visualDensity: VisualDensity.compact,
+    icon: Icon(icon, color: color, size: 21),
   );
 
   Future<void> remove(Map<String, dynamic> item) async {
@@ -1034,20 +1083,27 @@ class _SalesPageState extends State<SalesPage> {
   }) {
     final filtered = type == null
         ? items
-        : items.where((e) => e['type'] == type).toList();
-    final values = filtered.map((e) => '${e['id']}').toSet();
+        : items.where((item) => item['type'] == type).toList();
+    final uniqueById = <String, Map<String, dynamic>>{};
+    for (final item in filtered) {
+      final id = item['id']?.toString();
+      if (id == null || id.isEmpty) continue;
+      uniqueById.putIfAbsent(id, () => item);
+    }
+    final uniqueItems = uniqueById.values.toList();
+    final selectedValue = uniqueById.containsKey(value) ? value : null;
     return SizedBox(
       width: 280,
       child: DropdownButtonFormField<String>(
         isExpanded: true,
-        initialValue: values.contains(value) ? value : null,
+        initialValue: selectedValue,
         decoration: InputDecoration(labelText: label),
-        items: filtered
+        items: uniqueItems
             .map(
-              (e) => DropdownMenuItem(
-                value: '${e['id']}',
+              (item) => DropdownMenuItem(
+                value: '${item['id']}',
                 child: Text(
-                  '${e['code']} - ${e['name']}',
+                  '${item['code']} - ${item['name']}',
                   overflow: TextOverflow.ellipsis,
                 ),
               ),

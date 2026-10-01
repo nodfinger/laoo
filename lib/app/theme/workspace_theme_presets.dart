@@ -156,9 +156,21 @@ class WorkspaceThemePreset {
           borderRadius: BorderRadius.circular(LaooRadius.xs),
           borderSide: BorderSide(color: border),
         ),
+        disabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
+          borderSide: BorderSide(color: border),
+        ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(LaooRadius.xs),
           borderSide: BorderSide(color: primary, width: 1.5),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
+          borderSide: const BorderSide(color: LaooColors.error),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
+          borderSide: const BorderSide(color: LaooColors.error, width: 1.5),
         ),
       ),
       dialogTheme: DialogThemeData(

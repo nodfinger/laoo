@@ -12,7 +12,8 @@ abstract final class ExpenseMenuCodes {
       approvalInbox = '41005',
       settlements = '41006',
       myExpenses = '41007',
-      reports = '41008';
+      reports = '41008',
+      directEntries = '41009';
 }
 
 abstract final class ExpenseRouteNames {
@@ -23,7 +24,8 @@ abstract final class ExpenseRouteNames {
       approvalInbox = 'expenseApprovalInbox',
       settlements = 'expenseSettlements',
       myExpenses = 'myExpenses',
-      reports = 'expenseReports';
+      reports = 'expenseReports',
+      directEntries = 'expenseDirectEntries';
 }
 
 abstract final class ExpenseRoutePaths {
@@ -34,7 +36,8 @@ abstract final class ExpenseRoutePaths {
       approvalInbox = '/company/expense-approvals',
       settlements = '/company/expense-settlements',
       myExpenses = '/company/my-expenses',
-      reports = '/company/expense-reports';
+      reports = '/company/expense-reports',
+      directEntries = '/company/direct-expenses';
 }
 
 abstract final class ExpenseRoutes {
@@ -45,7 +48,7 @@ abstract final class ExpenseRoutes {
       screenType: 2,
       routeName: ExpenseRouteNames.settings,
       routePath: ExpenseRoutePaths.settings,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: ExpenseProject.code,
@@ -53,7 +56,7 @@ abstract final class ExpenseRoutes {
       screenType: 1,
       routeName: ExpenseRouteNames.categories,
       routePath: ExpenseRoutePaths.categories,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: ExpenseProject.code,
@@ -61,7 +64,7 @@ abstract final class ExpenseRoutes {
       screenType: 4,
       routeName: ExpenseRouteNames.advances,
       routePath: ExpenseRoutePaths.advances,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: ExpenseProject.code,
@@ -69,7 +72,7 @@ abstract final class ExpenseRoutes {
       screenType: 4,
       routeName: ExpenseRouteNames.claims,
       routePath: ExpenseRoutePaths.claims,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: ExpenseProject.code,
@@ -77,7 +80,7 @@ abstract final class ExpenseRoutes {
       screenType: 3,
       routeName: ExpenseRouteNames.approvalInbox,
       routePath: ExpenseRoutePaths.approvalInbox,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: ExpenseProject.code,
@@ -85,7 +88,7 @@ abstract final class ExpenseRoutes {
       screenType: 2,
       routeName: ExpenseRouteNames.settlements,
       routePath: ExpenseRoutePaths.settlements,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: ExpenseProject.code,
@@ -93,7 +96,7 @@ abstract final class ExpenseRoutes {
       screenType: 4,
       routeName: ExpenseRouteNames.myExpenses,
       routePath: ExpenseRoutePaths.myExpenses,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: ExpenseProject.code,
@@ -101,7 +104,15 @@ abstract final class ExpenseRoutes {
       screenType: 3,
       routeName: ExpenseRouteNames.reports,
       routePath: ExpenseRoutePaths.reports,
-      isImplemented: false,
+      isImplemented: true,
+    ),
+    FeatureRouteContract(
+      projectCode: ExpenseProject.code,
+      menuCode: ExpenseMenuCodes.directEntries,
+      screenType: 4,
+      routeName: ExpenseRouteNames.directEntries,
+      routePath: ExpenseRoutePaths.directEntries,
+      isImplemented: true,
     ),
   ];
   static Iterable<FeatureRouteContract> get implemented =>

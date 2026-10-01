@@ -942,6 +942,13 @@ abstract final class AppMenuRouteRegistry {
       path: ExpenseRoutePaths.reports,
       scope: AppMenuScope.company,
     ),
+    ExpenseMenuCodes.directEntries: AppMenuRouteSpec(
+      menuCode: ExpenseMenuCodes.directEntries,
+      databaseRouteName: ExpenseRouteNames.directEntries,
+      goRouteName: ExpenseRouteNames.directEntries,
+      path: ExpenseRoutePaths.directEntries,
+      scope: AppMenuScope.company,
+    ),
     ProjectMenuCodes.settings: AppMenuRouteSpec(
       menuCode: ProjectMenuCodes.settings,
       databaseRouteName: ProjectRouteNames.settings,
