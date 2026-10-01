@@ -20,6 +20,9 @@
 - Padding ภายใน Card ใช้ `LaooLayout.cardPadding` (`10px`)
 - ระยะทั่วไประหว่าง Card/Section ใช้ `LaooLayout.cardSpacing` (`10px`); หน้าจอ List/CRUD ใช้ `LaooLayout.listSectionSpacing` (`6px`) และ Card รายการใช้ `LaooLayout.listItemSpacing` (`6px`)
 - เส้นคั่นใช้ `LaooColors.border` สีเทาอ่อนและบาง
+- TextBox และ ComboBox ทุกหน้าจอ โดยเฉพาะภายใน Popup ต้องเป็นกรอบรอบช่องแบบ `OutlineInputBorder` เส้นสีเทาจางจาก Neutral/Border Token กลาง และมุมโค้ง `LaooRadius.xs` (`4px`) เสมอ ห้ามใช้เฉพาะเส้นใต้ ห้ามไม่มีกรอบ และห้ามใช้สี Primary เป็นกรอบในสถานะปกติ
+- สีที่สื่อการโต้ตอบหรือเอกลักษณ์ของผู้ใช้ เช่น Focus Border, Floating Label ขณะ Focus, Cursor, Selected Item, Icon และปุ่ม Action ต้องอ่านจาก `workspaceThemeController.value`/User Profile Theme ผ่าน Semantic Token กลาง ห้าม hardcode สีรายหน้าจอ
+- สีพื้นขาว สีเทากลาง และสีสถานะ Error/Delete/Warning เป็น Semantic Color ตามมาตรฐาน ไม่ถูกแทนด้วยสี Primary ของ User; สถานะ Disabled ต้องใช้ Disabled/Neutral Token และยังคงกรอบเทาจางกับมุม `4px`
 - Caption หลักของหน้า `List`, `Card`, `Action` และ `Popup/Dialog` ใช้ `fontSize: 18`, `fontWeight: FontWeight.w700` และ `LaooColors.pageCaption` ซึ่งต้องเป็นสีดำ ส่วน Icon ใช้สีหลักของ User Style; ยกเว้น Popup ยืนยันลบ ให้ Caption และ Icon ใช้สี Error/Delete ตาม `alertdelete.md`
 - ห้ามใช้ `Colors.green`, `Colors.blue` หรือสีหลักแบบ hardcode; สีแดงใช้ได้เฉพาะ Error, Delete, Offline หรือสถานะไม่ใช้งานตามข้อกำหนด
 - เมื่อ User เปลี่ยน Style สีทุกส่วนที่อิง User Styleต้องเปลี่ยนทันทีและต้องไม่กระทบ User คนอื่น
@@ -41,5 +44,5 @@
 ## Prompt กลางสำหรับส่งให้ AI
 
 ```text
-ปรับหน้าจอใน Project C:\laooplatform\laoo โดยอ่าน AGENTS.md และ docs/standards/UX_UI_STANDARD.md ก่อน จากนั้นอ่านมาตรฐานเฉพาะประเภทหน้าจอที่เกี่ยวข้อง ห้ามแก้ API, SQL, Repository หรือ Business Logic ให้ใช้ LaooColors, LaooLayout, LaooRadius, LaooTypography และ Workspace Theme จากส่วนกลางเท่านั้น ตรวจ Permission, Responsive, Overflow, dart format และ dart analyze แล้วสรุปไฟล์ที่แก้
+ปรับหน้าจอใน Project C:\laooplatform\laoo โดยอ่าน AGENTS.md และ docs/standards/UX_UI_STANDARD.md ก่อน จากนั้นอ่านมาตรฐานเฉพาะประเภทหน้าจอที่เกี่ยวข้อง ห้ามแก้ API, SQL, Repository หรือ Business Logic ให้ใช้ LaooColors, LaooLayout, LaooRadius, LaooTypography และ Workspace Theme จากส่วนกลางเท่านั้น TextBox/ComboBox ต้องมีกรอบเทาจางแบบ Outline มุม 4px ทุกสถานะ และสีโต้ตอบต้องอ่านจาก User Profile Theme ตรวจ Permission, Responsive, Overflow, dart format และ dart analyze แล้วสรุปไฟล์ที่แก้
 ```

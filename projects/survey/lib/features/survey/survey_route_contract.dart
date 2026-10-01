@@ -42,7 +42,7 @@ abstract final class SurveyRoutes {
       screenType: 2,
       routeName: SurveyRouteNames.settings,
       routePath: SurveyRoutePaths.settings,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: SurveyProject.code,
@@ -50,7 +50,7 @@ abstract final class SurveyRoutes {
       screenType: 4,
       routeName: SurveyRouteNames.questionnaires,
       routePath: SurveyRoutePaths.questionnaires,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: SurveyProject.code,
@@ -58,7 +58,7 @@ abstract final class SurveyRoutes {
       screenType: 3,
       routeName: SurveyRouteNames.approvalInbox,
       routePath: SurveyRoutePaths.approvalInbox,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: SurveyProject.code,
@@ -66,7 +66,7 @@ abstract final class SurveyRoutes {
       screenType: 2,
       routeName: SurveyRouteNames.delivery,
       routePath: SurveyRoutePaths.delivery,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: SurveyProject.code,
@@ -74,7 +74,7 @@ abstract final class SurveyRoutes {
       screenType: 3,
       routeName: SurveyRouteNames.results,
       routePath: SurveyRoutePaths.results,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: SurveyProject.code,
@@ -82,7 +82,7 @@ abstract final class SurveyRoutes {
       screenType: 3,
       routeName: SurveyRouteNames.reports,
       routePath: SurveyRoutePaths.reports,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: SurveyProject.code,
@@ -90,7 +90,7 @@ abstract final class SurveyRoutes {
       screenType: 3,
       routeName: SurveyRouteNames.mine,
       routePath: SurveyRoutePaths.mine,
-      isImplemented: false,
+      isImplemented: true,
     ),
   ];
   static Iterable<FeatureRouteContract> get implemented =>

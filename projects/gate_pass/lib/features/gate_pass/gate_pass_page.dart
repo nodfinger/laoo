@@ -1616,269 +1616,22 @@ class _GatePassPageState extends State<GatePassPage> {
     }
   }
 
-  Future<void> _editSettings(Map<String, dynamic> value) async {
-    List<Map<String, dynamic>> approvers;
-    try {
-      approvers = _rows(
-        _map(await _api.get('/api/company/gate-pass/approver-options')),
+  Widget _settingsCard(BuildContext context, Map<String, dynamic> value) =>
+      _GatePassSettingsForm(
+        key: ValueKey<String>(
+          <Object?>[
+            value['isEnabled'],
+            value['defaultReturnDays'],
+            value['defaultApproverUserID'],
+            value['maxAttachmentSizeMB'],
+            value['maxAttachmentsPerStage'],
+          ].join('|'),
+        ),
+        value: value,
+        canEdit: _canEdit,
+        api: _api,
+        onSaved: _retry,
       );
-    } catch (_) {
-      if (mounted) {
-        showGatePassMessage(
-          context,
-          message: 'โหลดรายชื่อผู้อนุมัติไม่สำเร็จ',
-          error: true,
-        );
-      }
-      return;
-    }
-    if (!mounted) return;
-    final days = TextEditingController(
-      text: (value['defaultReturnDays'] ?? 7).toString(),
-    );
-    final maxMb = TextEditingController(
-      text: (value['maxAttachmentSizeMB'] ?? 1).toString(),
-    );
-    final maxCount = TextEditingController(
-      text: (value['maxAttachmentsPerStage'] ?? 5).toString(),
-    );
-    var isEnabled = value['isEnabled'] == true;
-    var approverId = int.tryParse(
-      value['defaultApproverUserID']?.toString() ?? '',
-    );
-    final saved = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => Dialog(
-          backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(gatePassUiTokens.radius),
-          ),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 520),
-            child: Padding(
-              padding: gatePassUiTokens.cardPadding,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  SizedBox(
-                    height: 48,
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        'แก้ไขการตั้งค่า',
-                        style: gatePassUiTokens.captionStyle,
-                      ),
-                    ),
-                  ),
-                  Divider(color: gatePassUiTokens.borderColor),
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text('สถานะ', style: gatePassUiTokens.inputStyle),
-                    value: isEnabled,
-                    onChanged: (value) =>
-                        setDialogState(() => isEnabled = value),
-                  ),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<int?>(
-                    initialValue: approverId,
-                    decoration: const InputDecoration(
-                      labelText: 'ผู้อนุมัติเริ่มต้น',
-                    ),
-                    items: [
-                      const DropdownMenuItem<int?>(
-                        value: null,
-                        child: Text('ไม่กำหนด'),
-                      ),
-                      ...approvers.map(
-                        (option) => DropdownMenuItem<int?>(
-                          value: int.tryParse(option['id'].toString()),
-                          child: Text(
-                            '${option['code'] ?? ''} - ${option['name'] ?? ''}',
-                          ),
-                        ),
-                      ),
-                    ],
-                    onChanged: (value) =>
-                        setDialogState(() => approverId = value),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: days,
-                    keyboardType: TextInputType.number,
-                    style: gatePassUiTokens.inputStyle,
-                    decoration: const InputDecoration(
-                      labelText: 'กำหนดรับคืนเริ่มต้น (วัน)',
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: maxMb,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    style: gatePassUiTokens.inputStyle,
-                    decoration: const InputDecoration(
-                      labelText: 'ขนาดรูปสูงสุดหลังย่อ (MB)',
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: maxCount,
-                    keyboardType: TextInputType.number,
-                    style: gatePassUiTokens.inputStyle,
-                    decoration: const InputDecoration(
-                      labelText: 'จำนวนรูปสูงสุดต่อขั้นตอน',
-                    ),
-                  ),
-                  Divider(color: gatePassUiTokens.borderColor),
-                  SizedBox(
-                    height: gatePassUiTokens.buttonHeight,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text('ยกเลิก'),
-                        ),
-                        const SizedBox(width: 8),
-                        FilledButton.icon(
-                          onPressed: () async {
-                            final returnDays = int.tryParse(days.text);
-                            final attachmentMb = double.tryParse(maxMb.text);
-                            final attachmentCount = int.tryParse(maxCount.text);
-                            if (returnDays == null ||
-                                returnDays < 1 ||
-                                returnDays > 365 ||
-                                attachmentMb == null ||
-                                attachmentMb <= 0 ||
-                                attachmentMb > 1 ||
-                                attachmentCount == null ||
-                                attachmentCount < 1 ||
-                                attachmentCount > 20) {
-                              showGatePassMessage(
-                                this.context,
-                                message:
-                                    'กำหนดวันรับคืน 1-365 วัน ขนาดรูปหลังย่อต้องไม่เกิน 1 MB และจำนวนรูป 1-20 รูป',
-                                error: true,
-                              );
-                              return;
-                            }
-                            try {
-                              await _api.put(
-                                '/api/company/gate-pass/settings',
-                                body: {
-                                  'isEnabled': isEnabled,
-                                  'defaultReturnDays': returnDays,
-                                  'defaultApproverUserID': approverId,
-                                  'maxAttachmentSizeMB': attachmentMb,
-                                  'maxAttachmentsPerStage': attachmentCount,
-                                },
-                              );
-                              if (context.mounted) {
-                                Navigator.pop(context, true);
-                              }
-                            } catch (_) {
-                              if (mounted) {
-                                showGatePassMessage(
-                                  this.context,
-                                  message: 'บันทึกการตั้งค่าไม่สำเร็จ',
-                                  error: true,
-                                );
-                              }
-                            }
-                          },
-                          icon: const Icon(Icons.save_outlined),
-                          label: const Text('บันทึก'),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-    days.dispose();
-    maxMb.dispose();
-    maxCount.dispose();
-    if (saved == true && mounted) {
-      showGatePassMessage(context, message: 'บันทึกการตั้งค่าแล้ว');
-      _retry();
-    }
-  }
-
-  Widget _settingsCard(BuildContext context, Map<String, dynamic> value) {
-    final tokens = gatePassUiTokens;
-    final enabled = value['isEnabled'] == true ? 'ใช้งาน' : 'ปิดใช้งาน';
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: tokens.cardPadding,
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'ค่าการทำงานปัจจุบัน',
-                      style: tokens.sectionStyle,
-                    ),
-                  ),
-                  if (_canEdit)
-                    IconButton(
-                      tooltip: 'แก้ไขการตั้งค่า',
-                      onPressed: () => _editSettings(value),
-                      icon: Icon(
-                        Icons.edit_outlined,
-                        color: tokens.primaryColor,
-                      ),
-                    ),
-                ],
-              ),
-              Divider(color: tokens.borderColor),
-              _settingRow('เปิดใช้งานระบบ', enabled),
-              SizedBox(height: tokens.itemSpacing),
-              _settingRow(
-                'กำหนดรับคืนเริ่มต้น',
-                '${value['defaultReturnDays'] ?? '-'} วัน',
-              ),
-              SizedBox(height: tokens.itemSpacing),
-              _settingRow(
-                'ขนาดรูปสูงสุดหลังย่อ',
-                '${value['maxAttachmentSizeMB'] ?? 1} MB',
-              ),
-              SizedBox(height: tokens.itemSpacing),
-              _settingRow(
-                'จำนวนรูปสูงสุดต่อขั้นตอน',
-                '${value['maxAttachmentsPerStage'] ?? 5} รูป',
-              ),
-              SizedBox(height: tokens.itemSpacing),
-              _settingRow(
-                'ผู้อนุมัติเริ่มต้น',
-                (value['defaultApproverName'] ?? 'ไม่กำหนด').toString(),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _settingRow(String label, String value) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(label, style: gatePassUiTokens.inputStyle),
-      const SizedBox(height: 4),
-      Text(value, style: gatePassUiTokens.sectionStyle),
-    ],
-  );
 
   Widget _dashboardCard(BuildContext context, Map<String, dynamic> value) {
     final tokens = gatePassUiTokens;
@@ -2110,4 +1863,309 @@ class _GatePassPageState extends State<GatePassPage> {
         ),
         textStyle: tokens.buttonStyle,
       );
+}
+
+class _GatePassSettingsForm extends StatefulWidget {
+  const _GatePassSettingsForm({
+    required this.value,
+    required this.canEdit,
+    required this.api,
+    required this.onSaved,
+    super.key,
+  });
+
+  final Map<String, dynamic> value;
+  final bool canEdit;
+  final JsonApiClient api;
+  final VoidCallback onSaved;
+
+  @override
+  State<_GatePassSettingsForm> createState() => _GatePassSettingsFormState();
+}
+
+class _GatePassSettingsFormState extends State<_GatePassSettingsForm> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _returnDays;
+  late final TextEditingController _maxAttachmentSize;
+  late final TextEditingController _maxAttachments;
+  late final Future<List<Map<String, dynamic>>> _approvers;
+  late bool _isEnabled;
+  int? _approverId;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _isEnabled = widget.value['isEnabled'] == true;
+    _approverId = int.tryParse(
+      widget.value['defaultApproverUserID']?.toString() ?? '',
+    );
+    _returnDays = TextEditingController(
+      text: (widget.value['defaultReturnDays'] ?? 7).toString(),
+    );
+    _maxAttachmentSize = TextEditingController(
+      text: (widget.value['maxAttachmentSizeMB'] ?? 1).toString(),
+    );
+    _maxAttachments = TextEditingController(
+      text: (widget.value['maxAttachmentsPerStage'] ?? 5).toString(),
+    );
+    _approvers = _loadApprovers();
+  }
+
+  @override
+  void dispose() {
+    _returnDays.dispose();
+    _maxAttachmentSize.dispose();
+    _maxAttachments.dispose();
+    super.dispose();
+  }
+
+  Future<List<Map<String, dynamic>>> _loadApprovers() async {
+    final response = await widget.api.get(
+      '/api/company/gate-pass/approver-options',
+    );
+    if (response is List) {
+      return response
+          .whereType<Map>()
+          .map((row) => Map<String, dynamic>.from(row))
+          .toList();
+    }
+    if (response is Map) {
+      final map = Map<String, dynamic>.from(response);
+      final source = map['items'] ?? map['data'];
+      if (source is List) {
+        return source
+            .whereType<Map>()
+            .map((row) => Map<String, dynamic>.from(row))
+            .toList();
+      }
+    }
+    return const [];
+  }
+
+  String? _validateReturnDays(String? value) {
+    final days = int.tryParse(value?.trim() ?? '');
+    if (days == null || days < 1 || days > 365) {
+      return 'ระบุจำนวนวันตั้งแต่ 1-365 วัน';
+    }
+    return null;
+  }
+
+  String? _validateAttachmentSize(String? value) {
+    final size = double.tryParse((value ?? '').trim().replaceAll(',', '.'));
+    if (size == null || size <= 0 || size > 1) {
+      return 'ระบุขนาดมากกว่า 0 และไม่เกิน 1 MB';
+    }
+    return null;
+  }
+
+  String? _validateAttachmentCount(String? value) {
+    final count = int.tryParse(value?.trim() ?? '');
+    if (count == null || count < 1 || count > 20) {
+      return 'ระบุจำนวนตั้งแต่ 1-20 รูป';
+    }
+    return null;
+  }
+
+  Future<void> _save() async {
+    if (_saving || !widget.canEdit) return;
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    setState(() => _saving = true);
+    try {
+      await widget.api.put(
+        '/api/company/gate-pass/settings',
+        body: {
+          'isEnabled': _isEnabled,
+          'defaultReturnDays': int.parse(_returnDays.text.trim()),
+          'defaultApproverUserID': _approverId,
+          'maxAttachmentSizeMB': double.parse(
+            _maxAttachmentSize.text.trim().replaceAll(',', '.'),
+          ),
+          'maxAttachmentsPerStage': int.parse(_maxAttachments.text.trim()),
+        },
+      );
+      if (!mounted) return;
+      setState(() => _saving = false);
+      showGatePassMessage(context, message: 'บันทึกการตั้งค่าแล้ว');
+      widget.onSaved();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      showGatePassMessage(
+        context,
+        message: 'บันทึกการตั้งค่าไม่สำเร็จ กรุณาตรวจสอบข้อมูลและสิทธิ์',
+        error: true,
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = gatePassUiTokens;
+    return Card(
+      margin: EdgeInsets.zero,
+      child: SingleChildScrollView(
+        padding: tokens.cardPadding,
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('ค่าการทำงานปัจจุบัน', style: tokens.sectionStyle),
+              Divider(color: tokens.borderColor),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('สถานะ', style: tokens.inputStyle),
+                  const SizedBox(width: 8),
+                  Switch(
+                    value: _isEnabled,
+                    onChanged: widget.canEdit && !_saving
+                        ? (value) => setState(() => _isEnabled = value)
+                        : null,
+                  ),
+                  const SizedBox(width: 4),
+                  Flexible(
+                    child: Text(
+                      _isEnabled ? 'เปิดใช้งานระบบ' : 'ปิดใช้งานระบบ',
+                      style: tokens.inputStyle,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  const spacing = 16.0;
+                  final compact = constraints.maxWidth < 720;
+                  final fieldWidth = compact
+                      ? constraints.maxWidth
+                      : (constraints.maxWidth - spacing) / 2;
+                  return Wrap(
+                    spacing: spacing,
+                    runSpacing: 16,
+                    children: [
+                      SizedBox(
+                        width: fieldWidth,
+                        child: FutureBuilder<List<Map<String, dynamic>>>(
+                          future: _approvers,
+                          builder: (context, snapshot) {
+                            final options = snapshot.data ?? const [];
+                            final selected =
+                                options.any(
+                                  (option) =>
+                                      int.tryParse(option['id'].toString()) ==
+                                      _approverId,
+                                )
+                                ? _approverId
+                                : null;
+                            return DropdownButtonFormField<int?>(
+                              initialValue: selected,
+                              isExpanded: true,
+                              decoration: InputDecoration(
+                                labelText: 'ผู้อนุมัติเริ่มต้น',
+                                helperText: snapshot.hasError
+                                    ? 'โหลดรายชื่อไม่สำเร็จ'
+                                    : null,
+                              ),
+                              items: [
+                                const DropdownMenuItem<int?>(
+                                  value: null,
+                                  child: Text('ไม่กำหนด'),
+                                ),
+                                ...options.map(
+                                  (option) => DropdownMenuItem<int?>(
+                                    value: int.tryParse(
+                                      option['id'].toString(),
+                                    ),
+                                    child: Text(
+                                      '${option['code'] ?? ''} - ${option['name'] ?? ''}',
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                              onChanged:
+                                  widget.canEdit && !_saving && snapshot.hasData
+                                  ? (value) => _approverId = value
+                                  : null,
+                            );
+                          },
+                        ),
+                      ),
+                      SizedBox(
+                        width: fieldWidth,
+                        child: TextFormField(
+                          controller: _returnDays,
+                          enabled: widget.canEdit && !_saving,
+                          keyboardType: TextInputType.number,
+                          style: tokens.inputStyle,
+                          decoration: const InputDecoration(
+                            labelText: 'กำหนดรับคืนเริ่มต้น (วัน)',
+                          ),
+                          validator: _validateReturnDays,
+                        ),
+                      ),
+                      SizedBox(
+                        width: fieldWidth,
+                        child: TextFormField(
+                          controller: _maxAttachmentSize,
+                          enabled: widget.canEdit && !_saving,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          style: tokens.inputStyle,
+                          decoration: const InputDecoration(
+                            labelText: 'ขนาดรูปสูงสุดหลังย่อ (MB)',
+                          ),
+                          validator: _validateAttachmentSize,
+                        ),
+                      ),
+                      SizedBox(
+                        width: fieldWidth,
+                        child: TextFormField(
+                          controller: _maxAttachments,
+                          enabled: widget.canEdit && !_saving,
+                          keyboardType: TextInputType.number,
+                          style: tokens.inputStyle,
+                          decoration: const InputDecoration(
+                            labelText: 'จำนวนรูปสูงสุดต่อขั้นตอน',
+                          ),
+                          validator: _validateAttachmentCount,
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+              if (widget.canEdit) ...[
+                const SizedBox(height: 16),
+                Divider(color: tokens.borderColor),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: FilledButton.icon(
+                    onPressed: _saving ? null : _save,
+                    style: FilledButton.styleFrom(
+                      minimumSize: Size(120, tokens.buttonHeight),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(tokens.radius),
+                      ),
+                      textStyle: tokens.buttonStyle,
+                    ),
+                    icon: _saving
+                        ? const SizedBox.square(
+                            dimension: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.save_outlined),
+                    label: Text(_saving ? 'กำลังบันทึก' : 'บันทึก'),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

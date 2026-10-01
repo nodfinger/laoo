@@ -12,6 +12,8 @@ dependencies:
   go_router: ^17.4.0
   laoo_shared_core:
     path: ../../packages/laoo_shared_core
+  laoo_shared_workspace_ui:
+    path: ../../packages/laoo_shared_workspace_ui
 
 dev_dependencies:
   flutter_test:

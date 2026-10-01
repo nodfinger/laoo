@@ -40,7 +40,7 @@ abstract final class ProjectRoutes {
       screenType: 2,
       routeName: ProjectRouteNames.settings,
       routePath: ProjectRoutePaths.settings,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: ProjectManagementProject.code,
@@ -48,7 +48,7 @@ abstract final class ProjectRoutes {
       screenType: 1,
       routeName: ProjectRouteNames.budgetCategories,
       routePath: ProjectRoutePaths.budgetCategories,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: ProjectManagementProject.code,
@@ -56,7 +56,7 @@ abstract final class ProjectRoutes {
       screenType: 4,
       routeName: ProjectRouteNames.projects,
       routePath: ProjectRoutePaths.projects,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: ProjectManagementProject.code,
@@ -64,7 +64,7 @@ abstract final class ProjectRoutes {
       screenType: 2,
       routeName: ProjectRouteNames.myTasks,
       routePath: ProjectRoutePaths.myTasks,
-      isImplemented: false,
+      isImplemented: true,
     ),
     FeatureRouteContract(
       projectCode: ProjectManagementProject.code,
@@ -72,7 +72,7 @@ abstract final class ProjectRoutes {
       screenType: 3,
       routeName: ProjectRouteNames.reports,
       routePath: ProjectRoutePaths.reports,
-      isImplemented: false,
+      isImplemented: true,
     ),
   ];
 

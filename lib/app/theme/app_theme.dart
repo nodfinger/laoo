@@ -54,7 +54,30 @@ abstract final class AppTheme {
         titleTextStyle: LaooTypography.popupTitleStyle,
       ),
       inputDecorationTheme: InputDecorationTheme(
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
+          borderSide: const BorderSide(color: LaooColors.border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
+          borderSide: const BorderSide(color: LaooColors.border),
+        ),
+        disabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
+          borderSide: const BorderSide(color: LaooColors.border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
+          borderSide: BorderSide(color: colorScheme.primary, width: 1.5),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
+          borderSide: const BorderSide(color: LaooColors.error),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
+          borderSide: const BorderSide(color: LaooColors.error, width: 1.5),
+        ),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(

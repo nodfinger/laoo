@@ -30,10 +30,97 @@ import 'core/widgets/timed_snack_bar.dart';
 import 'features/support/presentation/widgets/support_workspace_shell.dart';
 
 void main() {
-  configureFiveSFeatureHost(_buildMeetingWorkspaceShell);
-  configureSurveyFeatureHost(_buildMeetingWorkspaceShell);
-  configureExpenseFeatureHost(_buildMeetingWorkspaceShell);
-  configureProjectFeatureHost(_buildMeetingWorkspaceShell);
+  configureFiveSFeatureHost(
+    _buildMeetingWorkspaceShell,
+    apiClientFactory: ApiClient.new,
+    apiClientDisposer: (client) => (client as ApiClient).dispose(),
+    menuTitleResolver: (menuCode, fallback) => NavigationMenuRepository()
+        .resolveMenuName(menuCode: menuCode, fallback: fallback),
+    messagePresenter: (context, {required message, required error}) =>
+        showTimedSnackBar(context, message: message, error: error),
+    upload: (path, {required fileName, required bytes, fields}) {
+      final client = ApiClient();
+      return client
+          .upload(path, fileName: fileName, bytes: bytes, fields: fields)
+          .whenComplete(client.dispose);
+    },
+    uiTokensProvider: () {
+      final theme = workspaceThemeController.value;
+      return LaooWorkspaceUiTokens(
+        contentMargin: const EdgeInsets.all(LaooLayout.cardMargin),
+        cardPadding: const EdgeInsets.all(LaooLayout.cardPadding),
+        sectionSpacing: 6,
+        captionFilterSpacing: 6,
+        itemSpacing: 6,
+        radius: LaooRadius.xs,
+        compactBreakpoint: 900,
+        paginationHeight: LaooLayout.paginationCardHeight,
+        captionStyle: LaooTypography.screenCaptionStyle,
+        sectionStyle: const TextStyle(
+          fontFamily: LaooTypography.fontFamily,
+          fontFamilyFallback: LaooTypography.fontFallback,
+          fontSize: LaooTypography.sectionTitle,
+          height: LaooTypography.titleLineHeight,
+          fontWeight: LaooTypography.emphasizedWeight,
+          color: LaooColors.textPrimary,
+        ),
+        inputStyle: const TextStyle(
+          fontFamily: LaooTypography.fontFamily,
+          fontFamilyFallback: LaooTypography.fontFallback,
+          fontSize: LaooTypography.inputText,
+          height: LaooTypography.inputLineHeight,
+          color: LaooColors.textPrimary,
+        ),
+        tableStyle: const TextStyle(
+          fontFamily: LaooTypography.fontFamily,
+          fontFamilyFallback: LaooTypography.fontFallback,
+          fontSize: LaooTypography.tableBody,
+          height: LaooTypography.bodyLineHeight,
+          color: LaooColors.textPrimary,
+        ),
+        buttonStyle: const TextStyle(
+          fontFamily: LaooTypography.fontFamily,
+          fontFamilyFallback: LaooTypography.fontFallback,
+          fontSize: LaooTypography.button,
+          fontWeight: LaooTypography.emphasizedWeight,
+        ),
+        buttonHeight: LaooTypography.buttonHeight,
+        primaryColor: theme.primary,
+        borderColor: theme.border,
+        backgroundColor: LaooColors.background,
+      );
+    },
+  );
+  configureSurveyFeatureHost(
+    _buildMeetingWorkspaceShell,
+    apiClientFactory: ApiClient.new,
+    apiClientDisposer: (client) => (client as ApiClient).dispose(),
+    menuTitleResolver: (menuCode, fallback) => NavigationMenuRepository()
+        .resolveMenuName(menuCode: menuCode, fallback: fallback),
+    messagePresenter: (context, {required message, required error}) =>
+        showTimedSnackBar(context, message: message, error: error),
+    uiTokensProvider: _surveyWorkspaceTokens,
+  );
+  configureExpenseFeatureHost(
+    _buildMeetingWorkspaceShell,
+    apiClientFactory: ApiClient.new,
+    apiClientDisposer: (client) => (client as ApiClient).dispose(),
+    menuTitleResolver: (menuCode, fallback) => NavigationMenuRepository()
+        .resolveMenuName(menuCode: menuCode, fallback: fallback),
+    messagePresenter: (context, {required message, required error}) =>
+        showTimedSnackBar(context, message: message, error: error),
+    uiTokensProvider: _surveyWorkspaceTokens,
+  );
+  configureProjectFeatureHost(
+    _buildMeetingWorkspaceShell,
+    apiClientFactory: ApiClient.new,
+    apiClientDisposer: (client) => (client as ApiClient).dispose(),
+    menuTitleResolver: (menuCode, fallback) => NavigationMenuRepository()
+        .resolveMenuName(menuCode: menuCode, fallback: fallback),
+    messagePresenter: (context, {required message, required error}) =>
+        showTimedSnackBar(context, message: message, error: error),
+    uiTokensProvider: _surveyWorkspaceTokens,
+  );
   configureIntranetFeatureHost(_buildMeetingWorkspaceShell);
   configureVoteFeatureHost(
     _buildMeetingWorkspaceShell,
@@ -41,7 +128,61 @@ void main() {
     apiClientDisposer: (client) => (client as ApiClient).dispose(),
   );
   configurePosFeatureHost(_buildMeetingWorkspaceShell);
-  configureSalesFeatureHost(_buildMeetingWorkspaceShell);
+  configureSalesFeatureHost(
+    _buildMeetingWorkspaceShell,
+    apiClientFactory: ApiClient.new,
+    apiClientDisposer: (client) => (client as ApiClient).dispose(),
+    menuTitleResolver: (menuCode, fallback) => NavigationMenuRepository()
+        .resolveMenuName(menuCode: menuCode, fallback: fallback),
+    messagePresenter: (context, {required message, required error}) =>
+        showTimedSnackBar(context, message: message, error: error),
+    uiTokensProvider: () {
+      final theme = workspaceThemeController.value;
+      return LaooWorkspaceUiTokens(
+        contentMargin: const EdgeInsets.all(LaooLayout.cardMargin),
+        cardPadding: const EdgeInsets.all(LaooLayout.cardPadding),
+        sectionSpacing: LaooLayout.listSectionSpacing,
+        captionFilterSpacing: LaooLayout.listSectionSpacing,
+        itemSpacing: LaooLayout.listItemSpacing,
+        radius: LaooRadius.xs,
+        compactBreakpoint: 900,
+        paginationHeight: LaooLayout.paginationCardHeight,
+        captionStyle: LaooTypography.screenCaptionStyle,
+        sectionStyle: const TextStyle(
+          fontFamily: LaooTypography.fontFamily,
+          fontFamilyFallback: LaooTypography.fontFallback,
+          fontSize: LaooTypography.sectionTitle,
+          height: LaooTypography.titleLineHeight,
+          fontWeight: LaooTypography.emphasizedWeight,
+          color: LaooColors.textPrimary,
+        ),
+        inputStyle: const TextStyle(
+          fontFamily: LaooTypography.fontFamily,
+          fontFamilyFallback: LaooTypography.fontFallback,
+          fontSize: LaooTypography.inputText,
+          height: LaooTypography.inputLineHeight,
+          color: LaooColors.textPrimary,
+        ),
+        tableStyle: const TextStyle(
+          fontFamily: LaooTypography.fontFamily,
+          fontFamilyFallback: LaooTypography.fontFallback,
+          fontSize: LaooTypography.tableBody,
+          height: LaooTypography.bodyLineHeight,
+          color: LaooColors.textPrimary,
+        ),
+        buttonStyle: const TextStyle(
+          fontFamily: LaooTypography.fontFamily,
+          fontFamilyFallback: LaooTypography.fontFallback,
+          fontSize: LaooTypography.button,
+          fontWeight: LaooTypography.emphasizedWeight,
+        ),
+        buttonHeight: LaooTypography.buttonHeight,
+        primaryColor: theme.primary,
+        borderColor: theme.border,
+        backgroundColor: LaooColors.background,
+      );
+    },
+  );
   configureEvaluationFeatureHost(
     _buildMeetingWorkspaceShell,
     apiClientFactory: ApiClient.new,
@@ -325,6 +466,53 @@ void main() {
     ),
   );
   runApp(const LaooApp());
+}
+
+LaooWorkspaceUiTokens _surveyWorkspaceTokens() {
+  final theme = workspaceThemeController.value;
+  return LaooWorkspaceUiTokens(
+    contentMargin: const EdgeInsets.all(LaooLayout.cardMargin),
+    cardPadding: const EdgeInsets.all(LaooLayout.cardPadding),
+    sectionSpacing: LaooLayout.listSectionSpacing,
+    captionFilterSpacing: LaooLayout.listSectionSpacing,
+    itemSpacing: LaooLayout.listItemSpacing,
+    radius: LaooRadius.xs,
+    compactBreakpoint: 900,
+    paginationHeight: LaooLayout.paginationCardHeight,
+    captionStyle: LaooTypography.screenCaptionStyle,
+    sectionStyle: const TextStyle(
+      fontFamily: LaooTypography.fontFamily,
+      fontFamilyFallback: LaooTypography.fontFallback,
+      fontSize: LaooTypography.sectionTitle,
+      height: LaooTypography.titleLineHeight,
+      fontWeight: LaooTypography.emphasizedWeight,
+      color: LaooColors.textPrimary,
+    ),
+    inputStyle: const TextStyle(
+      fontFamily: LaooTypography.fontFamily,
+      fontFamilyFallback: LaooTypography.fontFallback,
+      fontSize: LaooTypography.inputText,
+      height: LaooTypography.inputLineHeight,
+      color: LaooColors.textPrimary,
+    ),
+    tableStyle: const TextStyle(
+      fontFamily: LaooTypography.fontFamily,
+      fontFamilyFallback: LaooTypography.fontFallback,
+      fontSize: LaooTypography.tableBody,
+      height: LaooTypography.bodyLineHeight,
+      color: LaooColors.textPrimary,
+    ),
+    buttonStyle: const TextStyle(
+      fontFamily: LaooTypography.fontFamily,
+      fontFamilyFallback: LaooTypography.fontFallback,
+      fontSize: LaooTypography.button,
+      fontWeight: LaooTypography.emphasizedWeight,
+    ),
+    buttonHeight: LaooTypography.buttonHeight,
+    primaryColor: theme.primary,
+    borderColor: theme.border,
+    backgroundColor: LaooColors.background,
+  );
 }
 
 Widget _buildMeetingWorkspaceShell({

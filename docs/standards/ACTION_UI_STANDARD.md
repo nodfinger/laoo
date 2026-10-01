@@ -14,14 +14,16 @@
 - พื้นผิวกรอบหน้า Action, Header Card และ Form Card เป็นสีขาว ขอบมุมโค้ง `LaooRadius.xs` (`4px`); พื้นที่ Workspace รอบนอกยังใช้ Theme กลาง
 - Caption เป็นสีดำตาม `LaooColors.pageCaption` และมี Icon ด้านหน้าใช้สี Primary ของ User ที่ Login
 - ปุ่ม Action ทุกปุ่มต้องกำหนดมุมโค้ง `LaooRadius.xs` (`4px`) อย่างชัดเจน ห้ามใช้มุมทรงแคปซูลหรือค่าเริ่มต้นของ Widget ที่ต่างจากมาตรฐาน
-- TextBox และ ComboBox ทุกช่องต้องมี `OutlineInputBorder` เส้นสี `LaooColors.border` มุมโค้ง `LaooRadius.xs` (`4px`); เมื่อ Focus ใช้สี Primary ของ User และคงมุมโค้ง `4px` ในทุกสถานะ รวม Disabled และ Validation Error
+- TextBox และ ComboBox ทุกช่องต้องมี `OutlineInputBorder` ครบรอบช่อง เส้นสีเทาจางจาก `LaooColors.border`/Neutral Border Token และมุมโค้ง `LaooRadius.xs` (`4px`) เสมอ ห้ามใช้ Underline, Borderless หรือกรอบสี Primary ในสถานะปกติ
+- เมื่อ Focus ให้กรอบ, Floating Label, Cursor และ Selection ใช้ Primary จาก User Profile Theme; เมื่อ Disabled ใช้ Disabled/Neutral Token และเมื่อ Validation Error ใช้ Error Token โดยทุกสถานะต้องคงกรอบรอบช่องและมุมโค้ง `4px`
+- Icon, Switch, Checkbox, Radio, Selected Item และปุ่ม Action ที่เป็นสีเอกลักษณ์ต้องอ่าน Semantic Color จาก User Profile Theme ห้ามกำหนดสี Primary แบบ hardcode ภายในหน้าจอ
 - หน้า View ใช้รูปแบบเดียวกัน โดยแสดงข้อมูลแบบอ่านอย่างเดียวและแสดง Action ตาม Permission
 - การสร้างหรือแก้หน้า Action ต้องตรวจข้อกำหนดชุดนี้ทุกครั้ง; ข้อยกเว้นเฉพาะหน้าต้องมีคำสั่งจากพ่อระบุชัดเจน
 
 ## Flow
 
 - Action Screen ต้องสืบทอด `MenuCode`, `ScreenType` และ Permission Context จากหน้าจอแม่
-- งาน Form หลาย Field ของ `ScreenType = 1` อยู่ใน Popup เดียว ไม่สร้าง Shell หรือ Route ใหม่; Popup ต้อง Responsive และเลื่อนเฉพาะเนื้อหาภายในเมื่อพื้นที่ไม่พอ
+- งาน Form หลาย Field ของ `ScreenType = 1` อยู่ใน Popup เดียว ไม่สร้าง Shell หรือ Route ใหม่; Popup ต้องแบ่งเป็น Header, Scrollable Content และ Footer โดยเลื่อนเฉพาะ Content เมื่อพื้นที่ไม่พอ ห้ามให้ Footer บัง Field หรือ ComboBox ด้านล่าง
 - ตรวจ ActionCode, Flow และปลายทางหลัง Save/Cancel จาก Feature Specification ก่อนแก้ไข
 - ปุ่มและความสามารถต้องแสดงตาม ScreenType และ Permission
 
@@ -37,7 +39,7 @@
 
 ## Form Card
 
-- Form อยู่ใน Card สีขาว มุมโค้ง `LaooRadius.xs` (`4px`) เต็มความกว้างและจัดติดกับ Header Card โดยใช้เส้น Border จาก User Style คั่น
+- Form อยู่บนพื้นสีขาวภายใน Popup มุมโค้ง `LaooRadius.xs` (`4px`) เต็มความกว้างและใช้เส้น `LaooColors.border` สีเทาจางคั่น Header/Content/Footer; Popup ทั่วไปไม่มีเส้นกรอบรอบนอก
 - Padding ใช้ `LaooLayout.cardPadding`; ระยะห่างระหว่างแถว Field ใช้ `LaooLayout.popupFieldSpacing` (`16px`)
 - หัวข้อย่อยเป็นสีดำ ส่วน Icon ของหัวข้อใช้ Primary ตาม User Style
 - ช่อง `สถานะ` อยู่บนสุดก่อน Field อื่น และข้อความกับ Switch อยู่ติดกัน
@@ -55,5 +57,5 @@
 ## Prompt สำหรับส่งให้ AI
 
 ```text
-ปรับหน้า Action ของ ScreenType = 1 เป็น Popup สีขาว แบ่ง Panel เมื่อมีหลาย Field ตาม ACTION_UI_STANDARD.md และ POPUP_UI_STANDARD.md Caption เป็น {MenuName} > {Action} สีดำ 18px Icon ตาม User Style ปุ่มยกเลิก/บันทึกอยู่ด้านล่างขวาชุดเดียว Font ปุ่ม 13px สูง 48px ช่องกรอก 14px TextBox/ComboBox และปุ่มมุมโค้ง 4px ระยะระหว่างแถว 16px ตรวจ Responsive, Overflow, dart format และ dart analyze ไม่เปลี่ยน Business Logic เว้นแต่ได้รับคำสั่ง
+ปรับหน้า Action ของ ScreenType = 1 เป็น Popup สีขาว แบ่ง Panel เมื่อมีหลาย Field ตาม ACTION_UI_STANDARD.md และ POPUP_UI_STANDARD.md Caption เป็น {MenuName} > {Action} สีดำ 18px Icon ตาม User Style ปุ่มยกเลิก/บันทึกอยู่ด้านล่างขวาชุดเดียว Font ปุ่ม 13px สูง 48px ช่องกรอก 14px TextBox/ComboBox ต้องมีกรอบเทาจางแบบ Outline และมุมโค้ง 4px ทุกสถานะ สี Focus/Icon/Selection/Action อ่านจาก User Profile Theme ปุ่มมุมโค้ง 4px ระยะระหว่างแถว 16px ตรวจ Responsive, Overflow, dart format และ dart analyze ไม่เปลี่ยน Business Logic เว้นแต่ได้รับคำสั่ง
 ```

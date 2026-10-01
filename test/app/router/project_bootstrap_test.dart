@@ -3,7 +3,7 @@ import 'package:laoo/app/router/app_menu_route_registry.dart';
 import 'package:laoo_project/project_feature.dart';
 
 void main() {
-  test('Project has all approved contracts but no active routes', () {
+  test('Project has all approved contracts and active routes', () {
     expect(ProjectManagementProject.code, 'LAOO_PROJECT');
     expect(ProjectRoutes.all, hasLength(5));
     expect(
@@ -16,8 +16,8 @@ void main() {
         '42005',
       ]),
     );
-    expect(ProjectRoutes.implemented, isEmpty);
-    expect(buildProjectFeatureRoutes(), isEmpty);
+    expect(ProjectRoutes.implemented, hasLength(5));
+    expect(buildProjectFeatureRoutes(), hasLength(5));
     for (final route in ProjectRoutes.all) {
       final mapped = AppMenuRouteRegistry.byMenuCode(route.menuCode);
       expect(mapped, isNotNull);
