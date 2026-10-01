@@ -3,7 +3,7 @@ import 'package:laoo/app/router/app_menu_route_registry.dart';
 import 'package:laoo_pos/pos_feature.dart';
 
 void main() {
-  test('POS has all approved contracts but no active routes', () {
+  test('POS exposes all approved routes through the Center host', () {
     expect(PosProject.code, 'LAOO_POS');
     expect(PosRoutes.all, hasLength(7));
     expect(
@@ -18,8 +18,9 @@ void main() {
         '46007',
       ]),
     );
-    expect(PosRoutes.implemented, isEmpty);
-    expect(buildPosFeatureRoutes(), isEmpty);
+    expect(PosRoutes.implemented, hasLength(PosRoutes.all.length));
+    expect(buildPosFeatureRoutes(), hasLength(PosRoutes.all.length));
+    expect(PosRoutes.all.every((route) => route.isImplemented), isTrue);
     for (final route in PosRoutes.all) {
       final mapped = AppMenuRouteRegistry.byMenuCode(route.menuCode);
       expect(mapped, isNotNull);

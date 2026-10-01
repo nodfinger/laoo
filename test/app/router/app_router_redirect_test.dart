@@ -81,6 +81,21 @@ void main() {
       }
     });
 
+    test('sends company users with Intranet permission to their Intranet home', () {
+      for (final path in <String>[RoutePaths.landing, RoutePaths.login]) {
+        expect(
+          redirect(
+            path: path,
+            isAuthenticated: true,
+            isCompanyUser: true,
+            allowedMenuCodes: const {'43004'},
+          ),
+          '/company/my-intranet',
+          reason: path,
+        );
+      }
+    });
+
     test('keeps reset password public for authenticated users', () {
       expect(
         redirect(

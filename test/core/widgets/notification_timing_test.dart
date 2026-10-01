@@ -29,6 +29,22 @@ void main() {
     expect(find.byType(AutoDismissMessage), findsNothing);
   });
 
+  testWidgets('AutoDismissMessage uses 50 percent background opacity', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: AutoDismissMessage(message: 'Test alert', onClose: () {}),
+        ),
+      ),
+    );
+
+    final card = tester.widget<Card>(find.byType(Card));
+    expect(card.color?.a, closeTo(.50, .001));
+    expect(find.byTooltip('ปิด'), findsOneWidget);
+  });
+
   testWidgets('timed alert uses top-right overlay and close action', (
     tester,
   ) async {

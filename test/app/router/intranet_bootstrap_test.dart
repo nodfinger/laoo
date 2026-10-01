@@ -3,7 +3,7 @@ import 'package:laoo/app/router/app_menu_route_registry.dart';
 import 'package:laoo_intranet/intranet_feature.dart';
 
 void main() {
-  test('Intranet has all approved contracts but no active routes', () {
+  test('Intranet exposes all approved routes through the Center host', () {
     expect(IntranetProject.code, 'LAOO_INTRANET');
     expect(IntranetRoutes.all, hasLength(5));
     expect(
@@ -16,8 +16,8 @@ void main() {
         '43005',
       ]),
     );
-    expect(IntranetRoutes.implemented, isEmpty);
-    expect(buildIntranetFeatureRoutes(), isEmpty);
+    expect(IntranetRoutes.implemented, hasLength(5));
+    expect(buildIntranetFeatureRoutes(), hasLength(5));
     for (final route in IntranetRoutes.all) {
       final mapped = AppMenuRouteRegistry.byMenuCode(route.menuCode);
       expect(mapped, isNotNull);
