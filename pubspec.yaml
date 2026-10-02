@@ -40,6 +40,12 @@ dependencies:
     path: projects/expense
   laoo_project:
     path: projects/project
+  laoo_document_control:
+    path: projects/document_control
+  laoo_knowledge:
+    path: projects/knowledge
+  laoo_memo:
+    path: projects/memo
   laoo_intranet:
     path: projects/intranet
   laoo_vote:

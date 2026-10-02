@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:laoo_shared_workspace_ui/laoo_shared_workspace_ui.dart';
 
 import '../../core/api/visitor_api_client.dart';
 import 'visitor_feature_host.dart';
@@ -113,16 +114,12 @@ class _VisitorAppointmentsPageState extends State<VisitorAppointmentsPage> {
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(
-                            Icons.star_border_rounded,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                          const SizedBox(width: 8),
                           Text(
                             _actions['caption']?.toString() ??
                                 'นัดหมายล่วงหน้า',
                             style: Theme.of(context).textTheme.titleLarge,
                           ),
+                          const LaooPageFavoriteButton(),
                         ],
                       ),
                       if (_can('create'))
@@ -679,15 +676,11 @@ class _VisitorAppointmentApprovalsPageState
                   padding: const EdgeInsets.all(16),
                   child: Row(
                     children: [
-                      Icon(
-                        Icons.star_border_rounded,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      const SizedBox(width: 8),
                       Text(
                         _actions['caption']?.toString() ?? 'สถานะการอนุมัติ',
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
+                      const LaooPageFavoriteButton(),
                     ],
                   ),
                 ),

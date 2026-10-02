@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:laoo_shared_core/laoo_shared_core.dart';
+import 'package:laoo_shared_workspace_ui/laoo_shared_workspace_ui.dart';
 
 import 'evaluation_feature_host.dart';
 import 'evaluation_popup_theme.dart';
@@ -316,9 +317,8 @@ class _CaptionCard extends StatelessWidget {
         padding: tokens.cardPadding,
         child: Row(
           children: [
-            Icon(Icons.star_border, color: tokens.primaryColor),
-            SizedBox(width: tokens.itemSpacing),
             Expanded(child: Text(title, style: tokens.captionStyle)),
+            const LaooPageFavoriteButton(),
           ],
         ),
       ),

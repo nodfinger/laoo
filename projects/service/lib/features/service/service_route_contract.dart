@@ -58,13 +58,6 @@ abstract final class ServiceRoutes {
     ),
     FeatureRouteContract(
       projectCode: ServiceProject.code,
-      menuCode: '14001',
-      screenType: 1,
-      routeName: 'assetLocations',
-      routePath: '/asset/locations',
-    ),
-    FeatureRouteContract(
-      projectCode: ServiceProject.code,
       menuCode: '14002',
       screenType: 1,
       routeName: 'assetItems',
@@ -198,13 +191,6 @@ abstract final class ServiceRoutes {
     ),
     FeatureRouteContract(
       projectCode: ServiceProject.code,
-      menuCode: '19003',
-      screenType: 3,
-      routeName: 'reportsSatisfaction',
-      routePath: '/reports/satisfaction',
-    ),
-    FeatureRouteContract(
-      projectCode: ServiceProject.code,
       menuCode: '20001',
       screenType: 1,
       routeName: 'portalRequest',
@@ -230,13 +216,6 @@ abstract final class ServiceRoutes {
       screenType: 3,
       routeName: 'portalPmSchedule',
       routePath: '/portal/pm-schedule',
-    ),
-    FeatureRouteContract(
-      projectCode: ServiceProject.code,
-      menuCode: '20005',
-      screenType: 3,
-      routeName: 'portalEvaluation',
-      routePath: '/portal/evaluation',
     ),
     FeatureRouteContract(
       projectCode: ServiceProject.code,

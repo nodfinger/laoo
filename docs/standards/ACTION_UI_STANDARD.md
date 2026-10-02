@@ -30,7 +30,7 @@
 ## Header Card
 
 - Header เป็น Card สีขาวเต็มความกว้าง ไม่มีเส้นกรอบ และมุมโค้ง `4px`
-- Icon ดาวอยู่ซ้ายสุดและใช้สี Primary; Caption อยู่ชิดถัดจากดาว
+- Caption อยู่ด้านซ้าย และปุ่ม Icon ดาวอยู่ถัดจาก Caption ใช้สี Primary ของ User Style โดยต้องกดเพิ่ม/นำออกจากเมนูลัดของผู้ Login ได้
 - Caption ใช้รูปแบบ `{MenuName} > {Action}` และใช้มาตรฐานกลาง `fontSize: 18`, `fontWeight: FontWeight.w700`, `color: Colors.black` ตาม `TYPOGRAPHY_STANDARD.md`
 - ปุ่ม `ยกเลิก` และ `บันทึก` อยู่ด้านล่างขวาของ Popup หลังเส้นคั่น
 - ปุ่มยกเลิกเป็น Outlined Primary; ปุ่มบันทึกเป็น Filled Primary; มุมโค้ง `4px`

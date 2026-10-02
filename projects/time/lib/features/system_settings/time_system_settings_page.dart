@@ -356,6 +356,7 @@ class _TimeSystemSettingsPageState extends State<TimeSystemSettingsPage> {
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
             child: Row(
               children: [
+                Expanded(child: Text(caption, style: tokens.captionStyle)),
                 IconButton(
                   tooltip: _isFavorite
                       ? 'นำออกจากเมนูลัดของฉัน'
@@ -373,8 +374,6 @@ class _TimeSystemSettingsPageState extends State<TimeSystemSettingsPage> {
                     color: tokens.primaryColor,
                   ),
                 ),
-                const SizedBox(width: 6),
-                Expanded(child: Text(caption, style: tokens.captionStyle)),
                 const SizedBox(width: 12),
                 FilledButton.icon(
                   onPressed: _canEdit && !_saving ? _save : null,

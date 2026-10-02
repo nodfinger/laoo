@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:laoo_shared_workspace_ui/laoo_shared_workspace_ui.dart';
 
 import '../../core/api/visitor_api_client.dart';
 import 'visitor_exceptions_repository.dart';
@@ -113,11 +114,6 @@ class _VisitorExceptionsPageState extends State<VisitorExceptionsPage> {
         _surface(
           Row(
             children: [
-              Icon(
-                Icons.star_border_rounded,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   _actions?.caption ?? '',
@@ -126,6 +122,7 @@ class _VisitorExceptionsPageState extends State<VisitorExceptionsPage> {
                   ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
                 ),
               ),
+              const LaooPageFavoriteButton(),
             ],
           ),
         ),

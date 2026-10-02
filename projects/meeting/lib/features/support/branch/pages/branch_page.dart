@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/widgets/auto_dismiss_message.dart';
+import '../../../../core/widgets/timed_snack_bar.dart';
 import '../../../../core/widgets/combo_box_text.dart';
 
 import '../../../../core/navigation/navigation_menu_repository.dart';
@@ -1077,9 +1078,7 @@ class _BranchPageState extends State<BranchPage> {
       }
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(error.toString())));
+        showTimedSnackBar(context, message: error.toString(), error: true);
       }
     } finally {
       if (mounted) setState(() => _saving = false);

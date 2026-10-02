@@ -9,6 +9,9 @@ import 'package:laoo_five_s/five_s_feature.dart';
 import 'package:laoo_survey/survey_feature.dart';
 import 'package:laoo_expense/expense_feature.dart';
 import 'package:laoo_project/project_feature.dart';
+import 'package:laoo_document_control/document_control_feature.dart';
+import 'package:laoo_knowledge/knowledge_feature.dart';
+import 'package:laoo_memo/memo_feature.dart';
 import 'package:laoo_intranet/intranet_feature.dart';
 import 'package:laoo_vote/vote_feature.dart';
 import 'package:laoo_pos/pos_feature.dart';
@@ -190,6 +193,9 @@ final GoRouter appRouter = GoRouter(
     ...buildSurveyFeatureRoutes(),
     ...buildExpenseFeatureRoutes(),
     ...buildProjectFeatureRoutes(),
+    ...buildDocumentControlFeatureRoutes(),
+    ...buildKnowledgeFeatureRoutes(),
+    ...buildMemoFeatureRoutes(),
     ...buildIntranetFeatureRoutes(),
     ...buildVoteFeatureRoutes(),
     ...buildPosFeatureRoutes(),
@@ -314,6 +320,12 @@ String? resolveAppRouteRedirect({
         : RoutePaths.authenticatedHome;
   }
 
+  if (path == RoutePaths.authenticatedHome &&
+      isCompanyUser &&
+      allowedMenuCodes.contains(IntranetMenuCodes.myIntranet)) {
+    return IntranetRoutePaths.myIntranet;
+  }
+
   final isCompanySetupRoute =
       path == RoutePaths.companySetup ||
       path == RoutePaths.companySetupAdditional;
@@ -362,8 +374,7 @@ String? resolveAppRouteRedirect({
       // Let training self-service pages render their own standard API
       // notification. The backend remains the source of truth for access.
       final isTrainingSelfService =
-          path == '/company/training-results' ||
-          path == '/company/my-training';
+          path == '/company/training-results' || path == '/company/my-training';
       if (isTrainingSelfService) return null;
       return _authorizedHome(isLaooSupport: isLaooSupport);
     }

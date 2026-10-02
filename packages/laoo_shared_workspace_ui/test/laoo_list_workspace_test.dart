@@ -61,7 +61,7 @@ void main() {
         of: previousButton,
         matching: find.byType(LaooSurfaceCard),
       );
-      expect(tester.getSize(previousButton), const Size(48, 48));
+      expect(tester.getSize(previousButton), const Size(34, 34));
       expect(tester.getSize(paginationCard).height, 56);
       final buttonRect = tester.getRect(previousButton);
       final cardRect = tester.getRect(paginationCard);

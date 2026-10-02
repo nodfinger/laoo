@@ -464,6 +464,40 @@ ORDER BY R.CompletedDate DESC,R.RequestID DESC OFFSET @offset ROWS FETCH NEXT @t
         return Ok(new { items = rows });
     }
 
+    [HttpGet("evaluation-templates")]
+    public async Task<IActionResult> EvaluationTemplates(CancellationToken token)
+    {
+        await using var c = await Open(token);
+        var canReceive = await ScreenType(c, "17001", token) == 2 && await Allowed(c, "17001", "EDIT", token) ||
+                         await ScreenType(c, "15001", token) == 1 && await Allowed(c, "15001", "EDIT", token);
+        if (!await InService(c, token) || !canReceive) return Forbid();
+        if (!await EvaluationEnabled(c, null, token))
+            return Ok(new { evaluationEnabled = false, defaultTemplateId = (long?)null, items = Array.Empty<object>() });
+
+        const string sql = """
+SELECT T.EvaluationTemplateID,T.TemplateCode,T.TemplateName,
+       CASE WHEN S.DefaultEvaluationTemplateID=T.EvaluationTemplateID AND S.IsActive=1 THEN 1 ELSE 0 END IsDefault
+FROM dbo.TDEVTemplate T
+LEFT JOIN dbo.TDEVSystemSetting S
+  ON S.CompanyID=T.CompanyID AND S.SourceType=N'SERVICE'
+WHERE T.CompanyID=@company AND T.SourceType=N'SERVICE' AND T.IsActive=1
+ORDER BY IsDefault DESC,T.TemplateCode,T.EvaluationTemplateID;
+""";
+        await using var command = new SqlCommand(sql, c);
+        Add(command, "@company", SqlDbType.BigInt, CompanyId);
+        var items = new List<object>();
+        long? defaultTemplateId = null;
+        await using var reader = await command.ExecuteReaderAsync(token);
+        while (await reader.ReadAsync(token))
+        {
+            var id = reader.GetInt64(0);
+            var isDefault = Convert.ToBoolean(reader.GetValue(3));
+            if (isDefault) defaultTemplateId = id;
+            items.Add(new { id, code = reader.GetString(1), name = reader.GetString(2), isDefault });
+        }
+        return Ok(new { evaluationEnabled = true, defaultTemplateId, items });
+    }
+
     [HttpPost("{id:long}/receive")]
     public Task<IActionResult> Receive(long id, ActionRequest request, CancellationToken token) => Transition(id, "RECEIVED", request, token);
     [HttpPost("{id:long}/start")]
@@ -493,7 +527,19 @@ ORDER BY R.CompletedDate DESC,R.RequestID DESC OFFSET @offset ROWS FETCH NEXT @t
             {
                 if (!x.AssignedEmployeeId.HasValue) return BadRequest(new { message = "กรุณาเลือกช่างซ่อม" });
                 await using var e = new SqlCommand("SELECT FullName FROM dbo.TDADEmployee WHERE CompanyID=@company AND EmployeeID=@employee AND IsActive=1 AND IsServiceTechnician=1", c, tx); Add(e, "@company", SqlDbType.BigInt, CompanyId); Add(e, "@employee", SqlDbType.BigInt, x.AssignedEmployeeId); var name = Convert.ToString(await e.ExecuteScalarAsync(token)); if (string.IsNullOrWhiteSpace(name)) return BadRequest(new { message = "ไม่พบช่างซ่อมที่ใช้งานได้ใน Company นี้" });
-                await using var u = new SqlCommand("UPDATE dbo.TDADServiceRequest SET StatusCode=N'RECEIVED',AssignedEmployeeID=@employee,AssignedEmployeeNameSnapshot=@name,ReceivedDate=SYSUTCDATETIME(),ReceivedBy=@user,UpdateDate=SYSUTCDATETIME(),UpdateBy=@user WHERE CompanyID=@company AND RequestID=@id AND RowVersion=@version", c, tx); Add(u, "@employee", SqlDbType.BigInt, x.AssignedEmployeeId); Add(u, "@name", SqlDbType.NVarChar, name, 200); Add(u, "@user", SqlDbType.BigInt, UserId); Add(u, "@company", SqlDbType.BigInt, CompanyId); Add(u, "@id", SqlDbType.BigInt, id); Add(u, "@version", SqlDbType.VarBinary, version); await u.ExecuteNonQueryAsync(token);
+                var evaluationEnabled = await EvaluationEnabled(c, tx, token);
+                if (evaluationEnabled && !x.EvaluationTemplateId.HasValue)
+                    return BadRequest(new { message = "กรุณาเลือกแบบประเมินงานบริการ", description = "บริษัทเปิดใช้งานระบบประเมิน จึงต้องเลือกแบบประเมินก่อนรับงาน" });
+                if (!evaluationEnabled && x.EvaluationTemplateId.HasValue)
+                    return BadRequest(new { message = "บริษัทไม่ได้เปิดใช้งานระบบประเมิน", description = "ไม่สามารถกำหนดแบบประเมินให้ใบงานนี้ได้" });
+                if (x.EvaluationTemplateId.HasValue)
+                {
+                    await using var template = new SqlCommand("SELECT COUNT_BIG(1) FROM dbo.TDEVTemplate WHERE CompanyID=@company AND EvaluationTemplateID=@template AND SourceType=N'SERVICE' AND IsActive=1", c, tx);
+                    Add(template, "@company", SqlDbType.BigInt, CompanyId); Add(template, "@template", SqlDbType.BigInt, x.EvaluationTemplateId);
+                    if (Convert.ToInt64(await template.ExecuteScalarAsync(token)) != 1)
+                        return BadRequest(new { message = "แบบประเมินไม่ถูกต้อง", description = "ต้องเลือกแบบประเมินงานบริการที่เปิดใช้งานและอยู่ในบริษัทเดียวกัน" });
+                }
+                await using var u = new SqlCommand("UPDATE dbo.TDADServiceRequest SET StatusCode=N'RECEIVED',AssignedEmployeeID=@employee,AssignedEmployeeNameSnapshot=@name,EvaluationTemplateID=@template,ReceivedDate=SYSUTCDATETIME(),ReceivedBy=@user,UpdateDate=SYSUTCDATETIME(),UpdateBy=@user WHERE CompanyID=@company AND RequestID=@id AND RowVersion=@version", c, tx); Add(u, "@employee", SqlDbType.BigInt, x.AssignedEmployeeId); Add(u, "@name", SqlDbType.NVarChar, name, 200); Add(u, "@template", SqlDbType.BigInt, x.EvaluationTemplateId); Add(u, "@user", SqlDbType.BigInt, UserId); Add(u, "@company", SqlDbType.BigInt, CompanyId); Add(u, "@id", SqlDbType.BigInt, id); Add(u, "@version", SqlDbType.VarBinary, version); await u.ExecuteNonQueryAsync(token);
             }
             else if (next == "IN_PROGRESS") await UpdateStatus(c, tx, id, "IN_PROGRESS", "StartedDate=SYSUTCDATETIME(),StartedBy=@user", token);
             else if (next == "COMPLETED")
@@ -526,7 +572,7 @@ ORDER BY R.CompletedDate DESC,R.RequestID DESC OFFSET @offset ROWS FETCH NEXT @t
         {
             await using var connection = await Open(token);
             const string sql = """
-SELECT R.RequestNo,R.Subject,R.CompletedDate,U.UserID
+SELECT R.RequestNo,R.Subject,R.CompletedDate,U.UserID,R.EvaluationTemplateID
 FROM dbo.TDADServiceRequest R
 JOIN dbo.TDADUser U
   ON U.CompanyID=R.CompanyID
@@ -536,17 +582,29 @@ WHERE R.CompanyID=@company
   AND R.RequestID=@request
   AND R.StatusCode=N'COMPLETED'
   AND R.IsActive=1
-  AND R.CompletedDate IS NOT NULL;
+  AND R.CompletedDate IS NOT NULL
+  AND EXISTS
+  (
+      SELECT 1
+      FROM dbo.TDADCompanyProject CP
+      JOIN dbo.TDADProject P ON P.ProjectID=CP.ProjectID
+      WHERE CP.CompanyID=R.CompanyID AND CP.PartnerID=@partner
+        AND CP.IsEnabled=1 AND P.ProjectCode=N'LAOO_EVALUATION' AND P.IsActive=1
+        AND (CP.StartDate IS NULL OR CP.StartDate<=CONVERT(date,SYSUTCDATETIME()))
+        AND (CP.ExpireDate IS NULL OR CP.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))
+  );
 """;
             await using var command = new SqlCommand(sql, connection);
             Add(command, "@company", SqlDbType.BigInt, CompanyId);
             Add(command, "@request", SqlDbType.BigInt, requestId);
+            Add(command, "@partner", SqlDbType.BigInt, ClaimLong("partner_id"));
             await using var reader = await command.ExecuteReaderAsync(token);
             if (!await reader.ReadAsync(token)) return;
             var requestNo = reader.GetString(0);
             var subject = reader.GetString(1);
             var completedAt = reader.GetDateTime(2);
             var requesterUserId = reader.GetInt64(3);
+            var evaluationTemplateId = Long(reader, 4);
             await reader.DisposeAsync();
 
             await evaluationPublisher.PublishAsync(
@@ -557,7 +615,8 @@ WHERE R.CompanyID=@company
                     requestId,
                     $"{requestNo} | {subject}",
                     DateTime.SpecifyKind(completedAt, DateTimeKind.Utc),
-                    [requesterUserId]),
+                    [requesterUserId],
+                    evaluationTemplateId),
                 token);
         }
         catch (Exception exception) when (!token.IsCancellationRequested)
@@ -997,6 +1056,26 @@ WHERE Q.CompanyID=@company AND Q.QrToken=@token AND Q.IsActive=1;
 
     private sealed record ServiceSettingsState(bool ServiceEnabled, bool AllowWalkIn, bool RequireEquipment, bool AttachmentRequired, bool WorkflowEnabled);
 
+    private async Task<bool> EvaluationEnabled(SqlConnection connection, SqlTransaction? transaction, CancellationToken token)
+    {
+        const string sql = """
+SELECT CASE WHEN EXISTS
+(
+    SELECT 1
+    FROM dbo.TDADCompanyProject CP
+    JOIN dbo.TDADProject P ON P.ProjectID=CP.ProjectID
+    WHERE CP.CompanyID=@company AND CP.PartnerID=@partner
+      AND CP.IsEnabled=1 AND P.ProjectCode=N'LAOO_EVALUATION' AND P.IsActive=1
+      AND (CP.StartDate IS NULL OR CP.StartDate<=CONVERT(date,SYSUTCDATETIME()))
+      AND (CP.ExpireDate IS NULL OR CP.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))
+) THEN 1 ELSE 0 END;
+""";
+        await using var command = new SqlCommand(sql, connection, transaction);
+        Add(command, "@company", SqlDbType.BigInt, CompanyId);
+        Add(command, "@partner", SqlDbType.BigInt, ClaimLong("partner_id"));
+        return Convert.ToBoolean(await command.ExecuteScalarAsync(token));
+    }
+
     private async Task<RequestAccessInfo> RequestAccess(SqlConnection c, long id, CancellationToken token)
     {
         await using var q = new SqlCommand("SELECT StatusCode,CreateBy FROM dbo.TDADServiceRequest WHERE CompanyID=@company AND RequestID=@id AND IsActive=1", c);
@@ -1062,7 +1141,7 @@ WHERE Q.CompanyID=@company AND Q.QrToken=@token AND Q.IsActive=1;
 
     public sealed record CreateRequest(string? RequesterType, long? RequesterId, long? EquipmentItemId, string? Subject, string? Detail, string? QrToken = null);
     public sealed record EditRequest(string? Subject, string? Detail, string? RowVersion);
-    public sealed record ActionRequest(long? AssignedEmployeeId, string? ResolutionDetail, string? CancellationReason, IReadOnlyList<ServicePartRequest>? Parts = null);
+    public sealed record ActionRequest(long? AssignedEmployeeId, string? ResolutionDetail, string? CancellationReason, IReadOnlyList<ServicePartRequest>? Parts = null, long? EvaluationTemplateId = null);
     public sealed record ServicePartRequest(long WarehouseId, long ItemId, decimal Quantity, IReadOnlyList<long>? SerialInstanceIds = null);
     private sealed record RequestAccessInfo(bool Found, string Status, long? CreatedBy);
     private sealed record ProcessedImage(byte[] Bytes, string ContentType, string Extension, int Width, int Height, string? Error)

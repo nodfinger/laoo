@@ -201,12 +201,9 @@ class _ItemPageState extends State<ItemPage> {
   void _show(String text) {
     _timer?.cancel();
     setState(() => _message = text);
-    _timer = Timer(
-      Duration(seconds: companySetupController.current?.timeAlert ?? 30),
-      () {
-        if (mounted) setState(() => _message = null);
-      },
-    );
+    _timer = Timer(companySetupController.alertDuration, () {
+      if (mounted) setState(() => _message = null);
+    });
   }
 
   String _readableError(Object error) {

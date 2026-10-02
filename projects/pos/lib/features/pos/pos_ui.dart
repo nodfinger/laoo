@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:laoo_shared_workspace_ui/laoo_shared_workspace_ui.dart';
 
 import 'pos_feature_host.dart';
 
@@ -44,19 +45,25 @@ ButtonStyle posOutlinedStyle() => OutlinedButton.styleFrom(
 );
 
 class PosCaption extends StatelessWidget {
-  const PosCaption({super.key, required this.title, this.trailing});
+  const PosCaption({
+    super.key,
+    required this.title,
+    required this.menuCode,
+    this.trailing,
+  });
   final String title;
+  final String menuCode;
   final Widget? trailing;
   @override
-  Widget build(BuildContext context) => posCard(
-    child: Row(
-      children: [
-        Icon(Icons.point_of_sale_outlined, color: posUiTokens.primaryColor),
-        const SizedBox(width: 10),
-        Expanded(child: Text(title, style: posUiTokens.captionStyle)),
-        ?trailing,
-      ],
+  Widget build(BuildContext context) => LaooCaptionCard(
+    tokens: posUiTokens,
+    caption: title,
+    leading: Icon(
+      Icons.point_of_sale_outlined,
+      color: posUiTokens.primaryColor,
     ),
+    favoriteKey: menuCode,
+    trailing: trailing,
   );
 }
 

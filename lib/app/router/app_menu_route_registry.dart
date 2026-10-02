@@ -8,6 +8,10 @@ import 'package:laoo_expense/expense_feature.dart'
     show ExpenseMenuCodes, ExpenseRouteNames, ExpenseRoutePaths;
 import 'package:laoo_project/project_feature.dart'
     show ProjectMenuCodes, ProjectRouteNames, ProjectRoutePaths;
+import 'package:laoo_document_control/document_control_feature.dart'
+    show DocumentControlRoutes;
+import 'package:laoo_knowledge/knowledge_feature.dart' show KnowledgeRoutes;
+import 'package:laoo_memo/memo_feature.dart' show MemoRoutes;
 import 'package:laoo_intranet/intranet_feature.dart'
     show IntranetMenuCodes, IntranetRouteNames, IntranetRoutePaths;
 import 'package:laoo_vote/vote_feature.dart'
@@ -382,13 +386,6 @@ abstract final class AppMenuRouteRegistry {
       path: RoutePaths.reportsHistory,
       scope: AppMenuScope.company,
     ),
-    '19003': AppMenuRouteSpec(
-      menuCode: '19003',
-      databaseRouteName: 'reportsSatisfaction',
-      goRouteName: RouteNames.reportsSatisfaction,
-      path: RoutePaths.reportsSatisfaction,
-      scope: AppMenuScope.company,
-    ),
     '20001': AppMenuRouteSpec(
       menuCode: '20001',
       databaseRouteName: 'portalRequest',
@@ -415,13 +412,6 @@ abstract final class AppMenuRouteRegistry {
       databaseRouteName: 'portalPmSchedule',
       goRouteName: RouteNames.portalPmSchedule,
       path: RoutePaths.portalPmSchedule,
-      scope: AppMenuScope.company,
-    ),
-    '20005': AppMenuRouteSpec(
-      menuCode: '20005',
-      databaseRouteName: 'portalEvaluation',
-      goRouteName: RouteNames.portalEvaluation,
-      path: RoutePaths.portalEvaluation,
       scope: AppMenuScope.company,
     ),
     '20006': AppMenuRouteSpec(
@@ -1125,6 +1115,30 @@ abstract final class AppMenuRouteRegistry {
       scope: AppMenuScope.company,
     ),
     for (final route in PosRoutes.all)
+      route.menuCode: AppMenuRouteSpec(
+        menuCode: route.menuCode,
+        databaseRouteName: route.routeName,
+        goRouteName: route.routeName,
+        path: route.routePath,
+        scope: AppMenuScope.company,
+      ),
+    for (final route in DocumentControlRoutes.all)
+      route.menuCode: AppMenuRouteSpec(
+        menuCode: route.menuCode,
+        databaseRouteName: route.routeName,
+        goRouteName: route.routeName,
+        path: route.routePath,
+        scope: AppMenuScope.company,
+      ),
+    for (final route in KnowledgeRoutes.all)
+      route.menuCode: AppMenuRouteSpec(
+        menuCode: route.menuCode,
+        databaseRouteName: route.routeName,
+        goRouteName: route.routeName,
+        path: route.routePath,
+        scope: AppMenuScope.company,
+      ),
+    for (final route in MemoRoutes.all)
       route.menuCode: AppMenuRouteSpec(
         menuCode: route.menuCode,
         databaseRouteName: route.routeName,

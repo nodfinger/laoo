@@ -28,6 +28,9 @@ class CompanySetupController extends ChangeNotifier {
 
   int get orgStructureType => _current?.orgStructureType ?? 1;
 
+  Duration get alertDuration =>
+      Duration(seconds: (_current?.timeAlert ?? 30).clamp(1, 3600));
+
   Future<CompanySetupContext> load() async {
     final setup = await _service.loadRuntime();
     _current = setup;

@@ -218,6 +218,7 @@ class TimeWorkspaceTheme extends StatelessWidget {
         textButtonTheme: TextButtonThemeData(
           style: TextButton.styleFrom(
             minimumSize: Size(0, tokens.buttonHeight),
+            maximumSize: Size(double.infinity, tokens.buttonHeight),
             textStyle: tokens.buttonStyle,
             foregroundColor: tokens.primaryColor,
             shape: buttonShape,
@@ -249,6 +250,7 @@ class TimeWorkspaceTheme extends StatelessWidget {
         filledButtonTheme: FilledButtonThemeData(
           style: FilledButton.styleFrom(
             minimumSize: Size(0, tokens.buttonHeight),
+            maximumSize: Size(double.infinity, tokens.buttonHeight),
             textStyle: tokens.buttonStyle,
             backgroundColor: tokens.primaryColor,
             foregroundColor: Colors.white,
@@ -258,6 +260,7 @@ class TimeWorkspaceTheme extends StatelessWidget {
         outlinedButtonTheme: OutlinedButtonThemeData(
           style: OutlinedButton.styleFrom(
             minimumSize: Size(0, tokens.buttonHeight),
+            maximumSize: Size(double.infinity, tokens.buttonHeight),
             textStyle: tokens.buttonStyle,
             foregroundColor: tokens.primaryColor,
             side: BorderSide(color: tokens.primaryColor),
@@ -558,7 +561,7 @@ class TimePaginationCard extends StatelessWidget {
   }
 }
 
-class TimeCaptionCard extends StatefulWidget {
+class TimeCaptionCard extends StatelessWidget {
   const TimeCaptionCard({
     required this.api,
     required this.menuCode,
@@ -573,70 +576,11 @@ class TimeCaptionCard extends StatefulWidget {
   final Widget? trailing;
 
   @override
-  State<TimeCaptionCard> createState() => _TimeCaptionCardState();
-}
-
-class _TimeCaptionCardState extends State<TimeCaptionCard> {
-  bool favorite = false;
-  bool saving = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    try {
-      final data = await widget.api.get('/api/user-favorites') as List<dynamic>;
-      if (mounted) {
-        setState(
-          () => favorite = data.any((item) {
-            final value = Map<String, dynamic>.from(item as Map);
-            return value['menuCode'] == widget.menuCode;
-          }),
-        );
-      }
-    } catch (_) {
-      // Favorite availability must not block the business screen.
-    }
-  }
-
-  Future<void> _toggle() async {
-    if (saving) return;
-    setState(() => saving = true);
-    try {
-      if (favorite) {
-        await widget.api.delete('/api/user-favorites/${widget.menuCode}');
-      } else {
-        await widget.api.post(
-          '/api/user-favorites',
-          body: {'menuCode': widget.menuCode},
-        );
-      }
-      if (mounted) setState(() => favorite = !favorite);
-    } catch (_) {
-      // Favorite failure is non-blocking; the page remains usable.
-    } finally {
-      if (mounted) setState(() => saving = false);
-    }
-  }
-
-  @override
   Widget build(BuildContext context) => LaooCaptionCard(
     tokens: timeUiTokens.workspace,
-    caption: widget.caption,
-    leading: IconButton(
-      tooltip: favorite
-          ? 'นำออกจากเมนูลัดของฉัน'
-          : 'เพิ่มหน้านี้เป็นเมนูลัดของฉัน',
-      onPressed: saving ? null : _toggle,
-      icon: Icon(
-        favorite ? Icons.star_rounded : Icons.star_border_rounded,
-        color: timeUiTokens.primaryColor,
-      ),
-    ),
-    trailing: widget.trailing,
+    caption: caption,
+    favoriteKey: menuCode,
+    trailing: trailing,
   );
 }
 

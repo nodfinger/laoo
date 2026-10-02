@@ -174,7 +174,8 @@ class TrainingActionDialog extends StatelessWidget {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          minimumSize: Size(0, tokens.workspace.buttonHeight),
+          minimumSize: Size(100, tokens.workspace.buttonHeight),
+          maximumSize: Size(double.infinity, tokens.workspace.buttonHeight),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(radius),
           ),
@@ -183,7 +184,8 @@ class TrainingActionDialog extends StatelessWidget {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          minimumSize: Size(0, tokens.workspace.buttonHeight),
+          minimumSize: Size(84, tokens.workspace.buttonHeight),
+          maximumSize: Size(double.infinity, tokens.workspace.buttonHeight),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(radius),
           ),
@@ -192,7 +194,8 @@ class TrainingActionDialog extends StatelessWidget {
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          minimumSize: Size(0, tokens.workspace.buttonHeight),
+          minimumSize: Size(84, tokens.workspace.buttonHeight),
+          maximumSize: Size(double.infinity, tokens.workspace.buttonHeight),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(radius),
           ),

@@ -9,6 +9,9 @@ using LaooGatePassModule;
 using LaooSurveyModule;
 using LaooExpenseModule;
 using LaooProjectModule;
+using LaooDocumentControlModule;
+using LaooKnowledgeModule;
+using LaooMemoModule;
 using LaooIntranetModule;
 using LaooVoteModule;
 using LaooPosModule;
@@ -55,6 +58,9 @@ builder.Services
     .AddApplicationPart(typeof(SurveyModuleMarker).Assembly)
     .AddApplicationPart(typeof(ExpenseModuleMarker).Assembly)
     .AddApplicationPart(typeof(ProjectModuleMarker).Assembly)
+    .AddApplicationPart(typeof(DocumentControlModuleMarker).Assembly)
+    .AddApplicationPart(typeof(KnowledgeModuleMarker).Assembly)
+    .AddApplicationPart(typeof(MemoModuleMarker).Assembly)
     .AddApplicationPart(typeof(IntranetModuleMarker).Assembly)
     .AddApplicationPart(typeof(VoteModuleMarker).Assembly)
     .AddApplicationPart(typeof(PosModuleMarker).Assembly)

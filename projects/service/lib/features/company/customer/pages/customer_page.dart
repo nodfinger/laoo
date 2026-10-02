@@ -831,10 +831,13 @@ class _CustomerPageState extends State<CustomerPage> {
           child: Row(
             children: [
               const Expanded(
-                child: WorkspacePageTitle(
-                  title: 'ข้อมูลลูกค้า',
-                  favoriteKey: '09001',
-                  titleColor: Colors.black,
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: WorkspacePageTitle(
+                    title: 'ข้อมูลลูกค้า',
+                    favoriteKey: '09001',
+                    titleColor: Colors.black,
+                  ),
                 ),
               ),
               if (MediaQuery.sizeOf(context).width >= 600)
@@ -1055,13 +1058,27 @@ class _CustomerPageState extends State<CustomerPage> {
               dataRowMaxHeight: 64,
               columns: [
                 LaooTableColumns.id,
-                ...[
-                  'Action',
-                  'แนบไฟล์',
-                  'รหัสลูกค้า',
-                  'ชื่อลูกค้า',
-                  'โทรศัพท์',
-                ].map(
+                DataColumn(
+                  columnWidth: const FixedColumnWidth(104),
+                  label: Text(
+                    'Action',
+                    style: TextStyle(
+                      color: accent,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                DataColumn(
+                  columnWidth: const FixedColumnWidth(112),
+                  label: Text(
+                    'แนบไฟล์',
+                    style: TextStyle(
+                      color: accent,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                ...['รหัสลูกค้า', 'ชื่อลูกค้า', 'โทรศัพท์'].map(
                   (h) => DataColumn(
                     label: Text(
                       h,
@@ -1079,7 +1096,8 @@ class _CustomerPageState extends State<CustomerPage> {
                       cells: [
                         DataCell(Text('${x['customerID'] ?? ''}')),
                         DataCell(
-                          Wrap(
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
                               if (actions['edit'] == true)
                                 IconButton(

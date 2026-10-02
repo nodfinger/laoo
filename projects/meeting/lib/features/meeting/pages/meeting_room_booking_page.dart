@@ -2186,8 +2186,7 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
     );
     _notificationOverlay = entry;
     Overlay.of(context, rootOverlay: true).insert(entry);
-    final seconds = companySetupController.current?.timeAlert ?? 30;
-    _notificationTimer = Timer(Duration(seconds: seconds), () {
+    _notificationTimer = Timer(companySetupController.alertDuration, () {
       if (_notificationOverlay == entry) _dismissNotification();
     });
   }

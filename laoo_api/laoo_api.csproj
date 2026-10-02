@@ -31,6 +31,7 @@
     <ProjectReference Include="..\projects\survey\packages\dotnet\Laoo.Survey.Module\Laoo.Survey.Module.csproj" />
     <ProjectReference Include="..\projects\expense\packages\dotnet\Laoo.Expense.Module\Laoo.Expense.Module.csproj" />
     <ProjectReference Include="..\projects\project\packages\dotnet\Laoo.Project.Module\Laoo.Project.Module.csproj" />
+    <ProjectReference Include="..\projects\document_control\packages\dotnet\Laoo.DocumentControl.Module\Laoo.DocumentControl.Module.csproj" />
     <ProjectReference Include="..\projects\intranet\packages\dotnet\Laoo.Intranet.Module\Laoo.Intranet.Module.csproj" />
     <ProjectReference Include="..\projects\vote\packages\dotnet\Laoo.Vote.Module\Laoo.Vote.Module.csproj" />
     <ProjectReference Include="..\projects\pos\packages\dotnet\Laoo.Pos.Module\Laoo.Pos.Module.csproj" />
@@ -40,4 +41,8 @@
     <ProjectReference Include="..\projects\evaluation\packages\dotnet\Laoo.Evaluation.Module\Laoo.Evaluation.Module.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\projects\knowledge\packages\dotnet\Laoo.Knowledge.Module\Laoo.Knowledge.Module.csproj" />
+    <ProjectReference Include="..\projects\memo\packages\dotnet\Laoo.Memo.Module\Laoo.Memo.Module.csproj" />
+  </ItemGroup>
 </Project>

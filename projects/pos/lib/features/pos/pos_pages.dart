@@ -73,7 +73,7 @@ class _PosPageState extends State<PosPage> {
   @override
   Widget build(BuildContext context) => buildPosWorkspaceShell(
     pageTitle: title.isEmpty ? widget.fallbackTitle : title,
-    activeMenu: title.isEmpty ? widget.fallbackTitle : title,
+    activeMenu: widget.menuCode,
     child: ColoredBox(
       color: posUiTokens.backgroundColor,
       child: Padding(
@@ -85,7 +85,7 @@ class _PosPageState extends State<PosPage> {
             : Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  PosCaption(title: title),
+                  PosCaption(title: title, menuCode: widget.menuCode),
                   SizedBox(height: posUiTokens.sectionSpacing),
                   Expanded(child: _body()),
                 ],

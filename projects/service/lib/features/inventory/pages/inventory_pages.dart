@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:laoo_shared_workspace_ui/laoo_shared_workspace_ui.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:math' as math;
 
@@ -344,8 +345,6 @@ class _WarehousePageState extends State<WarehousePage> {
           children: [
             Row(
               children: [
-                Icon(Icons.star_border_rounded, color: primary),
-                const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     _menuName,
@@ -356,6 +355,7 @@ class _WarehousePageState extends State<WarehousePage> {
                     ),
                   ),
                 ),
+                const LaooPageFavoriteButton(),
                 if (!compact)
                   OutlinedButton(
                     onPressed: () => setState(() => _card = !cardMode),
@@ -3119,11 +3119,10 @@ class _Header extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
         children: [
-          Icon(Icons.star_border, color: Theme.of(context).colorScheme.primary),
-          const SizedBox(width: 10),
           Expanded(
             child: Text(title, style: LaooTypography.screenCaptionStyle),
           ),
+          const LaooPageFavoriteButton(),
           if (onBack != null)
             OutlinedButton.icon(
               onPressed: onBack,

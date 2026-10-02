@@ -3,16 +3,20 @@ import 'package:flutter/material.dart';
 import '../company_setup/company_setup_controller.dart';
 import '../../app/theme/workspace_theme_presets.dart';
 
+const double _alertBackgroundOpacity = .50;
+
 class AutoDismissMessage extends StatefulWidget {
   const AutoDismissMessage({
     super.key,
     required this.message,
     required this.onClose,
     this.error = false,
+    this.duration,
   });
   final String message;
   final VoidCallback onClose;
   final bool error;
+  final Duration? duration;
   @override
   State<AutoDismissMessage> createState() => _AutoDismissMessageState();
 }
@@ -28,7 +32,7 @@ class _AutoDismissMessageState extends State<AutoDismissMessage> {
   void _start() {
     _timer?.cancel();
     _timer = Timer(
-      Duration(seconds: companySetupController.current?.timeAlert ?? 30),
+      widget.duration ?? companySetupController.alertDuration,
       widget.onClose,
     );
   }
@@ -37,7 +41,8 @@ class _AutoDismissMessageState extends State<AutoDismissMessage> {
   void didUpdateWidget(covariant AutoDismissMessage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.message != widget.message ||
-        oldWidget.onClose != widget.onClose) {
+        oldWidget.error != widget.error ||
+        oldWidget.duration != widget.duration) {
       _start();
     }
   }
@@ -63,9 +68,9 @@ class _AutoDismissMessageState extends State<AutoDismissMessage> {
         child: Card(
           elevation: 8,
           margin: EdgeInsets.zero,
-          color: widget.error
-              ? scheme.error.withValues(alpha: .50)
-              : color.withValues(alpha: .62),
+          color: (widget.error ? scheme.error : color).withValues(
+            alpha: _alertBackgroundOpacity,
+          ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:laoo_shared_workspace_ui/laoo_shared_workspace_ui.dart';
 import '../../core/api/visitor_api_client.dart';
 import 'visitor_contact_points_repository.dart';
 import 'visitor_feature_host.dart';
@@ -109,17 +110,13 @@ class _VisitorContactPointsPageState extends State<VisitorContactPointsPage> {
       padding: const EdgeInsets.all(16),
       child: Row(
         children: [
-          Icon(
-            Icons.star_border_rounded,
-            color: Theme.of(c).colorScheme.primary,
-          ),
-          const SizedBox(width: 10),
           Expanded(
             child: Text(
               _actions?.caption ?? 'กำหนดจุดติดต่อ',
               style: Theme.of(c).textTheme.titleLarge,
             ),
           ),
+          const LaooPageFavoriteButton(),
           if (_actions?.create == true)
             FilledButton.icon(
               onPressed: _edit,

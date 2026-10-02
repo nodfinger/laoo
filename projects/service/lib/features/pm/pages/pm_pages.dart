@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:laoo_shared_workspace_ui/laoo_shared_workspace_ui.dart';
 
 import '../../../app/theme/laoo_design_tokens.dart';
 import '../../../app/theme/laoo_typography.dart';
@@ -506,17 +507,13 @@ class _CalendarState extends State<PmCalendarPage> {
               padding: const EdgeInsets.all(LaooLayout.cardPadding),
               child: Row(
                 children: [
-                  Icon(
-                    Icons.star_border,
-                    color: Theme.of(c).colorScheme.primary,
-                  ),
-                  const SizedBox(width: LaooLayout.cardPadding),
                   Expanded(
                     child: Text(
                       _caption,
                       style: LaooTypography.screenCaptionStyle,
                     ),
                   ),
+                  const LaooPageFavoriteButton(),
                 ],
               ),
             ),

@@ -3,11 +3,15 @@ import 'package:laoo_service/app/router/app_menu_route_registry.dart';
 import 'package:laoo_service/features/service/service_route_contract.dart';
 
 void main() {
-  test('portal evaluation is a read-only ScreenType 3 route', () {
-    final route = ServiceRoutes.byMenuCode('20005');
-    expect(route.screenType, 3);
-    expect(route.routeName, 'portalEvaluation');
-    expect(route.routePath, '/portal/evaluation');
+  test('retired Service menus are not routable', () {
+    const retired = {'14001', '19003', '20005'};
+    expect(
+      ServiceRoutes.all.where((route) => retired.contains(route.menuCode)),
+      isEmpty,
+    );
+    for (final menuCode in retired) {
+      expect(AppMenuRouteRegistry.byMenuCode(menuCode), isNull);
+    }
   });
 
   test('PM and work-order routes use approved ScreenTypes', () {
@@ -56,7 +60,6 @@ void main() {
       '11004',
       '11005',
       '12001',
-      '14001',
       '14002',
       '14003',
       '15001',
@@ -69,12 +72,10 @@ void main() {
       '17003',
       '19001',
       '19002',
-      '19003',
       '20001',
       '20002',
       '20003',
       '20004',
-      '20005',
       '20006',
     };
 

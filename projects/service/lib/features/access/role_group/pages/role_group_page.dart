@@ -88,12 +88,9 @@ class _RoleGroupPageState extends State<RoleGroupPage> {
       _alert = message;
       _alertError = error;
     });
-    _alertTimer = Timer(
-      Duration(seconds: companySetupController.current?.timeAlert ?? 30),
-      () {
-        if (mounted) setState(() => _alert = null);
-      },
-    );
+    _alertTimer = Timer(companySetupController.alertDuration, () {
+      if (mounted) setState(() => _alert = null);
+    });
   }
 
   String _thaiError(Object error) {

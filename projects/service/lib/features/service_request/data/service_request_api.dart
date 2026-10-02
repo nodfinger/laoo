@@ -155,10 +155,22 @@ class ServiceRequestApi {
         .toList();
   }
 
-  Future<void> receive(int id, int employeeId) async {
+  Future<Map<String, dynamic>> evaluationTemplates() async =>
+      Map<String, dynamic>.from(
+        await _client.get('/api/service/requests/evaluation-templates') as Map,
+      );
+
+  Future<void> receive(
+    int id,
+    int employeeId, {
+    int? evaluationTemplateId,
+  }) async {
     await _client.post(
       '/api/service/requests/$id/receive',
-      body: {'assignedEmployeeId': employeeId},
+      body: {
+        'assignedEmployeeId': employeeId,
+        'evaluationTemplateId': evaluationTemplateId,
+      },
     );
   }
 
