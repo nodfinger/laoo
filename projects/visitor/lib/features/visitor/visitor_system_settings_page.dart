@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:laoo_shared_workspace_ui/laoo_shared_workspace_ui.dart';
 
 import '../../core/api/visitor_api_client.dart';
 import 'visitor_feature_host.dart';
@@ -343,17 +344,13 @@ class _VisitorSystemSettingsPageState extends State<VisitorSystemSettingsPage> {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       child: Row(
         children: [
-          Icon(
-            Icons.star_border_rounded,
-            color: Theme.of(context).colorScheme.primary,
-          ),
-          const SizedBox(width: 8),
           Expanded(
             child: Text(
               _actions?.caption ?? 'กำหนดค่าระบบ Visitor',
               style: Theme.of(context).textTheme.titleLarge,
             ),
           ),
+          const LaooPageFavoriteButton(),
         ],
       ),
     ),

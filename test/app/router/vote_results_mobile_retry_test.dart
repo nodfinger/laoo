@@ -38,7 +38,10 @@ void main() {
     expect(find.text('1-20 จาก 21'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
-    await tester.tap(find.byIcon(Icons.chevron_right));
+    final nextPage = find.byIcon(Icons.chevron_right);
+    await tester.ensureVisible(nextPage);
+    await tester.pumpAndSettle();
+    await tester.tap(nextPage);
     await tester.pumpAndSettle();
     expect(api.lastPage, 2);
     expect(find.text('VOTE-19'), findsOneWidget);

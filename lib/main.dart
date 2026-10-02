@@ -1,9 +1,14 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:laoo_meeting/meeting_feature.dart';
 import 'package:laoo_five_s/five_s_feature.dart';
 import 'package:laoo_survey/survey_feature.dart';
 import 'package:laoo_expense/expense_feature.dart';
 import 'package:laoo_project/project_feature.dart';
+import 'package:laoo_document_control/document_control_feature.dart';
+import 'package:laoo_knowledge/knowledge_feature.dart';
+import 'package:laoo_memo/memo_feature.dart';
 import 'package:laoo_intranet/intranet_feature.dart';
 import 'package:laoo_vote/vote_feature.dart';
 import 'package:laoo_pos/pos_feature.dart';
@@ -15,6 +20,7 @@ import 'package:laoo_training/training_feature.dart';
 import 'package:laoo_gate_pass/gate_pass_feature.dart';
 import 'package:laoo_visitor/visitor_feature.dart';
 import 'package:laoo_shared_workspace_ui/laoo_shared_workspace_ui.dart';
+import 'package:printing/printing.dart';
 
 import 'app/laoo_app.dart';
 import 'app/theme/laoo_design_tokens.dart';
@@ -30,6 +36,43 @@ import 'core/widgets/timed_snack_bar.dart';
 import 'features/support/presentation/widgets/support_workspace_shell.dart';
 
 void main() {
+  configureMemoFeatureHost(
+    _buildMeetingWorkspaceShell,
+    apiClientFactory: ApiClient.new,
+    apiClientDisposer: (client) => (client as ApiClient).dispose(),
+    menuTitleResolver: (menuCode, fallback) => NavigationMenuRepository()
+        .resolveMenuName(menuCode: menuCode, fallback: fallback),
+    messagePresenter: (context, {required message, required error}) =>
+        showTimedSnackBar(context, message: message, error: error),
+    upload: (path, {required fileName, required bytes, fields}) {
+      final client = ApiClient();
+      return client
+          .upload(
+            path,
+            fileName: fileName,
+            bytes: Uint8List.fromList(bytes),
+            fields: fields,
+          )
+          .whenComplete(client.dispose);
+    },
+    uiTokensProvider: _surveyWorkspaceTokens,
+  );
+  configureKnowledgeFeatureHost(
+    _buildMeetingWorkspaceShell,
+    apiClientFactory: ApiClient.new,
+    apiClientDisposer: (client) => (client as ApiClient).dispose(),
+    menuTitleResolver: (menuCode, fallback) => NavigationMenuRepository()
+        .resolveMenuName(menuCode: menuCode, fallback: fallback),
+    messagePresenter: (context, {required message, required error}) =>
+        showTimedSnackBar(context, message: message, error: error),
+    uiTokensProvider: _surveyWorkspaceTokens,
+    upload: (path, {required fileName, required bytes, fields}) {
+      final client = ApiClient();
+      return client
+          .upload(path, fileName: fileName, bytes: bytes, fields: fields)
+          .whenComplete(client.dispose);
+    },
+  );
   configureFiveSFeatureHost(
     _buildMeetingWorkspaceShell,
     apiClientFactory: ApiClient.new,
@@ -120,6 +163,70 @@ void main() {
     messagePresenter: (context, {required message, required error}) =>
         showTimedSnackBar(context, message: message, error: error),
     uiTokensProvider: _surveyWorkspaceTokens,
+  );
+  configureDocumentControlFeatureHost(
+    _buildMeetingWorkspaceShell,
+    apiClientFactory: ApiClient.new,
+    apiClientDisposer: (client) => (client as ApiClient).dispose(),
+    menuTitleResolver: (menuCode, fallback) => NavigationMenuRepository()
+        .resolveMenuName(menuCode: menuCode, fallback: fallback),
+    messagePresenter: (context, {required message, required error}) =>
+        showTimedSnackBar(context, message: message, error: error),
+    uiTokensProvider: _surveyWorkspaceTokens,
+    upload: (path, {required fileName, required bytes, fields}) {
+      final client = ApiClient();
+      return client
+          .upload(path, fileName: fileName, bytes: bytes, fields: fields)
+          .whenComplete(client.dispose);
+    },
+    filePresenter:
+        (
+          context, {
+          required path,
+          required fileName,
+          required contentType,
+          required download,
+        }) async {
+          final client = ApiClient();
+          try {
+            final bytes = await client.getBytes(path);
+            if (download) {
+              await Printing.sharePdf(
+                bytes: Uint8List.fromList(bytes),
+                filename: fileName,
+              );
+              return;
+            }
+            if (contentType.toLowerCase().contains('pdf')) {
+              if (!context.mounted) return;
+              await showDialog<void>(
+                context: context,
+                builder: (previewContext) => Dialog(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: SizedBox(
+                    width: 900,
+                    height: 720,
+                    child: PdfPreview(
+                      build: (_) async => Uint8List.fromList(bytes),
+                      canChangeOrientation: false,
+                      canChangePageFormat: false,
+                      canDebug: false,
+                    ),
+                  ),
+                ),
+              );
+              return;
+            }
+            await Printing.sharePdf(
+              bytes: Uint8List.fromList(bytes),
+              filename: fileName,
+            );
+          } finally {
+            client.dispose();
+          }
+        },
   );
   configureIntranetFeatureHost(
     _buildMeetingWorkspaceShell,

@@ -36,7 +36,7 @@
 
 - กว้างเต็ม Content Area, Surface ตาม User Style, ไม่มีกรอบและเงา, มุม `4px`
 - Padding ซ้าย/ขวา `16px`, บน/ล่าง `14px`; ความสูงภายในไม่น้อยกว่าปุ่ม Action `48px`
-- ซ้ายเป็น Icon ดาว Primary และ Caption `18px/w700`; ขวาเป็นปุ่มสลับ List/Card และปุ่ม `เพิ่ม`
+- ซ้ายเป็น Caption `18px/w700` และปุ่ม Icon ดาว Primary ที่กดเพิ่ม/นำออกจากเมนูลัดได้อยู่ถัดจาก Caption; ขวาเป็นปุ่มสลับ List/Card และปุ่ม `เพิ่ม`
 - ปุ่มสลับ View เป็น Icon Button ขนาด Target อย่างน้อย `48px`, พื้น Primary โปร่ง `10%`, มุม `4px`
 - ปุ่ม `เพิ่ม` สูง `48px`, ความกว้างขั้นต่ำ `100px`, Filled Primary, Icon `+`, Font `13px`, มุม `4px`
 - ปุ่ม `เพิ่ม` แสดงเมื่อมี `CREATE`; ปุ่มสลับ View ซ่อนเมื่อหน้าจอถูกบังคับเป็น Card Mode

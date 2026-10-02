@@ -21,6 +21,10 @@ class LaooWorkspaceUiTokens {
     required this.borderColor,
     required this.backgroundColor,
     this.surfaceColor = Colors.white,
+    this.paginationButtonSize = 34,
+    this.dialogInsetPadding = 24,
+    this.popupHeaderMinHeight = 48,
+    this.popupMaxWidth = 480,
   });
 
   final EdgeInsets contentMargin;
@@ -41,6 +45,10 @@ class LaooWorkspaceUiTokens {
   final Color borderColor;
   final Color backgroundColor;
   final Color surfaceColor;
+  final double paginationButtonSize;
+  final double dialogInsetPadding;
+  final double popupHeaderMinHeight;
+  final double popupMaxWidth;
 }
 
 class LaooSurfaceCard extends StatelessWidget {
@@ -68,12 +76,65 @@ class LaooSurfaceCard extends StatelessWidget {
   );
 }
 
+typedef LaooFavoriteButtonBuilder =
+    Widget Function(BuildContext context, String menuKey);
+
+class LaooWorkspaceFavoriteScope extends InheritedWidget {
+  const LaooWorkspaceFavoriteScope({
+    required this.activeMenu,
+    required this.favoriteButtonBuilder,
+    required super.child,
+    super.key,
+  });
+
+  final String? activeMenu;
+  final LaooFavoriteButtonBuilder favoriteButtonBuilder;
+
+  static LaooWorkspaceFavoriteScope? maybeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<LaooWorkspaceFavoriteScope>();
+
+  static Widget? buttonOf(BuildContext context, {String? menuKey}) {
+    final scope = maybeOf(context);
+    final key = (menuKey ?? scope?.activeMenu)?.trim();
+    if (scope == null || key == null || key.isEmpty || key == 'home') {
+      return null;
+    }
+    return scope.favoriteButtonBuilder(context, key);
+  }
+
+  @override
+  bool updateShouldNotify(LaooWorkspaceFavoriteScope oldWidget) =>
+      activeMenu != oldWidget.activeMenu ||
+      favoriteButtonBuilder != oldWidget.favoriteButtonBuilder;
+}
+
+class LaooPageFavoriteButton extends StatelessWidget {
+  const LaooPageFavoriteButton({this.menuKey, this.spacing = 6, super.key});
+
+  final String? menuKey;
+  final double spacing;
+
+  @override
+  Widget build(BuildContext context) {
+    final button = LaooWorkspaceFavoriteScope.buttonOf(
+      context,
+      menuKey: menuKey,
+    );
+    if (button == null) return const SizedBox.shrink();
+    return Padding(
+      padding: EdgeInsets.only(left: spacing),
+      child: button,
+    );
+  }
+}
+
 class LaooCaptionCard extends StatelessWidget {
   const LaooCaptionCard({
     required this.tokens,
     required this.caption,
     this.leading,
     this.trailing,
+    this.favoriteKey,
     super.key,
   });
 
@@ -81,23 +142,28 @@ class LaooCaptionCard extends StatelessWidget {
   final String caption;
   final Widget? leading;
   final Widget? trailing;
+  final String? favoriteKey;
 
   @override
   Widget build(BuildContext context) => LaooSurfaceCard(
     tokens: tokens,
-    padding: EdgeInsets.symmetric(
-      horizontal: tokens.cardPadding.horizontal / 2,
-      vertical: tokens.cardPadding.vertical / 2,
-    ),
-    child: Row(
-      children: [
-        if (leading != null) ...[leading!, SizedBox(width: tokens.itemSpacing)],
-        Expanded(child: Text(caption, style: tokens.captionStyle)),
-        if (trailing != null) ...[
-          SizedBox(width: tokens.itemSpacing),
-          trailing!,
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    child: ConstrainedBox(
+      constraints: BoxConstraints(minHeight: tokens.popupHeaderMinHeight),
+      child: Row(
+        children: [
+          if (leading != null) ...[
+            leading!,
+            SizedBox(width: tokens.itemSpacing),
+          ],
+          Expanded(child: Text(caption, style: tokens.captionStyle)),
+          LaooPageFavoriteButton(menuKey: favoriteKey),
+          if (trailing != null) ...[
+            SizedBox(width: tokens.itemSpacing),
+            trailing!,
+          ],
         ],
-      ],
+      ),
     ),
   );
 }
@@ -167,7 +233,7 @@ class LaooWorkspaceDataTable extends StatelessWidget {
               height: constraints.maxHeight,
               child: SingleChildScrollView(
                 child: DataTable(
-                  headingRowHeight: 52,
+                  headingRowHeight: 56,
                   dataRowMinHeight: 48,
                   dataRowMaxHeight: 56,
                   horizontalMargin: 14,
@@ -213,6 +279,13 @@ class LaooListCardToggle extends StatelessWidget {
   Widget build(BuildContext context) => IconButton(
     tooltip: 'สลับ Card/List',
     color: tokens.primaryColor,
+    style: IconButton.styleFrom(
+      fixedSize: const Size.square(48),
+      backgroundColor: tokens.primaryColor.withValues(alpha: 0.10),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(tokens.radius),
+      ),
+    ),
     onPressed: () => onChanged(!cards),
     icon: Icon(cards ? Icons.view_list : Icons.grid_view),
   );
@@ -225,7 +298,7 @@ class LaooActionDialog extends StatelessWidget {
     required this.title,
     required this.content,
     required this.actions,
-    this.width = 560,
+    this.width = 480,
     super.key,
   });
 
@@ -237,41 +310,108 @@ class LaooActionDialog extends StatelessWidget {
   final double width;
 
   @override
-  Widget build(BuildContext context) => AlertDialog(
-    backgroundColor: Colors.white,
-    surfaceTintColor: Colors.transparent,
-    insetPadding: const EdgeInsets.all(16),
-    contentPadding: EdgeInsets.zero,
-    titlePadding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-    actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-    shape: RoundedRectangleBorder(
+  Widget build(BuildContext context) {
+    final shape = RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(tokens.radius),
-    ),
-    title: Row(
-      children: [
-        Icon(icon, color: tokens.primaryColor),
-        const SizedBox(width: 10),
-        Expanded(child: Text(title, style: tokens.captionStyle)),
-      ],
-    ),
-    content: SizedBox(
-      width: width,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Divider(height: 1, color: tokens.borderColor),
-            const SizedBox(height: 12),
-            content,
-            const SizedBox(height: 12),
-            Divider(height: 1, color: tokens.borderColor),
-          ],
+    );
+    final popupTheme = Theme.of(context).copyWith(
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          minimumSize: Size(100, tokens.buttonHeight),
+          maximumSize: Size(double.infinity, tokens.buttonHeight),
+          shape: shape,
+          textStyle: tokens.buttonStyle,
         ),
       ),
-    ),
-    actions: actions,
-  );
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          minimumSize: Size(84, tokens.buttonHeight),
+          maximumSize: Size(double.infinity, tokens.buttonHeight),
+          shape: shape,
+          textStyle: tokens.buttonStyle,
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          minimumSize: Size(84, tokens.buttonHeight),
+          maximumSize: Size(double.infinity, tokens.buttonHeight),
+          shape: shape,
+          textStyle: tokens.buttonStyle,
+        ),
+      ),
+    );
+    final media = MediaQuery.of(context);
+    final availableHeight =
+        media.size.height -
+        media.viewInsets.vertical -
+        media.viewPadding.vertical -
+        (tokens.dialogInsetPadding * 2);
+    final effectiveWidth = width.clamp(0, tokens.popupMaxWidth).toDouble();
+    return Theme(
+      data: popupTheme,
+      child: Dialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        insetPadding: EdgeInsets.all(tokens.dialogInsetPadding),
+        shape: shape,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: effectiveWidth,
+            maxHeight: availableHeight.clamp(160, double.infinity).toDouble(),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: tokens.popupHeaderMinHeight,
+                ),
+                child: Padding(
+                  padding: tokens.cardPadding,
+                  child: Row(
+                    children: [
+                      Icon(icon, size: 24, color: tokens.primaryColor),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: tokens.captionStyle.copyWith(
+                            color: Colors.black,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Divider(height: 1, color: tokens.borderColor),
+              Flexible(
+                child: SingleChildScrollView(
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: tokens.cardPadding,
+                  child: content,
+                ),
+              ),
+              Divider(height: 1, color: tokens.borderColor),
+              Padding(
+                padding: tokens.cardPadding,
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Wrap(
+                    alignment: WrapAlignment.end,
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: actions,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class LaooPaginationCard extends StatelessWidget {
@@ -349,8 +489,9 @@ class LaooPaginationCard extends StatelessWidget {
     LaooWorkspaceUiTokens tokens, {
     bool current = false,
   }) => OutlinedButton.styleFrom(
-    minimumSize: Size(tokens.buttonHeight, tokens.buttonHeight),
-    maximumSize: Size(tokens.buttonHeight, tokens.buttonHeight),
+    minimumSize: Size(tokens.paginationButtonSize, tokens.paginationButtonSize),
+    maximumSize: Size(tokens.paginationButtonSize, tokens.paginationButtonSize),
+    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
     padding: EdgeInsets.zero,
     textStyle: tokens.buttonStyle,
     foregroundColor: current ? Colors.white : tokens.primaryColor,

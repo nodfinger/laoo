@@ -11,10 +11,12 @@ class AutoDismissMessage extends StatefulWidget {
     required this.message,
     required this.onClose,
     this.error = false,
+    this.duration,
   });
   final String message;
   final VoidCallback onClose;
   final bool error;
+  final Duration? duration;
   @override
   State<AutoDismissMessage> createState() => _AutoDismissMessageState();
 }
@@ -30,7 +32,7 @@ class _AutoDismissMessageState extends State<AutoDismissMessage> {
   void _start() {
     _timer?.cancel();
     _timer = Timer(
-      Duration(seconds: companySetupController.current?.timeAlert ?? 30),
+      widget.duration ?? companySetupController.alertDuration,
       widget.onClose,
     );
   }
@@ -39,7 +41,8 @@ class _AutoDismissMessageState extends State<AutoDismissMessage> {
   void didUpdateWidget(covariant AutoDismissMessage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.message != widget.message ||
-        oldWidget.onClose != widget.onClose) {
+        oldWidget.error != widget.error ||
+        oldWidget.duration != widget.duration) {
       _start();
     }
   }

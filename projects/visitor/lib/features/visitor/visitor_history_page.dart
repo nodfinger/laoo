@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:laoo_shared_workspace_ui/laoo_shared_workspace_ui.dart';
 
 import '../../core/api/visitor_api_client.dart';
 import 'visitor_feature_host.dart';
@@ -115,11 +116,6 @@ class _VisitorHistoryPageState extends State<VisitorHistoryPage> {
         _surface(
           Row(
             children: [
-              Icon(
-                Icons.star_border_rounded,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   _actions?.caption ?? 'ประวัติผู้มาติดต่อ',
@@ -128,6 +124,7 @@ class _VisitorHistoryPageState extends State<VisitorHistoryPage> {
                   ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
                 ),
               ),
+              const LaooPageFavoriteButton(),
             ],
           ),
         ),

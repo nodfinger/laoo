@@ -19,7 +19,7 @@
 
 - Caption อ่าน `MenuName` จาก Navigation API/`TDADMainMenu` ห้าม hardcode
 - Caption ใช้มาตรฐานกลาง `fontSize: 18`, `fontWeight: FontWeight.w700`, `color: Colors.black` ตาม `TYPOGRAPHY_STANDARD.md`
-- Icon ดาวอยู่ซ้ายสุด ชิดกับ Caption และใช้สี Primary ของ User Style
+- Icon ดาวอยู่ถัดจาก Caption ใช้สี Primary ของ User Style และต้องกดเพิ่ม/นำออกจากเมนูลัดของผู้ Login ได้
 - ปุ่ม `+ เพิ่ม` อยู่ขวา ใช้สี Primary มุมโค้ง `4px` และแสดงตาม Permission
 - ใต้ Caption Card ห้ามมีเส้นคั่นสีเทา; ใช้พื้นที่ว่างระหว่าง Caption Card กับ Filter Card `6px` เพื่อแยกส่วนแทน
 

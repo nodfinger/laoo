@@ -68,12 +68,41 @@ abstract final class AppTheme {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          minimumSize: const Size(120, LaooTypography.buttonHeight),
+          minimumSize: const Size(100, LaooTypography.buttonHeight),
           maximumSize: const Size(double.infinity, LaooTypography.buttonHeight),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(LaooRadius.xs),
           ),
-          textStyle: const TextStyle(fontSize: LaooTypography.button),
+          textStyle: const TextStyle(
+            fontSize: LaooTypography.button,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size(84, LaooTypography.buttonHeight),
+          maximumSize: const Size(double.infinity, LaooTypography.buttonHeight),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(LaooRadius.xs),
+          ),
+          textStyle: const TextStyle(
+            fontSize: LaooTypography.button,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          minimumSize: const Size(84, LaooTypography.buttonHeight),
+          maximumSize: const Size(double.infinity, LaooTypography.buttonHeight),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(LaooRadius.xs),
+          ),
+          textStyle: const TextStyle(
+            fontSize: LaooTypography.button,
+            fontWeight: FontWeight.w700,
+          ),
         ),
       ),
     );

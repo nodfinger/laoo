@@ -94,6 +94,7 @@ class _JobDispatchPageState extends State<JobDispatchPage> {
       final detail = await _api.detail(id, menuCode: '17001');
       final attachments = await _api.attachments(id, menuCode: '17001');
       final technicians = await _api.technicians();
+      final evaluationOptions = await _api.evaluationTemplates();
       if (!mounted) return;
       final selected = await showDialog<int>(
         context: context,
@@ -103,6 +104,7 @@ class _JobDispatchPageState extends State<JobDispatchPage> {
           data: detail,
           attachments: attachments,
           technicians: technicians,
+          evaluationOptions: evaluationOptions,
         ),
       );
       if (selected != null && mounted) {
@@ -366,12 +368,14 @@ class _DispatchDialog extends StatefulWidget {
     required this.data,
     required this.attachments,
     required this.technicians,
+    required this.evaluationOptions,
   });
   final ServiceRequestApi api;
   final String caption;
   final Map<String, dynamic> data;
   final List<Map<String, dynamic>> attachments;
   final List<Map<String, dynamic>> technicians;
+  final Map<String, dynamic> evaluationOptions;
 
   @override
   State<_DispatchDialog> createState() => _DispatchDialogState();
@@ -379,7 +383,22 @@ class _DispatchDialog extends StatefulWidget {
 
 class _DispatchDialogState extends State<_DispatchDialog> {
   int? _employeeId;
+  int? _evaluationTemplateId;
   bool _saving = false;
+
+  bool get _evaluationEnabled =>
+      widget.evaluationOptions['evaluationEnabled'] == true;
+  List<Map<String, dynamic>> get _evaluationTemplates =>
+      (widget.evaluationOptions['items'] as List? ?? const [])
+          .map((item) => Map<String, dynamic>.from(item as Map))
+          .toList();
+
+  @override
+  void initState() {
+    super.initState();
+    _evaluationTemplateId =
+        (widget.evaluationOptions['defaultTemplateId'] as num?)?.toInt();
+  }
 
   Future<void> _save() async {
     if (_employeeId == null || _saving) return;
@@ -388,6 +407,7 @@ class _DispatchDialogState extends State<_DispatchDialog> {
       await widget.api.receive(
         (_data['requestId'] as num).toInt(),
         _employeeId!,
+        evaluationTemplateId: _evaluationTemplateId,
       );
       if (mounted) Navigator.pop(context, _employeeId);
     } catch (error) {
@@ -493,6 +513,38 @@ class _DispatchDialogState extends State<_DispatchDialog> {
                   ? null
                   : (value) => setState(() => _employeeId = value),
             ),
+            if (_evaluationEnabled) ...[
+              const SizedBox(height: LaooLayout.popupFieldSpacing),
+              DropdownButtonFormField<int>(
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'แบบประเมินงานบริการ *',
+                  helperText: 'ใช้ส่งให้ผู้แจ้งหลังปิดงาน',
+                ),
+                initialValue: _evaluationTemplateId,
+                items: [
+                  for (final item in _evaluationTemplates)
+                    DropdownMenuItem(
+                      value: (item['id'] as num).toInt(),
+                      child: Text(
+                        '${item['code']} | ${item['name']}',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                ],
+                onChanged: _saving || _evaluationTemplates.isEmpty
+                    ? null
+                    : (value) => setState(() => _evaluationTemplateId = value),
+              ),
+              if (_evaluationTemplates.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.only(top: 6),
+                  child: Text(
+                    'ยังไม่มีแบบประเมินประเภทงานบริการ กรุณาสร้างแบบประเมินก่อนรับงาน',
+                    style: TextStyle(color: Colors.red, fontSize: 12),
+                  ),
+                ),
+            ],
           ],
         ),
       ),
@@ -520,7 +572,13 @@ class _DispatchDialogState extends State<_DispatchDialog> {
                   child: const Text('ยกเลิก'),
                 ),
                 FilledButton.icon(
-                  onPressed: _employeeId == null || _saving ? null : _save,
+                  onPressed:
+                      _employeeId == null ||
+                          (_evaluationEnabled &&
+                              _evaluationTemplateId == null) ||
+                          _saving
+                      ? null
+                      : _save,
                   style: FilledButton.styleFrom(
                     minimumSize: const Size(0, 48),
                     shape: RoundedRectangleBorder(

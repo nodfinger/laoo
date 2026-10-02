@@ -34,6 +34,7 @@
 - Mobile แสดงเมนูลัดทั้งหมดผ่าน Popup รูปดาว และใช้ User Menu แบบ Compact; คำอธิบายสิทธิ์/ประเภทผู้ใช้แสดงภายใน User Menu ไม่วางเป็นบรรทัดที่สองบน Header
 - คำสั่งออกจากระบบอยู่ภายใน User Menu เพียงตำแหน่งเดียว ห้ามวางปุ่มซ้ำบน Workspace Header
 - Caption และชื่อเมนูต้องอ่านจาก Navigation API/`TDADMainMenu.MenuName` ผ่าน Resolver กลาง ห้าม hardcode แยกจาก Sidebar
+- ทุกหน้าจอที่ผูก MenuCode ต้องมีปุ่ม Icon ดาวอยู่ถัดจาก Caption เพื่อเพิ่ม/นำออกจากเมนูลัดของผู้ Login และสถานะต้องเชื่อมกับเมนูลัดส่วนกลางทันที
 - ทุกหน้าจอต้องเต็ม Content Area ภายใน Shared Workspace และไม่สร้าง Shell ซ้อน
 - เมื่อ Content Area แคบกว่า `900px` ต้องใช้ Responsive Layout ที่ไม่เกิด Overflow
 - Action ทุกชนิดต้องตรวจทั้ง `ScreenType` และ Permission ของ User; Backend ต้องตรวจซ้ำ

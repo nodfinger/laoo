@@ -134,6 +134,7 @@ class VisitorWorkspaceTheme extends StatelessWidget {
         textButtonTheme: TextButtonThemeData(
           style: TextButton.styleFrom(
             minimumSize: Size(0, tokens.buttonHeight),
+            maximumSize: Size(double.infinity, tokens.buttonHeight),
             textStyle: buttonText,
             foregroundColor: colors.primary,
             shape: shape,
@@ -142,6 +143,7 @@ class VisitorWorkspaceTheme extends StatelessWidget {
         outlinedButtonTheme: OutlinedButtonThemeData(
           style: OutlinedButton.styleFrom(
             minimumSize: Size(0, tokens.buttonHeight),
+            maximumSize: Size(double.infinity, tokens.buttonHeight),
             textStyle: buttonText,
             foregroundColor: colors.primary,
             side: BorderSide(color: colors.primary),
@@ -151,6 +153,7 @@ class VisitorWorkspaceTheme extends StatelessWidget {
         filledButtonTheme: FilledButtonThemeData(
           style: FilledButton.styleFrom(
             minimumSize: Size(0, tokens.buttonHeight),
+            maximumSize: Size(double.infinity, tokens.buttonHeight),
             textStyle: buttonText,
             backgroundColor: colors.primary,
             foregroundColor: colors.onPrimary,

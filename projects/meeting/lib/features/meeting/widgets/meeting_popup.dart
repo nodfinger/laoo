@@ -21,6 +21,9 @@ ThemeData meetingPopupTheme(BuildContext context) {
         minimumSize: const WidgetStatePropertyAll<Size>(
           Size(0, LaooTypography.buttonHeight),
         ),
+        maximumSize: const WidgetStatePropertyAll<Size>(
+          Size(double.infinity, LaooTypography.buttonHeight),
+        ),
         textStyle: const WidgetStatePropertyAll<TextStyle>(
           TextStyle(fontSize: LaooTypography.button),
         ),

@@ -429,13 +429,10 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
 
   void _scheduleMessageDismiss() {
     if (_message == null || _messageTimer != null) return;
-    _messageTimer = Timer(
-      Duration(seconds: companySetupController.current?.timeAlert ?? 30),
-      () {
-        if (mounted) setState(() => _message = null);
-        _messageTimer = null;
-      },
-    );
+    _messageTimer = Timer(companySetupController.alertDuration, () {
+      if (mounted) setState(() => _message = null);
+      _messageTimer = null;
+    });
   }
 
   Future<void> _load() async {

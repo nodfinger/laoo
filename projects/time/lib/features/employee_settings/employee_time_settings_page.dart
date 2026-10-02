@@ -164,9 +164,8 @@ class _EmployeeTimeSettingsPageState extends State<EmployeeTimeSettingsPage> {
           _card(
             Row(
               children: [
-                Icon(Icons.star_border, color: tokens.primaryColor),
-                const SizedBox(width: 6),
                 Expanded(child: Text(caption, style: tokens.captionStyle)),
+                const LaooPageFavoriteButton(),
                 LaooListCardToggle(
                   tokens: tokens.workspace,
                   cards: _cards,

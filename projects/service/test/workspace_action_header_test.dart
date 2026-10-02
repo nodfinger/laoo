@@ -70,7 +70,7 @@ void main() {
     expect(cancelRect.left, 0);
   });
 
-  testWidgets('keeps favorite star left of a black caption', (tester) async {
+  testWidgets('keeps favorite star after a black caption', (tester) async {
     await tester.pumpWidget(
       const MaterialApp(
         home: Scaffold(
@@ -83,7 +83,7 @@ void main() {
     final titleRect = tester.getRect(find.text(title));
     final titleText = tester.widget<Text>(find.text(title));
 
-    expect(starRect.right, lessThan(titleRect.left));
+    expect(starRect.left, greaterThan(titleRect.right));
     expect(titleText.style?.color, Colors.black);
   });
 

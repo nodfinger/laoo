@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:laoo_shared_workspace_ui/laoo_shared_workspace_ui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
@@ -497,17 +498,13 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
               ),
               child: Row(
                 children: [
-                  Icon(
-                    Icons.star_border_rounded,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       _checkInCaption,
                       style: visitorUiTokens.captionStyle,
                     ),
                   ),
+                  const LaooPageFavoriteButton(),
                 ],
               ),
             ),

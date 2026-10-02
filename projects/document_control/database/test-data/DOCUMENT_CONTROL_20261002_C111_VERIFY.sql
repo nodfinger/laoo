@@ -1,0 +1,15 @@
+SET NOCOUNT ON;
+DECLARE @Company bigint=(SELECT CompanyID FROM dbo.TDADUser WHERE Username=N'c111' AND IsActive=1);
+DECLARE @User bigint=(SELECT UserID FROM dbo.TDADUser WHERE Username=N'c111' AND CompanyID=@Company AND IsActive=1);
+DECLARE @Project bigint=(SELECT ProjectID FROM dbo.TDADProject WHERE ProjectCode=N'LAOO_DOCUMENT' AND IsActive=1);
+DECLARE @Partner bigint=(SELECT PartnerID FROM dbo.TDSTCompanySetUp WHERE CompanyID=@Company AND IsActive=1);
+IF @Company IS NULL OR @User IS NULL OR @Project IS NULL THROW 56830,N'Document Control identity or project is missing.',1;
+IF (SELECT COUNT(*) FROM dbo.TDADMainMenu WHERE MenuCode BETWEEN N'48001' AND N'48008' AND IsActive=1)<>8 THROW 56831,N'Document Control metadata must contain eight active menus.',1;
+IF EXISTS(SELECT 1 FROM (VALUES(N'48001',2),(N'48002',1),(N'48003',4),(N'48004',3),(N'48005',1),(N'48006',3),(N'48007',3),(N'48008',3)) x(MenuCode,ScreenType) LEFT JOIN dbo.TDADMainMenu m ON m.MenuCode=x.MenuCode AND m.ScreenType=x.ScreenType WHERE m.MenuCode IS NULL) THROW 56832,N'Document Control ScreenType contract is invalid.',1;
+IF NOT EXISTS(SELECT 1 FROM dbo.TDADCompanyProject WHERE ProjectID=@Project AND PartnerID=@Partner AND CompanyID=@Company AND IsEnabled=1) THROW 56833,N'c111 company entitlement is missing.',1;
+IF NOT EXISTS(SELECT 1 FROM dbo.TDADUserProject WHERE ProjectID=@Project AND CompanyID=@Company AND UserID=@User AND IsActive=1) THROW 56834,N'c111 user entitlement is missing.',1;
+IF (SELECT COUNT(*) FROM dbo.TDDCDocumentType WHERE CompanyID=@Company AND IsActive=1)<4 THROW 56835,N'Document type fixture is incomplete.',1;
+IF EXISTS(SELECT required.StatusCode FROM (VALUES(N'DRAFT'),(N'IN_REVIEW'),(N'IN_APPROVAL'),(N'EFFECTIVE'),(N'OBSOLETE'),(N'PUBLISHED')) required(StatusCode) WHERE NOT EXISTS(SELECT 1 FROM dbo.TDDCDocument d WHERE d.CompanyID=@Company AND d.DocumentNo LIKE N'DOCCTRL-20261002-C111-%' AND d.StatusCode=required.StatusCode)) THROW 56836,N'Document workflow fixture is incomplete.',1;
+IF NOT EXISTS(SELECT 1 FROM dbo.TDDCAccessRule a JOIN dbo.TDDCDocument d ON d.CompanyID=a.CompanyID AND d.DocumentID=a.DocumentID WHERE d.CompanyID=@Company AND d.DocumentNo=N'DOCCTRL-20261002-C111-DRAFT' AND a.SubjectType=N'DEPARTMENT' AND a.CanView=1 AND a.CanPreview=1 AND a.CanDownload=0) THROW 56837,N'Restricted department access fixture is missing.',1;
+IF (SELECT COUNT(*) FROM dbo.TDADPermission WHERE ProjectID=@Project AND ScreenCode BETWEEN N'48001' AND N'48008' AND IsActive=1)<24 THROW 56838,N'Document permission baseline is incomplete.',1;
+PRINT N'DOCUMENT CONTROL VERIFY PASSED';

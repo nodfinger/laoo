@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:laoo_shared_workspace_ui/laoo_shared_workspace_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
@@ -193,17 +194,13 @@ class _ServiceRequestQrPageState extends State<ServiceRequestQrPage> {
                 padding: const EdgeInsets.all(LaooLayout.cardPadding),
                 child: Row(
                   children: [
-                    Icon(
-                      Icons.star_border,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    const SizedBox(width: LaooLayout.cardPadding),
                     Expanded(
                       child: Text(
                         _menuName,
                         style: LaooTypography.screenCaptionStyle,
                       ),
                     ),
+                    const LaooPageFavoriteButton(),
                     if (_canCreate)
                       FilledButton.icon(
                         onPressed: _loading ? null : _create,

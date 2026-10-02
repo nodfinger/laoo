@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:laoo_shared_workspace_ui/laoo_shared_workspace_ui.dart';
 import '../../../app/theme/laoo_design_tokens.dart';
 import '../../../app/theme/laoo_typography.dart';
 import '../../../core/company_setup/company_date_formatter.dart';
@@ -499,8 +500,6 @@ class _StockReceiptWorkspaceState extends State<StockReceiptWorkspace> {
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.star_border, color: _primary),
-                const SizedBox(width: 8),
                 Flexible(
                   child: Text(
                     '${widget.caption}$suffix',
@@ -511,6 +510,7 @@ class _StockReceiptWorkspaceState extends State<StockReceiptWorkspace> {
                     ),
                   ),
                 ),
+                const LaooPageFavoriteButton(),
               ],
             ),
             Wrap(spacing: 8, runSpacing: 6, children: buttons),

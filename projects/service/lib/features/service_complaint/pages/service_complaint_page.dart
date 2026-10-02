@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:laoo_shared_workspace_ui/laoo_shared_workspace_ui.dart';
 
 import '../../../app/theme/laoo_design_tokens.dart';
 import '../../../core/api/api_exception.dart';
@@ -261,11 +262,6 @@ class _ServiceComplaintPageState extends State<ServiceComplaintPage> {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        Icons.star_border,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      const SizedBox(width: 8),
                       Text(
                         _caption,
                         style: const TextStyle(
@@ -274,6 +270,7 @@ class _ServiceComplaintPageState extends State<ServiceComplaintPage> {
                           fontWeight: FontWeight.w700,
                         ),
                       ),
+                      const LaooPageFavoriteButton(),
                     ],
                   ),
                   if (_canCreate)

@@ -3,12 +3,11 @@ import 'package:flutter/foundation.dart';
 import 'company_setup_context.dart';
 import 'company_setup_service.dart';
 
-final CompanySetupController companySetupController =
-    CompanySetupController();
+final CompanySetupController companySetupController = CompanySetupController();
 
 class CompanySetupController extends ChangeNotifier {
   CompanySetupController({CompanySetupService? service})
-      : _service = service ?? CompanySetupService();
+    : _service = service ?? CompanySetupService();
 
   final CompanySetupService _service;
   CompanySetupContext? _current;
@@ -28,6 +27,9 @@ class CompanySetupController extends ChangeNotifier {
   int get pageSize => _current?.rowStd ?? 50;
 
   int get orgStructureType => _current?.orgStructureType ?? 1;
+
+  Duration get alertDuration =>
+      Duration(seconds: (_current?.timeAlert ?? 30).clamp(1, 3600));
 
   Future<CompanySetupContext> load() async {
     final setup = await _service.loadRuntime();

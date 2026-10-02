@@ -1,0 +1,16 @@
+SET NOCOUNT ON;
+DECLARE @Company bigint=(SELECT TOP 1 CompanyID FROM dbo.TDADUser WHERE Username=N'c111' AND IsActive=1);
+DECLARE @User bigint=(SELECT TOP 1 UserID FROM dbo.TDADUser WHERE Username=N'c111' AND CompanyID=@Company AND IsActive=1);
+DECLARE @Project bigint=(SELECT ProjectID FROM dbo.TDADProject WHERE ProjectCode=N'LAOO_KNOWLEDGE' AND IsActive=1);
+IF (SELECT COUNT(*) FROM dbo.TDADMainMenu WHERE MenuCode BETWEEN N'49001' AND N'49008' AND IsActive=1 AND IsVisible=1)<>8 THROW 56931,N'Knowledge menu metadata is incomplete.',1;
+IF EXISTS(SELECT 1 FROM (VALUES(N'49001',2),(N'49002',1),(N'49003',4),(N'49004',2),(N'49005',3),(N'49006',1),(N'49007',3),(N'49008',3)) x(MenuCode,ScreenType) LEFT JOIN dbo.TDADMainMenu m ON m.MenuCode=x.MenuCode WHERE m.MenuCode IS NULL OR m.ScreenType<>x.ScreenType) THROW 56932,N'Knowledge ScreenType contract failed.',1;
+IF NOT EXISTS(SELECT 1 FROM dbo.TDADCompanyProject WHERE CompanyID=@Company AND ProjectID=@Project AND IsEnabled=1) THROW 56933,N'Knowledge company entitlement is missing.',1;
+IF NOT EXISTS(SELECT 1 FROM dbo.TDADUserProject WHERE CompanyID=@Company AND UserID=@User AND ProjectID=@Project AND IsActive=1) THROW 56934,N'Knowledge user entitlement is missing.',1;
+IF (SELECT COUNT(*) FROM dbo.TDADUserPermission up JOIN dbo.TDADPermission p ON p.PermissionID=up.PermissionID AND p.ProjectID=up.ProjectID WHERE up.UserID=@User AND up.ProjectID=@Project AND up.IsAllowed=1 AND up.IsActive=1)<(SELECT COUNT(*) FROM dbo.TDADPermission WHERE ProjectID=@Project AND IsActive=1) THROW 56935,N'Knowledge c111 permissions are incomplete.',1;
+IF (SELECT COUNT(*) FROM dbo.TDKNCategory WHERE CompanyID=@Company AND IsActive=1)<7 THROW 56936,N'Knowledge categories are incomplete.',1;
+IF (SELECT COUNT(*) FROM dbo.TDKNArticle WHERE CompanyID=@Company AND ArticleCode LIKE N'KNOWLEDGE-20261003-C111-%')<8 THROW 56937,N'Knowledge article cases are incomplete.',1;
+IF EXISTS(SELECT s.StatusCode FROM (VALUES(N'DRAFT'),(N'IN_REVIEW'),(N'PUBLISHED'),(N'REVIEW_DUE'),(N'ARCHIVED')) s(StatusCode) WHERE NOT EXISTS(SELECT 1 FROM dbo.TDKNArticle a WHERE a.CompanyID=@Company AND a.ArticleCode LIKE N'KNOWLEDGE-20261003-C111-%' AND a.StatusCode=s.StatusCode)) THROW 56938,N'Knowledge article status coverage is incomplete.',1;
+IF EXISTS(SELECT t.ContentType FROM (VALUES(N'ARTICLE'),(N'VIDEO_URL'),(N'DOCUMENT_CONTROL'),(N'TRAINING')) t(ContentType) WHERE NOT EXISTS(SELECT 1 FROM dbo.TDKNArticle a WHERE a.CompanyID=@Company AND a.ArticleCode LIKE N'KNOWLEDGE-20261003-C111-%' AND a.ContentType=t.ContentType)) THROW 56939,N'Knowledge content type coverage is incomplete.',1;
+IF NOT EXISTS(SELECT 1 FROM dbo.TDKNQuestion q JOIN dbo.TDKNAnswer a ON a.CompanyID=q.CompanyID AND a.QuestionID=q.QuestionID AND a.IsAccepted=1 WHERE q.CompanyID=@Company AND q.StatusCode=N'RESOLVED') THROW 56940,N'Knowledge Q&A accepted flow is incomplete.',1;
+IF NOT EXISTS(SELECT 1 FROM dbo.TDKNFeedback WHERE CompanyID=@Company AND UserID=@User) OR NOT EXISTS(SELECT 1 FROM dbo.TDKNFollow WHERE CompanyID=@Company AND UserID=@User) THROW 56941,N'Knowledge feedback/follow sample is incomplete.',1;
+PRINT N'KNOWLEDGE_VERIFY_OK';

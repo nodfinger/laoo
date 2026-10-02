@@ -273,12 +273,9 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
       _message = text;
       _error = error;
     });
-    _alertTimer = Timer(
-      Duration(seconds: companySetupController.current?.timeAlert ?? 30),
-      () {
-        if (mounted) setState(() => _message = null);
-      },
-    );
+    _alertTimer = Timer(companySetupController.alertDuration, () {
+      if (mounted) setState(() => _message = null);
+    });
   }
 
   String _thai(Object e) =>

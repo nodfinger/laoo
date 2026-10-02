@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:laoo_shared_workspace_ui/laoo_shared_workspace_ui.dart';
 
 import 'pos_api.dart';
 import 'pos_feature_host.dart';
@@ -238,10 +239,10 @@ class _CrudState extends State<_PosSimpleCrud> {
           itemBuilder: (_, index) {
             final endpoint = widget.endpoints[index],
                 rows = data[endpoint] ?? [];
-            return posCard(
-              child: Column(
-                children: [
-                  Row(
+            return Column(
+              children: [
+                posCard(
+                  child: Row(
                     children: [
                       Expanded(
                         child: Text(
@@ -258,69 +259,92 @@ class _CrudState extends State<_PosSimpleCrud> {
                         ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  if (rows.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.all(24),
-                      child: Text('ยังไม่มีข้อมูล'),
-                    )
-                  else
-                    ...rows.map(
-                      (x) => Container(
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        decoration: BoxDecoration(
-                          border: Border(
-                            bottom: BorderSide(color: posUiTokens.borderColor),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    '${x['code'] ?? ''} · ${x['name'] ?? ''}',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  Text(
-                                    (x['branch'] ?? x['outlet'] ?? '')
-                                        .toString(),
-                                  ),
-                                  if (x['activationId'] != null)
-                                    SelectableText(
-                                      'Activation ID: ${x['activationId']}',
-                                      style: const TextStyle(fontSize: 12),
-                                    ),
-                                ],
-                              ),
+                ),
+                SizedBox(height: posUiTokens.sectionSpacing),
+                LaooTableCard(
+                  tokens: posUiTokens,
+                  child: rows.isEmpty
+                      ? const Center(child: Text('ยังไม่มีข้อมูล'))
+                      : LaooWorkspaceDataTable(
+                          tokens: posUiTokens,
+                          columns: const [
+                            LaooWorkspaceTableColumns.id,
+                            DataColumn(
+                              label: Center(child: Text('Action')),
+                              columnWidth: FixedColumnWidth(100),
                             ),
-                            if (widget.actions['edit'] == true)
-                              IconButton(
-                                tooltip: 'แก้ไข',
-                                onPressed: () => _openForm(endpoint, x),
-                                icon: Icon(
-                                  Icons.edit_outlined,
-                                  color: posUiTokens.primaryColor,
-                                ),
-                              ),
-                            if (widget.actions['delete'] == true)
-                              IconButton(
-                                tooltip: 'ลบ',
-                                onPressed: () => _delete(endpoint, x),
-                                icon: const Icon(
-                                  Icons.delete_outline,
-                                  color: Colors.red,
-                                ),
-                              ),
+                            DataColumn(label: Text('รหัส')),
+                            DataColumn(label: Text('ชื่อ')),
+                            DataColumn(label: Text('สาขา/จุดขาย')),
+                            DataColumn(label: Text('สถานะ')),
                           ],
+                          rows: List<DataRow>.generate(rows.length, (i) {
+                            final row = rows[i];
+                            return DataRow(
+                              cells: [
+                                DataCell(Text('${i + 1}')),
+                                DataCell(
+                                  Center(
+                                    child: Wrap(
+                                      spacing: 2,
+                                      children: [
+                                        if (widget.actions['edit'] == true)
+                                          IconButton(
+                                            tooltip: 'แก้ไข',
+                                            onPressed: () =>
+                                                _openForm(endpoint, row),
+                                            icon: Icon(
+                                              Icons.edit_outlined,
+                                              color: posUiTokens.primaryColor,
+                                            ),
+                                          ),
+                                        if (widget.actions['delete'] == true)
+                                          IconButton(
+                                            tooltip: 'ลบ',
+                                            onPressed: () =>
+                                                _delete(endpoint, row),
+                                            icon: Icon(
+                                              Icons.delete_outline,
+                                              color: Theme.of(
+                                                context,
+                                              ).colorScheme.error,
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                DataCell(Text('${row['code'] ?? '-'}')),
+                                DataCell(Text('${row['name'] ?? '-'}')),
+                                DataCell(
+                                  Text(
+                                    '${row['branch'] ?? row['outlet'] ?? '-'}',
+                                  ),
+                                ),
+                                DataCell(
+                                  Text(
+                                    row['active'] == false ||
+                                            row['isActive'] == false
+                                        ? 'ปิดใช้งาน'
+                                        : 'ใช้งาน',
+                                  ),
+                                ),
+                              ],
+                            );
+                          }),
                         ),
-                      ),
-                    ),
-                ],
-              ),
+                ),
+                SizedBox(height: posUiTokens.sectionSpacing),
+                LaooPaginationCard(
+                  tokens: posUiTokens,
+                  page: 1,
+                  pageCount: 1,
+                  pageSize: rows.isEmpty ? 20 : rows.length,
+                  total: rows.length,
+                  onPrevious: null,
+                  onNext: null,
+                ),
+              ],
             );
           },
         );

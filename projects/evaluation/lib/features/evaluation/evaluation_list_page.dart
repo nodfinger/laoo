@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:laoo_shared_core/laoo_shared_core.dart';
+import 'package:laoo_shared_workspace_ui/laoo_shared_workspace_ui.dart';
 
 import 'evaluation_feature_host.dart';
 import 'evaluation_popup_theme.dart';
@@ -103,14 +104,10 @@ class _EvaluationListPageState extends State<EvaluationListPage> {
               padding: const EdgeInsets.all(10),
               child: Row(
                 children: [
-                  Icon(
-                    Icons.star_border,
-                    color: evaluationUiTokens.primaryColor,
-                  ),
-                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(_title, style: evaluationUiTokens.captionStyle),
                   ),
+                  const LaooPageFavoriteButton(),
                   if (_canCreate)
                     FilledButton.icon(
                       style: FilledButton.styleFrom(
@@ -997,17 +994,13 @@ class _EvaluationListPageState extends State<EvaluationListPage> {
                     padding: evaluationUiTokens.cardPadding,
                     child: Row(
                       children: [
-                        Icon(
-                          Icons.star_border,
-                          color: evaluationUiTokens.primaryColor,
-                        ),
-                        SizedBox(width: evaluationUiTokens.itemSpacing),
                         Expanded(
                           child: Text(
                             _title,
                             style: evaluationUiTokens.captionStyle,
                           ),
                         ),
+                        const LaooPageFavoriteButton(),
                         if (widget.menu == '47003' && _canCreate)
                           SizedBox(
                             height: evaluationUiTokens.buttonHeight,

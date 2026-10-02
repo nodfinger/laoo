@@ -224,13 +224,6 @@ abstract final class AppMenuRouteRegistry {
       path: RoutePaths.companyCustomers,
       scope: AppMenuScope.company,
     ),
-    '14001': AppMenuRouteSpec(
-      menuCode: '14001',
-      databaseRouteName: 'assetLocations',
-      goRouteName: RouteNames.assetLocations,
-      path: RoutePaths.assetLocations,
-      scope: AppMenuScope.company,
-    ),
     '14002': AppMenuRouteSpec(
       menuCode: '14002',
       databaseRouteName: 'assetItems',
@@ -329,13 +322,6 @@ abstract final class AppMenuRouteRegistry {
       path: RoutePaths.reportsHistory,
       scope: AppMenuScope.company,
     ),
-    '19003': AppMenuRouteSpec(
-      menuCode: '19003',
-      databaseRouteName: 'reportsSatisfaction',
-      goRouteName: RouteNames.reportsSatisfaction,
-      path: RoutePaths.reportsSatisfaction,
-      scope: AppMenuScope.company,
-    ),
     '20001': AppMenuRouteSpec(
       menuCode: '20001',
       databaseRouteName: 'portalRequest',
@@ -362,13 +348,6 @@ abstract final class AppMenuRouteRegistry {
       databaseRouteName: 'portalPmSchedule',
       goRouteName: RouteNames.portalPmSchedule,
       path: RoutePaths.portalPmSchedule,
-      scope: AppMenuScope.company,
-    ),
-    '20005': AppMenuRouteSpec(
-      menuCode: '20005',
-      databaseRouteName: 'portalEvaluation',
-      goRouteName: RouteNames.portalEvaluation,
-      path: RoutePaths.portalEvaluation,
       scope: AppMenuScope.company,
     ),
     '20006': AppMenuRouteSpec(

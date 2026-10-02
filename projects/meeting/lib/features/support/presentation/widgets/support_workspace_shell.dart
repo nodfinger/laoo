@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:laoo_shared_workspace_ui/laoo_shared_workspace_ui.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/app_menu_route_registry.dart';
@@ -26,6 +27,53 @@ final ValueNotifier<String?> mobileSelectedMenuGroup = ValueNotifier<String?>(
   null,
 );
 final UserFavoriteRepository _userFavoriteRepository = UserFavoriteRepository();
+
+class _ScopedWorkspaceFavoriteButton extends StatelessWidget {
+  const _ScopedWorkspaceFavoriteButton({required this.menuKey});
+  final String menuKey;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = workspaceThemeController.value.primary;
+    return ValueListenableBuilder<Set<String>>(
+      valueListenable: supportFavoritePages,
+      builder: (context, favorites, _) => FutureBuilder<NavigationMenuItem?>(
+        future: NavigationMenuRepository().findMenu(
+          menuCode: menuKey,
+          routeName: menuKey,
+        ),
+        builder: (context, snapshot) {
+          final resolved = snapshot.data?.code.trim();
+          final code = resolved ?? menuKey;
+          final selected = favorites.contains(code);
+          return IconButton(
+            tooltip: selected
+                ? 'นำออกจากเมนูลัดของฉัน'
+                : 'เพิ่มหน้านี้เป็นเมนูลัดของฉัน',
+            onPressed: resolved == null || resolved.isEmpty
+                ? null
+                : () async {
+                    final next = <String>{...favorites};
+                    if (selected) {
+                      next.remove(resolved);
+                      await _userFavoriteRepository.remove(resolved);
+                    } else {
+                      next.add(resolved);
+                      await _userFavoriteRepository.add(resolved);
+                    }
+                    supportFavoritePages.value = next;
+                    supportFavoriteRefresh.value++;
+                  },
+            icon: Icon(
+              selected ? Icons.star_rounded : Icons.star_border_rounded,
+              color: accent,
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
 
 enum WorkspaceMenuScope { support, partner, company }
 
@@ -206,10 +254,8 @@ class _WorkspacePageTitleState extends State<WorkspacePageTitle> {
         final accent = preset.primary;
         return Row(
           mainAxisSize: MainAxisSize.max,
-          mainAxisAlignment: key == null
-              ? MainAxisAlignment.start
-              : MainAxisAlignment.end,
-          textDirection: key == null ? TextDirection.ltr : TextDirection.rtl,
+          mainAxisAlignment: MainAxisAlignment.start,
+          textDirection: TextDirection.ltr,
           children: [
             Flexible(
               child: Text(
@@ -387,6 +433,12 @@ class SupportWorkspaceShell extends StatelessWidget {
                 valueListenable: workspaceButtonMenu,
                 builder: (context, selectedButtonMenu, _) {
                   final buttonMenu = selectedButtonMenu;
+                  final scopedChild = LaooWorkspaceFavoriteScope(
+                    activeMenu: activeMenu,
+                    favoriteButtonBuilder: (context, menuKey) =>
+                        _ScopedWorkspaceFavoriteButton(menuKey: menuKey),
+                    child: child,
+                  );
                   return SafeArea(
                     child: Stack(
                       children: [
@@ -417,11 +469,11 @@ class SupportWorkspaceShell extends StatelessWidget {
                                         preset: preset,
                                         activeMenu: activeMenu,
                                         compact: compact,
-                                        child: child,
+                                        child: scopedChild,
                                       ),
                                     )
                                   else
-                                    Expanded(child: child),
+                                    Expanded(child: scopedChild),
                                 ],
                               ),
                             ),

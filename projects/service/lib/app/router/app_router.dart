@@ -508,13 +508,6 @@ final List<GoRoute> _placeholderRoutes = [
     builder: (context, state) => const OrganizationStructurePage(),
   ),
   _scopePlaceholder(
-    RoutePaths.assetLocations,
-    RouteNames.assetLocations,
-    'ผังสถานที่และพื้นที่',
-    WorkspaceMenuScope.company,
-    'assetLocations',
-  ),
-  _scopePlaceholder(
     RoutePaths.assetItems,
     RouteNames.assetItems,
     'ทะเบียนอุปกรณ์และ QR Code',
@@ -612,13 +605,6 @@ final List<GoRoute> _placeholderRoutes = [
     WorkspaceMenuScope.company,
     'reportsHistory',
   ),
-  _scopePlaceholder(
-    RoutePaths.reportsSatisfaction,
-    RouteNames.reportsSatisfaction,
-    'รายงานผลประเมินความพึงพอใจ',
-    WorkspaceMenuScope.company,
-    'reportsSatisfaction',
-  ),
   _portalPlaceholder(
     RoutePaths.portalRequest,
     RouteNames.portalRequest,
@@ -638,11 +624,6 @@ final List<GoRoute> _placeholderRoutes = [
     RoutePaths.portalPmSchedule,
     RouteNames.portalPmSchedule,
     'รอบบำรุงรักษาของห้อง',
-  ),
-  _portalPlaceholder(
-    RoutePaths.portalEvaluation,
-    RouteNames.portalEvaluation,
-    'ประเมินความพึงพอใจ',
   ),
   _portalPlaceholder(
     RoutePaths.portalComplaint,

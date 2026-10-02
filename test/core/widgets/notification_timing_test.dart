@@ -71,4 +71,40 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(AutoDismissMessage), findsNothing);
   });
+
+  testWidgets(
+    'AutoDismissMessage keeps the original deadline across parent rebuilds',
+    (tester) async {
+      var visible = true;
+      late StateSetter rebuild;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StatefulBuilder(
+            builder: (context, setState) {
+              rebuild = setState;
+              return Scaffold(
+                body: visible
+                    ? AutoDismissMessage(
+                        message: 'Three second alert',
+                        duration: const Duration(seconds: 3),
+                        onClose: () => setState(() => visible = false),
+                      )
+                    : const SizedBox.shrink(),
+              );
+            },
+          ),
+        ),
+      );
+
+      await tester.pump(const Duration(seconds: 2));
+      rebuild(() {});
+      await tester.pump();
+      expect(find.byType(AutoDismissMessage), findsOneWidget);
+
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump();
+      expect(find.byType(AutoDismissMessage), findsNothing);
+    },
+  );
 }

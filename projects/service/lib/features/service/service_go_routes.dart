@@ -190,10 +190,6 @@ GoRoute _portalPlaceholder(FeatureRouteContract route, String title) => GoRoute(
   ),
 );
 
-const _workspacePlaceholders = <String, String>{
-  '14001': 'ผังสถานที่และพื้นที่',
-  '14003': 'ทะเบียนลูกค้าภายนอก',
-  '19003': 'รายงานผลประเมินความพึงพอใจ',
-};
+const _workspacePlaceholders = <String, String>{'14003': 'ทะเบียนลูกค้าภายนอก'};
 
-const _portalPlaceholders = <String, String>{'20005': 'ประเมินความพึงพอใจ'};
+const _portalPlaceholders = <String, String>{};

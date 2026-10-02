@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:laoo_shared_core/laoo_shared_core.dart';
+import 'package:laoo_shared_workspace_ui/laoo_shared_workspace_ui.dart';
 
 import 'gate_pass_feature_host.dart';
 
@@ -27,6 +28,7 @@ class _GatePassPageState extends State<GatePassPage> {
   late String _title;
   String _appliedQuery = '';
   int _page = 1;
+  bool _cards = false;
   Map<String, dynamic> _actions = const {};
 
   bool get _isSettings => widget.endpoint == 'settings';
@@ -40,6 +42,17 @@ class _GatePassPageState extends State<GatePassPage> {
   bool get _canApprove => _actions['approve'] == true;
   bool get _canConfirmExit => _actions['confirmExit'] == true;
   bool get _canConfirmReturn => _actions['confirmReturn'] == true;
+  IconData get _menuIcon => switch (widget.endpoint) {
+    'settings' => Icons.settings_outlined,
+    'purposes' => Icons.category_outlined,
+    'requests' => Icons.assignment_outlined,
+    'approvals' => Icons.approval_outlined,
+    'exit-checks' => Icons.verified_user_outlined,
+    'return-checks' => Icons.assignment_return_outlined,
+    'history' => Icons.history_outlined,
+    'dashboard' => Icons.dashboard_outlined,
+    _ => Icons.local_shipping_outlined,
+  };
 
   @override
   void initState() {
@@ -194,16 +207,23 @@ class _GatePassPageState extends State<GatePassPage> {
 
   Widget _captionCard(BuildContext context) {
     final tokens = gatePassUiTokens;
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: tokens.cardPadding,
-        child: Row(
+    final shared = _sharedTokens(context);
+    return LayoutBuilder(
+      builder: (context, constraints) => LaooCaptionCard(
+        tokens: shared,
+        caption: _title,
+        leading: Icon(_menuIcon, color: tokens.primaryColor),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.star_border, color: tokens.primaryColor),
-            const SizedBox(width: 8),
-            Expanded(child: Text(_title, style: tokens.captionStyle)),
-            if ((_isPurposes || _isRequests) && _canCreate)
+            if (constraints.maxWidth >= tokens.compactBreakpoint)
+              LaooListCardToggle(
+                tokens: shared,
+                cards: _cards,
+                onChanged: (value) => setState(() => _cards = value),
+              ),
+            if ((_isPurposes || _isRequests) && _canCreate) ...[
+              SizedBox(width: tokens.itemSpacing),
               FilledButton.icon(
                 onPressed: _isPurposes ? () => _editPurpose() : _createRequest,
                 style: FilledButton.styleFrom(
@@ -216,6 +236,7 @@ class _GatePassPageState extends State<GatePassPage> {
                 icon: const Icon(Icons.add),
                 label: const Text('เพิ่ม'),
               ),
+            ],
           ],
         ),
       ),
@@ -228,59 +249,56 @@ class _GatePassPageState extends State<GatePassPage> {
       borderRadius: BorderRadius.circular(tokens.radius),
       borderSide: BorderSide(color: tokens.borderColor),
     );
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: tokens.cardPadding,
-        child: Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            SizedBox(
-              width: (MediaQuery.sizeOf(context).width - 40).clamp(0.0, 280.0),
-              child: TextField(
-                controller: _searchController,
-                onSubmitted: (_) => _search(),
-                style: tokens.inputStyle,
-                decoration: InputDecoration(
-                  hintText: 'ค้นหารหัส ชื่อ หรือสถานะ',
-                  prefixIcon: const Icon(Icons.search),
-                  border: inputBorder,
-                  enabledBorder: inputBorder,
-                  focusedBorder: inputBorder.copyWith(
-                    borderSide: BorderSide(color: tokens.primaryColor),
-                  ),
+    return LaooFilterCard(
+      tokens: _sharedTokens(context),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          SizedBox(
+            width: (MediaQuery.sizeOf(context).width - 40).clamp(0.0, 280.0),
+            child: TextField(
+              controller: _searchController,
+              onSubmitted: (_) => _search(),
+              style: tokens.inputStyle,
+              decoration: InputDecoration(
+                hintText: 'ค้นหารหัส ชื่อ หรือสถานะ',
+                prefixIcon: const Icon(Icons.search),
+                border: inputBorder,
+                enabledBorder: inputBorder,
+                focusedBorder: inputBorder.copyWith(
+                  borderSide: BorderSide(color: tokens.primaryColor),
                 ),
               ),
             ),
-            Wrap(
-              spacing: 8,
-              children: [
-                FilledButton.icon(
-                  onPressed: _search,
-                  style: _filterFilledStyle(tokens),
-                  icon: const Icon(Icons.search),
-                  label: const Text('ค้นหา'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: _clearFilter,
-                  style: _filterOutlinedStyle(tokens),
-                  icon: const Icon(Icons.clear),
-                  label: const Text('ล้าง Filter'),
-                ),
-              ],
-            ),
-          ],
-        ),
+          ),
+          Wrap(
+            spacing: 8,
+            children: [
+              FilledButton.icon(
+                onPressed: _search,
+                style: _filterFilledStyle(tokens),
+                icon: const Icon(Icons.search),
+                label: const Text('ค้นหา'),
+              ),
+              OutlinedButton.icon(
+                onPressed: _clearFilter,
+                style: _filterOutlinedStyle(tokens),
+                icon: const Icon(Icons.clear),
+                label: const Text('ล้าง Filter'),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 
   Widget _resultCard(BuildContext context, List<Map<String, dynamic>> rows) {
     if (rows.isEmpty) {
-      return Card(
-        margin: EdgeInsets.zero,
+      return LaooTableCard(
+        tokens: _sharedTokens(context),
         child: Center(
           child: Text('ไม่พบข้อมูล', style: gatePassUiTokens.inputStyle),
         ),
@@ -288,7 +306,8 @@ class _GatePassPageState extends State<GatePassPage> {
     }
     return LayoutBuilder(
       builder: (context, constraints) {
-        if (constraints.maxWidth < gatePassUiTokens.compactBreakpoint) {
+        if (_cards ||
+            constraints.maxWidth < gatePassUiTokens.compactBreakpoint) {
           return ListView.separated(
             itemCount: rows.length,
             separatorBuilder: (_, _) =>
@@ -297,36 +316,33 @@ class _GatePassPageState extends State<GatePassPage> {
                 _rowCard(context, rows[index], index),
           );
         }
-        return Card(
-          margin: EdgeInsets.zero,
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(minWidth: constraints.maxWidth),
-              child: DataTable(
-                headingRowColor: WidgetStatePropertyAll(
-                  gatePassUiTokens.primaryColor.withValues(alpha: 0.10),
-                ),
-                dividerThickness: 1,
-                columns: const [
-                  DataColumn(label: Text('ID')),
-                  DataColumn(label: Text('จัดการ')),
-                  DataColumn(label: Text('รหัส / เอกสาร')),
-                  DataColumn(label: Text('รายละเอียด')),
-                  DataColumn(label: Text('สถานะ')),
+        return LaooTableCard(
+          tokens: _sharedTokens(context),
+          child: LaooWorkspaceDataTable(
+            tokens: _sharedTokens(context),
+            headingRowColor: WidgetStatePropertyAll(
+              gatePassUiTokens.primaryColor.withValues(alpha: 0.10),
+            ),
+            columns: const [
+              LaooWorkspaceTableColumns.id,
+              DataColumn(
+                label: Center(child: Text('Action')),
+                columnWidth: FixedColumnWidth(100),
+              ),
+              DataColumn(label: Text('รหัส / เอกสาร')),
+              DataColumn(label: Text('รายละเอียด')),
+              DataColumn(label: Text('สถานะ')),
+            ],
+            rows: List<DataRow>.generate(
+              rows.length,
+              (index) => DataRow(
+                cells: [
+                  DataCell(Text((index + 1).toString())),
+                  DataCell(Center(child: _rowActions(rows[index]))),
+                  DataCell(Text(_primaryText(rows[index]))),
+                  DataCell(Text(_detailText(rows[index]))),
+                  DataCell(Text(_statusText(rows[index]))),
                 ],
-                rows: List<DataRow>.generate(
-                  rows.length,
-                  (index) => DataRow(
-                    cells: [
-                      DataCell(Text((index + 1).toString())),
-                      DataCell(_rowActions(rows[index])),
-                      DataCell(Text(_primaryText(rows[index]))),
-                      DataCell(Text(_detailText(rows[index]))),
-                      DataCell(Text(_statusText(rows[index]))),
-                    ],
-                  ),
-                ),
               ),
             ),
           ),
@@ -336,26 +352,24 @@ class _GatePassPageState extends State<GatePassPage> {
   }
 
   Widget _rowCard(BuildContext context, Map<String, dynamic> row, int index) =>
-      Card(
-        margin: EdgeInsets.zero,
-        child: Padding(
-          padding: gatePassUiTokens.cardPadding,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('ID ${index + 1}', style: gatePassUiTokens.inputStyle),
-              const SizedBox(height: 4),
-              Text(_primaryText(row), style: gatePassUiTokens.sectionStyle),
-              const SizedBox(height: 4),
-              Text(_detailText(row), style: gatePassUiTokens.inputStyle),
-              const SizedBox(height: 4),
-              Text(_statusText(row), style: gatePassUiTokens.inputStyle),
-              if (_rowActions(row) is! SizedBox) ...[
-                SizedBox(height: gatePassUiTokens.itemSpacing),
-                _rowActions(row),
-              ],
+      LaooSurfaceCard(
+        tokens: _sharedTokens(context),
+        padding: gatePassUiTokens.cardPadding,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('ID ${index + 1}', style: gatePassUiTokens.inputStyle),
+            const SizedBox(height: 4),
+            Text(_primaryText(row), style: gatePassUiTokens.sectionStyle),
+            const SizedBox(height: 4),
+            Text(_detailText(row), style: gatePassUiTokens.inputStyle),
+            const SizedBox(height: 4),
+            Text(_statusText(row), style: gatePassUiTokens.inputStyle),
+            if (_rowActions(row) is! SizedBox) ...[
+              SizedBox(height: gatePassUiTokens.itemSpacing),
+              _rowActions(row),
             ],
-          ),
+          ],
         ),
       );
 
@@ -501,7 +515,7 @@ class _GatePassPageState extends State<GatePassPage> {
           borderRadius: BorderRadius.circular(gatePassUiTokens.radius),
         ),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 520),
+          constraints: const BoxConstraints(maxWidth: 480),
           child: Padding(
             padding: gatePassUiTokens.cardPadding,
             child: Column(
@@ -592,7 +606,7 @@ class _GatePassPageState extends State<GatePassPage> {
           borderRadius: BorderRadius.circular(gatePassUiTokens.radius),
         ),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 520),
+          constraints: const BoxConstraints(maxWidth: 480),
           child: Padding(
             padding: gatePassUiTokens.cardPadding,
             child: Column(
@@ -683,7 +697,7 @@ class _GatePassPageState extends State<GatePassPage> {
             borderRadius: BorderRadius.circular(gatePassUiTokens.radius),
           ),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 680, maxHeight: 720),
+            constraints: const BoxConstraints(maxWidth: 480, maxHeight: 720),
             child: Padding(
               padding: gatePassUiTokens.cardPadding,
               child: Column(
@@ -881,7 +895,7 @@ class _GatePassPageState extends State<GatePassPage> {
             borderRadius: BorderRadius.circular(gatePassUiTokens.radius),
           ),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 680),
+            constraints: const BoxConstraints(maxWidth: 480),
             child: Padding(
               padding: gatePassUiTokens.cardPadding,
               child: SingleChildScrollView(
@@ -1417,7 +1431,7 @@ class _GatePassPageState extends State<GatePassPage> {
             borderRadius: BorderRadius.circular(gatePassUiTokens.radius),
           ),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 520),
+            constraints: const BoxConstraints(maxWidth: 480),
             child: Padding(
               padding: gatePassUiTokens.cardPadding,
               child: Column(
@@ -1744,65 +1758,38 @@ class _GatePassPageState extends State<GatePassPage> {
 
   Widget _paginationCard(BuildContext context, {required int total}) {
     const pageSize = 10;
-    final tokens = gatePassUiTokens;
     final pages = total == 0 ? 1 : (total / pageSize).ceil();
-    final start = total == 0 ? 0 : (_page - 1) * pageSize + 1;
-    final end = total == 0 ? 0 : (_page * pageSize).clamp(0, total);
-    final theme = Theme.of(context);
-
-    Widget arrow(IconData icon, int target, bool enabled) => SizedBox.square(
-      dimension: 34,
-      child: OutlinedButton(
-        onPressed: enabled ? () => setState(() => _page = target) : null,
-        style: OutlinedButton.styleFrom(
-          padding: EdgeInsets.zero,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(tokens.radius),
-          ),
-        ),
-        child: Icon(icon, size: 20),
-      ),
+    return LaooPaginationCard(
+      tokens: _sharedTokens(context),
+      page: _page,
+      pageCount: pages,
+      pageSize: pageSize,
+      total: total,
+      onPrevious: _page > 1 ? () => setState(() => _page--) : null,
+      onNext: _page < pages ? () => setState(() => _page++) : null,
     );
+  }
 
-    return Card(
-      margin: EdgeInsets.zero,
-      child: SizedBox(
-        height: tokens.paginationCardHeight,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Row(
-            children: [
-              arrow(Icons.chevron_left, _page - 1, _page > 1),
-              const SizedBox(width: 6),
-              Container(
-                width: 34,
-                height: 34,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: tokens.primaryColor,
-                  borderRadius: BorderRadius.circular(tokens.radius),
-                ),
-                child: Text(
-                  _page.toString(),
-                  style: tokens.buttonStyle.copyWith(
-                    color: theme.colorScheme.onPrimary,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 6),
-              arrow(Icons.chevron_right, _page + 1, _page < pages),
-              const SizedBox(width: 12),
-              Flexible(
-                child: Text(
-                  '$start-$end จาก $total',
-                  overflow: TextOverflow.ellipsis,
-                  style: tokens.inputStyle,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+  LaooWorkspaceUiTokens _sharedTokens(BuildContext context) {
+    final tokens = gatePassUiTokens;
+    return LaooWorkspaceUiTokens(
+      contentMargin: tokens.contentMargin,
+      cardPadding: tokens.cardPadding,
+      sectionSpacing: tokens.sectionSpacing,
+      captionFilterSpacing: tokens.sectionSpacing,
+      itemSpacing: tokens.itemSpacing,
+      radius: tokens.radius,
+      compactBreakpoint: tokens.compactBreakpoint,
+      paginationHeight: tokens.paginationCardHeight,
+      captionStyle: tokens.captionStyle,
+      sectionStyle: tokens.sectionStyle,
+      inputStyle: tokens.inputStyle,
+      tableStyle: tokens.tableStyle,
+      buttonStyle: tokens.buttonStyle,
+      buttonHeight: tokens.buttonHeight,
+      primaryColor: tokens.primaryColor,
+      borderColor: tokens.borderColor,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
     );
   }
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:laoo_shared_workspace_ui/laoo_shared_workspace_ui.dart';
 
 abstract final class VoteUiTokens {
   static const double contentMargin = 10;
@@ -142,8 +143,6 @@ class VotePageLayout extends StatelessWidget {
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.star_border, color: theme.colorScheme.primary),
-                      const SizedBox(width: 12),
                       Expanded(
                         child: Text(
                           title,
@@ -152,6 +151,7 @@ class VotePageLayout extends StatelessWidget {
                           style: voteCaptionStyle(context),
                         ),
                       ),
+                      const LaooPageFavoriteButton(),
                       if (!compact && onToggleMode != null) ...[
                         const SizedBox(width: 8),
                         DecoratedBox(

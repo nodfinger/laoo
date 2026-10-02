@@ -16,14 +16,16 @@ ThemeData evaluationPopupTheme(BuildContext context) {
     dividerColor: tokens.borderColor,
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
-        minimumSize: Size(0, tokens.buttonHeight),
+        minimumSize: Size(100, tokens.buttonHeight),
+        maximumSize: Size(double.infinity, tokens.buttonHeight),
         shape: RoundedRectangleBorder(borderRadius: radius),
         textStyle: tokens.buttonStyle,
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
-        minimumSize: Size(0, tokens.buttonHeight),
+        minimumSize: Size(84, tokens.buttonHeight),
+        maximumSize: Size(double.infinity, tokens.buttonHeight),
         foregroundColor: tokens.primaryColor,
         side: BorderSide(color: tokens.primaryColor),
         shape: RoundedRectangleBorder(borderRadius: radius),
@@ -33,6 +35,8 @@ ThemeData evaluationPopupTheme(BuildContext context) {
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
         foregroundColor: tokens.primaryColor,
+        minimumSize: Size(84, tokens.buttonHeight),
+        maximumSize: Size(double.infinity, tokens.buttonHeight),
         shape: RoundedRectangleBorder(borderRadius: radius),
         textStyle: tokens.buttonStyle,
       ),
