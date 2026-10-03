@@ -43,6 +43,18 @@ class CompanySetupApi {
     return CompanySetupModel.fromJson(data);
   }
 
+  Future<String?> uploadMemberCover({
+    required String fileName,
+    required List<int> bytes,
+  }) async {
+    final data = await _client.upload(
+      '/api/company-setup/member-cover',
+      fileName: fileName,
+      bytes: bytes,
+    );
+    return data is Map ? data['memberCoverImagePath']?.toString() : null;
+  }
+
   Future<List<Map<String, dynamic>>> runItemOptions({String? groupCode}) async {
     final data = await _client.get(
       '/api/company-setup/run-item-options',

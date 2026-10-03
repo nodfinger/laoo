@@ -41,6 +41,9 @@ class CompanySetupModel {
     this.partnerTelephone,
     this.partnerEmail,
     this.companyId,
+    this.memberCoverImagePath,
+    this.memberCoverMimeType,
+    this.memberCoverSizeBytes,
     this.yearFormat,
     this.versionId,
     this.emailHost,
@@ -61,6 +64,9 @@ class CompanySetupModel {
   final String? partnerTelephone;
   final String? partnerEmail;
   final int? companyId;
+  final String? memberCoverImagePath;
+  final String? memberCoverMimeType;
+  final int? memberCoverSizeBytes;
   final String ownerCode;
   final String ownerName;
   final String? customerNameTh;
@@ -121,6 +127,9 @@ class CompanySetupModel {
       partnerTelephone: json['partnerTelephone']?.toString(),
       partnerEmail: json['partnerEmail']?.toString(),
       companyId: asInt(json['companyID']) ?? asInt(json['companyId']),
+      memberCoverImagePath: json['memberCoverImagePath']?.toString(),
+      memberCoverMimeType: json['memberCoverMimeType']?.toString(),
+      memberCoverSizeBytes: asInt(json['memberCoverSizeBytes']),
       ownerCode: json['ownerCode']?.toString() ?? '',
       ownerName: json['ownerName']?.toString() ?? '',
       customerNameTh: json['customerNameTh']?.toString(),

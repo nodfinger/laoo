@@ -12,6 +12,7 @@ import 'package:laoo_project/project_feature.dart';
 import 'package:laoo_document_control/document_control_feature.dart';
 import 'package:laoo_knowledge/knowledge_feature.dart';
 import 'package:laoo_memo/memo_feature.dart';
+import 'package:laoo_provider/provider_feature.dart';
 import 'package:laoo_intranet/intranet_feature.dart';
 import 'package:laoo_vote/vote_feature.dart';
 import 'package:laoo_pos/pos_feature.dart';
@@ -142,6 +143,7 @@ final GoRouter appRouter = GoRouter(
       builder: (context, state) => const PersonRegistryPage(),
     ),
 
+    ...buildProviderPublicRoutes(),
     GoRoute(
       path: RoutePaths.landing,
       name: RouteNames.landing,
@@ -196,6 +198,7 @@ final GoRouter appRouter = GoRouter(
     ...buildDocumentControlFeatureRoutes(),
     ...buildKnowledgeFeatureRoutes(),
     ...buildMemoFeatureRoutes(),
+    ...buildProviderFeatureRoutes(),
     ...buildIntranetFeatureRoutes(),
     ...buildVoteFeatureRoutes(),
     ...buildPosFeatureRoutes(),
@@ -300,7 +303,8 @@ String? resolveAppRouteRedirect({
       path == RoutePaths.landing ||
       path == RoutePaths.login ||
       path == RoutePaths.resetPassword ||
-      EvaluationPublicRoutePaths.isResponseRoute(path);
+      EvaluationPublicRoutePaths.isResponseRoute(path) ||
+      path.startsWith('/providers/');
 
   if (!isAuthenticated) {
     return isPublicRoute ? null : RoutePaths.login;
@@ -348,7 +352,16 @@ String? resolveAppRouteRedirect({
   }
 
   final isCompanyRoute = path.startsWith('/company/');
-  if (isCompanyRoute && !isCompanyUser) {
+  final isProviderSupportRoute =
+      isLaooSupport &&
+      const {
+        '/company/provider-locations',
+        '/company/provider-service-types',
+        '/company/provider-approvals',
+        '/company/provider-reviews',
+        '/company/provider-reports',
+      }.contains(path);
+  if (isCompanyRoute && !isCompanyUser && !isProviderSupportRoute) {
     return RoutePaths.authenticatedHome;
   }
 

@@ -46,6 +46,8 @@ dependencies:
     path: projects/knowledge
   laoo_memo:
     path: projects/memo
+  laoo_provider:
+    path: projects/provider
   laoo_intranet:
     path: projects/intranet
   laoo_vote:
@@ -67,6 +69,7 @@ dependencies:
   url_launcher: ^6.3.2
   file_picker: ^10.3.10
   image: ^4.5.4
+  geolocator: ^14.0.2
   pdf: ^3.13.0
   printing: ^5.15.0
 

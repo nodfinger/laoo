@@ -1,0 +1,14 @@
+SET NOCOUNT ON;
+DECLARE @Company bigint=(SELECT TOP 1 CompanyID FROM dbo.TDADUser WHERE Username=N'c111' AND IsActive=1);
+DECLARE @Project bigint=(SELECT ProjectID FROM dbo.TDADProject WHERE ProjectCode=N'LAOO_PROVIDER' AND IsActive=1);
+IF (SELECT COUNT(*) FROM dbo.TDADMainMenu WHERE MenuCode BETWEEN N'51001' AND N'51009' AND IsActive=1)<>9 THROW 57141,N'Provider menu metadata incomplete.',1;
+IF EXISTS(SELECT 1 FROM (VALUES(N'51001',2),(N'51002',1),(N'51003',1),(N'51004',2),(N'51005',3),(N'51006',1),(N'51007',3),(N'51008',3),(N'51009',1)) x(MenuCode,ScreenType) LEFT JOIN dbo.TDADMainMenu m ON m.MenuCode=x.MenuCode WHERE m.MenuCode IS NULL OR m.ScreenType<>x.ScreenType) THROW 57142,N'Provider ScreenType contract failed.',1;
+IF (SELECT COUNT(*) FROM dbo.TDADPermission WHERE ProjectID=@Project AND ScreenCode=N'51009' AND ActionCode IN(N'VIEW',N'CREATE',N'EDIT',N'DELETE') AND IsActive=1)<>4 THROW 57150,N'Provider portfolio permission contract failed.',1;
+IF NOT EXISTS(SELECT 1 FROM dbo.TDADCompanyProject WHERE CompanyID=@Company AND ProjectID=@Project AND IsEnabled=1) THROW 57143,N'Provider company entitlement missing.',1;
+IF (SELECT COUNT(*) FROM dbo.TDPRServiceType WHERE IsActive=1)<3 THROW 57144,N'Provider services missing.',1;
+IF (SELECT COUNT(*) FROM dbo.TDPRLocation WHERE IsActive=1)<9 THROW 57145,N'Provider sample locations missing.',1;
+IF NOT EXISTS(SELECT 1 FROM dbo.TDPRProviderProfile WHERE CompanyID=@Company AND StatusCode=N'APPROVED' AND PublishedRevisionID IS NOT NULL) THROW 57146,N'Provider published profile missing.',1;
+IF (SELECT COUNT(*) FROM dbo.TDPRReview WHERE CompanyID=@Company AND IsHidden=0)<6 THROW 57147,N'Provider review samples missing.',1;
+IF (SELECT COUNT(*) FROM dbo.TDPRPortfolio WHERE CompanyID=@Company AND IsActive=1)<2 THROW 57148,N'Provider portfolio samples missing.',1;
+IF NOT EXISTS(SELECT 1 FROM dbo.TDSTCompanySetUp WHERE CompanyID=@Company AND MemberCoverImagePath IS NOT NULL) THROW 57149,N'Provider member cover sample missing.',1;
+PRINT N'PROVIDER_VERIFY_OK';

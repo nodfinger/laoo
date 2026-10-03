@@ -9,6 +9,7 @@ import 'package:laoo_project/project_feature.dart';
 import 'package:laoo_document_control/document_control_feature.dart';
 import 'package:laoo_knowledge/knowledge_feature.dart';
 import 'package:laoo_memo/memo_feature.dart';
+import 'package:laoo_provider/provider_feature.dart';
 import 'package:laoo_intranet/intranet_feature.dart';
 import 'package:laoo_vote/vote_feature.dart';
 import 'package:laoo_pos/pos_feature.dart';
@@ -36,6 +37,22 @@ import 'core/widgets/timed_snack_bar.dart';
 import 'features/support/presentation/widgets/support_workspace_shell.dart';
 
 void main() {
+  configureProviderFeatureHost(
+    _buildMeetingWorkspaceShell,
+    apiClientFactory: ApiClient.new,
+    apiClientDisposer: (client) => (client as ApiClient).dispose(),
+    menuTitleResolver: (menuCode, fallback) => NavigationMenuRepository()
+        .resolveMenuName(menuCode: menuCode, fallback: fallback),
+    messagePresenter: (context, {required message, required error}) =>
+        showTimedSnackBar(context, message: message, error: error),
+    uiTokensProvider: _surveyWorkspaceTokens,
+    upload: (path, {required fileName, required bytes, fields}) {
+      final client = ApiClient();
+      return client
+          .upload(path, fileName: fileName, bytes: bytes, fields: fields)
+          .whenComplete(client.dispose);
+    },
+  );
   configureMemoFeatureHost(
     _buildMeetingWorkspaceShell,
     apiClientFactory: ApiClient.new,

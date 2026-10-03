@@ -16,15 +16,18 @@ public sealed class CompanySetupController : ControllerBase
     private readonly IConfiguration _configuration;
     private readonly PasswordService _passwordService;
     private readonly CompanySetupSecretService _secretService;
+    private readonly IWebHostEnvironment _environment;
 
     public CompanySetupController(
         IConfiguration configuration,
         PasswordService passwordService,
-        CompanySetupSecretService secretService)
+        CompanySetupSecretService secretService,
+        IWebHostEnvironment environment)
     {
         _configuration = configuration;
         _passwordService = passwordService;
         _secretService = secretService;
+        _environment = environment;
     }
 
     [HttpGet]
@@ -266,6 +269,80 @@ ELSE
         return Ok(new { view = await AllowedAsync(connection, "VIEW", cancellationToken), edit = await AllowedAsync(connection, "EDIT", cancellationToken) });
     }
 
+    [HttpPost("member-cover"), RequestSizeLimit(1024 * 1024 + 65536)]
+    public async Task<ActionResult<object>> UploadMemberCover(
+        IFormFile file,
+        CancellationToken cancellationToken)
+    {
+        var owner = ResolveOwner();
+        if (owner is null || owner.Value.OwnerType != "C" || owner.Value.CompanyID is null)
+            return Forbid();
+        if (file is null || file.Length <= 0)
+            return BadRequest(new { message = "กรุณาเลือกไฟล์รูปปกสมาชิก" });
+        if (file.Length > 1024 * 1024)
+            return BadRequest(new { message = "รูปปกสมาชิกต้องมีขนาดไม่เกิน 1 MB หลังลดขนาด" });
+        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (extension is not ".jpg" and not ".jpeg" and not ".png" and not ".webp")
+            return BadRequest(new { message = "รองรับเฉพาะรูป JPG, PNG และ WEBP" });
+        await using var source = file.OpenReadStream();
+        var header = new byte[12];
+        var read = await source.ReadAsync(header.AsMemory(0, header.Length), cancellationToken);
+        var jpeg = read >= 3 && header[0] == 0xff && header[1] == 0xd8 && header[2] == 0xff;
+        var png = read >= 8 && header.AsSpan(0, 8).SequenceEqual(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 });
+        var webp = read >= 12 && header.AsSpan(0, 4).SequenceEqual("RIFF"u8) && header.AsSpan(8, 4).SequenceEqual("WEBP"u8);
+        if (!jpeg && !png && !webp)
+            return BadRequest(new { message = "เนื้อหาไฟล์รูปไม่ถูกต้อง" });
+        if ((jpeg && extension is not ".jpg" and not ".jpeg") || (png && extension != ".png") || (webp && extension != ".webp"))
+            return BadRequest(new { message = "นามสกุลไฟล์ไม่ตรงกับชนิดรูปภาพ" });
+
+        await using var connection = CreateConnection();
+        await connection.OpenAsync(cancellationToken);
+        if (!await AllowedAsync(connection, "EDIT", cancellationToken)) return Forbid();
+        if (!await HasMemberCoverColumnsAsync(connection, cancellationToken))
+            return BadRequest(new { message = "ฐานข้อมูลยังไม่พร้อมเก็บรูปปกสมาชิก กรุณารัน Migration ของ LAOO_PROVIDER" });
+        const string oldSql = "SELECT MemberCoverImagePath FROM dbo.TDSTCompanySetUp WHERE OwnerType='C' AND CompanyID=@CompanyID";
+        await using var oldCommand = new SqlCommand(oldSql, connection);
+        Add(oldCommand, "@CompanyID", SqlDbType.BigInt, owner.Value.CompanyID);
+        var oldPath = Convert.ToString(await oldCommand.ExecuteScalarAsync(cancellationToken));
+
+        var root = _environment.WebRootPath ?? Path.Combine(_environment.ContentRootPath, "wwwroot");
+        var relativeFolder = Path.Combine("uploads", "provider", "companies", owner.Value.CompanyID.Value.ToString(), "cover");
+        var folder = Path.Combine(root, relativeFolder);
+        Directory.CreateDirectory(folder);
+        var storedName = $"{Guid.NewGuid():N}{extension}";
+        var absolutePath = Path.Combine(folder, storedName);
+        await using (var output = System.IO.File.Create(absolutePath))
+            await file.CopyToAsync(output, cancellationToken);
+        var relativePath = (relativeFolder + "/" + storedName).Replace((char)92, '/');
+        try
+        {
+            const string updateSql = """
+UPDATE dbo.TDSTCompanySetUp
+SET MemberCoverImagePath=@Path,MemberCoverMimeType=@Mime,MemberCoverSizeBytes=@Size,
+    UpdateBy=@UserID,UpdateDate=SYSUTCDATETIME()
+WHERE OwnerType='C' AND CompanyID=@CompanyID
+""";
+            await using var update = new SqlCommand(updateSql, connection);
+            Add(update, "@Path", SqlDbType.NVarChar, relativePath, 1000);
+            Add(update, "@Mime", SqlDbType.NVarChar, jpeg ? "image/jpeg" : png ? "image/png" : "image/webp", 100);
+            Add(update, "@Size", SqlDbType.BigInt, file.Length);
+            Add(update, "@UserID", SqlDbType.BigInt, GetActorIdFromToken());
+            Add(update, "@CompanyID", SqlDbType.BigInt, owner.Value.CompanyID);
+            if (await update.ExecuteNonQueryAsync(cancellationToken) != 1)
+            {
+                System.IO.File.Delete(absolutePath);
+                return NotFound();
+            }
+        }
+        catch
+        {
+            if (System.IO.File.Exists(absolutePath)) System.IO.File.Delete(absolutePath);
+            throw;
+        }
+        DeleteStoredFile(root, oldPath);
+        return Ok(new { memberCoverImagePath = relativePath, sizeBytes = file.Length });
+    }
+
     [HttpGet("run-item-options")]
     public async Task<ActionResult<List<CompanySetupOption>>> RunItemOptions(
         [FromQuery] string? groupCode,
@@ -370,6 +447,10 @@ ELSE
         var businessTypeProjection = hasBusinessTypeColumn
             ? "S.BusinessTypeCode"
             : "N'COMPANY'";
+        var hasMemberCoverColumns = await HasMemberCoverColumnsAsync(connection, cancellationToken);
+        var memberCoverProjection = hasMemberCoverColumns
+            ? "S.MemberCoverImagePath,S.MemberCoverMimeType,S.MemberCoverSizeBytes"
+            : "CAST(NULL AS nvarchar(1000)) AS MemberCoverImagePath,CAST(NULL AS nvarchar(100)) AS MemberCoverMimeType,CAST(NULL AS bigint) AS MemberCoverSizeBytes";
         var sql = $$"""
 SET QUOTED_IDENTIFIER ON;
 SET ANSI_NULLS ON;
@@ -398,6 +479,7 @@ SELECT
     S.Telephone AS Telephone,
     S.TaxID AS TaxID,
     CAST(NULL AS nvarchar(320)) AS CustomerEmail,
+    {{memberCoverProjection}},
     S.Name,
     S.TitleHeader,
     (SELECT TOP 1 RunItem
@@ -539,6 +621,9 @@ WHERE S.OwnerType = @OwnerType
             NString("Telephone"),
             NString("TaxID"),
             NString("CustomerEmail"),
+            NString("MemberCoverImagePath"),
+            NString("MemberCoverMimeType"),
+            NLong("MemberCoverSizeBytes"),
             reader.GetString(reader.GetOrdinal("Name")),
             reader.GetString(reader.GetOrdinal("TitleHeader")),
             NString("RunItem"),
@@ -591,6 +676,30 @@ WHERE S.OwnerType = @OwnerType
             """;
         await using var command = new SqlCommand(sql, connection, transaction);
         return Convert.ToBoolean(await command.ExecuteScalarAsync(cancellationToken));
+    }
+
+    private static async Task<bool> HasMemberCoverColumnsAsync(
+        SqlConnection connection,
+        CancellationToken cancellationToken)
+    {
+        const string sql = """
+SELECT CASE WHEN COL_LENGTH(N'dbo.TDSTCompanySetUp',N'MemberCoverImagePath') IS NOT NULL
+                  AND COL_LENGTH(N'dbo.TDSTCompanySetUp',N'MemberCoverMimeType') IS NOT NULL
+                  AND COL_LENGTH(N'dbo.TDSTCompanySetUp',N'MemberCoverSizeBytes') IS NOT NULL
+            THEN CAST(1 AS bit) ELSE CAST(0 AS bit) END
+""";
+        await using var command = new SqlCommand(sql, connection);
+        return Convert.ToBoolean(await command.ExecuteScalarAsync(cancellationToken));
+    }
+
+    private static void DeleteStoredFile(string root, string? relativePath)
+    {
+        if (string.IsNullOrWhiteSpace(relativePath)) return;
+        var fullRoot = Path.GetFullPath(root);
+        var absolute = Path.GetFullPath(Path.Combine(fullRoot, relativePath.Replace('/', Path.DirectorySeparatorChar)));
+        if (absolute.StartsWith(fullRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
+            && System.IO.File.Exists(absolute))
+            System.IO.File.Delete(absolute);
     }
 
     private static async Task<string> LoadBusinessTypeAsync(

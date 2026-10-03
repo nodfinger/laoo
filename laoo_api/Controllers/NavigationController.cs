@@ -119,6 +119,9 @@ INNER JOIN dbo.TDADMainMenu M ON M.MenuCode = PM.MenuCode AND M.IsActive = 1 AND
 INNER JOIN dbo.TDADMenuGroup OwnerGroup ON OwnerGroup.MenuGroupCode=M.MenuGroupCode AND OwnerGroup.IsActive=1
 WHERE UPPER(LTRIM(RTRIM(G.AudienceType))) IN (N'A',@AudienceType)
   AND UPPER(LTRIM(RTRIM(OwnerGroup.AudienceType))) IN (N'A',@AudienceType)
+  AND (M.MenuCode NOT BETWEEN N'51001' AND N'51009'
+       OR (@UserType=N'LAOO_SUPPORT' AND M.MenuCode IN(N'51002',N'51003',N'51005',N'51007',N'51008'))
+       OR (@UserType=N'COMPANY_USER' AND M.MenuCode IN(N'51001',N'51004',N'51006',N'51007',N'51008',N'51009')))
   -- Company accounts are managed through the Person/Employee workflow.
   AND (@UserType <> N'COMPANY_USER' OR G.MenuGroupCode <> N'07')
   -- The Company branch menu remains Company-only in the shared settings group.

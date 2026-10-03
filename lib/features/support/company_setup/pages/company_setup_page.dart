@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:laoo_provider/provider_feature.dart';
 import '../../../../core/widgets/auto_dismiss_message.dart';
 import 'package:go_router/go_router.dart';
 
@@ -87,6 +89,9 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
   String? _partnerAddress;
   String? _partnerTelephone;
   String? _partnerEmail;
+  String? _memberCoverImagePath;
+  int? _companyId;
+  bool _uploadingMemberCover = false;
 
   @override
   void initState() {
@@ -124,6 +129,8 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
       _partnerAddress = setup.partnerAddress;
       _partnerTelephone = setup.partnerTelephone;
       _partnerEmail = setup.partnerEmail;
+      _memberCoverImagePath = setup.memberCoverImagePath;
+      _companyId = setup.companyId;
       _ownerName.text = setup.name;
       _titleHeader.text = setup.titleHeader;
       _customerNameTh.text = setup.customerNameTh ?? '';
@@ -726,6 +733,8 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
                         ),
                         const SizedBox(height: 8),
                         if (_ownerType == 'C') ...[
+                          _memberCoverCard(preset.primary),
+                          const SizedBox(height: 8),
                           _CompanyBusinessTypeCard(
                             value: _businessTypeCode,
                             options: _businessTypeOptions,
@@ -801,6 +810,118 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
         ),
       ),
     );
+  }
+
+  Widget _memberCoverCard(Color accent) => Card(
+    margin: EdgeInsets.zero,
+    elevation: 0,
+    color: Colors.white,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Wrap(
+        spacing: 16,
+        runSpacing: 12,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: SizedBox.square(
+              dimension: 128,
+              child:
+                  _memberCoverImagePath == null ||
+                      _memberCoverImagePath!.isEmpty
+                  ? ColoredBox(
+                      color: const Color(0xfff1f5f4),
+                      child: Icon(
+                        Icons.business_outlined,
+                        size: 48,
+                        color: accent,
+                      ),
+                    )
+                  : Image.network(
+                      '/api/public/providers/companies/$_companyId/cover',
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) =>
+                          const Icon(Icons.broken_image_outlined),
+                    ),
+            ),
+          ),
+          SizedBox(
+            width: 420,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'รูปปกสมาชิก',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'รูปสี่เหลี่ยมจัตุรัส ระบบจะครอปกึ่งกลางและลดขนาดอัตโนมัติให้ไม่เกิน 1 MB',
+                  style: TextStyle(fontSize: 14),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  height: 48,
+                  child: OutlinedButton.icon(
+                    onPressed: !_canEdit || _uploadingMemberCover
+                        ? null
+                        : _pickMemberCover,
+                    icon: _uploadingMemberCover
+                        ? const SizedBox.square(
+                            dimension: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.add_photo_alternate_outlined),
+                    label: const Text('เลือกรูปปก'),
+                    style: OutlinedButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+
+  Future<void> _pickMemberCover() async {
+    final picked = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      withData: true,
+    );
+    if (picked == null || picked.files.single.bytes == null) return;
+    setState(() => _uploadingMemberCover = true);
+    try {
+      final compressed = compressProviderImage(
+        picked.files.single.bytes!,
+        picked.files.single.name,
+        square: true,
+      );
+      final path = await _api.uploadMemberCover(
+        fileName: compressed.fileName,
+        bytes: compressed.bytes,
+      );
+      if (!mounted) return;
+      setState(() {
+        _memberCoverImagePath = path;
+        _messageIsError = false;
+        _message = 'อัปโหลดรูปปกสมาชิกแล้ว';
+      });
+    } catch (error) {
+      if (mounted)
+        setState(() {
+          _messageIsError = true;
+          _message = 'อัปโหลดรูปปกสมาชิกไม่สำเร็จ: $error';
+        });
+    } finally {
+      if (mounted) setState(() => _uploadingMemberCover = false);
+    }
   }
 }
 

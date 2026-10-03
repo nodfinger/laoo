@@ -44,5 +44,6 @@
   <ItemGroup>
     <ProjectReference Include="..\projects\knowledge\packages\dotnet\Laoo.Knowledge.Module\Laoo.Knowledge.Module.csproj" />
     <ProjectReference Include="..\projects\memo\packages\dotnet\Laoo.Memo.Module\Laoo.Memo.Module.csproj" />
+    <ProjectReference Include="..\projects\provider\packages\dotnet\Laoo.Provider.Module\Laoo.Provider.Module.csproj" />
   </ItemGroup>
 </Project>

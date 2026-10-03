@@ -9,6 +9,7 @@ using LaooGatePassModule;
 using LaooSurveyModule;
 using LaooExpenseModule;
 using LaooProjectModule;
+using LaooProviderModule;
 using LaooDocumentControlModule;
 using LaooKnowledgeModule;
 using LaooMemoModule;
@@ -58,6 +59,7 @@ builder.Services
     .AddApplicationPart(typeof(SurveyModuleMarker).Assembly)
     .AddApplicationPart(typeof(ExpenseModuleMarker).Assembly)
     .AddApplicationPart(typeof(ProjectModuleMarker).Assembly)
+    .AddApplicationPart(typeof(ProviderModuleMarker).Assembly)
     .AddApplicationPart(typeof(DocumentControlModuleMarker).Assembly)
     .AddApplicationPart(typeof(KnowledgeModuleMarker).Assembly)
     .AddApplicationPart(typeof(MemoModuleMarker).Assembly)
@@ -209,6 +211,18 @@ builder.Services.AddRateLimiter(options =>
             factory: _ => new FixedWindowRateLimiterOptions
             {
                 PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+    options.AddPolicy("provider-review", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.User.FindFirst("user_id")?.Value
+                ?? httpContext.Connection.RemoteIpAddress?.ToString()
+                ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 20,
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0,
                 AutoReplenishment = true
