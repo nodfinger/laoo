@@ -13,6 +13,7 @@ import '../../support/presentation/widgets/support_workspace_shell.dart';
 import '../../support/partner/data/api_partner_repository.dart';
 import '../../support/partner/data/core_partner_api_client.dart';
 import '../../support/partner/models/partner.dart';
+import '../../support/project_package/pages/project_package_page.dart';
 import '../data/partner_company_repository.dart';
 import '../models/partner_company.dart';
 import 'partner_company_modules_page.dart';
@@ -503,6 +504,12 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
     }
   }
 
+  Future<void> _openPackageMaster() async {
+    await Navigator.of(
+      context,
+    ).push<void>(MaterialPageRoute(builder: (_) => const ProjectPackagePage()));
+  }
+
   Future<void> _confirmDelete(PartnerCompany item) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -655,6 +662,16 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
                               : 'partnerCompanies',
                         ),
                       ),
+                      if (widget.menuScope == WorkspaceMenuScope.support &&
+                          _canEdit)
+                        OutlinedButton.icon(
+                          onPressed: _openPackageMaster,
+                          icon: const Icon(Icons.inventory_2_outlined),
+                          label: const Text('Package Master'),
+                        ),
+                      if (widget.menuScope == WorkspaceMenuScope.support &&
+                          _canEdit)
+                        const SizedBox(width: 8),
                       if (widget.menuScope != WorkspaceMenuScope.support &&
                           _canCreate)
                         FilledButton.icon(

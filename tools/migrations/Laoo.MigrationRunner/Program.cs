@@ -10,6 +10,14 @@ var migrationDirectory = ResolveMigrationDirectory(root, options.ProjectCode);
 var files = Directory.Exists(migrationDirectory)
     ? Directory.GetFiles(migrationDirectory, "*.sql").Order().ToArray()
     : [];
+if (!string.IsNullOrWhiteSpace(options.MigrationId))
+{
+    files = files.Where(file => string.Equals(
+        Path.GetFileNameWithoutExtension(file), options.MigrationId,
+        StringComparison.OrdinalIgnoreCase)).ToArray();
+    if (files.Length != 1)
+        throw new InvalidOperationException($"Migration not found: {options.MigrationId}");
+}
 
 ValidateFileNames(files, options.ProjectCode);
 if (options.DryRun)
@@ -66,6 +74,7 @@ static string ResolveMigrationDirectory(string root, string projectCode) =>
         "LAOO_KNOWLEDGE" => Path.Combine(root, "projects", "knowledge", "database", "migrations"),
         "LAOO_MEMO" => Path.Combine(root, "projects", "memo", "database", "migrations"),
         "LAOO_PROVIDER" => Path.Combine(root, "projects", "provider", "database", "migrations"),
+        "LAOO_SCHOOL" => Path.Combine(root, "projects", "school", "database", "migrations"),
         _ => throw new ArgumentOutOfRangeException(nameof(projectCode), projectCode, "Unsupported ProjectCode"),
     };
 
@@ -178,6 +187,7 @@ internal sealed record RunnerOptions(
     string Root,
     string ProjectCode,
     string AppliedBy,
+    string? MigrationId,
     bool DryRun)
 {
     public static RunnerOptions Parse(string[] args)
@@ -194,6 +204,7 @@ internal sealed record RunnerOptions(
         var appliedBy = Value("--applied-by")
             ?? Environment.UserName
             ?? "unknown";
-        return new RunnerOptions(root, project, appliedBy, args.Contains("--dry-run"));
+        var migrationId = Value("--migration")?.Trim();
+        return new RunnerOptions(root, project, appliedBy, migrationId, args.Contains("--dry-run"));
     }
 }

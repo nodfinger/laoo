@@ -688,6 +688,13 @@ packages:
       relative: true
     source: path
     version: "1.0.0+1"
+  laoo_school:
+    dependency: "direct main"
+    description:
+      path: "projects/school"
+      relative: true
+    source: path
+    version: "1.0.0+1"
   laoo_service:
     dependency: "direct main"
     description:

@@ -198,6 +198,8 @@ ORDER BY P.SortOrder,P.ProjectID;
         PartnerCompanyProjectUpdateRequest request,
         CancellationToken cancellationToken)
     {
+        if (PackageSubscriptionIsSourceOfTruth())
+            return Conflict(new { message = "กรุณากำหนดสิทธิ์ผ่านแพ็กเกจราย Project", code = "PACKAGE_SUBSCRIPTION_REQUIRED" });
         var partnerId = PartnerId();
         var partnerUserId = LongClaim("partner_user_id");
         if (partnerId is null || partnerUserId is null) return Forbid();
@@ -288,6 +290,8 @@ END;
         PartnerCompanyFeatureUpdateRequest request,
         CancellationToken cancellationToken)
     {
+        if (PackageSubscriptionIsSourceOfTruth())
+            return Conflict(new { message = "Feature ถูกควบคุมโดย Package Master", code = "PACKAGE_SUBSCRIPTION_REQUIRED" });
         var partnerId = PartnerId();
         var projectId = LongClaim("project_id");
         var partnerUserId = LongClaim("partner_user_id");
@@ -377,6 +381,8 @@ END;
             throw;
         }
     }
+
+    private static bool PackageSubscriptionIsSourceOfTruth() => true;
 
     [HttpPost]
     public async Task<ActionResult<PartnerCompanyResponse>> Create(

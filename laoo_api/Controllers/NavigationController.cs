@@ -82,24 +82,28 @@ WITH AllowedProjects AS
     FROM dbo.TDADUserProject UPR
     INNER JOIN dbo.TDADProject PR ON PR.ProjectID=UPR.ProjectID AND PR.IsActive=1
     INNER JOIN dbo.TDSTCompanySetUp C ON C.CompanyID=UPR.CompanyID AND C.IsActive=1
-    INNER JOIN dbo.TDADCompanyProject CP
-        ON CP.ProjectID=UPR.ProjectID AND CP.CompanyID=UPR.CompanyID
-       AND CP.PartnerID=C.PartnerID AND CP.IsEnabled=1
-       AND (CP.StartDate IS NULL OR CP.StartDate<=CONVERT(date,SYSUTCDATETIME()))
-       AND (CP.ExpireDate IS NULL OR CP.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))
     WHERE @UserType=N'COMPANY_USER'
       AND UPR.UserID=@UserID AND UPR.CompanyID=@CompanyID AND UPR.IsActive=1
+      AND ((PR.ProjectType=N'CORE' AND EXISTS(SELECT 1 FROM dbo.TDADCompanyProject CP
+             WHERE CP.ProjectID=PR.ProjectID AND CP.CompanyID=C.CompanyID AND CP.PartnerID=C.PartnerID
+               AND CP.IsEnabled=1 AND (CP.StartDate IS NULL OR CP.StartDate<=CONVERT(date,SYSUTCDATETIME()))
+               AND (CP.ExpireDate IS NULL OR CP.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))))
+        OR (PR.ProjectType<>N'CORE' AND EXISTS(SELECT 1 FROM dbo.TDADCompanyProjectSubscription S
+             JOIN dbo.TDADProjectPackage PK ON PK.PackageID=S.PackageID AND PK.ProjectID=S.ProjectID AND PK.IsActive=1
+             WHERE S.CompanyID=C.CompanyID AND S.PartnerID=C.PartnerID AND S.ProjectID=PR.ProjectID AND S.IsCurrent=1
+               AND S.StartDate<=CONVERT(date,SYSUTCDATETIME())
+               AND (S.StatusCode IN(N'ACTIVE',N'TRIAL',N'EXPIRED') OR S.ExpireDate<CONVERT(date,SYSUTCDATETIME())))))
     UNION
     SELECT PR.ProjectID
     FROM dbo.TDADProject PR
     INNER JOIN dbo.TDSTCompanySetUp C ON C.CompanyID=@CompanyID AND C.IsActive=1
-    INNER JOIN dbo.TDADCompanyProject CP
-        ON CP.ProjectID=PR.ProjectID AND CP.CompanyID=C.CompanyID
-       AND CP.PartnerID=C.PartnerID AND CP.IsEnabled=1
-       AND (CP.StartDate IS NULL OR CP.StartDate<=CONVERT(date,SYSUTCDATETIME()))
-       AND (CP.ExpireDate IS NULL OR CP.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))
     WHERE @UserType=N'COMPANY_USER' AND (@CanViewTrainingResults=1 OR @CanViewMyTraining=1)
       AND PR.ProjectCode=N'LAOO_TRAINING' AND PR.IsActive=1
+      AND EXISTS(SELECT 1 FROM dbo.TDADCompanyProjectSubscription S
+          JOIN dbo.TDADProjectPackage PK ON PK.PackageID=S.PackageID AND PK.ProjectID=S.ProjectID AND PK.IsActive=1
+          WHERE S.CompanyID=C.CompanyID AND S.PartnerID=C.PartnerID AND S.ProjectID=PR.ProjectID AND S.IsCurrent=1
+            AND S.StartDate<=CONVERT(date,SYSUTCDATETIME())
+            AND (S.StatusCode IN(N'ACTIVE',N'TRIAL',N'EXPIRED') OR S.ExpireDate<CONVERT(date,SYSUTCDATETIME())))
 )
 SELECT PR.ProjectID,PR.ProjectCode,PR.ProjectNameTH,PR.ProjectType,PR.IconName,
        PR.SortOrder,PR.IsExpandedDefault,
@@ -130,7 +134,7 @@ WHERE UPPER(LTRIM(RTRIM(G.AudienceType))) IN (N'A',@AudienceType)
   AND (
         ISNULL(G.OpenOption, 0) = 0
         OR @UserType <> N'COMPANY_USER'
-        OR (
+        OR (PR.ProjectType=N'CORE' AND
             ISNULL(G.OpenOption, 0) = 1
             AND M.FeatureCode IS NOT NULL
             AND EXISTS
@@ -146,6 +150,14 @@ WHERE UPPER(LTRIM(RTRIM(G.AudienceType))) IN (N'A',@AudienceType)
                   AND (CF.ExpireDate IS NULL OR CF.ExpireDate >= CONVERT(date, SYSUTCDATETIME()))
             )
         )
+        OR (PR.ProjectType<>N'CORE' AND
+            (NULLIF(LTRIM(RTRIM(M.FeatureCode)),N'') IS NULL OR EXISTS
+            (
+                SELECT 1 FROM dbo.TDADCompanyProjectSubscription S
+                INNER JOIN dbo.TDADProjectPackageFeature PF
+                    ON PF.PackageID=S.PackageID AND PF.FeatureCode=M.FeatureCode AND PF.IsEnabled=1
+                WHERE S.CompanyID=@CompanyID AND S.ProjectID=AP.ProjectID AND S.IsCurrent=1
+            )))
       )
 ORDER BY PR.SortOrder,PG.SortOrder,PM.SortOrder,M.MenuCode;
 """;
@@ -255,11 +267,10 @@ SELECT CASE WHEN EXISTS
     INNER JOIN dbo.TDADUserEmployee UE ON UE.UserID=U.UserID AND UE.CompanyID=U.CompanyID AND UE.IsActive=1
     INNER JOIN dbo.TDADEmployee E ON E.EmployeeID=UE.EmployeeID AND E.CompanyID=UE.CompanyID AND E.IsActive=1
     INNER JOIN dbo.TDADProject PR ON PR.ProjectCode=N'LAOO_TRAINING' AND PR.IsActive=1
-    INNER JOIN dbo.TDADCompanyProject CP
-        ON CP.ProjectID=PR.ProjectID AND CP.CompanyID=C.CompanyID AND CP.PartnerID=C.PartnerID
-       AND CP.IsEnabled=1
-       AND (CP.StartDate IS NULL OR CP.StartDate<=CONVERT(date,SYSUTCDATETIME()))
-       AND (CP.ExpireDate IS NULL OR CP.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))
+    INNER JOIN dbo.TDADCompanyProjectSubscription S
+        ON S.ProjectID=PR.ProjectID AND S.CompanyID=C.CompanyID AND S.PartnerID=C.PartnerID
+       AND S.IsCurrent=1 AND S.StartDate<=CONVERT(date,SYSUTCDATETIME())
+       AND (S.StatusCode IN(N'ACTIVE',N'TRIAL',N'EXPIRED') OR S.ExpireDate<CONVERT(date,SYSUTCDATETIME()))
     WHERE U.UserID=@UserID AND U.CompanyID=@CompanyID AND U.IsActive=1
 ) THEN CAST(1 AS bit) ELSE CAST(0 AS bit) END;
 """;
@@ -281,11 +292,10 @@ SELECT CASE WHEN EXISTS
     FROM dbo.TDADUser U
     INNER JOIN dbo.TDSTCompanySetUp C ON C.CompanyID=U.CompanyID AND C.IsActive=1
     INNER JOIN dbo.TDADProject PR ON PR.ProjectCode=N'LAOO_TRAINING' AND PR.IsActive=1
-    INNER JOIN dbo.TDADCompanyProject CP
-        ON CP.ProjectID=PR.ProjectID AND CP.CompanyID=C.CompanyID AND CP.PartnerID=C.PartnerID
-       AND CP.IsEnabled=1
-       AND (CP.StartDate IS NULL OR CP.StartDate<=CONVERT(date,SYSUTCDATETIME()))
-       AND (CP.ExpireDate IS NULL OR CP.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))
+    INNER JOIN dbo.TDADCompanyProjectSubscription S
+        ON S.ProjectID=PR.ProjectID AND S.CompanyID=C.CompanyID AND S.PartnerID=C.PartnerID
+       AND S.IsCurrent=1 AND S.StartDate<=CONVERT(date,SYSUTCDATETIME())
+       AND (S.StatusCode IN(N'ACTIVE',N'TRIAL',N'EXPIRED') OR S.ExpireDate<CONVERT(date,SYSUTCDATETIME()))
     WHERE U.UserID=@UserID AND U.CompanyID=@CompanyID AND U.IsActive=1
       AND EXISTS
       (

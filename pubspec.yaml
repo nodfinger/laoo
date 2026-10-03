@@ -48,6 +48,8 @@ dependencies:
     path: projects/memo
   laoo_provider:
     path: projects/provider
+  laoo_school:
+    path: projects/school
   laoo_intranet:
     path: projects/intranet
   laoo_vote:

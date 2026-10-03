@@ -129,4 +129,40 @@ class PartnerCompanyRepository {
       },
     );
   }
+
+  Future<List<PartnerCompanySubscription>> getCompanySubscriptions(
+    int companyId,
+  ) async {
+    final data = await _api.get(
+      '/api/partner/companies/$companyId/subscriptions',
+    );
+    return (data as List<dynamic>)
+        .map(
+          (item) =>
+              PartnerCompanySubscription.fromJson(item as Map<String, dynamic>),
+        )
+        .toList();
+  }
+
+  Future<void> updateCompanySubscription(
+    int companyId,
+    int projectId, {
+    required int packageId,
+    required String statusCode,
+    required DateTime startDate,
+    DateTime? expireDate,
+    String? reason,
+  }) async {
+    String date(DateTime value) => value.toIso8601String().substring(0, 10);
+    await _api.put(
+      '/api/partner/companies/$companyId/subscriptions/$projectId',
+      body: {
+        'packageId': packageId,
+        'statusCode': statusCode,
+        'startDate': date(startDate),
+        'expireDate': expireDate == null ? null : date(expireDate),
+        'reason': reason,
+      },
+    );
+  }
 }
