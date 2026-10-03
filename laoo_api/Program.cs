@@ -10,6 +10,7 @@ using LaooSurveyModule;
 using LaooExpenseModule;
 using LaooProjectModule;
 using LaooProviderModule;
+using LaooSchoolModule;
 using LaooDocumentControlModule;
 using LaooKnowledgeModule;
 using LaooMemoModule;
@@ -60,6 +61,7 @@ builder.Services
     .AddApplicationPart(typeof(ExpenseModuleMarker).Assembly)
     .AddApplicationPart(typeof(ProjectModuleMarker).Assembly)
     .AddApplicationPart(typeof(ProviderModuleMarker).Assembly)
+    .AddApplicationPart(typeof(SchoolModuleMarker).Assembly)
     .AddApplicationPart(typeof(DocumentControlModuleMarker).Assembly)
     .AddApplicationPart(typeof(KnowledgeModuleMarker).Assembly)
     .AddApplicationPart(typeof(MemoModuleMarker).Assembly)

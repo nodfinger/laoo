@@ -26,7 +26,6 @@ SELECT P.ProjectID,P.ProjectNameTH,M.MenuCode,M.MenuName,G.MenuGroupCode,G.MenuG
  CAST(MAX(CASE WHEN RP.ActionCode='DELETE' AND RP.IsAllowed=1 THEN 1 ELSE 0 END) AS bit)
 FROM dbo.TDADProject P
 JOIN dbo.TDSTCompanySetUp C ON C.CompanyID=@Company AND C.PartnerID=@Partner AND C.IsActive=1
-JOIN dbo.TDADCompanyProject CP ON CP.ProjectID=P.ProjectID AND CP.CompanyID=C.CompanyID AND CP.PartnerID=C.PartnerID AND CP.IsEnabled=1
 JOIN dbo.TDADUserProject UP ON UP.ProjectID=P.ProjectID AND UP.UserID=@User AND UP.CompanyID=C.CompanyID AND UP.IsActive=1
 JOIN dbo.TDADProjectMenu PM ON PM.ProjectID=P.ProjectID AND PM.IsActive=1
 JOIN dbo.TDADMainMenu M ON M.MenuCode=PM.MenuCode AND M.IsActive=1 AND M.IsVisible=1
@@ -35,8 +34,15 @@ JOIN dbo.TDADMenuGroup OG ON OG.MenuGroupCode=M.MenuGroupCode AND OG.IsActive=1
 JOIN dbo.TDADProjectMenuGroup PG ON PG.ProjectID=P.ProjectID AND PG.MenuGroupCode=G.MenuGroupCode AND PG.IsActive=1
 LEFT JOIN dbo.TDADRoleGroupPermission RP ON RP.RoleGroupID=@Role AND RP.ProjectID=P.ProjectID AND RP.MenuCode=M.MenuCode
 WHERE P.IsActive=1 AND UPPER(LTRIM(RTRIM(G.AudienceType))) IN ('A','C') AND UPPER(LTRIM(RTRIM(OG.AudienceType))) IN ('A','C')
- AND G.MenuGroupCode<>'07' AND (CP.StartDate IS NULL OR CP.StartDate<=CONVERT(date,SYSUTCDATETIME()))
- AND (CP.ExpireDate IS NULL OR CP.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))
+ AND G.MenuGroupCode<>'07'
+ AND ((P.ProjectType=N'CORE' AND EXISTS(SELECT 1 FROM dbo.TDADCompanyProject CP WHERE CP.ProjectID=P.ProjectID AND CP.CompanyID=C.CompanyID AND CP.PartnerID=C.PartnerID AND CP.IsEnabled=1
+       AND (CP.StartDate IS NULL OR CP.StartDate<=CONVERT(date,SYSUTCDATETIME())) AND (CP.ExpireDate IS NULL OR CP.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))))
+   OR (P.ProjectType<>N'CORE' AND EXISTS(SELECT 1 FROM dbo.TDADCompanyProjectSubscription S
+       JOIN dbo.TDADProjectPackage PK ON PK.PackageID=S.PackageID AND PK.IsActive=1
+       WHERE S.ProjectID=P.ProjectID AND S.CompanyID=C.CompanyID AND S.PartnerID=C.PartnerID AND S.IsCurrent=1
+         AND S.StatusCode IN(N'ACTIVE',N'TRIAL') AND S.StartDate<=CONVERT(date,SYSUTCDATETIME())
+         AND (S.ExpireDate IS NULL OR S.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))
+         AND (NULLIF(LTRIM(RTRIM(M.FeatureCode)),N'') IS NULL OR EXISTS(SELECT 1 FROM dbo.TDADProjectPackageFeature PF WHERE PF.PackageID=PK.PackageID AND PF.FeatureCode=M.FeatureCode AND PF.IsEnabled=1)))))
 GROUP BY P.ProjectID,P.ProjectNameTH,M.MenuCode,M.MenuName,G.MenuGroupCode,G.MenuGroupName,M.ScreenType,PG.SortOrder,PM.SortOrder
 ORDER BY P.ProjectID,PG.SortOrder,PM.SortOrder,M.MenuCode;
 """;
@@ -66,7 +72,8 @@ ORDER BY P.ProjectID,PG.SortOrder,PM.SortOrder,M.MenuCode;
             await SyncRoleUsersToGrantedProjects(connection,tx,roleGroupId,token);
             await tx.CommitAsync(token); return NoContent();
         }
-        catch(SqlException ex) when(ex.Number==50010){await tx.RollbackAsync(token);return BadRequest(new{message="เมนูไม่อยู่ในขอบเขตบริษัท",description="Project หรือเมนูอาจถูกปิด กรุณาโหลดรายการสิทธิ์ใหม่ก่อนบันทึก"});}
+        catch(SqlException ex) when(ex.Number==50010){await tx.RollbackAsync(token);return BadRequest(new{message="เมนูไม่อยู่ในขอบเขตบริษัท",description="Project, Package หรือ Feature อาจถูกปิด กรุณาโหลดรายการสิทธิ์ใหม่ก่อนบันทึก"});}
+        catch(SqlException ex) when(ex.Number==50011){await tx.RollbackAsync(token);return Conflict(new{message="จำนวนผู้ใช้เกินโควตาแพ็กเกจ",description="กรุณาลดผู้ใช้ของ Project หรือให้ Partner Upgrade แพ็กเกจ"});}
         catch{await tx.RollbackAsync(token);throw;}
     }
 
@@ -87,7 +94,6 @@ ORDER BY P.ProjectID,PG.SortOrder,PM.SortOrder,M.MenuCode;
 DECLARE @Type int;
 SELECT @Type=M.ScreenType FROM dbo.TDADProject P
 JOIN dbo.TDSTCompanySetUp C ON C.CompanyID=@Company AND C.PartnerID=@Partner AND C.IsActive=1
-JOIN dbo.TDADCompanyProject CP ON CP.ProjectID=P.ProjectID AND CP.CompanyID=C.CompanyID AND CP.PartnerID=C.PartnerID AND CP.IsEnabled=1
 JOIN dbo.TDADUserProject UP ON UP.ProjectID=P.ProjectID AND UP.UserID=@User AND UP.CompanyID=C.CompanyID AND UP.IsActive=1
 JOIN dbo.TDADProjectMenu PM ON PM.ProjectID=P.ProjectID AND PM.MenuCode=@Menu AND PM.IsActive=1
 JOIN dbo.TDADMainMenu M ON M.MenuCode=PM.MenuCode AND M.IsActive=1 AND M.IsVisible=1
@@ -96,7 +102,14 @@ JOIN dbo.TDADMenuGroup OG ON OG.MenuGroupCode=M.MenuGroupCode AND OG.IsActive=1
 JOIN dbo.TDADProjectMenuGroup PG ON PG.ProjectID=P.ProjectID AND PG.MenuGroupCode=G.MenuGroupCode AND PG.IsActive=1
 WHERE P.ProjectID=@Project AND P.IsActive=1 AND G.MenuGroupCode<>'07'
  AND UPPER(LTRIM(RTRIM(G.AudienceType))) IN ('A','C') AND UPPER(LTRIM(RTRIM(OG.AudienceType))) IN ('A','C')
- AND (CP.StartDate IS NULL OR CP.StartDate<=CONVERT(date,SYSUTCDATETIME())) AND (CP.ExpireDate IS NULL OR CP.ExpireDate>=CONVERT(date,SYSUTCDATETIME()));
+ AND ((P.ProjectType=N'CORE' AND EXISTS(SELECT 1 FROM dbo.TDADCompanyProject CP WHERE CP.ProjectID=P.ProjectID AND CP.CompanyID=C.CompanyID AND CP.PartnerID=C.PartnerID AND CP.IsEnabled=1
+       AND (CP.StartDate IS NULL OR CP.StartDate<=CONVERT(date,SYSUTCDATETIME())) AND (CP.ExpireDate IS NULL OR CP.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))))
+   OR (P.ProjectType<>N'CORE' AND EXISTS(SELECT 1 FROM dbo.TDADCompanyProjectSubscription S
+       JOIN dbo.TDADProjectPackage PK ON PK.PackageID=S.PackageID AND PK.IsActive=1
+       WHERE S.ProjectID=P.ProjectID AND S.CompanyID=C.CompanyID AND S.PartnerID=C.PartnerID AND S.IsCurrent=1
+         AND S.StatusCode IN(N'ACTIVE',N'TRIAL') AND S.StartDate<=CONVERT(date,SYSUTCDATETIME())
+         AND (S.ExpireDate IS NULL OR S.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))
+         AND (NULLIF(LTRIM(RTRIM(M.FeatureCode)),N'') IS NULL OR EXISTS(SELECT 1 FROM dbo.TDADProjectPackageFeature PF WHERE PF.PackageID=PK.PackageID AND PF.FeatureCode=M.FeatureCode AND PF.IsEnabled=1)))));
 IF @Type IS NULL THROW 50010,'MENU_SCOPE_INVALID',1;
 DELETE FROM dbo.TDADRoleGroupPermission WHERE RoleGroupID=@Role AND ProjectID=@Project AND MenuCode=@Menu;
 INSERT dbo.TDADRoleGroupPermission(RoleGroupID,ProjectID,MenuCode,ActionCode,IsAllowed,CreatedBy)
@@ -149,17 +162,40 @@ INNER JOIN dbo.TDADRoleGroupPermission RP
 INNER JOIN dbo.TDADProject P
     ON P.ProjectID=RP.ProjectID
    AND P.IsActive=1
-INNER JOIN dbo.TDADCompanyProject CP
-    ON CP.CompanyID=RG.CompanyID
-   AND CP.PartnerID=@Partner
-   AND CP.ProjectID=RP.ProjectID
-   AND CP.IsEnabled=1
-   AND (CP.StartDate IS NULL OR CP.StartDate<=CONVERT(date,SYSUTCDATETIME()))
-   AND (CP.ExpireDate IS NULL OR CP.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))
 WHERE RG.RoleGroupID=@Role
   AND RG.ScopeType='C'
   AND RG.CompanyID=@Company
-  AND RG.IsActive=1;
+  AND RG.IsActive=1
+  AND ((P.ProjectType=N'CORE' AND EXISTS(SELECT 1 FROM dbo.TDADCompanyProject CP
+         WHERE CP.CompanyID=RG.CompanyID AND CP.PartnerID=@Partner AND CP.ProjectID=P.ProjectID AND CP.IsEnabled=1
+           AND (CP.StartDate IS NULL OR CP.StartDate<=CONVERT(date,SYSUTCDATETIME()))
+           AND (CP.ExpireDate IS NULL OR CP.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))))
+    OR (P.ProjectType<>N'CORE' AND EXISTS(SELECT 1 FROM dbo.TDADCompanyProjectSubscription S
+         JOIN dbo.TDADProjectPackage PK ON PK.PackageID=S.PackageID AND PK.IsActive=1
+         WHERE S.CompanyID=RG.CompanyID AND S.PartnerID=@Partner AND S.ProjectID=P.ProjectID AND S.IsCurrent=1
+           AND S.StatusCode IN(N'ACTIVE',N'TRIAL') AND S.StartDate<=CONVERT(date,SYSUTCDATETIME())
+           AND (S.ExpireDate IS NULL OR S.ExpireDate>=CONVERT(date,SYSUTCDATETIME())))));
+
+IF EXISTS
+(
+ SELECT 1
+ FROM (SELECT DISTINCT ProjectID FROM @GrantedProjects) G
+ JOIN dbo.TDADCompanyProjectSubscription S ON S.CompanyID=@Company AND S.ProjectID=G.ProjectID AND S.IsCurrent=1
+ JOIN dbo.TDADProjectPackageQuota Q ON Q.PackageID=S.PackageID AND Q.QuotaCode=N'MAX_USERS' AND Q.LimitValue>=0
+ CROSS APPLY
+ (
+   SELECT COUNT(DISTINCT Z.UserID) UsedUsers
+   FROM
+   (
+     SELECT UP.UserID FROM dbo.TDADUserProject UP
+     WHERE UP.CompanyID=@Company AND UP.ProjectID=G.ProjectID AND UP.IsActive=1
+     UNION
+     SELECT GP.UserID FROM @GrantedProjects GP WHERE GP.ProjectID=G.ProjectID
+   ) Z
+ ) U
+ WHERE U.UsedUsers>Q.LimitValue
+)
+ THROW 50011,N'PACKAGE_MAX_USERS_EXCEEDED',1;
 
 UPDATE UP
 SET UP.IsActive=1,

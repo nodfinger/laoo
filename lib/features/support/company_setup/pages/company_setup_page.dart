@@ -14,6 +14,7 @@ import '../../../../core/widgets/combo_box_text.dart';
 import '../data/company_setup_api.dart';
 import '../models/company_setup_constants.dart';
 import '../models/company_setup_model.dart';
+import '../widgets/company_subscription_card.dart';
 import '../../presentation/widgets/support_workspace_shell.dart';
 
 class CompanySetupPage extends StatefulWidget {
@@ -766,6 +767,8 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
                         ],
                       ],
                       if (!widget.additionalOnly) ...[
+                        const SizedBox(height: 8),
+                        const CompanySubscriptionCard(),
                         const SizedBox(height: 8),
                         _LegacySetupCards(
                           controllers: {

@@ -135,3 +135,81 @@ class PartnerCompanyProject {
         sortOrder: (json['sortOrder'] as num?)?.toInt() ?? 0,
       );
 }
+
+class ProjectPackageOption {
+  const ProjectPackageOption({
+    required this.packageId,
+    required this.packageCode,
+    required this.packageNameTh,
+    required this.tierCode,
+    required this.billingCycle,
+    required this.price,
+    required this.trialDays,
+  });
+  final int packageId;
+  final String packageCode;
+  final String packageNameTh;
+  final String tierCode;
+  final String billingCycle;
+  final double price;
+  final int trialDays;
+
+  factory ProjectPackageOption.fromJson(Map<String, dynamic> json) =>
+      ProjectPackageOption(
+        packageId: (json['packageId'] as num).toInt(),
+        packageCode: json['packageCode'] as String,
+        packageNameTh: json['packageNameTh'] as String,
+        tierCode: json['tierCode'] as String,
+        billingCycle: json['billingCycle'] as String,
+        price: (json['price'] as num?)?.toDouble() ?? 0,
+        trialDays: (json['trialDays'] as num?)?.toInt() ?? 0,
+      );
+}
+
+class PartnerCompanySubscription {
+  const PartnerCompanySubscription({
+    required this.projectId,
+    required this.projectCode,
+    required this.projectNameTh,
+    required this.packages,
+    this.subscriptionId,
+    this.packageId,
+    this.statusCode,
+    this.startDate,
+    this.expireDate,
+    this.accessMode,
+  });
+  final int projectId;
+  final String projectCode;
+  final String projectNameTh;
+  final List<ProjectPackageOption> packages;
+  final int? subscriptionId;
+  final int? packageId;
+  final String? statusCode;
+  final DateTime? startDate;
+  final DateTime? expireDate;
+  final String? accessMode;
+
+  factory PartnerCompanySubscription.fromJson(Map<String, dynamic> json) =>
+      PartnerCompanySubscription(
+        projectId: (json['projectId'] as num).toInt(),
+        projectCode: json['projectCode'] as String,
+        projectNameTh: json['projectNameTh'] as String,
+        packages: (json['packages'] as List<dynamic>? ?? const [])
+            .map(
+              (item) =>
+                  ProjectPackageOption.fromJson(item as Map<String, dynamic>),
+            )
+            .toList(),
+        subscriptionId: (json['subscriptionId'] as num?)?.toInt(),
+        packageId: (json['packageId'] as num?)?.toInt(),
+        statusCode: json['statusCode'] as String?,
+        startDate: json['startDate'] == null
+            ? null
+            : DateTime.tryParse(json['startDate'] as String),
+        expireDate: json['expireDate'] == null
+            ? null
+            : DateTime.tryParse(json['expireDate'] as String),
+        accessMode: json['accessMode'] as String?,
+      );
+}

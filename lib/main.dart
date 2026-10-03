@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -10,6 +11,7 @@ import 'package:laoo_document_control/document_control_feature.dart';
 import 'package:laoo_knowledge/knowledge_feature.dart';
 import 'package:laoo_memo/memo_feature.dart';
 import 'package:laoo_provider/provider_feature.dart';
+import 'package:laoo_school/school_feature.dart';
 import 'package:laoo_intranet/intranet_feature.dart';
 import 'package:laoo_vote/vote_feature.dart';
 import 'package:laoo_pos/pos_feature.dart';
@@ -22,6 +24,7 @@ import 'package:laoo_gate_pass/gate_pass_feature.dart';
 import 'package:laoo_visitor/visitor_feature.dart';
 import 'package:laoo_shared_workspace_ui/laoo_shared_workspace_ui.dart';
 import 'package:printing/printing.dart';
+import 'package:http/http.dart' as http;
 
 import 'app/laoo_app.dart';
 import 'app/theme/laoo_design_tokens.dart';
@@ -29,6 +32,7 @@ import 'app/theme/laoo_typography.dart';
 import 'app/theme/workspace_theme_presets.dart';
 import 'core/api/api_client.dart';
 import 'core/api/api_exception.dart';
+import 'core/config/app_config.dart';
 import 'core/company_setup/company_setup_controller.dart';
 import 'core/company_setup/company_date_formatter.dart';
 import 'core/navigation/navigation_menu_repository.dart';
@@ -36,7 +40,45 @@ import 'core/widgets/auto_dismiss_message.dart';
 import 'core/widgets/timed_snack_bar.dart';
 import 'features/support/presentation/widgets/support_workspace_shell.dart';
 
+Future<dynamic> _schoolGuardianRequest(
+  String path, {
+  Map<String, dynamic>? body,
+  String? token,
+}) async {
+  final uri = Uri.parse(AppConfig.apiBaseUrl).resolve(path);
+  final headers = <String, String>{
+    'Accept': 'application/json',
+    if (body != null) 'Content-Type': 'application/json',
+    if (token != null) 'Authorization': 'Bearer $token',
+  };
+  final response = body == null
+      ? await http.get(uri, headers: headers)
+      : await http.post(uri, headers: headers, body: jsonEncode(body));
+  final decoded = response.body.isEmpty ? null : jsonDecode(response.body);
+  if (response.statusCode < 200 || response.statusCode >= 300) {
+    final message = decoded is Map<String, dynamic>
+        ? decoded['message']?.toString()
+        : null;
+    throw StateError(message ?? 'ไม่สามารถเชื่อมต่อระบบผู้ปกครองได้');
+  }
+  return decoded;
+}
+
 void main() {
+  configureSchoolFeatureHost(
+    _buildMeetingWorkspaceShell,
+    apiClientFactory: ApiClient.new,
+    apiClientDisposer: (client) => (client as ApiClient).dispose(),
+    menuTitleResolver: (menuCode, fallback) => NavigationMenuRepository()
+        .resolveMenuName(menuCode: menuCode, fallback: fallback),
+    messagePresenter: (context, {required message, required error}) =>
+        showTimedSnackBar(context, message: message, error: error),
+    uiTokensProvider: _surveyWorkspaceTokens,
+    guardianLogin: (body) =>
+        _schoolGuardianRequest('/api/school/guardian/login', body: body),
+    guardianPortal: (token) =>
+        _schoolGuardianRequest('/api/school/guardian/portal', token: token),
+  );
   configureProviderFeatureHost(
     _buildMeetingWorkspaceShell,
     apiClientFactory: ApiClient.new,

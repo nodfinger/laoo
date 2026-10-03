@@ -1,7 +1,8 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('core', 'service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense', 'project', 'document_control', 'knowledge', 'memo', 'provider', 'intranet', 'vote', 'pos', 'sales', 'evaluation')]
+    [ValidateSet('core', 'service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense', 'project', 'document_control', 'knowledge', 'memo', 'provider', 'school', 'intranet', 'vote', 'pos', 'sales', 'evaluation')]
     [string]$Module,
+    [string]$MigrationId,
     [switch]$DryRun
 )
 
@@ -23,6 +24,7 @@ $projectCodes = @{
     knowledge = 'LAOO_KNOWLEDGE'
     memo = 'LAOO_MEMO'
     provider = 'LAOO_PROVIDER'
+    school = 'LAOO_SCHOOL'
     intranet = 'LAOO_INTRANET'
     vote = 'LAOO_VOTE'
     pos = 'LAOO_POS'
@@ -37,6 +39,7 @@ $arguments = @(
     '--project', $projectCodes[$Module]
 )
 if ($DryRun) { $arguments += '--dry-run' }
+if ($MigrationId) { $arguments += @('--migration', $MigrationId) }
 
 & dotnet @arguments
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

@@ -30,11 +30,32 @@ WITH Eligible AS
  JOIN dbo.TDADProject P ON P.ProjectID=PM.ProjectID AND P.IsActive=1
  JOIN dbo.TDADMainMenu M ON M.MenuCode=PM.MenuCode AND M.IsActive=1
  JOIN dbo.TDSTCompanySetUp C ON C.CompanyID=@CompanyID AND C.PartnerID=@PartnerID AND C.IsActive=1
- JOIN dbo.TDADCompanyProject CP ON CP.ProjectID=P.ProjectID AND CP.CompanyID=C.CompanyID AND CP.PartnerID=C.PartnerID AND CP.IsEnabled=1
  JOIN dbo.TDADUserProject UP ON UP.ProjectID=P.ProjectID AND UP.UserID=@UserID AND UP.CompanyID=C.CompanyID AND UP.IsActive=1
  WHERE PM.MenuCode=@MenuCode AND PM.IsActive=1
- AND (CP.StartDate IS NULL OR CP.StartDate<=CONVERT(date,SYSUTCDATETIME()))
- AND (CP.ExpireDate IS NULL OR CP.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))
+ AND
+ (
+   (P.ProjectType=N'CORE' AND EXISTS
+    (SELECT 1 FROM dbo.TDADCompanyProject CP
+     WHERE CP.ProjectID=P.ProjectID AND CP.CompanyID=C.CompanyID AND CP.PartnerID=C.PartnerID
+       AND CP.IsEnabled=1
+       AND (CP.StartDate IS NULL OR CP.StartDate<=CONVERT(date,SYSUTCDATETIME()))
+       AND (CP.ExpireDate IS NULL OR CP.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))))
+   OR
+   (P.ProjectType<>N'CORE' AND EXISTS
+    (SELECT 1 FROM dbo.TDADCompanyProjectSubscription S
+     JOIN dbo.TDADProjectPackage PK ON PK.PackageID=S.PackageID AND PK.ProjectID=S.ProjectID AND PK.IsActive=1
+     WHERE S.CompanyID=C.CompanyID AND S.PartnerID=C.PartnerID AND S.ProjectID=P.ProjectID AND S.IsCurrent=1
+       AND S.StartDate<=CONVERT(date,SYSUTCDATETIME())
+       AND
+       (
+         (S.StatusCode IN(N'ACTIVE',N'TRIAL') AND (S.ExpireDate IS NULL OR S.ExpireDate>=CONVERT(date,SYSUTCDATETIME())))
+         OR ((S.StatusCode=N'EXPIRED' OR S.ExpireDate<CONVERT(date,SYSUTCDATETIME()))
+             AND @Action IN(N'VIEW',N'PREVIEW',N'DOWNLOAD',N'PRINT',N'EXPORT'))
+       )
+       AND (NULLIF(LTRIM(RTRIM(M.FeatureCode)),N'') IS NULL OR EXISTS
+         (SELECT 1 FROM dbo.TDADProjectPackageFeature PF
+          WHERE PF.PackageID=PK.PackageID AND PF.FeatureCode=M.FeatureCode AND PF.IsEnabled=1))))
+ )
 )
 SELECT CAST(CASE WHEN EXISTS
 (

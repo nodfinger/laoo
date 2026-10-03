@@ -13,6 +13,7 @@ import 'package:laoo_document_control/document_control_feature.dart'
 import 'package:laoo_knowledge/knowledge_feature.dart' show KnowledgeRoutes;
 import 'package:laoo_memo/memo_feature.dart' show MemoRoutes;
 import 'package:laoo_provider/provider_feature.dart' show ProviderRoutes;
+import 'package:laoo_school/school_feature.dart' show SchoolRoutes;
 import 'package:laoo_intranet/intranet_feature.dart'
     show IntranetMenuCodes, IntranetRouteNames, IntranetRoutePaths;
 import 'package:laoo_vote/vote_feature.dart'
@@ -1140,6 +1141,14 @@ abstract final class AppMenuRouteRegistry {
         scope: AppMenuScope.company,
       ),
     for (final route in ProviderRoutes.all)
+      route.menuCode: AppMenuRouteSpec(
+        menuCode: route.menuCode,
+        databaseRouteName: route.routeName,
+        goRouteName: route.routeName,
+        path: route.routePath,
+        scope: AppMenuScope.company,
+      ),
+    for (final route in SchoolRoutes.all)
       route.menuCode: AppMenuRouteSpec(
         menuCode: route.menuCode,
         databaseRouteName: route.routeName,

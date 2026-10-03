@@ -24,8 +24,11 @@ class PartnerCompanyModulesPage extends StatefulWidget {
 
 class _PartnerCompanyModulesPageState extends State<PartnerCompanyModulesPage> {
   final PartnerCompanyRepository _repository = PartnerCompanyRepository();
-  List<PartnerCompanyProject> _projects = const [];
-  Map<int, bool> _selection = const {};
+  List<PartnerCompanySubscription> _projects = const [];
+  Map<int, int?> _packageByProject = const {};
+  Map<int, String> _statusByProject = const {};
+  Map<int, DateTime> _startByProject = const {};
+  Map<int, DateTime?> _expireByProject = const {};
   bool _loading = true;
   bool _saving = false;
   String? _error;
@@ -42,14 +45,26 @@ class _PartnerCompanyModulesPageState extends State<PartnerCompanyModulesPage> {
       _error = null;
     });
     try {
-      final projects = await _repository.getCompanyProjects(
+      final projects = await _repository.getCompanySubscriptions(
         widget.company.companyId,
       );
       if (!mounted) return;
       setState(() {
         _projects = projects;
-        _selection = {
-          for (final project in projects) project.projectId: project.isEnabled,
+        final today = DateUtils.dateOnly(DateTime.now());
+        _packageByProject = {
+          for (final project in projects) project.projectId: project.packageId,
+        };
+        _statusByProject = {
+          for (final project in projects)
+            project.projectId: project.statusCode ?? 'ACTIVE',
+        };
+        _startByProject = {
+          for (final project in projects)
+            project.projectId: project.startDate ?? today,
+        };
+        _expireByProject = {
+          for (final project in projects) project.projectId: project.expireDate,
         };
       });
     } catch (error) {
@@ -66,14 +81,22 @@ class _PartnerCompanyModulesPageState extends State<PartnerCompanyModulesPage> {
       _error = null;
     });
     try {
-      await _repository.updateCompanyProjects(
-        widget.company.companyId,
-        _selection,
-      );
+      for (final project in _projects) {
+        final packageId = _packageByProject[project.projectId];
+        if (packageId == null) continue;
+        await _repository.updateCompanySubscription(
+          widget.company.companyId,
+          project.projectId,
+          packageId: packageId,
+          statusCode: _statusByProject[project.projectId] ?? 'ACTIVE',
+          startDate: _startByProject[project.projectId]!,
+          expireDate: _expireByProject[project.projectId],
+        );
+      }
       if (mounted) Navigator.of(context).pop(true);
     } catch (error) {
       if (mounted) {
-        setState(() => _error = 'บันทึกระบบที่เปิดใช้ไม่สำเร็จ: $error');
+        setState(() => _error = 'บันทึกแพ็กเกจไม่สำเร็จ: $error');
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -82,7 +105,7 @@ class _PartnerCompanyModulesPageState extends State<PartnerCompanyModulesPage> {
 
   @override
   Widget build(BuildContext context) {
-    final title = '${widget.menuName} > ระบบที่เปิดใช้';
+    final title = '${widget.menuName} > กำหนดแพ็กเกจ';
     final compact = MediaQuery.sizeOf(context).width < 900;
     return SupportWorkspaceShell(
       pageTitle: title,
@@ -256,7 +279,7 @@ class _PartnerCompanyModulesPageState extends State<PartnerCompanyModulesPage> {
   );
 
   Widget _sectionHeader(BuildContext context) {
-    final enabledCount = _selection.values.where((enabled) => enabled).length;
+    final enabledCount = _packageByProject.values.whereType<int>().length;
     final primary = Theme.of(context).colorScheme.primary;
     return Wrap(
       alignment: WrapAlignment.spaceBetween,
@@ -270,7 +293,7 @@ class _PartnerCompanyModulesPageState extends State<PartnerCompanyModulesPage> {
             Icon(Icons.apps_outlined, color: primary),
             const SizedBox(width: 8),
             Text(
-              'ระบบที่เปิดใช้',
+              'แพ็กเกจรายระบบ',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 fontSize: LaooTypography.sectionTitle,
                 fontWeight: LaooTypography.emphasizedWeight,
@@ -280,7 +303,7 @@ class _PartnerCompanyModulesPageState extends State<PartnerCompanyModulesPage> {
           ],
         ),
         Text(
-          'เปิด $enabledCount จาก ${_projects.length} ระบบ',
+          'กำหนดแล้ว $enabledCount จาก ${_projects.length} ระบบ',
           style: Theme.of(
             context,
           ).textTheme.bodySmall?.copyWith(color: LaooColors.textSecondary),
@@ -290,114 +313,216 @@ class _PartnerCompanyModulesPageState extends State<PartnerCompanyModulesPage> {
   }
 
   Widget _featureGrid(BuildContext context, {required bool compact}) {
-    if (compact) {
-      return Column(
-        children: [
-          for (var index = 0; index < _projects.length; index++) ...[
-            _projectRow(_projects[index]),
-            if (index < _projects.length - 1) const SizedBox(height: 6),
-          ],
+    return Column(
+      children: [
+        for (var index = 0; index < _projects.length; index++) ...[
+          _projectRow(_projects[index]),
+          if (index < _projects.length - 1) const SizedBox(height: 6),
         ],
-      );
-    }
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        const spacing = 10.0;
-        final itemWidth = (constraints.maxWidth - spacing) / 2;
-        return Wrap(
-          spacing: spacing,
-          runSpacing: spacing,
-          children: [
-            for (final project in _projects)
-              SizedBox(width: itemWidth, child: _projectRow(project)),
-          ],
-        );
-      },
+      ],
     );
   }
 
-  Widget _projectRow(PartnerCompanyProject project) {
-    final enabled = _selection[project.projectId] == true;
+  Widget _projectRow(PartnerCompanySubscription project) {
+    final selectedPackage = _packageByProject[project.projectId];
     final primary = Theme.of(context).colorScheme.primary;
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 160),
-      constraints: const BoxConstraints(minHeight: 92),
+    return Container(
       padding: const EdgeInsets.all(LaooLayout.cardPadding),
       decoration: BoxDecoration(
-        color: enabled
+        color: selectedPackage != null
             ? primary.withValues(alpha: 0.08)
             : LaooColors.surfaceSoft,
         borderRadius: BorderRadius.circular(LaooRadius.xs),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: LaooColors.white,
-              borderRadius: BorderRadius.circular(LaooRadius.xs),
-            ),
-            child: Icon(_iconFor(project.projectCode), color: primary),
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: LaooColors.white,
+                  borderRadius: BorderRadius.circular(LaooRadius.xs),
+                ),
+                child: Icon(_iconFor(project.projectCode), color: primary),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      project.projectNameTh,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: LaooTypography.emphasizedWeight,
+                        color: LaooColors.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      project.projectCode,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: LaooColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              _accessBadge(project.accessMode),
+            ],
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
+          const SizedBox(height: 10),
+          LayoutBuilder(
+            builder: (context, constraints) => Wrap(
+              spacing: 10,
+              runSpacing: 10,
               children: [
-                Text(
-                  project.projectNameTh,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontWeight: LaooTypography.emphasizedWeight,
-                    color: LaooColors.textPrimary,
-                    height: LaooTypography.bodyLineHeight,
+                SizedBox(
+                  width: constraints.maxWidth < 640
+                      ? constraints.maxWidth
+                      : 280,
+                  child: DropdownButtonFormField<int?>(
+                    initialValue: selectedPackage,
+                    decoration: const InputDecoration(labelText: 'แพ็กเกจ *'),
+                    items: [
+                      const DropdownMenuItem<int?>(
+                        value: null,
+                        child: Text('ยังไม่กำหนด'),
+                      ),
+                      ...project.packages.map(
+                        (item) => DropdownMenuItem<int?>(
+                          value: item.packageId,
+                          child: Text(item.packageNameTh),
+                        ),
+                      ),
+                    ],
+                    onChanged: _saving
+                        ? null
+                        : (value) => _selectPackage(project, value),
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  project.description?.trim().isNotEmpty == true
-                      ? project.description!
-                      : project.projectCode,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: LaooColors.textSecondary,
-                    height: LaooTypography.bodyLineHeight,
+                if (selectedPackage != null) ...[
+                  SizedBox(
+                    width: constraints.maxWidth < 640
+                        ? constraints.maxWidth
+                        : 190,
+                    child: DropdownButtonFormField<String>(
+                      initialValue:
+                          _statusByProject[project.projectId] ?? 'ACTIVE',
+                      decoration: const InputDecoration(labelText: 'สถานะ *'),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'ACTIVE',
+                          child: Text('ใช้งาน'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'TRIAL',
+                          child: Text('ทดลองใช้'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'SUSPENDED',
+                          child: Text('ระงับ'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'CANCELLED',
+                          child: Text('ยกเลิก'),
+                        ),
+                      ],
+                      onChanged: _saving
+                          ? null
+                          : (value) => setState(() {
+                              _statusByProject = {
+                                ..._statusByProject,
+                                project.projectId: value ?? 'ACTIVE',
+                              };
+                            }),
+                    ),
                   ),
-                ),
+                  _dateField(project, start: true),
+                  _dateField(project, start: false),
+                ],
               ],
             ),
           ),
-          const SizedBox(width: 8),
-          Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Switch.adaptive(
-                value: enabled,
-                onChanged: _saving || project.isCore
-                    ? null
-                    : (value) => setState(() {
-                        _selection = {..._selection, project.projectId: value};
-                      }),
-                activeThumbColor: primary,
-              ),
-              Text(
-                project.isCore
-                    ? 'ระบบหลัก'
-                    : enabled
-                    ? 'เปิดใช้งาน'
-                    : 'ปิดใช้งาน',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: enabled ? primary : LaooColors.textSecondary,
-                  fontWeight: LaooTypography.emphasizedWeight,
-                ),
-              ),
-            ],
-          ),
         ],
+      ),
+    );
+  }
+
+  void _selectPackage(PartnerCompanySubscription project, int? packageId) {
+    final package = project.packages
+        .where((item) => item.packageId == packageId)
+        .firstOrNull;
+    final start = DateUtils.dateOnly(DateTime.now());
+    DateTime? expire;
+    if (package?.billingCycle == 'MONTHLY') {
+      expire = DateTime(start.year, start.month + 1, start.day);
+    } else if (package?.billingCycle == 'YEARLY') {
+      expire = DateTime(start.year + 1, start.month, start.day);
+    }
+    setState(() {
+      _packageByProject = {..._packageByProject, project.projectId: packageId};
+      _startByProject = {..._startByProject, project.projectId: start};
+      _expireByProject = {..._expireByProject, project.projectId: expire};
+    });
+  }
+
+  Widget _dateField(PartnerCompanySubscription project, {required bool start}) {
+    final value = start
+        ? _startByProject[project.projectId]
+        : _expireByProject[project.projectId];
+    return SizedBox(
+      width: 180,
+      height: 48,
+      child: OutlinedButton.icon(
+        onPressed: _saving
+            ? null
+            : () async {
+                final selected = await showDatePicker(
+                  context: context,
+                  initialDate: value ?? DateTime.now(),
+                  firstDate: DateTime(2020),
+                  lastDate: DateTime(2100),
+                );
+                if (selected == null || !mounted) return;
+                setState(() {
+                  if (start) {
+                    _startByProject = {
+                      ..._startByProject,
+                      project.projectId: selected,
+                    };
+                  } else {
+                    _expireByProject = {
+                      ..._expireByProject,
+                      project.projectId: selected,
+                    };
+                  }
+                });
+              },
+        icon: const Icon(Icons.calendar_month_outlined, size: 18),
+        label: Text(
+          value == null
+              ? (start ? 'วันเริ่ม' : 'ไม่หมดอายุ')
+              : '${value.day.toString().padLeft(2, '0')}/'
+                    '${value.month.toString().padLeft(2, '0')}/${value.year}',
+        ),
+      ),
+    );
+  }
+
+  Widget _accessBadge(String? mode) {
+    final label = switch (mode) {
+      'FULL' => 'ใช้งาน',
+      'READ_ONLY' => 'อ่านอย่างเดียว',
+      'BLOCKED' => 'ปิดใช้งาน',
+      _ => 'ยังไม่กำหนด',
+    };
+    return Text(
+      label,
+      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+        color: Theme.of(context).colorScheme.primary,
+        fontWeight: FontWeight.w700,
       ),
     );
   }
