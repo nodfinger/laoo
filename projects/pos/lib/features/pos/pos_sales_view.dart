@@ -15,11 +15,15 @@ class PosSalesView extends StatefulWidget {
 
 class _SalesState extends State<PosSalesView> {
   final search = TextEditingController();
+  final memberCode = TextEditingController();
+  Map<String, dynamic>? sportMember;
+  bool findingMember = false;
   String? activation;
   Map<String, dynamic>? terminal;
   List<Map<String, dynamic>> products = [];
   final cart = <int, Map<String, dynamic>>{};
   bool loading = true, paying = false;
+  String? pendingSaleKey, pendingSignature;
   @override
   void initState() {
     super.initState();
@@ -29,7 +33,51 @@ class _SalesState extends State<PosSalesView> {
   @override
   void dispose() {
     search.dispose();
+    memberCode.dispose();
     super.dispose();
+  }
+
+  Future<void> _findMember() async {
+    if (activation == null || memberCode.text.trim().isEmpty || findingMember) {
+      return;
+    }
+    setState(() => findingMember = true);
+    try {
+      final found = await widget.api.sportMember(memberCode.text.trim());
+      final next = await widget.api.products(
+        activation!,
+        sportMemberId: (found['id'] as num).toInt(),
+      );
+      if (!mounted) return;
+      setState(() {
+        sportMember = found;
+        products = next;
+        cart.clear();
+      });
+    } catch (e) {
+      if (mounted) {
+        memberCode.text = sportMember?['code']?.toString() ?? '';
+        showPosMessage(
+          context,
+          message: 'ตรวจสมาชิกไม่สำเร็จ: $e',
+          error: true,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => findingMember = false);
+    }
+  }
+
+  Future<void> _clearMember() async {
+    if (activation == null) return;
+    final next = await widget.api.products(activation!);
+    if (!mounted) return;
+    setState(() {
+      sportMember = null;
+      memberCode.clear();
+      products = next;
+      cart.clear();
+    });
   }
 
   Future<void> _load() async {
@@ -41,7 +89,10 @@ class _SalesState extends State<PosSalesView> {
     }
     try {
       terminal = await widget.api.bootstrap(activation!);
-      products = await widget.api.products(activation!);
+      products = await widget.api.products(
+        activation!,
+        sportMemberId: (sportMember?['id'] as num?)?.toInt(),
+      );
       if (mounted) setState(() => loading = false);
     } catch (_) {
       if (mounted) {
@@ -97,29 +148,63 @@ class _SalesState extends State<PosSalesView> {
     0,
     (v, x) => v + ((x['price'] as num).toDouble() * (x['quantity'] as double)),
   );
+  double get payable {
+    final taxRate = (terminal?['taxPercent'] as num?)?.toDouble() ?? 0;
+    final tax = (total * taxRate).round() / 100;
+    return total + tax;
+  }
+
   Future<void> _pay() async {
     if (cart.isEmpty || activation == null) return;
     setState(() => paying = true);
     try {
+      final ordered = cart.entries.toList()
+        ..sort((a, b) => a.key.compareTo(b.key));
+      final itemsSignature = ordered
+          .map((entry) => "${entry.key}:${entry.value['quantity']}")
+          .join('|');
+      final signature = "${sportMember?['id'] ?? '-'}|$itemsSignature";
+      if (pendingSignature != signature) {
+        pendingSignature = signature;
+        pendingSaleKey = _requestId();
+      }
       final result = await widget.api.finalize({
         'activationID': activation,
-        'idempotencyKey': _requestId(),
+        'idempotencyKey': pendingSaleKey,
         'items': cart.values
             .map((x) => {'itemID': x['id'], 'quantity': x['quantity']})
             .toList(),
         'discountAmount': 0,
         'paymentCode': 'CASH',
-        'receivedAmount': total * 1.07,
+        'receivedAmount': payable,
         'paymentReference': null,
         'customerID': null,
+        'sportMemberID': sportMember?['id'],
       });
       if (mounted) {
+        pendingSaleKey = null;
+        pendingSignature = null;
         showPosMessage(
           context,
           message: 'ชำระเงินแล้ว · ${result['receipt'] ?? ''}',
         );
-        setState(() => cart.clear());
-        products = await widget.api.products(activation!);
+        setState(() {
+          cart.clear();
+          sportMember = null;
+          memberCode.clear();
+        });
+        try {
+          final next = await widget.api.products(activation!);
+          if (mounted) setState(() => products = next);
+        } catch (_) {
+          if (mounted) {
+            showPosMessage(
+              context,
+              message: 'ขายสำเร็จแล้ว แต่โหลดสต๊อกล่าสุดไม่สำเร็จ',
+              error: true,
+            );
+          }
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -194,6 +279,50 @@ class _SalesState extends State<PosSalesView> {
               ),
             ),
             SizedBox(height: posUiTokens.sectionSpacing),
+            posCard(
+              child: Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  SizedBox(
+                    width: compact
+                        ? (c.maxWidth - 32).clamp(180.0, 320.0)
+                        : 280,
+                    child: TextField(
+                      controller: memberCode,
+                      onSubmitted: (_) => _findMember(),
+                      decoration: posInput(
+                        'รหัสสมาชิกกีฬา',
+                        icon: Icons.card_membership_outlined,
+                      ),
+                    ),
+                  ),
+                  FilledButton.icon(
+                    style: posFilledStyle(),
+                    onPressed: findingMember ? null : _findMember,
+                    icon: const Icon(Icons.person_search_outlined),
+                    label: Text(findingMember ? 'กำลังตรวจ' : 'ตรวจสมาชิก'),
+                  ),
+                  if (sportMember != null) ...[
+                    Text(
+                      "${sportMember!['name']} · ${sportMember!['level']}",
+                      style: TextStyle(
+                        color: posUiTokens.primaryColor,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    OutlinedButton.icon(
+                      style: posOutlinedStyle(),
+                      onPressed: _clearMember,
+                      icon: const Icon(Icons.close),
+                      label: const Text('ขายราคาปกติ'),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            SizedBox(height: posUiTokens.sectionSpacing),
             Expanded(
               child: compact
                   ? DefaultTabController(
@@ -237,6 +366,7 @@ class _SalesState extends State<PosSalesView> {
             products = await widget.api.products(
               activation!,
               search: search.text,
+              sportMemberId: (sportMember?['id'] as num?)?.toInt(),
             );
             setState(() {});
           },

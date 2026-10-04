@@ -9,7 +9,7 @@ using Microsoft.Extensions.Configuration;
 namespace LaooPosModule.Controllers;
 
 [ApiController, Authorize, Route("api/company/pos")]
-public sealed class PosController(IConfiguration config) : ControllerBase
+public sealed partial class PosController(IConfiguration config) : ControllerBase
 {
     static readonly string[] Menus=["46001","46002","46003","46004","46005","46006","46007"];
 
@@ -135,14 +135,22 @@ WHERE x.CompanyID=@co AND x.ActivationID=@activation AND x.IsActive=1 AND o.IsAc
     }
 
     [HttpGet("products/{activationId:guid}")]
-    public async Task<IActionResult> Products(Guid activationId,[FromQuery]string? search,CancellationToken t)
+    public async Task<IActionResult> Products(Guid activationId,[FromQuery]string? search,
+        [FromQuery]long? sportMemberId,CancellationToken t)
     {
         if(!Scope(out var co,out var user))return Forbid();await using var c=await Open(t);if(!await Can(c,"46004","VIEW",t))return Forbid();var terminal=await Terminal(c,co,user,activationId,t);if(terminal is null)return Forbid();
-        const string sql=@"SELECT x.ItemID id,i.ItemCode code,i.ItemName name,x.Barcode,COALESCE(x.SalePriceOverride,p.SalePrice,i.UnitPrice) price,COALESCE(s.Quantity,0) stock,x.ShowStock showStock
+        var memberPrice=sportMemberId is long member
+            ? await ResolveSportPrice(c,null,co,member,t) : null;
+        if(sportMemberId is not null && memberPrice is null)
+            return Conflict(new{message="ใช้ราคาสมาชิกไม่ได้",
+                description="ตรวจสถานะสมาชิก แพ็กเกจ และสิทธิ์ระบบกีฬา"});
+        const string sql=@"SELECT x.ItemID id,i.ItemCode code,i.ItemName name,x.Barcode,COALESCE(mp.SalePrice,x.SalePriceOverride,p.SalePrice,i.UnitPrice) price,COALESCE(s.Quantity,0) stock,x.ShowStock showStock
 FROM dbo.TDPOOutletItem x JOIN dbo.TDIVItem i ON i.CompanyID=x.CompanyID AND i.ItemID=x.ItemID JOIN dbo.TDPOOutlet o ON o.CompanyID=x.CompanyID AND o.OutletID=x.OutletID
-LEFT JOIN dbo.TDIVItemPriceLevel p ON p.CompanyID=x.CompanyID AND p.ItemID=x.ItemID AND p.PriceLevelCode=o.PriceLevelCode LEFT JOIN dbo.TDIVStockBalance s ON s.CompanyID=x.CompanyID AND s.WarehouseID=o.WarehouseID AND s.ItemID=x.ItemID
+LEFT JOIN dbo.TDIVItemPriceLevel p ON p.CompanyID=x.CompanyID AND p.ItemID=x.ItemID AND p.PriceLevelCode=o.PriceLevelCode
+LEFT JOIN dbo.TDIVItemPriceLevel mp ON mp.CompanyID=x.CompanyID AND mp.ItemID=x.ItemID AND mp.PriceLevelCode=@sportPrice
+LEFT JOIN dbo.TDIVStockBalance s ON s.CompanyID=x.CompanyID AND s.WarehouseID=o.WarehouseID AND s.ItemID=x.ItemID
 WHERE x.CompanyID=@co AND x.OutletID=@outlet AND x.IsSellable=1 AND i.IsActive=1 AND (@search IS NULL OR i.ItemCode LIKE N'%'+@search+N'%' OR i.ItemName LIKE N'%'+@search+N'%' OR x.Barcode=@search) ORDER BY i.ItemCode";
-        await using var q=new SqlCommand(sql,c);P(q,"@co",SqlDbType.BigInt,co);P(q,"@outlet",SqlDbType.BigInt,terminal.OutletID);P(q,"@search",SqlDbType.NVarChar,Clean(search),250);return Ok(await ReadRows(q,t));
+        await using var q=new SqlCommand(sql,c);P(q,"@co",SqlDbType.BigInt,co);P(q,"@outlet",SqlDbType.BigInt,terminal.OutletID);P(q,"@search",SqlDbType.NVarChar,Clean(search),250);P(q,"@sportPrice",SqlDbType.NVarChar,memberPrice?.PriceLevelCode,30);return Ok(await ReadRows(q,t));
     }
 
     [HttpGet("shifts")]
@@ -183,10 +191,65 @@ UPDATE dbo.TDPOShift SET ClosedBy=@user,ClosedAt=SYSUTCDATETIME(),ExpectedCash=@
         try{
             await using var setting=new SqlCommand("SELECT IsEnabled,RequireOpenShift,AllowNegativeStock,TaxPercent,ReceiptPrefix,DefaultPaymentCode FROM dbo.TDSTCompanySetupSystemPOS WHERE CompanyID=@co",c,tx);P(setting,"@co",SqlDbType.BigInt,co);await using var sr=await setting.ExecuteReaderAsync(t);if(!await sr.ReadAsync(t)){await sr.CloseAsync();await tx.RollbackAsync(t);return Bad("ยังไม่ได้ตั้งค่าระบบ","บันทึกหน้าตั้งค่า POS ก่อนขาย");}var enabled=sr.GetBoolean(0);var requireShift=sr.GetBoolean(1);var allowNegative=sr.GetBoolean(2);var taxRate=sr.GetDecimal(3);var prefix=sr.GetString(4);var payment=string.IsNullOrWhiteSpace(x.PaymentCode)?sr.GetString(5):x.PaymentCode.Trim().ToUpperInvariant();await sr.CloseAsync();if(!enabled){await tx.RollbackAsync(t);return Conflict(new{message="ระบบ POS ปิดใช้งาน",description="เปิดใช้งานจากหน้าตั้งค่าระบบ POS"});}
             long? shift=null;await using(var sq=new SqlCommand("SELECT TOP 1 ShiftID FROM dbo.TDPOShift WITH(UPDLOCK,HOLDLOCK) WHERE CompanyID=@co AND TerminalID=@terminal AND StatusCode=N'OPEN'",c,tx)){P(sq,"@co",SqlDbType.BigInt,co);P(sq,"@terminal",SqlDbType.BigInt,terminal.TerminalID);var value=await sq.ExecuteScalarAsync(t);if(value is not null)shift=Convert.ToInt64(value);}if(requireShift&&shift is null){await tx.RollbackAsync(t);return Conflict(new{message="ยังไม่ได้เปิดกะ",description="เปิดกะเงินสดของเครื่องนี้ก่อนเริ่มขาย"});}
+            var sportPrice=x.SportMemberID is long sportMember
+                ? await ResolveSportPrice(c,tx,co,sportMember,t) : null;
+            if(x.SportMemberID is not null && sportPrice is null){
+                await tx.RollbackAsync(t);
+                return Conflict(new{message="ใช้ราคาสมาชิกไม่ได้",
+                    description="สมาชิกหรือแพ็กเกจกีฬาไม่พร้อมใช้งาน หรือบริษัทไม่ได้เปิดระบบกีฬา"});
+            }
             var lines=new List<SaleLine>();decimal subtotal=0;foreach(var input in x.Items.GroupBy(i=>i.ItemID).Select(g=>new SaleItemInput(g.Key,g.Sum(v=>v.Quantity)))){
-                await using var iq=new SqlCommand("SELECT i.ItemCode,i.ItemName,COALESCE(oi.SalePriceOverride,p.SalePrice,i.UnitPrice),COALESCE(s.Quantity,0) FROM dbo.TDPOOutletItem oi JOIN dbo.TDIVItem i ON i.CompanyID=oi.CompanyID AND i.ItemID=oi.ItemID JOIN dbo.TDPOOutlet o ON o.CompanyID=oi.CompanyID AND o.OutletID=oi.OutletID LEFT JOIN dbo.TDIVItemPriceLevel p ON p.CompanyID=oi.CompanyID AND p.ItemID=oi.ItemID AND p.PriceLevelCode=o.PriceLevelCode LEFT JOIN dbo.TDIVStockBalance s WITH(UPDLOCK,HOLDLOCK) ON s.CompanyID=oi.CompanyID AND s.WarehouseID=o.WarehouseID AND s.ItemID=oi.ItemID WHERE oi.CompanyID=@co AND oi.OutletID=@outlet AND oi.ItemID=@item AND oi.IsSellable=1 AND i.IsActive=1",c,tx);P(iq,"@co",SqlDbType.BigInt,co);P(iq,"@outlet",SqlDbType.BigInt,terminal.OutletID);P(iq,"@item",SqlDbType.BigInt,input.ItemID);await using var ir=await iq.ExecuteReaderAsync(t);if(!await ir.ReadAsync(t)){await ir.CloseAsync();await tx.RollbackAsync(t);return Bad("สินค้าไม่พร้อมขาย",$"สินค้า {input.ItemID} ไม่อยู่ในจุดขายหรือปิดใช้งาน");}var code=ir.GetString(0);var name=ir.GetString(1);var price=ir.GetDecimal(2);var stock=ir.GetDecimal(3);await ir.CloseAsync();if(price<=0){await tx.RollbackAsync(t);return Bad("สินค้ายังไม่มีราคา",$"{code} - {name} ต้องกำหนดราคาก่อนขาย");}if(!allowNegative&&stock<input.Quantity){await tx.RollbackAsync(t);return Conflict(new{message="สต็อกไม่พอ",description=$"{code} - {name} คงเหลือ {stock:N2}"});}var amount=price*input.Quantity;subtotal+=amount;lines.Add(new(input.ItemID,code,name,input.Quantity,price,amount));}
+                const string itemSql="""
+SELECT i.ItemCode,i.ItemName,
+ COALESCE(mp.SalePrice,oi.SalePriceOverride,p.SalePrice,i.UnitPrice),
+ COALESCE(s.Quantity,0)
+FROM dbo.TDPOOutletItem oi
+JOIN dbo.TDIVItem i ON i.CompanyID=oi.CompanyID AND i.ItemID=oi.ItemID
+JOIN dbo.TDPOOutlet o ON o.CompanyID=oi.CompanyID AND o.OutletID=oi.OutletID
+LEFT JOIN dbo.TDIVItemPriceLevel p ON p.CompanyID=oi.CompanyID
+ AND p.ItemID=oi.ItemID AND p.PriceLevelCode=o.PriceLevelCode
+LEFT JOIN dbo.TDIVItemPriceLevel mp ON mp.CompanyID=oi.CompanyID
+ AND mp.ItemID=oi.ItemID AND mp.PriceLevelCode=@sportPrice
+LEFT JOIN dbo.TDIVStockBalance s WITH(UPDLOCK,HOLDLOCK) ON s.CompanyID=oi.CompanyID
+ AND s.WarehouseID=o.WarehouseID AND s.ItemID=oi.ItemID
+WHERE oi.CompanyID=@co AND oi.OutletID=@outlet AND oi.ItemID=@item
+ AND oi.IsSellable=1 AND i.IsActive=1
+""";
+                await using var iq=new SqlCommand(itemSql,c,tx);
+                P(iq,"@co",SqlDbType.BigInt,co);
+                P(iq,"@outlet",SqlDbType.BigInt,terminal.OutletID);
+                P(iq,"@item",SqlDbType.BigInt,input.ItemID);
+                P(iq,"@sportPrice",SqlDbType.NVarChar,sportPrice?.PriceLevelCode,30);
+                await using var ir=await iq.ExecuteReaderAsync(t);
+                if(!await ir.ReadAsync(t)){await ir.CloseAsync();await tx.RollbackAsync(t);return Bad("สินค้าไม่พร้อมขาย",$"สินค้า {input.ItemID} ไม่อยู่ในจุดขายหรือปิดใช้งาน");}
+                var code=ir.GetString(0);var name=ir.GetString(1);var price=ir.GetDecimal(2);var stock=ir.GetDecimal(3);await ir.CloseAsync();
+                if(price<=0){await tx.RollbackAsync(t);return Bad("สินค้ายังไม่มีราคา",$"{code} - {name} ต้องกำหนดราคาก่อนขาย");}
+                if(!allowNegative&&stock<input.Quantity){await tx.RollbackAsync(t);return Conflict(new{message="สต็อกไม่พอ",description=$"{code} - {name} คงเหลือ {stock:N2}"});}
+                var amount=price*input.Quantity;subtotal+=amount;lines.Add(new(input.ItemID,code,name,input.Quantity,price,amount));
+            }
             if(x.DiscountAmount>subtotal){await tx.RollbackAsync(t);return Bad("ส่วนลดไม่ถูกต้อง","ส่วนลดต้องไม่เกินยอดสินค้า");}var taxable=subtotal-x.DiscountAmount;var tax=Math.Round(taxable*taxRate/100,2,MidpointRounding.AwayFromZero);var net=taxable+tax;if(x.ReceivedAmount<net){await tx.RollbackAsync(t);return Bad("ยอดรับชำระไม่ครบ",$"ต้องรับชำระอย่างน้อย {net:N2}");}var change=x.ReceivedAmount-net;
-            var receipt=$"{prefix}-{DateTime.UtcNow:yyyyMMdd}-{DateTime.UtcNow:HHmmssfff}";await using var h=new SqlCommand("INSERT dbo.TDPOSale(CompanyID,ProjectID,BranchID,OutletID,TerminalID,ShiftID,ReceiptNo,CustomerID,CashierUserID,Subtotal,DiscountAmount,TaxAmount,NetAmount,IdempotencyKey) OUTPUT INSERTED.SaleID SELECT @co,ProjectID,@branch,@outlet,@terminal,@shift,@receipt,@customer,@user,@subtotal,@discount,@tax,@net,@key FROM dbo.TDADProject WHERE ProjectCode=N'LAOO_POS'",c,tx);P(h,"@co",SqlDbType.BigInt,co);P(h,"@branch",SqlDbType.BigInt,terminal.BranchID);P(h,"@outlet",SqlDbType.BigInt,terminal.OutletID);P(h,"@terminal",SqlDbType.BigInt,terminal.TerminalID);P(h,"@shift",SqlDbType.BigInt,shift);P(h,"@receipt",SqlDbType.NVarChar,receipt,50);P(h,"@customer",SqlDbType.BigInt,x.CustomerID);P(h,"@user",SqlDbType.BigInt,user);P(h,"@subtotal",SqlDbType.Decimal,subtotal);P(h,"@discount",SqlDbType.Decimal,x.DiscountAmount);P(h,"@tax",SqlDbType.Decimal,tax);P(h,"@net",SqlDbType.Decimal,net);P(h,"@key",SqlDbType.UniqueIdentifier,x.IdempotencyKey);var sale=Convert.ToInt64(await h.ExecuteScalarAsync(t));
+            var receipt=$"{prefix}-{DateTime.UtcNow:yyyyMMdd}-{DateTime.UtcNow:HHmmssfff}";
+            const string headerSql="""
+INSERT dbo.TDPOSale(CompanyID,ProjectID,BranchID,OutletID,TerminalID,ShiftID,
+ ReceiptNo,CustomerID,CashierUserID,Subtotal,DiscountAmount,TaxAmount,NetAmount,
+ IdempotencyKey,SportMemberID,SportLevelIDSnapshot,SportPriceLevelCodeSnapshot)
+OUTPUT INSERTED.SaleID
+SELECT @co,ProjectID,@branch,@outlet,@terminal,@shift,@receipt,@customer,@user,
+ @subtotal,@discount,@tax,@net,@key,@sportMember,@sportLevel,@sportPrice
+FROM dbo.TDADProject WHERE ProjectCode=N'LAOO_POS'
+""";
+            await using var h=new SqlCommand(headerSql,c,tx);
+            P(h,"@co",SqlDbType.BigInt,co);P(h,"@branch",SqlDbType.BigInt,terminal.BranchID);
+            P(h,"@outlet",SqlDbType.BigInt,terminal.OutletID);P(h,"@terminal",SqlDbType.BigInt,terminal.TerminalID);
+            P(h,"@shift",SqlDbType.BigInt,shift);P(h,"@receipt",SqlDbType.NVarChar,receipt,50);
+            P(h,"@customer",SqlDbType.BigInt,x.CustomerID);P(h,"@user",SqlDbType.BigInt,user);
+            P(h,"@subtotal",SqlDbType.Decimal,subtotal);P(h,"@discount",SqlDbType.Decimal,x.DiscountAmount);
+            P(h,"@tax",SqlDbType.Decimal,tax);P(h,"@net",SqlDbType.Decimal,net);
+            P(h,"@key",SqlDbType.UniqueIdentifier,x.IdempotencyKey);
+            P(h,"@sportMember",SqlDbType.BigInt,sportPrice?.MemberID);
+            P(h,"@sportLevel",SqlDbType.BigInt,sportPrice?.LevelID);
+            P(h,"@sportPrice",SqlDbType.NVarChar,sportPrice?.PriceLevelCode,30);
+            var sale=Convert.ToInt64(await h.ExecuteScalarAsync(t));
             foreach(var line in lines){var lineDiscount=subtotal==0?0:Math.Round(x.DiscountAmount*line.Amount/subtotal,2);var lineTax=Math.Round((line.Amount-lineDiscount)*taxRate/100,2);await using var d=new SqlCommand("INSERT dbo.TDPOSaleItem(CompanyID,SaleID,ItemID,ItemCodeSnapshot,ItemNameSnapshot,Quantity,UnitPrice,DiscountAmount,TaxAmount,LineNetAmount) OUTPUT INSERTED.SaleItemID VALUES(@co,@sale,@item,@code,@name,@qty,@price,@discount,@tax,@net)",c,tx);P(d,"@co",SqlDbType.BigInt,co);P(d,"@sale",SqlDbType.BigInt,sale);P(d,"@item",SqlDbType.BigInt,line.ItemID);P(d,"@code",SqlDbType.NVarChar,line.Code,50);P(d,"@name",SqlDbType.NVarChar,line.Name,250);P(d,"@qty",SqlDbType.Decimal,line.Quantity);P(d,"@price",SqlDbType.Decimal,line.Price);P(d,"@discount",SqlDbType.Decimal,lineDiscount);P(d,"@tax",SqlDbType.Decimal,lineTax);P(d,"@net",SqlDbType.Decimal,line.Amount-lineDiscount+lineTax);var detail=Convert.ToInt64(await d.ExecuteScalarAsync(t));await Stock(c,tx,co,terminal.WarehouseID,line.ItemID,-line.Quantity,"POS_SALE",sale,detail,user,null,t);}
             await using var pay=new SqlCommand("INSERT dbo.TDPOSalePayment(CompanyID,SaleID,PaymentCode,Amount,ReceivedAmount,ChangeAmount,ReferenceNo) VALUES(@co,@sale,@payment,@net,@received,@change,@reference)",c,tx);P(pay,"@co",SqlDbType.BigInt,co);P(pay,"@sale",SqlDbType.BigInt,sale);P(pay,"@payment",SqlDbType.NVarChar,payment,20);P(pay,"@net",SqlDbType.Decimal,net);P(pay,"@received",SqlDbType.Decimal,x.ReceivedAmount);P(pay,"@change",SqlDbType.Decimal,change);P(pay,"@reference",SqlDbType.NVarChar,Clean(x.PaymentReference),100);await pay.ExecuteNonQueryAsync(t);await tx.CommitAsync(t);return Ok(new{id=sale,receipt,subtotal,discount=x.DiscountAmount,tax,net,received=x.ReceivedAmount,change});
         }catch(SqlException e)when(e.Number is 2601 or 2627){await tx.RollbackAsync(t);return Conflict(new{message="รายการขายถูกส่งซ้ำ",description="ระบบไม่สร้างใบขายหรือสต็อกซ้ำจากคำขอเดิม"});}catch{await tx.RollbackAsync(t);throw;}
@@ -261,7 +324,7 @@ public sealed record OutletItemInput(long OutletID,long ItemID,string? Barcode,d
 public sealed record OpenShiftInput(Guid ActivationID,decimal OpeningCash);
 public sealed record CloseShiftInput(decimal CountedCash,string? Remark);
 public sealed record SaleItemInput(long ItemID,decimal Quantity);
-public sealed record SaleInput(Guid ActivationID,Guid IdempotencyKey,List<SaleItemInput> Items,decimal DiscountAmount,string PaymentCode,decimal ReceivedAmount,string? PaymentReference,long? CustomerID);
+public sealed record SaleInput(Guid ActivationID,Guid IdempotencyKey,List<SaleItemInput> Items,decimal DiscountAmount,string PaymentCode,decimal ReceivedAmount,string? PaymentReference,long? CustomerID,long? SportMemberID=null);
 public sealed record ReturnItemInput(long SaleItemID,decimal Quantity);
 public sealed record ReturnInput(long SaleID,List<ReturnItemInput> Items,string PaymentCode,string Reason);
 public sealed record CancelInput(string Reason);
