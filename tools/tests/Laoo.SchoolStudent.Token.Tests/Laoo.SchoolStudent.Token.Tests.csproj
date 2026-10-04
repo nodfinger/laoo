@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings></PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.0" />
+    <Compile Include="../../../laoo_api/Models/AuthModels.cs" Link="AuthModels.cs" />
+    <Compile Include="../../../laoo_api/Security/JwtTokenService.cs" Link="JwtTokenService.cs" />
+    <Compile Include="../../../laoo_api/Security/JwtOptions.cs" Link="JwtOptions.cs" />
+  </ItemGroup>
+</Project>
