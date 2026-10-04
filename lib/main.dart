@@ -12,6 +12,7 @@ import 'package:laoo_knowledge/knowledge_feature.dart';
 import 'package:laoo_memo/memo_feature.dart';
 import 'package:laoo_provider/provider_feature.dart';
 import 'package:laoo_school/school_feature.dart';
+import 'package:laoo_school_food/school_food_feature.dart';
 import 'package:laoo_intranet/intranet_feature.dart';
 import 'package:laoo_vote/vote_feature.dart';
 import 'package:laoo_pos/pos_feature.dart';
@@ -24,6 +25,7 @@ import 'package:laoo_gate_pass/gate_pass_feature.dart';
 import 'package:laoo_visitor/visitor_feature.dart';
 import 'package:laoo_shared_workspace_ui/laoo_shared_workspace_ui.dart';
 import 'package:printing/printing.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
 
 import 'app/laoo_app.dart';
@@ -65,6 +67,35 @@ Future<dynamic> _schoolGuardianRequest(
 }
 
 void main() {
+  configureSchoolFoodFeatureHost(
+    shell: _buildMeetingWorkspaceShell,
+    api: ApiClient.new,
+    dispose: (client) => (client as ApiClient).dispose(),
+    tokens: _surveyWorkspaceTokens,
+    portalRequest: _schoolGuardianRequest,
+    reportExport: (path, query, fileName) async {
+      final client = ApiClient();
+      try {
+        final bytes = await client.getBytes(path, query: query);
+        await FilePicker.platform.saveFile(
+          fileName: fileName,
+          type: FileType.custom,
+          allowedExtensions: const ['csv'],
+          bytes: Uint8List.fromList(bytes),
+        );
+      } finally {
+        client.dispose();
+      }
+    },
+    dateText: (value) {
+      final setup = companySetupController.current;
+      return setup == null
+          ? CompanyDateFormatter.formatDateByYearFormat(value, 'AD')
+          : CompanyDateFormatter.formatDate(value, setup);
+    },
+    message: (context, {required message, required error}) =>
+        showTimedSnackBar(context, message: message, error: error),
+  );
   configureSchoolFeatureHost(
     _buildMeetingWorkspaceShell,
     apiClientFactory: ApiClient.new,

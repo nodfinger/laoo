@@ -50,6 +50,8 @@ dependencies:
     path: projects/provider
   laoo_school:
     path: projects/school
+  laoo_school_food:
+    path: projects/school_food
   laoo_intranet:
     path: projects/intranet
   laoo_vote:

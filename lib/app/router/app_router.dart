@@ -14,6 +14,7 @@ import 'package:laoo_knowledge/knowledge_feature.dart';
 import 'package:laoo_memo/memo_feature.dart';
 import 'package:laoo_provider/provider_feature.dart';
 import 'package:laoo_school/school_feature.dart';
+import 'package:laoo_school_food/school_food_feature.dart';
 import 'package:laoo_intranet/intranet_feature.dart';
 import 'package:laoo_vote/vote_feature.dart';
 import 'package:laoo_pos/pos_feature.dart';
@@ -202,6 +203,7 @@ final GoRouter appRouter = GoRouter(
     ...buildMemoFeatureRoutes(),
     ...buildProviderFeatureRoutes(),
     ...buildSchoolFeatureRoutes(),
+    ...buildSchoolFoodRoutes(),
     ...buildIntranetFeatureRoutes(),
     ...buildVoteFeatureRoutes(),
     ...buildPosFeatureRoutes(),
@@ -308,7 +310,8 @@ String? resolveAppRouteRedirect({
       path == RoutePaths.resetPassword ||
       EvaluationPublicRoutePaths.isResponseRoute(path) ||
       path.startsWith('/providers/') ||
-      path.startsWith('/school/guardian');
+      path.startsWith('/school/guardian') ||
+      path == '/school/student/food';
 
   if (!isAuthenticated) {
     return isPublicRoute ? null : RoutePaths.login;
