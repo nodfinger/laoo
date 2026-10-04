@@ -38,6 +38,21 @@ public sealed class JwtTokenService
         AddIfValue(claims, "user_id", user.UserId);
         AddIfValue(claims, "person_id", user.PersonId);
         AddIfValue(claims, "guardian_id", user.GuardianId);
+        if (user.UserType == "SCHOOL_STUDENT")
+        {
+            if (user.StudentId is not > 0 || user.CredentialVersion is not > 0
+                || user.CompanyId is not > 0 || user.UserId.HasValue || user.GuardianId.HasValue
+                || user.LaooUserId.HasValue || user.PartnerUserId.HasValue || user.PersonId.HasValue
+                || user.CanLoginAsUser || user.LoginMode != "SCHOOL_STUDENT"
+                || user.ProjectCode is not ("LAOO_SCHOOL" or "LAOO_SCHOOL_FOOD"))
+                throw new ArgumentException("Student token requires isolated student identity and credential version.", nameof(user));
+            AddIfValue(claims, "student_id", user.StudentId);
+            AddIfValue(claims, "credential_version", user.CredentialVersion);
+        }
+        else if (user.StudentId.HasValue || user.CredentialVersion.HasValue)
+        {
+            throw new ArgumentException("Student claims cannot be attached to another identity type.", nameof(user));
+        }
         AddIfValue(claims, "company_id", user.CompanyId);
         AddIfValue(claims, "branch_id", user.BranchId);
 
