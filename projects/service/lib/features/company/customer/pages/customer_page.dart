@@ -2,14 +2,19 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:laoo_shared_workspace_ui/laoo_shared_workspace_ui.dart';
+import '../../../../core/api/api_client.dart';
+import '../../../../core/widgets/business_card_ocr_tokens.dart';
 import '../../../../core/widgets/timed_snack_bar.dart';
 import '../../../../core/widgets/pinned_data_table.dart';
 import '../../../../app/theme/workspace_theme_presets.dart';
+import '../../../../app/theme/laoo_design_tokens.dart';
 import '../../../../core/company_setup/company_date_formatter.dart';
 import '../../../../core/company_setup/company_setup_controller.dart';
 import '../../../../features/support/presentation/widgets/support_workspace_shell.dart';
 import '../data/customer_api.dart';
 import '../data/customer_file_api.dart';
+import '../widgets/customer_shipping_label_dialog.dart';
 import '../../../../core/master/master_group_codes.dart';
 import '../../../../features/support/master_data/data/master_data_api.dart';
 import '../../../../features/profile/data/user_profile_repository.dart';
@@ -1059,7 +1064,7 @@ class _CustomerPageState extends State<CustomerPage> {
               columns: [
                 LaooTableColumns.id,
                 DataColumn(
-                  columnWidth: const FixedColumnWidth(104),
+                  columnWidth: const FixedColumnWidth(152),
                   label: Text(
                     'Action',
                     style: TextStyle(
@@ -1099,6 +1104,11 @@ class _CustomerPageState extends State<CustomerPage> {
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
+                              IconButton(
+                                tooltip: 'พิมพ์ใบปะหน้า',
+                                icon: Icon(Icons.print_outlined, color: accent),
+                                onPressed: () => _showShippingLabel(x),
+                              ),
                               if (actions['edit'] == true)
                                 IconButton(
                                   icon: Icon(
@@ -1217,109 +1227,146 @@ class _CustomerPageState extends State<CustomerPage> {
     if (mounted) load();
   }
 
-  Widget _cards(
-    List<Map<String, dynamic>> data,
-    Color accent,
-  ) => ListView.separated(
-    padding: const EdgeInsets.symmetric(horizontal: 8),
-    itemCount: data.length,
-    separatorBuilder: (_, _) => const SizedBox(height: 8),
-    itemBuilder: (_, index) {
-      final x = data[index];
-      final short = '${x['cusShortCode'] ?? ''}';
-      return Card(
-        margin: EdgeInsets.zero,
-        elevation: 2,
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '$short${short.isEmpty ? '' : ' - '}${x['cusCode'] ?? ''}',
-                      style: TextStyle(
-                        color: accent,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text('${x['cusName'] ?? ''}'),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${x['phone'] ?? ''}',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
-                ),
-              ),
-              IconButton(
-                tooltip: _canManageBusinessCard
-                    ? 'แนบนามบัตร'
-                    : 'ไม่มีสิทธิ์จัดการนามบัตร',
-                onPressed: _canManageBusinessCard
-                    ? () => _showCustomerFiles(
-                        (x['customerID'] as num).toInt(),
-                        'BUSINESS_CARD',
-                        accent,
-                        customerName: '${x['cusName'] ?? ''}',
-                        canEdit: actions['edit'] == true,
-                        canDelete: actions['delete'] == true,
-                      )
-                    : null,
-                icon: Icon(
-                  _canManageBusinessCard
-                      ? (x['hasBusinessCard'] == true
-                            ? Icons.badge
-                            : Icons.add_photo_alternate_outlined)
-                      : Icons.lock_outline,
-                  color: accent,
-                ),
-              ),
-              IconButton(
-                tooltip: _canManageCustomerDocument
-                    ? 'แนบเอกสาร'
-                    : 'ไม่มีสิทธิ์จัดการเอกสารลูกค้า',
-                onPressed: _canManageCustomerDocument
-                    ? () => _showCustomerFiles(
-                        (x['customerID'] as num).toInt(),
-                        'CUSTOMER_DOCUMENT',
-                        accent,
-                        customerName: '${x['cusName'] ?? ''}',
-                        canEdit: actions['edit'] == true,
-                        canDelete: actions['delete'] == true,
-                      )
-                    : null,
-                icon: Icon(
-                  _canManageCustomerDocument
-                      ? (x['hasCustomerDocument'] == true
-                            ? Icons.description
-                            : Icons.attach_file)
-                      : Icons.lock_outline,
-                  color: accent,
-                ),
-              ),
-              if (actions['edit'] == true)
-                IconButton(
-                  onPressed: () async {
-                    final d = await api.get((x['customerID'] as num).toInt());
-                    if (mounted) setState(() => editing = d);
-                  },
-                  icon: Icon(Icons.edit_outlined, color: accent),
-                ),
-              if (actions['delete'] == true)
-                IconButton(
-                  onPressed: () => remove(x),
-                  icon: const Icon(Icons.delete_outline, color: Colors.red),
-                ),
-            ],
-          ),
+  Future<void> _showShippingLabel(Map<String, dynamic> row) async {
+    try {
+      final customer = await api.get((row['customerID'] as num).toInt());
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (_) => CustomerShippingLabelDialog(
+          customer: customer,
+          accent: workspaceThemeController.value.primary,
         ),
       );
-    },
-  );
+    } catch (error) {
+      if (!mounted) return;
+      showTimedSnackBar(
+        context,
+        message: _customerError('เปิดใบปะหน้า', error),
+        error: true,
+      );
+    }
+  }
+
+  Widget _cards(List<Map<String, dynamic>> data, Color accent) =>
+      ListView.separated(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        itemCount: data.length,
+        separatorBuilder: (_, _) => const SizedBox(height: 8),
+        itemBuilder: (_, index) {
+          final x = data[index];
+          final short = '${x['cusShortCode'] ?? ''}';
+          return Card(
+            margin: EdgeInsets.zero,
+            elevation: 2,
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '$short${short.isEmpty ? '' : ' - '}${x['cusCode'] ?? ''}',
+                    style: TextStyle(
+                      color: accent,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text('${x['cusName'] ?? ''}'),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${x['phone'] ?? ''}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 8),
+                  const Divider(height: 1, color: LaooColors.border),
+                  const SizedBox(height: 4),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Wrap(
+                      spacing: 0,
+                      runSpacing: 0,
+                      children: [
+                        IconButton(
+                          tooltip: 'พิมพ์ใบปะหน้า',
+                          onPressed: () => _showShippingLabel(x),
+                          icon: Icon(Icons.print_outlined, color: accent),
+                        ),
+                        IconButton(
+                          tooltip: _canManageBusinessCard
+                              ? 'แนบนามบัตร'
+                              : 'ไม่มีสิทธิ์จัดการนามบัตร',
+                          onPressed: _canManageBusinessCard
+                              ? () => _showCustomerFiles(
+                                  (x['customerID'] as num).toInt(),
+                                  'BUSINESS_CARD',
+                                  accent,
+                                  customerName: '${x['cusName'] ?? ''}',
+                                  canEdit: actions['edit'] == true,
+                                  canDelete: actions['delete'] == true,
+                                )
+                              : null,
+                          icon: Icon(
+                            _canManageBusinessCard
+                                ? (x['hasBusinessCard'] == true
+                                      ? Icons.badge
+                                      : Icons.add_photo_alternate_outlined)
+                                : Icons.lock_outline,
+                            color: accent,
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: _canManageCustomerDocument
+                              ? 'แนบเอกสาร'
+                              : 'ไม่มีสิทธิ์จัดการเอกสารลูกค้า',
+                          onPressed: _canManageCustomerDocument
+                              ? () => _showCustomerFiles(
+                                  (x['customerID'] as num).toInt(),
+                                  'CUSTOMER_DOCUMENT',
+                                  accent,
+                                  customerName: '${x['cusName'] ?? ''}',
+                                  canEdit: actions['edit'] == true,
+                                  canDelete: actions['delete'] == true,
+                                )
+                              : null,
+                          icon: Icon(
+                            _canManageCustomerDocument
+                                ? (x['hasCustomerDocument'] == true
+                                      ? Icons.description
+                                      : Icons.attach_file)
+                                : Icons.lock_outline,
+                            color: accent,
+                          ),
+                        ),
+                        if (actions['edit'] == true)
+                          IconButton(
+                            tooltip: 'แก้ไข',
+                            onPressed: () async {
+                              final d = await api.get(
+                                (x['customerID'] as num).toInt(),
+                              );
+                              if (mounted) setState(() => editing = d);
+                            },
+                            icon: Icon(Icons.edit_outlined, color: accent),
+                          ),
+                        if (actions['delete'] == true)
+                          IconButton(
+                            tooltip: 'ลบ',
+                            onPressed: () => remove(x),
+                            icon: const Icon(
+                              Icons.delete_outline,
+                              color: Colors.red,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
 
   Widget _pager(int total, Color accent) => Container(
     margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -1510,6 +1557,39 @@ class CustomerForm extends StatefulWidget {
 }
 
 class _CustomerFormState extends State<CustomerForm> {
+  final _ocrApi = ApiClient();
+  final _ocrImages = <BusinessCardImage>[];
+  int? _savedCustomerId;
+
+  Future<void> _importBusinessCard(BusinessCardImport result) async {
+    final changes = result.forCustomer();
+    if (!await confirmBusinessCardChanges(
+      context,
+      businessCardOcrTokens(context),
+      {for (final e in fields.entries) e.key: e.value.text},
+      changes,
+      names,
+    )) {
+      return;
+    }
+    if (!mounted) return;
+    setState(() {
+      for (final e in changes.entries) {
+        fields[e.key]!.text = e.value;
+      }
+      if (widget.canManageBusinessCard) {
+        _ocrImages.clear();
+        _ocrImages.addAll(result.images);
+      }
+    });
+    showTimedSnackBar(
+      context,
+      message: widget.canManageBusinessCard
+          ? 'นำเข้าข้อมูลแล้ว ตรวจสอบและกดบันทึกเพื่อเก็บข้อมูลพร้อมรูป'
+          : 'นำเข้าเฉพาะข้อความ ยังไม่แนบภาพเพราะไม่มีสิทธิ์จัดการนามบัตร',
+    );
+  }
+
   final _formKey = GlobalKey<FormState>();
   final fields = <String, TextEditingController>{};
   final _master = MasterDataApi();
@@ -1559,6 +1639,9 @@ class _CustomerFormState extends State<CustomerForm> {
     'email2': 'Email ผู้ติดต่อ 2',
     'creditDays': 'จำนวนวันเครดิต',
     'creditLimit': 'วงเงินเครดิต',
+    'shippingLabelName': 'ชื่อใบปะหน้า',
+    'shippingLabelAddress': 'ที่อยู่',
+    'shippingLabelPhone': 'เบอร์โทร',
   };
   @override
   void initState() {
@@ -1640,6 +1723,7 @@ class _CustomerFormState extends State<CustomerForm> {
     }
     _master.dispose();
     _fileApi.dispose();
+    _ocrApi.dispose();
     super.dispose();
   }
 
@@ -1782,12 +1866,28 @@ class _CustomerFormState extends State<CustomerForm> {
       'salespersonEmployeeID': _salespersonEmployeeId,
       'isActive': _active,
     };
+    var recordSaved = false;
     try {
-      final id = widget.initial['customerID'];
+      final id = widget.initial['customerID'] ?? _savedCustomerId;
       if (id == null) {
-        await widget.api.create(b);
+        final created = await widget.api.create(b);
+        _savedCustomerId = (created['customerId'] as num).toInt();
       } else {
         await widget.api.update((id as num).toInt(), b);
+      }
+      // Retain the created ID on attachment failure, so retry never creates
+      // another customer. Remove each successful upload from the pending queue.
+      recordSaved = true;
+      final customerId = (id as num?)?.toInt() ?? _savedCustomerId!;
+      while (_ocrImages.isNotEmpty) {
+        final image = _ocrImages.first;
+        await _fileApi.upload(
+          customerId,
+          fileName: image.name,
+          bytes: image.bytes,
+          fileType: 'BUSINESS_CARD',
+        );
+        _ocrImages.removeAt(0);
       }
       if (mounted) {
         showTimedSnackBar(context, message: 'บันทึกข้อมูลลูกค้าสำเร็จ');
@@ -1798,7 +1898,9 @@ class _CustomerFormState extends State<CustomerForm> {
         setState(() => saving = false);
         showTimedSnackBar(
           context,
-          message: _customerError('บันทึกข้อมูลลูกค้า', e),
+          message: recordSaved
+              ? 'บันทึกข้อมูลลูกค้าแล้ว แต่แนบภาพยังไม่ครบ\nรายละเอียดเพิ่มเติม: ตรวจการเชื่อมต่อและกดบันทึกเพื่อลองแนบภาพที่เหลืออีกครั้ง'
+              : _customerError('บันทึกข้อมูลลูกค้า', e),
           error: true,
         );
       }
@@ -1829,6 +1931,24 @@ class _CustomerFormState extends State<CustomerForm> {
                     'ข้อมูลลูกค้า > ${widget.initial['customerID'] == null ? 'เพิ่ม' : 'แก้ไข'}',
                 favoriteKey: '09001',
                 actions: [
+                  BusinessCardOcrButton(
+                    tokens: businessCardOcrTokens(context),
+                    target: 'customers',
+                    recordId:
+                        (widget.initial['customerID'] as num?)?.toInt() ??
+                        _savedCustomerId,
+                    enabled: !saving,
+                    get: (path, query) => _ocrApi.get(path, query: query),
+                    upload: (path, bytes, name, values) => _ocrApi.upload(
+                      path,
+                      bytes: bytes,
+                      fileName: name,
+                      fields: values,
+                    ),
+                    notify: (ctx, message, error) =>
+                        showTimedSnackBar(ctx, message: message, error: error),
+                    onImported: _importBusinessCard,
+                  ),
                   const Text('สถานะติดต่อ'),
                   Switch(
                     value: _active,
@@ -2188,6 +2308,35 @@ class _CustomerFormState extends State<CustomerForm> {
                     {'key': 'email2', 'label': 'Email คนที่ 2'},
                   ]),
                   const SizedBox(height: 14),
+                  _sectionTitle('ข้อมูลใบปะหน้า'),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: TextField(
+                      controller: fields['shippingLabelName'],
+                      decoration: const InputDecoration(
+                        labelText: 'ชื่อใบปะหน้า',
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: double.infinity,
+                    child: TextField(
+                      controller: fields['shippingLabelAddress'],
+                      minLines: 2,
+                      maxLines: 4,
+                      decoration: const InputDecoration(labelText: 'ที่อยู่'),
+                    ),
+                  ),
+                  SizedBox(
+                    width: double.infinity,
+                    child: TextField(
+                      controller: fields['shippingLabelPhone'],
+                      keyboardType: TextInputType.phone,
+                      decoration: const InputDecoration(labelText: 'เบอร์โทร'),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
                   _sectionTitle('การขาย'),
                   const SizedBox(height: 12),
                   SizedBox(
@@ -2315,6 +2464,9 @@ class _CustomerFormState extends State<CustomerForm> {
                       'positionName2',
                       'phone2',
                       'email2',
+                      'shippingLabelName',
+                      'shippingLabelAddress',
+                      'shippingLabelPhone',
                     }.contains(e.key))
                       SizedBox(
                         width: e.key == 'cusAddress' ? 500 : 220,

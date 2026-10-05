@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/api/visitor_api_client.dart';
 import 'visitor_feature_host.dart';
 import 'visitor_inside_repository.dart';
+import 'visitor_slip_action.dart';
 import 'visitor_visit_detail_dialog.dart';
 
 class VisitorInsidePage extends StatefulWidget {
@@ -371,6 +372,26 @@ class _VisitorInsidePageState extends State<VisitorInsidePage> {
     }
   }
 
+  Future<void> _printSlip(VisitorInside row) async {
+    setState(() => _working = true);
+    try {
+      await printVisitorSlip(
+        context: context,
+        repository: _repository,
+        visitId: row.id,
+      );
+    } catch (error) {
+      if (mounted) {
+        setState(
+          () => _error =
+              'ไม่สามารถเปิดสลิปเข้าพบได้\nรายละเอียดเพิ่มเติม: $error',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _working = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) => buildVisitorWorkspaceShell(
     pageTitle: _actions?.caption ?? 'ผู้มาติดต่อภายใน',
@@ -548,7 +569,7 @@ class _VisitorInsidePageState extends State<VisitorInsidePage> {
           ),
         ),
         SizedBox(
-          width: 110,
+          width: 190,
           child: Text(
             'การทำงาน',
             style: TextStyle(fontWeight: FontWeight.w700),
@@ -629,20 +650,25 @@ class _VisitorInsidePageState extends State<VisitorInsidePage> {
               ),
         icon: const Icon(Icons.visibility_outlined, size: 18),
       ),
+      IconButton(
+        tooltip: 'พิมพ์สลิปเข้าพบ',
+        onPressed: _working ? null : () => _printSlip(row),
+        icon: const Icon(Icons.print_outlined, size: 18),
+      ),
       if (_actions?.canEdit == true)
         compact
             ? SizedBox(
-                width: 110,
+                width: 90,
                 child: OutlinedButton.icon(
                   onPressed: _working ? null : () => _checkOutAdvanced(row),
                   icon: const Icon(Icons.logout, size: 16),
                   label: const Text('ออก'),
                 ),
               )
-            : OutlinedButton.icon(
+            : IconButton(
+                tooltip: 'Check-out',
                 onPressed: _working ? null : () => _checkOutAdvanced(row),
-                icon: const Icon(Icons.logout, size: 16),
-                label: const Text('Check-out'),
+                icon: const Icon(Icons.logout, size: 18),
               ),
     ],
   );

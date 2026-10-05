@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../app/router/app_menu_route_registry.dart';
 import '../../../../app/router/route_names.dart';
 import '../../../../app/router/route_paths.dart';
+import '../../../../app/theme/laoo_design_tokens.dart';
 import '../../../../app/theme/laoo_typography.dart';
 import '../../../../app/theme/workspace_theme_presets.dart';
 import '../../../../core/auth/app_auth_controller.dart';
@@ -46,6 +47,11 @@ class _ScopedWorkspaceFavoriteButton extends StatelessWidget {
           final code = resolved ?? menuKey;
           final selected = favorites.contains(code);
           return IconButton(
+            style: IconButton.styleFrom(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(LaooRadius.xs),
+              ),
+            ),
             tooltip: selected
                 ? 'นำออกจากเมนูลัดของฉัน'
                 : 'เพิ่มหน้านี้เป็นเมนูลัดของฉัน',
@@ -105,7 +111,8 @@ class WorkspacePageTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final key = favoriteKey;
+    final key =
+        favoriteKey ?? LaooWorkspaceFavoriteScope.maybeOf(context)?.activeMenu;
 
     return ValueListenableBuilder<WorkspaceThemePreset>(
       valueListenable: workspaceThemeController,
@@ -113,9 +120,26 @@ class WorkspacePageTitle extends StatelessWidget {
         final accent = preset.primary;
         return Row(
           mainAxisSize: MainAxisSize.min,
-          textDirection: key == null ? TextDirection.ltr : TextDirection.rtl,
           children: [
             if (key != null) ...[
+              LaooPageMenuIcon(menuKey: key, color: accent),
+              const SizedBox(width: 8),
+            ],
+            Flexible(
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textDirection: TextDirection.ltr,
+                style: TextStyle(
+                  fontSize: titleFontSize ?? LaooTypography.workspaceCaption,
+                  fontWeight: LaooTypography.workspaceCaptionWeight,
+                  color: Colors.black,
+                ),
+              ),
+            ),
+            if (key != null) ...[
+              const SizedBox(width: 2),
               ValueListenableBuilder<Set<String>>(
                 valueListenable: supportFavoritePages,
                 builder: (context, favorites, _) {
@@ -128,6 +152,11 @@ class WorkspacePageTitle extends StatelessWidget {
                       final code = snapshot.data?.code.trim() ?? key;
                       final selected = favorites.contains(code);
                       return IconButton(
+                        style: IconButton.styleFrom(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(LaooRadius.xs),
+                          ),
+                        ),
                         tooltip: selected
                             ? 'นำออกจากเมนูลัดของฉัน'
                             : 'เพิ่มหน้านี้เป็นเมนูลัดของฉัน',
@@ -156,19 +185,7 @@ class WorkspacePageTitle extends StatelessWidget {
                   );
                 },
               ),
-              const SizedBox(width: 6),
             ],
-            Flexible(
-              child: Text(
-                title,
-                textDirection: TextDirection.ltr,
-                style: TextStyle(
-                  fontSize: titleFontSize ?? LaooTypography.workspaceCaption,
-                  fontWeight: LaooTypography.workspaceCaptionWeight,
-                  color: Colors.black,
-                ),
-              ),
-            ),
           ],
         );
       },

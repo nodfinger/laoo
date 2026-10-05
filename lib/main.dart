@@ -41,6 +41,7 @@ import 'core/navigation/navigation_menu_repository.dart';
 import 'core/widgets/auto_dismiss_message.dart';
 import 'core/widgets/timed_snack_bar.dart';
 import 'features/support/presentation/widgets/support_workspace_shell.dart';
+import 'features/visitor/visitor_slip_pdf_service.dart';
 
 Future<dynamic> _schoolGuardianRequest(
   String path, {
@@ -54,14 +55,22 @@ Future<dynamic> _schoolGuardianRequest(
     if (token != null) 'Authorization': 'Bearer $token',
   };
   final response = body == null
-      ? await http.get(uri, headers: headers)
-      : await http.post(uri, headers: headers, body: jsonEncode(body));
+      ? await http
+            .get(uri, headers: headers)
+            .timeout(const Duration(seconds: 30))
+      : await http
+            .post(uri, headers: headers, body: jsonEncode(body))
+            .timeout(const Duration(seconds: 30));
   final decoded = response.body.isEmpty ? null : jsonDecode(response.body);
   if (response.statusCode < 200 || response.statusCode >= 300) {
     final message = decoded is Map<String, dynamic>
         ? decoded['message']?.toString()
         : null;
-    throw StateError(message ?? 'ไม่สามารถเชื่อมต่อระบบผู้ปกครองได้');
+    throw ApiException(
+      message: message ?? 'ไม่สามารถเชื่อมต่อระบบโรงเรียนได้',
+      statusCode: response.statusCode,
+      details: decoded,
+    );
   }
   return decoded;
 }
@@ -662,6 +671,8 @@ void main() {
   );
   configureVisitorFeatureHost(
     _buildMeetingWorkspaceShell,
+    noticePresenter: (context, message, error) =>
+        showTimedSnackBar(context, message: message, error: error),
     uiTokensProvider: () => const VisitorUiTokens(
       cardMargin: LaooLayout.cardMargin,
       cardPadding: LaooLayout.cardPadding,
@@ -679,6 +690,12 @@ void main() {
       floatingLabelSource: LaooTypography.materialFloatingLabelSource,
       captionStyle: LaooTypography.screenCaptionStyle,
     ),
+    slipPresenter: (context, {required visit, required company, companyLogo}) =>
+        VisitorSlipPdfService.print(
+          visit: visit,
+          company: company,
+          companyLogo: companyLogo,
+        ),
   );
   runApp(const LaooApp());
 }

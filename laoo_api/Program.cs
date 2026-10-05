@@ -142,6 +142,7 @@ builder.Services.Configure<JwtOptions>(
 builder.Services.AddSingleton<SqlConnectionFactory>();
 builder.Services.AddScoped<DatabaseRouteResolver>();
 builder.Services.AddSingleton<PasswordService>();
+builder.Services.AddSingleton<LaooApi.Ocr.IBusinessCardOcr, LaooApi.Ocr.TesseractBusinessCardOcr>();
 builder.Services.AddSingleton<CompanySetupSecretService>();
 builder.Services.AddSingleton<JwtTokenService>();
 builder.Services.AddScoped<DatabaseSeeder>();

@@ -32,6 +32,7 @@ local.machine.json
 .pub-cache/
 .pub/
 /build/
+**/build/
 /coverage/
 packages/**/pubspec.lock
 
@@ -40,10 +41,13 @@ packages/**/pubspec.lock
 **/obj/
 /artifacts/
 /.codex-center-build/
+/.runlogs/
 /worktrees/
 
 # Runtime uploads belong on the deployed API storage, never in Git
 **/wwwroot/uploads/**
+/laoo_api/App_Data/tessdata/*.traineddata
+/laoo_api/App_Data/ocr-temp/
 
 # Symbolication related
 app.*.symbols

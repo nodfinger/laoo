@@ -8,7 +8,10 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../core/api/visitor_api_client.dart';
 import 'visitor_feature_host.dart';
+import 'visitor_inside_repository.dart';
 import 'visitor_settings_repository.dart';
+import 'visitor_slip_action.dart';
+import 'visitor_ocr_tokens.dart';
 
 const _checkInCaption = 'รับผู้มาติดต่อ';
 
@@ -23,6 +26,42 @@ class VisitorCheckInPage extends StatefulWidget {
 
 class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
   static const _maximumCardImageBytes = 1024 * 1024;
+  Future<void> _importBusinessCard(BusinessCardImport result) async {
+    if (_appointmentId != null) return;
+    final values = result.forVisitor();
+    if (!await confirmBusinessCardChanges(
+      context,
+      visitorOcrTokens(context),
+      {'name': _name.text, 'phone': _phone.text},
+      values,
+      {'name': 'ชื่อผู้มาติดต่อ', 'phone': 'โทรศัพท์'},
+    )) {
+      return;
+    }
+    if (!mounted || _appointmentId != null) return;
+    try {
+      final images = result.images
+          .map((image) => _prepareCardImage(image.bytes))
+          .toList();
+      setState(() {
+        if (values.containsKey('name')) _name.text = values['name']!;
+        if (values.containsKey('phone')) _phone.text = values['phone']!;
+        // A business card is evidence, never a national identity card.
+        _otherImages.addAll(images);
+      });
+      presentVisitorNotice(
+        context,
+        'นำเข้าข้อมูลแล้ว ตรวจสอบก่อนบันทึกรายการเข้าพบ',
+        false,
+      );
+    } catch (_) {
+      _show(
+        'นำเข้ารูปนามบัตรไม่ได้\nรายละเอียดเพิ่มเติม: เลือกภาพใหม่ ข้อมูลเข้าพบยังไม่ถูกบันทึก',
+        error: true,
+      );
+    }
+  }
+
   final _name = TextEditingController();
   final _phone = TextEditingController();
   final _nationalId = TextEditingController();
@@ -420,8 +459,26 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
           fields: {'evidenceType': 'OTHER', 'captureStage': 'CHECKIN'},
         );
       }
+      String? slipError;
       if (mounted) {
-        _show('บันทึกผู้มาติดต่อเข้าเรียบร้อย', error: false);
+        try {
+          await printVisitorSlip(
+            context: context,
+            repository: VisitorInsideRepository(_api),
+            visitId: visitId,
+          );
+        } catch (error) {
+          slipError = error.toString();
+        }
+      }
+      if (mounted) {
+        _show(
+          slipError == null
+              ? 'บันทึกผู้มาติดต่อและเปิดหน้าพิมพ์สลิปแล้ว'
+              : 'บันทึกผู้มาติดต่อแล้ว แต่เปิดสลิปไม่สำเร็จ\n'
+                    'รายละเอียดเพิ่มเติม: $slipError',
+          error: slipError != null,
+        );
         _clearForm();
         context.go('/visitor/check-in');
       }
@@ -518,6 +575,20 @@ class _VisitorCheckInPageState extends State<VisitorCheckInPage> {
             children: [
               _contactPointField(context),
               _appointmentLookup(context),
+              BusinessCardOcrButton(
+                tokens: visitorOcrTokens(context),
+                target: 'visitors',
+                enabled: _appointmentId == null,
+                get: (path, query) => _api.get(path, query: query),
+                upload: (path, bytes, name, fields) => _api.upload(
+                  path,
+                  bytes: bytes,
+                  fileName: name,
+                  fields: fields,
+                ),
+                notify: presentVisitorNotice,
+                onImported: _importBusinessCard,
+              ),
               const SizedBox(height: 12),
               _field(
                 _name,

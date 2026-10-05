@@ -26,7 +26,8 @@ public sealed class TaxInvoiceController(IConfiguration configuration) : Control
             view = await Can(c, "VIEW", token),
             create = await Can(c, "CREATE", token),
             edit = await Can(c, "EDIT", token),
-            delete = await Can(c, "DELETE", token)
+            delete = await Can(c, "DELETE", token),
+            print = await Can(c, "PRINT", token)
         });
     }
 
@@ -156,6 +157,79 @@ public sealed class TaxInvoiceController(IConfiguration configuration) : Control
             taxInvoiceDetailId = r.GetInt64(0), lineNo = r.GetInt32(1), quotationDetailId = Long(r, 2), preOrderDetailId = Long(r, 3), itemId = r.GetInt64(4), itemCode = r.GetString(5), itemName = r.GetString(6), unitCode = Text(r, 7), quantity = r.GetDecimal(8), unitPrice = r.GetDecimal(9), discountType = r.GetString(10), beforeDiscount = r.GetDecimal(11), discountPercent = r.GetDecimal(12), discountAmount = r.GetDecimal(13), amount = r.GetDecimal(14), remark = Text(r, 15)
         });
         return Ok(new { header, items });
+    }
+
+    [HttpGet("{id:long}/print-data")]
+    public async Task<IActionResult> PrintData(long id, [FromQuery] string? mode, CancellationToken token)
+    {
+        await using var c = await Open(token);
+        if (!await Can(c, "PRINT", token)) return Forbid();
+
+        var normalizedMode = (mode ?? "PREVIEW").Trim().ToUpperInvariant();
+        if (normalizedMode is not ("PREVIEW" or "FINAL"))
+            return BadRequest(new { message = "โหมดพิมพ์ไม่ถูกต้อง", description = "รองรับเฉพาะ PREVIEW และ FINAL" });
+
+        const string headerSql = """
+        SELECT TaxInvoiceID,TaxInvoiceCode,TaxInvoiceDate,ReferenceType,CustomerID,CusCode,CusName,CusAddress,TaxID,
+               ContactName,ContactPhone,ContactEmail,PaymentType,CreditDays,DueDate,Subtotal,DiscountPercent,DiscountAmount,
+               AmountAfterDiscount,TaxPercent,TaxAmount,NetAmount,StatusCode,Remark
+        FROM dbo.TDARTaxInvoice
+        WHERE TaxInvoiceID=@id AND CompanyID=@company AND IsActive=1;
+        """;
+        object? header = null;
+        string? status = null;
+        await using (var cmd = new SqlCommand(headerSql, c))
+        {
+            Add(cmd, "@id", SqlDbType.BigInt, id);
+            Add(cmd, "@company", SqlDbType.BigInt, CompanyId());
+            await using var r = await cmd.ExecuteReaderAsync(token);
+            if (await r.ReadAsync(token))
+            {
+                status = r.GetString(22);
+                header = new
+                {
+                    taxInvoiceId = r.GetInt64(0), taxInvoiceCode = r.GetString(1), taxInvoiceDate = r.GetDateTime(2), referenceType = r.GetString(3),
+                    customerId = r.GetInt64(4), customerCode = r.GetString(5), customerName = r.GetString(6), customerAddress = Text(r, 7), customerTaxId = Text(r, 8),
+                    contactName = Text(r, 9), contactPhone = Text(r, 10), contactEmail = Text(r, 11), paymentType = Text(r, 12), creditDays = r.GetInt32(13), dueDate = Date(r, 14),
+                    subtotal = r.GetDecimal(15), discountPercent = r.GetDecimal(16), discountAmount = r.GetDecimal(17), amountAfterDiscount = r.GetDecimal(18),
+                    taxPercent = r.GetDecimal(19), taxAmount = r.GetDecimal(20), netAmount = r.GetDecimal(21), statusCode = status, remark = Text(r, 23)
+                };
+            }
+        }
+        if (header is null)
+            return NotFound(new { message = "ไม่พบใบกำกับภาษี", description = "เอกสารอาจถูกลบหรือไม่อยู่ใน Company นี้" });
+        if (status == "VOID")
+            return Conflict(new { message = "พิมพ์ใบกำกับภาษีไม่ได้", description = "เอกสารถูกยกเลิกแล้ว" });
+        if (normalizedMode == "FINAL" && status != "ISSUED")
+            return Conflict(new { message = "พิมพ์ใบกำกับภาษีฉบับจริงไม่ได้", description = "ต้องออกใบกำกับภาษีให้เรียบร้อยก่อนพิมพ์ 4 ชุด" });
+
+        var items = await RowsById(c, """
+          SELECT [LineNo],ItemCode,ItemName,UnitCode,Quantity,UnitPrice,BeforeDiscount,DiscountPercent,DiscountAmount,Amount,Remark
+          FROM dbo.TDARTaxInvoiceDetail WHERE TaxInvoiceID=@id ORDER BY [LineNo]
+        """, id, token, r => new
+        {
+            lineNo = r.GetInt32(0), itemCode = r.GetString(1), itemName = r.GetString(2), unitCode = Text(r, 3),
+            quantity = r.GetDecimal(4), unitPrice = r.GetDecimal(5), beforeDiscount = r.GetDecimal(6), discountPercent = r.GetDecimal(7),
+            discountAmount = r.GetDecimal(8), amount = r.GetDecimal(9), remark = Text(r, 10)
+        });
+
+        object company;
+        const string companySql = """
+        SELECT COALESCE(NULLIF(CustomerNameTH,N''),NULLIF(CustomerNameEN,N''),NULLIF(Name,N''),N'-'),
+               COALESCE(AddressText,N''),COALESCE(Telephone,N''),COALESCE(EmailCenter,N''),COALESCE(TaxID,N'')
+        FROM dbo.TDSTCompanySetUp
+        WHERE CompanyID=@company AND OwnerType=N'C' AND IsActive=1;
+        """;
+        await using (var cmd = new SqlCommand(companySql, c))
+        {
+            Add(cmd, "@company", SqlDbType.BigInt, CompanyId());
+            await using var r = await cmd.ExecuteReaderAsync(token);
+            if (!await r.ReadAsync(token))
+                return Conflict(new { message = "พิมพ์ใบกำกับภาษีไม่ได้", description = "ไม่พบข้อมูลกำหนดค่าบริษัท" });
+            company = new { companyName = r.GetString(0), address = r.GetString(1), telephone = r.GetString(2), email = r.GetString(3), taxId = r.GetString(4) };
+        }
+
+        return Ok(new { mode = normalizedMode, isDraft = status == "DRAFT", company, header, items });
     }
 
     [HttpPost]

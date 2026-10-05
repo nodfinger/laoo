@@ -78,17 +78,21 @@ class LaooSurfaceCard extends StatelessWidget {
 
 typedef LaooFavoriteButtonBuilder =
     Widget Function(BuildContext context, String menuKey);
+typedef LaooMenuIconBuilder =
+    Widget Function(BuildContext context, String menuKey, Color color);
 
 class LaooWorkspaceFavoriteScope extends InheritedWidget {
   const LaooWorkspaceFavoriteScope({
     required this.activeMenu,
     required this.favoriteButtonBuilder,
+    this.menuIconBuilder,
     required super.child,
     super.key,
   });
 
   final String? activeMenu;
   final LaooFavoriteButtonBuilder favoriteButtonBuilder;
+  final LaooMenuIconBuilder? menuIconBuilder;
 
   static LaooWorkspaceFavoriteScope? maybeOf(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<LaooWorkspaceFavoriteScope>();
@@ -102,10 +106,52 @@ class LaooWorkspaceFavoriteScope extends InheritedWidget {
     return scope.favoriteButtonBuilder(context, key);
   }
 
+  static Widget? menuIconOf(
+    BuildContext context, {
+    required String? menuKey,
+    required Color color,
+  }) {
+    final scope = maybeOf(context);
+    final key = menuKey?.trim();
+    if (scope == null ||
+        scope.menuIconBuilder == null ||
+        key == null ||
+        key.isEmpty) {
+      return null;
+    }
+    return scope.menuIconBuilder!(context, key, color);
+  }
+
   @override
   bool updateShouldNotify(LaooWorkspaceFavoriteScope oldWidget) =>
       activeMenu != oldWidget.activeMenu ||
-      favoriteButtonBuilder != oldWidget.favoriteButtonBuilder;
+      favoriteButtonBuilder != oldWidget.favoriteButtonBuilder ||
+      menuIconBuilder != oldWidget.menuIconBuilder;
+}
+
+class LaooPageMenuIcon extends StatelessWidget {
+  const LaooPageMenuIcon({
+    required this.menuKey,
+    required this.color,
+    this.size = 24,
+    this.fallback,
+    super.key,
+  });
+
+  final String? menuKey;
+  final Color color;
+  final double size;
+  final Widget? fallback;
+
+  @override
+  Widget build(BuildContext context) =>
+      LaooWorkspaceFavoriteScope.menuIconOf(
+        context,
+        menuKey: menuKey,
+        color: color,
+      ) ??
+      fallback ??
+      Icon(Icons.apps_outlined, size: size, color: color);
 }
 
 class LaooPageFavoriteButton extends StatelessWidget {
@@ -145,27 +191,46 @@ class LaooCaptionCard extends StatelessWidget {
   final String? favoriteKey;
 
   @override
-  Widget build(BuildContext context) => LaooSurfaceCard(
-    tokens: tokens,
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-    child: ConstrainedBox(
-      constraints: BoxConstraints(minHeight: tokens.popupHeaderMinHeight),
-      child: Row(
-        children: [
-          if (leading != null) ...[
-            leading!,
-            SizedBox(width: tokens.itemSpacing),
+  Widget build(BuildContext context) {
+    final activeMenu = LaooWorkspaceFavoriteScope.maybeOf(context)?.activeMenu;
+    final menuKey = favoriteKey ?? activeMenu;
+    final menuIcon = LaooWorkspaceFavoriteScope.menuIconOf(
+      context,
+      menuKey: menuKey,
+      color: tokens.primaryColor,
+    );
+    final captionIcon = menuIcon ?? leading;
+    return LaooSurfaceCard(
+      tokens: tokens,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(minHeight: tokens.popupHeaderMinHeight),
+        child: Row(
+          children: [
+            if (captionIcon != null) ...[
+              captionIcon,
+              SizedBox(width: tokens.itemSpacing),
+            ],
+            Flexible(
+              fit: FlexFit.loose,
+              child: Text(
+                caption,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: tokens.captionStyle,
+              ),
+            ),
+            LaooPageFavoriteButton(menuKey: menuKey),
+            if (trailing != null) ...[
+              const Spacer(),
+              SizedBox(width: tokens.itemSpacing),
+              trailing!,
+            ],
           ],
-          Expanded(child: Text(caption, style: tokens.captionStyle)),
-          LaooPageFavoriteButton(menuKey: favoriteKey),
-          if (trailing != null) ...[
-            SizedBox(width: tokens.itemSpacing),
-            trailing!,
-          ],
-        ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class LaooFilterCard extends StatelessWidget {

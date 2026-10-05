@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 
 typedef VisitorWorkspaceShellBuilder =
@@ -9,6 +11,26 @@ typedef VisitorWorkspaceShellBuilder =
 
 VisitorWorkspaceShellBuilder? _workspaceShellBuilder;
 VisitorUiTokens Function()? _uiTokensProvider;
+VisitorSlipPresenter? _slipPresenter;
+typedef VisitorNoticePresenter =
+    void Function(BuildContext context, String message, bool error);
+VisitorNoticePresenter? _noticePresenter;
+
+void presentVisitorNotice(BuildContext context, String message, bool error) {
+  final presenter = _noticePresenter;
+  if (presenter == null) {
+    throw StateError('Visitor notification host is not configured.');
+  }
+  presenter(context, message, error);
+}
+
+typedef VisitorSlipPresenter =
+    Future<void> Function(
+      BuildContext context, {
+      required Map<String, dynamic> visit,
+      required Map<String, dynamic> company,
+      Uint8List? companyLogo,
+    });
 
 class VisitorUiTokens {
   const VisitorUiTokens({
@@ -56,9 +78,31 @@ VisitorUiTokens get visitorUiTokens =>
 void configureVisitorFeatureHost(
   VisitorWorkspaceShellBuilder builder, {
   VisitorUiTokens Function()? uiTokensProvider,
+  VisitorSlipPresenter? slipPresenter,
+  VisitorNoticePresenter? noticePresenter,
 }) {
   _workspaceShellBuilder = builder;
   _uiTokensProvider = uiTokensProvider;
+  _slipPresenter = slipPresenter;
+  _noticePresenter = noticePresenter;
+}
+
+Future<void> presentVisitorSlip(
+  BuildContext context, {
+  required Map<String, dynamic> visit,
+  required Map<String, dynamic> company,
+  Uint8List? companyLogo,
+}) async {
+  final presenter = _slipPresenter;
+  if (presenter == null) {
+    throw StateError('ระบบพิมพ์สลิป Visitor ยังไม่ได้เชื่อมต่อกับ Center');
+  }
+  await presenter(
+    context,
+    visit: visit,
+    company: company,
+    companyLogo: companyLogo,
+  );
 }
 
 Widget buildVisitorWorkspaceShell({

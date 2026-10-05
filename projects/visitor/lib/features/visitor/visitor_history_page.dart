@@ -6,6 +6,8 @@ import 'package:laoo_shared_workspace_ui/laoo_shared_workspace_ui.dart';
 import '../../core/api/visitor_api_client.dart';
 import 'visitor_feature_host.dart';
 import 'visitor_history_repository.dart';
+import 'visitor_inside_repository.dart';
+import 'visitor_slip_action.dart';
 
 class VisitorHistoryPage extends StatefulWidget {
   const VisitorHistoryPage({super.key});
@@ -241,7 +243,7 @@ class _VisitorHistoryPageState extends State<VisitorHistoryPage> {
             Expanded(child: Text('จุดติดต่อ')),
             Expanded(child: Text('เวลาเข้า')),
             Expanded(flex: 2, child: Text('ผล / เวลาออก')),
-            SizedBox(width: 110),
+            SizedBox(width: 96, child: Center(child: Text('การทำงาน'))),
           ],
         ),
       ),
@@ -266,10 +268,21 @@ class _VisitorHistoryPageState extends State<VisitorHistoryPage> {
               Expanded(child: Text(_dateTime(item.checkedInDate))),
               Expanded(flex: 2, child: _outcomeCell(item)),
               SizedBox(
-                width: 110,
-                child: OutlinedButton(
-                  onPressed: () => _showDetail(item),
-                  child: const Text('ดูรายละเอียด'),
+                width: 96,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    IconButton(
+                      tooltip: 'ดูรายละเอียด',
+                      onPressed: () => _showDetail(item),
+                      icon: const Icon(Icons.visibility_outlined, size: 18),
+                    ),
+                    IconButton(
+                      tooltip: 'พิมพ์สลิปเข้าพบ',
+                      onPressed: () => _printSlip(item),
+                      icon: const Icon(Icons.print_outlined, size: 18),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -297,9 +310,20 @@ class _VisitorHistoryPageState extends State<VisitorHistoryPage> {
                 style: const TextStyle(fontWeight: FontWeight.w700),
               ),
             ),
-            OutlinedButton(
-              onPressed: () => _showDetail(item),
-              child: const Text('ดูรายละเอียด'),
+            Wrap(
+              spacing: 2,
+              children: [
+                IconButton(
+                  tooltip: 'ดูรายละเอียด',
+                  onPressed: () => _showDetail(item),
+                  icon: const Icon(Icons.visibility_outlined, size: 18),
+                ),
+                IconButton(
+                  tooltip: 'พิมพ์สลิปเข้าพบ',
+                  onPressed: () => _printSlip(item),
+                  icon: const Icon(Icons.print_outlined, size: 18),
+                ),
+              ],
             ),
           ],
         ),
@@ -360,6 +384,23 @@ class _VisitorHistoryPageState extends State<VisitorHistoryPage> {
     context: context,
     builder: (_) => _HistoryDetailDialog(repository: _repository, item: item),
   );
+
+  Future<void> _printSlip(VisitorHistoryItem item) async {
+    try {
+      await printVisitorSlip(
+        context: context,
+        repository: VisitorInsideRepository(_api),
+        visitId: item.id,
+      );
+    } catch (error) {
+      if (mounted) {
+        setState(
+          () => _error =
+              'ไม่สามารถเปิดสลิปเข้าพบได้\nรายละเอียดเพิ่มเติม: $error',
+        );
+      }
+    }
+  }
 
   String _dateTime(String value) {
     final parsed = DateTime.tryParse(value);

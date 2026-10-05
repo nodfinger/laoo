@@ -47,6 +47,11 @@ class _ScopedWorkspaceFavoriteButton extends StatelessWidget {
           final code = resolved ?? menuKey;
           final selected = favorites.contains(code);
           return IconButton(
+            style: IconButton.styleFrom(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(LaooRadius.xs),
+              ),
+            ),
             tooltip: selected
                 ? 'นำออกจากเมนูลัดของฉัน'
                 : 'เพิ่มหน้านี้เป็นเมนูลัดของฉัน',
@@ -222,23 +227,24 @@ class WorkspacePageTitle extends StatefulWidget {
 
 class _WorkspacePageTitleState extends State<WorkspacePageTitle> {
   Future<NavigationMenuItem?>? _menuFuture;
+  String? _loadedMenuKey;
 
   @override
   void initState() {
     super.initState();
-    _loadMenuFuture();
   }
 
   @override
   void didUpdateWidget(covariant WorkspacePageTitle oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.favoriteKey != widget.favoriteKey) {
-      _loadMenuFuture();
+      _loadedMenuKey = null;
     }
   }
 
-  void _loadMenuFuture() {
-    final key = widget.favoriteKey;
+  void _loadMenuFuture(String? key) {
+    if (_loadedMenuKey == key) return;
+    _loadedMenuKey = key;
     _menuFuture = key == null
         ? null
         : NavigationMenuRepository().findMenu(menuCode: key, routeName: key);
@@ -246,7 +252,10 @@ class _WorkspacePageTitleState extends State<WorkspacePageTitle> {
 
   @override
   Widget build(BuildContext context) {
-    final key = widget.favoriteKey;
+    final key =
+        widget.favoriteKey ??
+        LaooWorkspaceFavoriteScope.maybeOf(context)?.activeMenu;
+    _loadMenuFuture(key);
 
     return ValueListenableBuilder<WorkspaceThemePreset>(
       valueListenable: workspaceThemeController,
@@ -255,17 +264,22 @@ class _WorkspacePageTitleState extends State<WorkspacePageTitle> {
         return Row(
           mainAxisSize: MainAxisSize.max,
           mainAxisAlignment: MainAxisAlignment.start,
-          textDirection: TextDirection.ltr,
           children: [
+            if (key != null) ...[
+              LaooPageMenuIcon(menuKey: key, color: accent),
+              const SizedBox(width: 8),
+            ],
             Flexible(
               child: Text(
                 widget.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 textDirection: TextDirection.ltr,
                 style: LaooTypography.pageCaptionStyle,
               ),
             ),
             if (key != null) ...[
-              const SizedBox(width: 6),
+              const SizedBox(width: 2),
               ValueListenableBuilder<Set<String>>(
                 valueListenable: supportFavoritePages,
                 builder: (context, favorites, _) {
@@ -275,6 +289,11 @@ class _WorkspacePageTitleState extends State<WorkspacePageTitle> {
                       final code = snapshot.data?.code.trim() ?? key;
                       final selected = favorites.contains(code);
                       return IconButton(
+                        style: IconButton.styleFrom(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(LaooRadius.xs),
+                          ),
+                        ),
                         tooltip: selected
                             ? 'นำออกจากเมนูลัดของฉัน'
                             : 'เพิ่มหน้านี้เป็นเมนูลัดของฉัน',

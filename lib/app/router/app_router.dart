@@ -4,6 +4,8 @@ import '../../features/company/vendor/data/vendor_api.dart';
 import '../../core/navigation/navigation_menu_repository.dart';
 import '../../features/company/vendor/pages/vendor_page.dart';
 import '../../features/company/person/pages/person_registry_page.dart';
+import '../../features/company/contact/contact_page.dart';
+import '../../features/company/ocr/business_card_ocr_settings_page.dart';
 import 'package:laoo_meeting/meeting_feature.dart';
 import 'package:laoo_five_s/five_s_feature.dart';
 import 'package:laoo_survey/survey_feature.dart';
@@ -49,6 +51,7 @@ import '../../features/support/employee/pages/employee_shared_page.dart';
 import '../../features/support/global_settings/pages/global_settings_page.dart';
 import '../../features/support/global_permission_settings/pages/global_permission_settings_page.dart';
 import '../../features/support/menu_management/pages/laoo_menu_management_page.dart';
+import '../../features/support/qr_code_generator/qr_code_generator_page.dart';
 import '../../features/support/partner_user/pages/partner_user_page.dart';
 import '../../features/access/role_group/pages/role_group_page.dart';
 import '../../features/access/menu_permission/pages/menu_permission_page.dart';
@@ -143,6 +146,16 @@ final GoRouter appRouter = GoRouter(
       path: RoutePaths.companyPersons,
       name: RouteNames.companyPersons,
       builder: (context, state) => const PersonRegistryPage(),
+    ),
+    GoRoute(
+      path: RoutePaths.companyBusinessCardOcrSettings,
+      name: RouteNames.companyBusinessCardOcrSettings,
+      builder: (context, state) => const BusinessCardOcrSettingsPage(),
+    ),
+    GoRoute(
+      path: RoutePaths.companyContacts,
+      name: RouteNames.companyContacts,
+      builder: (context, state) => const ContactPage(),
     ),
 
     ...buildProviderPublicRoutes(),
@@ -580,6 +593,11 @@ final List<GoRoute> _placeholderRoutes = [
     path: RoutePaths.laooMenuManagement,
     name: RouteNames.laooMenuManagement,
     builder: (context, state) => const LaooMenuManagementPage(),
+  ),
+  GoRoute(
+    path: RoutePaths.qrCodeGenerator,
+    name: RouteNames.qrCodeGenerator,
+    builder: (context, state) => const QrCodeGeneratorPage(),
   ),
   GoRoute(
     path: RoutePaths.organizationStructure,

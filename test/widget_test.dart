@@ -27,7 +27,7 @@ void main() {
     await tester.pumpWidget(const ProviderScope(child: LaooApp()));
     await tester.pumpAndSettle();
 
-    expect(find.bySemanticsLabel('Laoo Solutions'), findsOneWidget);
+    expect(find.bySemanticsLabel('Laoo Provider'), findsOneWidget);
     expect(find.byType(TextField), findsNothing);
     expect(find.byType(CircularProgressIndicator), findsNothing);
     expect(tester.takeException(), isNull);
@@ -59,7 +59,7 @@ void main() {
       ),
     );
 
-    expect(find.bySemanticsLabel('Laoo Solutions'), findsOneWidget);
+    expect(find.bySemanticsLabel('Laoo Provider'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

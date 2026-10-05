@@ -31,8 +31,10 @@ class CustomerApi {
       (e) => MapEntry('${e.key}', e.value == true),
     ),
   );
-  Future<void> create(Map<String, dynamic> body) async =>
-      _client.post('/api/company/customers', body: body);
+  Future<Map<String, dynamic>> create(Map<String, dynamic> body) async =>
+      Map<String, dynamic>.from(
+        await _client.post('/api/company/customers', body: body) as Map,
+      );
   Future<void> update(int id, Map<String, dynamic> body) async =>
       _client.put('/api/company/customers/$id', body: body);
   Future<void> delete(int id) async =>
