@@ -37,6 +37,17 @@ class TaxInvoiceApi {
     await _client.get('/api/company/tax-invoices/$id') as Map,
   );
 
+  Future<Map<String, dynamic>> printData(
+    int id, {
+    required bool finalDocument,
+  }) async => Map<String, dynamic>.from(
+    await _client.get(
+          '/api/company/tax-invoices/$id/print-data',
+          query: {'mode': finalDocument ? 'FINAL' : 'PREVIEW'},
+        )
+        as Map,
+  );
+
   Future<Map<String, dynamic>> create(Map<String, dynamic> body) async =>
       Map<String, dynamic>.from(
         await _client.post('/api/company/tax-invoices', body: body) as Map,

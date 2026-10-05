@@ -13,6 +13,7 @@ import '../../../../core/widgets/timed_snack_bar.dart';
 import '../../../profile/data/user_profile_repository.dart';
 import '../../../support/presentation/widgets/support_workspace_shell.dart';
 import '../data/tax_invoice_api.dart';
+import '../services/tax_invoice_pdf_service.dart';
 
 class TaxInvoicePage extends StatelessWidget {
   const TaxInvoicePage({this.action = false, this.taxInvoiceId, super.key});
@@ -41,7 +42,6 @@ class _TaxInvoiceListPageState extends State<_TaxInvoiceListPage> {
   String _menuName = 'ใบกำกับภาษี';
   String _status = 'ALL';
   String _reference = 'ALL';
-  bool _loading = true;
   bool _card = false;
   int _page = 0;
 
@@ -91,7 +91,6 @@ class _TaxInvoiceListPageState extends State<_TaxInvoiceListPage> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
     try {
       final values = await Future.wait([
         _api.list(
@@ -112,11 +111,9 @@ class _TaxInvoiceListPageState extends State<_TaxInvoiceListPage> {
           ),
         );
         _page = _page.clamp(0, _pages - 1);
-        _loading = false;
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() => _loading = false);
       _error('โหลดรายการใบกำกับภาษีไม่ได้', e);
     }
   }
@@ -560,6 +557,7 @@ class _TaxInvoiceActionPageState extends State<_TaxInvoiceActionPage> {
   DateTime _date = DateTime.now();
   bool _loading = true;
   bool _saving = false;
+  bool _exportingPdf = false;
 
   bool get _editable => _status == 'DRAFT';
   List<Map<String, dynamic>> get _customers => _maps(_lookup['customers']);
@@ -972,6 +970,34 @@ class _TaxInvoiceActionPageState extends State<_TaxInvoiceActionPage> {
     }
   }
 
+  Future<void> _exportPdf({required bool finalDocument}) async {
+    if (_exportingPdf || _actions['print'] != true) return;
+    if (_id == null) {
+      await _save();
+      if (_id == null) return;
+    }
+    setState(() => _exportingPdf = true);
+    try {
+      final data = await _api.printData(_id!, finalDocument: finalDocument);
+      await TaxInvoicePdfService.export(
+        data: data,
+        finalDocument: finalDocument,
+        accent: workspaceThemeController.value.primary,
+      );
+    } catch (e) {
+      if (mounted) {
+        _error(
+          finalDocument
+              ? 'พิมพ์ใบกำกับภาษี 4 ชุดไม่สำเร็จ'
+              : 'ดูตัวอย่างใบกำกับภาษีไม่สำเร็จ',
+          e,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _exportingPdf = false);
+    }
+  }
+
   void _error(String message, Object e) => showTimedSnackBar(
     context,
     message: '$message\nรายละเอียด: $e',
@@ -1028,6 +1054,26 @@ class _TaxInvoiceActionPageState extends State<_TaxInvoiceActionPage> {
       title: '$_menuName > ${_id == null ? 'เพิ่ม' : 'แก้ไข'}',
       favoriteKey: _activeMenu,
       actions: [
+        if (_status == 'DRAFT' && _actions['print'] == true)
+          OutlinedButton.icon(
+            onPressed: _exportingPdf
+                ? null
+                : () => _exportPdf(finalDocument: false),
+            style: _outlinedStyle(accent),
+            icon: const Icon(Icons.preview_outlined),
+            label: Text(_exportingPdf ? 'กำลังสร้าง PDF...' : 'ดูตัวอย่าง'),
+          ),
+        if (_status == 'ISSUED' && _actions['print'] == true)
+          FilledButton.icon(
+            onPressed: _exportingPdf
+                ? null
+                : () => _exportPdf(finalDocument: true),
+            style: _filledStyle(accent),
+            icon: const Icon(Icons.print_outlined),
+            label: Text(
+              _exportingPdf ? 'กำลังสร้าง PDF...' : 'พิมพ์ใบกำกับภาษี 4 ชุด',
+            ),
+          ),
         if (_status == 'DRAFT' && _id != null && _actions['edit'] == true)
           FilledButton.icon(
             onPressed: _issue,

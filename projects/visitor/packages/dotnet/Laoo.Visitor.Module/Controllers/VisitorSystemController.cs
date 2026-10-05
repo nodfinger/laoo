@@ -781,6 +781,23 @@ WHERE V.CompanyID=@CompanyID AND V.VisitorVisitID=@VisitID
             hostConfirmedByName = Text(reader, 20), hostConfirmedDate = Date(reader, 21)
         };
         await reader.CloseAsync();
+        await using var companyCommand = new SqlCommand("""
+SELECT COALESCE(NULLIF(LTRIM(RTRIM(CustomerNameTH)),N''),NULLIF(LTRIM(RTRIM(Name)),N''),CompanyCode),
+       CASE WHEN COL_LENGTH(N'dbo.TDSTCompanySetUp',N'MemberCoverImagePath') IS NULL
+            THEN CAST(NULL AS nvarchar(1000)) ELSE MemberCoverImagePath END
+FROM dbo.TDSTCompanySetUp
+WHERE CompanyID=@CompanyID AND OwnerType='C' AND IsActive=1;
+""", connection);
+        Add(companyCommand, "@CompanyID", SqlDbType.BigInt, companyId);
+        await using var companyReader = await companyCommand.ExecuteReaderAsync(token);
+        object company = new { companyName = "", logoPath = (string?)null };
+        if (await companyReader.ReadAsync(token))
+            company = new
+            {
+                companyName = Text(companyReader, 0) ?? string.Empty,
+                logoPath = Text(companyReader, 1),
+            };
+        await companyReader.CloseAsync();
         var images = await ReadRows(connection, """
 SELECT VisitorVisitImageID,EvidenceType,CaptureStage,SideCode,FileRelativePath,OriginalFileName,ContentType,ContentLength,CreateDate,CreateBy
 FROM dbo.TDTMVisitorVisitImage WHERE CompanyID=@CompanyID AND VisitorVisitID=@VisitID ORDER BY CreateDate,VisitorVisitImageID;
@@ -796,7 +813,7 @@ FROM dbo.TDTMVisitorNotificationOutbox
 WHERE CompanyID=@CompanyID AND VisitorVisitID=@VisitID
 ORDER BY VisitorNotificationOutboxID;
 """, companyId, visitId, token);
-        return Ok(new { visit = detail, images, notes, notifications });
+        return Ok(new { visit = detail, company, images, notes, notifications });
     }
 
     [HttpGet("check-ins/{visitId:long}/images/{imageId:long}")]

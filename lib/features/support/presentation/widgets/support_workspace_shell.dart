@@ -28,6 +28,50 @@ final ValueNotifier<String?> mobileSelectedMenuGroup = ValueNotifier<String?>(
 );
 final UserFavoriteRepository _userFavoriteRepository = UserFavoriteRepository();
 
+class _ScopedWorkspaceMenuIcon extends StatefulWidget {
+  const _ScopedWorkspaceMenuIcon({required this.menuKey, required this.color});
+
+  final String menuKey;
+  final Color color;
+
+  @override
+  State<_ScopedWorkspaceMenuIcon> createState() =>
+      _ScopedWorkspaceMenuIconState();
+}
+
+class _ScopedWorkspaceMenuIconState extends State<_ScopedWorkspaceMenuIcon> {
+  late Future<NavigationMenuItem?> _menu;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ScopedWorkspaceMenuIcon oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.menuKey != widget.menuKey) _load();
+  }
+
+  void _load() {
+    _menu = NavigationMenuRepository().findMenu(
+      menuCode: widget.menuKey,
+      routeName: widget.menuKey,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<NavigationMenuItem?>(
+    future: _menu,
+    builder: (context, snapshot) => Icon(
+      resolveNavigationIcon(snapshot.data?.iconName),
+      size: 24,
+      color: widget.color,
+    ),
+  );
+}
+
 class _ScopedWorkspaceFavoriteButton extends StatelessWidget {
   const _ScopedWorkspaceFavoriteButton({required this.menuKey});
 
@@ -48,6 +92,11 @@ class _ScopedWorkspaceFavoriteButton extends StatelessWidget {
           final code = resolved ?? menuKey;
           final selected = favorites.contains(code);
           return IconButton(
+            style: IconButton.styleFrom(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(LaooRadius.xs),
+              ),
+            ),
             tooltip: selected
                 ? 'นำออกจากเมนูลัดของฉัน'
                 : 'เพิ่มหน้านี้เป็นเมนูลัดของฉัน',
@@ -119,7 +168,8 @@ class WorkspacePageTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final key = favoriteKey;
+    final key =
+        favoriteKey ?? LaooWorkspaceFavoriteScope.maybeOf(context)?.activeMenu;
 
     return ValueListenableBuilder<WorkspaceThemePreset>(
       valueListenable: workspaceThemeController,
@@ -127,9 +177,34 @@ class WorkspacePageTitle extends StatelessWidget {
         final accent = preset.primary;
         return Row(
           mainAxisSize: MainAxisSize.min,
-          textDirection: key == null ? TextDirection.ltr : TextDirection.rtl,
           children: [
             if (key != null) ...[
+              LaooPageMenuIcon(
+                menuKey: key,
+                color: accent,
+                fallback: Icon(
+                  resolveNavigationIcon(null),
+                  size: 24,
+                  color: accent,
+                ),
+              ),
+              const SizedBox(width: 8),
+            ],
+            Flexible(
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textDirection: TextDirection.ltr,
+                style: TextStyle(
+                  fontSize: titleFontSize ?? LaooTypography.workspaceCaption,
+                  fontWeight: LaooTypography.workspaceCaptionWeight,
+                  color: Colors.black,
+                ),
+              ),
+            ),
+            if (key != null) ...[
+              const SizedBox(width: 2),
               ValueListenableBuilder<Set<String>>(
                 valueListenable: supportFavoritePages,
                 builder: (context, favorites, _) {
@@ -142,6 +217,11 @@ class WorkspacePageTitle extends StatelessWidget {
                       final code = snapshot.data?.code.trim() ?? key;
                       final selected = favorites.contains(code);
                       return IconButton(
+                        style: IconButton.styleFrom(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(LaooRadius.xs),
+                          ),
+                        ),
                         tooltip: selected
                             ? 'นำออกจากเมนูลัดของฉัน'
                             : 'เพิ่มหน้านี้เป็นเมนูลัดของฉัน',
@@ -170,19 +250,7 @@ class WorkspacePageTitle extends StatelessWidget {
                   );
                 },
               ),
-              const SizedBox(width: 6),
             ],
-            Flexible(
-              child: Text(
-                title,
-                textDirection: TextDirection.ltr,
-                style: TextStyle(
-                  fontSize: titleFontSize ?? LaooTypography.workspaceCaption,
-                  fontWeight: LaooTypography.workspaceCaptionWeight,
-                  color: Colors.black,
-                ),
-              ),
-            ),
           ],
         );
       },
@@ -381,6 +449,11 @@ class SupportWorkspaceShell extends StatelessWidget {
                     activeMenu: activeMenu,
                     favoriteButtonBuilder: (context, menuKey) =>
                         _ScopedWorkspaceFavoriteButton(menuKey: menuKey),
+                    menuIconBuilder: (context, menuKey, color) =>
+                        _ScopedWorkspaceMenuIcon(
+                          menuKey: menuKey,
+                          color: color,
+                        ),
                     child: child,
                   );
                   return SafeArea(

@@ -9,6 +9,9 @@ abstract final class RouteNames {
   static const String companyProducts = 'company-products';
   static const String companyCustomers = 'company-customers';
   static const String companyPersons = 'company-persons';
+  static const String companyBusinessCardOcrSettings =
+      'company-business-card-ocr-settings';
+  static const String companyContacts = 'company-contacts';
   static const String companyQuotations = 'company-quotations';
   static const String companyPreOrders = 'company-pre-orders';
   static const String companyTemporaryReceipts = 'company-temporary-receipts';
@@ -58,6 +61,7 @@ abstract final class RouteNames {
   static const String globalSettings = 'globalSettings';
   static const String globalPermissionSettings = 'globalPermissionSettings';
   static const String laooMenuManagement = 'laooMenuManagement';
+  static const String qrCodeGenerator = 'qrCodeGenerator';
   static const String masterData = 'masterData';
   static const String organizationStructure = 'organizationStructure';
   static const String companyEmployees = 'companyEmployees';

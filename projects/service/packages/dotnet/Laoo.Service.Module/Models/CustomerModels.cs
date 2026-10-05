@@ -9,6 +9,9 @@ public sealed record CustomerListRow(
     string? BusinessTypeCode,
     string? ProvCode,
     string? Phone,
+    string? ShippingLabelName,
+    string? ShippingLabelAddress,
+    string? ShippingLabelPhone,
     bool IsActive,
     bool HasBusinessCard,
     bool HasCustomerDocument);
@@ -41,4 +44,7 @@ public sealed record CustomerUpsertRequest(
     decimal? CreditLimit,
     long? SalespersonEmployeeID,
     string? TaxType,
+    string? ShippingLabelName,
+    string? ShippingLabelAddress,
+    string? ShippingLabelPhone,
     bool IsActive);

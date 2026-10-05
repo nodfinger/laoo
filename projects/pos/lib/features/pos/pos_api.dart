@@ -19,10 +19,19 @@ class PosApi {
   Future<List<Map<String, dynamic>>> products(
     String activationId, {
     String? search,
+    int? sportMemberId,
   }) async => _list(
     await client.get(
       '/api/company/pos/products/$activationId',
-      query: {if (search != null && search.trim().isNotEmpty) 'search': search},
+      query: {
+        if (search != null && search.trim().isNotEmpty) 'search': search,
+        if (sportMemberId != null) 'sportMemberId': '$sportMemberId',
+      },
+    ),
+  );
+  Future<Map<String, dynamic>> sportMember(String code) async => _map(
+    await client.get(
+      '/api/company/pos/sport-members/${Uri.encodeComponent(code)}',
     ),
   );
   Future<Map<String, dynamic>> create(String endpoint, Object body) async =>

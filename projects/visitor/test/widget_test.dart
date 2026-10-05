@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:laoo_shared_core/laoo_shared_core.dart';
 import 'package:laoo_visitor/core/config/app_config.dart';
+import 'package:laoo_visitor/features/visitor/visitor_inside_repository.dart';
 import 'package:laoo_visitor/features/visitor/visitor_settings_repository.dart';
 import 'package:laoo_visitor/visitor_feature.dart';
 
@@ -34,5 +35,25 @@ void main() {
     expect(host.name, 'สมชาย ใจดี');
     expect(host.phone, '0812345678');
     expect(host.building, 'สำนักงานใหญ่');
+  });
+
+  test('maps company identity used by the 50 mm visitor slip', () {
+    final detail = VisitorVisitDetail.fromJson(const {
+      'visit': {'visitorVisitId': 101, 'visitorName': 'ผู้มาติดต่อทดสอบ'},
+      'company': {
+        'companyName': 'บริษัทตัวอย่าง จำกัด',
+        'logoPath': 'uploads/provider/companies/1/cover/logo.png',
+      },
+      'images': [],
+      'notes': [],
+      'notifications': [],
+    });
+
+    expect(detail.visit['visitorVisitId'], 101);
+    expect(detail.company['companyName'], 'บริษัทตัวอย่าง จำกัด');
+    expect(
+      detail.company['logoPath'],
+      'uploads/provider/companies/1/cover/logo.png',
+    );
   });
 }

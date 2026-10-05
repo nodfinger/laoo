@@ -9,6 +9,9 @@ abstract final class RoutePaths {
   static const String companyProducts = '/company/products';
   static const String companyCustomers = '/company/customers';
   static const String companyPersons = '/company/persons';
+  static const String companyBusinessCardOcrSettings =
+      '/company/business-card-ocr-settings';
+  static const String companyContacts = '/company/contacts';
   static const String companyQuotations = '/company/quotations';
   static const String companyPreOrders = '/company/pre-orders';
   static const String companyTemporaryReceipts = '/company/temporary-receipts';
@@ -60,6 +63,7 @@ abstract final class RoutePaths {
   static const String globalPermissionSettings =
       '/support/global-permission-settings';
   static const String laooMenuManagement = '/support/menu-management';
+  static const String qrCodeGenerator = '/support/qr-code-generator';
   static const String masterData = '/master-data';
   static const String organizationStructure = '/organization-structure';
   static const String companyEmployees = '/company/employees';

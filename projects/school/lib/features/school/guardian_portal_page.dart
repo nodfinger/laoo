@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import 'school_feature_host.dart';
 
@@ -209,6 +210,20 @@ class _GuardianPortalPageState extends State<GuardianPortalPage> {
           style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
         ),
         const Text('ข้อมูลล่าสุดของบุตรหลานในช่วง 30 วัน'),
+        const SizedBox(height: 10),
+        OutlinedButton.icon(
+          onPressed: token == null
+              ? null
+              : () => context.push('/school/guardian/food', extra: token),
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(100, 48),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+          icon: const Icon(Icons.restaurant_outlined),
+          label: const Text('อาหารและ Wallet ของบุตรหลาน'),
+        ),
         const SizedBox(height: 16),
         LayoutBuilder(
           builder: (_, box) {

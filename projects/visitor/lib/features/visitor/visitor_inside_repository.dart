@@ -61,6 +61,9 @@ class VisitorInsideRepository {
   Future<List<int>> imageBytes(int visitId, int imageId) =>
       api.getBytes('/api/visitor/check-ins/$visitId/images/$imageId');
 
+  Future<List<int>> fileBytes(String path) =>
+      api.getBytes(path.startsWith('/') ? path : '/$path');
+
   Future<void> addNote(
     int visitId,
     String text, {
@@ -174,6 +177,7 @@ class VisitorInside {
 class VisitorVisitDetail {
   const VisitorVisitDetail({
     required this.visit,
+    required this.company,
     required this.images,
     required this.notes,
     required this.notifications,
@@ -182,6 +186,7 @@ class VisitorVisitDetail {
   factory VisitorVisitDetail.fromJson(Map<String, dynamic> json) =>
       VisitorVisitDetail(
         visit: Map<String, dynamic>.from(json['visit'] as Map? ?? const {}),
+        company: Map<String, dynamic>.from(json['company'] as Map? ?? const {}),
         images: (json['images'] as List<dynamic>? ?? const [])
             .map((value) => Map<String, dynamic>.from(value as Map))
             .toList(growable: false),
@@ -194,6 +199,7 @@ class VisitorVisitDetail {
       );
 
   final Map<String, dynamic> visit;
+  final Map<String, dynamic> company;
   final List<Map<String, dynamic>> images;
   final List<Map<String, dynamic>> notes;
   final List<Map<String, dynamic>> notifications;

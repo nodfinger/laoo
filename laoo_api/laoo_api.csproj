@@ -14,6 +14,7 @@
     <PackageReference Include="SkiaSharp" Version="4.153.0" />
     <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="4.153.0" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
+    <PackageReference Include="TesseractOCR" Version="5.5.2" />
   </ItemGroup>
 
   <ItemGroup>
@@ -47,5 +48,6 @@
     <ProjectReference Include="..\projects\provider\packages\dotnet\Laoo.Provider.Module\Laoo.Provider.Module.csproj" />
     <ProjectReference Include="..\projects\school\packages\dotnet\Laoo.School.Module\Laoo.School.Module.csproj" />
     <ProjectReference Include="..\projects\school_food\packages\dotnet\Laoo.SchoolFood.Module\Laoo.SchoolFood.Module.csproj" />
+    <ProjectReference Include="..\projects\sport\packages\dotnet\Laoo.Sport.Module\Laoo.Sport.Module.csproj" />
   </ItemGroup>
 </Project>

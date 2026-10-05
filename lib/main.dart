@@ -12,6 +12,7 @@ import 'package:laoo_knowledge/knowledge_feature.dart';
 import 'package:laoo_memo/memo_feature.dart';
 import 'package:laoo_provider/provider_feature.dart';
 import 'package:laoo_school/school_feature.dart';
+import 'package:laoo_school_food/school_food_feature.dart';
 import 'package:laoo_intranet/intranet_feature.dart';
 import 'package:laoo_vote/vote_feature.dart';
 import 'package:laoo_pos/pos_feature.dart';
@@ -24,6 +25,7 @@ import 'package:laoo_gate_pass/gate_pass_feature.dart';
 import 'package:laoo_visitor/visitor_feature.dart';
 import 'package:laoo_shared_workspace_ui/laoo_shared_workspace_ui.dart';
 import 'package:printing/printing.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
 
 import 'app/laoo_app.dart';
@@ -39,6 +41,7 @@ import 'core/navigation/navigation_menu_repository.dart';
 import 'core/widgets/auto_dismiss_message.dart';
 import 'core/widgets/timed_snack_bar.dart';
 import 'features/support/presentation/widgets/support_workspace_shell.dart';
+import 'features/visitor/visitor_slip_pdf_service.dart';
 
 Future<dynamic> _schoolGuardianRequest(
   String path, {
@@ -52,19 +55,56 @@ Future<dynamic> _schoolGuardianRequest(
     if (token != null) 'Authorization': 'Bearer $token',
   };
   final response = body == null
-      ? await http.get(uri, headers: headers)
-      : await http.post(uri, headers: headers, body: jsonEncode(body));
+      ? await http
+            .get(uri, headers: headers)
+            .timeout(const Duration(seconds: 30))
+      : await http
+            .post(uri, headers: headers, body: jsonEncode(body))
+            .timeout(const Duration(seconds: 30));
   final decoded = response.body.isEmpty ? null : jsonDecode(response.body);
   if (response.statusCode < 200 || response.statusCode >= 300) {
     final message = decoded is Map<String, dynamic>
         ? decoded['message']?.toString()
         : null;
-    throw StateError(message ?? 'ไม่สามารถเชื่อมต่อระบบผู้ปกครองได้');
+    throw ApiException(
+      message: message ?? 'ไม่สามารถเชื่อมต่อระบบโรงเรียนได้',
+      statusCode: response.statusCode,
+      details: decoded,
+    );
   }
   return decoded;
 }
 
 void main() {
+  configureSchoolFoodFeatureHost(
+    shell: _buildMeetingWorkspaceShell,
+    api: ApiClient.new,
+    dispose: (client) => (client as ApiClient).dispose(),
+    tokens: _surveyWorkspaceTokens,
+    portalRequest: _schoolGuardianRequest,
+    reportExport: (path, query, fileName) async {
+      final client = ApiClient();
+      try {
+        final bytes = await client.getBytes(path, query: query);
+        await FilePicker.platform.saveFile(
+          fileName: fileName,
+          type: FileType.custom,
+          allowedExtensions: const ['csv'],
+          bytes: Uint8List.fromList(bytes),
+        );
+      } finally {
+        client.dispose();
+      }
+    },
+    dateText: (value) {
+      final setup = companySetupController.current;
+      return setup == null
+          ? CompanyDateFormatter.formatDateByYearFormat(value, 'AD')
+          : CompanyDateFormatter.formatDate(value, setup);
+    },
+    message: (context, {required message, required error}) =>
+        showTimedSnackBar(context, message: message, error: error),
+  );
   configureSchoolFeatureHost(
     _buildMeetingWorkspaceShell,
     apiClientFactory: ApiClient.new,
@@ -631,6 +671,8 @@ void main() {
   );
   configureVisitorFeatureHost(
     _buildMeetingWorkspaceShell,
+    noticePresenter: (context, message, error) =>
+        showTimedSnackBar(context, message: message, error: error),
     uiTokensProvider: () => const VisitorUiTokens(
       cardMargin: LaooLayout.cardMargin,
       cardPadding: LaooLayout.cardPadding,
@@ -648,6 +690,12 @@ void main() {
       floatingLabelSource: LaooTypography.materialFloatingLabelSource,
       captionStyle: LaooTypography.screenCaptionStyle,
     ),
+    slipPresenter: (context, {required visit, required company, companyLogo}) =>
+        VisitorSlipPdfService.print(
+          visit: visit,
+          company: company,
+          companyLogo: companyLogo,
+        ),
   );
   runApp(const LaooApp());
 }
