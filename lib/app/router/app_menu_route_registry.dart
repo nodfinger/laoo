@@ -16,6 +16,7 @@ import 'package:laoo_provider/provider_feature.dart' show ProviderRoutes;
 import 'package:laoo_school/school_feature.dart' show SchoolRoutes;
 import 'package:laoo_school_food/school_food_feature.dart'
     show SchoolFoodRoutes;
+import 'package:laoo_patrol/patrol_feature.dart' show PatrolRoutes;
 import 'package:laoo_intranet/intranet_feature.dart'
     show IntranetMenuCodes, IntranetRouteNames, IntranetRoutePaths;
 import 'package:laoo_vote/vote_feature.dart'
@@ -1180,6 +1181,14 @@ abstract final class AppMenuRouteRegistry {
         scope: AppMenuScope.company,
       ),
     for (final route in SchoolFoodRoutes.all)
+      route.menuCode: AppMenuRouteSpec(
+        menuCode: route.menuCode,
+        databaseRouteName: route.routeName,
+        goRouteName: route.routeName,
+        path: route.routePath,
+        scope: AppMenuScope.company,
+      ),
+    for (final route in PatrolRoutes.all)
       route.menuCode: AppMenuRouteSpec(
         menuCode: route.menuCode,
         databaseRouteName: route.routeName,

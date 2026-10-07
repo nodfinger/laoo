@@ -13,6 +13,7 @@ import 'package:laoo_memo/memo_feature.dart';
 import 'package:laoo_provider/provider_feature.dart';
 import 'package:laoo_school/school_feature.dart';
 import 'package:laoo_school_food/school_food_feature.dart';
+import 'package:laoo_patrol/patrol_feature.dart';
 import 'package:laoo_intranet/intranet_feature.dart';
 import 'package:laoo_vote/vote_feature.dart';
 import 'package:laoo_pos/pos_feature.dart';
@@ -76,6 +77,16 @@ Future<dynamic> _schoolGuardianRequest(
 }
 
 void main() {
+  configurePatrolFeatureHost(
+    _buildMeetingWorkspaceShell,
+    apiClientFactory: ApiClient.new,
+    apiClientDisposer: (client) => (client as ApiClient).dispose(),
+    menuTitleResolver: (menuCode, fallback) => NavigationMenuRepository()
+        .resolveMenuName(menuCode: menuCode, fallback: fallback),
+    messagePresenter: (context, {required message, required error}) =>
+        showTimedSnackBar(context, message: message, error: error),
+    uiTokensProvider: _surveyWorkspaceTokens,
+  );
   configureSchoolFoodFeatureHost(
     shell: _buildMeetingWorkspaceShell,
     api: ApiClient.new,

@@ -13,6 +13,7 @@ using LaooProviderModule;
 using LaooSchoolModule;
 using Laoo.SchoolFood;
 using Laoo.Sport;
+using Laoo.Patrol;
 using LaooDocumentControlModule;
 using LaooKnowledgeModule;
 using LaooMemoModule;
@@ -66,6 +67,7 @@ builder.Services
     .AddApplicationPart(typeof(SchoolModuleMarker).Assembly)
     .AddApplicationPart(typeof(SchoolFoodModuleMarker).Assembly)
     .AddApplicationPart(typeof(SportModuleMarker).Assembly)
+    .AddApplicationPart(typeof(PatrolModuleMarker).Assembly)
     .AddApplicationPart(typeof(DocumentControlModuleMarker).Assembly)
     .AddApplicationPart(typeof(KnowledgeModuleMarker).Assembly)
     .AddApplicationPart(typeof(MemoModuleMarker).Assembly)
