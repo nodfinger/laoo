@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense', 'project', 'intranet', 'vote', 'pos', 'sales', 'evaluation', 'patrol')]
+    [ValidateSet('service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense', 'project', 'intranet', 'vote', 'pos', 'sales', 'evaluation', 'patrol', 'digital_checklist')]
     [string]$Module,
 
     [ValidateSet('unassigned', 'core', 'business', 'center-service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense', 'project', 'intranet', 'vote', 'pos', 'sales', 'evaluation')]
@@ -27,7 +27,7 @@ if ([string]::IsNullOrWhiteSpace($Role)) {
     $ownedModules = @($machineConfig.ownedModules | ForEach-Object { [string]$_ } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
 }
 
-$validRoles = @('unassigned', 'core', 'business', 'center-service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense', 'project', 'intranet', 'vote', 'pos', 'sales', 'evaluation')
+$validRoles = @('unassigned', 'core', 'business', 'center-service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense', 'project', 'intranet', 'vote', 'pos', 'sales', 'evaluation', 'digital_checklist')
 if ($Role -notin $validRoles) {
     throw "Invalid machine role '$Role'. Expected: $($validRoles -join ', ')."
 }
@@ -61,6 +61,7 @@ $ownedRoleByModule = @{
     pos = 'pos'
     sales = 'sales'
     evaluation = 'evaluation'
+    digital_checklist = 'digital_checklist'
 }
 
 if ($Role -ne 'business' -and $Role -ne $ownedRoleByModule[$Module]) {

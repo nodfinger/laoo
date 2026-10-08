@@ -58,7 +58,11 @@ class _UserProfileThemeLoaderState extends State<UserProfileThemeLoader> {
     }
     _loadedUser = identity;
     final requestIdentity = identity;
-    workspaceThemeController.value = workspaceThemeByCode('STYLE01');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _loadedUser == requestIdentity) {
+        workspaceThemeController.value = workspaceThemeByCode('STYLE01');
+      }
+    });
     try {
       final profile = await _repo.get();
       final code = profile['themeCode']?.toString();
@@ -86,9 +90,15 @@ class _UserProfileThemeLoaderState extends State<UserProfileThemeLoader> {
       if (mounted &&
           _loadedUser == requestIdentity &&
           _identity(appAuthController.session) == requestIdentity) {
-        workspaceThemeController.value = code != null && code.isNotEmpty
-            ? workspaceThemeByCode(code)
-            : workspaceThemeByCode('STYLE01');
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted &&
+              _loadedUser == requestIdentity &&
+              _identity(appAuthController.session) == requestIdentity) {
+            workspaceThemeController.value = code != null && code.isNotEmpty
+                ? workspaceThemeByCode(code)
+                : workspaceThemeByCode('STYLE01');
+          }
+        });
       }
       if (_loadedUser == requestIdentity) {
         workspaceButtonMenu.value = menuStyle == null || menuStyle.isEmpty

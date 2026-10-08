@@ -14,6 +14,7 @@ import 'package:laoo_provider/provider_feature.dart';
 import 'package:laoo_school/school_feature.dart';
 import 'package:laoo_school_food/school_food_feature.dart';
 import 'package:laoo_patrol/patrol_feature.dart';
+import 'package:laoo_digital_checklist/digital_checklist_feature.dart';
 import 'package:laoo_intranet/intranet_feature.dart';
 import 'package:laoo_vote/vote_feature.dart';
 import 'package:laoo_pos/pos_feature.dart';
@@ -77,6 +78,31 @@ Future<dynamic> _schoolGuardianRequest(
 }
 
 void main() {
+  configureDigitalChecklistFeature(
+    shell: _buildMeetingWorkspaceShell,
+    api: ApiClient.new,
+    dispose: (client) => (client as ApiClient).dispose(),
+    upload: (path, {required fileName, required bytes, required fields}) async {
+      final client = ApiClient();
+      try {
+        return await client.upload(
+          path,
+          fileName: fileName,
+          bytes: bytes,
+          fields: fields,
+        );
+      } finally {
+        client.dispose();
+      }
+    },
+    tokens: _surveyWorkspaceTokens,
+    title: (code, fallback) => NavigationMenuRepository().resolveMenuName(
+      menuCode: code,
+      fallback: fallback,
+    ),
+    message: (context, {required message, required error}) =>
+        showTimedSnackBar(context, message: message, error: error),
+  );
   configurePatrolFeatureHost(
     _buildMeetingWorkspaceShell,
     apiClientFactory: ApiClient.new,
