@@ -14,6 +14,7 @@ using LaooSchoolModule;
 using Laoo.SchoolFood;
 using Laoo.Sport;
 using Laoo.Patrol;
+using Laoo.DigitalChecklist;
 using LaooDocumentControlModule;
 using LaooKnowledgeModule;
 using LaooMemoModule;
@@ -68,6 +69,7 @@ builder.Services
     .AddApplicationPart(typeof(SchoolFoodModuleMarker).Assembly)
     .AddApplicationPart(typeof(SportModuleMarker).Assembly)
     .AddApplicationPart(typeof(PatrolModuleMarker).Assembly)
+    .AddApplicationPart(typeof(DigitalChecklistModuleMarker).Assembly)
     .AddApplicationPart(typeof(DocumentControlModuleMarker).Assembly)
     .AddApplicationPart(typeof(KnowledgeModuleMarker).Assembly)
     .AddApplicationPart(typeof(MemoModuleMarker).Assembly)
@@ -146,9 +148,11 @@ builder.Services.AddScoped<DatabaseRouteResolver>();
 builder.Services.AddSingleton<PasswordService>();
 builder.Services.AddSingleton<LaooApi.Ocr.IBusinessCardOcr, LaooApi.Ocr.TesseractBusinessCardOcr>();
 builder.Services.AddSingleton<CompanySetupSecretService>();
+builder.Services.AddSingleton<IDigitalChecklistEmailSender, DigitalChecklistEmailSender>();
 builder.Services.AddSingleton<JwtTokenService>();
 builder.Services.AddScoped<DatabaseSeeder>();
 builder.Services.AddScoped<AuthenticationService>();
+builder.Services.AddHostedService<DigitalChecklistScheduleWorker>();
 builder.Services.AddScoped<PasswordResetService>();
 builder.Services.AddScoped<CompanyPersonService>();
 builder.Services.AddScoped<IEvaluationSourceCompletedPublisher, EvaluationSourceCompletedPublisher>();

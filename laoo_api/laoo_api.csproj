@@ -51,4 +51,7 @@
     <ProjectReference Include="..\projects\sport\packages\dotnet\Laoo.Sport.Module\Laoo.Sport.Module.csproj" />
     <ProjectReference Include="..\projects\patrol\packages\dotnet\Laoo.Patrol.Module\Laoo.Patrol.Module.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../projects/digital_checklist/packages/dotnet/Laoo.DigitalChecklist.Module/Laoo.DigitalChecklist.Module.csproj" />
+  </ItemGroup>
 </Project>

@@ -203,30 +203,57 @@ class LaooCaptionCard extends StatelessWidget {
     return LaooSurfaceCard(
       tokens: tokens,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(minHeight: tokens.popupHeaderMinHeight),
-        child: Row(
-          children: [
-            if (captionIcon != null) ...[
-              captionIcon,
-              SizedBox(width: tokens.itemSpacing),
-            ],
-            Flexible(
-              fit: FlexFit.loose,
-              child: Text(
-                caption,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: tokens.captionStyle,
-              ),
-            ),
-            LaooPageFavoriteButton(menuKey: menuKey),
-            if (trailing != null) ...[
-              const Spacer(),
-              SizedBox(width: tokens.itemSpacing),
-              trailing!,
-            ],
-          ],
+      child: LayoutBuilder(
+        builder: (context, constraints) => ConstrainedBox(
+          constraints: BoxConstraints(minHeight: tokens.popupHeaderMinHeight),
+          child: constraints.maxWidth < 420 && trailing != null
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        if (captionIcon != null) ...[
+                          captionIcon,
+                          SizedBox(width: tokens.itemSpacing),
+                        ],
+                        Expanded(
+                          child: Text(
+                            caption,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: tokens.captionStyle,
+                          ),
+                        ),
+                        LaooPageFavoriteButton(menuKey: menuKey),
+                      ],
+                    ),
+                    SizedBox(height: tokens.itemSpacing),
+                    Align(alignment: Alignment.centerRight, child: trailing),
+                  ],
+                )
+              : Row(
+                  children: [
+                    if (captionIcon != null) ...[
+                      captionIcon,
+                      SizedBox(width: tokens.itemSpacing),
+                    ],
+                    Flexible(
+                      fit: FlexFit.loose,
+                      child: Text(
+                        caption,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: tokens.captionStyle,
+                      ),
+                    ),
+                    LaooPageFavoriteButton(menuKey: menuKey),
+                    if (trailing != null) ...[
+                      const Spacer(),
+                      SizedBox(width: tokens.itemSpacing),
+                      trailing!,
+                    ],
+                  ],
+                ),
         ),
       ),
     );

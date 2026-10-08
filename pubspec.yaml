@@ -54,6 +54,8 @@ dependencies:
     path: projects/school_food
   laoo_patrol:
     path: projects/patrol
+  laoo_digital_checklist:
+    path: projects/digital_checklist
   laoo_intranet:
     path: projects/intranet
   laoo_vote:
