@@ -76,6 +76,19 @@ GROUP BY CASE WHEN M.BirthDate IS NULL THEN N'ไม่ระบุ'
  ELSE N'60 ขึ้นไป' END
 """, ct, ("@co", Company), ("@actor", Actor), ("@from", fromUtc),
             ("@to", toUtc), ("@branch", branchId), ("@sport", sportTypeId));
-        return Ok(new { summary = summary.Single(), sports, gender, age });
+        var expiring = await SportDb.Rows(db, null, """
+SELECT TOP(20) M.MemberCode code,P.FullName name,E.EndsOn endsOn
+FROM dbo.TDSPMembership E
+JOIN dbo.TDSPMember M ON M.CompanyID=E.CompanyID AND M.MemberID=E.MemberID AND M.IsActive=1
+JOIN dbo.TDADPerson P ON P.CompanyID=M.CompanyID AND P.PersonID=M.PersonID
+WHERE E.CompanyID=@co AND E.StatusCode=N'ACTIVE'
+AND E.EndsOn>=CONVERT(date,DATEADD(hour,7,SYSUTCDATETIME()))
+AND E.EndsOn<=DATEADD(day,COALESCE((SELECT ExpiryNoticeDays FROM dbo.TDSPSetting
+ WHERE CompanyID=@co),30),CONVERT(date,DATEADD(hour,7,SYSUTCDATETIME())))
+AND EXISTS(SELECT 1 FROM dbo.TDADUser U WHERE U.CompanyID=@co
+ AND U.UserID=@actor AND U.IsCompanyAdmin=1)
+ORDER BY E.EndsOn,M.MemberCode
+""", ct, ("@co", Company), ("@actor", Actor));
+        return Ok(new { summary = summary.Single(), sports, gender, age, expiring });
     }
 }

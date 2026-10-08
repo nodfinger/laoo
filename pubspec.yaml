@@ -52,6 +52,10 @@ dependencies:
     path: projects/school
   laoo_school_food:
     path: projects/school_food
+  laoo_sport:
+    path: projects/sport
+  laoo_market:
+    path: projects/market
   laoo_patrol:
     path: projects/patrol
   laoo_digital_checklist:
