@@ -17,6 +17,7 @@ import 'package:laoo_memo/memo_feature.dart';
 import 'package:laoo_provider/provider_feature.dart';
 import 'package:laoo_school/school_feature.dart';
 import 'package:laoo_school_food/school_food_feature.dart';
+import 'package:laoo_patrol/patrol_feature.dart';
 import 'package:laoo_intranet/intranet_feature.dart';
 import 'package:laoo_vote/vote_feature.dart';
 import 'package:laoo_pos/pos_feature.dart';
@@ -217,6 +218,7 @@ final GoRouter appRouter = GoRouter(
     ...buildProviderFeatureRoutes(),
     ...buildSchoolFeatureRoutes(),
     ...buildSchoolFoodRoutes(),
+    ...buildPatrolFeatureRoutes(),
     ...buildIntranetFeatureRoutes(),
     ...buildVoteFeatureRoutes(),
     ...buildPosFeatureRoutes(),

@@ -20,7 +20,7 @@ void main() {
     appRouter.go(RoutePaths.landing);
   });
 
-  testWidgets('App opens the minimal landing page', (
+  testWidgets('App opens the public landing page with provider search', (
     WidgetTester tester,
   ) async {
     appRouter.go(RoutePaths.landing);
@@ -28,7 +28,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.bySemanticsLabel('Laoo Provider'), findsOneWidget);
-    expect(find.byType(TextField), findsNothing);
+    expect(find.byType(TextField), findsOneWidget);
+    expect(find.text('ค้นหาชื่อบริษัทหรือบริการ'), findsOneWidget);
     expect(find.byType(CircularProgressIndicator), findsNothing);
     expect(tester.takeException(), isNull);
   });

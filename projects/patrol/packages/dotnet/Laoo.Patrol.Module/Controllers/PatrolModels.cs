@@ -1,0 +1,12 @@
+namespace Laoo.Patrol.Controllers;
+public sealed record SettingInput(int GraceBefore, int GraceAfter, int OfflineHours, int GpsRadius, int EscalateAfter);
+public sealed record CheckpointInput(long BranchId, long? BuildingId, long? FloorId, long? RoomId, string Code, string Name, string TimeMode, decimal? Latitude, decimal? Longitude, int? GpsRadius, bool RequireGps, bool RequirePhoto, bool RequireChecklist, List<string> Methods, bool Active = true);
+public sealed record DeviceInput(long? CheckpointId, string Code, string Name, string Adapter, string? PublicKey);
+public sealed record CredentialInput(long EmployeeId, string Type, string Reference, string? Hint, long? DeviceId);
+public sealed record ChecklistInput(string Code, string Name, string WorkType, List<string> Items, bool Active = true);
+public sealed record RoutePointInput(long CheckpointId, string TimeMode, TimeSpan? WindowStart, TimeSpan? WindowEnd, int GraceBefore, int GraceAfter, long? ChecklistTemplateId);
+public sealed record RouteInput(long BranchId, string Code, string Name, string WorkType, string SequenceMode, List<RoutePointInput> Points, bool Active = true);
+public sealed record ScheduleInput(long RouteId, string Code, string Name, DateTime StartsAt, DateTime EndsAt, long? EmployeeId, string? TeamCode);
+public sealed record CheckEventInput(Guid EventKey, string Method, DateTime OccurredAt, long? DeviceId, long? DeviceSequence, decimal? Latitude, decimal? Longitude, decimal? GpsAccuracy, bool Offline, string? PhotoPath, string? ChecklistJson, string? Note, string? CredentialReference, string? Signature);
+public sealed record IncidentInput(long RunId, long? RunCheckpointId, string Severity, string Subject, string Detail);
+public sealed record PatrolReasonInput(string Reason);

@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense', 'project', 'intranet', 'vote', 'pos', 'sales', 'evaluation')]
+    [ValidateSet('service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense', 'project', 'intranet', 'vote', 'pos', 'sales', 'evaluation', 'patrol')]
     [string]$Module,
 
     [ValidateSet('unassigned', 'core', 'business', 'center-service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense', 'project', 'intranet', 'vote', 'pos', 'sales', 'evaluation')]
@@ -96,6 +96,7 @@ try {
         'pos' { 'projects\pos\packages\dotnet\Laoo.Pos.Module\Laoo.Pos.Module.csproj' }
         'sales' { 'projects\sales\packages\dotnet\Laoo.Sales.Module\Laoo.Sales.Module.csproj' }
         'evaluation' { 'projects\evaluation\packages\dotnet\Laoo.Evaluation.Module\Laoo.Evaluation.Module.csproj' }
+        'patrol' { 'projects\patrol\packages\dotnet\Laoo.Patrol.Module\Laoo.Patrol.Module.csproj' }
     }
     Invoke-Checked "$Module API module Release build" { dotnet build $apiModule -c Release }
 }
