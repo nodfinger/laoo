@@ -63,7 +63,7 @@ FROM dbo.TDSPPackage P WHERE P.CompanyID=@co ORDER BY P.PackageName
         await using var db = await Open(ct);
         if (await Guard(db, "54006", "VIEW", ct) is { } denied) return denied;
         return Ok(await SportDb.Rows(db, null, """
-SELECT M.MemberID id,M.MemberCode code,P.FullName name,M.LevelID levelId,
+SELECT M.MemberID id,M.MemberCode code,M.PersonID personId,P.FullName name,M.LevelID levelId,
  L.LevelName level,M.GenderCode gender,M.BirthDate birthDate,M.IsActive active
 FROM dbo.TDSPMember M
 JOIN dbo.TDADPerson P ON P.CompanyID=M.CompanyID AND P.PersonID=M.PersonID

@@ -13,6 +13,8 @@ import 'package:laoo_memo/memo_feature.dart';
 import 'package:laoo_provider/provider_feature.dart';
 import 'package:laoo_school/school_feature.dart';
 import 'package:laoo_school_food/school_food_feature.dart';
+import 'package:laoo_sport/sport_feature.dart';
+import 'package:laoo_market/market_feature.dart';
 import 'package:laoo_patrol/patrol_feature.dart';
 import 'package:laoo_digital_checklist/digital_checklist_feature.dart';
 import 'package:laoo_intranet/intranet_feature.dart';
@@ -40,6 +42,7 @@ import 'core/config/app_config.dart';
 import 'core/company_setup/company_setup_controller.dart';
 import 'core/company_setup/company_date_formatter.dart';
 import 'core/navigation/navigation_menu_repository.dart';
+import 'core/navigation/navigation_icon_resolver.dart';
 import 'core/widgets/auto_dismiss_message.dart';
 import 'core/widgets/timed_snack_bar.dart';
 import 'features/support/presentation/widgets/support_workspace_shell.dart';
@@ -138,6 +141,37 @@ void main() {
       return setup == null
           ? CompanyDateFormatter.formatDateByYearFormat(value, 'AD')
           : CompanyDateFormatter.formatDate(value, setup);
+    },
+    message: (context, {required message, required error}) =>
+        showTimedSnackBar(context, message: message, error: error),
+  );
+  configureSportFeatureHost(
+    shell: _buildMeetingWorkspaceShell,
+    api: ApiClient.new,
+    dispose: (client) => (client as ApiClient).dispose(),
+    tokens: _surveyWorkspaceTokens,
+    menuIcon: (name) => NavigationIconResolver.resolve(name),
+    message: (context, {required message, required error}) =>
+        showTimedSnackBar(context, message: message, error: error),
+  );
+  configureMarketFeatureHost(
+    shell: _buildMeetingWorkspaceShell,
+    api: ApiClient.new,
+    dispose: (client) => (client as ApiClient).dispose(),
+    tokens: _surveyWorkspaceTokens,
+    menuIcon: (name) => NavigationIconResolver.resolve(name),
+    dateText: (value) {
+      final setup = companySetupController.current;
+      return setup == null
+          ? CompanyDateFormatter.formatDateByYearFormat(value, 'AD')
+          : CompanyDateFormatter.formatDate(value, setup);
+    },
+    errorText: (error, action) {
+      if (error is ApiException) {
+        final description = error.description;
+        return '$actionไม่สำเร็จ: ${error.message}\nรายละเอียดเพิ่มเติม: ${description ?? 'ตรวจสอบข้อมูลและลองอีกครั้ง'}';
+      }
+      return '$actionไม่สำเร็จ กรุณาตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง\nรายละเอียดเพิ่มเติม: หากยังพบปัญหาให้ติดต่อผู้ดูแลระบบ';
     },
     message: (context, {required message, required error}) =>
         showTimedSnackBar(context, message: message, error: error),

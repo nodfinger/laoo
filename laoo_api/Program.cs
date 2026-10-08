@@ -68,6 +68,7 @@ builder.Services
     .AddApplicationPart(typeof(SchoolModuleMarker).Assembly)
     .AddApplicationPart(typeof(SchoolFoodModuleMarker).Assembly)
     .AddApplicationPart(typeof(SportModuleMarker).Assembly)
+    .AddApplicationPart(typeof(Laoo.Market.MarketModuleMarker).Assembly)
     .AddApplicationPart(typeof(PatrolModuleMarker).Assembly)
     .AddApplicationPart(typeof(DigitalChecklistModuleMarker).Assembly)
     .AddApplicationPart(typeof(DocumentControlModuleMarker).Assembly)

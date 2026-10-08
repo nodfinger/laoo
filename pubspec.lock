@@ -653,6 +653,13 @@ packages:
       relative: true
     source: path
     version: "1.0.0+1"
+  laoo_market:
+    dependency: "direct main"
+    description:
+      path: "projects/market"
+      relative: true
+    source: path
+    version: "1.0.0+1"
   laoo_meeting:
     dependency: "direct main"
     description:
@@ -751,6 +758,13 @@ packages:
       relative: true
     source: path
     version: "0.1.0"
+  laoo_sport:
+    dependency: "direct main"
+    description:
+      path: "projects/sport"
+      relative: true
+    source: path
+    version: "1.0.0+1"
   laoo_survey:
     dependency: "direct main"
     description:

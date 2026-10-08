@@ -17,6 +17,8 @@ import 'package:laoo_memo/memo_feature.dart';
 import 'package:laoo_provider/provider_feature.dart';
 import 'package:laoo_school/school_feature.dart';
 import 'package:laoo_school_food/school_food_feature.dart';
+import 'package:laoo_sport/sport_feature.dart';
+import 'package:laoo_market/market_feature.dart';
 import 'package:laoo_patrol/patrol_feature.dart';
 import 'package:laoo_digital_checklist/digital_checklist_feature.dart';
 import 'package:laoo_intranet/intranet_feature.dart';
@@ -219,6 +221,8 @@ final GoRouter appRouter = GoRouter(
     ...buildProviderFeatureRoutes(),
     ...buildSchoolFeatureRoutes(),
     ...buildSchoolFoodRoutes(),
+    ...buildSportRoutes(),
+    ...buildMarketRoutes(),
     ...buildPatrolFeatureRoutes(),
     ...buildDigitalChecklistFeatureRoutes(),
     ...buildIntranetFeatureRoutes(),

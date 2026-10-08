@@ -51,6 +51,16 @@ async Task Check(string name, HttpMethod method, string path, HttpStatusCode exp
 await Check("anonymous denied", HttpMethod.Get, "api/company/sport/settings", HttpStatusCode.Unauthorized);
 await Check("settings", HttpMethod.Get, "api/company/sport/settings", HttpStatusCode.OK, jwt);
 await Check("actions", HttpMethod.Get, "api/company/sport/actions/54008", HttpStatusCode.OK, jwt);
+foreach (var menu in Enumerable.Range(54001, 11))
+    await Check($"menu {menu} access", HttpMethod.Get,
+        $"api/company/sport/actions/{menu}", HttpStatusCode.OK, jwt);
+foreach (var menu in new[] { 54003, 54005, 54006, 54007, 54008, 54010, 54011 })
+    await Check($"menu {menu} options", HttpMethod.Get,
+        $"api/company/sport/options/{menu}", HttpStatusCode.OK, jwt);
+await Check("memberships page", HttpMethod.Get, "api/company/sport/memberships?page=1", HttpStatusCode.OK, jwt);
+await Check("check-ins", HttpMethod.Get,
+    "api/company/sport/checkins?from=2026-10-01T00:00:00%2B07:00&to=2026-10-09T00:00:00%2B07:00",
+    HttpStatusCode.OK, jwt);
 await Check("sport types", HttpMethod.Get, "api/company/sport/sport-types", HttpStatusCode.OK, jwt);
 await Check("facilities", HttpMethod.Get, "api/company/sport/facilities", HttpStatusCode.OK, jwt);
 await Check("levels", HttpMethod.Get, "api/company/sport/levels", HttpStatusCode.OK, jwt);
@@ -61,6 +71,18 @@ var today = DateOnly.FromDateTime(DateTime.UtcNow);
 await Check("dashboard", HttpMethod.Get,
     $"api/company/sport/dashboard?from={today.ToString("yyyy-MM-dd",CultureInfo.InvariantCulture)}&to={today.AddDays(1).ToString("yyyy-MM-dd",CultureInfo.InvariantCulture)}",
     HttpStatusCode.OK, jwt);
+using (var dashboardRequest = new HttpRequestMessage(HttpMethod.Get,
+    $"api/company/sport/dashboard?from={today.ToString("yyyy-MM-dd",CultureInfo.InvariantCulture)}&to={today.AddDays(1).ToString("yyyy-MM-dd",CultureInfo.InvariantCulture)}"))
+{
+    dashboardRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", jwt);
+    using var response = await http.SendAsync(dashboardRequest);
+    if (response.StatusCode != HttpStatusCode.OK)
+        throw new Exception($"dashboard dimensions: {(int)response.StatusCode}");
+    using var data = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+    foreach (var dimension in new[] { "summary", "sports", "gender", "age", "expiring" })
+        if (!data.RootElement.TryGetProperty(dimension, out _)) throw new Exception($"Dashboard missing {dimension}");
+    passed++; Console.WriteLine("PASS dashboard includes all summary dimensions");
+}
 await Check("wrong company denied", HttpMethod.Get, "api/company/sport/settings",
     HttpStatusCode.Forbidden, Token(99999999, actor, "LAOO"));
 await Check("no user permission denied", HttpMethod.Get, "api/company/sport/settings",
@@ -81,6 +103,14 @@ void Assert(string name, HttpStatusCode actual, HttpStatusCode expected)
 }
 var memberA = await Number($"SELECT MemberID FROM dbo.TDSPMember WHERE CompanyID={company} AND MemberCode=N'SP261004_A'");
 var memberB = await Number($"SELECT MemberID FROM dbo.TDSPMember WHERE CompanyID={company} AND MemberCode=N'SP261004_B'");
+if (memberA <= 0 || memberB <= 0) throw new Exception("Sport sample members missing");
+foreach (var (table, minimum) in new[] { ("TDSPMember", 2), ("TDSPSportType", 3),
+    ("TDSPFacility", 3), ("TDSPPackage", 2), ("TDSPBooking", 2) })
+{
+    var count = await Number($"SELECT COUNT(*) FROM dbo.{table} WHERE CompanyID={company}");
+    if (count < minimum) throw new Exception($"Sport sample {table} missing: {count}");
+    passed++; Console.WriteLine($"PASS sample {table} ({count})");
+}
 await Check("POS member lookup", HttpMethod.Get,
     "api/company/pos/sport-members/SP261004_A", HttpStatusCode.OK, jwt);
 await Check("POS unknown member", HttpMethod.Get,
@@ -104,6 +134,14 @@ using (var previewRequest = new HttpRequestMessage(HttpMethod.Get,
 var multi = await Number($"SELECT PackageID FROM dbo.TDSPPackage WHERE CompanyID={company} AND PackageCode=N'SP261004_MULTI'");
 var daily = await Number($"SELECT PackageID FROM dbo.TDSPPackage WHERE CompanyID={company} AND PackageCode=N'SP261004_DAY'");
 var court = await Number($"SELECT FacilityID FROM dbo.TDSPFacility WHERE CompanyID={company} AND FacilityCode=N'SP261004_B1'");
+await Check("package sport selections", HttpMethod.Get,
+    $"api/company/sport/packages/{multi}/sports", HttpStatusCode.OK, jwt);
+await Check("facility hours selections", HttpMethod.Get,
+    $"api/company/sport/facilities/{court}/hours", HttpStatusCode.OK, jwt);
+await Check("member booking entitlements", HttpMethod.Get,
+    $"api/company/sport/bookings/member/{memberA}/entitlements", HttpStatusCode.OK, jwt);
+await Check("foreign package selections hidden", HttpMethod.Get,
+    "api/company/sport/packages/99999999/sports", HttpStatusCode.OK, jwt);
 var (duplicateSportStatus, _) = await Post("api/company/sport/sport-types", new {
     code = "SP261004_BAS", name = "ทดสอบรหัสซ้ำ"
 });
