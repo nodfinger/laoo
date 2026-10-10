@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../app/theme/laoo_design_tokens.dart';
 import '../../../../app/theme/workspace_theme_presets.dart';
 import '../../../../core/auth/app_auth_controller.dart';
+import '../../../../core/company_setup/company_date_formatter.dart';
 import '../../../../core/company_setup/company_setup_controller.dart';
 import '../../../../core/navigation/navigation_menu_repository.dart';
 import '../../../../core/widgets/pinned_data_table.dart';
@@ -662,6 +663,7 @@ class _DeliveryNoteActionPageState extends State<DeliveryNoteActionPage> {
   final _form = GlobalKey<FormState>();
   final _code = TextEditingController();
   final _date = TextEditingController();
+  final _creditDays = TextEditingController(text: '0');
   final _contact = TextEditingController();
   final _phone = TextEditingController();
   final _address = TextEditingController();
@@ -672,6 +674,7 @@ class _DeliveryNoteActionPageState extends State<DeliveryNoteActionPage> {
   int? _customerId;
   int? _referenceId;
   String _referenceType = 'NONE';
+  String _saleTypeCode = 'CASH';
   String _status = 'DRAFT';
   String _menuName = 'ใบส่งของ';
   bool _loading = true;
@@ -690,6 +693,16 @@ class _DeliveryNoteActionPageState extends State<DeliveryNoteActionPage> {
     0,
     (s, r) => s + _num(r['deliveryQty']) * _num(r['unitPrice']),
   );
+  String get _dueDateText {
+    final date = DateTime.tryParse(_date.text);
+    final days = int.tryParse(_creditDays.text);
+    if (date == null || days == null || days <= 0) return '-';
+    return CompanyDateFormatter.formatDateByYearFormat(
+      date.add(Duration(days: days)),
+      companySetupController.current?.yearFormat ?? 'C',
+    );
+  }
+
   Map<String, dynamic>? get _selectedCustomer =>
       _customers.cast<Map<String, dynamic>?>().firstWhere(
         (customer) => customer?['customerId'] == _customerId,
@@ -711,6 +724,7 @@ class _DeliveryNoteActionPageState extends State<DeliveryNoteActionPage> {
     for (final c in [
       _code,
       _date,
+      _creditDays,
       _contact,
       _phone,
       _address,
@@ -778,6 +792,8 @@ class _DeliveryNoteActionPageState extends State<DeliveryNoteActionPage> {
       _id = (h['deliveryNoteId'] as num).toInt();
       _code.text = '${h['deliveryCode'] ?? ''}';
       _date.text = '${h['deliveryDate']}'.split('T').first;
+      _saleTypeCode = '${h['saleTypeCode'] ?? ''}';
+      _creditDays.text = '${h['creditDays'] ?? 0}';
       _referenceType = '${h['referenceType'] ?? 'NONE'}';
       _referenceId = (h['referenceId'] as num?)?.toInt();
       _customerId = (h['customerId'] as num).toInt();
@@ -912,6 +928,10 @@ class _DeliveryNoteActionPageState extends State<DeliveryNoteActionPage> {
 
   Map<String, dynamic> _body() => {
     'deliveryDate': _date.text,
+    'saleTypeCode': _saleTypeCode,
+    'creditDays': _saleTypeCode == 'CREDIT'
+        ? int.tryParse(_creditDays.text)
+        : null,
     'referenceType': _referenceType,
     'referenceId': _referenceId,
     'customerId': _customerId,
@@ -1272,11 +1292,73 @@ class _DeliveryNoteActionPageState extends State<DeliveryNoteActionPage> {
                                       controller: _date,
                                       readOnly: !_editable,
                                       decoration: _dec('* วันที่เอกสาร'),
+                                      onChanged: (_) => setState(() {}),
                                       validator: (v) => v?.isEmpty == true
                                           ? 'กรุณาระบุวันที่'
                                           : null,
                                     ),
                                   ),
+                                  SizedBox(
+                                    width: compact ? constraints.maxWidth : 200,
+                                    child: DropdownButtonFormField<String>(
+                                      initialValue:
+                                          const [
+                                            'CASH',
+                                            'CREDIT',
+                                          ].contains(_saleTypeCode)
+                                          ? _saleTypeCode
+                                          : null,
+                                      decoration: _dec('* ประเภทขาย'),
+                                      items: const [
+                                        DropdownMenuItem(
+                                          value: 'CASH',
+                                          child: Text('เงินสด'),
+                                        ),
+                                        DropdownMenuItem(
+                                          value: 'CREDIT',
+                                          child: Text('เครดิต'),
+                                        ),
+                                      ],
+                                      onChanged: _editable
+                                          ? (value) => setState(() {
+                                              _saleTypeCode = value ?? '';
+                                              if (_saleTypeCode == 'CASH') {
+                                                _creditDays.text = '0';
+                                              }
+                                            })
+                                          : null,
+                                      validator: (value) => value == null
+                                          ? 'กรุณาเลือกประเภทขาย'
+                                          : null,
+                                    ),
+                                  ),
+                                  if (_saleTypeCode == 'CREDIT') ...[
+                                    SizedBox(
+                                      width: compact
+                                          ? constraints.maxWidth
+                                          : 170,
+                                      child: TextFormField(
+                                        controller: _creditDays,
+                                        readOnly: !_editable,
+                                        keyboardType: TextInputType.number,
+                                        decoration: _dec('* วันเครดิต'),
+                                        onChanged: (_) => setState(() {}),
+                                        validator: (value) =>
+                                            (int.tryParse(value ?? '') ?? 0) > 0
+                                            ? null
+                                            : 'กรุณาระบุวันเครดิตมากกว่า 0',
+                                      ),
+                                    ),
+                                    SizedBox(
+                                      width: compact
+                                          ? constraints.maxWidth
+                                          : 200,
+                                      child: InputDecorator(
+                                        decoration: _dec('วันครบกำหนด'),
+                                        child: Text(_dueDateText),
+                                      ),
+                                    ),
+                                  ],
                                   SizedBox(
                                     width: compact ? constraints.maxWidth : 260,
                                     child: TextFormField(

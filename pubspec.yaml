@@ -90,6 +90,7 @@ dependencies:
   geolocator: ^14.0.2
   pdf: ^3.13.0
   printing: ^5.15.0
+  archive: ^4.0.9
   qr_flutter: ^4.1.0
 
 dev_dependencies:

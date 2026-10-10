@@ -6,6 +6,8 @@ public sealed class TaxInvoiceUpsertRequest
     public string? ReferenceType { get; init; }
     public long? ReferenceId { get; init; }
     public long CustomerId { get; init; }
+    public long? BranchId { get; init; }
+    public string? CustomerTaxBranchCode { get; init; }
     public string? ContactName { get; init; }
     public string? ContactPhone { get; init; }
     public string? ContactEmail { get; init; }

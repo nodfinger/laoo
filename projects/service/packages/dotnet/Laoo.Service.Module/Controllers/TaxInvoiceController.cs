@@ -81,6 +81,7 @@ public sealed class TaxInvoiceController(IConfiguration configuration) : Control
         if (!await Can(c, "VIEW", token)) return Forbid();
         return Ok(new
         {
+            branches = await Rows(c, "SELECT BranchID,BranchCode,BranchNameTH,TaxBranchCode FROM dbo.TDADBranch WHERE CompanyID=@company AND IsActive=1 ORDER BY BranchCode", token, r => new { branchId=r.GetInt64(0),branchCode=r.GetString(1),branchName=r.GetString(2),taxBranchCode=Text(r,3) }),
             customers = await Rows(c, """
               SELECT CustomerID,CusCode,CusName,CusAddress,TaxID,ContName1,Phone1,Email1,ContName2,Phone2,Email2,PaymentType,CreditDays
               FROM dbo.TDARCustomer WHERE CompanyID=@company AND IsActive=1 ORDER BY CusCode
@@ -132,7 +133,7 @@ public sealed class TaxInvoiceController(IConfiguration configuration) : Control
         if (!await Can(c, "VIEW", token)) return Forbid();
         const string sql = """
         SELECT TaxInvoiceID,TaxInvoiceCode,TaxInvoiceDate,ReferenceType,COALESCE(QuotationID,PreOrderID,TemporaryReceiptID),CustomerID,CusCode,CusName,CusAddress,TaxID,
-               ContactName,ContactPhone,ContactEmail,PaymentType,CreditDays,DueDate,Subtotal,DiscountPercent,DiscountAmount,AmountAfterDiscount,TaxPercent,TaxAmount,NetAmount,StatusCode,Remark
+               ContactName,ContactPhone,ContactEmail,PaymentType,CreditDays,DueDate,Subtotal,DiscountPercent,DiscountAmount,AmountAfterDiscount,TaxPercent,TaxAmount,NetAmount,StatusCode,Remark,BranchID,CustomerTaxBranchCode
         FROM dbo.TDARTaxInvoice WHERE TaxInvoiceID=@id AND CompanyID=@company AND IsActive=1
         """;
         object? header = null;
@@ -145,7 +146,8 @@ public sealed class TaxInvoiceController(IConfiguration configuration) : Control
                 taxInvoiceId = r.GetInt64(0), taxInvoiceCode = r.GetString(1), taxInvoiceDate = r.GetDateTime(2), referenceType = r.GetString(3), referenceId = Long(r, 4),
                 customerId = r.GetInt64(5), customerCode = r.GetString(6), customerName = r.GetString(7), customerAddress = Text(r, 8), taxId = Text(r, 9),
                 contactName = Text(r, 10), contactPhone = Text(r, 11), contactEmail = Text(r, 12), paymentType = Text(r, 13), creditDays = r.GetInt32(14), dueDate = Date(r, 15),
-                subtotal = r.GetDecimal(16), discountPercent = r.GetDecimal(17), discountAmount = r.GetDecimal(18), amountAfterDiscount = r.GetDecimal(19), taxPercent = r.GetDecimal(20), taxAmount = r.GetDecimal(21), netAmount = r.GetDecimal(22), statusCode = r.GetString(23), remark = Text(r, 24)
+                subtotal = r.GetDecimal(16), discountPercent = r.GetDecimal(17), discountAmount = r.GetDecimal(18), amountAfterDiscount = r.GetDecimal(19), taxPercent = r.GetDecimal(20), taxAmount = r.GetDecimal(21), netAmount = r.GetDecimal(22), statusCode = r.GetString(23), remark = Text(r, 24),
+                branchId = Long(r,25), customerTaxBranchCode = Text(r,26)
             };
         }
         if (header is null) return NotFound(new { message = "ไม่พบใบกำกับภาษี", description = "เอกสารอาจถูกลบหรือไม่อยู่ในบริษัทนี้" });
@@ -363,6 +365,12 @@ public sealed class TaxInvoiceController(IConfiguration configuration) : Control
         {
             var status = await Scalar(c, tx, "SELECT StatusCode FROM dbo.TDARTaxInvoice WITH(UPDLOCK,HOLDLOCK) WHERE TaxInvoiceID=@id AND CompanyID=@company AND IsActive=1", id, token);
             if (status != "DRAFT") return await RollbackConflict(tx, token, "ออกใบกำกับภาษีไม่ได้", "ออกเอกสารได้เฉพาะสถานะร่าง");
+            await using (var vat = new SqlCommand("SELECT IsVatRegistered FROM dbo.TDSTCompanySetUp WHERE CompanyID=@company AND IsActive=1", c, tx))
+            {
+                Add(vat, "@company", SqlDbType.BigInt, CompanyId());
+                if (await vat.ExecuteScalarAsync(token) is not bool registered || !registered)
+                    return await RollbackBadRequest(tx, token, "ออกใบกำกับภาษีไม่ได้", "บริษัทต้องยืนยันสถานะจดทะเบียน VAT ที่เมนูตั้งค่าระบบภาษีก่อน");
+            }
             const string sql = "SELECT TaxInvoiceDetailID,ItemID,Quantity,PreOrderDetailID,QuotationDetailID,WarehouseID FROM dbo.TDARTaxInvoiceDetail WHERE TaxInvoiceID=@id ORDER BY [LineNo]";
             var lines = new List<(long Detail,long Item,decimal Qty,long? Pre,long? Quote,long? Warehouse)>();
             await using (var cmd = new SqlCommand(sql, c, tx))
@@ -384,6 +392,12 @@ public sealed class TaxInvoiceController(IConfiguration configuration) : Control
                     Add(pre,"@qty",SqlDbType.Decimal,line.Qty); Add(pre,"@detail",SqlDbType.BigInt,line.Pre.Value);
                     if (await pre.ExecuteNonQueryAsync(token) == 0) return await RollbackConflict(tx, token, "จำนวนสินค้าเกินใบจอง", $"รายการอ้างอิง {line.Pre.Value} มีจำนวนคงเหลือไม่เพียงพอ");
                 }
+            }
+            await using (var branch = new SqlCommand("SELECT COUNT(1) FROM dbo.TDARTaxInvoice T JOIN dbo.TDADBranch B ON B.BranchID=T.BranchID AND B.CompanyID=T.CompanyID AND B.IsActive=1 AND LEN(B.TaxBranchCode)=5 WHERE T.TaxInvoiceID=@id AND T.CompanyID=@company", c, tx))
+            {
+                Add(branch,"@id",SqlDbType.BigInt,id);Add(branch,"@company",SqlDbType.BigInt,CompanyId());
+                if(Convert.ToInt32(await branch.ExecuteScalarAsync(token))!=1)
+                    return await RollbackBadRequest(tx,token,"ข้อมูลสาขาภาษีไม่ครบ","เลือกสาขาที่มีรหัสสาขาภาษี 5 หลักก่อนออกใบกำกับภาษี");
             }
             await using (var done = new SqlCommand("UPDATE dbo.TDARTaxInvoice SET StatusCode=N'ISSUED',UpdateDate=SYSUTCDATETIME(),UpdatedBy=@user WHERE TaxInvoiceID=@id AND CompanyID=@company", c, tx))
             { Add(done,"@id",SqlDbType.BigInt,id); Add(done,"@company",SqlDbType.BigInt,CompanyId()); Add(done,"@user",SqlDbType.BigInt,UserId()); await done.ExecuteNonQueryAsync(token); }
@@ -433,8 +447,14 @@ public sealed class TaxInvoiceController(IConfiguration configuration) : Control
         var type = NormalizeReference(request.ReferenceType);
         if (type is null) return BadRequest(new { message = "ประเภทเอกสารอ้างอิงไม่ถูกต้อง", description = "รองรับ NONE, QUOTATION, PREORDER และ TEMP_RECEIPT เท่านั้น" });
         if (request.CustomerId <= 0 || request.Items.Count == 0) return BadRequest(new { message = "ข้อมูลใบกำกับภาษีไม่ครบ", description = "กรุณาเลือกลูกค้าและเพิ่มสินค้าอย่างน้อย 1 รายการ" });
+        if (request.BranchId is null or <=0 || (request.CustomerTaxBranchCode is { Length: >0 } && (request.CustomerTaxBranchCode.Length!=5 || !request.CustomerTaxBranchCode.All(char.IsDigit))))
+            return BadRequest(new { message = "ข้อมูลสาขาภาษีไม่ถูกต้อง", description = "เลือกสาขาบริษัท และระบุสาขาภาษีลูกค้าเป็นตัวเลข 5 หลักหากมี" });
         if (request.CreditDays < 0 || request.TaxPercent is < 0 or > 100 || request.DiscountPercent is < 0 or > 100 || request.DiscountAmount < 0)
             return BadRequest(new { message = "ยอดเงินหรือเงื่อนไขเครดิตไม่ถูกต้อง", description = "จำนวนวันเครดิตต้องไม่ติดลบ และเปอร์เซ็นต์ต้องอยู่ระหว่าง 0 ถึง 100" });
+        var saleType = request.PaymentType?.Trim().ToUpperInvariant();
+        if (saleType is not ("CASH" or "CREDIT")) return BadRequest(new { message = "ประเภทขายไม่ถูกต้อง", description = "กรุณาเลือกเงินสดหรือเครดิต" });
+        if (saleType == "CREDIT" && request.CreditDays <= 0) return BadRequest(new { message = "วันเครดิตไม่ถูกต้อง", description = "การขายเครดิตต้องระบุจำนวนวันมากกว่า 0" });
+        if (saleType == "CASH" && request.CreditDays != 0) return BadRequest(new { message = "วันเครดิตไม่สอดคล้อง", description = "การขายเงินสดต้องมีวันเครดิตเป็น 0" });
         await using var c = await Open(token);
         if (!await Can(c, action, token)) return Forbid();
         await using var tx = (SqlTransaction)await c.BeginTransactionAsync(IsolationLevel.Serializable, token);
@@ -442,6 +462,12 @@ public sealed class TaxInvoiceController(IConfiguration configuration) : Control
         {
             var customer = await Customer(c, tx, request.CustomerId, token);
             if (customer is null) return await RollbackBadRequest(tx, token, "เลือกลูกค้าไม่ได้", "ไม่พบลูกค้าในบริษัทที่กำลังใช้งาน");
+            await using (var branch = new SqlCommand("SELECT COUNT(1) FROM dbo.TDADBranch WHERE CompanyID=@company AND BranchID=@branch AND IsActive=1",c,tx))
+            {
+                Add(branch,"@company",SqlDbType.BigInt,CompanyId());Add(branch,"@branch",SqlDbType.BigInt,request.BranchId);
+                if(Convert.ToInt32(await branch.ExecuteScalarAsync(token))!=1)
+                    return await RollbackBadRequest(tx,token,"ไม่พบสาขา","สาขาที่เลือกไม่อยู่ในบริษัทนี้");
+            }
             var referenceError = await ValidateReference(c, tx, type, request.ReferenceId, request.CustomerId, token);
             if (referenceError is not null) return await RollbackBadRequest(tx, token, "เอกสารอ้างอิงไม่ถูกต้อง", referenceError);
             var calculated = new List<CalculatedLine>();
@@ -475,7 +501,7 @@ public sealed class TaxInvoiceController(IConfiguration configuration) : Control
                   UPDATE dbo.TDARTaxInvoice SET TaxInvoiceDate=@date,ReferenceType=@type,QuotationID=@quotation,PreOrderID=@preorder,TemporaryReceiptID=@receipt,
                     CustomerID=@customer,CusCode=@cusCode,CusName=@cusName,CusAddress=@address,TaxID=@tax,ContactName=@contact,ContactPhone=@phone,ContactEmail=@email,
                     PaymentType=@payment,CreditDays=@credit,DueDate=@due,Subtotal=@subtotal,DiscountPercent=@discountPercent,DiscountAmount=@discountAmount,
-                    AmountAfterDiscount=@afterDiscount,TaxPercent=@taxPercent,TaxAmount=@taxAmount,NetAmount=@net,Remark=@remark,UpdateDate=SYSUTCDATETIME(),UpdatedBy=@user
+                    AmountAfterDiscount=@afterDiscount,TaxPercent=@taxPercent,TaxAmount=@taxAmount,NetAmount=@net,Remark=@remark,BranchID=@branch,CustomerTaxBranchCode=@customerBranch,UpdateDate=SYSUTCDATETIME(),UpdatedBy=@user
                   WHERE TaxInvoiceID=@id AND CompanyID=@company;
                   DELETE dbo.TDARTaxInvoiceDetail WHERE TaxInvoiceID=@id;
                 """, c, tx);
@@ -486,10 +512,10 @@ public sealed class TaxInvoiceController(IConfiguration configuration) : Control
                 code = await NextCode(c, tx, token);
                 await using var insert = new SqlCommand("""
                   INSERT dbo.TDARTaxInvoice(CompanyID,TaxInvoiceCode,TaxInvoiceDate,ReferenceType,QuotationID,PreOrderID,TemporaryReceiptID,CustomerID,CusCode,CusName,CusAddress,TaxID,
-                    ContactName,ContactPhone,ContactEmail,PaymentType,CreditDays,DueDate,Subtotal,DiscountPercent,DiscountAmount,AmountAfterDiscount,TaxPercent,TaxAmount,NetAmount,StatusCode,Remark,IsActive,CreatedBy)
+                    ContactName,ContactPhone,ContactEmail,PaymentType,CreditDays,DueDate,Subtotal,DiscountPercent,DiscountAmount,AmountAfterDiscount,TaxPercent,TaxAmount,NetAmount,StatusCode,Remark,IsActive,CreatedBy,BranchID,CustomerTaxBranchCode)
                   OUTPUT INSERTED.TaxInvoiceID
                   VALUES(@company,@code,@date,@type,@quotation,@preorder,@receipt,@customer,@cusCode,@cusName,@address,@tax,@contact,@phone,@email,@payment,@credit,@due,
-                    @subtotal,@discountPercent,@discountAmount,@afterDiscount,@taxPercent,@taxAmount,@net,N'DRAFT',@remark,1,@user)
+                    @subtotal,@discountPercent,@discountAmount,@afterDiscount,@taxPercent,@taxAmount,@net,N'DRAFT',@remark,1,@user,@branch,@customerBranch)
                 """, c, tx);
                 Add(insert, "@code", SqlDbType.NVarChar, code, 30); BindHeader(insert, request, type, customer, subtotal, headerDiscount, afterDiscount, taxAmount, net, null);
                 invoiceId = Convert.ToInt64(await insert.ExecuteScalarAsync(token));
@@ -525,10 +551,11 @@ public sealed class TaxInvoiceController(IConfiguration configuration) : Control
     {
         var date = request.TaxInvoiceDate?.Date ?? DateTime.Today;
         Add(cmd, "@company", SqlDbType.BigInt, CompanyId()); Add(cmd, "@date", SqlDbType.Date, date); Add(cmd, "@type", SqlDbType.NVarChar, type, 30);
+        Add(cmd, "@branch", SqlDbType.BigInt, request.BranchId); Add(cmd, "@customerBranch", SqlDbType.NVarChar, Filter(request.CustomerTaxBranchCode), 5);
         Add(cmd, "@quotation", SqlDbType.BigInt, type == "QUOTATION" ? request.ReferenceId : null); Add(cmd, "@preorder", SqlDbType.BigInt, type == "PREORDER" ? request.ReferenceId : null); Add(cmd, "@receipt", SqlDbType.BigInt, type == "TEMP_RECEIPT" ? request.ReferenceId : null);
         Add(cmd, "@customer", SqlDbType.BigInt, customer.Id); Add(cmd, "@cusCode", SqlDbType.NVarChar, customer.Code, 50); Add(cmd, "@cusName", SqlDbType.NVarChar, customer.Name, 200); Add(cmd, "@address", SqlDbType.NVarChar, customer.Address, 1000); Add(cmd, "@tax", SqlDbType.NVarChar, customer.TaxId, 30);
         Add(cmd, "@contact", SqlDbType.NVarChar, Filter(request.ContactName), 200); Add(cmd, "@phone", SqlDbType.NVarChar, Filter(request.ContactPhone), 100); Add(cmd, "@email", SqlDbType.NVarChar, Filter(request.ContactEmail), 200);
-        Add(cmd, "@payment", SqlDbType.NVarChar, Filter(request.PaymentType) ?? customer.PaymentType, 50); Add(cmd, "@credit", SqlDbType.Int, request.CreditDays); Add(cmd, "@due", SqlDbType.Date, date.AddDays(request.CreditDays));
+        Add(cmd, "@payment", SqlDbType.NVarChar, request.PaymentType!.Trim().ToUpperInvariant(), 50); Add(cmd, "@credit", SqlDbType.Int, request.CreditDays); Add(cmd, "@due", SqlDbType.Date, request.PaymentType.Trim().Equals("CREDIT", StringComparison.OrdinalIgnoreCase) ? date.AddDays(request.CreditDays) : null);
         Add(cmd, "@subtotal", SqlDbType.Decimal, subtotal); Add(cmd, "@discountPercent", SqlDbType.Decimal, request.DiscountPercent); Add(cmd, "@discountAmount", SqlDbType.Decimal, discount); Add(cmd, "@afterDiscount", SqlDbType.Decimal, afterDiscount);
         Add(cmd, "@taxPercent", SqlDbType.Decimal, request.TaxPercent); Add(cmd, "@taxAmount", SqlDbType.Decimal, taxAmount); Add(cmd, "@net", SqlDbType.Decimal, net); Add(cmd, "@remark", SqlDbType.NVarChar, Filter(request.Remark), 1000); Add(cmd, "@user", SqlDbType.BigInt, UserId());
         if (id.HasValue) Add(cmd, "@id", SqlDbType.BigInt, id.Value);
