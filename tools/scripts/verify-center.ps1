@@ -1,9 +1,9 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense', 'project', 'intranet', 'vote', 'pos', 'sales', 'evaluation', 'patrol', 'digital_checklist')]
+    [ValidateSet('service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense', 'project', 'intranet', 'vote', 'pos', 'sales', 'evaluation', 'patrol', 'digital_checklist', 'rental', 'booking', 'pet')]
     [string]$Module,
 
-    [ValidateSet('unassigned', 'core', 'business', 'center-service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense', 'project', 'intranet', 'vote', 'pos', 'sales', 'evaluation')]
+    [ValidateSet('unassigned', 'core', 'business', 'center-service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense', 'project', 'intranet', 'vote', 'pos', 'sales', 'evaluation', 'rental', 'booking', 'pet')]
     [string]$Role
 )
 
@@ -13,8 +13,9 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 function Invoke-Checked {
     param([string]$Label, [scriptblock]$Command)
     Write-Host "[$Label]"
+    $global:LASTEXITCODE = $null
     & $Command
-    if (-not $?) {
+    if (-not $? -or ($null -ne $LASTEXITCODE -and $LASTEXITCODE -ne 0)) {
         $exitCode = if ($null -eq $LASTEXITCODE) { 'unknown' } else { $LASTEXITCODE }
         throw "$Label failed with exit code $exitCode"
     }
@@ -98,6 +99,9 @@ try {
         'evaluation' { 'projects\evaluation\packages\dotnet\Laoo.Evaluation.Module\Laoo.Evaluation.Module.csproj' }
         'patrol' { 'projects\patrol\packages\dotnet\Laoo.Patrol.Module\Laoo.Patrol.Module.csproj' }
         'digital_checklist' { 'projects\digital_checklist\packages\dotnet\Laoo.DigitalChecklist.Module\Laoo.DigitalChecklist.Module.csproj' }
+        'booking' { 'projects\booking\packages\dotnet\Laoo.Booking.Module\Laoo.Booking.Module.csproj' }
+        'rental' { 'projects\rental\packages\dotnet\Laoo.Rental.Module\Laoo.Rental.Module.csproj' }
+        'pet' { 'projects\pet\packages\dotnet\Laoo.Pet.Module\Laoo.Pet.Module.csproj' }
     }
     Invoke-Checked "$Module API module Release build" { dotnet build $apiModule -c Release }
 }

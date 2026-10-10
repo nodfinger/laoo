@@ -19,6 +19,10 @@ import 'package:laoo_school/school_feature.dart';
 import 'package:laoo_school_food/school_food_feature.dart';
 import 'package:laoo_sport/sport_feature.dart';
 import 'package:laoo_market/market_feature.dart';
+import 'package:laoo_rental/rental_feature.dart';
+import 'package:laoo_booking/booking_feature.dart';
+import 'package:laoo_pet/pet_feature.dart';
+import '../../features/booking_member/booking_member_portal_page.dart';
 import 'package:laoo_patrol/patrol_feature.dart';
 import 'package:laoo_digital_checklist/digital_checklist_feature.dart';
 import 'package:laoo_intranet/intranet_feature.dart';
@@ -165,6 +169,11 @@ final GoRouter appRouter = GoRouter(
     ...buildProviderPublicRoutes(),
     ...buildSchoolPublicRoutes(),
     GoRoute(
+      path: '/booking/member',
+      name: 'booking-member-portal',
+      builder: (context, state) => const BookingMemberPortalPage(),
+    ),
+    GoRoute(
       path: RoutePaths.landing,
       name: RouteNames.landing,
       builder: (context, state) => const LandingPage(),
@@ -223,6 +232,9 @@ final GoRouter appRouter = GoRouter(
     ...buildSchoolFoodRoutes(),
     ...buildSportRoutes(),
     ...buildMarketRoutes(),
+    ...buildRentalRoutes(),
+    ...buildBookingRoutes(),
+    ...buildPetRoutes(),
     ...buildPatrolFeatureRoutes(),
     ...buildDigitalChecklistFeatureRoutes(),
     ...buildIntranetFeatureRoutes(),
@@ -332,7 +344,8 @@ String? resolveAppRouteRedirect({
       EvaluationPublicRoutePaths.isResponseRoute(path) ||
       path.startsWith('/providers/') ||
       path.startsWith('/school/guardian') ||
-      path == '/school/student/food';
+      path == '/school/student/food' ||
+      path == '/booking/member';
 
   if (!isAuthenticated) {
     return isPublicRoute ? null : RoutePaths.login;
