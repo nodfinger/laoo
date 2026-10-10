@@ -47,7 +47,8 @@ public sealed record AuthenticatedUser(
     long? PersonId = null,
     long? GuardianId = null,
     long? StudentId = null,
-    long? CredentialVersion = null);
+    long? CredentialVersion = null,
+    long? MemberId = null);
 
 public sealed record TokenResult(
     string AccessToken,

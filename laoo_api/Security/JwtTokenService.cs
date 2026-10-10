@@ -43,15 +43,26 @@ public sealed class JwtTokenService
             if (user.StudentId is not > 0 || user.CredentialVersion is not > 0
                 || user.CompanyId is not > 0 || user.UserId.HasValue || user.GuardianId.HasValue
                 || user.LaooUserId.HasValue || user.PartnerUserId.HasValue || user.PersonId.HasValue
-                || user.CanLoginAsUser || user.LoginMode != "SCHOOL_STUDENT"
+                || user.CanLoginAsUser || user.LoginMode != "SCHOOL_STUDENT" || user.MemberId.HasValue
                 || user.ProjectCode is not ("LAOO_SCHOOL" or "LAOO_SCHOOL_FOOD"))
                 throw new ArgumentException("Student token requires isolated student identity and credential version.", nameof(user));
             AddIfValue(claims, "student_id", user.StudentId);
             AddIfValue(claims, "credential_version", user.CredentialVersion);
         }
-        else if (user.StudentId.HasValue || user.CredentialVersion.HasValue)
+        else if (user.UserType == "BOOKING_MEMBER")
         {
-            throw new ArgumentException("Student claims cannot be attached to another identity type.", nameof(user));
+            if (user.MemberId is not > 0 || user.CredentialVersion is not > 0
+                || user.CompanyId is not > 0 || user.UserId.HasValue || user.GuardianId.HasValue
+                || user.StudentId.HasValue || user.LaooUserId.HasValue || user.PartnerUserId.HasValue
+                || user.CanLoginAsUser || user.LoginMode != "BOOKING_MEMBER"
+                || user.ProjectCode != "LAOO_BOOKING")
+                throw new ArgumentException("Booking member token requires isolated member identity and credential version.", nameof(user));
+            AddIfValue(claims, "member_id", user.MemberId);
+            AddIfValue(claims, "credential_version", user.CredentialVersion);
+        }
+        else if (user.StudentId.HasValue || user.MemberId.HasValue || user.CredentialVersion.HasValue)
+        {
+            throw new ArgumentException("Portal claims cannot be attached to another identity type.", nameof(user));
         }
         AddIfValue(claims, "company_id", user.CompanyId);
         AddIfValue(claims, "branch_id", user.BranchId);

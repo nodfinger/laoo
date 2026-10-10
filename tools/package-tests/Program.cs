@@ -149,6 +149,9 @@ if (!CompanyMenuAccess.Sql.Contains("TDADCompanyProjectSubscription", StringComp
     || !CompanyMenuAccess.Sql.Contains("N'EXPIRED'", StringComparison.Ordinal)
     || !CompanyMenuAccess.Sql.Contains("N'DOWNLOAD'", StringComparison.Ordinal))
     throw new Exception("Shared authorization contract lost package or expired read-only guards.");
+if (!CompanyMenuAccess.Sql.Contains("S.StatusCode IN(N'ACTIVE',N'TRIAL') AND S.ExpireDate<", StringComparison.Ordinal)
+    || CompanyMenuAccess.Sql.Contains("S.StatusCode=N'EXPIRED' OR S.ExpireDate<", StringComparison.Ordinal))
+    throw new Exception("SUSPENDED subscriptions must not regain read access after expiry.");
 
 const string supportSql = """
 SELECT TOP(1) U.LaooUserID,P.ProjectID
