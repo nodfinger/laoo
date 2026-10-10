@@ -15,6 +15,9 @@ import 'package:laoo_school/school_feature.dart';
 import 'package:laoo_school_food/school_food_feature.dart';
 import 'package:laoo_sport/sport_feature.dart';
 import 'package:laoo_market/market_feature.dart';
+import 'package:laoo_rental/rental_feature.dart';
+import 'package:laoo_booking/booking_feature.dart';
+import 'package:laoo_pet/pet_feature.dart';
 import 'package:laoo_patrol/patrol_feature.dart';
 import 'package:laoo_digital_checklist/digital_checklist_feature.dart';
 import 'package:laoo_intranet/intranet_feature.dart';
@@ -172,6 +175,89 @@ void main() {
         return '$actionไม่สำเร็จ: ${error.message}\nรายละเอียดเพิ่มเติม: ${description ?? 'ตรวจสอบข้อมูลและลองอีกครั้ง'}';
       }
       return '$actionไม่สำเร็จ กรุณาตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง\nรายละเอียดเพิ่มเติม: หากยังพบปัญหาให้ติดต่อผู้ดูแลระบบ';
+    },
+    message: (context, {required message, required error}) =>
+        showTimedSnackBar(context, message: message, error: error),
+  );
+  configureRentalFeatureHost(
+    shell: _buildMeetingWorkspaceShell,
+    api: ApiClient.new,
+    dispose: (client) => (client as ApiClient).dispose(),
+    upload: (path, {required fileName, required bytes, required fields}) {
+      final client = ApiClient();
+      return client
+          .upload(path, fileName: fileName, bytes: bytes, fields: fields)
+          .whenComplete(client.dispose);
+    },
+    download: (path, {required fileName}) async {
+      final client = ApiClient();
+      try {
+        final bytes = await client.getBytes(path);
+        await FilePicker.platform.saveFile(
+          fileName: fileName,
+          bytes: Uint8List.fromList(bytes),
+        );
+      } finally {
+        client.dispose();
+      }
+    },
+    tokens: _surveyWorkspaceTokens,
+    menuIcon: (name) => NavigationIconResolver.resolve(name),
+    errorText: (error, action) {
+      if (error is ApiException) {
+        return '$actionไม่สำเร็จ: ${error.message}\nรายละเอียดเพิ่มเติม: ${error.description ?? 'ตรวจสอบข้อมูลและลองใหม่'}';
+      }
+      return '$actionไม่สำเร็จ กรุณาตรวจสอบข้อมูลและลองใหม่\nรายละเอียดเพิ่มเติม: หากยังพบปัญหาให้ติดต่อผู้ดูแลระบบ';
+    },
+    message: (context, {required message, required error}) =>
+        showTimedSnackBar(context, message: message, error: error),
+  );
+  configureBookingFeatureHost(
+    shell: _buildMeetingWorkspaceShell,
+    api: ApiClient.new,
+    dispose: (client) => (client as ApiClient).dispose(),
+    tokens: _surveyWorkspaceTokens,
+    menuIcon: (name) => NavigationIconResolver.resolve(name),
+    errorText: (error, action) {
+      if (error is ApiException) {
+        return '$actionไม่สำเร็จ: ${error.message} ${error.description ?? ''}';
+      }
+      return '$actionไม่สำเร็จ กรุณาลองอีกครั้ง';
+    },
+    message: (context, {required message, required error}) =>
+        showTimedSnackBar(context, message: message, error: error),
+  );
+  configurePetFeatureHost(
+    shell: _buildMeetingWorkspaceShell,
+    api: ApiClient.new,
+    dispose: (client) => (client as ApiClient).dispose(),
+    tokens: _surveyWorkspaceTokens,
+    menuIcon: (name) => NavigationIconResolver.resolve(name),
+    dateFormat: (date) {
+      final setup = companySetupController.current;
+      return setup == null
+          ? CompanyDateFormatter.formatDateByYearFormat(date, 'AD')
+          : CompanyDateFormatter.formatDate(date, setup);
+    },
+    upload: (path, {required fileName, required bytes, required fields}) {
+      final client = ApiClient();
+      return client
+          .upload(path, fileName: fileName, bytes: bytes, fields: fields)
+          .whenComplete(client.dispose);
+    },
+    download: (path) async {
+      final client = ApiClient();
+      try {
+        return await client.getBytes(path);
+      } finally {
+        client.dispose();
+      }
+    },
+    errorText: (error, action) {
+      if (error is ApiException) {
+        return '$actionไม่สำเร็จ: ${error.message}\nรายละเอียดเพิ่มเติม: ${error.description ?? 'ตรวจสอบข้อมูลและลองใหม่'}';
+      }
+      return '$actionไม่สำเร็จ กรุณาตรวจสอบข้อมูลและลองใหม่\nรายละเอียดเพิ่มเติม: หากยังพบปัญหาให้ติดต่อผู้ดูแลระบบ';
     },
     message: (context, {required message, required error}) =>
         showTimedSnackBar(context, message: message, error: error),

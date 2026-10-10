@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('core', 'service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense', 'project', 'document_control', 'knowledge', 'memo', 'provider', 'school', 'school_food', 'sport', 'patrol', 'intranet', 'vote', 'pos', 'sales', 'evaluation', 'digital_checklist', 'market')]
+    [ValidateSet('core', 'service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense', 'project', 'document_control', 'knowledge', 'memo', 'provider', 'school', 'school_food', 'sport', 'patrol', 'intranet', 'vote', 'pos', 'sales', 'evaluation', 'digital_checklist', 'market', 'rental', 'booking', 'pet')]
     [string]$Module,
     [string]$MigrationId,
     [switch]$DryRun
@@ -35,6 +35,9 @@ $projectCodes = @{
     evaluation = 'LAOO_EVALUATION'
     digital_checklist = 'LAOO_DIGITAL_CHECKLIST'
     market = 'LAOO_MARKET'
+    rental = 'LAOO_RENTAL'
+    booking = 'LAOO_BOOKING'
+    pet = 'LAOO_PET'
 }
 $arguments = @(
     'run',

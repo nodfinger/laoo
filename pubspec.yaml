@@ -56,6 +56,12 @@ dependencies:
     path: projects/sport
   laoo_market:
     path: projects/market
+  laoo_rental:
+    path: projects/rental
+  laoo_booking:
+    path: projects/booking
+  laoo_pet:
+    path: projects/pet
   laoo_patrol:
     path: projects/patrol
   laoo_digital_checklist:
