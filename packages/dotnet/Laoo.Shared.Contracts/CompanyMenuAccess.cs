@@ -49,7 +49,7 @@ WITH Eligible AS
        AND
        (
          (S.StatusCode IN(N'ACTIVE',N'TRIAL') AND (S.ExpireDate IS NULL OR S.ExpireDate>=CONVERT(date,SYSUTCDATETIME())))
-         OR ((S.StatusCode=N'EXPIRED' OR S.ExpireDate<CONVERT(date,SYSUTCDATETIME()))
+         OR ((S.StatusCode=N'EXPIRED' OR (S.StatusCode IN(N'ACTIVE',N'TRIAL') AND S.ExpireDate<CONVERT(date,SYSUTCDATETIME())))
              AND @Action IN(N'VIEW',N'PREVIEW',N'DOWNLOAD',N'PRINT',N'EXPORT'))
        )
        AND (NULLIF(LTRIM(RTRIM(M.FeatureCode)),N'') IS NULL OR EXISTS

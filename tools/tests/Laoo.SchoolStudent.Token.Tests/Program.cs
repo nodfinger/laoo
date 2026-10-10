@@ -43,4 +43,24 @@ Reject("impersonation capability rejected",student with {CanLoginAsUser=true});
 Reject("wrong login mode rejected",student with {LoginMode="COMPANY"});
 Reject("wrong project rejected",student with {ProjectCode="LAOO"});
 Reject("student claims on company user rejected",baseline with {StudentId=3,CredentialVersion=1});
+var bookingMember=baseline with {
+    UserType="BOOKING_MEMBER",LoginMode="BOOKING_MEMBER",ProjectCode="LAOO_BOOKING",
+    UserId=null,PersonId=4,MemberId=5,CredentialVersion=9
+};
+var memberToken=Read(bookingMember);
+Check("booking member identity claim",memberToken.Claims.Any(c=>c.Type=="member_id"&&c.Value=="5"));
+Check("booking member credential version",memberToken.Claims.Any(c=>c.Type=="credential_version"&&c.Value=="9"));
+Check("booking member cannot inherit employee identity",!memberToken.Claims.Any(c=>c.Type is "user_id" or "guardian_id" or "student_id"));
+Reject("booking member id required",bookingMember with {MemberId=null});
+Reject("booking member credential version required",bookingMember with {CredentialVersion=null});
+Reject("booking member company required",bookingMember with {CompanyId=null});
+Reject("booking member employee identity rejected",bookingMember with {UserId=1});
+Reject("booking member student identity rejected",bookingMember with {StudentId=3});
+Reject("booking member guardian identity rejected",bookingMember with {GuardianId=2});
+Reject("booking member support identity rejected",bookingMember with {LaooUserId=1});
+Reject("booking member partner identity rejected",bookingMember with {PartnerUserId=1});
+Reject("booking member impersonation rejected",bookingMember with {CanLoginAsUser=true});
+Reject("booking member wrong login mode rejected",bookingMember with {LoginMode="COMPANY"});
+Reject("booking member wrong project rejected",bookingMember with {ProjectCode="LAOO"});
+Reject("booking member claims on company identity rejected",baseline with {MemberId=5,CredentialVersion=9});
 Console.WriteLine($"Passed {count} isolated token contract checks. No database or production signing key used.");
