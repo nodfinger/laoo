@@ -538,7 +538,8 @@ class _TaxInvoiceActionPageState extends State<_TaxInvoiceActionPage> {
   final _contactName = TextEditingController();
   final _contactPhone = TextEditingController();
   final _contactEmail = TextEditingController();
-  final _paymentType = TextEditingController();
+  final _customerTaxBranch = TextEditingController();
+  final _paymentType = TextEditingController(text: 'CASH');
   final _creditDays = TextEditingController(text: '0');
   final _discountPercent = TextEditingController(text: '0');
   final _discountAmount = TextEditingController(text: '0');
@@ -551,6 +552,7 @@ class _TaxInvoiceActionPageState extends State<_TaxInvoiceActionPage> {
   String _referenceType = 'NONE';
   int? _referenceId;
   int? _customerId;
+  int? _branchId;
   int? _id;
   String _code = '';
   String _status = 'DRAFT';
@@ -561,6 +563,7 @@ class _TaxInvoiceActionPageState extends State<_TaxInvoiceActionPage> {
 
   bool get _editable => _status == 'DRAFT';
   List<Map<String, dynamic>> get _customers => _maps(_lookup['customers']);
+  List<Map<String, dynamic>> get _branches => _maps(_lookup['branches']);
   List<Map<String, dynamic>> get _items => _maps(_lookup['items']);
   List<Map<String, dynamic>> get _references => switch (_referenceType) {
     'QUOTATION' => _maps(_lookup['quotations']),
@@ -602,6 +605,7 @@ class _TaxInvoiceActionPageState extends State<_TaxInvoiceActionPage> {
       _contactName,
       _contactPhone,
       _contactEmail,
+      _customerTaxBranch,
       _paymentType,
       _creditDays,
       _discountPercent,
@@ -653,6 +657,8 @@ class _TaxInvoiceActionPageState extends State<_TaxInvoiceActionPage> {
     _referenceType = '${h['referenceType']}';
     _referenceId = (h['referenceId'] as num?)?.toInt();
     _customerId = (h['customerId'] as num?)?.toInt();
+    _branchId = (h['branchId'] as num?)?.toInt();
+    _customerTaxBranch.text = '${h['customerTaxBranchCode'] ?? ''}';
     _status = '${h['statusCode']}';
     _contactName.text = '${h['contactName'] ?? ''}';
     _contactPhone.text = '${h['contactPhone'] ?? ''}';
@@ -676,8 +682,13 @@ class _TaxInvoiceActionPageState extends State<_TaxInvoiceActionPage> {
         _contactName.text = '${customer['contactName'] ?? ''}';
         _contactPhone.text = '${customer['contactPhone'] ?? ''}';
         _contactEmail.text = '${customer['contactEmail'] ?? ''}';
-        _paymentType.text = '${customer['paymentType'] ?? ''}';
-        _creditDays.text = '${customer['creditDays'] ?? 0}';
+        final term = '${customer['paymentType'] ?? ''}'.toUpperCase();
+        _paymentType.text = const ['CASH', 'CREDIT'].contains(term)
+            ? term
+            : 'CASH';
+        _creditDays.text = _paymentType.text == 'CREDIT'
+            ? '${customer['creditDays'] ?? 0}'
+            : '0';
         _taxPercent.text = '${value['taxPercent'] ?? 7}';
         _discountPercent.text = '${value['discountPercent'] ?? 0}';
         _discountAmount.text = '${value['discountAmount'] ?? 0}';
@@ -698,8 +709,13 @@ class _TaxInvoiceActionPageState extends State<_TaxInvoiceActionPage> {
       _contactName.text = '${customer['contactName1'] ?? ''}';
       _contactPhone.text = '${customer['phone1'] ?? ''}';
       _contactEmail.text = '${customer['email1'] ?? ''}';
-      _paymentType.text = '${customer['paymentType'] ?? ''}';
-      _creditDays.text = '${customer['creditDays'] ?? 0}';
+      final term = '${customer['paymentType'] ?? ''}'.toUpperCase();
+      _paymentType.text = const ['CASH', 'CREDIT'].contains(term)
+          ? term
+          : 'CASH';
+      _creditDays.text = _paymentType.text == 'CREDIT'
+          ? '${customer['creditDays'] ?? 0}'
+          : '0';
     });
   }
 
@@ -887,6 +903,7 @@ class _TaxInvoiceActionPageState extends State<_TaxInvoiceActionPage> {
     if (!_editable || _saving) return;
     if (!_formKey.currentState!.validate() ||
         _customerId == null ||
+        _branchId == null ||
         _lines.isEmpty) {
       _error(
         'บันทึกใบกำกับภาษีไม่ได้',
@@ -901,6 +918,8 @@ class _TaxInvoiceActionPageState extends State<_TaxInvoiceActionPage> {
         'referenceType': _referenceType,
         'referenceId': _referenceType == 'NONE' ? null : _referenceId,
         'customerId': _customerId,
+        'branchId': _branchId,
+        'customerTaxBranchCode': _customerTaxBranch.text.trim(),
         'contactName': _contactName.text,
         'contactPhone': _contactPhone.text,
         'contactEmail': _contactEmail.text,
@@ -1194,6 +1213,30 @@ class _TaxInvoiceActionPageState extends State<_TaxInvoiceActionPage> {
               ),
             ),
             SizedBox(
+              width: compact ? double.infinity : 270,
+              child: DropdownButtonFormField<int>(
+                initialValue: _branchId,
+                decoration: const InputDecoration(
+                  labelText: '* สาขาออกใบกำกับภาษี',
+                ),
+                items: _branches
+                    .map(
+                      (e) => DropdownMenuItem<int>(
+                        value: (e['branchId'] as num).toInt(),
+                        child: Text(
+                          '${e['branchName']} (${e['taxBranchCode'] ?? 'รอตรวจ'})',
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    )
+                    .toList(),
+                onChanged: !_editable
+                    ? null
+                    : (value) => setState(() => _branchId = value),
+                validator: (value) => value == null ? 'กรุณาเลือกสาขา' : null,
+              ),
+            ),
+            SizedBox(
               width: compact ? double.infinity : 360,
               child: DropdownButtonFormField<int>(
                 initialValue: _customerId,
@@ -1234,6 +1277,23 @@ class _TaxInvoiceActionPageState extends State<_TaxInvoiceActionPage> {
               ),
             ),
             SizedBox(
+              width: compact ? double.infinity : 210,
+              child: TextFormField(
+                controller: _customerTaxBranch,
+                readOnly: !_editable,
+                maxLength: 5,
+                decoration: const InputDecoration(
+                  labelText: 'สาขาภาษีลูกค้า (ถ้ามี)',
+                ),
+                validator: (value) {
+                  final code = (value ?? '').trim();
+                  return code.isNotEmpty && !RegExp(r'^\d{5}$').hasMatch(code)
+                      ? 'กรุณาระบุตัวเลข 5 หลัก'
+                      : null;
+                },
+              ),
+            ),
+            SizedBox(
               width: compact ? double.infinity : 230,
               child: TextFormField(
                 controller: _contactName,
@@ -1261,31 +1321,56 @@ class _TaxInvoiceActionPageState extends State<_TaxInvoiceActionPage> {
             ),
             SizedBox(
               width: compact ? double.infinity : 200,
-              child: TextFormField(
-                controller: _paymentType,
-                readOnly: !_editable,
-                decoration: const InputDecoration(labelText: 'ประเภทชำระเงิน'),
+              child: DropdownButtonFormField<String>(
+                key: ValueKey(_paymentType.text),
+                initialValue:
+                    const ['CASH', 'CREDIT'].contains(_paymentType.text)
+                    ? _paymentType.text
+                    : null,
+                decoration: const InputDecoration(labelText: '* ประเภทขาย'),
+                items: const [
+                  DropdownMenuItem(value: 'CASH', child: Text('เงินสด')),
+                  DropdownMenuItem(value: 'CREDIT', child: Text('เครดิต')),
+                ],
+                onChanged: _editable
+                    ? (value) => setState(() {
+                        _paymentType.text = value ?? '';
+                        if (_paymentType.text == 'CASH') _creditDays.text = '0';
+                      })
+                    : null,
+                validator: (value) =>
+                    value == null ? 'กรุณาเลือกประเภทขาย' : null,
               ),
             ),
-            SizedBox(
-              width: compact ? double.infinity : 160,
-              child: _numberField(
-                _creditDays,
-                'จำนวนวันเครดิต',
-                readOnly: !_editable,
+            if (_paymentType.text == 'CREDIT') ...[
+              SizedBox(
+                width: compact ? double.infinity : 160,
+                child: TextFormField(
+                  controller: _creditDays,
+                  readOnly: !_editable,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  onChanged: (_) => setState(() {}),
+                  decoration: const InputDecoration(
+                    labelText: '* จำนวนวันเครดิต',
+                  ),
+                  validator: (value) => (int.tryParse(value ?? '') ?? 0) > 0
+                      ? null
+                      : 'กรุณาระบุวันเครดิตมากกว่า 0',
+                ),
               ),
-            ),
-            SizedBox(
-              width: compact ? double.infinity : 220,
-              child: InputDecorator(
-                decoration: const InputDecoration(labelText: 'วันครบกำหนด'),
-                child: Text(
-                  _formatDate(
-                    _date.add(Duration(days: _int(_creditDays.text))),
+              SizedBox(
+                width: compact ? double.infinity : 220,
+                child: InputDecorator(
+                  decoration: const InputDecoration(labelText: 'วันครบกำหนด'),
+                  child: Text(
+                    _formatDate(
+                      _date.add(Duration(days: _int(_creditDays.text))),
+                    ),
                   ),
                 ),
               ),
-            ),
+            ],
           ],
         ),
       ],

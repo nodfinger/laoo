@@ -2,6 +2,8 @@ namespace LaooServiceModule.Models;
 
 public sealed class DeliveryNoteUpsertRequest
 {
+    public string? SaleTypeCode { get; init; }
+    public int? CreditDays { get; init; }
     public DateTime? DeliveryDate { get; init; }
     public string? ReferenceType { get; init; }
     public long? ReferenceId { get; init; }

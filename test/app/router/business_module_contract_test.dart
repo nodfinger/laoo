@@ -52,8 +52,22 @@ void main() {
   });
 
   test('Inventory catalog is ShowOnly and issue is Header-Detail', () {
-    expect(ServiceRoutes.byMenuCode('08002')?.screenType, 3);
-    expect(ServiceRoutes.byMenuCode('08003')?.screenType, 4);
+    expect(ServiceRoutes.byMenuCode('08002').screenType, 3);
+    expect(ServiceRoutes.byMenuCode('08003').screenType, 4);
+  });
+
+  test('Core VAT purchase and monthly report routes follow ScreenType', () {
+    expect(ServiceRoutes.byMenuCode('09008').screenType, 2);
+    expect(ServiceRoutes.byMenuCode('09010').projectCode, 'LAOO');
+    expect(ServiceRoutes.byMenuCode('09010').screenType, 4);
+    expect(ServiceRoutes.byMenuCode('09019').screenType, 3);
+    expect(ServiceRoutes.byMenuCode('09020').screenType, 3);
+    for (final code in ['09008', '09010', '09019', '09020']) {
+      final route = ServiceRoutes.byMenuCode(code);
+      final menu = AppMenuRouteRegistry.byMenuCode(code)!;
+      expect(menu.path, route.routePath);
+      expect(menu.goRouteName, route.effectiveGoRouteName);
+    }
   });
 
   test(

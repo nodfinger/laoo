@@ -7,6 +7,13 @@ abstract final class ServiceProject {
 abstract final class ServiceRoutes {
   static const all = <FeatureRouteContract>[
     FeatureRouteContract(
+      projectCode: 'LAOO',
+      menuCode: '09008',
+      screenType: 2,
+      routeName: 'companyVatSettings',
+      routePath: '/company/vat-settings',
+    ),
+    FeatureRouteContract(
       projectCode: ServiceProject.code,
       menuCode: '18001',
       screenType: 2,
@@ -55,6 +62,27 @@ abstract final class ServiceRoutes {
       screenType: 4,
       routeName: 'companyTaxInvoices',
       routePath: '/company/tax-invoices',
+    ),
+    FeatureRouteContract(
+      projectCode: 'LAOO',
+      menuCode: '09010',
+      screenType: 4,
+      routeName: 'companyPurchaseTaxInvoices',
+      routePath: '/company/purchase-tax-invoices',
+    ),
+    FeatureRouteContract(
+      projectCode: 'LAOO',
+      menuCode: '09019',
+      screenType: 3,
+      routeName: 'companySalesTaxReport',
+      routePath: '/company/sales-tax-report',
+    ),
+    FeatureRouteContract(
+      projectCode: 'LAOO',
+      menuCode: '09020',
+      screenType: 3,
+      routeName: 'companyPurchaseTaxReport',
+      routePath: '/company/purchase-tax-report',
     ),
     FeatureRouteContract(
       projectCode: ServiceProject.code,

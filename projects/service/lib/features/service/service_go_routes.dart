@@ -17,6 +17,9 @@ import '../company/delivery_note/pages/delivery_note_page.dart';
 import '../company/pre_order/pages/pre_order_page.dart';
 import '../company/quotation/pages/quotation_page.dart';
 import '../company/tax_invoice/pages/tax_invoice_page.dart';
+import '../company/purchase_tax_invoice/pages/purchase_tax_invoice_page.dart';
+import '../company/tax_report/pages/tax_report_page.dart';
+import '../company/vat_settings/pages/vat_settings_page.dart';
 import '../company/temporary_receipt/pages/temporary_receipt_page.dart';
 import '../inventory/pages/inventory_pages.dart';
 import '../inventory/pages/stock_receipt_page.dart';
@@ -26,6 +29,7 @@ import 'service_route_contract.dart';
 List<GoRoute> buildServiceFeatureRoutes({
   ReceiptVendorCreator? onCreateReceiptVendor,
 }) => [
+  _page('09008', (state) => const VatSettingsPage()),
   _page('09001', (state) => const CustomerPage()),
   _page(
     '09003',
@@ -72,6 +76,9 @@ List<GoRoute> buildServiceFeatureRoutes({
       taxInvoiceId: int.tryParse(state.uri.queryParameters['id'] ?? ''),
     ),
   ),
+  _page('09010', (state) => const PurchaseTaxInvoicePage()),
+  _page('09019', (state) => const TaxReportPage(sales: true)),
+  _page('09020', (state) => const TaxReportPage(sales: false)),
   _page('08002', (state) => const InventoryItemCatalogPage()),
   _page('08003', (state) => const InventoryIssuePage()),
   _page('08004', (state) => const WarehousePage()),
