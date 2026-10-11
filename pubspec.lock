@@ -779,6 +779,13 @@ packages:
       relative: true
     source: path
     version: "0.1.0"
+  laoo_site:
+    dependency: "direct main"
+    description:
+      path: "projects/site"
+      relative: true
+    source: path
+    version: "1.0.0+1"
   laoo_sport:
     dependency: "direct main"
     description:

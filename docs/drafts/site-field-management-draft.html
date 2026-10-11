@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="th">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>LAOO_SITE · Draft ระบบตรวจไซต์งาน</title>
+<style>
+@font-face{font-family:n;src:url('../../assets/fonts/NotoSansThai-Variable.ttf')}
+*{box-sizing:border-box}:root{--p:#087f5b;--pale:#e9f5ef;--line:#dbe3de;--bg:#f8f9fb}
+body{margin:0;background:var(--bg);font:14px/1.5 n,Tahoma,Arial,sans-serif;color:#1c2921}
+button,input,select,textarea{font:inherit}button{cursor:pointer}button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--p)}
+.ribbon{padding:7px;background:#273a30;color:white;text-align:center;font-size:12px}
+.shell{display:grid;grid-template-columns:210px minmax(0,1fr)}aside{padding:10px;background:white;border-right:1px solid var(--line)}
+.brand{height:52px;color:var(--p);font-weight:800}.nav{display:block;width:100%;min-height:44px;padding:8px;border:0;border-radius:4px;background:white;text-align:left}
+.nav.on,.nav:hover{background:var(--pale);color:var(--p)}main{min-width:0}.top{display:flex;align-items:center;gap:8px;min-height:52px;padding:0 10px;background:white}
+.top .right{margin-left:auto}.mobile-nav{display:none}.content{padding:10px}.page{display:none}.page.on{display:block}
+.caption,.card,.filter,.pager,.metric{background:white;border-radius:4px}.caption{display:flex;align-items:center;gap:8px;min-height:60px;padding:10px;margin-bottom:6px;flex-wrap:wrap}
+.caption h1{margin:0;color:black;font-size:18px}.caption .icon,.star{color:var(--p)}.caption .icon{font-size:22px}
+.star{width:40px;height:40px;border:0;background:none;font-size:22px}.push{margin-left:auto}.card,.filter,.pager{padding:10px;margin-bottom:6px}
+h2{margin:0 0 10px;font-size:16px}p{margin:5px 0 10px}.muted{color:#63716a;font-size:12px}
+.btn{min-height:48px;padding:0 13px;border:1px solid var(--p);border-radius:4px;background:white;color:var(--p);font-size:13px;font-weight:700}
+.btn.fill{background:var(--p);color:white}.btn.small{min-height:40px}.btn:disabled{color:#aaa;border-color:var(--line)}
+.row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.field{display:grid;gap:4px;min-width:0}.field span{font-size:14px;color:var(--p)}
+.field input,.field select,.field textarea{width:100%;min-height:48px;padding:10px;border:1px solid var(--line);border-radius:4px;background:white}
+.field textarea{min-height:90px;resize:vertical}.fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.full{grid-column:1/-1}
+.filter{display:flex;align-items:end;gap:8px;flex-wrap:wrap}.filter .field{width:min(280px,100%)}.filter input,.filter select{min-height:40px}
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:6px}.metric{padding:14px}.metric strong{display:block;font-size:26px}
+.split{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(245px,.8fr);gap:10px}.stack{display:grid;gap:6px;align-content:start}
+.line{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid var(--line)}.line b{flex:1;min-width:120px}
+.bar{height:8px;width:100%;border-radius:4px;background:#e7eeea;overflow:hidden}.bar i{display:block;height:100%;background:var(--p)}
+.badge{padding:3px 8px;border-radius:4px;background:var(--pale);color:var(--p);font-size:12px}.badge.wait{background:#fff4df;color:#946919}
+.note{padding:12px;background:white;border-left:3px solid var(--p)}.photos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.photo{display:grid;place-items:center;min-height:90px;padding:8px;border:1px dashed #a9c5b1;border-radius:4px;background:#e3ebe5;text-align:center;font-size:12px}
+.share label{display:flex;align-items:center;gap:8px;min-height:42px;margin-bottom:6px;padding:8px;border:1px solid var(--line);border-radius:4px}
+.share input{width:18px;height:18px;accent-color:var(--p)}.table-wrap{overflow:auto}
+table{width:100%;border-collapse:collapse;white-space:nowrap;text-align:left}th{padding:11px;background:var(--pale);color:var(--p)}td{padding:11px;border-bottom:1px solid var(--line)}
+.pager{display:flex;align-items:center;gap:6px;min-height:56px}.pager button{width:34px;height:34px;border:1px solid var(--p);border-radius:4px;background:white;color:var(--p)}
+.pager .current{background:var(--p);color:white}.sticky{display:flex;justify-content:flex-end;gap:8px;position:sticky;bottom:0;padding:10px;background:white;border-top:1px solid var(--line)}
+.modal{position:fixed;inset:0;display:none;place-items:center;padding:24px;background:#0008;z-index:20}.modal.on{display:grid}
+.dialog{display:flex;flex-direction:column;width:min(480px,100%);max-height:calc(100vh - 48px);background:white;border-radius:4px;overflow:hidden}
+.dialog header,.dialog footer{min-height:48px;padding:10px}.dialog header{border-bottom:1px solid var(--line);font-size:18px;font-weight:700}
+.dialog article{overflow:auto;padding:10px}.dialog article .field{margin-bottom:16px}.dialog footer{display:flex;justify-content:flex-end;gap:8px;border-top:1px solid var(--line)}
+.toast{display:none;position:fixed;top:66px;right:14px;max-width:min(340px,calc(100vw - 28px));padding:10px;background:#087f5b80;border-radius:4px;z-index:30}.toast.on{display:block}
+@media(max-width:900px){.shell{display:block}aside{display:none}.mobile-nav{display:flex;gap:4px;overflow:auto;padding:4px 10px;background:white}.mobile-nav .nav{flex:0 0 auto;width:auto}.split{grid-template-columns:1fr}}
+@media(max-width:600px){.top .user{display:none}.grid,.fields{grid-template-columns:1fr}.filter .field{width:100%}.photos{grid-template-columns:repeat(2,minmax(0,1fr))}.caption .push{flex-basis:100%}.sticky .btn{flex:1}}
+</style></head><body>
+<div class="ribbon">DRAFT ตรวจ Layout / Field / Flow · ข้อมูลตัวอย่าง ไม่เชื่อม API</div>
+<div class="shell"><aside><div class="brand">▣ LAOO_SITE</div><nav id="nav-desktop"></nav></aside>
+<main><div class="top"><b>หน้าแรก</b> / ระบบตรวจไซต์งาน <span class="right user muted">ช่างหน้างาน</span><button class="btn small" id="offline">จำลองเน็ตหลุด</button></div>
+<nav class="mobile-nav" id="nav-mobile"></nav><div class="content">
+<section class="page on" id="dashboard">
+<div class="caption"><span class="icon">▦</span><h1>Dashboard ไซต์งาน</h1><button class="star">☆</button><span class="push"></span><span class="muted">ตัวอย่าง ณ 10/10/2026</span></div>
+<div class="filter"><label class="field"><span>ช่วงเวลา</span><select><option>เดือนนี้</option><option>สัปดาห์นี้</option></select></label><button class="btn fill small">ค้นหา</button></div>
+<div class="grid"><div class="metric">ไซต์กำลังดำเนินการ<strong>3</strong><span class="muted">2 ไซต์มีรายงานวันนี้</span></div><div class="metric">รายงานรอตรวจ<strong>2</strong></div><div class="metric">ปัญหาค้างแก้ไข<strong>4</strong></div></div>
+<div class="split"><div class="card"><h2>ความคืบหน้าตามโครงการ</h2><div class="line"><b>ติดตั้ง CCTV โรงเรียนบางนา</b>72%<div class="bar"><i style="width:72%"></i></div></div>
+<div class="line"><b>วางระบบ Network อาคารสำนักงาน</b>48%<div class="bar"><i style="width:48%"></i></div></div>
+<div class="line"><b>ปรับปรุงอาคาร A ศูนย์บริการลูกค้า</b>18%<div class="bar"><i style="width:18%"></i></div></div><p class="muted">Progress จากงานย่อยถ่วงน้ำหนัก</p></div>
+<div class="stack"><div class="card"><h2>สิ่งที่ต้องทำ</h2><p>วันนี้ · ตรวจรายงาน 2 รายการ</p><p>พรุ่งนี้ · ส่งมอบงานงวดที่ 2</p></div><div class="note">ไซต์ชั้น 3 รออนุญาตเข้าพื้นที่</div></div></div></section>
+<section class="page" id="sites">
+<div class="caption"><span class="icon">▤</span><h1>โครงการไซต์และลูกค้า</h1><button class="star">☆</button><span class="push"></span><button class="btn fill" data-modal="site-modal">＋ เพิ่มโครงการ</button></div>
+<div class="filter"><label class="field"><span>ค้นหา</span><input placeholder="โครงการ / ลูกค้า"></label><button class="btn fill small">ค้นหา</button><button class="btn small">ล้าง Filter</button></div>
+<div class="card table-wrap"><table><thead><tr><th>ID</th><th>Action</th><th>โครงการไซต์</th><th>ลูกค้า</th><th>Progress</th></tr></thead><tbody>
+<tr><td>1</td><td><button class="btn small" data-modal="site-modal">ดู/แก้ไข</button></td><td>CCTV โรงเรียนบางนา</td><td>โรงเรียนบางนา</td><td>72%</td></tr>
+<tr><td>2</td><td><button class="btn small" data-modal="site-modal">ดู/แก้ไข</button></td><td>Network อาคารสำนักงาน</td><td>บริษัท สำนักงานใหม่ จำกัด</td><td>48%</td></tr></tbody></table></div>
+<div class="pager"><button disabled>‹</button><button class="current">1</button><button disabled>›</button><span>1-2 จาก 2</span></div></section>
+<section class="page" id="daily">
+<div class="caption"><span class="icon">▣</span><h1>บันทึกหน้างานรายวัน</h1><button class="star">☆</button><span class="push"></span><span class="badge wait" id="daily-status">ร่าง · ยังไม่ส่ง</span></div>
+<div class="split"><div><div class="card"><h2>ข้อมูลหลัก</h2><div class="fields">
+<label class="field"><span>โครงการไซต์ *</span><select><option>CCTV โรงเรียนบางนา</option></select></label><label class="field"><span>วันที่ทำงาน *</span><input type="date" value="2026-10-10"></label>
+<label class="field full"><span>งานวันนี้ *</span><textarea>ติดตั้งกล้องชั้น 2 จำนวน 4 จุด ทดสอบภาพจาก NVR</textarea></label></div></div>
+<div class="card"><h2>คนงาน</h2><div class="line"><b>สมชาย ใจดี</b>พนักงาน · 8 ชม.</div><div class="line"><b>ทีมเดินสาย A · 3 คน</b>ผู้รับเหมาช่วง</div><button class="btn small demo">＋ เพิ่มคนงาน</button></div>
+<div class="card"><h2>วัสดุ</h2><div class="line"><b>กล้อง IP Dome</b>สินค้า Master · 4 ตัว</div><div class="line"><b>สาย LAN CAT6</b>รายการหน้างาน · 80 ม.</div><p class="muted">ยังไม่ตัดสต๊อก</p></div>
+<div class="card"><h2>รูปหน้างาน</h2><div class="photos"><div class="photo">กล้องทางเดิน</div><div class="photo">ตู้ NVR</div><div class="photo">＋ เพิ่มภาพ</div></div></div>
+<div class="card"><h2>ปัญหาและค่าใช้จ่ายไซต์</h2><div class="fields"><label class="field full"><span>ปัญหา</span><textarea>รออนุญาตเข้าห้องชั้น 3</textarea></label><label class="field"><span>ค่าใช้จ่าย</span><input value="450.00"></label><label class="field"><span>รายละเอียด</span><input value="อุปกรณ์ยึดสาย"></label></div><p class="muted">ไม่ลงระบบค่าใช้จ่ายอัตโนมัติ</p></div></div>
+<div class="stack"><div class="card"><h2>งานย่อย</h2><div class="line"><b>ติดตั้งกล้องชั้น 2</b>80%</div><div class="line"><b>ทดสอบภาพ</b>40%</div></div><div class="note">ลูกค้ายังไม่เห็นจนกว่าหัวหน้าไซต์เผยแพร่</div></div></div>
+<div class="sticky"><button class="btn demo">บันทึกร่าง</button><button class="btn fill" id="send-review">ส่งหัวหน้าไซต์ตรวจ</button></div></section>
+<section class="page" id="review">
+<div class="caption"><span class="icon">☑</span><h1>ตรวจและเผยแพร่รายงาน</h1><button class="star">☆</button><span class="push"></span><span class="badge wait">รอตรวจ 2 รายการ</span></div>
+<div class="split"><div class="card"><h2>รายงาน 10/10/2026 · CCTV โรงเรียนบางนา</h2><p>ติดตั้งกล้อง 4 จุด และทดสอบภาพ</p><div class="photos"><div class="photo">กล้องทางเดิน</div><div class="photo">ตู้ NVR</div></div>
+<div class="line"><b>คนงาน</b>4 คน</div><div class="line"><b>วัสดุ</b>2 รายการ</div><div class="line"><b>ค่าใช้จ่าย</b>450.00 บาท</div></div>
+<div class="stack"><div class="card share"><h2>เลือกข้อมูลที่ลูกค้าเห็น</h2><label><input type="checkbox" checked> งานวันนี้และ Progress</label><label><input type="checkbox" checked> รูปภาพ</label><label><input type="checkbox"> คนงาน</label><label><input type="checkbox"> วัสดุ</label><label><input type="checkbox"> ปัญหา</label><label><input type="checkbox"> ค่าใช้จ่าย</label></div>
+<div class="card row"><button class="btn" data-modal="return-modal">ส่งกลับ</button><button class="btn fill" id="publish">เผยแพร่</button></div></div></div><div class="pager"><button disabled>‹</button><button class="current">1</button><button disabled>›</button><span>1-2 จาก 2</span></div></section>
+<section class="page" id="issues">
+<div class="caption"><span class="icon">⚑</span><h1>ปัญหาหน้างาน</h1><button class="star">☆</button><span class="push"></span><button class="btn fill" data-modal="issue-modal">＋ เพิ่มปัญหา</button></div>
+<div class="filter"><label class="field"><span>ค้นหา</span><input placeholder="โครงการ / ปัญหา"></label><button class="btn fill small">ค้นหา</button></div>
+<div class="card table-wrap"><table><thead><tr><th>ID</th><th>Action</th><th>ปัญหา</th><th>โครงการ</th><th>สถานะ</th></tr></thead><tbody>
+<tr><td>1</td><td><button class="btn small" data-modal="issue-modal">แก้ไข</button></td><td>เข้าพื้นที่ชั้น 3 ไม่ได้</td><td>CCTV โรงเรียนบางนา</td><td><span class="badge wait">รอดำเนินการ</span></td></tr></tbody></table></div>
+<div class="pager"><button disabled>‹</button><button class="current">1</button><button disabled>›</button><span>1-1 จาก 1</span></div></section>
+<section class="page" id="handover">
+<div class="caption"><span class="icon">⇄</span><h1>ส่งมอบงานลูกค้า</h1><button class="star">☆</button><span class="push"></span><span class="badge wait" id="handover-status">รอส่งมอบ</span></div>
+<div class="split"><div><div class="card"><h2>ข้อมูลส่งมอบ</h2><div class="fields"><label class="field"><span>โครงการไซต์ *</span><select><option>CCTV โรงเรียนบางนา</option></select></label><label class="field"><span>ประเภท *</span><select><option>ส่งมอบงวดงาน</option><option>ส่งมอบจบโครงการ</option></select></label>
+<label class="field full"><span>ชื่องวด *</span><input value="งวดที่ 2 · ติดตั้งกล้องชั้น 2"></label><label class="field full"><span>ขอบเขตงาน *</span><textarea>กล้อง 4 จุด พร้อมผลทดสอบภาพ</textarea></label></div></div>
+<div class="card"><h2>งานย่อยและหลักฐาน</h2><div class="line"><b>ติดตั้งกล้อง</b><span class="badge">เสร็จแล้ว</span></div><div class="photos"><div class="photo">จุดติดตั้ง</div><div class="photo">NVR</div><div class="photo">＋ แนบหลักฐาน</div></div></div></div>
+<div class="stack"><div class="card"><h2>ผู้ตรวจรับ</h2><p>โรงเรียนบางนา · คุณวราภรณ์</p><p class="muted">ลูกค้า Login เพื่อรับงานหรือส่งกลับ</p></div><div class="note">ส่งมอบงวดนี้ไม่ปิดโครงการ</div></div></div>
+<div class="sticky"><button class="btn demo">บันทึกร่าง</button><button class="btn fill" id="send-handover">ส่งลูกค้าตรวจรับ</button></div></section>
+<section class="page" id="customer">
+<div class="caption"><span class="icon">▣</span><h1>พอร์ทัลลูกค้า</h1><button class="star">☆</button><span class="push"></span><span class="badge">มุมมองลูกค้า</span></div>
+<div class="card"><h2>ติดตั้ง CCTV โรงเรียนบางนา</h2><p>บริษัท ช่างระบบไทย จำกัด · กำหนดส่ง 31/10/2026</p><div class="row"><b>Progress</b><b class="push">72%</b></div><div class="bar"><i style="width:72%"></i></div></div>
+<div class="split"><div class="card"><h2>รายงานที่เผยแพร่แล้ว</h2><p>10 ต.ค. · ติดตั้งกล้องชั้น 2 จำนวน 4 จุด</p><div class="photos"><div class="photo">กล้องทางเดิน</div><div class="photo">ตู้ NVR</div></div><p class="muted">ไม่แสดงข้อมูลภายในที่ไม่ได้เลือกแชร์</p></div>
+<div class="stack"><div class="card"><h2>รอตรวจรับ <span class="badge wait" id="accept-status">1 งวด</span></h2><p>งวดที่ 2 · ติดตั้งกล้องชั้น 2</p><div class="row"><button class="btn" data-modal="return-modal">ขอแก้ไข</button><button class="btn fill" id="accept">ยืนยันรับงาน</button></div></div><div class="card"><h2>แจ้งเตือนในระบบ</h2><p>มีรายงานใหม่และงานรอตรวจรับ</p></div></div></div></section>
+<section class="page" id="settings">
+<div class="caption"><span class="icon">⚙</span><h1>ตั้งค่าระบบตรวจไซต์งาน</h1><button class="star">☆</button></div>
+<div class="card"><h2>การใช้งานบริษัท</h2><div class="fields"><label class="field"><span>สถานะ</span><select><option>เปิดใช้งาน</option></select></label><label class="field"><span>รูปแบบเลขไซต์</span><input value="SITE-{yyyy}-{running}"></label><label class="field"><span>การตรวจรายงาน</span><select><option>หัวหน้าไซต์ต้องตรวจ</option></select></label><label class="field"><span>เตือนก่อนส่งมอบ (วัน)</span><input type="number" value="3"></label></div></div>
+<div class="card"><h2>การเผยแพร่</h2><p>ค่าเริ่มต้นให้ลูกค้าเห็นงานวันนี้ Progress และรูปที่เลือก</p></div><div class="sticky"><button class="btn fill demo">บันทึก</button></div></section>
+</div></main></div>
+<div class="modal" id="site-modal"><div class="dialog"><header>▤ โครงการไซต์ &gt; เพิ่ม</header><article><label class="field"><span>ชื่อโครงการ *</span><input placeholder="ชื่องาน"></label><label class="field"><span>ลูกค้า *</span><select><option>เลือกจากส่วนกลาง</option></select></label><label class="field"><span>สถานที่ไซต์ *</span><input placeholder="ที่อยู่"></label></article><footer><button class="btn close">ยกเลิก</button><button class="btn fill demo">บันทึก</button></footer></div></div>
+<div class="modal" id="issue-modal"><div class="dialog"><header>⚑ ปัญหา &gt; เพิ่ม</header><article><label class="field"><span>เรื่อง *</span><input></label><label class="field"><span>รายละเอียด *</span><textarea></textarea></label></article><footer><button class="btn close">ยกเลิก</button><button class="btn fill demo">บันทึก</button></footer></div></div>
+<div class="modal" id="return-modal"><div class="dialog"><header>↶ ส่งกลับแก้ไข</header><article><label class="field"><span>เหตุผล *</span><textarea placeholder="ระบุสิ่งที่ต้องแก้ไข"></textarea></label></article><footer><button class="btn close">ยกเลิก</button><button class="btn fill" id="confirm-return">ส่งกลับ</button></footer></div></div>
+<div class="toast" id="toast" role="status"></div>
+<script>
+const menus=[['dashboard','63008','Dashboard'],['sites','63002','โครงการไซต์'],['daily','63003','บันทึกรายวัน'],['review','63004','ตรวจและเผยแพร่'],['issues','63005','ปัญหา'],['handover','63006','ส่งมอบ'],['customer','63007','พอร์ทัลลูกค้า'],['settings','63001','ตั้งค่า']];
+for(const host of [document.querySelector('#nav-desktop'),document.querySelector('#nav-mobile')])for(const [id,code,name] of menus){const b=document.createElement('button');b.type='button';b.className='nav';b.dataset.page=id;b.textContent=code+' '+name;host.append(b)}
+function go(id){document.querySelectorAll('.page').forEach(p=>p.classList.toggle('on',p.id===id));document.querySelectorAll('.nav').forEach(b=>b.classList.toggle('on',b.dataset.page===id));window.scrollTo(0,0)}
+document.querySelectorAll('.nav').forEach(b=>b.addEventListener('click',()=>go(b.dataset.page)));go('dashboard');
+let timer;function note(s){const t=document.querySelector('#toast');t.textContent=s;t.classList.add('on');clearTimeout(timer);timer=setTimeout(()=>t.classList.remove('on'),3000)}
+document.querySelectorAll('.star').forEach(b=>b.addEventListener('click',()=>{b.textContent=b.textContent==='☆'?'★':'☆';note('เมนูลัดเปลี่ยนแล้ว · ตัวอย่าง')}));
+document.querySelectorAll('[data-modal]').forEach(b=>b.addEventListener('click',()=>document.getElementById(b.dataset.modal).classList.add('on')));
+document.querySelectorAll('.close').forEach(b=>b.addEventListener('click',()=>b.closest('.modal').classList.remove('on')));
+document.querySelectorAll('.demo').forEach(b=>b.addEventListener('click',()=>{b.closest('.modal')?.classList.remove('on');note('ตัวอย่าง · ไม่บันทึกจริง')}));
+document.querySelector('#send-review').addEventListener('click',()=>{document.querySelector('#daily-status').textContent='ส่งตรวจแล้ว';note('ส่งตรวจ · ตัวอย่าง')});
+document.querySelector('#publish').addEventListener('click',()=>{go('customer');note('เผยแพร่ · ตัวอย่าง')});
+document.querySelector('#send-handover').addEventListener('click',()=>{document.querySelector('#handover-status').textContent='รอลูกค้าตรวจรับ';note('ส่งตรวจรับ · ตัวอย่าง')});
+document.querySelector('#accept').addEventListener('click',()=>{document.querySelector('#accept-status').textContent='รับงานแล้ว';note('รับงาน · ตัวอย่าง')});
+document.querySelector('#confirm-return').addEventListener('click',()=>{document.querySelector('#return-modal').classList.remove('on');note('ส่งกลับ · ตัวอย่าง')});
+let offline=false;document.querySelector('#offline').addEventListener('click',e=>{offline=!offline;e.currentTarget.textContent=offline?'กลับมาออนไลน์':'จำลองเน็ตหลุด';document.querySelector('#send-review').disabled=offline;document.querySelector('#send-handover').disabled=offline;note(offline?'ออฟไลน์ · ยังส่งเข้า Server ไม่ได้':'ออนไลน์แล้ว')});
+</script></body></html>

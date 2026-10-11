@@ -21,6 +21,7 @@ import 'package:laoo_market/market_feature.dart' show MarketRoutes;
 import 'package:laoo_rental/rental_feature.dart' show RentalRoutes;
 import 'package:laoo_booking/booking_feature.dart' show BookingRoutes;
 import 'package:laoo_pet/pet_feature.dart' show PetRoutes;
+import 'package:laoo_site/site_feature.dart' show SiteRoutes;
 import 'package:laoo_patrol/patrol_feature.dart' show PatrolRoutes;
 import 'package:laoo_digital_checklist/digital_checklist_feature.dart'
     show DigitalChecklistRoutes;
@@ -1248,6 +1249,14 @@ abstract final class AppMenuRouteRegistry {
         scope: AppMenuScope.company,
       ),
     for (final route in PetRoutes.all)
+      route.menuCode: AppMenuRouteSpec(
+        menuCode: route.menuCode,
+        databaseRouteName: route.routeName,
+        goRouteName: route.routeName,
+        path: route.routePath,
+        scope: AppMenuScope.company,
+      ),
+    for (final route in SiteRoutes.all)
       route.menuCode: AppMenuRouteSpec(
         menuCode: route.menuCode,
         databaseRouteName: route.routeName,

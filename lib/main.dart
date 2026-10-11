@@ -18,6 +18,7 @@ import 'package:laoo_market/market_feature.dart';
 import 'package:laoo_rental/rental_feature.dart';
 import 'package:laoo_booking/booking_feature.dart';
 import 'package:laoo_pet/pet_feature.dart';
+import 'package:laoo_site/site_feature.dart';
 import 'package:laoo_patrol/patrol_feature.dart';
 import 'package:laoo_digital_checklist/digital_checklist_feature.dart';
 import 'package:laoo_intranet/intranet_feature.dart';
@@ -41,6 +42,7 @@ import 'app/theme/laoo_typography.dart';
 import 'app/theme/workspace_theme_presets.dart';
 import 'core/api/api_client.dart';
 import 'core/api/api_exception.dart';
+import 'core/auth/app_auth_controller.dart';
 import 'core/config/app_config.dart';
 import 'core/company_setup/company_setup_controller.dart';
 import 'core/company_setup/company_date_formatter.dart';
@@ -261,6 +263,45 @@ void main() {
     },
     message: (context, {required message, required error}) =>
         showTimedSnackBar(context, message: message, error: error),
+  );
+  configureSiteFeatureHost(
+    shell: _buildMeetingWorkspaceShell,
+    api: ApiClient.new,
+    dispose: (client) => (client as ApiClient).dispose(),
+    tokens: _surveyWorkspaceTokens,
+    menuIcon: (name) => NavigationIconResolver.resolve(name),
+    errorText: (error, action) {
+      if (error is ApiException) {
+        return '$actionไม่สำเร็จ: ${error.message} ${error.description ?? ''}';
+      }
+      return '$actionไม่สำเร็จ กรุณาลองอีกครั้ง';
+    },
+    message: (context, {required message, required error}) =>
+        showTimedSnackBar(context, message: message, error: error),
+    upload: (path, {required fileName, required bytes, required fields}) {
+      final client = ApiClient();
+      return client
+          .upload(path, fileName: fileName, bytes: bytes, fields: fields)
+          .whenComplete(client.dispose);
+    },
+    download: (path) async {
+      final client = ApiClient();
+      try {
+        return await client.getBytes(path);
+      } finally {
+        client.dispose();
+      }
+    },
+    publicApiBaseUrl: AppConfig.apiBaseUrl,
+    draftScope: () {
+      final session = appAuthController.session;
+      if (session?.userType != 'COMPANY_USER' ||
+          session?.companyId == null ||
+          session?.userId == null) {
+        return null;
+      }
+      return '${session!.companyId}:${session.userId}';
+    },
   );
   configureSchoolFeatureHost(
     _buildMeetingWorkspaceShell,

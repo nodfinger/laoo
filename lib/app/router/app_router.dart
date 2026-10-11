@@ -22,6 +22,7 @@ import 'package:laoo_market/market_feature.dart';
 import 'package:laoo_rental/rental_feature.dart';
 import 'package:laoo_booking/booking_feature.dart';
 import 'package:laoo_pet/pet_feature.dart';
+import 'package:laoo_site/site_feature.dart';
 import '../../features/booking_member/booking_member_portal_page.dart';
 import 'package:laoo_patrol/patrol_feature.dart';
 import 'package:laoo_digital_checklist/digital_checklist_feature.dart';
@@ -235,6 +236,8 @@ final GoRouter appRouter = GoRouter(
     ...buildRentalRoutes(),
     ...buildBookingRoutes(),
     ...buildPetRoutes(),
+    ...buildSitePublicRoutes(),
+    ...buildSiteRoutes(),
     ...buildPatrolFeatureRoutes(),
     ...buildDigitalChecklistFeatureRoutes(),
     ...buildIntranetFeatureRoutes(),
@@ -345,7 +348,8 @@ String? resolveAppRouteRedirect({
       path.startsWith('/providers/') ||
       path.startsWith('/school/guardian') ||
       path == '/school/student/food' ||
-      path == '/booking/member';
+      path == '/booking/member' ||
+      path == '/site/customer';
 
   if (!isAuthenticated) {
     return isPublicRoute ? null : RoutePaths.login;
@@ -354,6 +358,7 @@ String? resolveAppRouteRedirect({
   if (EvaluationPublicRoutePaths.isResponseRoute(path)) {
     return null;
   }
+  if (path == '/site/customer') return null;
 
   if (path == RoutePaths.landing || path == RoutePaths.login) {
     if (isCompanyUser &&
