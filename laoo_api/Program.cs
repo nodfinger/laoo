@@ -72,6 +72,7 @@ builder.Services
     .AddApplicationPart(typeof(Laoo.Rental.RentalModuleMarker).Assembly)
     .AddApplicationPart(typeof(Laoo.Booking.BookingModuleMarker).Assembly)
     .AddApplicationPart(typeof(Laoo.Pet.PetModuleMarker).Assembly)
+    .AddApplicationPart(typeof(Laoo.Site.SiteModuleMarker).Assembly)
     .AddApplicationPart(typeof(PatrolModuleMarker).Assembly)
     .AddApplicationPart(typeof(DigitalChecklistModuleMarker).Assembly)
     .AddApplicationPart(typeof(DocumentControlModuleMarker).Assembly)

@@ -53,6 +53,7 @@
     <ProjectReference Include="..\projects\rental\packages\dotnet\Laoo.Rental.Module\Laoo.Rental.Module.csproj" />
     <ProjectReference Include="..\projects\booking\packages\dotnet\Laoo.Booking.Module\Laoo.Booking.Module.csproj" />
     <ProjectReference Include="..\projects\pet\packages\dotnet\Laoo.Pet.Module\Laoo.Pet.Module.csproj" />
+    <ProjectReference Include="..\projects\site\packages\dotnet\Laoo.Site.Module\Laoo.Site.Module.csproj" />
     <ProjectReference Include="..\projects\patrol\packages\dotnet\Laoo.Patrol.Module\Laoo.Patrol.Module.csproj" />
   </ItemGroup>
   <ItemGroup>

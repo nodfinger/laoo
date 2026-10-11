@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense', 'project', 'intranet', 'vote', 'pos', 'sales', 'evaluation', 'patrol', 'digital_checklist', 'rental', 'booking', 'pet')]
+    [ValidateSet('service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense', 'project', 'intranet', 'vote', 'pos', 'sales', 'evaluation', 'patrol', 'digital_checklist', 'rental', 'booking', 'pet', 'site')]
     [string]$Module,
 
     [ValidateSet('unassigned', 'core', 'business', 'center-service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense', 'project', 'intranet', 'vote', 'pos', 'sales', 'evaluation', 'rental', 'booking', 'pet')]
@@ -102,6 +102,7 @@ try {
         'booking' { 'projects\booking\packages\dotnet\Laoo.Booking.Module\Laoo.Booking.Module.csproj' }
         'rental' { 'projects\rental\packages\dotnet\Laoo.Rental.Module\Laoo.Rental.Module.csproj' }
         'pet' { 'projects\pet\packages\dotnet\Laoo.Pet.Module\Laoo.Pet.Module.csproj' }
+        'site' { 'projects\site\packages\dotnet\Laoo.Site.Module\Laoo.Site.Module.csproj' }
     }
     Invoke-Checked "$Module API module Release build" { dotnet build $apiModule -c Release }
 }

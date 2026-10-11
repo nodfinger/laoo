@@ -62,6 +62,8 @@ dependencies:
     path: projects/booking
   laoo_pet:
     path: projects/pet
+  laoo_site:
+    path: projects/site
   laoo_patrol:
     path: projects/patrol
   laoo_digital_checklist:
