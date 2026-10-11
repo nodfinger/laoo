@@ -11,6 +11,7 @@ import '../../../core/company_setup/company_setup_controller.dart';
 import '../../../core/navigation/navigation_menu_repository.dart';
 import '../../../core/widgets/timed_snack_bar.dart';
 import '../../profile/data/user_profile_repository.dart';
+import '../../support/presentation/widgets/support_workspace_shell.dart';
 import '../data/employee_borrow_api.dart';
 
 class EmployeeBorrowPage extends StatefulWidget {
@@ -40,6 +41,12 @@ class _EmployeeBorrowPageState extends State<EmployeeBorrowPage> {
   int get _pageSize => companySetupController.pageSize > 0
       ? companySetupController.pageSize
       : 20;
+  String get _routeName => switch (widget.menuCode) {
+    '08009' => 'employeeBorrowApprovals',
+    '08010' => 'employeeBorrowTransfers',
+    '08011' => 'employeeBorrowHistory',
+    _ => 'employeeBorrowRequests',
+  };
 
   @override
   void initState() {
@@ -74,16 +81,10 @@ class _EmployeeBorrowPageState extends State<EmployeeBorrowPage> {
   }
 
   Future<void> _resolveName() async {
-    final routeName = switch (widget.menuCode) {
-      '08009' => 'employeeBorrowApprovals',
-      '08010' => 'employeeBorrowTransfers',
-      '08011' => 'employeeBorrowHistory',
-      _ => 'employeeBorrowRequests',
-    };
     try {
       final name = await NavigationMenuRepository().resolveMenuName(
         menuCode: widget.menuCode,
-        routeName: routeName,
+        routeName: _routeName,
         fallback: _menuName,
       );
       if (mounted) setState(() => _menuName = name);
@@ -1151,27 +1152,32 @@ class _EmployeeBorrowPageState extends State<EmployeeBorrowPage> {
   }
 
   @override
-  Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, box) {
-      final compact = box.maxWidth < 900;
-      return Padding(
-        padding: const EdgeInsets.all(LaooLayout.cardMargin),
-        child: Column(
-          children: [
-            _header(context, compact),
-            const SizedBox(height: LaooLayout.listSectionSpacing),
-            if (_form)
-              _formBody(context, compact)
-            else ...[
-              _filter(),
+  Widget build(BuildContext context) => SupportWorkspaceShell(
+    pageTitle: _menuName,
+    activeMenu: _routeName,
+    menuScope: WorkspaceMenuScope.company,
+    child: LayoutBuilder(
+      builder: (context, box) {
+        final compact = box.maxWidth < 900;
+        return Padding(
+          padding: const EdgeInsets.all(LaooLayout.cardMargin),
+          child: Column(
+            children: [
+              _header(context, compact),
               const SizedBox(height: LaooLayout.listSectionSpacing),
-              _results(context, compact),
-              const SizedBox(height: LaooLayout.listSectionSpacing),
-              _pager(),
+              if (_form)
+                _formBody(context, compact)
+              else ...[
+                _filter(),
+                const SizedBox(height: LaooLayout.listSectionSpacing),
+                _results(context, compact),
+                const SizedBox(height: LaooLayout.listSectionSpacing),
+                _pager(),
+              ],
             ],
-          ],
-        ),
-      );
-    },
+          ),
+        );
+      },
+    ),
   );
 }
