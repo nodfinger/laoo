@@ -12,6 +12,7 @@ class BranchRecord {
     this.contName,
     this.contPhone,
     this.contPositionName,
+    this.taxBranchCode,
     required this.isActive,
   });
 
@@ -28,6 +29,7 @@ class BranchRecord {
     contName: json['contName'] as String?,
     contPhone: json['contPhone'] as String?,
     contPositionName: json['contPositionName'] as String?,
+    taxBranchCode: json['taxBranchCode'] as String?,
     isActive: json['isActive'] == true,
   );
 
@@ -43,6 +45,7 @@ class BranchRecord {
   final String? contName;
   final String? contPhone;
   final String? contPositionName;
+  final String? taxBranchCode;
   final bool isActive;
 
   // Transitional indexer keeps existing screens compatible while they move
@@ -60,6 +63,7 @@ class BranchRecord {
     'contName' => contName,
     'contPhone' => contPhone,
     'contPositionName' => contPositionName,
+    'taxBranchCode' => taxBranchCode,
     'isActive' => isActive,
     _ => null,
   };
@@ -77,6 +81,7 @@ class BranchUpsertRequest {
     this.contName,
     this.contPhone,
     this.contPositionName,
+    this.taxBranchCode,
     this.isActive = true,
   });
 
@@ -90,6 +95,7 @@ class BranchUpsertRequest {
   final String? contName;
   final String? contPhone;
   final String? contPositionName;
+  final String? taxBranchCode;
   final bool isActive;
 
   Map<String, dynamic> toJson() => {
@@ -103,6 +109,7 @@ class BranchUpsertRequest {
     'contName': contName,
     'contPhone': contPhone,
     'contPositionName': contPositionName,
+    'taxBranchCode': taxBranchCode,
     'isActive': isActive,
   };
 }

@@ -46,7 +46,8 @@ public sealed record BranchRequest(
     string? ContName,
     string? ContPhone,
     string? ContPositionName,
-    bool IsActive = true);
+    bool IsActive = true,
+    string? TaxBranchCode = null);
 
 public sealed record BranchAccessRequest(
     string AccessModeCode,
