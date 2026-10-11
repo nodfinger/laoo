@@ -8,5 +8,6 @@ export 'features/company/delivery_note/pages/delivery_note_page.dart';
 export 'features/company/pre_order/pages/pre_order_page.dart';
 export 'features/company/quotation/pages/quotation_page.dart';
 export 'features/company/tax_invoice/pages/tax_invoice_page.dart';
+export 'features/company/purchase_delivery/pages/purchase_delivery_page.dart';
 export 'features/company/temporary_receipt/pages/temporary_receipt_page.dart';
 export 'features/inventory/pages/inventory_pages.dart';

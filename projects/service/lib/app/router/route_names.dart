@@ -10,6 +10,9 @@ abstract final class RouteNames {
   static const String companyTemporaryReceipts = 'company-temporary-receipts';
   static const String companyDeliveryNotes = 'company-delivery-notes';
   static const String companyTaxInvoices = 'company-tax-invoices';
+  static const String companyPurchaseDeliveries = 'company-purchase-deliveries';
+  static const String companyPurchaseTaxInvoices =
+      'company-purchase-tax-invoices';
   static const String assetLocations = 'asset-locations';
   static const String assetItems = 'asset-items';
   static const String assetCustomers = 'asset-customers';

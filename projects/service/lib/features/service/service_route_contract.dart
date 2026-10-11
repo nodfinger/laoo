@@ -65,6 +65,13 @@ abstract final class ServiceRoutes {
     ),
     FeatureRouteContract(
       projectCode: 'LAOO',
+      menuCode: '09009',
+      screenType: 4,
+      routeName: 'companyPurchaseDeliveries',
+      routePath: '/company/purchase-deliveries',
+    ),
+    FeatureRouteContract(
+      projectCode: 'LAOO',
       menuCode: '09010',
       screenType: 4,
       routeName: 'companyPurchaseTaxInvoices',

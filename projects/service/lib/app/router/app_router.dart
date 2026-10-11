@@ -27,6 +27,8 @@ import '../../features/company/pre_order/pages/pre_order_page.dart';
 import '../../features/company/temporary_receipt/pages/temporary_receipt_page.dart';
 import '../../features/company/delivery_note/pages/delivery_note_page.dart';
 import '../../features/company/tax_invoice/pages/tax_invoice_page.dart';
+import '../../features/company/purchase_delivery/pages/purchase_delivery_page.dart';
+import '../../features/company/purchase_tax_invoice/pages/purchase_tax_invoice_page.dart';
 import '../../features/support/partner_user/pages/partner_user_page.dart';
 import '../../features/access/role_group/pages/role_group_page.dart';
 import '../../features/access/menu_permission/pages/menu_permission_page.dart';
@@ -176,6 +178,16 @@ final GoRouter appRouter = GoRouter(
             state.uri.queryParameters['action'] == 'edit',
         taxInvoiceId: int.tryParse(state.uri.queryParameters['id'] ?? ''),
       ),
+    ),
+    GoRoute(
+      path: RoutePaths.companyPurchaseDeliveries,
+      name: RouteNames.companyPurchaseDeliveries,
+      builder: (context, state) => const PurchaseDeliveryPage(),
+    ),
+    GoRoute(
+      path: RoutePaths.companyPurchaseTaxInvoices,
+      name: RouteNames.companyPurchaseTaxInvoices,
+      builder: (context, state) => const PurchaseTaxInvoicePage(),
     ),
     GoRoute(
       path: RoutePaths.companyBranches,

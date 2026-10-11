@@ -189,6 +189,20 @@ abstract final class AppMenuRouteRegistry {
       path: RoutePaths.companyTaxInvoices,
       scope: AppMenuScope.company,
     ),
+    '09009': AppMenuRouteSpec(
+      menuCode: '09009',
+      databaseRouteName: 'companyPurchaseDeliveries',
+      goRouteName: RouteNames.companyPurchaseDeliveries,
+      path: RoutePaths.companyPurchaseDeliveries,
+      scope: AppMenuScope.company,
+    ),
+    '09010': AppMenuRouteSpec(
+      menuCode: '09010',
+      databaseRouteName: 'companyPurchaseTaxInvoices',
+      goRouteName: RouteNames.companyPurchaseTaxInvoices,
+      path: RoutePaths.companyPurchaseTaxInvoices,
+      scope: AppMenuScope.company,
+    ),
     '07001': AppMenuRouteSpec(
       menuCode: '07001',
       databaseRouteName: 'partnerUsers',
