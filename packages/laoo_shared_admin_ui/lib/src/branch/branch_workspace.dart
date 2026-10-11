@@ -57,6 +57,7 @@ class _BranchWorkspaceState extends State<BranchWorkspace> {
   final contact = TextEditingController();
   final contactPhone = TextEditingController();
   final position = TextEditingController();
+  final taxBranch = TextEditingController();
 
   List<BranchRecord> items = const [];
   List<BranchCompanyOption> companies = const [];
@@ -115,6 +116,7 @@ class _BranchWorkspaceState extends State<BranchWorkspace> {
       contact,
       contactPhone,
       position,
+      taxBranch,
     ]) {
       controller.dispose();
     }
@@ -1003,6 +1005,7 @@ class _BranchWorkspaceState extends State<BranchWorkspace> {
     contact.text = item?.contName ?? '';
     contactPhone.text = item?.contPhone ?? '';
     position.text = item?.contPositionName ?? '';
+    taxBranch.text = item?.taxBranchCode ?? '';
     formCompanyId =
         item?.companyId ??
         (companies.isNotEmpty ? companies.first.companyId : null);
@@ -1118,6 +1121,18 @@ class _BranchWorkspaceState extends State<BranchWorkspace> {
     const SizedBox(height: 12),
     field(nameEn, 'ชื่อสาขา (ภาษาอังกฤษ)'),
     const SizedBox(height: 12),
+    field(
+      taxBranch,
+      'รหัสสาขาภาษี 5 หลัก (ถ้ามี)',
+      keyboard: TextInputType.number,
+      validator: (value) {
+        final code = (value ?? '').trim();
+        return code.isNotEmpty && !RegExp(r'^\d{5}$').hasMatch(code)
+            ? 'กรุณาระบุตัวเลข 5 หลัก'
+            : null;
+      },
+    ),
+    const SizedBox(height: 12),
     twoFields(
       field(
         email,
@@ -1232,6 +1247,7 @@ class _BranchWorkspaceState extends State<BranchWorkspace> {
         contName: nullable(contact.text),
         contPhone: nullable(contactPhone.text),
         contPositionName: nullable(position.text),
+        taxBranchCode: nullable(taxBranch.text),
         isActive: formActive,
       );
       if (current == null) {

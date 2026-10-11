@@ -44,7 +44,8 @@ public sealed class JwtTokenService
                 || user.CompanyId is not > 0 || user.UserId.HasValue || user.GuardianId.HasValue
                 || user.LaooUserId.HasValue || user.PartnerUserId.HasValue || user.PersonId.HasValue
                 || user.CanLoginAsUser || user.LoginMode != "SCHOOL_STUDENT" || user.MemberId.HasValue
-                || user.ProjectCode is not ("LAOO_SCHOOL" or "LAOO_SCHOOL_FOOD"))
+                || user.ProjectCode is not ("LAOO_SCHOOL" or "LAOO_SCHOOL_FOOD")
+                || user.SiteCustomerAccountId.HasValue)
                 throw new ArgumentException("Student token requires isolated student identity and credential version.", nameof(user));
             AddIfValue(claims, "student_id", user.StudentId);
             AddIfValue(claims, "credential_version", user.CredentialVersion);
@@ -55,12 +56,23 @@ public sealed class JwtTokenService
                 || user.CompanyId is not > 0 || user.UserId.HasValue || user.GuardianId.HasValue
                 || user.StudentId.HasValue || user.LaooUserId.HasValue || user.PartnerUserId.HasValue
                 || user.CanLoginAsUser || user.LoginMode != "BOOKING_MEMBER"
-                || user.ProjectCode != "LAOO_BOOKING")
+                || user.ProjectCode != "LAOO_BOOKING" || user.SiteCustomerAccountId.HasValue)
                 throw new ArgumentException("Booking member token requires isolated member identity and credential version.", nameof(user));
             AddIfValue(claims, "member_id", user.MemberId);
             AddIfValue(claims, "credential_version", user.CredentialVersion);
         }
-        else if (user.StudentId.HasValue || user.MemberId.HasValue || user.CredentialVersion.HasValue)
+        else if (user.UserType == "SITE_CUSTOMER")
+        {
+            if (user.SiteCustomerAccountId is not > 0 || user.CompanyId is not > 0
+                || user.UserId.HasValue || user.PersonId.HasValue || user.GuardianId.HasValue
+                || user.StudentId.HasValue || user.MemberId.HasValue || user.LaooUserId.HasValue
+                || user.PartnerUserId.HasValue || user.CanLoginAsUser
+                || user.LoginMode != "SITE_CUSTOMER" || user.ProjectCode != "LAOO_SITE")
+                throw new ArgumentException("Site customer token requires isolated customer identity.", nameof(user));
+            AddIfValue(claims, "site_customer_account_id", user.SiteCustomerAccountId);
+        }
+        else if (user.StudentId.HasValue || user.MemberId.HasValue || user.CredentialVersion.HasValue
+            || user.SiteCustomerAccountId.HasValue)
         {
             throw new ArgumentException("Portal claims cannot be attached to another identity type.", nameof(user));
         }
