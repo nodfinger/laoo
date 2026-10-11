@@ -74,6 +74,10 @@ public sealed record ItemDetail(
     public ItemProjectAccess? ProjectAccess { get; init; }
     public IReadOnlyList<ItemWarrantyPolicyInput> WarrantyPolicies { get; init; } = [];
     public long? ResponsibleDepartmentOrgUnitID { get; init; }
+    public bool IsBorrowable { get; init; }
+    public bool BorrowApprovalRequired { get; init; }
+    public int? BorrowMaxDays { get; init; }
+    public long? BorrowApprovalRouteID { get; init; }
 }
 
 public sealed record ItemUpsertRequest(
@@ -108,6 +112,11 @@ public sealed record ItemUpsertRequest(
     public IReadOnlyList<ItemWarrantyPolicyInput>? WarrantyPolicies { get; init; }
     public long? ResponsibleDepartmentOrgUnitID { get; init; }
     public string? ReceiveStockPriceModeCode { get; init; }
+    // Null means a legacy client did not edit the borrow policy.
+    public bool? IsBorrowable { get; init; }
+    public bool? BorrowApprovalRequired { get; init; }
+    public int? BorrowMaxDays { get; init; }
+    public long? BorrowApprovalRouteID { get; init; }
 }
 
 public sealed record ItemWarrantyPolicyInput(string CoverageTypeCode, string WarrantyModeCode, int? DurationMonths);

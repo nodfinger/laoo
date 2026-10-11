@@ -197,7 +197,7 @@ ORDER BY UnitCode,NameTH;
         await using var c = await OpenAsync(token);
         await EnsureImageStorageSchemaAsync(c, token);
         if (!await CanAsync(c, "VIEW", token)) return Forbid();
-        const string itemSql = "SELECT ItemID,ItemCode,ItemName,ItemGroupCode,ItemTypeCode,ItemKindCode,StockTrackingCode,(SELECT STRING_AGG(U.UsageCode,N',') FROM dbo.TDIVItemUsage U WHERE U.CompanyID=I.CompanyID AND U.ItemID=I.ItemID),UnitPrice,UnitCode,CostPrice,COALESCE((SELECT SUM(B.Quantity) FROM dbo.TDIVStockBalance B WHERE B.CompanyID=I.CompanyID AND B.ItemID=I.ItemID),0),MinStock,PurchaseQuantity,RemarkItem1,Note1,Note2,Note3,Note4,Note5,OrderCode,OrderLink1,OrderLink2,IsActive,ShowShop,ResponsibleDepartmentOrgUnitID,COALESCE(ReceiveStockPriceModeCode,N'CUSTOM') FROM dbo.TDIVItem I WHERE ItemID=@id AND CompanyID=@company";
+        const string itemSql = "SELECT ItemID,ItemCode,ItemName,ItemGroupCode,ItemTypeCode,ItemKindCode,StockTrackingCode,(SELECT STRING_AGG(U.UsageCode,N',') FROM dbo.TDIVItemUsage U WHERE U.CompanyID=I.CompanyID AND U.ItemID=I.ItemID),UnitPrice,UnitCode,CostPrice,COALESCE((SELECT SUM(B.Quantity) FROM dbo.TDIVStockBalance B WHERE B.CompanyID=I.CompanyID AND B.ItemID=I.ItemID),0),MinStock,PurchaseQuantity,RemarkItem1,Note1,Note2,Note3,Note4,Note5,OrderCode,OrderLink1,OrderLink2,IsActive,ShowShop,ResponsibleDepartmentOrgUnitID,COALESCE(ReceiveStockPriceModeCode,N'CUSTOM'),IsBorrowable,BorrowApprovalRequired,BorrowMaxDays,BorrowApprovalRouteID FROM dbo.TDIVItem I WHERE ItemID=@id AND CompanyID=@company";
         await using var item = new SqlCommand(itemSql, c);
         Add(item, "@id", SqlDbType.BigInt, id); Add(item, "@company", SqlDbType.BigInt, CompanyID());
         await using var r = await item.ExecuteReaderAsync(token);
@@ -205,9 +205,13 @@ ORDER BY UnitCode,NameTH;
         var values = new object?[] { r.GetInt64(0), r.GetString(1), r.GetString(2), TextValue(r, 3) ?? string.Empty, TextValue(r, 4) ?? string.Empty, r.GetString(5), r.GetString(6), ParseUsageCodes(TextValue(r, 7)), r.GetDecimal(8), TextValue(r, 9) ?? string.Empty, r.GetDecimal(10), r.GetDecimal(11), r.GetDecimal(12), r.GetDecimal(13), TextValue(r, 14), TextValue(r, 15), TextValue(r, 16), TextValue(r, 17), TextValue(r, 18), TextValue(r, 19), TextValue(r, 20), TextValue(r, 21), TextValue(r, 22), r.GetBoolean(23), r.GetBoolean(24) };
         long? responsibleDepartmentId = r.IsDBNull(25) ? null : r.GetInt64(25);
         var receiveStockPriceModeCode = r.GetString(26);
+        var isBorrowable = r.GetBoolean(27);
+        var borrowApprovalRequired = r.GetBoolean(28);
+        int? borrowMaxDays = r.IsDBNull(29) ? null : r.GetInt32(29);
+        long? borrowApprovalRouteId = r.IsDBNull(30) ? null : r.GetInt64(30);
         await r.DisposeAsync();
         var detail = new ItemDetail((long)values[0]!, (string)values[1]!, (string)values[2]!, (string)values[3]!, (string)values[4]!, (string)values[5]!, (string)values[6]!, (IReadOnlyList<string>)values[7]!, (decimal)values[8]!, (string)values[9]!, (decimal)values[10]!, (decimal)values[11]!, (decimal)values[12]!, (decimal)values[13]!, (string?)values[14], (string?)values[15], (string?)values[16], (string?)values[17], (string?)values[18], (string?)values[19], (string?)values[20], (string?)values[21], (string?)values[22], (bool)values[23]!, (bool)values[24]!, await PackUnits(c, id, token), await Images(c, id, token));
-        return Ok(detail with { ProjectAccess = await ReadProjectAccess(c, id, token), WarrantyPolicies = await ReadWarrantyPolicies(c, id, token), ResponsibleDepartmentOrgUnitID = responsibleDepartmentId, ReceiveStockPriceModeCode = receiveStockPriceModeCode });
+        return Ok(detail with { ProjectAccess = await ReadProjectAccess(c, id, token), WarrantyPolicies = await ReadWarrantyPolicies(c, id, token), ResponsibleDepartmentOrgUnitID = responsibleDepartmentId, ReceiveStockPriceModeCode = receiveStockPriceModeCode, IsBorrowable = isBorrowable, BorrowApprovalRequired = borrowApprovalRequired, BorrowMaxDays = borrowMaxDays, BorrowApprovalRouteID = borrowApprovalRouteId });
     }
 
     [HttpGet("{id:long}/pack-units")]
@@ -446,6 +450,8 @@ ORDER BY M.Seq,M.MasterCode;
             return BadRequest(new { message = "วิธีควบคุมสต็อกไม่ถูกต้อง", description = "กรุณาเลือก NONE, QUANTITY หรือ SERIAL" });
         if (itemKind == "SERVICE" && tracking != "NONE")
             return BadRequest(new { message = "บริการไม่สามารถควบคุมสต็อกได้", description = "Item ชนิด SERVICE ต้องใช้ StockTrackingCode เป็น NONE" });
+        if (request.IsBorrowable == true && (itemKind != "GOODS" || tracking is not ("QUANTITY" or "SERIAL") || request.BorrowMaxDays is not > 0))
+            return BadRequest(new { message = "กติกาการยืมไม่ถูกต้อง", description = "สินค้าที่เปิดให้ยืมต้องเป็นสินค้า GOODS ติดตามสต๊อก และกำหนดวันยืมสูงสุดมากกว่า 0" });
         if (usages.Length == 0 || usages.Any(x => !ItemCatalogCodes.Usages.Contains(x)))
             return BadRequest(new { message = "วัตถุประสงค์ไม่ถูกต้อง", description = "Item ต้องมีอย่างน้อยหนึ่งค่าใน SALE, MATERIAL, EQUIPMENT หรือ SPARE_PART" });
         if (request.ShowShop && !usages.Contains("SALE", StringComparer.OrdinalIgnoreCase))
@@ -491,6 +497,18 @@ ORDER BY M.Seq,M.MasterCode;
                 Bind(cmd, request, code, name, receiveStockPriceModeCode); Add(cmd, "@id", SqlDbType.BigInt, id.Value);
                 if (await cmd.ExecuteNonQueryAsync(token) == 0) return NotFound();
                 itemId = id.Value;
+            }
+            if (request.IsBorrowable.HasValue)
+            {
+                await using var policy = new SqlCommand("UPDATE dbo.TDIVItem SET IsBorrowable=@enabled,BorrowApprovalRequired=@approval,BorrowMaxDays=@days,BorrowApprovalRouteID=@route WHERE CompanyID=@company AND ItemID=@item AND (@route IS NULL OR EXISTS(SELECT 1 FROM dbo.TDIVBorrowApprovalRoute R WHERE R.BorrowApprovalRouteID=@route AND R.CompanyID=@company AND R.IsActive=1))", c, tx);
+                Add(policy, "@company", SqlDbType.BigInt, CompanyID());
+                Add(policy, "@item", SqlDbType.BigInt, itemId);
+                Add(policy, "@enabled", SqlDbType.Bit, request.IsBorrowable.Value);
+                Add(policy, "@approval", SqlDbType.Bit, request.IsBorrowable.Value && request.BorrowApprovalRequired == true);
+                Add(policy, "@days", SqlDbType.Int, request.IsBorrowable.Value ? (object?)request.BorrowMaxDays ?? DBNull.Value : DBNull.Value);
+                Add(policy, "@route", SqlDbType.BigInt, request.IsBorrowable.Value && request.BorrowApprovalRequired == true ? (object?)request.BorrowApprovalRouteID ?? DBNull.Value : DBNull.Value);
+                if (await policy.ExecuteNonQueryAsync(token) != 1)
+                    return BadRequest(new { message = "กติกาการยืมไม่ถูกต้อง", description = "สายอนุมัติไม่อยู่ในบริษัทนี้หรือปิดใช้งาน" });
             }
             if (request.ProjectAccess is not null)
                 await SaveProjectAccess(c, tx, itemId, request.ProjectAccess, token);

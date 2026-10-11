@@ -24,6 +24,7 @@ import '../company/vat_settings/pages/vat_settings_page.dart';
 import '../company/temporary_receipt/pages/temporary_receipt_page.dart';
 import '../inventory/pages/inventory_pages.dart';
 import '../inventory/pages/stock_receipt_page.dart';
+import '../inventory/pages/employee_borrow_page.dart';
 import '../support/presentation/widgets/support_workspace_shell.dart';
 import 'service_route_contract.dart';
 
@@ -89,6 +90,10 @@ List<GoRoute> buildServiceFeatureRoutes({
     (state) => StockReceiptPage(onCreateVendor: onCreateReceiptVendor),
   ),
   _page('08006', (state) => const SerialRegistryPage()),
+  _page('08008', (state) => const EmployeeBorrowPage(menuCode: '08008')),
+  _page('08009', (state) => const EmployeeBorrowPage(menuCode: '08009')),
+  _page('08010', (state) => const EmployeeBorrowPage(menuCode: '08010')),
+  _page('08011', (state) => const EmployeeBorrowPage(menuCode: '08011')),
   _page(
     '14002',
     (state) =>

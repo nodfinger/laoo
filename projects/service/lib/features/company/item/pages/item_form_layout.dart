@@ -12,6 +12,7 @@ import '../../../../app/theme/laoo_typography.dart';
 import '../../../../app/theme/workspace_theme_presets.dart';
 import '../../../../core/widgets/timed_snack_bar.dart';
 import '../data/item_api.dart';
+import '../../../inventory/data/employee_borrow_api.dart';
 
 class _UpperCaseTextFormatter extends TextInputFormatter {
   @override
@@ -84,6 +85,123 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
   int _additionalTab = 0;
   List<Map<String, dynamic>> _packs = [];
   List<Map<String, dynamic>> _images = [];
+  late final TextEditingController _borrowDays;
+  bool _borrowable = false, _borrowApprovalRequired = false;
+  int? _borrowRouteID;
+  List<Map<String, dynamic>> _borrowRoutes = [];
+
+  Future<void> _loadBorrowRoutes() async {
+    final api = EmployeeBorrowApi();
+    try {
+      final routes = await api.routes();
+      if (mounted) setState(() => _borrowRoutes = routes);
+    } catch (_) {
+      // The item policy can still use the company default route.
+    } finally {
+      api.dispose();
+    }
+  }
+
+  Future<void> _manageBorrowRoutes() async {
+    final api = EmployeeBorrowApi();
+    final name = TextEditingController();
+    try {
+      final users = await api.approvers();
+      if (!mounted) return;
+      final steps = <int>[];
+      var isDefault = _borrowRoutes.isEmpty;
+      final saved = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (dialogContext, update) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(LaooRadius.xs),
+            ),
+            title: const Text('ข้อมูลสินค้า > เพิ่มสายอนุมัติ'),
+            content: SizedBox(
+              width: 450,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(
+                      controller: name,
+                      onChanged: (_) => update(() {}),
+                      decoration: const InputDecoration(
+                        labelText: 'ชื่อสายอนุมัติ *',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: LaooLayout.popupFieldSpacing),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('ใช้เป็นสายเริ่มต้นบริษัท'),
+                      value: isDefault,
+                      onChanged: (v) => update(() => isDefault = v),
+                    ),
+                    const Text('เลือกผู้อนุมัติตามลำดับขั้น'),
+                    for (final user in users)
+                      CheckboxListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text('${user['name']}'),
+                        subtitle:
+                            steps.contains((user['userID'] as num).toInt())
+                            ? Text(
+                                'ขั้นที่ ${steps.indexOf((user['userID'] as num).toInt()) + 1}',
+                              )
+                            : null,
+                        value: steps.contains((user['userID'] as num).toInt()),
+                        onChanged: (on) => update(() {
+                          final id = (user['userID'] as num).toInt();
+                          if (on == true) {
+                            steps.add(id);
+                          } else {
+                            steps.remove(id);
+                          }
+                        }),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              OutlinedButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('ยกเลิก'),
+              ),
+              FilledButton(
+                onPressed: name.text.trim().isEmpty || steps.isEmpty
+                    ? null
+                    : () => Navigator.pop(dialogContext, true),
+                child: const Text('บันทึก'),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (saved == true) {
+        await api.addRoute({
+          'name': name.text.trim(),
+          'isDefault': isDefault,
+          'steps': steps,
+        });
+        await _loadBorrowRoutes();
+        if (mounted)
+          showTimedSnackBar(context, message: 'บันทึกสายอนุมัติแล้ว');
+      }
+    } catch (error) {
+      if (mounted)
+        showTimedSnackBar(
+          context,
+          message: 'บันทึกสายอนุมัติไม่สำเร็จ\nรายละเอียดเพิ่มเติม: $error',
+          error: true,
+        );
+    } finally {
+      name.dispose();
+      api.dispose();
+    }
+  }
 
   int get _maxImageBytes => (widget.maxItemImageSizeMB * 1024 * 1024).ceil();
 
@@ -155,6 +273,13 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
     _showShop = _data['showShop'] == true;
     _packs = List<Map<String, dynamic>>.from(_data['packUnits'] ?? []);
     _images = List<Map<String, dynamic>>.from(_data['images'] ?? []);
+    _borrowable = _data['isBorrowable'] == true;
+    _borrowApprovalRequired = _data['borrowApprovalRequired'] == true;
+    _borrowDays = TextEditingController(
+      text: '${_data['borrowMaxDays'] ?? ''}',
+    );
+    _borrowRouteID = (_data['borrowApprovalRouteID'] as num?)?.toInt();
+    _loadBorrowRoutes();
     WidgetsBinding.instance.addPostFrameCallback((_) => _previewCode());
   }
 
@@ -176,6 +301,7 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
       _note3,
       _note4,
       _note5,
+      _borrowDays,
     ]) {
       controller.dispose();
     }
@@ -311,6 +437,12 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
       'showShop': _showShop,
       'packUnits': _packs,
       'images': _images,
+      'isBorrowable': _borrowable,
+      'borrowApprovalRequired': _borrowable && _borrowApprovalRequired,
+      'borrowMaxDays': _borrowable ? int.tryParse(_borrowDays.text) : null,
+      'borrowApprovalRouteID': _borrowable && _borrowApprovalRequired
+          ? _borrowRouteID
+          : null,
     };
     final creating = _data['itemID'] == null;
     try {
@@ -348,6 +480,10 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
           _itemKind = 'GOODS';
           _stockTracking = 'QUANTITY';
           _usageCodes = {'SALE'};
+          _borrowable = false;
+          _borrowApprovalRequired = false;
+          _borrowDays.clear();
+          _borrowRouteID = null;
           _saving = false;
         });
       }
@@ -357,6 +493,100 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
       setState(() => _saving = false);
       showTimedSnackBar(context, message: error.toString(), error: true);
     }
+  }
+
+  Widget _borrowPolicyPanel(bool wide) {
+    final canBorrow =
+        _itemKind == 'GOODS' &&
+        (_stockTracking == 'QUANTITY' || _stockTracking == 'SERIAL');
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'กติกาการยืมภายในบริษัท',
+          style: TextStyle(
+            fontSize: LaooTypography.sectionTitle,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 8),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('เปิดให้ยืม'),
+          subtitle: canBorrow
+              ? null
+              : const Text('ใช้ได้เฉพาะสินค้าที่ติดตามสต๊อกแบบจำนวนหรือ SN'),
+          value: canBorrow && _borrowable,
+          onChanged: canBorrow
+              ? (value) => setState(() => _borrowable = value)
+              : null,
+        ),
+        if (_borrowable && canBorrow) ...[
+          const SizedBox(height: LaooLayout.popupFieldSpacing),
+          Wrap(
+            spacing: 12,
+            runSpacing: LaooLayout.popupFieldSpacing,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              SizedBox(
+                width: wide ? 220 : double.infinity,
+                child: TextFormField(
+                  controller: _borrowDays,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'ยืมได้สูงสุด (วัน) *',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (text) =>
+                      _borrowable && (int.tryParse(text ?? '') ?? 0) <= 0
+                      ? 'กรุณากำหนดจำนวนวันมากกว่า 0'
+                      : null,
+                ),
+              ),
+              SizedBox(
+                width: wide ? 280 : double.infinity,
+                child: SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('ต้องขออนุมัติ'),
+                  value: _borrowApprovalRequired,
+                  onChanged: (value) =>
+                      setState(() => _borrowApprovalRequired = value),
+                ),
+              ),
+            ],
+          ),
+          if (_borrowApprovalRequired) ...[
+            const SizedBox(height: LaooLayout.popupFieldSpacing),
+            DropdownButtonFormField<int?>(
+              value: _borrowRouteID,
+              decoration: const InputDecoration(
+                labelText: 'สายอนุมัติ',
+                helperText: 'ไม่เลือก = ใช้สายเริ่มต้นของบริษัท',
+                border: OutlineInputBorder(),
+              ),
+              items: [
+                const DropdownMenuItem<int?>(
+                  value: null,
+                  child: Text('สายเริ่มต้นบริษัท'),
+                ),
+                for (final route in _borrowRoutes)
+                  DropdownMenuItem<int?>(
+                    value: (route['routeID'] as num).toInt(),
+                    child: Text('${route['routeName']}'),
+                  ),
+              ],
+              onChanged: (value) => setState(() => _borrowRouteID = value),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: _manageBorrowRoutes,
+              icon: const Icon(Icons.account_tree_outlined),
+              label: const Text('เพิ่มสายอนุมัติ'),
+            ),
+          ],
+        ],
+      ],
+    );
   }
 
   @override
@@ -490,6 +720,8 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
                                           _compactFields(wide),
                                           const SizedBox(height: 16),
                                           _additionalPanel(accent, wide),
+                                          const SizedBox(height: 16),
+                                          _borrowPolicyPanel(wide),
                                         ],
                                       ),
                                     ),
