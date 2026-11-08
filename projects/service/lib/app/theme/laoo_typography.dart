@@ -30,7 +30,10 @@ abstract final class LaooTypography {
 
   // Form / input
   static const double inputText = 14;
+  static const double popupInputText = 16;
   static const double inputLabel = 16;
+  static const double floatingLabel = 14;
+  static const double materialFloatingLabelSource = floatingLabel / 0.75;
   static const double inputHint = 14;
   static const double validation = 12;
   static const double comboBox = 14;

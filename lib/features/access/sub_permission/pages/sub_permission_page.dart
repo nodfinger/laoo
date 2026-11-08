@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../app/theme/laoo_design_tokens.dart';
+import '../../../../app/theme/laoo_typography.dart';
 import '../../../../app/theme/workspace_theme_presets.dart';
 import '../../../../core/widgets/timed_snack_bar.dart';
 import '../../../support/presentation/widgets/support_workspace_shell.dart';
@@ -50,62 +52,98 @@ class _SubPermissionPageState extends State<SubPermissionPage> {
 
   @override
   Widget build(BuildContext context) {
-    final accent = workspaceThemeController.value.primary;
-    final menus = <String, List<Map<String, dynamic>>>{};
+    final groups = <String, Map<String, List<Map<String, dynamic>>>>{};
     for (final row in _rows) {
-      menus.putIfAbsent('${row['menuCode']}', () => []).add(row);
+      groups
+          .putIfAbsent('${row['menuGroupName']}', () => {})
+          .putIfAbsent('${row['menuCode']}', () => [])
+          .add(row);
     }
     return SupportWorkspaceShell(
       pageTitle: _caption,
       activeMenu: widget.activeMenu,
       menuScope: WorkspaceMenuScope.company,
-      child: ColoredBox(
-        color: const Color(0xFFF8F9FB),
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : ListView(
-                padding: const EdgeInsets.all(20),
-                children: [
-                  Card(
-                    color: Colors.white,
-                    elevation: 0,
-                    surfaceTintColor: Colors.transparent,
-                    shadowColor: Colors.transparent,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(4),
-                      side: BorderSide.none,
-                    ),
-                    child: Container(
-                      width: double.infinity,
-                      height: 48,
-                      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                      decoration: const BoxDecoration(
-                        border: Border(
-                          bottom: BorderSide(color: Color(0xFFE1E5E8)),
+      child: ValueListenableBuilder<WorkspaceThemePreset>(
+        valueListenable: workspaceThemeController,
+        builder: (context, preset, _) {
+          final accent = preset.primary;
+          return ColoredBox(
+            color: preset.toThemeData().scaffoldBackgroundColor,
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : ListView(
+                    padding: const EdgeInsets.all(LaooLayout.cardMargin),
+                    children: [
+                      Card(
+                        margin: EdgeInsets.zero,
+                        color: Colors.white,
+                        elevation: 0,
+                        surfaceTintColor: Colors.transparent,
+                        shadowColor: Colors.transparent,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(4),
+                          side: BorderSide.none,
+                        ),
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
+                          child: WorkspacePageTitle(
+                            title: _caption,
+                            favoriteKey: widget.activeMenu,
+                          ),
                         ),
                       ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.tune_outlined, color: accent, size: 20),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              _caption,
-                              style: const TextStyle(
-                                color: Colors.black,
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
+                      const SizedBox(height: 8),
+                      ...groups.entries.map(
+                        (group) => Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Card(
+                            margin: EdgeInsets.zero,
+                            color: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: ExpansionTile(
+                              initiallyExpanded: true,
+                              iconColor: accent,
+                              collapsedIconColor: accent,
+                              textColor: Theme.of(
+                                context,
+                              ).colorScheme.onSurface,
+                              collapsedTextColor: Theme.of(
+                                context,
+                              ).colorScheme.onSurface,
+                              shape: const Border(),
+                              collapsedShape: const Border(),
+                              tilePadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
                               ),
+                              leading: Icon(
+                                Icons.folder_outlined,
+                                color: accent,
+                              ),
+                              title: Text(
+                                group.key,
+                                style: const TextStyle(
+                                  fontSize: LaooTypography.sectionTitle,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              children: group.value.values
+                                  .map((rows) => _menuCard(rows, accent))
+                                  .toList(),
                             ),
                           ),
-                        ],
+                        ),
                       ),
-                    ),
+                    ],
                   ),
-                  const SizedBox(height: 6),
-                  ...menus.entries.map((menu) => _menuCard(menu.value, accent)),
-                ],
-              ),
+          );
+        },
       ),
     );
   }
@@ -114,7 +152,7 @@ class _SubPermissionPageState extends State<SubPermissionPage> {
     final menuCode = '${rows.first['menuCode']}';
     return Card(
       color: Colors.white,
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
       elevation: 0,
       surfaceTintColor: Colors.transparent,
       shadowColor: Colors.transparent,
@@ -123,6 +161,12 @@ class _SubPermissionPageState extends State<SubPermissionPage> {
         side: BorderSide.none,
       ),
       child: ExpansionTile(
+        iconColor: accent,
+        collapsedIconColor: accent,
+        textColor: Theme.of(context).colorScheme.onSurface,
+        collapsedTextColor: Theme.of(context).colorScheme.onSurface,
+        shape: const Border(),
+        collapsedShape: const Border(),
         initiallyExpanded: _expandedMenus.contains(menuCode),
         onExpansionChanged: (value) {
           setState(() {
@@ -136,17 +180,20 @@ class _SubPermissionPageState extends State<SubPermissionPage> {
         leading: Icon(Icons.account_tree_outlined, color: accent, size: 21),
         title: Text(
           '${rows.first['menuName']}',
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          style: const TextStyle(
+            fontSize: LaooTypography.sectionTitle,
+            fontWeight: FontWeight.w700,
+          ),
         ),
         children: [
           ...rows.asMap().entries.expand(
             (entry) => [
               _pointRow(entry.value, accent),
               if (entry.key < rows.length - 1)
-                const Divider(
-                  color: Color(0xFFF5F6F7),
-                  height: 1,
-                  thickness: 1,
+                Divider(
+                  color: workspaceThemeController.value.border,
+                  height: .6,
+                  thickness: .6,
                 ),
             ],
           ),
@@ -168,13 +215,19 @@ class _SubPermissionPageState extends State<SubPermissionPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('${point['permissionPointName']}'),
+              Text(
+                '${point['permissionPointName']}',
+                style: const TextStyle(fontSize: LaooTypography.body),
+              ),
               if ('${point['employeeNames'] ?? ''}'.trim().isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(top: 4),
                   child: Text(
                     '${point['employeeNames']}',
-                    style: TextStyle(color: accent, fontSize: 14),
+                    style: TextStyle(
+                      color: accent,
+                      fontSize: LaooTypography.body,
+                    ),
                   ),
                 ),
               if ('${point['permissionPointDescription'] ?? ''}'
@@ -214,8 +267,7 @@ class _SubPermissionPageState extends State<SubPermissionPage> {
           builder: (context, setDialogState) => Dialog(
             backgroundColor: Colors.white,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(18),
-              side: BorderSide(color: accent),
+              borderRadius: BorderRadius.circular(4),
             ),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 560, maxHeight: 650),
@@ -230,16 +282,16 @@ class _SubPermissionPageState extends State<SubPermissionPage> {
                         Expanded(
                           child: Text(
                             '${point['permissionPointName']}',
-                            style: TextStyle(
-                              color: accent,
-                              fontSize: 20,
+                            style: const TextStyle(
+                              color: LaooColors.pageCaption,
+                              fontSize: 18,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
                         ),
                       ],
                     ),
-                    Divider(color: accent),
+                    Divider(color: Theme.of(context).dividerColor),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
                       initialValue: departmentFilter,
@@ -247,19 +299,25 @@ class _SubPermissionPageState extends State<SubPermissionPage> {
                         labelText: 'แผนก',
                         labelStyle: TextStyle(
                           color: accent,
-                          fontSize: 16,
+                          fontSize: LaooTypography.inputLabel,
                           fontWeight: FontWeight.w500,
+                        ),
+                        floatingLabelStyle: TextStyle(
+                          color: accent,
+                          fontSize: LaooTypography.materialFloatingLabelSource,
                         ),
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 12,
                           vertical: 10,
                         ),
                         enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(color: accent),
+                          borderRadius: BorderRadius.circular(4),
+                          borderSide: BorderSide(
+                            color: Theme.of(context).dividerColor,
+                          ),
                         ),
                         focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(4),
                           borderSide: BorderSide(color: accent, width: 2),
                         ),
                       ),
@@ -276,7 +334,9 @@ class _SubPermissionPageState extends State<SubPermissionPage> {
                                   value: name,
                                   child: Text(
                                     name,
-                                    style: const TextStyle(fontSize: 14),
+                                    style: const TextStyle(
+                                      fontSize: LaooTypography.comboBox,
+                                    ),
                                   ),
                                 ),
                               )
@@ -307,6 +367,8 @@ class _SubPermissionPageState extends State<SubPermissionPage> {
                                   CheckboxListTile(
                                     value: selected.contains(id),
                                     activeColor: accent,
+                                    controlAffinity:
+                                        ListTileControlAffinity.leading,
                                     title: Text(
                                       '${employee['employeeCode']} - ${employee['fullName']}',
                                     ),
@@ -334,8 +396,9 @@ class _SubPermissionPageState extends State<SubPermissionPage> {
                                               .length -
                                           1)
                                     Divider(
-                                      color: accent.withValues(alpha: .25),
-                                      height: 1,
+                                      color: Theme.of(context).dividerColor,
+                                      height: .6,
+                                      thickness: .6,
                                     ),
                                 ],
                               );
@@ -343,19 +406,24 @@ class _SubPermissionPageState extends State<SubPermissionPage> {
                             .toList(),
                       ),
                     ),
-                    Divider(color: accent),
+                    Divider(color: Theme.of(context).dividerColor),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        TextButton(
+                        OutlinedButton.icon(
                           onPressed: () => Navigator.pop(dialogContext, false),
-                          child: Text(
-                            'ยกเลิก',
-                            style: TextStyle(color: accent),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: accent,
+                            minimumSize: const Size(84, 48),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(4),
+                            ),
                           ),
+                          icon: const Icon(Icons.close),
+                          label: const Text('ยกเลิก'),
                         ),
                         const SizedBox(width: 8),
-                        FilledButton(
+                        FilledButton.icon(
                           onPressed: () async {
                             try {
                               await _api.saveEmployees(
@@ -383,8 +451,13 @@ class _SubPermissionPageState extends State<SubPermissionPage> {
                           style: FilledButton.styleFrom(
                             backgroundColor: accent,
                             foregroundColor: Colors.white,
+                            minimumSize: const Size(100, 48),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(4),
+                            ),
                           ),
-                          child: const Text('บันทึก'),
+                          icon: const Icon(Icons.save_outlined),
+                          label: const Text('บันทึก'),
                         ),
                       ],
                     ),

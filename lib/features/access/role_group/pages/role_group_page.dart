@@ -1,7 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:laoo_shared_admin_ui/laoo_shared_admin_ui.dart'
+    show FilterHeightSync, filterActionHeightStyle;
+import '../../../../app/theme/laoo_design_tokens.dart';
+import '../../../../app/theme/laoo_typography.dart';
 import '../../../../core/api/api_exception.dart';
 import '../../../../core/company_setup/company_setup_controller.dart';
+import '../../../../core/navigation/navigation_menu_repository.dart';
 import '../../../../core/widgets/pinned_data_table.dart';
 import '../../../../app/theme/workspace_theme_presets.dart';
 import '../../../support/presentation/widgets/support_workspace_shell.dart';
@@ -14,9 +19,13 @@ class RoleGroupPage extends StatefulWidget {
     super.key,
     required this.scope,
     required this.activeMenu,
+    this.embedded = false,
+    this.onSelected,
   });
   final String scope;
   final String activeMenu;
+  final bool embedded;
+  final ValueChanged<RoleGroup>? onSelected;
   @override
   State<RoleGroupPage> createState() => _RoleGroupPageState();
 }
@@ -35,12 +44,29 @@ class _RoleGroupPageState extends State<RoleGroupPage> {
   bool _card = false;
   bool _loading = false;
   bool _canCreate = false, _canEdit = false, _canDelete = false;
+  String _caption = 'กลุ่มสิทธิ์';
   @override
   void initState() {
     super.initState();
     _loadPermissions();
     _load();
     _loadDefaultViewMode();
+    _loadCaption();
+  }
+
+  Future<void> _loadCaption() async {
+    final menuCode = widget.scope == 'partner'
+        ? '11003'
+        : widget.scope == 'laoo'
+        ? '12003'
+        : '10003';
+    try {
+      final caption = await NavigationMenuRepository().resolveMenuName(
+        menuCode: menuCode,
+        fallback: _caption,
+      );
+      if (mounted) setState(() => _caption = caption);
+    } catch (_) {}
   }
 
   Future<void> _loadDefaultViewMode() async {
@@ -110,10 +136,11 @@ class _RoleGroupPageState extends State<RoleGroupPage> {
     return 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง';
   }
 
-  Future<void> _save(String code, String name, String desc, bool active) async {
-    if (code.trim().isEmpty || name.trim().isEmpty) {
-      _notice('กรุณาระบุรหัสและชื่อกลุ่มสิทธิ์', error: true);
-      return;
+  Future<bool> _save(String code, String name, String desc, bool active) async {
+    if ((widget.scope != 'customer' && code.trim().isEmpty) ||
+        name.trim().isEmpty) {
+      _notice('กรุณาระบุข้อมูลกลุ่มสิทธิ์ให้ครบ', error: true);
+      return false;
     }
     final editing = _editing != null;
     setState(() => _loading = true);
@@ -139,23 +166,285 @@ class _RoleGroupPageState extends State<RoleGroupPage> {
         _notice('เพิ่มข้อมูลใหม่สำเร็จ');
       }
       _load();
+      return true;
     } catch (e) {
       _notice(_thaiError(e), error: true);
+      return false;
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
+  Future<void> _openCustomerForm(RoleGroup? item) async {
+    _editing = item;
+    final name = TextEditingController(text: item?.name);
+    final description = TextEditingController(text: item?.description);
+    var active = item?.isActive ?? true;
+    var saving = false;
+    String? error;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Theme.of(context).colorScheme.scrim.withValues(alpha: .54),
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => Dialog(
+          insetPadding: const EdgeInsets.all(LaooLayout.dialogInsetPadding),
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(LaooRadius.xs)),
+          ),
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 10, 10, 0),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      minHeight: LaooLayout.popupHeaderMinHeight,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.edit_outlined,
+                          color: workspaceThemeController.value.primary,
+                          size: 24,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'กลุ่มสิทธิ์ > ${item == null ? 'เพิ่ม' : 'แก้ไข'}',
+                            style: LaooTypography.popupTitleStyle,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 10),
+                  child: Divider(
+                    height: 1,
+                    thickness: 1,
+                    color: LaooColors.border,
+                  ),
+                ),
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(10, 12, 10, 12),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          children: [
+                            const Text('สถานะ'),
+                            const SizedBox(width: 8),
+                            Switch(
+                              value: active,
+                              activeTrackColor:
+                                  workspaceThemeController.value.primary,
+                              onChanged: saving
+                                  ? null
+                                  : (value) =>
+                                        setDialogState(() => active = value),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: LaooLayout.popupFieldSpacing),
+                        TextField(
+                          controller: name,
+                          cursorColor: workspaceThemeController.value.primary,
+                          enabled: !saving,
+                          style: const TextStyle(
+                            fontSize: LaooTypography.inputText,
+                          ),
+                          decoration: _rolePopupDecoration(
+                            context,
+                            'ชื่อกลุ่มสิทธิ์ *',
+                            errorText: error,
+                          ),
+                        ),
+                        const SizedBox(height: LaooLayout.popupFieldSpacing),
+                        TextField(
+                          controller: description,
+                          cursorColor: workspaceThemeController.value.primary,
+                          enabled: !saving,
+                          maxLines: 3,
+                          style: const TextStyle(
+                            fontSize: LaooTypography.inputText,
+                          ),
+                          decoration: _rolePopupDecoration(
+                            context,
+                            'รายละเอียด',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 10),
+                  child: Divider(
+                    height: 1,
+                    thickness: 1,
+                    color: LaooColors.border,
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 12, 10, 10),
+                  child: Wrap(
+                    alignment: WrapAlignment.end,
+                    spacing: 8,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: saving
+                            ? null
+                            : () => Navigator.pop(dialogContext),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor:
+                              workspaceThemeController.value.primary,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          textStyle: const TextStyle(
+                            fontFamily: LaooTypography.fontFamily,
+                            fontSize: LaooTypography.button,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          minimumSize: const Size(
+                            84,
+                            LaooTypography.buttonHeight,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(LaooRadius.xs),
+                          ),
+                        ),
+                        icon: const Icon(Icons.close),
+                        label: const Text('ยกเลิก'),
+                      ),
+                      FilledButton.icon(
+                        onPressed: saving
+                            ? null
+                            : () async {
+                                if (name.text.trim().isEmpty) {
+                                  setDialogState(
+                                    () => error = 'กรุณาระบุชื่อกลุ่มสิทธิ์',
+                                  );
+                                  return;
+                                }
+                                setDialogState(() {
+                                  saving = true;
+                                  error = null;
+                                });
+                                final success = await _save(
+                                  item?.code ?? '',
+                                  name.text,
+                                  description.text,
+                                  active,
+                                );
+                                if (!dialogContext.mounted) return;
+                                if (success) {
+                                  Navigator.pop(dialogContext);
+                                } else {
+                                  setDialogState(() {
+                                    saving = false;
+                                    error =
+                                        'บันทึกไม่สำเร็จ กรุณาตรวจสอบข้อมูลและลองอีกครั้ง';
+                                  });
+                                }
+                              },
+                        style: FilledButton.styleFrom(
+                          backgroundColor:
+                              workspaceThemeController.value.primary,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          textStyle: const TextStyle(
+                            fontFamily: LaooTypography.fontFamily,
+                            fontSize: LaooTypography.button,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          minimumSize: const Size(
+                            100,
+                            LaooTypography.buttonHeight,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(LaooRadius.xs),
+                          ),
+                        ),
+                        icon: const Icon(Icons.save_outlined),
+                        label: const Text('บันทึก'),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    name.dispose();
+    description.dispose();
+    _editing = null;
+  }
+
+  InputDecoration _rolePopupDecoration(
+    BuildContext context,
+    String label, {
+    String? errorText,
+  }) {
+    final primary = workspaceThemeController.value.primary;
+    final error = Theme.of(context).colorScheme.error;
+    OutlineInputBorder border(Color color, {double width = 1}) =>
+        OutlineInputBorder(
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
+          borderSide: BorderSide(color: color, width: width),
+        );
+    return InputDecoration(
+      labelText: label,
+      errorText: errorText,
+      labelStyle: const TextStyle(
+        fontFamily: LaooTypography.fontFamily,
+        fontSize: LaooTypography.inputLabel,
+      ),
+      errorStyle: const TextStyle(
+        fontFamily: LaooTypography.fontFamily,
+        fontSize: LaooTypography.validation,
+      ),
+      floatingLabelStyle: WidgetStateTextStyle.resolveWith(
+        (states) => TextStyle(
+          color: states.contains(WidgetState.error)
+              ? error
+              : states.contains(WidgetState.focused)
+              ? primary
+              : Theme.of(context).inputDecorationTheme.labelStyle?.color ??
+                    Theme.of(context).colorScheme.onSurfaceVariant,
+          fontSize: LaooTypography.materialFloatingLabelSource,
+        ),
+      ),
+      isDense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      border: border(LaooColors.border),
+      enabledBorder: border(LaooColors.border),
+      disabledBorder: border(LaooColors.border),
+      focusedBorder: border(primary, width: 1.5),
+      errorBorder: border(error),
+      focusedErrorBorder: border(error, width: 1.5),
+    );
+  }
+
   Future<void> _delete(RoleGroup item) async {
     final accent = workspaceThemeController.value.primary;
+    final errorColor = Theme.of(context).colorScheme.error;
     final yes = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(18),
-          side: BorderSide(color: accent, width: 1.2),
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
+          side: BorderSide(color: errorColor, width: 1.2),
         ),
         title: Row(
           children: [
@@ -163,19 +452,17 @@ class _RoleGroupPageState extends State<RoleGroupPage> {
               width: 42,
               height: 42,
               decoration: BoxDecoration(
-                color: accent.withValues(alpha: .14),
+                color: errorColor.withValues(alpha: .14),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Icon(Icons.delete_outline, color: accent),
+              child: Icon(Icons.delete_outline, color: errorColor),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
                 'ยืนยันการลบข้อมูล',
-                style: TextStyle(
-                  color: accent,
-                  fontSize: 19,
-                  fontWeight: FontWeight.w700,
+                style: LaooTypography.popupTitleStyle.copyWith(
+                  color: errorColor,
                 ),
               ),
             ),
@@ -188,12 +475,13 @@ class _RoleGroupPageState extends State<RoleGroupPage> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
               decoration: BoxDecoration(
-                color: accent.withValues(alpha: .13),
+                color: errorColor.withValues(alpha: .13),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
                 'ต้องการลบ ${item.code} - ${item.name} หรือไม่?',
                 textAlign: TextAlign.center,
+                style: TextStyle(color: errorColor),
               ),
             ),
             const SizedBox(height: 12),
@@ -210,8 +498,8 @@ class _RoleGroupPageState extends State<RoleGroupPage> {
           FilledButton.icon(
             onPressed: () => Navigator.pop(c, true),
             style: FilledButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
+              backgroundColor: errorColor,
+              foregroundColor: Theme.of(context).colorScheme.onError,
             ),
             icon: const Icon(Icons.delete_outline),
             label: const Text('ลบ'),
@@ -230,76 +518,91 @@ class _RoleGroupPageState extends State<RoleGroupPage> {
   }
 
   @override
-  Widget build(BuildContext context) => SupportWorkspaceShell(
-    pageTitle: 'กลุ่มสิทธิ์',
-    activeMenu: widget.activeMenu,
-    menuScope: widget.scope == 'partner'
-        ? WorkspaceMenuScope.partner
-        : widget.scope == 'laoo'
-        ? WorkspaceMenuScope.support
-        : WorkspaceMenuScope.company,
-    child: ColoredBox(
-      color: const Color(0xFFF8F9FB),
-      child: Stack(
-        children: [
-          Column(
-            children: [
-              Expanded(
-                child: _form
-                    ? _Form(
-                        key: _formKey,
-                        onCancel: () => setState(() {
-                          _form = false;
-                          _editing = null;
-                        }),
-                        onSave: _save,
-                        editing: _editing,
-                        loading: _loading,
-                        favoriteKey: widget.scope == 'partner'
-                            ? '11003'
-                            : widget.scope == 'laoo'
-                            ? '12003'
-                            : '10003',
-                      )
-                    : _List(
-                        future: _future,
-                        search: _search,
-                        onSearch: _load,
-                        canCreate: _canCreate,
-                        canEdit: _canEdit,
-                        canDelete: _canDelete,
-                        isCard: _card,
-                        onToggleView: () => setState(() => _card = !_card),
-                        favoriteKey: widget.scope == 'partner'
-                            ? '11003'
-                            : widget.scope == 'laoo'
-                            ? '12003'
-                            : '10003',
-                        onAdd: () => setState(() {
-                          _form = true;
-                          _editing = null;
-                        }),
-                        onEdit: (x) => setState(() {
-                          _form = true;
-                          _editing = x;
-                        }),
-                        onDelete: _delete,
-                      ),
-              ),
-            ],
-          ),
-          if (_alert != null)
-            Positioned(
-              top: 16,
-              right: 24,
-              child: _AlertBanner(
-                message: _alert!,
-                error: _alertError,
-                onClose: () => setState(() => _alert = null),
-              ),
+  Widget build(BuildContext context) {
+    final content = _buildContent();
+    if (widget.embedded) return content;
+    return SupportWorkspaceShell(
+      pageTitle: _caption,
+      activeMenu: widget.activeMenu,
+      menuScope: widget.scope == 'partner'
+          ? WorkspaceMenuScope.partner
+          : widget.scope == 'laoo'
+          ? WorkspaceMenuScope.support
+          : WorkspaceMenuScope.company,
+      child: content,
+    );
+  }
+
+  Widget _buildContent() => ColoredBox(
+    color: const Color(0xFFF8F9FB),
+    child: Stack(
+      children: [
+        Column(
+          children: [
+            Expanded(
+              child: _form
+                  ? _Form(
+                      key: _formKey,
+                      onCancel: () => setState(() {
+                        _form = false;
+                        _editing = null;
+                      }),
+                      onSave: (code, name, desc, active) async {
+                        await _save(code, name, desc, active);
+                      },
+                      editing: _editing,
+                      loading: _loading,
+                      favoriteKey: widget.scope == 'partner'
+                          ? '11003'
+                          : widget.scope == 'laoo'
+                          ? '12003'
+                          : '10003',
+                    )
+                  : _List(
+                      caption: _caption,
+                      future: _future,
+                      search: _search,
+                      onSearch: _load,
+                      canCreate: _canCreate,
+                      canEdit: _canEdit,
+                      canDelete: _canDelete,
+                      hideAutoCode: widget.scope == 'customer',
+                      isCard: _card,
+                      onToggleView: () => setState(() => _card = !_card),
+                      favoriteKey: widget.scope == 'partner'
+                          ? '11003'
+                          : widget.scope == 'laoo'
+                          ? '12003'
+                          : '10003',
+                      onAdd: () => widget.scope == 'customer'
+                          ? _openCustomerForm(null)
+                          : setState(() {
+                              _form = true;
+                              _editing = null;
+                            }),
+                      onEdit: (x) => widget.scope == 'customer'
+                          ? _openCustomerForm(x)
+                          : setState(() {
+                              _form = true;
+                              _editing = x;
+                            }),
+                      onDelete: _delete,
+                      onSelected: widget.onSelected,
+                    ),
             ),
-        ],
-      ),
+          ],
+        ),
+        if (_alert != null)
+          Positioned(
+            top: 16,
+            right: 24,
+            child: _AlertBanner(
+              message: _alert!,
+              error: _alertError,
+              onClose: () => setState(() => _alert = null),
+            ),
+          ),
+      ],
     ),
   );
 }
@@ -471,6 +774,7 @@ class _AlertBanner extends StatelessWidget {
 
 class _List extends StatefulWidget {
   const _List({
+    required this.caption,
     required this.future,
     required this.search,
     required this.onSearch,
@@ -480,15 +784,20 @@ class _List extends StatefulWidget {
     required this.canCreate,
     required this.canEdit,
     required this.canDelete,
+    required this.hideAutoCode,
     required this.isCard,
     required this.onToggleView,
     required this.favoriteKey,
+    this.onSelected,
   });
+  final String caption;
   final Future<List<RoleGroup>> future;
   final TextEditingController search;
   final VoidCallback onSearch, onAdd;
   final void Function(RoleGroup) onEdit, onDelete;
+  final ValueChanged<RoleGroup>? onSelected;
   final bool canCreate, canEdit, canDelete;
+  final bool hideAutoCode;
   final bool isCard;
   final VoidCallback onToggleView;
   final String favoriteKey;
@@ -500,6 +809,7 @@ class _ListState extends State<_List> {
   int page = 1;
   static const pageSize = 10;
   String statusFilter = 'all';
+  String appliedStatusFilter = 'all';
   int? sortColumn;
   bool sortAscending = true;
 
@@ -508,324 +818,425 @@ class _ListState extends State<_List> {
     sortAscending = ascending;
   });
 
+  void _applySearch() {
+    setState(() {
+      page = 1;
+      appliedStatusFilter = statusFilter;
+    });
+    widget.onSearch();
+  }
+
+  void _clearFilters() {
+    widget.search.clear();
+    setState(() {
+      page = 1;
+      statusFilter = 'all';
+      appliedStatusFilter = 'all';
+    });
+    widget.onSearch();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Card(
-            color: Colors.white,
-            elevation: 0,
-            surfaceTintColor: Colors.transparent,
-            shadowColor: Colors.transparent,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(4),
-              side: BorderSide.none,
-            ),
-            child: Container(
-              decoration: const BoxDecoration(
-                border: Border(bottom: BorderSide(color: Color(0xFFF5F6F7))),
+    return LayoutBuilder(
+      builder: (context, constraints) => Padding(
+        padding: const EdgeInsets.all(LaooLayout.cardMargin),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Card(
+              color: Colors.white,
+              elevation: 0,
+              surfaceTintColor: Colors.transparent,
+              shadowColor: Colors.transparent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(4),
+                side: BorderSide.none,
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              child: Row(
-                children: [
-                  WorkspacePageTitle(
-                    title: 'กลุ่มสิทธิ์',
-                    favoriteKey: widget.favoriteKey,
-                  ),
-                  const Spacer(),
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(4),
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.primary.withValues(alpha: .10),
-                    ),
-                    child: IconButton(
-                      tooltip: widget.isCard ? 'แสดงแบบรายการ' : 'แสดงแบบการ์ด',
-                      color: Theme.of(context).colorScheme.primary,
-                      onPressed: widget.onToggleView,
-                      icon: Icon(
-                        widget.isCard
-                            ? Icons.view_list_outlined
-                            : Icons.grid_view_outlined,
-                      ),
-                    ),
-                  ),
-                  if (widget.canCreate) const SizedBox(width: 8),
-                  if (widget.canCreate)
-                    FilledButton.icon(
-                      onPressed: widget.onAdd,
-                      icon: const Icon(Icons.add),
-                      label: const Text('เพิ่ม'),
-                    ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Card(
-            color: Colors.white,
-            elevation: 0,
-            surfaceTintColor: Colors.transparent,
-            shadowColor: Colors.transparent,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(4),
-              side: BorderSide.none,
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: LayoutBuilder(
-                builder: (context, constraints) => Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+              child: Container(
+                decoration: const BoxDecoration(
+                  border: Border(bottom: BorderSide(color: Color(0xFFF5F6F7))),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
+                child: Row(
                   children: [
-                    SizedBox(
-                      width: constraints.maxWidth < 600
-                          ? constraints.maxWidth
-                          : constraints.maxWidth - 178,
-                      child: TextField(
-                        controller: widget.search,
-                        onSubmitted: (_) {
-                          page = 1;
-                          widget.onSearch();
-                        },
-                        decoration: InputDecoration(
-                          labelText: 'ค้นหา',
-                          prefixIcon: const Icon(Icons.search),
-                          suffixIcon: IconButton(
-                            onPressed: widget.onSearch,
-                            icon: const Icon(Icons.arrow_forward),
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 12,
-                          ),
-                        ),
+                    Expanded(
+                      child: WorkspacePageTitle(
+                        title: widget.caption,
+                        favoriteKey: widget.favoriteKey,
                       ),
                     ),
-                    SizedBox(
-                      width: constraints.maxWidth < 600
-                          ? constraints.maxWidth
-                          : 170,
-                      child: DropdownButtonFormField<String>(
-                        initialValue: statusFilter,
-                        style: Theme.of(context).textTheme.bodyMedium,
-                        decoration: InputDecoration(
-                          labelText: 'สถานะ',
-                          labelStyle: TextStyle(
+                    if (constraints.maxWidth >= 600)
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(4),
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.primary.withValues(alpha: .10),
+                        ),
+                        child: SizedBox.square(
+                          dimension: LaooTypography.buttonHeight,
+                          child: IconButton(
+                            tooltip: widget.isCard
+                                ? 'แสดงแบบรายการ'
+                                : 'แสดงแบบการ์ด',
                             color: Theme.of(context).colorScheme.primary,
-                          ),
-                          floatingLabelStyle: TextStyle(
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(4),
-                            borderSide: BorderSide(
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(4),
-                            borderSide: BorderSide(
-                              color: Theme.of(context).colorScheme.primary,
-                              width: 1.5,
+                            onPressed: widget.onToggleView,
+                            icon: Icon(
+                              widget.isCard
+                                  ? Icons.view_list_outlined
+                                  : Icons.grid_view_outlined,
                             ),
                           ),
                         ),
-                        items: const [
-                          DropdownMenuItem(
-                            value: 'all',
-                            child: Text('ทั้งหมด'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'active',
-                            child: Text('เปิด'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'inactive',
-                            child: Text('ปิด'),
-                          ),
-                        ],
-                        onChanged: (value) => setState(() {
-                          statusFilter = value ?? 'all';
-                          page = 1;
-                        }),
                       ),
-                    ),
+                    if (widget.canCreate) const SizedBox(width: 8),
+                    if (widget.canCreate)
+                      FilledButton.icon(
+                        onPressed: widget.onAdd,
+                        style: FilledButton.styleFrom(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(LaooRadius.xs),
+                          ),
+                        ),
+                        icon: const Icon(Icons.add),
+                        label: const Text('เพิ่ม'),
+                      ),
                   ],
                 ),
               ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: FutureBuilder<List<RoleGroup>>(
-              future: widget.future,
-              builder: (context, snapshot) {
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
+            const SizedBox(height: 8),
+            Card(
+              color: Colors.white,
+              elevation: 0,
+              surfaceTintColor: Colors.transparent,
+              shadowColor: Colors.transparent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(4),
+                side: BorderSide.none,
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: LayoutBuilder(
+                  builder: (context, constraints) => FilterHeightSync(
+                    builder: (context, searchKey, height) => Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        const Icon(
-                          Icons.error_outline,
-                          color: Colors.red,
-                          size: 36,
+                        SizedBox(
+                          width: constraints.maxWidth < 600
+                              ? constraints.maxWidth
+                              : (constraints.maxWidth - 450).clamp(
+                                  150.0,
+                                  360.0,
+                                ),
+                          child: TextField(
+                            key: searchKey,
+                            controller: widget.search,
+                            onSubmitted: (_) => _applySearch(),
+                            decoration: InputDecoration(
+                              labelText: 'ค้นหา',
+                              prefixIcon: const Icon(Icons.search),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 12,
+                              ),
+                            ),
+                          ),
                         ),
-                        const Text('โหลดข้อมูลกลุ่มสิทธิ์ไม่สำเร็จ'),
-                        const Text('กรุณาลองใหม่อีกครั้ง'),
-                        OutlinedButton(
-                          onPressed: widget.onSearch,
-                          child: const Text('ลองใหม่'),
+                        FilledButton.icon(
+                          onPressed: _applySearch,
+                          style: FilledButton.styleFrom(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(
+                                LaooRadius.xs,
+                              ),
+                            ),
+                          ).merge(filterActionHeightStyle(height)),
+                          icon: const Icon(Icons.search),
+                          label: const Text('ค้นหา'),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: _clearFilters,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Theme.of(
+                              context,
+                            ).colorScheme.primary,
+                            side: BorderSide(
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(
+                                LaooRadius.xs,
+                              ),
+                            ),
+                          ).merge(filterActionHeightStyle(height)),
+                          icon: const Icon(Icons.filter_alt_off_outlined),
+                          label: const Text('ล้าง Filter'),
+                        ),
+                        SizedBox(
+                          width: constraints.maxWidth < 600
+                              ? constraints.maxWidth
+                              : 170,
+                          child: DropdownButtonFormField<String>(
+                            initialValue: statusFilter,
+                            style: Theme.of(context).textTheme.bodyMedium,
+                            decoration: InputDecoration(
+                              labelText: 'สถานะ',
+                              floatingLabelStyle: TextStyle(
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(4),
+                                borderSide: BorderSide(
+                                  color: workspaceThemeController.value.border,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(4),
+                                borderSide: BorderSide(
+                                  color: Theme.of(context).colorScheme.primary,
+                                  width: 1.5,
+                                ),
+                              ),
+                            ),
+                            items: const [
+                              DropdownMenuItem(
+                                value: 'all',
+                                child: Text('ทั้งหมด'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'active',
+                                child: Text('เปิด'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'inactive',
+                                child: Text('ปิด'),
+                              ),
+                            ],
+                            onChanged: (value) => setState(() {
+                              statusFilter = value ?? 'all';
+                              page = 1;
+                            }),
+                          ),
                         ),
                       ],
                     ),
-                  );
-                }
-                if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                final source = snapshot.data!;
-                final all = (statusFilter == 'active'
-                    ? source.where((item) => item.isActive).toList()
-                    : statusFilter == 'inactive'
-                    ? source.where((item) => !item.isActive).toList()
-                    : [...source]);
-                if (sortColumn != null) {
-                  all.sort((a, b) {
-                    final result = switch (sortColumn) {
-                      2 => a.code.compareTo(b.code),
-                      3 => a.name.compareTo(b.name),
-                      4 => a.isActive == b.isActive ? 0 : (a.isActive ? 1 : -1),
-                      _ => 0,
-                    };
-                    return sortAscending ? result : -result;
-                  });
-                }
-                final pages = all.isEmpty ? 1 : (all.length / pageSize).ceil();
-                if (page > pages) page = pages;
-                final start = (page - 1) * pageSize;
-                final rows = all.skip(start).take(pageSize).toList();
-                final firstItem = rows.isEmpty ? 0 : start + 1;
-                final lastItem = rows.isEmpty ? 0 : start + rows.length;
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: rows.isEmpty
-                          ? const Center(child: Text('ไม่พบข้อมูลตามเงื่อนไข'))
-                          : LayoutBuilder(
-                              builder: (context, constraints) {
-                                if (widget.isCard ||
-                                    constraints.maxWidth < 600) {
-                                  return _buildMobileCards(
-                                    context,
-                                    rows,
-                                    start,
-                                  );
-                                }
-                                return Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: FutureBuilder<List<RoleGroup>>(
+                future: widget.future,
+                builder: (context, snapshot) {
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.error_outline,
+                            color: Colors.red,
+                            size: 36,
+                          ),
+                          const Text('โหลดข้อมูลกลุ่มสิทธิ์ไม่สำเร็จ'),
+                          const Text('กรุณาลองใหม่อีกครั้ง'),
+                          OutlinedButton(
+                            onPressed: widget.onSearch,
+                            child: const Text('ลองใหม่'),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                  if (!snapshot.hasData) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  final source = snapshot.data!;
+                  final all = (appliedStatusFilter == 'active'
+                      ? source.where((item) => item.isActive).toList()
+                      : appliedStatusFilter == 'inactive'
+                      ? source.where((item) => !item.isActive).toList()
+                      : [...source]);
+                  if (sortColumn != null) {
+                    all.sort((a, b) {
+                      final result = switch (sortColumn) {
+                        2 when !widget.hideAutoCode => a.code.compareTo(b.code),
+                        2 when widget.hideAutoCode => a.name.compareTo(b.name),
+                        3 when !widget.hideAutoCode => a.name.compareTo(b.name),
+                        3 when widget.hideAutoCode =>
+                          a.isActive == b.isActive ? 0 : (a.isActive ? 1 : -1),
+                        4 =>
+                          a.isActive == b.isActive ? 0 : (a.isActive ? 1 : -1),
+                        _ => 0,
+                      };
+                      return sortAscending ? result : -result;
+                    });
+                  }
+                  final pages = all.isEmpty
+                      ? 1
+                      : (all.length / pageSize).ceil();
+                  if (page > pages) page = pages;
+                  final start = (page - 1) * pageSize;
+                  final rows = all.skip(start).take(pageSize).toList();
+                  final firstItem = rows.isEmpty ? 0 : start + 1;
+                  final lastItem = rows.isEmpty ? 0 : start + rows.length;
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: rows.isEmpty
+                            ? Container(
+                                width: double.infinity,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(
+                                    LaooRadius.xs,
                                   ),
-                                  clipBehavior: Clip.antiAlias,
-                                  child: SizedBox(
-                                    width: double.infinity,
-                                    child: Theme(
-                                      data: Theme.of(context).copyWith(
-                                        dividerColor: Colors.grey.shade300,
-                                      ),
-                                      child: DataTableTheme(
-                                        data: DataTableThemeData(
-                                          dataRowMinHeight: 48,
-                                          dataRowMaxHeight: 56,
-                                          headingTextStyle: Theme.of(context)
-                                              .textTheme
-                                              .labelLarge
-                                              ?.copyWith(
-                                                color: Theme.of(
-                                                  context,
-                                                ).colorScheme.primary,
-                                                fontWeight: FontWeight.w700,
-                                              ),
+                                ),
+                                child: const Center(
+                                  child: Text('ไม่พบข้อมูลตามเงื่อนไข'),
+                                ),
+                              )
+                            : LayoutBuilder(
+                                builder: (context, constraints) {
+                                  if (widget.isCard ||
+                                      constraints.maxWidth < 600) {
+                                    return _buildMobileCards(
+                                      context,
+                                      rows,
+                                      start,
+                                    );
+                                  }
+                                  return Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    clipBehavior: Clip.antiAlias,
+                                    child: SizedBox(
+                                      width: double.infinity,
+                                      child: Theme(
+                                        data: Theme.of(context).copyWith(
+                                          dividerColor: workspaceThemeController
+                                              .value
+                                              .border,
                                         ),
-                                        child: PinnedDataTable(
-                                          horizontalMargin: 8,
-                                          columnSpacing: 20,
-                                          dividerThickness: .6,
-                                          sortColumnIndex: sortColumn,
-                                          sortAscending: sortAscending,
-                                          headingRowColor:
-                                              WidgetStatePropertyAll(
-                                                Theme.of(context)
-                                                    .colorScheme
-                                                    .primary
-                                                    .withValues(alpha: 0.12),
-                                              ),
-                                          columns: [
-                                            LaooTableColumns.id,
-                                            DataColumn(
-                                              label: const SizedBox(
-                                                width: 120,
-                                                child: Center(
-                                                  child: Text('Action'),
+                                        child: DataTableTheme(
+                                          data: DataTableThemeData(
+                                            dataRowMinHeight: 48,
+                                            dataRowMaxHeight: 56,
+                                            headingRowHeight: 56,
+                                            headingTextStyle: Theme.of(context)
+                                                .textTheme
+                                                .labelLarge
+                                                ?.copyWith(
+                                                  color: Theme.of(
+                                                    context,
+                                                  ).colorScheme.primary,
+                                                  fontSize: LaooTypography
+                                                      .tableHeader,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                          ),
+                                          child: PinnedDataTable(
+                                            showCheckboxColumn: false,
+                                            horizontalMargin: 8,
+                                            columnSpacing: 20,
+                                            dividerThickness: .6,
+                                            sortColumnIndex: sortColumn,
+                                            sortAscending: sortAscending,
+                                            headingRowColor:
+                                                WidgetStatePropertyAll(
+                                                  Theme.of(context)
+                                                      .colorScheme
+                                                      .primary
+                                                      .withValues(alpha: 0.12),
+                                                ),
+                                            columns: [
+                                              LaooTableColumns.id,
+                                              DataColumn(
+                                                label: const SizedBox(
+                                                  width: 120,
+                                                  child: Padding(
+                                                    padding: EdgeInsets.only(
+                                                      left: 12,
+                                                    ),
+                                                    child: Align(
+                                                      alignment:
+                                                          Alignment.centerLeft,
+                                                      child: Text('Action'),
+                                                    ),
+                                                  ),
                                                 ),
                                               ),
-                                            ),
-                                            DataColumn(
-                                              label: const Text(
-                                                'รหัสกลุ่มสิทธิ์',
+                                              if (!widget.hideAutoCode)
+                                                DataColumn(
+                                                  label: const Text(
+                                                    'รหัสกลุ่มสิทธิ์',
+                                                  ),
+                                                  onSort: (column, ascending) =>
+                                                      _sort(column, ascending),
+                                                ),
+                                              DataColumn(
+                                                label: const Text('ชื่อกลุ่ม'),
+                                                onSort: (column, ascending) =>
+                                                    _sort(column, ascending),
                                               ),
-                                              onSort: (column, ascending) =>
-                                                  _sort(column, ascending),
-                                            ),
-                                            DataColumn(
-                                              label: const Text('ชื่อกลุ่ม'),
-                                              onSort: (column, ascending) =>
-                                                  _sort(column, ascending),
-                                            ),
-                                            DataColumn(
-                                              label: const Text('สถานะ'),
-                                              onSort: (column, ascending) =>
-                                                  _sort(column, ascending),
-                                            ),
-                                          ],
-                                          rows: [
-                                            for (
-                                              var i = 0;
-                                              i < rows.length;
-                                              i++
-                                            )
-                                              DataRow(
-                                                cells: [
-                                                  DataCell(
-                                                    SizedBox(
-                                                      width: 80,
-                                                      child: Padding(
-                                                        padding:
-                                                            const EdgeInsets.only(
-                                                              left: 12,
-                                                            ),
-                                                        child: Text(
-                                                          '${start + i + 1}',
+                                              DataColumn(
+                                                label: const Text('สถานะ'),
+                                                onSort: (column, ascending) =>
+                                                    _sort(column, ascending),
+                                              ),
+                                            ],
+                                            rows: [
+                                              for (
+                                                var i = 0;
+                                                i < rows.length;
+                                                i++
+                                              )
+                                                DataRow(
+                                                  onSelectChanged:
+                                                      widget.onSelected !=
+                                                              null &&
+                                                          rows[i].isActive
+                                                      ? (_) =>
+                                                            widget.onSelected!(
+                                                              rows[i],
+                                                            )
+                                                      : null,
+                                                  cells: [
+                                                    DataCell(
+                                                      SizedBox(
+                                                        width: 80,
+                                                        child: Padding(
+                                                          padding:
+                                                              const EdgeInsets.only(
+                                                                left: 12,
+                                                              ),
+                                                          child: Text(
+                                                            '${start + i + 1}',
+                                                          ),
                                                         ),
                                                       ),
                                                     ),
-                                                  ),
-                                                  DataCell(
-                                                    SizedBox(
-                                                      width: 120,
-                                                      child: Center(
+                                                    DataCell(
+                                                      SizedBox(
+                                                        width: 120,
                                                         child: Row(
-                                                          mainAxisSize:
-                                                              MainAxisSize.min,
+                                                          mainAxisAlignment:
+                                                              MainAxisAlignment
+                                                                  .start,
                                                           children: [
                                                             if (widget.canEdit)
                                                               IconButton(
@@ -850,11 +1261,12 @@ class _ListState extends State<_List> {
                                                                     widget.onDelete(
                                                                       rows[i],
                                                                     ),
-                                                                icon: const Icon(
+                                                                icon: Icon(
                                                                   Icons
                                                                       .delete_outline,
-                                                                  color: Colors
-                                                                      .red,
+                                                                  color: Theme.of(
+                                                                    context,
+                                                                  ).colorScheme.error,
                                                                 ),
                                                                 tooltip: 'ลบ',
                                                               ),
@@ -862,37 +1274,21 @@ class _ListState extends State<_List> {
                                                         ),
                                                       ),
                                                     ),
-                                                  ),
-                                                  DataCell(Text(rows[i].code)),
-                                                  DataCell(Text(rows[i].name)),
-                                                  DataCell(
-                                                    Container(
-                                                      padding:
-                                                          const EdgeInsets.symmetric(
-                                                            horizontal: 16,
-                                                            vertical: 6,
-                                                          ),
-                                                      decoration: BoxDecoration(
-                                                        color: rows[i].isActive
-                                                            ? Theme.of(context)
-                                                                  .colorScheme
-                                                                  .primary
-                                                                  .withValues(
-                                                                    alpha: .12,
-                                                                  )
-                                                            : Colors
-                                                                  .red
-                                                                  .shade50,
-                                                        borderRadius:
-                                                            BorderRadius.circular(
-                                                              20,
-                                                            ),
+                                                    if (!widget.hideAutoCode)
+                                                      DataCell(
+                                                        Text(rows[i].code),
                                                       ),
-                                                      child: Text(
-                                                        rows[i].isActive
-                                                            ? 'เปิด'
-                                                            : 'ปิด',
-                                                        style: TextStyle(
+                                                    DataCell(
+                                                      Text(rows[i].name),
+                                                    ),
+                                                    DataCell(
+                                                      Container(
+                                                        padding:
+                                                            const EdgeInsets.symmetric(
+                                                              horizontal: 16,
+                                                              vertical: 6,
+                                                            ),
+                                                        decoration: BoxDecoration(
                                                           color:
                                                               rows[i].isActive
                                                               ? Theme.of(
@@ -900,73 +1296,96 @@ class _ListState extends State<_List> {
                                                                     )
                                                                     .colorScheme
                                                                     .primary
-                                                              : Colors.red,
-                                                          fontWeight:
-                                                              FontWeight.w600,
+                                                                    .withValues(
+                                                                      alpha:
+                                                                          .12,
+                                                                    )
+                                                              : Colors
+                                                                    .red
+                                                                    .shade50,
+                                                          borderRadius:
+                                                              BorderRadius.circular(
+                                                                20,
+                                                              ),
+                                                        ),
+                                                        child: Text(
+                                                          rows[i].isActive
+                                                              ? 'เปิด'
+                                                              : 'ปิด',
+                                                          style: TextStyle(
+                                                            color:
+                                                                rows[i].isActive
+                                                                ? Theme.of(
+                                                                        context,
+                                                                      )
+                                                                      .colorScheme
+                                                                      .primary
+                                                                : Colors.red,
+                                                            fontWeight:
+                                                                FontWeight.w600,
+                                                          ),
                                                         ),
                                                       ),
                                                     ),
-                                                  ),
-                                                ],
-                                              ),
-                                          ],
+                                                  ],
+                                                ),
+                                            ],
+                                          ),
                                         ),
                                       ),
                                     ),
-                                  ),
-                                );
-                              },
-                            ),
-                    ),
-                    const SizedBox(height: 8),
-                    Card(
-                      color: Colors.white,
-                      elevation: 0,
-                      surfaceTintColor: Colors.transparent,
-                      shadowColor: Colors.transparent,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(4),
-                        side: BorderSide.none,
+                                  );
+                                },
+                              ),
                       ),
-                      child: Container(
-                        width: double.infinity,
-                        decoration: const BoxDecoration(
-                          border: Border(
-                            top: BorderSide(color: Color(0xFFF5F6F7)),
+                      const SizedBox(height: 8),
+                      Card(
+                        color: Colors.white,
+                        elevation: 0,
+                        surfaceTintColor: Colors.transparent,
+                        shadowColor: Colors.transparent,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(4),
+                          side: BorderSide.none,
+                        ),
+                        child: SizedBox(
+                          width: double.infinity,
+                          height: LaooLayout.paginationCardHeight,
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            child: Row(
+                              children: [
+                                _PageButton(
+                                  label: 'ก่อนหน้า',
+                                  enabled: page > 1,
+                                  onTap: () => setState(() => page--),
+                                ),
+                                _PageButton(
+                                  label: '$page',
+                                  enabled: false,
+                                  onTap: () {},
+                                  selected: true,
+                                ),
+                                _PageButton(
+                                  label: 'ถัดไป',
+                                  enabled: page < pages,
+                                  onTap: () => setState(() => page++),
+                                ),
+                                const SizedBox(width: 12),
+                                Text('$firstItem-$lastItem จาก ${all.length}'),
+                              ],
+                            ),
                           ),
                         ),
-                        padding: const EdgeInsets.all(10),
-                        child: Row(
-                          children: [
-                            _PageButton(
-                              label: 'ก่อนหน้า',
-                              enabled: page > 1,
-                              onTap: () => setState(() => page--),
-                            ),
-                            for (var i = 1; i <= pages; i++)
-                              _PageButton(
-                                label: '$i',
-                                enabled: i != page,
-                                onTap: () => setState(() => page = i),
-                                selected: i == page,
-                              ),
-                            _PageButton(
-                              label: 'ถัดไป',
-                              enabled: page < pages,
-                              onTap: () => setState(() => page++),
-                            ),
-                            const SizedBox(width: 12),
-                            Text('$firstItem-$lastItem จาก ${all.length}'),
-                          ],
-                        ),
                       ),
-                    ),
-                  ],
-                );
-              },
+                    ],
+                  );
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -995,73 +1414,82 @@ class _ListState extends State<_List> {
             borderRadius: BorderRadius.circular(4),
             side: BorderSide.none,
           ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        item.code,
-                        style: TextStyle(
-                          color: primary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    DecoratedBox(
-                      decoration: BoxDecoration(
-                        color:
-                            (item.isActive ? primary : theme.colorScheme.error)
-                                .withValues(alpha: .12),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
+          child: InkWell(
+            onTap: widget.onSelected != null && item.isActive
+                ? () => widget.onSelected!(item)
+                : null,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
                         child: Text(
-                          item.isActive ? 'เปิด' : 'ปิด',
+                          widget.hideAutoCode ? item.name : item.code,
                           style: TextStyle(
-                            color: item.isActive
-                                ? primary
-                                : theme.colorScheme.error,
+                            color: primary,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
                       ),
-                    ),
-                    if (widget.canEdit)
-                      IconButton(
-                        tooltip: 'แก้ไข',
-                        onPressed: () => widget.onEdit(item),
-                        icon: Icon(Icons.edit_outlined, color: primary),
-                      ),
-                    if (widget.canDelete)
-                      IconButton(
-                        tooltip: 'ลบ',
-                        onPressed: () => widget.onDelete(item),
-                        icon: Icon(
-                          Icons.delete_outline,
-                          color: theme.colorScheme.error,
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          color:
+                              (item.isActive
+                                      ? primary
+                                      : theme.colorScheme.error)
+                                  .withValues(alpha: .12),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          child: Text(
+                            item.isActive ? 'เปิด' : 'ปิด',
+                            style: TextStyle(
+                              color: item.isActive
+                                  ? primary
+                                  : theme.colorScheme.error,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ),
                       ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  item.name,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: theme.colorScheme.onSurface,
-                    fontWeight: FontWeight.w600,
+                      if (widget.canEdit)
+                        IconButton(
+                          tooltip: 'แก้ไข',
+                          onPressed: () => widget.onEdit(item),
+                          icon: Icon(Icons.edit_outlined, color: primary),
+                        ),
+                      if (widget.canDelete)
+                        IconButton(
+                          tooltip: 'ลบ',
+                          onPressed: () => widget.onDelete(item),
+                          icon: Icon(
+                            Icons.delete_outline,
+                            color: theme.colorScheme.error,
+                          ),
+                        ),
+                    ],
                   ),
-                ),
-              ],
+                  if (!widget.hideAutoCode) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      item.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: theme.colorScheme.onSurface,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
           ),
         );

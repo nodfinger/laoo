@@ -37,6 +37,21 @@ void main() {
     expect(result.items.single.notifyByEmail, isTrue);
     expect(result.items.single.notifyInSystem, isFalse);
   });
+
+  test(
+    'company employee lookup reads organization options from employee scope',
+    () async {
+      final api = _FakeApi();
+      final repository = EmployeeRepository(
+        api,
+        scope: EmployeeOwnerScope.company,
+      );
+      final result = await repository.organizationOptions();
+      expect(api.lastPath, '/api/company/employees/organization-options');
+      expect(result.orgStructureType, 2);
+      expect(result.units.single.nameTh, 'IT');
+    },
+  );
 }
 
 class _FakeApi implements JsonApiClient {
@@ -51,6 +66,21 @@ class _FakeApi implements JsonApiClient {
   }) async {
     lastPath = path;
     lastQuery = query;
+    if (path.endsWith('/organization-options')) {
+      return {
+        'orgStructureType': 2,
+        'units': [
+          {
+            'orgUnitId': 3,
+            'companyId': 9,
+            'unitType': 'DEP',
+            'unitCode': 'IT',
+            'nameTh': 'IT',
+            'isActive': true,
+          },
+        ],
+      };
+    }
     return {
       'items': [
         {

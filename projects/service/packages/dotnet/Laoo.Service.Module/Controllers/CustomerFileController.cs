@@ -133,6 +133,7 @@ VALUES(@company,@customer,@type,@original,@stored,@path,@extension,@content,@siz
     { await using var cmd = new SqlCommand("SELECT COUNT(1) FROM dbo.TDARCustomer WHERE CustomerID=@customer AND CompanyID=@company", c); Add(cmd, "@customer", SqlDbType.BigInt, customerId); Add(cmd, "@company", SqlDbType.BigInt, CompanyID()); return Convert.ToInt32(await cmd.ExecuteScalarAsync(token)) > 0; }
     private async Task<bool> CanAsync(SqlConnection c, string action, CancellationToken token, string? permissionPointCode = null)
     {
+        if (!await Laoo.Shared.Contracts.CompanyMenuAccess.IsSalesEnabledAsync(c, User, token)) return false;
         if (await Laoo.Shared.Contracts.CompanyMenuAccess.IsAllowedAsync(c, User, "09001", action, token)) return true;
         if (string.IsNullOrWhiteSpace(permissionPointCode)) return false;
         const string sql = """

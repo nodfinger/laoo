@@ -270,7 +270,7 @@ public sealed class KnowledgeController(IConfiguration configuration, IWebHostEn
     }
     [HttpPost("articles/{id:long}/files")]
     [RequestSizeLimit(2_200_000_000)]
-    public async Task<IActionResult> Upload(long id,[FromForm] IFormFile file,[FromForm] string kind="ATTACHMENT",CancellationToken token=default)
+    public async Task<IActionResult> Upload(long id,IFormFile file,[FromForm] string kind="ATTACHMENT",CancellationToken token=default)
     {
         kind=kind.ToUpperInvariant();if(kind is not ("COVER" or "VIDEO" or "ATTACHMENT")||file.Length<=0)return Bad("ไฟล์ไม่ถูกต้อง","เลือกไฟล์และประเภทไฟล์ที่รองรับ");if(!Scope(out var company,out var user))return Forbid();await using var db=await Open(token);if(!await Can(db,"49003","UPLOAD",token))return Forbid();await EnsureSettings(db,company,user,token);
         var setting=(await Query(db,"SELECT MaxVideoMB,MaxAttachmentMB,AllowedVideoExtensions,AllowedAttachmentExtensions FROM dbo.TDKNSystemSetting WHERE CompanyID=@company",token,("@company",company))).Single();var extensions=Convert.ToString(setting[kind=="VIDEO"?"AllowedVideoExtensions":"AllowedAttachmentExtensions"])!.Split(',',StringSplitOptions.RemoveEmptyEntries|StringSplitOptions.TrimEntries);var ext=Path.GetExtension(file.FileName).TrimStart('.').ToLowerInvariant();var max=Convert.ToInt64(setting[kind=="VIDEO"?"MaxVideoMB":"MaxAttachmentMB"])*1024*1024;if(!extensions.Contains(ext,StringComparer.OrdinalIgnoreCase))return Bad("ชนิดไฟล์ไม่รองรับ",$"อนุญาตเฉพาะ {string.Join(", ",extensions)}");if(file.Length>max)return Bad("ไฟล์มีขนาดเกินกำหนด",$"ไฟล์ต้องไม่เกิน {max/1024/1024} MB");

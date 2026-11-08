@@ -1,5 +1,7 @@
 using System.Data;
 using System.Security.Claims;
+using LaooApi.Security;
+using LaooApi.Models.Navigation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
@@ -15,20 +17,20 @@ public sealed class UserFavoriteController(IConfiguration configuration) : Contr
     {
         var owner = ResolveOwner();
         if (owner is null) return Forbid();
-        if (!long.TryParse(User.FindFirstValue("project_id"), out var projectId)) return Forbid();
+        var allowed = await AllowedMenuCodes(token);
+        if (allowed is null) return Forbid();
         await using var connection = new SqlConnection(configuration.GetConnectionString("LaooDatabase"));
         await connection.OpenAsync(token);
         await using var command = new SqlCommand($"""
 SELECT F.MenuCode, M.MenuName, M.RouteName, M.RoutePath, M.IconName, F.SortOrder
 FROM dbo.TDADUserFavorite F
 INNER JOIN dbo.TDADMainMenu M ON M.MenuCode=F.MenuCode AND M.IsActive=1 AND M.IsVisible=1
-INNER JOIN dbo.TDADProjectMenu PM ON PM.ProjectID=@project AND PM.MenuCode=M.MenuCode AND PM.IsActive=1
 WHERE {owner.Value.Where}
 ORDER BY F.SortOrder, M.SortOrder, M.MenuCode;
 """, connection);
         command.Parameters.Add("@id", SqlDbType.BigInt).Value = owner.Value.Id;
-        command.Parameters.Add("@project", SqlDbType.BigInt).Value = projectId;
-        return Ok(await ReadRows(command, token));
+        var rows = await ReadRows(command, token);
+        return Ok(rows.Where(row => allowed.Contains(row.MenuCode.Trim())).ToList());
     }
 
     [HttpPost]
@@ -36,26 +38,33 @@ ORDER BY F.SortOrder, M.SortOrder, M.MenuCode;
     {
         var owner = ResolveOwner();
         if (owner is null) return Forbid();
-        if (!long.TryParse(User.FindFirstValue("project_id"), out var projectId)) return Forbid();
         var menuCode = request.MenuCode?.Trim() ?? string.Empty;
         if (menuCode.Length == 0) return BadRequest(new { message = "กรุณาระบุ MenuCode" });
+        var allowed = await AllowedMenuCodes(token);
+        if (allowed is null || !allowed.Contains(menuCode)) return Forbid();
         await using var connection = new SqlConnection(configuration.GetConnectionString("LaooDatabase"));
         await connection.OpenAsync(token);
         await using var command = new SqlCommand($"""
-IF EXISTS (SELECT 1 FROM dbo.TDADMainMenu M INNER JOIN dbo.TDADProjectMenu PM ON PM.MenuCode=M.MenuCode AND PM.ProjectID=@project AND PM.IsActive=1 WHERE M.MenuCode=@menu AND M.IsActive=1 AND M.IsVisible=1)
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM dbo.TDADUserFavorite WHERE {owner.Value.Where} AND MenuCode=@menu)
-        INSERT dbo.TDADUserFavorite(UserType,{owner.Value.Column},MenuCode,SortOrder)
-        VALUES(@type,@id,@menu,@sort)
-END
+IF NOT EXISTS (SELECT 1 FROM dbo.TDADUserFavorite WHERE {owner.Value.Where} AND MenuCode=@menu)
+    INSERT dbo.TDADUserFavorite(UserType,{owner.Value.Column},MenuCode,SortOrder)
+    VALUES(@type,@id,@menu,@sort)
 """, connection);
         command.Parameters.Add("@type", SqlDbType.Char, 1).Value = owner.Value.Type;
         command.Parameters.Add("@id", SqlDbType.BigInt).Value = owner.Value.Id;
-        command.Parameters.Add("@project", SqlDbType.BigInt).Value = projectId;
         command.Parameters.Add("@menu", SqlDbType.NVarChar, 20).Value = menuCode;
         command.Parameters.Add("@sort", SqlDbType.Int).Value = request.SortOrder;
         await command.ExecuteNonQueryAsync(token);
         return Ok(new { menuCode });
+    }
+
+    private async Task<HashSet<string>?> AllowedMenuCodes(CancellationToken token)
+    {
+        var navigation = new NavigationController(configuration) { ControllerContext = ControllerContext };
+        var response = await navigation.GetMenus(token);
+        var groups = response.Value ?? (response.Result as OkObjectResult)?.Value as List<NavigationMenuGroupResponse>;
+        return groups?.SelectMany(group => group.Items)
+            .Select(item => item.MenuCode.Trim())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
     }
 
     [HttpDelete("{menuCode}")]

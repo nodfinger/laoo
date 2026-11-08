@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:laoo_shared_workspace_ui/laoo_shared_workspace_ui.dart';
 import 'package:go_router/go_router.dart';
+import 'package:laoo_shared_admin_ui/laoo_shared_admin_ui.dart'
+    show FilterHeightSync, filterActionHeightStyle;
 import 'dart:math' as math;
 
 import '../../../app/theme/laoo_design_tokens.dart';
@@ -357,19 +359,23 @@ class _WarehousePageState extends State<WarehousePage> {
                 ),
                 const LaooPageFavoriteButton(),
                 if (!compact)
-                  OutlinedButton(
-                    onPressed: () => setState(() => _card = !cardMode),
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(44, 40),
-                      padding: EdgeInsets.zero,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(LaooRadius.xs),
+                  SizedBox.square(
+                    dimension: LaooTypography.buttonHeight,
+                    child: IconButton(
+                      onPressed: () => setState(() => _card = !cardMode),
+                      tooltip: cardMode ? 'แสดงแบบรายการ' : 'แสดงแบบการ์ด',
+                      style: IconButton.styleFrom(
+                        backgroundColor: primary.withValues(alpha: .1),
+                        foregroundColor: primary,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(LaooRadius.xs),
+                        ),
                       ),
-                    ),
-                    child: Icon(
-                      cardMode
-                          ? Icons.list_alt_outlined
-                          : Icons.grid_view_rounded,
+                      icon: Icon(
+                        cardMode
+                            ? Icons.list_alt_outlined
+                            : Icons.grid_view_rounded,
+                      ),
                     ),
                   ),
                 if (!compact) const SizedBox(width: 8),
@@ -392,122 +398,131 @@ class _WarehousePageState extends State<WarehousePage> {
     );
   }
 
-  Widget _filterCard(BuildContext context) {
-    final primary = Theme.of(context).colorScheme.primary;
-    Widget searchField(double width) => SizedBox(
-      width: width,
-      child: TextField(
-        controller: _search,
-        style: const TextStyle(fontSize: LaooTypography.inputText),
-        onSubmitted: (_) => _load(),
-        decoration: InputDecoration(
-          hintText: 'ค้นหารหัสหรือชื่อคลัง',
-          hintStyle: const TextStyle(fontSize: LaooTypography.inputText),
-          prefixIcon: const Icon(Icons.search),
-          isDense: true,
-          contentPadding: const EdgeInsets.symmetric(vertical: 10),
-          border: _filterBorder(LaooColors.border),
-          enabledBorder: _filterBorder(LaooColors.border),
-          focusedBorder: _filterBorder(primary, width: 1.5),
-        ),
-      ),
-    );
-    final branchFilter = SizedBox(
-      width: 280,
-      child: DropdownButtonFormField<int?>(
-        key: ValueKey(_filterBranchId),
-        initialValue: _filterBranchId,
-        isExpanded: true,
-        style: const TextStyle(
-          color: LaooColors.textPrimary,
-          fontSize: LaooTypography.comboBox,
-        ),
-        decoration: InputDecoration(
-          labelText: 'สาขา',
-          isDense: true,
-          border: _filterBorder(LaooColors.border),
-          enabledBorder: _filterBorder(LaooColors.border),
-          focusedBorder: _filterBorder(primary, width: 1.5),
-        ),
-        items: [
-          const DropdownMenuItem<int?>(value: null, child: Text('ทุกสาขา')),
-          ..._branches.map(
-            (branch) => DropdownMenuItem<int?>(
-              value: (branch['branchID'] as num).toInt(),
-              child: Text('${branch['branchCode']} | ${branch['branchName']}'),
-            ),
+  Widget _filterCard(BuildContext context) => FilterHeightSync(
+    builder: (context, searchKey, height) {
+      final primary = Theme.of(context).colorScheme.primary;
+      Widget searchField(double width) => SizedBox(
+        width: width,
+        child: TextField(
+          key: searchKey,
+          controller: _search,
+          style: const TextStyle(fontSize: LaooTypography.inputText),
+          onSubmitted: (_) => _load(),
+          decoration: InputDecoration(
+            hintText: 'ค้นหารหัสหรือชื่อคลัง',
+            hintStyle: const TextStyle(fontSize: LaooTypography.inputText),
+            prefixIcon: const Icon(Icons.search),
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(vertical: 10),
+            border: _filterBorder(LaooColors.border),
+            enabledBorder: _filterBorder(LaooColors.border),
+            focusedBorder: _filterBorder(primary, width: 1.5),
           ),
-        ],
-        onChanged: (value) => setState(() {
-          _filterBranchId = value;
-          _page = 0;
-        }),
-      ),
-    );
-    final searchAction = FilledButton.icon(
-      onPressed: _load,
-      style: _filterButtonStyle(),
-      icon: const Icon(Icons.search, size: 18),
-      label: const Text('ค้นหา'),
-    );
-    final clearAction = OutlinedButton.icon(
-      onPressed: () {
-        _search.clear();
-        setState(() => _filterBranchId = null);
-        _load();
-      },
-      style: _filterButtonStyle(),
-      icon: const Icon(Icons.filter_alt_off_outlined, size: 18),
-      label: const Text('ล้าง Filter'),
-    );
+        ),
+      );
+      final branchFilter = SizedBox(
+        width: 280,
+        child: DropdownButtonFormField<int?>(
+          key: ValueKey(_filterBranchId),
+          initialValue: _filterBranchId,
+          isExpanded: true,
+          style: const TextStyle(
+            color: LaooColors.textPrimary,
+            fontSize: LaooTypography.comboBox,
+          ),
+          decoration: InputDecoration(
+            labelText: 'สาขา',
+            isDense: true,
+            border: _filterBorder(LaooColors.border),
+            enabledBorder: _filterBorder(LaooColors.border),
+            focusedBorder: _filterBorder(primary, width: 1.5),
+          ),
+          items: [
+            const DropdownMenuItem<int?>(value: null, child: Text('ทุกสาขา')),
+            ..._branches.map(
+              (branch) => DropdownMenuItem<int?>(
+                value: (branch['branchID'] as num).toInt(),
+                child: Text(
+                  '${branch['branchCode']} | ${branch['branchName']}',
+                ),
+              ),
+            ),
+          ],
+          onChanged: (value) => setState(() {
+            _filterBranchId = value;
+            _page = 0;
+          }),
+        ),
+      );
+      final searchAction = FilledButton.icon(
+        onPressed: _load,
+        style: _filterButtonStyle().merge(filterActionHeightStyle(height)),
+        icon: const Icon(Icons.search, size: 18),
+        label: const Text('ค้นหา'),
+      );
+      final clearAction = OutlinedButton.icon(
+        onPressed: () {
+          _search.clear();
+          setState(() => _filterBranchId = null);
+          _load();
+        },
+        style: _filterButtonStyle().merge(filterActionHeightStyle(height)),
+        icon: const Icon(Icons.filter_alt_off_outlined, size: 18),
+        label: const Text('ล้าง Filter'),
+      );
 
-    return Card(
-      margin: EdgeInsets.zero,
-      color: LaooColors.white,
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(LaooRadius.xs),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(LaooLayout.cardPadding),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final actions = Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [searchAction, const SizedBox(width: 8), clearAction],
-            );
-            final searchGroup = Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [searchField(260), const SizedBox(width: 8), actions],
-            );
-            if (constraints.maxWidth >= 800) {
-              return Row(
-                children: [branchFilter, const SizedBox(width: 8), searchGroup],
+      return Card(
+        margin: EdgeInsets.zero,
+        color: LaooColors.white,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(LaooLayout.cardPadding),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final actions = Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [searchAction, const SizedBox(width: 8), clearAction],
               );
-            }
-            if (constraints.maxWidth >= 510) {
+              final searchGroup = Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [searchField(260), const SizedBox(width: 8), actions],
+              );
+              if (constraints.maxWidth >= 800) {
+                return Row(
+                  children: [
+                    searchGroup,
+                    const SizedBox(width: 8),
+                    branchFilter,
+                  ],
+                );
+              }
+              if (constraints.maxWidth >= 510) {
+                return Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [searchGroup, branchFilter],
+                );
+              }
               return Wrap(
                 spacing: 8,
                 runSpacing: 8,
                 crossAxisAlignment: WrapCrossAlignment.center,
-                children: [branchFilter, searchGroup],
+                children: [
+                  searchField(constraints.maxWidth.clamp(0, 260).toDouble()),
+                  actions,
+                  SizedBox(width: constraints.maxWidth, child: branchFilter),
+                ],
               );
-            }
-            return Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                SizedBox(width: constraints.maxWidth, child: branchFilter),
-                searchField(constraints.maxWidth.clamp(0, 260).toDouble()),
-                actions,
-              ],
-            );
-          },
+            },
+          ),
         ),
-      ),
-    );
-  }
+      );
+    },
+  );
 
   OutlineInputBorder _filterBorder(Color color, {double width = 1}) =>
       OutlineInputBorder(
@@ -1855,59 +1870,73 @@ class _SerialRegistryToolbar extends StatelessWidget {
                   ),
                 ),
               ),
+              const LaooPageFavoriteButton(),
             ],
           ),
         ),
         const SizedBox(height: 6),
         card(
           LayoutBuilder(
-            builder: (context, constraints) => Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                SizedBox(
-                  width: constraints.maxWidth > 620
-                      ? 320
-                      : constraints.maxWidth,
-                  child: TextField(
-                    controller: controller,
-                    onSubmitted: (_) => onSearch(),
-                    decoration: const InputDecoration(
-                      prefixIcon: Icon(Icons.search),
-                      labelText: 'ค้นหา Serial, รหัส หรือชื่อสินค้า',
+            builder: (context, constraints) => FilterHeightSync(
+              builder: (context, searchKey, height) => Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  SizedBox(
+                    width: constraints.maxWidth > 620
+                        ? 320
+                        : constraints.maxWidth,
+                    child: TextField(
+                      key: searchKey,
+                      controller: controller,
+                      onSubmitted: (_) => onSearch(),
+                      decoration: const InputDecoration(
+                        prefixIcon: Icon(Icons.search),
+                        labelText: 'ค้นหา Serial, รหัส หรือชื่อสินค้า',
+                      ),
                     ),
                   ),
-                ),
-                FilledButton.icon(
-                  style: FilledButton.styleFrom(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(LaooRadius.xs),
-                    ),
+                  FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(LaooRadius.xs),
+                      ),
+                    ).merge(filterActionHeightStyle(height)),
+                    onPressed: onSearch,
+                    icon: const Icon(Icons.search),
+                    label: const Text('ค้นหา'),
                   ),
-                  onPressed: onSearch,
-                  icon: const Icon(Icons.search),
-                  label: const Text('ค้นหา'),
-                ),
-                if (canManageQr)
                   OutlinedButton.icon(
-                    onPressed: onManageQr,
-                    icon: const Icon(Icons.qr_code_2_outlined),
-                    label: Text(qrMenuName),
+                    style: filterActionHeightStyle(height),
+                    onPressed: () {
+                      controller.clear();
+                      onFilterChanged(null, null);
+                      onSearch();
+                    },
+                    icon: const Icon(Icons.filter_alt_off_outlined),
+                    label: const Text('ล้าง Filter'),
                   ),
-                filter(
-                  'วัตถุประสงค์',
-                  usageFilter,
-                  usageOptions,
-                  (value) => onFilterChanged(value, projectFilter),
-                ),
-                filter(
-                  'Project ที่นำไปใช้',
-                  projectFilter,
-                  projectOptions,
-                  (value) => onFilterChanged(usageFilter, value),
-                ),
-              ],
+                  if (canManageQr)
+                    OutlinedButton.icon(
+                      onPressed: onManageQr,
+                      icon: const Icon(Icons.qr_code_2_outlined),
+                      label: Text(qrMenuName),
+                    ),
+                  filter(
+                    'วัตถุประสงค์',
+                    usageFilter,
+                    usageOptions,
+                    (value) => onFilterChanged(value, projectFilter),
+                  ),
+                  filter(
+                    'Project ที่นำไปใช้',
+                    projectFilter,
+                    projectOptions,
+                    (value) => onFilterChanged(usageFilter, value),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -1960,6 +1989,10 @@ class InventoryItemCatalogPage extends StatefulWidget {
 
 class _InventoryItemCatalogPageState extends State<InventoryItemCatalogPage> {
   final _api = InventoryApi();
+  final _catalogSearch = TextEditingController();
+  String _catalogQuery = '';
+  bool _catalogCards = false;
+  int _catalogPage = 0;
   List<Map<String, dynamic>> _items = const [];
   bool _loading = true;
   String _menuName = 'รายการอะไหล่และวัสดุ';
@@ -1983,6 +2016,7 @@ class _InventoryItemCatalogPageState extends State<InventoryItemCatalogPage> {
 
   @override
   void dispose() {
+    _catalogSearch.dispose();
     _api.dispose();
     super.dispose();
   }
@@ -2011,39 +2045,310 @@ class _InventoryItemCatalogPageState extends State<InventoryItemCatalogPage> {
   @override
   Widget build(BuildContext context) => SupportWorkspaceShell(
     pageTitle: _menuName,
-    child: ListView(
-      padding: const EdgeInsets.all(12),
-      children: [
-        _Header(title: _menuName),
-        const SizedBox(height: 6),
-        Card(
-          margin: EdgeInsets.zero,
-          color: Colors.white,
-          child: _loading
-              ? const Padding(
-                  padding: EdgeInsets.all(32),
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              : DataTable(
-                  columns: const [
-                    DataColumn(label: Text('รหัส')),
-                    DataColumn(label: Text('ชื่อ')),
-                    DataColumn(label: Text('วิธีควบคุมสต็อก')),
-                  ],
-                  rows: _items
-                      .map(
-                        (x) => DataRow(
-                          cells: [
-                            DataCell(Text('${x['itemCode']}')),
-                            DataCell(Text('${x['itemName']}')),
-                            DataCell(Text('${x['stockTrackingCode']}')),
+    activeMenu: '08002',
+    menuScope: WorkspaceMenuScope.company,
+    child: Padding(
+      padding: const EdgeInsets.all(LaooLayout.cardMargin),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final primary = Theme.of(context).colorScheme.primary;
+          final compact = constraints.maxWidth < 900;
+          final filtered = _items
+              .where(
+                (row) => '${row['itemCode']} ${row['itemName']}'
+                    .toLowerCase()
+                    .contains(_catalogQuery),
+              )
+              .toList();
+          const pageSize = 20;
+          final lastPage = filtered.isEmpty
+              ? 0
+              : (filtered.length - 1) ~/ pageSize;
+          final page = math.min(_catalogPage, lastPage);
+          final visible = filtered
+              .skip(page * pageSize)
+              .take(pageSize)
+              .toList();
+          Widget surface(Widget child) => Card(
+            margin: EdgeInsets.zero,
+            color: Colors.white,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(LaooRadius.xs),
+            ),
+            child: child,
+          );
+          void search() => setState(() {
+            _catalogQuery = _catalogSearch.text.trim().toLowerCase();
+            _catalogPage = 0;
+          });
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              surface(
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _menuName,
+                          style: LaooTypography.screenCaptionStyle,
+                        ),
+                      ),
+                      const LaooPageFavoriteButton(),
+                      if (!compact)
+                        SizedBox.square(
+                          dimension: LaooTypography.buttonHeight,
+                          child: IconButton(
+                            tooltip: _catalogCards
+                                ? 'แสดงแบบรายการ'
+                                : 'แสดงแบบการ์ด',
+                            style: IconButton.styleFrom(
+                              backgroundColor: primary.withValues(alpha: .1),
+                              foregroundColor: primary,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(
+                                  LaooRadius.xs,
+                                ),
+                              ),
+                            ),
+                            onPressed: () =>
+                                setState(() => _catalogCards = !_catalogCards),
+                            icon: Icon(
+                              _catalogCards
+                                  ? Icons.view_list_outlined
+                                  : Icons.grid_view_outlined,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              surface(
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: FilterHeightSync(
+                    builder: (context, key, height) => Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: math
+                              .min(320, constraints.maxWidth - 44)
+                              .clamp(0, 320)
+                              .toDouble(),
+                          child: TextField(
+                            key: key,
+                            controller: _catalogSearch,
+                            onSubmitted: (_) => search(),
+                            decoration: const InputDecoration(
+                              prefixIcon: Icon(Icons.search),
+                              labelText: 'ค้นหารหัสหรือชื่อ',
+                            ),
+                          ),
+                        ),
+                        FilledButton.icon(
+                          style: filterActionHeightStyle(height),
+                          onPressed: search,
+                          icon: const Icon(Icons.search),
+                          label: const Text('ค้นหา'),
+                        ),
+                        OutlinedButton.icon(
+                          style: filterActionHeightStyle(height),
+                          onPressed: () {
+                            _catalogSearch.clear();
+                            search();
+                          },
+                          icon: const Icon(Icons.filter_alt_off_outlined),
+                          label: const Text('ล้าง Filter'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: surface(
+                  _loading
+                      ? const Center(child: CircularProgressIndicator())
+                      : visible.isEmpty
+                      ? const Center(child: Text('ไม่พบข้อมูล'))
+                      : Column(
+                          children: [
+                            if (!compact && !_catalogCards)
+                              Container(
+                                color: primary.withValues(alpha: .1),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 12,
+                                ),
+                                child: Row(
+                                  children: [
+                                    SizedBox(
+                                      width: 150,
+                                      child: Text(
+                                        'รหัส',
+                                        style: TextStyle(
+                                          color: primary,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: Text(
+                                        'ชื่อ',
+                                        style: TextStyle(
+                                          color: primary,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
+                                    SizedBox(
+                                      width: 180,
+                                      child: Text(
+                                        'วิธีควบคุมสต็อก',
+                                        style: TextStyle(
+                                          color: primary,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            Expanded(
+                              child: ListView.builder(
+                                itemCount: visible.length,
+                                itemBuilder: (context, index) {
+                                  final row = visible[index];
+                                  final code = '${row['itemCode'] ?? ''}';
+                                  final name = '${row['itemName'] ?? ''}';
+                                  final tracking =
+                                      '${row['stockTrackingCode'] ?? ''}';
+                                  if (!compact && !_catalogCards) {
+                                    return Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 14,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        border: Border(
+                                          bottom: BorderSide(
+                                            color: Theme.of(
+                                              context,
+                                            ).dividerColor,
+                                            width: .6,
+                                          ),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          SizedBox(
+                                            width: 150,
+                                            child: Text(
+                                              code,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          Expanded(
+                                            child: Text(
+                                              name,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          SizedBox(
+                                            width: 180,
+                                            child: Text(
+                                              tracking,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }
+                                  return ListTile(
+                                    title: Text(
+                                      name,
+                                      style: TextStyle(
+                                        color: compact || _catalogCards
+                                            ? primary
+                                            : Theme.of(
+                                                context,
+                                              ).colorScheme.onSurface,
+                                      ),
+                                    ),
+                                    subtitle: Text('$code  |  $tracking'),
+                                    shape: Border(
+                                      bottom: BorderSide(
+                                        color: Theme.of(context).dividerColor,
+                                        width: .6,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
                           ],
                         ),
-                      )
-                      .toList(),
                 ),
-        ),
-      ],
+              ),
+              const SizedBox(height: 8),
+              surface(
+                SizedBox(
+                  height: LaooLayout.paginationCardHeight,
+                  child: Row(
+                    children: [
+                      const SizedBox(width: 12),
+                      IconButton(
+                        tooltip: 'หน้าก่อนหน้า',
+                        onPressed: page > 0
+                            ? () => setState(() => _catalogPage = page - 1)
+                            : null,
+                        icon: const Icon(Icons.chevron_left),
+                      ),
+                      FilledButton(
+                        onPressed: null,
+                        style: FilledButton.styleFrom(
+                          disabledBackgroundColor: primary,
+                          disabledForegroundColor: Colors.white,
+                          minimumSize: const Size.square(
+                            LaooLayout.paginationButtonSize,
+                          ),
+                          padding: EdgeInsets.zero,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(LaooRadius.xs),
+                          ),
+                        ),
+                        child: Text('${page + 1}'),
+                      ),
+                      IconButton(
+                        tooltip: 'หน้าถัดไป',
+                        onPressed: page < lastPage
+                            ? () => setState(() => _catalogPage = page + 1)
+                            : null,
+                        icon: const Icon(Icons.chevron_right),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${filtered.isEmpty ? 0 : page * pageSize + 1}-${math.min((page + 1) * pageSize, filtered.length)} จาก ${filtered.length}',
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
     ),
   );
 }
@@ -2575,6 +2880,30 @@ class _InventoryIssuePageState extends State<InventoryIssuePage> {
     );
   }
 
+  Widget _issueStatus(Map<String, dynamic> row, Color primary) {
+    final status = '${row['statusCode'] ?? ''}'.toUpperCase();
+    final color = status == 'VOID' || status == 'CANCELLED'
+        ? Theme.of(context).colorScheme.error
+        : primary;
+    final label = switch (status) {
+      'DRAFT' => 'ร่าง',
+      'CONFIRMED' => 'ยืนยันแล้ว',
+      'VOID' || 'CANCELLED' => 'ยกเลิก',
+      _ => status,
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: .12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(color: color, fontWeight: FontWeight.w700),
+      ),
+    );
+  }
+
   Widget _buildList(BuildContext context) {
     final filtered = _filteredRows;
     const pageSize = 10;
@@ -2591,76 +2920,80 @@ class _InventoryIssuePageState extends State<InventoryIssuePage> {
             color: LaooColors.white,
             child: Padding(
               padding: const EdgeInsets.all(LaooLayout.cardPadding),
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  SizedBox(
-                    width: math.min(280, constraints.maxWidth - 20),
-                    child: TextField(
-                      controller: _search,
-                      onSubmitted: (_) => setState(() {
+              child: FilterHeightSync(
+                builder: (context, searchKey, height) => Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: math.min(280, constraints.maxWidth - 20),
+                      child: TextField(
+                        key: searchKey,
+                        controller: _search,
+                        onSubmitted: (_) => setState(() {
+                          _searchTerm = _search.text.trim().toLowerCase();
+                          _page = 0;
+                        }),
+                        decoration: _issueFieldDecoration(
+                          'เลขที่/ใบงาน',
+                        ).copyWith(prefixIcon: const Icon(Icons.search)),
+                      ),
+                    ),
+                    FilledButton.icon(
+                      onPressed: () => setState(() {
                         _searchTerm = _search.text.trim().toLowerCase();
                         _page = 0;
                       }),
-                      decoration: _issueFieldDecoration(
-                        'เลขที่/ใบงาน',
-                      ).copyWith(prefixIcon: const Icon(Icons.search)),
-                    ),
-                  ),
-                  SizedBox(
-                    width: math.min(220, constraints.maxWidth - 20),
-                    child: DropdownButtonFormField<String>(
-                      key: ValueKey('issue-status-$_statusFilter'),
-                      initialValue: _statusFilter,
-                      decoration: _issueFieldDecoration('สถานะ'),
-                      items: const [
-                        DropdownMenuItem(value: '', child: Text('ทั้งหมด')),
-                        DropdownMenuItem(value: 'DRAFT', child: Text('ร่าง')),
-                        DropdownMenuItem(
-                          value: 'CONFIRMED',
-                          child: Text('ยืนยันแล้ว'),
+                      style: FilledButton.styleFrom(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(LaooRadius.xs),
                         ),
-                        DropdownMenuItem(value: 'VOID', child: Text('ยกเลิก')),
-                      ],
-                      onChanged: (value) => setState(() {
-                        _statusFilter = value ?? '';
+                      ).merge(filterActionHeightStyle(height)),
+                      icon: const Icon(Icons.search),
+                      label: const Text('ค้นหา'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () => setState(() {
+                        _search.clear();
+                        _searchTerm = '';
+                        _statusFilter = '';
                         _page = 0;
                       }),
+                      style: OutlinedButton.styleFrom(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(LaooRadius.xs),
+                        ),
+                      ).merge(filterActionHeightStyle(height)),
+                      icon: const Icon(Icons.filter_alt_off_outlined),
+                      label: const Text('ล้าง Filter'),
                     ),
-                  ),
-                  FilledButton.icon(
-                    onPressed: () => setState(() {
-                      _searchTerm = _search.text.trim().toLowerCase();
-                      _page = 0;
-                    }),
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size(0, LaooLayout.filterActionHeight),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(LaooRadius.xs),
+                    SizedBox(
+                      width: math.min(220, constraints.maxWidth - 20),
+                      child: DropdownButtonFormField<String>(
+                        key: ValueKey('issue-status-$_statusFilter'),
+                        initialValue: _statusFilter,
+                        decoration: _issueFieldDecoration('สถานะ'),
+                        items: const [
+                          DropdownMenuItem(value: '', child: Text('ทั้งหมด')),
+                          DropdownMenuItem(value: 'DRAFT', child: Text('ร่าง')),
+                          DropdownMenuItem(
+                            value: 'CONFIRMED',
+                            child: Text('ยืนยันแล้ว'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'VOID',
+                            child: Text('ยกเลิก'),
+                          ),
+                        ],
+                        onChanged: (value) => setState(() {
+                          _statusFilter = value ?? '';
+                          _page = 0;
+                        }),
                       ),
                     ),
-                    icon: const Icon(Icons.search),
-                    label: const Text('ค้นหา'),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: () => setState(() {
-                      _search.clear();
-                      _searchTerm = '';
-                      _statusFilter = '';
-                      _page = 0;
-                    }),
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(0, LaooLayout.filterActionHeight),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(LaooRadius.xs),
-                      ),
-                    ),
-                    icon: const Icon(Icons.filter_alt_off_outlined),
-                    label: const Text('ล้าง Filter'),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -2668,7 +3001,7 @@ class _InventoryIssuePageState extends State<InventoryIssuePage> {
           Card(
             margin: EdgeInsets.zero,
             color:
-                constraints.maxWidth < 900 &&
+                constraints.maxWidth < 1100 &&
                     !_loading &&
                     _loadError == null &&
                     visible.isNotEmpty
@@ -2699,15 +3032,13 @@ class _InventoryIssuePageState extends State<InventoryIssuePage> {
                     padding: EdgeInsets.all(24),
                     child: Center(child: Text('ไม่พบใบเบิกจ่ายตามเงื่อนไข')),
                   )
-                : constraints.maxWidth < 900
+                : constraints.maxWidth < 1100
                 ? Column(
                     children: [
                       for (final row in visible)
                         Padding(
                           padding: EdgeInsets.only(
-                            bottom: identical(row, visible.last)
-                                ? 0
-                                : LaooLayout.listItemSpacing,
+                            bottom: identical(row, visible.last) ? 0 : 8,
                           ),
                           child: Card(
                             margin: EdgeInsets.zero,
@@ -2718,12 +3049,21 @@ class _InventoryIssuePageState extends State<InventoryIssuePage> {
                                 ListTile(
                                   title: Text('${row['issueCode']}'),
                                   subtitle: Text(
-                                    '${row['workOrderCode']}  •  ${row['statusCode']}\n${row['issueDate']}'
+                                    '${row['workOrderCode']}\n${row['issueDate']}'
                                         .split('T')
                                         .first,
                                   ),
                                   isThreeLine: true,
                                   onTap: () => _openIssue(row),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: LaooLayout.cardPadding,
+                                  ),
+                                  child: Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: _issueStatus(row, primary),
+                                  ),
                                 ),
                                 Padding(
                                   padding: const EdgeInsets.symmetric(
@@ -2772,7 +3112,7 @@ class _InventoryIssuePageState extends State<InventoryIssuePage> {
                                 ),
                               ),
                               DataCell(Text('${visible[i]['workOrderCode']}')),
-                              DataCell(Text('${visible[i]['statusCode']}')),
+                              DataCell(_issueStatus(visible[i], primary)),
                             ],
                           ),
                       ],
@@ -2794,15 +3134,15 @@ class _InventoryIssuePageState extends State<InventoryIssuePage> {
                     SizedBox(
                       width: LaooLayout.paginationButtonSize,
                       height: LaooLayout.paginationButtonSize,
-                      child: IconButton.outlined(
+                      child: IconButton.filled(
                         style: IconButton.styleFrom(
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(LaooRadius.xs),
                           ),
-                          side: BorderSide(
-                            color: page > 0 ? primary : LaooColors.border,
-                          ),
-                          foregroundColor: page > 0 ? primary : LaooColors.gray,
+                          backgroundColor: primary,
+                          foregroundColor: LaooColors.white,
+                          disabledBackgroundColor: Colors.grey.shade300,
+                          disabledForegroundColor: Colors.grey.shade700,
                         ),
                         padding: EdgeInsets.zero,
                         onPressed: page > 0
@@ -2832,19 +3172,15 @@ class _InventoryIssuePageState extends State<InventoryIssuePage> {
                     SizedBox(
                       width: LaooLayout.paginationButtonSize,
                       height: LaooLayout.paginationButtonSize,
-                      child: IconButton.outlined(
+                      child: IconButton.filled(
                         style: IconButton.styleFrom(
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(LaooRadius.xs),
                           ),
-                          side: BorderSide(
-                            color: page < lastPage
-                                ? primary
-                                : LaooColors.border,
-                          ),
-                          foregroundColor: page < lastPage
-                              ? primary
-                              : LaooColors.gray,
+                          backgroundColor: primary,
+                          foregroundColor: LaooColors.white,
+                          disabledBackgroundColor: Colors.grey.shade300,
+                          disabledForegroundColor: Colors.grey.shade700,
                         ),
                         padding: EdgeInsets.zero,
                         onPressed: page < lastPage

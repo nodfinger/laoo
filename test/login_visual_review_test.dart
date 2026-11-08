@@ -39,14 +39,15 @@ void main() {
     );
     await tester.runAsync(() async {
       await precacheImage(
-        const AssetImage('assets/images/laoo_app_icon.png'),
+        const AssetImage('assets/images/ryp_login_logo.png'),
         tester.element(find.byType(LoginPage)),
       );
     });
     await tester.pumpAndSettle();
 
     expect(find.text('เข้าสู่ระบบ'), findsWidgets);
-    expect(find.text('Simple today. Ready Tomorrow.'), findsOneWidget);
+    expect(find.text('LAOO PLATFORM'), findsNothing);
+    expect(find.text('Simple today. Ready Tomorrow.'), findsNothing);
     expect(find.text('ชื่อผู้ใช้งาน'), findsOneWidget);
     expect(find.text('รหัสผ่าน'), findsOneWidget);
     expect(tester.takeException(), isNull);

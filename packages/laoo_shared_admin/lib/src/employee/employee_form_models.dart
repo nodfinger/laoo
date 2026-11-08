@@ -53,6 +53,7 @@ class EmployeeFormInput {
     required this.notifyByEmail,
     required this.notifyInSystem,
     this.telephone,
+    this.internalTelephone,
     this.contact1 = const EmployeeEmergencyContactInput(),
     this.contact2 = const EmployeeEmergencyContactInput(),
     this.vehicle1 = const EmployeeVehicleInput(),
@@ -81,6 +82,7 @@ class EmployeeFormInput {
   final bool notifyByEmail;
   final bool notifyInSystem;
   final String? telephone;
+  final String? internalTelephone;
   final EmployeeEmergencyContactInput contact1;
   final EmployeeEmergencyContactInput contact2;
   final EmployeeVehicleInput vehicle1;
@@ -146,6 +148,7 @@ class EmployeeFormInput {
     'notifyByEmail': notifyByEmail,
     'notifyInSystem': notifyInSystem,
     'telephone': _text(telephone),
+    'internalTelephone': _text(internalTelephone),
     'contName1': _text(contact1.name),
     'contRelation1': _text(contact1.relation),
     'contPhone1': _text(contact1.phone),

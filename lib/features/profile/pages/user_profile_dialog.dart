@@ -485,6 +485,7 @@ class _UserProfileDialogState extends State<_UserProfileDialog> {
     return AlertDialog(
       backgroundColor: Colors.white,
       surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
       title: Row(
         children: [
           CircleAvatar(
@@ -495,10 +496,7 @@ class _UserProfileDialogState extends State<_UserProfileDialog> {
           const SizedBox(width: 12),
           Text(
             'ข้อมูลส่วนตัว',
-            style: TextStyle(
-              color: theme.colorScheme.primary,
-              fontWeight: FontWeight.w700,
-            ),
+            style: LaooTypography.popupTitleStyle,
           ),
         ],
       ),
@@ -513,6 +511,8 @@ class _UserProfileDialogState extends State<_UserProfileDialog> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    const Divider(height: 1),
+                    const SizedBox(height: 12),
                     if (_error != null) _errorBox(theme),
                     _section(theme, 'ข้อมูลเข้าสู่ระบบ', [
                       TextField(
@@ -522,34 +522,20 @@ class _UserProfileDialogState extends State<_UserProfileDialog> {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _currentPassword,
-                              obscureText: true,
-                              decoration: const InputDecoration(
-                                labelText: 'Password เดิม',
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: TextField(
-                              controller: _newPassword,
-                              obscureText: true,
-                              decoration: const InputDecoration(
-                                labelText: 'Password ใหม่ (ถ้าต้องการเปลี่ยน)',
-                              ),
-                            ),
-                          ),
-                        ],
+                      TextField(
+                        controller: _currentPassword,
+                        obscureText: true,
+                        decoration: const InputDecoration(labelText: 'Password เดิม'),
+                      ),
+                      const SizedBox(height: 14),
+                      TextField(
+                        controller: _newPassword,
+                        obscureText: true,
+                        decoration: const InputDecoration(labelText: 'Password ใหม่ (ถ้าต้องการเปลี่ยน)'),
                       ),
                     ]),
                     const SizedBox(height: 12),
                     _section(theme, 'การแสดงผลส่วนตัว', [
-                      _viewModeSelector(theme),
-                      const SizedBox(height: 14),
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -608,60 +594,43 @@ class _UserProfileDialogState extends State<_UserProfileDialog> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 14),
+                      TextField(
+                        controller: _intro,
+                        maxLines: 1,
+                        maxLength: 300,
+                        decoration: const InputDecoration(
+                          labelText: 'ข้อความแนะนำ',
+                          counterText: '',
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      OutlinedButton.icon(
+                        onPressed: _chooseTheme,
+                        icon: Icon(Icons.palette_outlined, color: theme.colorScheme.primary),
+                        label: const Text('เลือกโทนสี'),
+                      ),
+                      const SizedBox(height: 14),
                       LayoutBuilder(
                         builder: (context, constraints) {
-                          final compact = constraints.maxWidth < 420;
-                          final intro = Padding(
-                            padding: const EdgeInsets.only(top: 2),
-                            child: SizedBox(
-                              height: 56,
-                              child: TextField(
-                                controller: _intro,
-                                maxLines: 1,
-                                maxLength: 300,
-                                decoration: const InputDecoration(
-                                  isDense: true,
-                                  contentPadding: EdgeInsets.symmetric(
-                                    horizontal: 14,
-                                    vertical: 12,
-                                  ),
-                                  labelText: 'ข้อความแนะนำ',
-                                ),
-                              ),
-                            ),
+                          if (constraints.maxWidth < 440) {
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _viewModeSelector(theme),
+                                const SizedBox(height: 14),
+                                _menuStyleSelector(theme),
+                              ],
+                            );
+                          }
+                          return Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(child: _viewModeSelector(theme)),
+                              const SizedBox(width: 14),
+                              Expanded(child: _menuStyleSelector(theme)),
+                            ],
                           );
-                          final palette = IconButton(
-                            tooltip: 'เลือกโทนสี',
-                            onPressed: _chooseTheme,
-                            icon: Icon(
-                              Icons.palette_outlined,
-                              color: theme.colorScheme.primary,
-                            ),
-                          );
-                          final menuStyle = SizedBox(
-                            width: 200,
-                            child: _menuStyleSelector(theme),
-                          );
-                          return compact
-                              ? Row(
-                                  children: [
-                                    palette,
-                                    const SizedBox(width: 8),
-                                    Expanded(child: intro),
-                                    const SizedBox(width: 8),
-                                    menuStyle,
-                                  ],
-                                )
-                              : Row(
-                                  children: [
-                                    palette,
-                                    const SizedBox(width: 8),
-                                    Expanded(child: intro),
-                                    const SizedBox(width: 8),
-                                    menuStyle,
-                                  ],
-                                );
                         },
                       ),
                     ]),
@@ -710,7 +679,7 @@ class _UserProfileDialogState extends State<_UserProfileDialog> {
           border: Border.all(
             color: theme.colorScheme.primary.withValues(alpha: .28),
           ),
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(4),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

@@ -8,3 +8,4 @@ export 'src/employee/employee_workspace.dart';
 export 'src/organization/organization_structure_workspace.dart';
 export 'src/partner_user/partner_user_workspace.dart';
 export 'src/shared/shared_admin_ui_tokens.dart';
+export 'src/shared/filter_height_sync.dart';

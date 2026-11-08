@@ -3,6 +3,8 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:laoo_shared_admin_ui/laoo_shared_admin_ui.dart'
+    show FilterHeightSync, filterActionHeightStyle;
 
 import '../../../../app/theme/laoo_typography.dart';
 import '../../../../app/theme/laoo_design_tokens.dart';
@@ -1320,14 +1322,17 @@ class _ItemPageState extends State<ItemPage> {
                           color: workspaceThemeController.value.primary
                               .withValues(alpha: .10),
                         ),
-                        child: IconButton(
-                          tooltip: _card ? 'แสดงแบบรายการ' : 'แสดงแบบการ์ด',
-                          onPressed: () => setState(() => _card = !_card),
-                          color: workspaceThemeController.value.primary,
-                          icon: Icon(
-                            _card
-                                ? Icons.view_list_outlined
-                                : Icons.grid_view_outlined,
+                        child: SizedBox.square(
+                          dimension: LaooTypography.buttonHeight,
+                          child: IconButton(
+                            tooltip: _card ? 'แสดงแบบรายการ' : 'แสดงแบบการ์ด',
+                            onPressed: () => setState(() => _card = !_card),
+                            color: workspaceThemeController.value.primary,
+                            icon: Icon(
+                              _card
+                                  ? Icons.view_list_outlined
+                                  : Icons.grid_view_outlined,
+                            ),
                           ),
                         ),
                       ),
@@ -1364,139 +1369,134 @@ class _ItemPageState extends State<ItemPage> {
                                   240.0,
                                 )
                         : ((constraints.maxWidth - 32) / 5).clamp(140.0, 240.0);
-                    return Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        SizedBox(
-                          width: filterWidth,
-                          child: _filter('กลุ่มสินค้า', _group, _groups, (v) {
-                            _group = v;
-                            _currentPage = 0;
-                            _load();
-                          }),
-                        ),
-                        SizedBox(
-                          width: filterWidth,
-                          child: _filter('ประเภทสินค้า', _type, _types, (v) {
-                            _type = v;
-                            _currentPage = 0;
-                            _load();
-                          }),
-                        ),
-                        SizedBox(
-                          width: filterWidth,
-                          child: TextField(
-                            controller: _search,
-                            onSubmitted: (_) => _load(),
-                            decoration: const InputDecoration(
-                              labelText: 'ค้นหารหัส/ชื่อสินค้า',
-                              prefixIcon: Icon(Icons.search),
-                            ),
-                          ),
-                        ),
-                        FilledButton.icon(
-                          onPressed: _load,
-                          style: FilledButton.styleFrom(
-                            minimumSize: const Size(
-                              0,
-                              LaooLayout.filterActionHeight,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(
-                                LaooRadius.xs,
+                    return FilterHeightSync(
+                      builder: (context, searchKey, height) => Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          SizedBox(
+                            width: filterWidth,
+                            child: TextField(
+                              key: searchKey,
+                              controller: _search,
+                              onSubmitted: (_) => _load(),
+                              decoration: const InputDecoration(
+                                labelText: 'ค้นหารหัส/ชื่อสินค้า',
+                                prefixIcon: Icon(Icons.search),
                               ),
                             ),
                           ),
-                          icon: const Icon(Icons.search),
-                          label: const Text('ค้นหา'),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: () {
-                            _search.clear();
-                            _currentPage = 0;
-                            _load();
-                          },
-                          style: OutlinedButton.styleFrom(
-                            minimumSize: const Size(
-                              0,
-                              LaooLayout.filterActionHeight,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(
-                                LaooRadius.xs,
-                              ),
-                            ),
-                          ),
-                          icon: const Icon(Icons.filter_alt_off_outlined),
-                          label: const Text('ล้าง Filter'),
-                        ),
-                        SizedBox(
-                          width: filterWidth,
-                          child: DropdownButtonFormField<String>(
-                            initialValue: _statusFilter,
-                            decoration: const InputDecoration(
-                              labelText: 'สถานะ',
-                            ),
-                            style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(
-                                  fontSize: LaooTypography.tableBody,
-                                  height: 1.35,
+                          FilledButton.icon(
+                            onPressed: _load,
+                            style: FilledButton.styleFrom(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(
+                                  LaooRadius.xs,
                                 ),
-                            items: const [
-                              DropdownMenuItem(
-                                value: 'all',
-                                child: Text('ทั้งหมด'),
                               ),
-                              DropdownMenuItem(
-                                value: 'active',
-                                child: Text('ใช้งาน'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'inactive',
-                                child: Text('ไม่ใช้งาน'),
-                              ),
-                            ],
-                            onChanged: (v) => setState(() {
-                              _statusFilter = v ?? 'all';
+                            ).merge(filterActionHeightStyle(height)),
+                            icon: const Icon(Icons.search),
+                            label: const Text('ค้นหา'),
+                          ),
+                          OutlinedButton.icon(
+                            onPressed: () {
+                              _search.clear();
                               _currentPage = 0;
+                              _load();
+                            },
+                            style: OutlinedButton.styleFrom(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(
+                                  LaooRadius.xs,
+                                ),
+                              ),
+                            ).merge(filterActionHeightStyle(height)),
+                            icon: const Icon(Icons.filter_alt_off_outlined),
+                            label: const Text('ล้าง Filter'),
+                          ),
+                          SizedBox(
+                            width: filterWidth,
+                            child: _filter('กลุ่มสินค้า', _group, _groups, (v) {
+                              _group = v;
+                              _currentPage = 0;
+                              _load();
                             }),
                           ),
-                        ),
-                        SizedBox(
-                          width: filterWidth,
-                          child: DropdownButtonFormField<String>(
-                            initialValue: _showFilter,
-                            decoration: const InputDecoration(
-                              labelText: 'แสดง',
-                            ),
-                            style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(
-                                  fontSize: LaooTypography.tableBody,
-                                  height: 1.35,
-                                ),
-                            items: const [
-                              DropdownMenuItem(
-                                value: 'all',
-                                child: Text('ทั้งหมด'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'online',
-                                child: Text('Online'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'offline',
-                                child: Text('Offline'),
-                              ),
-                            ],
-                            onChanged: (v) => setState(() {
-                              _showFilter = v ?? 'all';
+                          SizedBox(
+                            width: filterWidth,
+                            child: _filter('ประเภทสินค้า', _type, _types, (v) {
+                              _type = v;
                               _currentPage = 0;
+                              _load();
                             }),
                           ),
-                        ),
-                      ],
+                          SizedBox(
+                            width: filterWidth,
+                            child: DropdownButtonFormField<String>(
+                              initialValue: _statusFilter,
+                              decoration: const InputDecoration(
+                                labelText: 'สถานะ',
+                              ),
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    fontSize: LaooTypography.tableBody,
+                                    height: 1.35,
+                                  ),
+                              items: const [
+                                DropdownMenuItem(
+                                  value: 'all',
+                                  child: Text('ทั้งหมด'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'active',
+                                  child: Text('ใช้งาน'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'inactive',
+                                  child: Text('ไม่ใช้งาน'),
+                                ),
+                              ],
+                              onChanged: (v) => setState(() {
+                                _statusFilter = v ?? 'all';
+                                _currentPage = 0;
+                              }),
+                            ),
+                          ),
+                          SizedBox(
+                            width: filterWidth,
+                            child: DropdownButtonFormField<String>(
+                              initialValue: _showFilter,
+                              decoration: const InputDecoration(
+                                labelText: 'แสดง',
+                              ),
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    fontSize: LaooTypography.tableBody,
+                                    height: 1.35,
+                                  ),
+                              items: const [
+                                DropdownMenuItem(
+                                  value: 'all',
+                                  child: Text('ทั้งหมด'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'online',
+                                  child: Text('Online'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'offline',
+                                  child: Text('Offline'),
+                                ),
+                              ],
+                              onChanged: (v) => setState(() {
+                                _showFilter = v ?? 'all';
+                                _currentPage = 0;
+                              }),
+                            ),
+                          ),
+                        ],
+                      ),
                     );
                   },
                 ),

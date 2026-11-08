@@ -1,8 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:laoo/app/theme/workspace_theme_presets.dart';
+import 'package:laoo/app/theme/laoo_theme.dart';
+import 'package:laoo/app/theme/laoo_typography.dart';
 
 void main() {
+  test('standard button themes use the shared height', () {
+    for (final theme in [
+      LaooTheme.fromKey(LaooThemeKey.green),
+      workspaceThemeByCode('STYLE01').toThemeData(),
+    ]) {
+      for (final style in [
+        theme.elevatedButtonTheme.style,
+        theme.filledButtonTheme.style,
+        theme.outlinedButtonTheme.style,
+        theme.textButtonTheme.style,
+      ]) {
+        expect(
+          style!.minimumSize!.resolve({})!.height,
+          LaooTypography.buttonHeight,
+        );
+        expect(
+          style.maximumSize!.resolve({})!.height,
+          LaooTypography.buttonHeight,
+        );
+      }
+    }
+  });
   test('workspace theme codes remain unique', () {
     final codes = workspaceThemePresets.map((preset) => preset.code).toList();
 

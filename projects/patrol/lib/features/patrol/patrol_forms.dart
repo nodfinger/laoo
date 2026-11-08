@@ -111,12 +111,15 @@ extension _PatrolForms on _PatrolPageState {
         checklist = row['requireChecklist'] == true,
         active = row['isActive'] != false,
         saving = false;
-    if (widget.menuCode == '56005')
+    if (widget.menuCode == '56005') {
       extra.text = (row['items'] ?? '').toString();
-    if (widget.menuCode == '56006')
+    }
+    if (widget.menuCode == '56006') {
       extra.text = (row['checkpointIds'] ?? '').toString();
-    if (widget.menuCode == '56007')
+    }
+    if (widget.menuCode == '56007') {
       extra.text = (row['routeId'] ?? '').toString();
+    }
     if (widget.menuCode == '56004') extra.text = '';
     await showDialog<void>(
       context: context,

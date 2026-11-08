@@ -260,7 +260,10 @@ class _ServiceSettingsPageState extends State<ServiceSettingsPage> {
         children: [
           Row(
             children: [
-              Icon(icon, color: Theme.of(context).colorScheme.primary),
+              Builder(
+                builder: (context) =>
+                    Icon(icon, color: Theme.of(context).colorScheme.primary),
+              ),
               const SizedBox(width: LaooLayout.listSectionSpacing),
               Expanded(
                 child: Text(

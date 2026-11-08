@@ -77,6 +77,21 @@ class _OrganizationStructurePageState extends State<OrganizationStructurePage> {
         errorText: (error) =>
             error is ApiException ? error.message : error.toString(),
         screenType: _contract.screenType,
+        inputTextStyle: const TextStyle(
+          fontFamily: LaooTypography.fontFamily,
+          fontFamilyFallback: LaooTypography.fontFallback,
+          fontSize: LaooTypography.inputText,
+        ),
+        inputLabelStyle: const TextStyle(
+          fontFamily: LaooTypography.fontFamily,
+          fontFamilyFallback: LaooTypography.fontFallback,
+          fontSize: LaooTypography.inputLabel,
+        ),
+        floatingLabelStyle: const TextStyle(
+          fontFamily: LaooTypography.fontFamily,
+          fontFamilyFallback: LaooTypography.fontFallback,
+          fontSize: LaooTypography.materialFloatingLabelSource,
+        ),
         titleBuilder: (context, title, showFavorite) => WorkspacePageTitle(
           title: title,
           favoriteKey: showFavorite ? _contract.menuCode : null,

@@ -15,7 +15,7 @@ class FoodFixtureApi implements JsonApiClient {
     Map<String, String>? query,
     bool authenticated = true,
   }) async {
-    if (path.contains('/actions/'))
+    if (path.contains('/actions/')) {
       return {
         'actions': {
           'view': true,
@@ -32,13 +32,15 @@ class FoodFixtureApi implements JsonApiClient {
           'ScreenType': type,
         },
       };
-    if (path.contains('/options/'))
+    }
+    if (path.contains('/options/')) {
       return {
         'warehouses': [
           {'id': 1, 'name': 'คลังโรงอาหาร'},
         ],
       };
-    if (path.endsWith('/shops'))
+    }
+    if (path.endsWith('/shops')) {
       return [
         {
           'id': 1,
@@ -48,16 +50,19 @@ class FoodFixtureApi implements JsonApiClient {
           'IsActive': true,
         },
       ];
-    if (path.endsWith('/settings'))
+    }
+    if (path.endsWith('/settings')) {
       return {
         'IsEnabled': true,
         'CommissionEnabled': true,
         'DefaultCommissionRate': 5,
       };
-    if (path.endsWith('/commission'))
+    }
+    if (path.endsWith('/commission')) {
       return [
         {'id': 1, 'ItemName': 'ข้าวไก่กระเทียม', 'Rate': 10},
       ];
+    }
     return {
       'rows': [
         {
@@ -193,8 +198,9 @@ void main() {
           find.text('ระบบขายอาหารในโรงเรียน ทดสอบชื่อภาษาไทยยาว'),
           findsOneWidget,
         );
-        if (index != 0 && index != 7)
+        if (index != 0 && index != 7) {
           expect(find.byType(LaooPaginationCard), findsOneWidget);
+        }
       });
     }
   }
@@ -323,15 +329,17 @@ void main() {
         expect(find.textContaining('นักเรียนตัวอย่าง'), findsWidgets);
         await tester.tap(product);
         await tester.pump();
-        if (width < 900)
+        if (width < 900) {
           expect(find.textContaining('ตะกร้า 1 รายการ'), findsOneWidget);
+        }
         await tester.enterText(input, 'SFDEMO-UNKNOWN');
         await tester.testTextInput.receiveAction(TextInputAction.search);
         await tester.pumpAndSettle();
         expect(api.scans, 2);
         expect(find.textContaining('ไม่พบบัตรหรือบัตรถูกระงับ'), findsWidgets);
-        if (width < 900)
+        if (width < 900) {
           expect(find.textContaining('ตะกร้า 0 รายการ'), findsOneWidget);
+        }
         expect(tester.takeException(), isNull);
       },
     );

@@ -2,8 +2,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import '../../app/theme/laoo_design_tokens.dart';
-
 /// Shared column definitions for operational list tables.
 abstract final class LaooTableColumns {
   static const double idWidth = 56;
@@ -166,7 +164,7 @@ class _PinnedDataTableState extends State<PinnedDataTable> {
     required double dataRowMinHeight,
     required double dataRowMaxHeight,
   }) => Theme(
-    data: Theme.of(context).copyWith(dividerColor: LaooColors.border),
+    data: Theme.of(context),
     child: DataTable(
       columns: _resolvedColumns,
       sortColumnIndex: widget.sortColumnIndex,

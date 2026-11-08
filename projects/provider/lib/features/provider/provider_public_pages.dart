@@ -32,7 +32,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
   void initState() {
     super.initState();
     api
-        .get('/api/public/providers/' + widget.slug, authenticated: false)
+        .get('/api/public/providers/${widget.slug}', authenticated: false)
         .then((v) {
           if (mounted) setState(() => data = v);
         })
@@ -101,7 +101,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                                           : Image.network(
                                               '/api/public/providers/profiles/${m['id']}/cover',
                                               fit: BoxFit.cover,
-                                              errorBuilder: (_, __, ___) =>
+                                              errorBuilder: (_, _, _) =>
                                                   const Icon(
                                                     Icons.business_outlined,
                                                   ),
@@ -129,11 +129,11 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                                 children: [
                                   _pill(
                                     Icons.star,
-                                    'คะแนน ' + m['averageRating'].toString(),
+                                    'คะแนน ${m['averageRating']}',
                                   ),
                                   _pill(
                                     Icons.rate_review_outlined,
-                                    m['reviewCount'].toString() + ' รีวิว',
+                                    '${m['reviewCount']} รีวิว',
                                   ),
                                   ...(_list(m['services']).map(
                                     (x) => _pill(
@@ -163,7 +163,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                                   if (m['lineUrl'] != null)
                                     _contact(
                                       Icons.chat_outlined,
-                                      'Line ' + (m['lineId'] ?? '').toString(),
+                                      'Line ${m['lineId'] ?? ''}',
                                       m['lineUrl'].toString(),
                                     ),
                                   if (m['websiteUrl'] != null)
@@ -209,12 +209,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                             final category = _publicMap(x);
                             return _pill(
                               Icons.inventory_2_outlined,
-                              category['groupCode'].toString() +
-                                  ' / ' +
-                                  category['typeCode'].toString() +
-                                  ' (' +
-                                  category['itemCount'].toString() +
-                                  ')',
+                              '${category['groupCode']} / ${category['typeCode']} (${category['itemCount']})',
                             );
                           }).toList(),
                         ),
@@ -258,7 +253,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                                             child: Image.network(
                                               '/api/public/providers/portfolio/${portfolio['id']}/cover',
                                               fit: BoxFit.cover,
-                                              errorBuilder: (_, __, ___) =>
+                                              errorBuilder: (_, _, _) =>
                                                   const Icon(
                                                     Icons.broken_image_outlined,
                                                   ),
@@ -325,13 +320,12 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                               color: Colors.amber,
                             ),
                             title: Text(
-                              (((_num(r['quality']) +
+                              '${((_num(r['quality']) +
                                               _num(r['punctuality']) +
                                               _num(r['service']) +
                                               _num(r['value'])) /
                                           4)
-                                      .toStringAsFixed(1)) +
-                                  ' / 5',
+                                      .toStringAsFixed(1)} / 5',
                             ),
                             subtitle: Text(
                               (r['comment'] ?? 'ไม่มีความคิดเห็น').toString(),
@@ -402,7 +396,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                                   ? '/api/public/providers/portfolio/${photo['id']}/cover'
                                   : '/api/public/providers/portfolio/photos/${photo['id']}',
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) =>
+                              errorBuilder: (_, _, _) =>
                                   const Icon(Icons.broken_image_outlined),
                             ),
                           ),
@@ -480,7 +474,7 @@ class _ProviderReviewPageState extends State<ProviderReviewPage> {
     super.initState();
     api
         .get(
-          '/api/public/providers/review/' + widget.token,
+          '/api/public/providers/review/${widget.token}',
           authenticated: false,
         )
         .then((v) {
@@ -502,7 +496,7 @@ class _ProviderReviewPageState extends State<ProviderReviewPage> {
     setState(() => saving = true);
     try {
       await api.post(
-        '/api/public/providers/review/' + widget.token,
+        '/api/public/providers/review/${widget.token}',
         authenticated: false,
         body: {
           'quality': scores[0],
@@ -590,7 +584,7 @@ class _ProviderReviewPageState extends State<ProviderReviewPage> {
                                   .map(
                                     (v) => DropdownMenuItem(
                                       value: v,
-                                      child: Text(v.toString() + ' ดาว'),
+                                      child: Text('$v ดาว'),
                                     ),
                                   )
                                   .toList(),

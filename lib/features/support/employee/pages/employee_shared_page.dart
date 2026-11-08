@@ -8,6 +8,7 @@ import 'package:laoo_shared_admin_ui/laoo_shared_admin_ui.dart';
 
 import '../../../../app/theme/laoo_design_tokens.dart';
 import '../../../../app/theme/laoo_typography.dart';
+import '../../../../app/theme/workspace_theme_presets.dart';
 import '../../../../core/api/api_client.dart';
 import '../../../../core/api/api_exception.dart';
 import '../../../../core/company_setup/company_date_formatter.dart';
@@ -17,9 +18,12 @@ import '../../../../core/navigation/navigation_menu_repository.dart';
 import '../../../../core/widgets/auto_dismiss_message.dart';
 import '../../../access/role_group/data/role_group_repository.dart';
 import '../../../access/role_group/models/role_group.dart';
+import '../../../access/role_group/pages/role_group_page.dart';
 import '../../../partner/models/partner_company.dart';
 import '../../../partner/data/partner_company_repository.dart';
 import '../../master_data/data/master_data_api.dart';
+import '../../master_data/pages/master_data_page.dart';
+import '../../master_data/pages/simple_master_search_dialog.dart';
 import '../../organization/data/organization_repository.dart' as local_org;
 import '../../presentation/widgets/support_workspace_shell.dart';
 import '../data/employee_repository.dart' as local_employee;
@@ -50,8 +54,16 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
   late final PartnerCompanyRepository _companyRepository;
   late final RoleGroupRepository _roleGroupRepository;
   late final MasterDataApi _masterDataApi;
+  late final MasterDataApi _positionMasterApi;
+  late final MasterDataApi _vehicleMasterApi;
 
   String _caption = 'พนักงาน';
+  String _organizationCaption = 'โครงสร้างองค์กร';
+  bool _canManageRoleGroups = false;
+  bool _canManageVehicleMaster = false;
+  bool _canChangeMasterData = false;
+  bool _canOpenPositionLookup = false;
+  bool _canShowEmployeeImages = false;
   bool _loading = true;
   Object? _loadError;
   List<EmployeeCompanyOption> _companies = const [];
@@ -60,6 +72,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
   List<EmployeeRoleGroupOption> _roleGroups = const [];
   List<EmployeeMasterOption> _carTypes = const [];
   List<EmployeeMasterOption> _oilTypes = const [];
+  List<EmployeeMasterOption> _positions = const [];
 
   @override
   void initState() {
@@ -87,6 +100,14 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
     _companyRepository = PartnerCompanyRepository(apiClient: _api);
     _roleGroupRepository = RoleGroupRepository(client: _api);
     _masterDataApi = MasterDataApi(apiClient: _api);
+    _positionMasterApi = MasterDataApi(
+      apiClient: _api,
+      lookup: widget.companyScoped ? 'employee-position' : null,
+    );
+    _vehicleMasterApi = MasterDataApi(
+      apiClient: _api,
+      lookup: widget.companyScoped ? 'employee-vehicle' : null,
+    );
     _loadDependencies();
   }
 
@@ -106,32 +127,89 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
               fallback: _caption,
             )
             .catchError((_) => _caption),
-        _organizationRepository.load(),
+        widget.companyScoped
+            ? _repository.organizationOptions()
+            : _organizationRepository.load(),
         _roleGroupRepository
             .list(
               widget.customer || widget.companyScoped ? 'customer' : 'partner',
             )
             .catchError((_) => const <RoleGroup>[]),
-        _masterDataApi
-            .list(MasterGroupCodes.carType)
-            .catchError((_) => const <Map<String, dynamic>>[]),
-        _masterDataApi
-            .list(MasterGroupCodes.oilType)
-            .catchError((_) => const <Map<String, dynamic>>[]),
+        widget.companyScoped
+            ? _vehicleMasterApi.list(MasterGroupCodes.carType)
+            : _vehicleMasterApi
+                  .list(MasterGroupCodes.carType)
+                  .catchError((_) => const <Map<String, dynamic>>[]),
+        widget.companyScoped
+            ? _vehicleMasterApi.list(MasterGroupCodes.oilType)
+            : _vehicleMasterApi
+                  .list(MasterGroupCodes.oilType)
+                  .catchError((_) => const <Map<String, dynamic>>[]),
         widget.customer && !widget.companyScoped
             ? _companyRepository
                   .getCompanies(support: _ownerScope == LaooOwnerScope.support)
                   .catchError((_) => const <PartnerCompany>[])
             : Future.value(const <dynamic>[]),
+        NavigationMenuRepository(apiClient: _api)
+            .resolveMenuName(
+              menuCode: _organizationRepository.contract.menuCode,
+              routeName: _organizationRepository.contract.routeName,
+              fallback: _organizationCaption,
+            )
+            .catchError((_) => _organizationCaption),
+        _roleGroupRepository
+            .actions(
+              widget.customer || widget.companyScoped ? 'customer' : 'partner',
+            )
+            .catchError((_) => <String, bool>{}),
+        _masterDataApi.actions().catchError((_) => <String, bool>{}),
+        _positionMasterApi
+            .list(MasterGroupCodes.position)
+            .catchError((_) => const <Map<String, dynamic>>[]),
+        widget.companyScoped
+            ? _api
+                  .get(
+                    '/api/company/sub-permissions/current',
+                    query: {'menuCode': _contract.menuCode},
+                  )
+                  .then(
+                    (value) => (value as List).map((e) => e.toString()).toSet(),
+                  )
+                  .catchError((_) => <String>{})
+            : Future.value(<String>{}),
       ]);
       final organization = results[1] as OrganizationStructureSnapshot;
       final roleGroups = results[2] as List;
       final carTypes = results[3] as List;
       final oilTypes = results[4] as List;
       final companies = results[5] as List;
+      final roleActions = results[7] as Map<String, bool>;
+      final masterActions = results[8] as Map<String, bool>;
+      final positions = results[9] as List;
+      final imagePermissions = results[10] as Set<String>;
       if (!mounted) return;
       setState(() {
         _caption = (results[0] as String).trim();
+        _canShowEmployeeImages =
+            imagePermissions.contains('*') ||
+            imagePermissions.contains('SHOW_EMPLOYEE_IMAGE');
+        _organizationCaption = (results[6] as String).trim();
+        _canChangeMasterData =
+            masterActions['view'] == true &&
+            (masterActions['create'] == true ||
+                masterActions['edit'] == true ||
+                masterActions['delete'] == true);
+        _canManageVehicleMaster =
+            widget.companyScoped ||
+            (!(widget.customer && !widget.companyScoped) &&
+                masterActions['view'] == true);
+        _canOpenPositionLookup =
+            widget.companyScoped ||
+            (!(widget.customer && !widget.companyScoped) &&
+                masterActions['view'] == true);
+        _canManageRoleGroups =
+            !(widget.customer && !widget.companyScoped) &&
+            roleActions['view'] == true;
         _organizationUnits = organization.units;
         _organizationMode = organization.orgStructureType;
         _roleGroups = roleGroups
@@ -145,6 +223,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
             .toList(growable: false);
         _carTypes = _masterOptions(carTypes);
         _oilTypes = _masterOptions(oilTypes);
+        _positions = _masterOptions(positions);
         _companies = companies
             .map(
               (value) => EmployeeCompanyOption(
@@ -162,6 +241,194 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
         _loading = false;
       });
     }
+  }
+
+  Future<List<EmployeeMasterOption>?> _manageMasterGroup(
+    String groupCode,
+  ) async {
+    final actions = await _masterDataApi.actions().catchError(
+      (_) => <String, bool>{},
+    );
+    if (!mounted) return null;
+    final positionLookup = groupCode == MasterGroupCodes.position;
+    final vehicleLookup =
+        groupCode == MasterGroupCodes.carType ||
+        groupCode == MasterGroupCodes.oilType;
+    if (actions['view'] != true &&
+        !((positionLookup || vehicleLookup) && widget.companyScoped)) {
+      throw StateError('ไม่มีสิทธิ์ดูรหัสพื้นฐาน กรุณาติดต่อผู้ดูแลระบบ');
+    }
+    final simple =
+        actions['view'] != true ||
+        !(actions['create'] == true ||
+            actions['edit'] == true ||
+            actions['delete'] == true);
+    final source = positionLookup
+        ? _positionMasterApi
+        : vehicleLookup
+        ? _vehicleMasterApi
+        : _masterDataApi;
+    final rows = simple
+        ? await source.list(groupCode)
+        : <Map<String, dynamic>>[];
+    if (!mounted) return null;
+    final selectedCode = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => simple
+          ? SimpleMasterSearchDialog(
+              title: positionLookup
+                  ? 'ตำแหน่ง'
+                  : groupCode == MasterGroupCodes.carType
+                  ? 'ประเภทรถ'
+                  : 'เชื้อเพลิง',
+              rows: rows,
+            )
+          : Theme(
+              data: workspaceThemeController.value.toThemeData(),
+              child: Dialog(
+                insetPadding: const EdgeInsets.all(24),
+                clipBehavior: Clip.antiAlias,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(LaooRadius.xs),
+                ),
+                child: SizedBox(
+                  width: 1000,
+                  height: (MediaQuery.sizeOf(dialogContext).height - 48).clamp(
+                    0.0,
+                    700.0,
+                  ),
+                  child: Column(
+                    children: [
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: IconButton(
+                          tooltip: 'ปิดหน้าจัดการรหัสพื้นฐาน',
+                          onPressed: () => Navigator.of(dialogContext).pop(),
+                          icon: const Icon(Icons.close),
+                        ),
+                      ),
+                      Expanded(
+                        child: MasterDataPage(
+                          menuScope: widget.menuScope,
+                          embedded: true,
+                          masterGroupCode: groupCode,
+                          simpleWhenReadOnly: true,
+                          onSelected: (code) =>
+                              Navigator.of(dialogContext).pop(code),
+                          api:
+                              widget.companyScoped &&
+                                  (positionLookup || vehicleLookup)
+                              ? MasterDataApi(
+                                  lookup: positionLookup
+                                      ? 'employee-position'
+                                      : 'employee-vehicle',
+                                )
+                              : null,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+    );
+    final loadedOptions = _masterOptions(
+      await (positionLookup
+              ? _positionMasterApi
+              : vehicleLookup
+              ? _vehicleMasterApi
+              : _masterDataApi)
+          .list(groupCode),
+    );
+    final options = loadedOptions
+        .map(
+          (option) => EmployeeMasterOption(
+            code: option.code,
+            name: option.name,
+            selected: option.code == selectedCode,
+          ),
+        )
+        .toList(growable: false);
+    if (mounted) {
+      setState(() {
+        if (groupCode == MasterGroupCodes.position) {
+          _positions = options;
+        } else if (groupCode == MasterGroupCodes.carType) {
+          _carTypes = options;
+        } else {
+          _oilTypes = options;
+        }
+      });
+    }
+    return options;
+  }
+
+  Future<List<EmployeeRoleGroupOption>?> _manageRoleGroups() async {
+    final scope = widget.customer || widget.companyScoped
+        ? 'customer'
+        : 'partner';
+    final actions = await _roleGroupRepository.actions(scope);
+    if (!mounted) return null;
+    if (actions['view'] != true) {
+      setState(() => _canManageRoleGroups = false);
+      throw StateError('ไม่มีสิทธิ์จัดการกลุ่มสิทธิ์ กรุณาติดต่อผู้ดูแลระบบ');
+    }
+    final selectedId = await showDialog<int>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => Theme(
+        data: workspaceThemeController.value.toThemeData(),
+        child: Dialog(
+          insetPadding: const EdgeInsets.all(24),
+          clipBehavior: Clip.antiAlias,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(LaooRadius.xs),
+          ),
+          child: SizedBox(
+            width: 1000,
+            height: (MediaQuery.sizeOf(dialogContext).height - 48).clamp(
+              0.0,
+              700.0,
+            ),
+            child: Column(
+              children: [
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: IconButton(
+                    tooltip: 'ปิดหน้าจัดการกลุ่มสิทธิ์',
+                    onPressed: () => Navigator.of(dialogContext).pop(),
+                    icon: const Icon(Icons.close),
+                  ),
+                ),
+                Expanded(
+                  child: RoleGroupPage(
+                    scope: scope,
+                    activeMenu: scope == 'customer' ? '10003' : '11003',
+                    embedded: true,
+                    onSelected: (group) =>
+                        Navigator.of(dialogContext).pop(group.id),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    final groups = await _roleGroupRepository.list(scope);
+    final roles = groups
+        .where((group) => group.isActive)
+        .map(
+          (group) => EmployeeRoleGroupOption(
+            id: group.id,
+            name: group.name,
+            selected: group.id == selectedId,
+          ),
+        )
+        .toList(growable: false);
+    if (mounted) setState(() => _roleGroups = roles);
+    return roles;
   }
 
   List<EmployeeMasterOption> _masterOptions(List values) => values
@@ -312,6 +579,13 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
           : EmployeeWorkspace(
               caption: _caption,
               repository: _repository,
+              organizationRepository: widget.customer && !widget.companyScoped
+                  ? null
+                  : _organizationRepository,
+              organizationCaption: _organizationCaption,
+              onOrganizationChanged: (units) {
+                if (mounted) setState(() => _organizationUnits = units);
+              },
               screenType: _contract.screenType,
               pageSize: companySetupController.pageSize,
               companies: _companies,
@@ -319,8 +593,20 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
               organizationMode: _organizationMode,
               customerScope: widget.customer && !widget.companyScoped,
               roleGroups: _roleGroups,
+              manageRoleGroups: _canManageRoleGroups ? _manageRoleGroups : null,
               carTypes: _carTypes,
               oilTypes: _oilTypes,
+              positions: _positions,
+              canChangeMasterData: _canChangeMasterData,
+              managePositions: _canOpenPositionLookup
+                  ? () => _manageMasterGroup(MasterGroupCodes.position)
+                  : null,
+              manageCarTypes: _canManageVehicleMaster
+                  ? () => _manageMasterGroup(MasterGroupCodes.carType)
+                  : null,
+              manageOilTypes: _canManageVehicleMaster
+                  ? () => _manageMasterGroup(MasterGroupCodes.oilType)
+                  : null,
               titleBuilder: (context, title, showFavorite) =>
                   WorkspacePageTitle(
                     title: title,
@@ -342,6 +628,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
               errorText: _errorText,
               confirmDelete: _confirmDelete,
               pickImage: _pickImage,
+              canShowEmployeeImages: _canShowEmployeeImages,
             ),
     ),
   );
@@ -376,6 +663,26 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
     radius: LaooRadius.xs,
     compactBreakpoint: 900,
     paginationHeight: LaooLayout.paginationCardHeight,
+    filterActionHeight: LaooLayout.filterActionHeight,
+    listViewToggleSize: LaooLayout.listViewToggleSize,
+    paginationButtonSize: LaooLayout.paginationButtonSize,
+    fieldSpacing: LaooLayout.popupFieldSpacing,
+    inputLabelStyle: TextStyle(
+      fontFamily: LaooTypography.fontFamily,
+      fontFamilyFallback: LaooTypography.fontFallback,
+      fontSize: LaooTypography.inputLabel,
+    ),
+    floatingLabelStyle: TextStyle(
+      fontFamily: LaooTypography.fontFamily,
+      fontFamilyFallback: LaooTypography.fontFallback,
+      fontSize: LaooTypography.materialFloatingLabelSource,
+    ),
+    sectionTitleStyle: TextStyle(
+      fontFamily: LaooTypography.fontFamily,
+      fontFamilyFallback: LaooTypography.fontFallback,
+      fontSize: LaooTypography.sectionTitle,
+      fontWeight: FontWeight.w700,
+    ),
     captionStyle: TextStyle(
       fontFamily: LaooTypography.fontFamily,
       fontFamilyFallback: LaooTypography.fontFallback,

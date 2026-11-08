@@ -1,10 +1,13 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:laoo_shared_admin_ui/laoo_shared_admin_ui.dart'
+    show FilterHeightSync, filterActionHeightStyle;
 import '../../../core/api/api_exception.dart';
 import '../../../core/widgets/combo_box_text.dart';
 import '../../../core/widgets/auto_dismiss_message.dart';
 
 import '../../../app/theme/laoo_typography.dart';
+import '../../../app/theme/laoo_design_tokens.dart';
 import '../../../app/theme/workspace_theme_presets.dart';
 import '../../../core/company_setup/company_setup_controller.dart';
 import '../../../core/navigation/navigation_menu_repository.dart';
@@ -149,50 +152,87 @@ class _PartnerCompanyFormPageState extends State<_PartnerCompanyFormPage> {
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
+            padding: EdgeInsets.all(
+              widget.support ? 24 : LaooLayout.cardMargin,
+            ),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: double.infinity),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  WorkspaceActionHeader(
-                    title:
-                        '${widget.menuName} > ${editing ? 'แก้ไข' : 'เพิ่ม'}',
-                    favoriteKey: 'company',
-                    actions: [
-                      OutlinedButton.icon(
-                        onPressed: _saving
-                            ? null
-                            : () => Navigator.pop(context),
-                        icon: const Icon(Icons.close),
-                        label: const Text('ยกเลิก'),
-                      ),
-                      FilledButton.icon(
-                        onPressed: _saving ? null : _save,
-                        icon: _saving
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(Icons.save_outlined),
-                        label: const Text('บันทึก'),
-                      ),
-                    ],
+                  Builder(
+                    builder: (context) {
+                      final header = WorkspaceActionHeader(
+                        title:
+                            '${widget.menuName} > ${editing ? 'แก้ไข' : 'เพิ่ม'}',
+                        favoriteKey: widget.support
+                            ? 'company'
+                            : 'partnerCompanies',
+                        actions: [
+                          OutlinedButton.icon(
+                            onPressed: _saving
+                                ? null
+                                : () => Navigator.pop(context),
+                            icon: const Icon(Icons.close),
+                            label: const Text('ยกเลิก'),
+                          ),
+                          FilledButton.icon(
+                            onPressed: _saving ? null : _save,
+                            icon: _saving
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(Icons.save_outlined),
+                            label: const Text('บันทึก'),
+                          ),
+                        ],
+                      );
+                      return widget.support
+                          ? header
+                          : WorkspaceSectionCard(child: header);
+                    },
                   ),
                   if (editing) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      'Partner: ${widget.existing?.partnerNameTh ?? '-'}',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.primary,
-                        fontWeight: FontWeight.w700,
+                    const SizedBox(height: LaooLayout.cardSpacing),
+                    WorkspaceSectionCard(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.business_outlined,
+                            color: workspaceThemeController.value.primary,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text.rich(
+                              TextSpan(
+                                children: [
+                                  TextSpan(
+                                    text: 'Partner: ',
+                                    style: TextStyle(
+                                      color: workspaceThemeController.value.primary,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  TextSpan(text: widget.existing?.partnerNameTh ?? '-'),
+                                ],
+                              ),
+                              style: TextStyle(
+                                color: workspaceThemeController.value.textPrimary,
+                                fontSize: LaooTypography.sectionTitle,
+                                height: LaooTypography.bodyLineHeight,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
-                  const SizedBox(height: 8),
+                  SizedBox(height: widget.support ? 8 : LaooLayout.cardSpacing),
                   if (_error != null) ...[
                     const SizedBox(height: 14),
                     MaterialBanner(
@@ -206,20 +246,41 @@ class _PartnerCompanyFormPageState extends State<_PartnerCompanyFormPage> {
                       ],
                     ),
                   ],
-                  const SizedBox(height: 8),
+                  if (widget.support) const SizedBox(height: 8),
                   Card(
+                    margin: widget.support ? null : EdgeInsets.zero,
+                    color: widget.support ? null : LaooColors.white,
+                    surfaceTintColor: widget.support
+                        ? null
+                        : Colors.transparent,
+                    elevation: widget.support ? null : 0,
+                    shape: widget.support
+                        ? null
+                        : RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(LaooRadius.xs),
+                            side: BorderSide.none,
+                          ),
                     child: Padding(
-                      padding: const EdgeInsets.all(20),
+                      padding: EdgeInsets.all(
+                        widget.support ? 20 : LaooLayout.cardPadding,
+                      ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Text('สถานะใช้งาน'),
+                              Text(
+                                'สถานะใช้งาน',
+                                style: TextStyle(
+                                  fontSize: LaooTypography.inputLabel,
+                                  color: workspaceThemeController.value.textPrimary,
+                                ),
+                              ),
                               const SizedBox(width: 8),
                               Switch.adaptive(
                                 value: _isActive,
+                                activeTrackColor: workspaceThemeController.value.primary,
                                 onChanged: (value) =>
                                     setState(() => _isActive = value),
                               ),
@@ -232,33 +293,41 @@ class _PartnerCompanyFormPageState extends State<_PartnerCompanyFormPage> {
                             required: true,
                           ),
                           if (!editing)
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  child: _formField(
-                                    _nameEn,
-                                    'ชื่อลูกค้า (ภาษาอังกฤษ)',
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: _formField(
-                                    _adminUsername,
-                                    'Username ผู้ดูแลระบบ *',
-                                    required: true,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: _formField(
-                                    _adminPassword,
-                                    'Password ผู้ดูแลระบบ *',
-                                    required: true,
-                                    obscureText: true,
-                                  ),
-                                ),
-                              ],
+                            LayoutBuilder(
+                              builder: (context, constraints) {
+                                final width = constraints.maxWidth < 700
+                                    ? constraints.maxWidth
+                                    : (constraints.maxWidth - 24) / 3;
+                                return Wrap(
+                                  spacing: 12,
+                                  children: [
+                                    SizedBox(
+                                      width: width,
+                                      child: _formField(
+                                        _nameEn,
+                                        'ชื่อลูกค้า (ภาษาอังกฤษ)',
+                                      ),
+                                    ),
+                                    SizedBox(
+                                      width: width,
+                                      child: _formField(
+                                        _adminUsername,
+                                        'Username ผู้ดูแลระบบ *',
+                                        required: true,
+                                      ),
+                                    ),
+                                    SizedBox(
+                                      width: width,
+                                      child: _formField(
+                                        _adminPassword,
+                                        'Password ผู้ดูแลระบบ *',
+                                        required: true,
+                                        obscureText: true,
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
                             )
                           else
                             _formField(_nameEn, 'ชื่อลูกค้า (ภาษาอังกฤษ)'),
@@ -295,30 +364,41 @@ class _PartnerCompanyFormPageState extends State<_PartnerCompanyFormPage> {
     int maxLines = 1,
     bool obscureText = false,
   }) {
+    final preset = workspaceThemeController.value;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.only(bottom: LaooLayout.popupFieldSpacing),
       child: TextFormField(
         controller: controller,
         keyboardType: keyboardType,
         maxLines: maxLines,
         obscureText: obscureText,
-        style: const TextStyle(
+        cursorColor: preset.primary,
+        style: TextStyle(
           fontFamily: LaooTypography.fontFamily,
+          fontFamilyFallback: LaooTypography.fontFallback,
           fontSize: LaooTypography.inputText,
+          height: LaooTypography.bodyLineHeight,
+          color: preset.textPrimary,
         ),
         decoration: InputDecoration(
           labelText: label,
-          labelStyle: const TextStyle(
+          labelStyle: TextStyle(
             fontFamily: LaooTypography.fontFamily,
-            fontSize: LaooTypography.inputHint,
-          ),
-          floatingLabelStyle: const TextStyle(
-            fontFamily: LaooTypography.fontFamily,
+            fontFamilyFallback: LaooTypography.fontFallback,
             fontSize: LaooTypography.inputLabel,
+            color: preset.textSecondary,
           ),
-          hintStyle: const TextStyle(
+          floatingLabelStyle: TextStyle(
             fontFamily: LaooTypography.fontFamily,
+            fontFamilyFallback: LaooTypography.fontFallback,
+            fontSize: LaooTypography.materialFloatingLabelSource,
+            color: preset.primary,
+          ),
+          hintStyle: TextStyle(
+            fontFamily: LaooTypography.fontFamily,
+            fontFamilyFallback: LaooTypography.fontFallback,
             fontSize: LaooTypography.inputHint,
+            color: preset.textSecondary,
           ),
         ),
         validator: required
@@ -339,6 +419,8 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
   List<Partner> _partners = const [];
   int? _partnerFilterId;
   String _statusFilter = 'ทั้งหมด';
+  String _partnerStatusDraft = 'ทั้งหมด';
+  bool _partnerCardMode = false;
   bool _loading = true;
   bool _canCreate = false;
   bool _canEdit = false;
@@ -638,6 +720,7 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.menuScope == WorkspaceMenuScope.partner) return _partnerPage();
     return SupportWorkspaceShell(
       menuScope: widget.menuScope,
       pageTitle: _menuName,
@@ -786,6 +869,543 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
                     onClose: () => setState(() => _message = null),
                   ),
                 ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _partnerSurface(Widget child) => Card(
+    margin: EdgeInsets.zero,
+    color: Colors.white,
+    elevation: 0,
+    surfaceTintColor: Colors.transparent,
+    clipBehavior: Clip.antiAlias,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(LaooRadius.xs),
+    ),
+    child: child,
+  );
+
+  void _partnerSearch() {
+    setState(() => _statusFilter = _partnerStatusDraft);
+    _load();
+  }
+
+  void _partnerClear() {
+    _search.clear();
+    setState(() {
+      _partnerStatusDraft = 'ทั้งหมด';
+      _statusFilter = 'ทั้งหมด';
+    });
+    _load();
+  }
+
+  Widget _partnerPage() {
+    _scheduleMessageDismiss();
+    return SupportWorkspaceShell(
+      menuScope: widget.menuScope,
+      pageTitle: _menuName,
+      activeMenu: _menuCode,
+      child: ValueListenableBuilder<WorkspaceThemePreset>(
+        valueListenable: workspaceThemeController,
+        builder: (context, preset, _) => LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxWidth < 1050;
+            final showCards = compact || _partnerCardMode;
+            final color = preset.primary;
+            final shape = RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(LaooRadius.xs),
+            );
+            return Padding(
+              padding: const EdgeInsets.all(LaooLayout.cardMargin),
+              child: Stack(
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _partnerSurface(
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: WorkspacePageTitle(
+                                  title: _menuName,
+                                  favoriteKey: 'partnerCompanies',
+                                ),
+                              ),
+                              if (!compact) ...[
+                                SizedBox(
+                                  width: LaooLayout.listViewToggleSize,
+                                  height: LaooLayout.listViewToggleSize,
+                                  child: IconButton(
+                                    tooltip: showCards
+                                        ? 'แสดงแบบตาราง'
+                                        : 'แสดงแบบการ์ด',
+                                    style: IconButton.styleFrom(
+                                      backgroundColor: color.withValues(
+                                        alpha: .1,
+                                      ),
+                                      foregroundColor: color,
+                                      shape: shape,
+                                    ),
+                                    onPressed: () => setState(
+                                      () =>
+                                          _partnerCardMode = !_partnerCardMode,
+                                    ),
+                                    icon: Icon(
+                                      showCards
+                                          ? Icons.view_list_outlined
+                                          : Icons.grid_view_outlined,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                              ],
+                              if (_canCreate)
+                                SizedBox(
+                                  height: LaooTypography.buttonHeight,
+                                  child: FilledButton.icon(
+                                    style: FilledButton.styleFrom(shape: shape),
+                                    onPressed: () => _openFullForm(),
+                                    icon: const Icon(Icons.add),
+                                    label: const Text('เพิ่มลูกค้า'),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      _partnerSurface(
+                        Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: LayoutBuilder(
+                            builder: (context, available) => FilterHeightSync(
+                              builder: (context, searchKey, height) => Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                children: [
+                                  SizedBox(
+                                    width: available.maxWidth < 330
+                                        ? available.maxWidth
+                                        : 330,
+                                    child: TextField(
+                                      key: searchKey,
+                                      controller: _search,
+                                      onSubmitted: (_) => _partnerSearch(),
+                                      decoration: const InputDecoration(
+                                        prefixIcon: Icon(Icons.search),
+                                        hintText: 'ค้นหาชื่อ และเบอร์โทรศัพท์',
+                                        isDense: true,
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(
+                                    height: height,
+                                    child: FilledButton.icon(
+                                      onPressed: _partnerSearch,
+                                      style: FilledButton.styleFrom(
+                                        shape: shape,
+                                      ).merge(filterActionHeightStyle(height)),
+                                      icon: const Icon(Icons.search),
+                                      label: const Text('ค้นหา'),
+                                    ),
+                                  ),
+                                  SizedBox(
+                                    height: height,
+                                    child: OutlinedButton.icon(
+                                      onPressed: _partnerClear,
+                                      style: OutlinedButton.styleFrom(
+                                        shape: shape,
+                                        foregroundColor: color,
+                                        side: BorderSide(color: color),
+                                      ).merge(filterActionHeightStyle(height)),
+                                      icon: const Icon(
+                                        Icons.filter_alt_off_outlined,
+                                      ),
+                                      label: const Text('ล้าง Filter'),
+                                    ),
+                                  ),
+                                  SizedBox(
+                                    width: available.maxWidth < 170
+                                        ? available.maxWidth
+                                        : 170,
+                                    child: DropdownButtonFormField<String>(
+                                      isExpanded: true,
+                                      initialValue: _partnerStatusDraft,
+                                      decoration: const InputDecoration(
+                                        labelText: 'สถานะ',
+                                      ),
+                                      items: const [
+                                        DropdownMenuItem(
+                                          value: 'ทั้งหมด',
+                                          child: LaooComboBoxText('ทั้งหมด'),
+                                        ),
+                                        DropdownMenuItem(
+                                          value: 'เปิดใช้งาน',
+                                          child: LaooComboBoxText('เปิดใช้งาน'),
+                                        ),
+                                        DropdownMenuItem(
+                                          value: 'ปิดใช้งาน',
+                                          child: LaooComboBoxText('ปิดใช้งาน'),
+                                        ),
+                                      ],
+                                      onChanged: (value) => setState(
+                                        () => _partnerStatusDraft =
+                                            value ?? 'ทั้งหมด',
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Expanded(
+                        child: _loading
+                            ? _partnerSurface(
+                                const Center(
+                                  child: CircularProgressIndicator(),
+                                ),
+                              )
+                            : _error != null
+                            ? _partnerSurface(
+                                Center(
+                                  child: Text(
+                                    'ไม่สามารถโหลดข้อมูลลูกค้าได้\nรายละเอียดเพิ่มเติม: กรุณาตรวจสอบการเชื่อมต่อและลองใหม่',
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              )
+                            : _filteredItems.isEmpty
+                            ? _partnerSurface(
+                                const Center(child: Text('ไม่พบข้อมูลลูกค้า')),
+                              )
+                            : showCards
+                            ? _partnerCards()
+                            : _partnerTable(),
+                      ),
+                      const SizedBox(height: 8),
+                      _partnerPagination(),
+                    ],
+                  ),
+                  if (_message != null)
+                    Positioned(
+                      top: 0,
+                      right: 0,
+                      child: AutoDismissMessage(
+                        key: ValueKey(_message),
+                        message: _message!,
+                        error: false,
+                        onClose: () => setState(() => _message = null),
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _partnerActions(PartnerCompany item) {
+    final primary = workspaceThemeController.value.primary;
+    final error = LaooColors.error;
+    Widget action(
+      String tooltip,
+      IconData icon,
+      Color iconColor,
+      VoidCallback onPressed,
+    ) => SizedBox(
+      width: 34,
+      height: 40,
+      child: IconButton(
+        tooltip: tooltip,
+        padding: EdgeInsets.zero,
+        visualDensity: VisualDensity.compact,
+        onPressed: onPressed,
+        icon: Icon(icon, color: iconColor, size: 20),
+      ),
+    );
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (_canEdit)
+          action(
+            'ระบบที่เปิดใช้',
+            Icons.apps_outlined,
+            primary,
+            () => _openModules(item),
+          ),
+        if (_canEdit)
+          action(
+            'กำหนดผู้ดูแลระบบ',
+            Icons.admin_panel_settings_outlined,
+            primary,
+            () => _openAdminCredentials(item),
+          ),
+        if (_canEdit)
+          action(
+            'แก้ไข',
+            Icons.edit_outlined,
+            primary,
+            () => _openFullForm(existing: item),
+          ),
+        if (_canDelete)
+          action('ลบ', Icons.delete_outline, error, () => _confirmDelete(item)),
+      ],
+    );
+  }
+
+  Widget _partnerStatus(PartnerCompany item) {
+    final color = item.isActive
+        ? workspaceThemeController.value.primary
+        : LaooColors.error;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: .12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        item.isActive ? 'เปิดใช้งาน' : 'ปิดใช้งาน',
+        maxLines: 1,
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.w700,
+          fontSize: LaooTypography.tableBody,
+        ),
+      ),
+    );
+  }
+
+  Widget _partnerTable() {
+    final preset = workspaceThemeController.value;
+    final accent = preset.primary;
+    const flex = <int>[45, 180, 260, 120, 190, 150, 125];
+    Widget line(List<Widget> cells, {bool header = false}) => Container(
+      height: 56,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        color: header ? accent.withValues(alpha: .12) : Colors.white,
+        border: Border(bottom: BorderSide(color: preset.border, width: .6)),
+      ),
+      child: Row(
+        children: [
+          for (var i = 0; i < cells.length; i++)
+            Expanded(flex: flex[i], child: cells[i]),
+        ],
+      ),
+    );
+    Widget value(String text) => Text(
+      text,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        fontSize: LaooTypography.tableBody,
+        color: preset.textPrimary,
+      ),
+    );
+    Widget header(
+      String text, {
+      int? index,
+      Comparable Function(PartnerCompany)? selector,
+    }) {
+      final label = Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Flexible(
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: accent,
+                fontSize: LaooTypography.tableHeader,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          if (index != null && _sortColumnIndex == index)
+            Icon(
+              _sortAscending ? Icons.arrow_upward : Icons.arrow_downward,
+              size: 16,
+              color: accent,
+            ),
+        ],
+      );
+      return index == null || selector == null
+          ? label
+          : InkWell(
+              onTap: () => _sortBy(
+                index,
+                selector,
+                _sortColumnIndex == index ? !_sortAscending : true,
+              ),
+              child: label,
+            );
+    }
+
+    return _partnerSurface(
+      Column(
+        children: [
+          line([
+            header('ID'),
+            header('Action'),
+            header('ชื่อลูกค้า', index: 2, selector: (p) => p.companyNameTh),
+            header('เลขผู้เสียภาษี', index: 3, selector: (p) => p.taxId ?? ''),
+            header('Email', index: 4, selector: (p) => p.email ?? ''),
+            header('โทรศัพท์', index: 5, selector: (p) => p.telephone ?? ''),
+            header('สถานะ', index: 6, selector: (p) => p.isActive ? 1 : 0),
+          ], header: true),
+          Expanded(
+            child: ListView.builder(
+              itemCount: _visibleItems.length,
+              itemBuilder: (context, index) {
+                final item = _visibleItems[index];
+                return line([
+                  value('${_currentPage * _pageSize + index + 1}'),
+                  _partnerActions(item),
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      value(item.companyNameTh),
+                      if ((item.adminUsername ?? '').trim().isNotEmpty)
+                        Text(
+                          'Admin: ${item.adminUsername}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: accent,
+                            fontSize: LaooTypography.bodySmall,
+                          ),
+                        ),
+                    ],
+                  ),
+                  value(item.taxId ?? '-'),
+                  value(item.email ?? '-'),
+                  value(item.telephone ?? '-'),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: _partnerStatus(item),
+                  ),
+                ]);
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _partnerCards() => ListView.separated(
+    itemCount: _visibleItems.length,
+    separatorBuilder: (_, _) => const SizedBox(height: 8),
+    itemBuilder: (context, index) {
+      final item = _visibleItems[index];
+      final primary = workspaceThemeController.value.primary;
+      return _partnerSurface(
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text(
+                    item.companyNameTh,
+                    style: TextStyle(
+                      color: primary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: LaooTypography.tableBody,
+                    ),
+                  ),
+                  _partnerStatus(item),
+                  _partnerActions(item),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text('Admin: ${item.adminUsername ?? '-'}'),
+              Text('เลขผู้เสียภาษี: ${item.taxId ?? '-'}'),
+              Text('Email: ${item.email ?? '-'}'),
+              Text('โทรศัพท์: ${item.telephone ?? '-'}'),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+
+  Widget _partnerPagination() {
+    final page = _currentPage.clamp(0, _pageCount - 1);
+    final total = _filteredItems.length;
+    final first = total == 0 ? 0 : page * _pageSize + 1;
+    final last = total == 0 ? 0 : ((page + 1) * _pageSize).clamp(0, total);
+    final preset = workspaceThemeController.value;
+    final accent = preset.primary;
+    final selectedText = preset.toThemeData().colorScheme.onPrimary;
+    Widget button(
+      Widget child,
+      VoidCallback? onPressed, {
+      bool selected = false,
+    }) => SizedBox(
+      width: LaooLayout.paginationButtonSize,
+      height: LaooLayout.paginationButtonSize,
+      child: FilledButton(
+        onPressed: onPressed,
+        style: FilledButton.styleFrom(
+          padding: EdgeInsets.zero,
+          backgroundColor: accent,
+          disabledBackgroundColor: selected ? accent : Colors.grey.shade300,
+          disabledForegroundColor: selected
+              ? selectedText
+              : Colors.grey.shade700,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(LaooRadius.xs),
+          ),
+        ),
+        child: child,
+      ),
+    );
+    return _partnerSurface(
+      SizedBox(
+        height: LaooLayout.paginationCardHeight,
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(
+            horizontal: LaooLayout.cardPadding,
+          ),
+          child: Row(
+            children: [
+              button(
+                const Icon(Icons.chevron_left, size: 22),
+                page > 0 ? () => setState(() => _currentPage = page - 1) : null,
+              ),
+              const SizedBox(width: 6),
+              button(Text('${page + 1}'), null, selected: true),
+              const SizedBox(width: 6),
+              button(
+                const Icon(Icons.chevron_right, size: 22),
+                page + 1 < _pageCount
+                    ? () => setState(() => _currentPage = page + 1)
+                    : null,
+              ),
+              const SizedBox(width: 12),
+              Text('$first-$last จาก $total'),
             ],
           ),
         ),
@@ -1257,130 +1877,197 @@ class _PartnerCompanyPageState extends State<PartnerCompanyPage> {
     try {
       final saved = await showDialog<bool>(
         context: context,
+        barrierDismissible: false,
         builder: (dialogContext) {
-          final primary = workspaceThemeController.value.primary;
+          final preset = workspaceThemeController.value;
+          final primary = preset.primary;
           String? dialogError;
+          bool saving = false;
           return StatefulBuilder(
-            builder: (context, setDialogState) => AlertDialog(
-              backgroundColor: Colors.white,
-              surfaceTintColor: Colors.transparent,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
-              ),
-              titlePadding: EdgeInsets.zero,
-              contentPadding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
-              actionsPadding: const EdgeInsets.fromLTRB(24, 8, 24, 18),
-              title: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
-                decoration: BoxDecoration(
-                  color: primary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            builder: (context, setDialogState) => Theme(
+              data: preset.toThemeData(),
+              child: Dialog(
+                backgroundColor: Colors.white,
+                surfaceTintColor: Colors.transparent,
+                insetPadding: const EdgeInsets.all(
+                  LaooLayout.dialogInsetPadding,
                 ),
-                child: Text(
-                  'กำหนดผู้ดูแลระบบ - ${item.companyNameTh}',
-                  style: TextStyle(
-                    color: primary,
-                    fontSize: LaooTypography.sectionTitle,
-                    fontWeight: FontWeight.w700,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(LaooRadius.xs),
+                ),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: 480,
+                    maxHeight: MediaQuery.sizeOf(context).height - 48,
                   ),
-                ),
-              ),
-              content: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Form(
-                    key: formKey,
+                  child: Padding(
+                    padding: const EdgeInsets.all(10),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Divider(
-                          color: primary.withValues(alpha: 0.25),
-                          height: 1,
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.manage_accounts_outlined,
+                              color: primary,
+                              size: 24,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'กำหนดผู้ดูแลระบบ - ${item.companyNameTh}',
+                                style: TextStyle(
+                                  color: LaooColors.pageCaption,
+                                  fontSize: LaooTypography.workspaceCaption,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        const Divider(height: 1, color: LaooColors.border),
+                        const SizedBox(height: 12),
+                        Flexible(
+                          child: SingleChildScrollView(
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                Form(
+                                  key: formKey,
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      TextFormField(
+                                        controller: username,
+                                        style: const TextStyle(
+                                          fontSize: LaooTypography.inputText,
+                                        ),
+                                        decoration: const InputDecoration(
+                                          labelText: 'Username *',
+                                          border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.all(
+                                              Radius.circular(LaooRadius.xs),
+                                            ),
+                                          ),
+                                        ),
+                                        validator: (v) => v!.trim().isEmpty
+                                            ? 'กรุณาระบุ Username'
+                                            : null,
+                                      ),
+                                      const SizedBox(height: 14),
+                                      TextFormField(
+                                        controller: password,
+                                        obscureText: true,
+                                        style: const TextStyle(
+                                          fontSize: LaooTypography.inputText,
+                                        ),
+                                        decoration: const InputDecoration(
+                                          labelText: 'Password *',
+                                          border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.all(
+                                              Radius.circular(LaooRadius.xs),
+                                            ),
+                                          ),
+                                        ),
+                                        validator: (v) => v!.isEmpty
+                                            ? 'กรุณาระบุ Password'
+                                            : null,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (dialogError != null)
+                                  Positioned(
+                                    top: -10,
+                                    right: -8,
+                                    child: AutoDismissMessage(
+                                      key: ValueKey(dialogError),
+                                      message: dialogError!,
+                                      error: true,
+                                      onClose: () => setDialogState(
+                                        () => dialogError = null,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
                         ),
                         const SizedBox(height: 12),
-                        TextFormField(
-                          controller: username,
-                          decoration: const InputDecoration(
-                            labelText: 'Username *',
-                          ),
-                          validator: (v) =>
-                              v!.trim().isEmpty ? 'กรุณาระบุ Username' : null,
-                        ),
-                        const SizedBox(height: 8),
-                        TextFormField(
-                          controller: password,
-                          obscureText: true,
-                          decoration: const InputDecoration(
-                            labelText: 'Password *',
-                          ),
-                          validator: (v) =>
-                              v!.isEmpty ? 'กรุณาระบุ Password' : null,
+                        const Divider(height: 1, color: LaooColors.border),
+                        const SizedBox(height: 12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            OutlinedButton.icon(
+                              onPressed: saving
+                                  ? null
+                                  : () => Navigator.pop(dialogContext, false),
+                              icon: const Icon(Icons.close),
+                              label: Text(
+                                'ยกเลิก',
+                                style: TextStyle(color: primary),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            FilledButton.icon(
+                              style: FilledButton.styleFrom(
+                                backgroundColor: primary,
+                                foregroundColor: Colors.white,
+                              ),
+                              onPressed: saving
+                                  ? null
+                                  : () async {
+                                      if (!formKey.currentState!.validate()) {
+                                        return;
+                                      }
+                                      setDialogState(() {
+                                        saving = true;
+                                        dialogError = null;
+                                      });
+                                      try {
+                                        await _repository.updateAdmin(
+                                          item.companyId,
+                                          username.text.trim(),
+                                          password.text,
+                                        );
+                                        if (dialogContext.mounted) {
+                                          Navigator.pop(dialogContext, true);
+                                        }
+                                      } on ApiException catch (error) {
+                                        if (dialogContext.mounted) {
+                                          setDialogState(
+                                            () => dialogError =
+                                                error.message.trim().isEmpty
+                                                ? 'บันทึกไม่สำเร็จ กรุณาตรวจสอบข้อมูลอีกครั้ง'
+                                                : error.message,
+                                          );
+                                        }
+                                      } catch (_) {
+                                        if (dialogContext.mounted) {
+                                          setDialogState(
+                                            () => dialogError =
+                                                'บันทึกไม่สำเร็จ กรุณาตรวจสอบข้อมูลอีกครั้ง',
+                                          );
+                                        }
+                                      } finally {
+                                        if (dialogContext.mounted) {
+                                          setDialogState(() => saving = false);
+                                        }
+                                      }
+                                    },
+                              icon: const Icon(Icons.save_outlined),
+                              label: const Text('บันทึก'),
+                            ),
+                          ],
                         ),
                       ],
                     ),
                   ),
-                  if (dialogError != null)
-                    Positioned(
-                      top: -10,
-                      right: -8,
-                      child: AutoDismissMessage(
-                        key: ValueKey(dialogError),
-                        message: dialogError!,
-                        error: true,
-                        onClose: () => setDialogState(() => dialogError = null),
-                      ),
-                    ),
-                ],
-              ),
-              actions: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    OutlinedButton.icon(
-                      onPressed: () => Navigator.pop(dialogContext, false),
-                      icon: const Icon(Icons.close),
-                      label: Text('ยกเลิก', style: TextStyle(color: primary)),
-                    ),
-                    const SizedBox(width: 10),
-                    FilledButton(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: primary,
-                        foregroundColor: Colors.white,
-                      ),
-                      onPressed: () async {
-                        if (!formKey.currentState!.validate()) return;
-                        try {
-                          await _repository.updateAdmin(
-                            item.companyId,
-                            username.text.trim(),
-                            password.text,
-                          );
-                          if (dialogContext.mounted) {
-                            Navigator.pop(dialogContext, true);
-                          }
-                        } on ApiException catch (error) {
-                          if (dialogContext.mounted) {
-                            setDialogState(
-                              () => dialogError = error.message.trim().isEmpty
-                                  ? 'บันทึกไม่สำเร็จ กรุณาตรวจสอบข้อมูลอีกครั้ง'
-                                  : error.message,
-                            );
-                          }
-                        } catch (_) {
-                          if (dialogContext.mounted) {
-                            setDialogState(
-                              () => dialogError =
-                                  'บันทึกไม่สำเร็จ กรุณาตรวจสอบข้อมูลอีกครั้ง',
-                            );
-                          }
-                        }
-                      },
-                      child: const Text('บันทึก'),
-                    ),
-                  ],
                 ),
-              ],
+              ),
             ),
           );
         },

@@ -8,7 +8,7 @@ using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 
 var root = Path.GetFullPath(args.FirstOrDefault() ?? ".");
-var config = new ConfigurationBuilder().AddJsonFile(Path.Combine(root, "laoo_api/local.json")).Build();
+var config = new ConfigurationBuilder().AddJsonFile(Path.Combine(root, "laoo_api/local.json")).AddEnvironmentVariables().Build();
 await using var connection = new SqlConnection(config.GetConnectionString("LaooDatabase"));
 await connection.OpenAsync();
 
@@ -55,6 +55,8 @@ var partnerController = new PartnerProjectSubscriptionController(config)
 };
 if (await partnerController.Get(company, default) is not ContentResult { StatusCode: 200 })
     throw new Exception("Partner cannot read own Company subscriptions.");
+if (await partnerController.Clear(company, coreProject, default) is not BadRequestObjectResult)
+    throw new Exception("Clearing the core project must be rejected.");
 
 await using (var crossCommand = new SqlCommand(
     "SELECT TOP(1) CompanyID FROM dbo.TDSTCompanySetUp WHERE IsActive=1 AND PartnerID<>@Partner AND CompanyID IS NOT NULL", connection))
@@ -64,6 +66,9 @@ await using (var crossCommand = new SqlCommand(
     if (crossCompany is not null &&
         await partnerController.Get(Convert.ToInt64(crossCompany), default) is not NotFoundObjectResult)
         throw new Exception("Partner can read a Company owned by another Partner.");
+    if (crossCompany is not null &&
+        await partnerController.Clear(Convert.ToInt64(crossCompany), coreProject, default) is not NotFoundObjectResult)
+        throw new Exception("Partner can clear another Partner's Company subscription.");
 }
 
 const string mismatchSql = """
@@ -123,6 +128,24 @@ await using (var flowCommand = new SqlCommand(flowFixtureSql, connection))
         await ExpectSaved(partnerController, company, project, lowPackage, "EXPIRED", today, today, runId);
         await ExpectSaved(partnerController, company, project, lowPackage, "SUSPENDED", today, future, runId);
         await ExpectSaved(partnerController, company, project, lowPackage, "CANCELLED", today, future, runId);
+        if (await partnerController.Clear(company, project, default) is not NoContentResult)
+            throw new Exception("Clearing the package failed.");
+        await using (var cleared = new SqlCommand("""
+SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM dbo.TDADCompanyProjectSubscription WHERE CompanyID=@Company AND ProjectID=@Project AND IsCurrent=1)
+ AND NOT EXISTS(SELECT 1 FROM dbo.TDADCompanyProject WHERE CompanyID=@Company AND ProjectID=@Project AND IsEnabled=1)
+ AND EXISTS(SELECT 1 FROM dbo.TDADCompanyProjectSubscriptionAudit WHERE CompanyID=@Company AND ProjectID=@Project AND ActionCode=N'CANCEL' AND AfterJson=N'{"packageId":null}')
+ THEN 1 ELSE 0 END;
+""", connection))
+        {
+            cleared.Parameters.AddWithValue("@Company", company);
+            cleared.Parameters.AddWithValue("@Project", project);
+            if (Convert.ToInt32(await cleared.ExecuteScalarAsync()) != 1)
+                throw new Exception("Clearing did not remove the current subscription, disable access and retain audit history.");
+        }
+        var afterClearAudit = await AuditCount(connection, company, project);
+        if (await partnerController.Clear(company, project, default) is not NoContentResult ||
+            await AuditCount(connection, company, project) != afterClearAudit)
+            throw new Exception("Repeated clearing must be idempotent.");
     }
     finally
     {

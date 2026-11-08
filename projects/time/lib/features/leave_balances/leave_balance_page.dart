@@ -93,8 +93,9 @@ class _LeaveBalancePageState extends State<LeaveBalancePage> {
       if (!widget.mine) {
         if (_branchId != null) query['branchId'] = '$_branchId';
         if (_divisionId != null) query['divisionOrgUnitId'] = '$_divisionId';
-        if (_departmentId != null)
+        if (_departmentId != null) {
           query['departmentOrgUnitId'] = '$_departmentId';
+        }
         if (_employeeId != null) query['employeeId'] = '$_employeeId';
       }
       if (_leaveTypeId != null) query['leaveTypeId'] = '$_leaveTypeId';
@@ -141,11 +142,12 @@ class _LeaveBalancePageState extends State<LeaveBalancePage> {
       final result = Map<String, dynamic>.from(
         await _api.post('/api/time/leave-balances/generate', body: {}) as Map,
       );
-      if (mounted)
+      if (mounted) {
         setState(
           () => _message =
               'ประมวลผลสิทธิ์สำเร็จ ${result['generatedCount']} รายการ',
         );
+      }
       await _load(page: _page);
     } catch (error) {
       if (mounted) setState(() => _message = timeErrorText(error));

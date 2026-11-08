@@ -11,6 +11,8 @@ public static class MasterConstCodes
     public const string CustomerTaxType = "004";
     /// Receipt payment methods in TDSTMasterCont (cash, transfer, cheque, card).
     public const string ReceiptPaymentMethod = "005";
+    public const string ServiceRequestPriority = "006";
+    public const string ServiceRequestChannel = "007";
 
     public const string ConstRunCus = "ConstRunCus";
     public const string ConstRunItem = "ConstRunItem";

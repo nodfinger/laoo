@@ -10,6 +10,7 @@
 
 ## ScreenType 1: Required Popup Action Style
 
+- ใช้ Popup `รหัสพื้นฐาน > จังหวัด > เพิ่ม` เป็นภาพอ้างอิงกลางสำหรับ Layout และระยะ ตามหัวข้อ `ต้นแบบ Popup Action ส่วนกลาง` ใน `POPUP_UI_STANDARD.md`; ให้ยึดข้อกำหนด Header/Scrollable Content/Footer และ Permission ตามเอกสารมาตรฐาน ไม่คัดลอก Field หรือ Business Logic ของต้นแบบ
 - หน้า Add/Edit/View ของ CRUD (`ScreenType = 1`) ต้องเปิดเป็น Popup Action Form เหนือหน้า List; ห้ามเปลี่ยนไปเป็นหน้าเต็ม Content Area เว้นแต่พ่ออนุมัติหน้าจอนั้นโดยตรง
 - พื้นผิวกรอบหน้า Action, Header Card และ Form Card เป็นสีขาว ขอบมุมโค้ง `LaooRadius.xs` (`4px`); พื้นที่ Workspace รอบนอกยังใช้ Theme กลาง
 - Caption เป็นสีดำตาม `LaooColors.pageCaption` และมี Icon ด้านหน้าใช้สี Primary ของ User ที่ Login
@@ -26,6 +27,7 @@
 - งาน Form หลาย Field ของ `ScreenType = 1` อยู่ใน Popup เดียว ไม่สร้าง Shell หรือ Route ใหม่; Popup ต้องแบ่งเป็น Header, Scrollable Content และ Footer โดยเลื่อนเฉพาะ Content เมื่อพื้นที่ไม่พอ ห้ามให้ Footer บัง Field หรือ ComboBox ด้านล่าง
 - ตรวจ ActionCode, Flow และปลายทางหลัง Save/Cancel จาก Feature Specification ก่อนแก้ไข
 - ปุ่มและความสามารถต้องแสดงตาม ScreenType และ Permission
+- ComboBox ที่รองรับการจัดการ แต่ผู้ Login ไม่มีสิทธิ์เพิ่ม แก้ไข หรือลบและมีสิทธิ์ค้นหา/อ่าน ให้ใช้ Icon ค้นหาภายในช่องเปิด Popup ค้นหาแบบง่ายตาม `POPUP_UI_STANDARD.md`; หากมีสิทธิ์จัดการให้แสดง Action ตามสิทธิ์จริง
 
 ## Header Card
 
@@ -40,13 +42,13 @@
 ## Form Card
 
 - Form อยู่บนพื้นสีขาวภายใน Popup มุมโค้ง `LaooRadius.xs` (`4px`) เต็มความกว้างและใช้เส้น `LaooColors.border` สีเทาจางคั่น Header/Content/Footer; Popup ทั่วไปไม่มีเส้นกรอบรอบนอก
-- Padding ใช้ `LaooLayout.cardPadding`; ระยะห่างระหว่างแถว Field ใช้ `LaooLayout.popupFieldSpacing` (`16px`)
+- Padding ใช้ `LaooLayout.cardPadding`; ระยะห่างระหว่างแถว Field ใช้ `LaooLayout.popupFieldSpacing` (`14px`)
 - หัวข้อย่อยเป็นสีดำ ส่วน Icon ของหัวข้อใช้ Primary ตาม User Style
 - ช่อง `สถานะ` อยู่บนสุดก่อน Field อื่น และข้อความกับ Switch อยู่ติดกัน
 - TextBox/ComboBox ทุกช่องใช้ `OutlineInputBorder` ตาม Required Action Style ด้านบน ไม่ใช้เพียงเส้นใต้
 - Field ในแถวเดียวกันต้องกว้างสมดุล; เมื่อหน้าจอแคบให้ย้ายลงบรรทัดใหม่โดยไม่ Overflow
 - Field บังคับมี `*`; เมื่อข้อมูลว่างหรือไม่ถูกต้องให้แสดงข้อความ Validation สีแดงใต้ Field ห้ามใช้ Alert กลางจอแทน Field Validation
-- Label และ Focus Border ใช้ Primary ตาม User Style
+- Floating Label เมื่อช่องมีข้อมูลหรือ Focus และ Focus Border ใช้ Primary ตาม User Style; ข้อความข้อมูลใช้ Semantic Text Color ของ Theme ผู้ Login และ Error/Disabled ใช้สีตามสถานะ
 
 ## Buttons and Result
 
@@ -57,5 +59,5 @@
 ## Prompt สำหรับส่งให้ AI
 
 ```text
-ปรับหน้า Action ของ ScreenType = 1 เป็น Popup สีขาว แบ่ง Panel เมื่อมีหลาย Field ตาม ACTION_UI_STANDARD.md และ POPUP_UI_STANDARD.md Caption เป็น {MenuName} > {Action} สีดำ 18px Icon ตาม User Style ปุ่มยกเลิก/บันทึกอยู่ด้านล่างขวาชุดเดียว Font ปุ่ม 13px สูง 48px ช่องกรอก 14px TextBox/ComboBox ต้องมีกรอบเทาจางแบบ Outline และมุมโค้ง 4px ทุกสถานะ สี Focus/Icon/Selection/Action อ่านจาก User Profile Theme ปุ่มมุมโค้ง 4px ระยะระหว่างแถว 16px ตรวจ Responsive, Overflow, dart format และ dart analyze ไม่เปลี่ยน Business Logic เว้นแต่ได้รับคำสั่ง
+ปรับหน้า Action ของ ScreenType = 1 เป็น Popup สีขาว แบ่ง Panel เมื่อมีหลาย Field ตาม ACTION_UI_STANDARD.md และ POPUP_UI_STANDARD.md Caption เป็น {MenuName} > {Action} สีดำ 18px Icon ตาม User Style ปุ่มยกเลิก/บันทึกอยู่ด้านล่างขวาชุดเดียว Font ปุ่ม 13px สูง 48px ข้อความ TextBox 16px และ ComboBox 14px TextBox/ComboBox ต้องมีกรอบเทาจางแบบ Outline และมุมโค้ง 4px ทุกสถานะ สี Focus/Icon/Selection/Action อ่านจาก User Profile Theme ปุ่มมุมโค้ง 4px ระยะระหว่างแถว 14px ตรวจ Responsive, Overflow, dart format และ dart analyze ไม่เปลี่ยน Business Logic เว้นแต่ได้รับคำสั่ง
 ```

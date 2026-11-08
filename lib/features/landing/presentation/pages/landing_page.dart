@@ -45,7 +45,7 @@ class _LandingPageState extends State<LandingPage> {
         api.get('/api/public/providers/locations', authenticated: false),
         api.get('/api/public/providers', authenticated: false),
       ]);
-      if (mounted)
+      if (mounted) {
         setState(() {
           services = _rows(r[0]);
           provinces = _rows(r[1]);
@@ -54,12 +54,14 @@ class _LandingPageState extends State<LandingPage> {
               : [];
           loading = false;
         });
+      }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           error = 'โหลดข้อมูลผู้ให้บริการไม่สำเร็จ';
           loading = false;
         });
+      }
     }
   }
 
@@ -84,17 +86,19 @@ class _LandingPageState extends State<LandingPage> {
       final r = _map(
         await api.get('/api/public/providers', query: q, authenticated: false),
       );
-      if (mounted)
+      if (mounted) {
         setState(() {
           providers = _rows(r['items']);
           loading = false;
         });
+      }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           error = 'ค้นหาไม่สำเร็จ';
           loading = false;
         });
+      }
     }
   }
 
@@ -102,19 +106,22 @@ class _LandingPageState extends State<LandingPage> {
     setState(() => gpsLoading = true);
     try {
       var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied)
+      if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
+      }
       if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever)
+          permission == LocationPermission.deniedForever) {
         throw Exception();
+      }
       final p = await Geolocator.getCurrentPosition();
       await find(lat: p.latitude, lng: p.longitude);
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(
           () => error =
               'ไม่สามารถใช้ตำแหน่งปัจจุบันได้ กรุณาอนุญาต GPS หรือเลือกพื้นที่เอง',
         );
+      }
     } finally {
       if (mounted) setState(() => gpsLoading = false);
     }
@@ -336,7 +343,7 @@ class _LandingPageState extends State<LandingPage> {
                   : ListView.separated(
                       scrollDirection: Axis.horizontal,
                       itemCount: services.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 10),
+                      separatorBuilder: (_, _) => const SizedBox(width: 10),
                       itemBuilder: (_, i) {
                         final s = services[i],
                             selected = service == (s['id'] as num).toInt();
@@ -384,7 +391,7 @@ class _LandingPageState extends State<LandingPage> {
                                           '/api/public/providers/service-types/${s['id']}/cover',
                                           width: double.infinity,
                                           fit: BoxFit.cover,
-                                          errorBuilder: (_, __, ___) =>
+                                          errorBuilder: (_, _, _) =>
                                               const Icon(
                                                 Icons.broken_image_outlined,
                                               ),
@@ -536,7 +543,7 @@ class _LandingPageState extends State<LandingPage> {
     shape: _shape,
     clipBehavior: Clip.antiAlias,
     child: InkWell(
-      onTap: () => context.go('/providers/' + p['slug'].toString()),
+      onTap: () => context.go('/providers/${p['slug']}'),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -563,7 +570,7 @@ class _LandingPageState extends State<LandingPage> {
                           width: 52,
                           height: 52,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => const Icon(
+                          errorBuilder: (_, _, _) => const Icon(
                             Icons.business_outlined,
                             color: LaooColors.green,
                           ),
@@ -610,16 +617,12 @@ class _LandingPageState extends State<LandingPage> {
               children: [
                 const Icon(Icons.star, color: Colors.amber, size: 20),
                 Text(
-                  ' ' +
-                      p['averageRating'].toString() +
-                      ' (' +
-                      p['reviewCount'].toString() +
-                      ')',
+                  ' ${p['averageRating']} (${p['reviewCount']})',
                 ),
                 const Spacer(),
                 if (p['distanceKm'] != null)
                   Text(
-                    p['distanceKm'].toString() + ' กม.',
+                    '${p['distanceKm']} กม.',
                     style: const TextStyle(fontWeight: FontWeight.w700),
                   )
                 else

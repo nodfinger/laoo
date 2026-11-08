@@ -1,8 +1,10 @@
 import '../../../../core/api/api_client.dart';
 
 class MasterDataApi {
-  MasterDataApi({ApiClient? apiClient}) : _api = apiClient ?? ApiClient();
+  MasterDataApi({ApiClient? apiClient, this.lookup})
+    : _api = apiClient ?? ApiClient();
   final ApiClient _api;
+  final String? lookup;
 
   Future<Map<String, bool>> actions() async {
     final data = await _api.get('/api/support/master-data/actions');
@@ -16,7 +18,11 @@ class MasterDataApi {
 
   Future<List<Map<String, dynamic>>> groups() async =>
       List<Map<String, dynamic>>.from(
-        await _api.get('/api/support/master-data/groups') as List,
+        await _api.get(
+              '/api/support/master-data/groups',
+              query: {'lookup': ?lookup},
+            )
+            as List,
       );
   Future<List<Map<String, dynamic>>> list(
     String groupCode, {
@@ -26,6 +32,7 @@ class MasterDataApi {
           '/api/support/master-data',
           query: {
             'groupCode': groupCode,
+            'lookup': ?lookup,
             if (search != null && search.isNotEmpty) 'search': search,
           },
         )

@@ -7,6 +7,7 @@ import '../company/person/pages/service_person_page.dart';
 import '../service_request/pages/service_request_page.dart';
 import '../service_request_qr/pages/service_request_qr_page.dart';
 import '../service_settings/pages/service_settings_page.dart';
+import '../service_request_subject/pages/service_request_subject_page.dart';
 import '../job_dispatch/pages/job_dispatch_page.dart';
 import '../job_work_orders/pages/job_work_orders_page.dart';
 import '../pm/pages/pm_pages.dart';
@@ -131,6 +132,7 @@ List<GoRoute> buildServiceFeatureRoutes({
     ),
   ),
   _page('18001', (state) => const ServiceSettingsPage()),
+  _page('18002', (state) => const ServiceRequestSubjectPage()),
   _page('17001', (state) => const JobDispatchPage()),
   _page(
     '17002',

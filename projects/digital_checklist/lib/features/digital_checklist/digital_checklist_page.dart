@@ -1570,7 +1570,7 @@ class _DigitalChecklistPageState extends State<DigitalChecklistPage> {
               onPressed: () => Navigator.pop(ctx, {
                 'code': code.text.trim(),
                 'name': name.text.trim(),
-                if (departmentId != null) 'departmentId': departmentId,
+                'departmentId': ?departmentId,
               }),
               child: const Text('บันทึก'),
             ),

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:laoo_shared_admin_ui/laoo_shared_admin_ui.dart'
+    show FilterHeightSync, filterActionHeightStyle;
 
 import '../../../../app/theme/laoo_design_tokens.dart';
 import '../../../../app/theme/laoo_typography.dart';
@@ -252,16 +254,29 @@ class _ServicePersonWorkspaceState extends State<ServicePersonWorkspace> {
                       ),
                     ),
                     if (!compact)
-                      IconButton(
-                        tooltip: 'สลับ Card/List',
-                        color: _primary,
-                        onPressed: () => setState(() => _cards = !_cards),
-                        icon: Icon(
-                          _cards
-                              ? Icons.view_list_outlined
-                              : Icons.grid_view_outlined,
+                      SizedBox.square(
+                        dimension: LaooTypography.buttonHeight,
+                        child: IconButton(
+                          tooltip: 'สลับ Card/List',
+                          color: _primary,
+                          style: IconButton.styleFrom(
+                            backgroundColor: _primary.withValues(alpha: .1),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(
+                                LaooRadius.xs,
+                              ),
+                            ),
+                          ),
+                          onPressed: () => setState(() => _cards = !_cards),
+                          icon: Icon(
+                            _cards
+                                ? Icons.view_list_outlined
+                                : Icons.grid_view_outlined,
+                          ),
                         ),
                       ),
+                    if (!compact && _actions['create'] == true)
+                      const SizedBox(width: 8),
                     if (_actions['create'] == true)
                       FilledButton.icon(
                         style: _button(true),
@@ -274,58 +289,73 @@ class _ServicePersonWorkspaceState extends State<ServicePersonWorkspace> {
               ),
               const SizedBox(height: 6),
               _surface(
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    SizedBox(
-                      width: compact ? box.maxWidth - 40 : 360,
-                      child: TextField(
-                        controller: _search,
-                        decoration: _input(
-                          hint: 'ค้นหาชื่อ ชื่อเล่น โทรศัพท์ หรืออีเมล',
-                          icon: Icons.search,
-                        ),
-                        onSubmitted: (_) => _searchNow(),
-                      ),
-                    ),
-                    SizedBox(
-                      width: compact ? box.maxWidth - 40 : 180,
-                      child: DropdownButtonFormField<bool?>(
-                        isExpanded: true,
-                        initialValue: _active,
-                        decoration: _input(label: 'สถานะ'),
-                        items: const [
-                          DropdownMenuItem(value: null, child: Text('ทั้งหมด')),
-                          DropdownMenuItem(value: true, child: Text('ใช้งาน')),
-                          DropdownMenuItem(
-                            value: false,
-                            child: Text('ไม่ใช้งาน'),
+                FilterHeightSync(
+                  builder: (context, searchKey, height) => Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      SizedBox(
+                        key: searchKey,
+                        width: compact ? box.maxWidth - 40 : 360,
+                        child: TextField(
+                          controller: _search,
+                          decoration: _input(
+                            hint: 'ค้นหาชื่อ ชื่อเล่น โทรศัพท์ หรืออีเมล',
+                            icon: Icons.search,
                           ),
-                        ],
-                        onChanged: (value) => setState(() => _active = value),
+                          onSubmitted: (_) => _searchNow(),
+                        ),
                       ),
-                    ),
-                    FilledButton(
-                      style: _button(true),
-                      onPressed: _loading ? null : _searchNow,
-                      child: const Text('ค้นหา'),
-                    ),
-                    OutlinedButton(
-                      style: _button(false),
-                      onPressed: _loading
-                          ? null
-                          : () {
-                              _search.clear();
-                              _query = '';
-                              _active = null;
-                              _page = 1;
-                              _load();
-                            },
-                      child: const Text('ล้าง Filter'),
-                    ),
-                  ],
+                      FilledButton.icon(
+                        style: _button(
+                          true,
+                        ).merge(filterActionHeightStyle(height)),
+                        onPressed: _loading ? null : _searchNow,
+                        icon: const Icon(Icons.search),
+                        label: const Text('ค้นหา'),
+                      ),
+                      OutlinedButton.icon(
+                        style: _button(
+                          false,
+                        ).merge(filterActionHeightStyle(height)),
+                        onPressed: _loading
+                            ? null
+                            : () {
+                                _search.clear();
+                                _query = '';
+                                _active = null;
+                                _page = 1;
+                                _load();
+                              },
+                        icon: const Icon(Icons.filter_alt_off_outlined),
+                        label: const Text('ล้าง Filter'),
+                      ),
+                      SizedBox(
+                        width: compact ? box.maxWidth - 40 : 180,
+                        child: DropdownButtonFormField<bool?>(
+                          isExpanded: true,
+                          initialValue: _active,
+                          decoration: _input(label: 'สถานะ'),
+                          items: const [
+                            DropdownMenuItem(
+                              value: null,
+                              child: Text('ทั้งหมด'),
+                            ),
+                            DropdownMenuItem(
+                              value: true,
+                              child: Text('ใช้งาน'),
+                            ),
+                            DropdownMenuItem(
+                              value: false,
+                              child: Text('ไม่ใช้งาน'),
+                            ),
+                          ],
+                          onChanged: (value) => setState(() => _active = value),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(height: LaooLayout.cardSpacing),

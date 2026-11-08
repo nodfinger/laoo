@@ -941,6 +941,23 @@ class _CustomerPageState extends State<CustomerPage> {
                       ),
                     ),
                   ),
+                  FilledButton.icon(
+                    onPressed: load,
+                    icon: const Icon(Icons.search),
+                    label: const Text('ค้นหา'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        search.clear();
+                        groupFilter = null;
+                        businessFilter = null;
+                      });
+                      load();
+                    },
+                    icon: const Icon(Icons.filter_alt_off_outlined),
+                    label: const Text('ล้าง Filter'),
+                  ),
                   SizedBox(
                     width: w,
                     child: DropdownButtonFormField<String>(
@@ -1010,7 +1027,7 @@ class _CustomerPageState extends State<CustomerPage> {
         Expanded(
           child: loading
               ? const Center(child: CircularProgressIndicator())
-              : _card
+              : _card || MediaQuery.sizeOf(context).width < 1100
               ? _cards(visible, accent)
               : LayoutBuilder(
                   builder: (context, constraints) => _table(
@@ -1044,7 +1061,9 @@ class _CustomerPageState extends State<CustomerPage> {
         side: BorderSide.none,
       ),
       child: Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.grey.shade300),
+        data: Theme.of(
+          context,
+        ).copyWith(dividerColor: workspaceThemeController.value.border),
         child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: SizedBox(
@@ -1403,6 +1422,12 @@ class _CustomerPageState extends State<CustomerPage> {
           page < total ? () => setState(() => page++) : null,
           accent,
         ),
+        const SizedBox(width: 8),
+        Text(
+          rows.isEmpty
+              ? '0-0 จาก 0'
+              : '${(page - 1) * pageSize + 1}-${(page * pageSize).clamp(0, rows.length)} จาก ${rows.length}',
+        ),
       ],
     ),
   );
@@ -1413,14 +1438,17 @@ class _CustomerPageState extends State<CustomerPage> {
         margin: const EdgeInsets.symmetric(horizontal: 4),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(4),
-          color: onPressed == null
-              ? Colors.grey.shade200
-              : accent.withValues(alpha: .12),
+          color: onPressed == null ? Colors.grey.shade200 : accent,
         ),
         child: IconButton(
           onPressed: onPressed,
           padding: EdgeInsets.zero,
-          icon: Icon(icon, color: onPressed == null ? Colors.grey : accent),
+          icon: Icon(
+            icon,
+            color: onPressed == null
+                ? Colors.grey
+                : Theme.of(context).colorScheme.onPrimary,
+          ),
         ),
       );
   Future<void> remove(Map<String, dynamic> x) async {

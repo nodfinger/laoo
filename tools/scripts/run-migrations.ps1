@@ -3,7 +3,8 @@ param(
     [ValidateSet('core', 'service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense', 'project', 'document_control', 'knowledge', 'memo', 'provider', 'school', 'school_food', 'sport', 'patrol', 'intranet', 'vote', 'pos', 'sales', 'evaluation', 'digital_checklist', 'market', 'rental', 'booking', 'pet', 'site')]
     [string]$Module,
     [string]$MigrationId,
-    [switch]$DryRun
+    [switch]$DryRun,
+    [switch]$ValidateOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -48,6 +49,10 @@ $arguments = @(
     '--project', $projectCodes[$Module]
 )
 if ($DryRun) { $arguments += '--dry-run' }
+if ($ValidateOnly) {
+    if (-not $MigrationId) { throw 'ValidateOnly requires an explicit MigrationId.' }
+    $arguments += '--validate-only'
+}
 if ($MigrationId) { $arguments += @('--migration', $MigrationId) }
 
 & dotnet @arguments

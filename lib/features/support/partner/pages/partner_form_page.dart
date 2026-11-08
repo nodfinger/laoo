@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../../core/widgets/auto_dismiss_message.dart';
+import '../../../../core/widgets/timed_snack_bar.dart';
 
 import '../../../../app/theme/laoo_design_tokens.dart';
 import '../../../../app/theme/laoo_typography.dart';
@@ -40,8 +40,6 @@ class _PartnerFormPageState extends State<PartnerFormPage> {
 
   DateTime? _startContactDate;
   bool _saving = false;
-  String? _message;
-  bool _messageIsError = false;
 
   List<TextEditingController> get _controllers => [
     _nameTh,
@@ -98,7 +96,6 @@ class _PartnerFormPageState extends State<PartnerFormPage> {
 
     setState(() {
       _saving = true;
-      _message = null;
     });
 
     try {
@@ -128,19 +125,18 @@ class _PartnerFormPageState extends State<PartnerFormPage> {
 
       if (widget.isCreate) {
         _clearForNextCreate();
-        setState(() {
-          _message = 'เพิ่มข้อมูล Partner สำเร็จ';
-          _messageIsError = false;
-        });
+        showTimedSnackBar(context, message: 'เพิ่มข้อมูล Partner สำเร็จ');
       } else {
         Navigator.of(context).pop(true);
       }
     } catch (_) {
       if (!mounted) return;
-      setState(() {
-        _message = 'ไม่สามารถบันทึกข้อมูลได้ กรุณาตรวจสอบข้อมูลแล้วลองอีกครั้ง';
-        _messageIsError = true;
-      });
+      showTimedSnackBar(
+        context,
+        message:
+            'ไม่สามารถบันทึกข้อมูลได้\nรายละเอียดเพิ่มเติม: กรุณาตรวจสอบข้อมูลแล้วลองอีกครั้ง',
+        error: true,
+      );
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -166,175 +162,157 @@ class _PartnerFormPageState extends State<PartnerFormPage> {
       child: Form(
         key: _formKey,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1050),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  WorkspaceActionHeader(
+          padding: const EdgeInsets.all(LaooLayout.cardMargin),
+          child: SizedBox(
+            width: double.infinity,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                WorkspaceSectionCard(
+                  child: WorkspaceActionHeader(
                     title: widget.isCreate
                         ? 'Partner > เพิ่ม'
                         : 'Partner > แก้ไข',
                     favoriteKey: 'Partner',
                     actions: [_actionButtons()],
                   ),
-                  const SizedBox(height: 16),
-                  if (_message != null) ...[
-                    AutoDismissMessage(
-                      message: _message!,
-                      error: _messageIsError,
-                      onClose: () => setState(() => _message = null),
+                ),
+                const SizedBox(height: LaooLayout.cardSpacing),
+                _Section(
+                  title: 'ข้อมูล Partner',
+                  children: [
+                    _responsiveFields([
+                      TextFormField(
+                        controller: _nameTh,
+                        decoration: const InputDecoration(
+                          label: _RequiredLabel('ชื่อ Partner'),
+                        ),
+                        validator: (value) =>
+                            value == null || value.trim().isEmpty
+                            ? 'กรุณาระบุชื่อ Partner'
+                            : null,
+                      ),
+                      TextFormField(
+                        controller: _nameEn,
+                        decoration: const InputDecoration(
+                          labelText: 'ชื่อภาษาอังกฤษ',
+                        ),
+                      ),
+                      TextFormField(
+                        controller: _shortName,
+                        decoration: const InputDecoration(labelText: 'ชื่อย่อ'),
+                      ),
+                      TextFormField(
+                        controller: _province,
+                        decoration: const InputDecoration(labelText: 'จังหวัด'),
+                      ),
+                      TextFormField(
+                        controller: _email,
+                        keyboardType: TextInputType.emailAddress,
+                        decoration: const InputDecoration(
+                          labelText: 'Email กลาง',
+                        ),
+                      ),
+                      TextFormField(
+                        controller: _telephone,
+                        keyboardType: TextInputType.phone,
+                        decoration: const InputDecoration(
+                          labelText: 'โทรศัพท์กลาง',
+                        ),
+                      ),
+                    ]),
+                    TextFormField(
+                      controller: _addressText,
+                      maxLines: 3,
+                      decoration: const InputDecoration(labelText: 'ที่อยู่'),
                     ),
                     const SizedBox(height: 14),
+                    _DateField(
+                      value: _startContactDate,
+                      onTap: () async {
+                        final selected = await showDatePicker(
+                          context: context,
+                          initialDate: _startContactDate ?? DateTime.now(),
+                          firstDate: DateTime(2000),
+                          lastDate: DateTime(2100),
+                        );
+                        if (selected != null) {
+                          setState(() => _startContactDate = selected);
+                        }
+                      },
+                    ),
                   ],
-                  _Section(
-                    title: 'ข้อมูล Partner',
-                    children: [
-                      _responsiveFields([
-                        TextFormField(
-                          controller: _nameTh,
-                          decoration: const InputDecoration(
-                            label: _RequiredLabel('ชื่อ Partner'),
-                          ),
-                          validator: (value) =>
-                              value == null || value.trim().isEmpty
-                              ? 'กรุณาระบุชื่อ Partner'
-                              : null,
-                        ),
-                        TextFormField(
-                          controller: _nameEn,
-                          decoration: const InputDecoration(
-                            labelText: 'ชื่อภาษาอังกฤษ',
-                          ),
-                        ),
-                        TextFormField(
-                          controller: _shortName,
-                          decoration: const InputDecoration(
-                            labelText: 'ชื่อย่อ',
-                          ),
-                        ),
-                        TextFormField(
-                          controller: _province,
-                          decoration: const InputDecoration(
-                            labelText: 'จังหวัด',
-                          ),
-                        ),
-                        TextFormField(
-                          controller: _email,
-                          keyboardType: TextInputType.emailAddress,
-                          decoration: const InputDecoration(
-                            labelText: 'Email กลาง',
-                          ),
-                        ),
-                        TextFormField(
-                          controller: _telephone,
-                          keyboardType: TextInputType.phone,
-                          decoration: const InputDecoration(
-                            labelText: 'โทรศัพท์กลาง',
-                          ),
-                        ),
-                      ]),
+                ),
+                _Section(
+                  title: 'ผู้ติดต่อคนที่ 1',
+                  children: [
+                    _responsiveFields([
                       TextFormField(
-                        controller: _addressText,
-                        maxLines: 3,
-                        decoration: const InputDecoration(labelText: 'ที่อยู่'),
-                      ),
-                      const SizedBox(height: 14),
-                      _DateField(
-                        value: _startContactDate,
-                        onTap: () async {
-                          final selected = await showDatePicker(
-                            context: context,
-                            initialDate: _startContactDate ?? DateTime.now(),
-                            firstDate: DateTime(2000),
-                            lastDate: DateTime(2100),
-                          );
-                          if (selected != null) {
-                            setState(() => _startContactDate = selected);
-                          }
-                        },
-                      ),
-                    ],
-                  ),
-                  _Section(
-                    title: 'ผู้ติดต่อคนที่ 1',
-                    children: [
-                      _responsiveFields([
-                        TextFormField(
-                          controller: _contactName1,
-                          decoration: const InputDecoration(
-                            labelText: 'ชื่อผู้ติดต่อ',
-                          ),
-                        ),
-                        TextFormField(
-                          controller: _position1,
-                          decoration: const InputDecoration(
-                            labelText: 'ตำแหน่ง',
-                          ),
-                        ),
-                        TextFormField(
-                          controller: _phone1,
-                          keyboardType: TextInputType.phone,
-                          decoration: const InputDecoration(
-                            labelText: 'เบอร์โทร',
-                          ),
-                        ),
-                        TextFormField(
-                          controller: _email1,
-                          keyboardType: TextInputType.emailAddress,
-                          decoration: const InputDecoration(labelText: 'Email'),
-                        ),
-                      ]),
-                    ],
-                  ),
-                  _Section(
-                    title: 'ผู้ติดต่อคนที่ 2',
-                    children: [
-                      _responsiveFields([
-                        TextFormField(
-                          controller: _contactName2,
-                          decoration: const InputDecoration(
-                            labelText: 'ชื่อผู้ติดต่อ',
-                          ),
-                        ),
-                        TextFormField(
-                          controller: _position2,
-                          decoration: const InputDecoration(
-                            labelText: 'ตำแหน่ง',
-                          ),
-                        ),
-                        TextFormField(
-                          controller: _phone2,
-                          keyboardType: TextInputType.phone,
-                          decoration: const InputDecoration(
-                            labelText: 'เบอร์โทร',
-                          ),
-                        ),
-                        TextFormField(
-                          controller: _email2,
-                          keyboardType: TextInputType.emailAddress,
-                          decoration: const InputDecoration(labelText: 'Email'),
-                        ),
-                      ]),
-                    ],
-                  ),
-                  _Section(
-                    title: 'หมายเหตุ',
-                    children: [
-                      TextFormField(
-                        controller: _remark,
-                        maxLines: 4,
+                        controller: _contactName1,
                         decoration: const InputDecoration(
-                          labelText: 'หมายเหตุ',
+                          labelText: 'ชื่อผู้ติดต่อ',
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                ],
-              ),
+                      TextFormField(
+                        controller: _position1,
+                        decoration: const InputDecoration(labelText: 'ตำแหน่ง'),
+                      ),
+                      TextFormField(
+                        controller: _phone1,
+                        keyboardType: TextInputType.phone,
+                        decoration: const InputDecoration(
+                          labelText: 'เบอร์โทร',
+                        ),
+                      ),
+                      TextFormField(
+                        controller: _email1,
+                        keyboardType: TextInputType.emailAddress,
+                        decoration: const InputDecoration(labelText: 'Email'),
+                      ),
+                    ]),
+                  ],
+                ),
+                _Section(
+                  title: 'ผู้ติดต่อคนที่ 2',
+                  children: [
+                    _responsiveFields([
+                      TextFormField(
+                        controller: _contactName2,
+                        decoration: const InputDecoration(
+                          labelText: 'ชื่อผู้ติดต่อ',
+                        ),
+                      ),
+                      TextFormField(
+                        controller: _position2,
+                        decoration: const InputDecoration(labelText: 'ตำแหน่ง'),
+                      ),
+                      TextFormField(
+                        controller: _phone2,
+                        keyboardType: TextInputType.phone,
+                        decoration: const InputDecoration(
+                          labelText: 'เบอร์โทร',
+                        ),
+                      ),
+                      TextFormField(
+                        controller: _email2,
+                        keyboardType: TextInputType.emailAddress,
+                        decoration: const InputDecoration(labelText: 'Email'),
+                      ),
+                    ]),
+                  ],
+                ),
+                _Section(
+                  title: 'หมายเหตุ',
+                  children: [
+                    TextFormField(
+                      controller: _remark,
+                      maxLines: 4,
+                      decoration: const InputDecoration(labelText: 'หมายเหตุ'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+              ],
             ),
           ),
         ),
@@ -402,18 +380,13 @@ class _RequiredLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final style =
-        Theme.of(context).inputDecorationTheme.labelStyle ??
-        Theme.of(context).textTheme.bodyLarge;
-
     return Text.rich(
       TextSpan(
-        style: style,
         children: [
           TextSpan(text: text),
-          const TextSpan(
+          TextSpan(
             text: ' *',
-            style: TextStyle(color: Colors.red),
+            style: TextStyle(color: Theme.of(context).colorScheme.error),
           ),
         ],
       ),
@@ -430,16 +403,16 @@ class _Section extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(bottom: LaooLayout.cardSpacing),
       elevation: 0,
+      color: LaooColors.white,
+      surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(LaooRadius.md),
-        side: BorderSide(
-          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.38),
-        ),
+        borderRadius: BorderRadius.circular(LaooRadius.xs),
+        side: BorderSide.none,
       ),
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(LaooLayout.cardPadding),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -447,8 +420,8 @@ class _Section extends StatelessWidget {
               title,
               style: TextStyle(
                 fontSize: LaooTypography.sectionTitle,
-                fontWeight: FontWeight.w500,
-                color: Theme.of(context).colorScheme.primary,
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
             const SizedBox(height: 16),

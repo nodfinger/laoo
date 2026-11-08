@@ -336,6 +336,16 @@ public sealed class DatabaseSeeder
                 @CompanyID, @PartnerID, N'DEMO', N'Demo Company Laoo', N'Laoo Demo Company',
                 N'Demo Company Laoo', N'Laoo Demo Company', 30, 30, 5, 1, N'C', 1, SYSUTCDATETIME()
             );
+            IF OBJECT_ID(N'dbo.TDADServiceRequestSubject', N'U') IS NOT NULL
+              EXEC sys.sp_executesql N'
+                INSERT dbo.TDADServiceRequestSubject
+                  (OwnerType,OwnerCompanyID,TemplateSubjectID,SubjectCode,Name,Seq,OrderBy,ShortCode,IsActive)
+                SELECT N''C'',@CompanyID,SubjectID,
+                  RIGHT(N''00000''+CONVERT(nvarchar(20),ROW_NUMBER() OVER(ORDER BY Seq,SubjectID)),5),
+                  Name,Seq,OrderBy,ShortCode,IsActive
+                FROM dbo.TDADServiceRequestSubject
+                WHERE OwnerType=N''L'' AND ISNULL(OwnerPartnerID,0)=0 AND ISNULL(OwnerCompanyID,0)=0',
+                N'@CompanyID bigint', @CompanyID;
         END;
 
         SELECT CompanyID

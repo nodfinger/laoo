@@ -15,6 +15,9 @@ class EmployeeWorkspace extends StatefulWidget {
     super.key,
     required this.caption,
     required this.repository,
+    this.organizationRepository,
+    this.organizationCaption = 'โครงสร้างองค์กร',
+    this.onOrganizationChanged,
     required this.screenType,
     required this.pageSize,
     required this.companies,
@@ -22,8 +25,14 @@ class EmployeeWorkspace extends StatefulWidget {
     required this.organizationMode,
     required this.customerScope,
     required this.roleGroups,
+    this.manageRoleGroups,
     required this.carTypes,
     required this.oilTypes,
+    this.positions = const [],
+    this.managePositions,
+    this.manageCarTypes,
+    this.manageOilTypes,
+    this.canChangeMasterData = true,
     required this.titleBuilder,
     required this.messageBuilder,
     required this.tokens,
@@ -32,10 +41,14 @@ class EmployeeWorkspace extends StatefulWidget {
     required this.confirmDelete,
     this.pickImage,
     this.thumbnailBuilder,
+    this.canShowEmployeeImages = false,
   });
 
   final String caption;
   final EmployeeRepository repository;
+  final OrganizationRepository? organizationRepository;
+  final String organizationCaption;
+  final ValueChanged<List<OrganizationUnitRecord>>? onOrganizationChanged;
   final int screenType;
   final int pageSize;
   final List<EmployeeCompanyOption> companies;
@@ -43,8 +56,14 @@ class EmployeeWorkspace extends StatefulWidget {
   final int organizationMode;
   final bool customerScope;
   final List<EmployeeRoleGroupOption> roleGroups;
+  final Future<List<EmployeeRoleGroupOption>?> Function()? manageRoleGroups;
   final List<EmployeeMasterOption> carTypes;
   final List<EmployeeMasterOption> oilTypes;
+  final List<EmployeeMasterOption> positions;
+  final Future<List<EmployeeMasterOption>?> Function()? managePositions;
+  final Future<List<EmployeeMasterOption>?> Function()? manageCarTypes;
+  final Future<List<EmployeeMasterOption>?> Function()? manageOilTypes;
+  final bool canChangeMasterData;
   final SharedAdminTitleBuilder titleBuilder;
   final SharedAdminMessageBuilder messageBuilder;
   final SharedAdminUiTokens tokens;
@@ -53,6 +72,7 @@ class EmployeeWorkspace extends StatefulWidget {
   final EmployeeDeleteConfirmation confirmDelete;
   final EmployeeImagePicker? pickImage;
   final EmployeeThumbnailBuilder? thumbnailBuilder;
+  final bool canShowEmployeeImages;
 
   @override
   State<EmployeeWorkspace> createState() => _EmployeeWorkspaceState();
@@ -153,6 +173,10 @@ class _EmployeeWorkspaceState extends State<EmployeeWorkspace> {
                 key: ValueKey((_editing?.employeeId, _createRevision)),
                 caption: widget.caption,
                 repository: widget.repository,
+                organizationRepository: widget.organizationRepository,
+                organizationCaption: widget.organizationCaption,
+                onOrganizationChanged: widget.onOrganizationChanged,
+                organizationMessageBuilder: widget.messageBuilder,
                 employee: _editing,
                 serviceEntitled: _controller.serviceEntitled,
                 companyId: _editing?.companyId ?? _controller.companyId,
@@ -161,8 +185,14 @@ class _EmployeeWorkspaceState extends State<EmployeeWorkspace> {
                 organizationUnits: widget.organizationUnits,
                 organizationMode: widget.organizationMode,
                 roleGroups: widget.roleGroups,
+                manageRoleGroups: widget.manageRoleGroups,
                 carTypes: widget.carTypes,
                 oilTypes: widget.oilTypes,
+                positions: widget.positions,
+                managePositions: widget.managePositions,
+                manageCarTypes: widget.manageCarTypes,
+                manageOilTypes: widget.manageOilTypes,
+                canChangeMasterData: widget.canChangeMasterData,
                 canSave:
                     (_editing == null && _controller.canCreate) ||
                     (_editing != null && _controller.canEdit),
@@ -189,6 +219,7 @@ class _EmployeeWorkspaceState extends State<EmployeeWorkspace> {
                 onDelete: _delete,
                 onUser: _openEdit,
                 thumbnailBuilder: widget.thumbnailBuilder,
+                canShowEmployeeImages: widget.canShowEmployeeImages,
               ),
       ),
       if (_message != null)

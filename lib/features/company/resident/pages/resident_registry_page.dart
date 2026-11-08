@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:laoo_shared_admin_ui/laoo_shared_admin_ui.dart'
+    show FilterHeightSync, filterActionHeightStyle;
 
 import '../../../../app/theme/laoo_design_tokens.dart';
 import '../../../../app/theme/laoo_typography.dart';
@@ -282,12 +284,27 @@ class _ResidentRegistryWorkspaceState extends State<ResidentRegistryWorkspace> {
                       ),
                     ),
                     if (!compact)
-                      IconButton(
-                        tooltip: 'สลับ Card/List',
-                        color: _primary,
-                        onPressed: () => setState(() => _cards = !_cards),
-                        icon: Icon(_cards ? Icons.view_list : Icons.grid_view),
+                      SizedBox.square(
+                        dimension: LaooTypography.buttonHeight,
+                        child: IconButton(
+                          tooltip: 'สลับ Card/List',
+                          color: _primary,
+                          style: IconButton.styleFrom(
+                            backgroundColor: _primary.withValues(alpha: .1),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(
+                                LaooRadius.xs,
+                              ),
+                            ),
+                          ),
+                          onPressed: () => setState(() => _cards = !_cards),
+                          icon: Icon(
+                            _cards ? Icons.view_list : Icons.grid_view,
+                          ),
+                        ),
                       ),
+                    if (!compact && _actions['create'] == true)
+                      const SizedBox(width: 8),
                     if (_actions['create'] == true)
                       FilledButton.icon(
                         style: registryButton(_primary, filled: true),
@@ -320,181 +337,191 @@ class _ResidentRegistryWorkspaceState extends State<ResidentRegistryWorkspace> {
     },
   );
 
-  Widget _filters(bool compact, double width) => Wrap(
-    spacing: 8,
-    runSpacing: 8,
-    crossAxisAlignment: WrapCrossAlignment.center,
-    children: [
-      SizedBox(
-        width: compact ? width - 40 : 300,
-        child: TextField(
-          key: const ValueKey('resident-search'),
-          controller: _search,
-          decoration: registryInput(
-            context,
-            hint: 'ค้นหาชื่อ โทรศัพท์ หรือห้อง',
-            icon: Icons.search,
-          ),
-          onSubmitted: (_) {
-            _query = _search.text.trim();
-            _page = 1;
-            _load();
-          },
-        ),
-      ),
-      if (_businessType == 'VILLAGE') ...[
+  Widget _filters(bool compact, double width) => FilterHeightSync(
+    builder: (context, searchKey, height) => Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
         SizedBox(
-          width: compact ? width - 40 : 190,
-          child: DropdownButtonFormField<int?>(
-            initialValue: _lane,
-            isExpanded: true,
-            decoration: registryInput(context, label: 'ซอย / แยก'),
-            items: [
-              const DropdownMenuItem(value: null, child: Text('ทั้งหมด')),
-              for (final row in _lanes)
-                DropdownMenuItem(
-                  value: (row['id'] as num).toInt(),
-                  child: Text(
-                    '${row['code']} | ${row['name']}',
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-            ],
-            onChanged: (value) {
-              setState(() {
-                _lane = value;
-                _house = null;
-                _page = 1;
-              });
+          key: searchKey,
+          width: compact ? width - 40 : 300,
+          child: TextField(
+            key: const ValueKey('resident-search'),
+            controller: _search,
+            decoration: registryInput(
+              context,
+              hint: 'ค้นหาชื่อ โทรศัพท์ หรือห้อง',
+              icon: Icons.search,
+            ),
+            onSubmitted: (_) {
+              _query = _search.text.trim();
+              _page = 1;
               _load();
             },
           ),
         ),
-        SizedBox(
-          width: compact ? width - 40 : 190,
-          child: DropdownButtonFormField<int?>(
-            key: ValueKey((_lane, _house)),
-            initialValue: _house,
-            isExpanded: true,
-            decoration: registryInput(context, label: 'บ้านเลขที่'),
-            items: [
-              const DropdownMenuItem(value: null, child: Text('ทั้งหมด')),
-              for (final row in _filterHouses)
-                DropdownMenuItem(
-                  value: (row['id'] as num).toInt(),
-                  child: Text(
-                    '${row['code']} | ${row['name']}',
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-            ],
-            onChanged: (value) {
-              setState(() {
-                _house = value;
-                _page = 1;
-              });
-              _load();
-            },
-          ),
+        FilledButton.icon(
+          style: registryButton(
+            _primary,
+            filled: true,
+          ).merge(filterActionHeightStyle(height)),
+          onPressed: _loading
+              ? null
+              : () {
+                  _query = _search.text.trim();
+                  _page = 1;
+                  _load();
+                },
+          icon: const Icon(Icons.search),
+          label: const Text('ค้นหา'),
         ),
-      ] else ...[
-        SizedBox(
-          width: compact ? width - 40 : 190,
-          child: DropdownButtonFormField<int?>(
-            initialValue: _building,
-            isExpanded: true,
-            decoration: registryInput(context, label: 'อาคาร'),
-            items: [
-              const DropdownMenuItem(value: null, child: Text('ทั้งหมด')),
-              for (final row in _buildings)
-                DropdownMenuItem(
-                  value: (row['id'] as num).toInt(),
-                  child: Text(
-                    '${row['code']} | ${row['name']}',
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-            ],
-            onChanged: (value) {
-              setState(() {
-                _building = value;
-                _room = null;
-                _page = 1;
-              });
-              _load();
-            },
-          ),
+        OutlinedButton.icon(
+          style: registryButton(
+            _primary,
+          ).merge(filterActionHeightStyle(height)),
+          onPressed: _loading
+              ? null
+              : () {
+                  _search.clear();
+                  _query = '';
+                  _active = null;
+                  _building = null;
+                  _room = null;
+                  _lane = null;
+                  _house = null;
+                  _page = 1;
+                  _load();
+                },
+          icon: const Icon(Icons.filter_alt_off_outlined),
+          label: const Text('ล้าง Filter'),
         ),
-        SizedBox(
-          width: compact ? width - 40 : 190,
-          child: DropdownButtonFormField<int?>(
-            key: ValueKey((_building, _room)),
-            initialValue: _room,
-            isExpanded: true,
-            decoration: registryInput(context, label: 'ห้อง'),
-            items: [
-              const DropdownMenuItem(value: null, child: Text('ทั้งหมด')),
-              for (final row in _filterRooms)
-                DropdownMenuItem(
-                  value: (row['id'] as num).toInt(),
-                  child: Text(
-                    '${row['code']} | ${row['name']}',
-                    overflow: TextOverflow.ellipsis,
+        if (_businessType == 'VILLAGE') ...[
+          SizedBox(
+            width: compact ? width - 40 : 190,
+            child: DropdownButtonFormField<int?>(
+              initialValue: _lane,
+              isExpanded: true,
+              decoration: registryInput(context, label: 'ซอย / แยก'),
+              items: [
+                const DropdownMenuItem(value: null, child: Text('ทั้งหมด')),
+                for (final row in _lanes)
+                  DropdownMenuItem(
+                    value: (row['id'] as num).toInt(),
+                    child: Text(
+                      '${row['code']} | ${row['name']}',
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                ),
+              ],
+              onChanged: (value) {
+                setState(() {
+                  _lane = value;
+                  _house = null;
+                  _page = 1;
+                });
+                _load();
+              },
+            ),
+          ),
+          SizedBox(
+            width: compact ? width - 40 : 190,
+            child: DropdownButtonFormField<int?>(
+              key: ValueKey((_lane, _house)),
+              initialValue: _house,
+              isExpanded: true,
+              decoration: registryInput(context, label: 'บ้านเลขที่'),
+              items: [
+                const DropdownMenuItem(value: null, child: Text('ทั้งหมด')),
+                for (final row in _filterHouses)
+                  DropdownMenuItem(
+                    value: (row['id'] as num).toInt(),
+                    child: Text(
+                      '${row['code']} | ${row['name']}',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+              ],
+              onChanged: (value) {
+                setState(() {
+                  _house = value;
+                  _page = 1;
+                });
+                _load();
+              },
+            ),
+          ),
+        ] else ...[
+          SizedBox(
+            width: compact ? width - 40 : 190,
+            child: DropdownButtonFormField<int?>(
+              initialValue: _building,
+              isExpanded: true,
+              decoration: registryInput(context, label: 'อาคาร'),
+              items: [
+                const DropdownMenuItem(value: null, child: Text('ทั้งหมด')),
+                for (final row in _buildings)
+                  DropdownMenuItem(
+                    value: (row['id'] as num).toInt(),
+                    child: Text(
+                      '${row['code']} | ${row['name']}',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+              ],
+              onChanged: (value) {
+                setState(() {
+                  _building = value;
+                  _room = null;
+                  _page = 1;
+                });
+                _load();
+              },
+            ),
+          ),
+          SizedBox(
+            width: compact ? width - 40 : 190,
+            child: DropdownButtonFormField<int?>(
+              key: ValueKey((_building, _room)),
+              initialValue: _room,
+              isExpanded: true,
+              decoration: registryInput(context, label: 'ห้อง'),
+              items: [
+                const DropdownMenuItem(value: null, child: Text('ทั้งหมด')),
+                for (final row in _filterRooms)
+                  DropdownMenuItem(
+                    value: (row['id'] as num).toInt(),
+                    child: Text(
+                      '${row['code']} | ${row['name']}',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+              ],
+              onChanged: (value) {
+                setState(() {
+                  _room = value;
+                  _page = 1;
+                });
+                _load();
+              },
+            ),
+          ),
+        ],
+        SizedBox(
+          width: compact ? width - 40 : 170,
+          child: DropdownButtonFormField<bool?>(
+            initialValue: _active,
+            decoration: registryInput(context, label: 'สถานะ'),
+            items: const [
+              DropdownMenuItem(value: null, child: Text('ทั้งหมด')),
+              DropdownMenuItem(value: true, child: Text('ใช้งาน')),
+              DropdownMenuItem(value: false, child: Text('ไม่ใช้งาน')),
             ],
-            onChanged: (value) {
-              setState(() {
-                _room = value;
-                _page = 1;
-              });
-              _load();
-            },
+            onChanged: (value) => setState(() => _active = value),
           ),
         ),
       ],
-      SizedBox(
-        width: compact ? width - 40 : 170,
-        child: DropdownButtonFormField<bool?>(
-          initialValue: _active,
-          decoration: registryInput(context, label: 'สถานะ'),
-          items: const [
-            DropdownMenuItem(value: null, child: Text('ทั้งหมด')),
-            DropdownMenuItem(value: true, child: Text('ใช้งาน')),
-            DropdownMenuItem(value: false, child: Text('ไม่ใช้งาน')),
-          ],
-          onChanged: (value) => setState(() => _active = value),
-        ),
-      ),
-      FilledButton(
-        style: registryButton(_primary, filled: true),
-        onPressed: _loading
-            ? null
-            : () {
-                _query = _search.text.trim();
-                _page = 1;
-                _load();
-              },
-        child: const Text('ค้นหา'),
-      ),
-      OutlinedButton(
-        style: registryButton(_primary),
-        onPressed: _loading
-            ? null
-            : () {
-                _search.clear();
-                _query = '';
-                _active = null;
-                _building = null;
-                _room = null;
-                _lane = null;
-                _house = null;
-                _page = 1;
-                _load();
-              },
-        child: const Text('ล้าง Filter'),
-      ),
-    ],
+    ),
   );
 
   Widget _content(bool cards) {

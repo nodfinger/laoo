@@ -61,8 +61,16 @@ void main() {
         isNull,
       );
     });
-    test('sends authenticated users away from landing and login by role', () {
-      for (final path in <String>[RoutePaths.landing, RoutePaths.login]) {
+    test('keeps landing public and redirects authenticated login by role', () {
+      expect(
+        redirect(
+          path: RoutePaths.landing,
+          isAuthenticated: true,
+          isCompanyUser: true,
+        ),
+        isNull,
+      );
+      for (final path in <String>[RoutePaths.login]) {
         expect(
           redirect(path: path, isAuthenticated: true, isLaooSupport: true),
           RoutePaths.supportHome,
@@ -85,7 +93,6 @@ void main() {
       'sends company users with Intranet permission to their Intranet home',
       () {
         for (final path in <String>[
-          RoutePaths.landing,
           RoutePaths.login,
           RoutePaths.authenticatedHome,
         ]) {

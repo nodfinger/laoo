@@ -6,8 +6,10 @@ import '../../../../core/widgets/auto_dismiss_message.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/route_names.dart';
+import '../../../../app/theme/laoo_design_tokens.dart';
 import '../../../../app/theme/workspace_theme_presets.dart';
 import '../../../../core/api/api_exception.dart';
+import '../../../../core/auth/app_auth_controller.dart';
 import '../../../../core/company_setup/company_setup_controller.dart';
 import '../../../../core/platform/window_title_service.dart';
 import '../../../../core/widgets/combo_box_text.dart';
@@ -680,7 +682,12 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
             _loading
                 ? const Center(child: CircularProgressIndicator())
                 : ListView(
-                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+                    padding: const EdgeInsets.fromLTRB(
+                      LaooLayout.cardMargin,
+                      LaooLayout.cardMargin,
+                      LaooLayout.cardMargin,
+                      20,
+                    ),
                     children: [
                       Card(
                         margin: EdgeInsets.zero,
@@ -718,9 +725,8 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: LaooLayout.cardSpacing),
                       if (!widget.additionalOnly) ...[
-                        const SizedBox(height: 4),
                         _CompanySetupUxForm(
                           ownerCode: _ownerCode,
                           ownerName: _ownerName,
@@ -768,32 +774,50 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
                       ],
                       if (!widget.additionalOnly) ...[
                         const SizedBox(height: 8),
-                        const CompanySubscriptionCard(),
-                        const SizedBox(height: 8),
-                        _LegacySetupCards(
-                          controllers: {
-                            'rowStd': _rowStd,
-                            'rowCardStd': _rowCardStd,
-                            'timeAlert': _timeAlert,
-                            'versionId': _versionId,
-                            'emailHost': _emailHost,
-                            'emailPort': _emailPort,
-                            'emailCenter': _emailCenter,
-                            'emailAdmin': _emailAdmin,
-                            'emailPasswordCenter': _emailPasswordCenter,
-                            'superUserName': _superUserName,
-                            'passwordCry': _passwordCry,
-                            'passwordEmpDefault': _passwordEmpDefault,
+                        ListenableBuilder(
+                          listenable: appAuthController,
+                          builder: (context, _) {
+                            final showCompanyCards =
+                                !appAuthController.isLaooSupport &&
+                                !appAuthController.isPartnerUser;
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                if (showCompanyCards) ...[
+                                  const CompanySubscriptionCard(),
+                                  const SizedBox(height: 8),
+                                ],
+                                _LegacySetupCards(
+                                  showCompanyCards: showCompanyCards,
+                                  controllers: {
+                                    'rowStd': _rowStd,
+                                    'rowCardStd': _rowCardStd,
+                                    'timeAlert': _timeAlert,
+                                    'versionId': _versionId,
+                                    'emailHost': _emailHost,
+                                    'emailPort': _emailPort,
+                                    'emailCenter': _emailCenter,
+                                    'emailAdmin': _emailAdmin,
+                                    'emailPasswordCenter': _emailPasswordCenter,
+                                    'superUserName': _superUserName,
+                                    'passwordCry': _passwordCry,
+                                    'passwordEmpDefault': _passwordEmpDefault,
+                                  },
+                                  yearFormat: _yearFormat,
+                                  onYearFormatChanged: (value) =>
+                                      setState(() => _yearFormat = value),
+                                  orgStructureType: _orgStructureType,
+                                  onOrgStructureTypeChanged: (value) =>
+                                      setState(() => _orgStructureType = value),
+                                  passwordPolicyCode: _passwordPolicyCode,
+                                  onPasswordPolicyCodeChanged: (value) =>
+                                      setState(
+                                        () => _passwordPolicyCode = value,
+                                      ),
+                                ),
+                              ],
+                            );
                           },
-                          yearFormat: _yearFormat,
-                          onYearFormatChanged: (value) =>
-                              setState(() => _yearFormat = value),
-                          orgStructureType: _orgStructureType,
-                          onOrgStructureTypeChanged: (value) =>
-                              setState(() => _orgStructureType = value),
-                          passwordPolicyCode: _passwordPolicyCode,
-                          onPasswordPolicyCodeChanged: (value) =>
-                              setState(() => _passwordPolicyCode = value),
                         ),
                       ],
                     ],
@@ -845,7 +869,7 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
                   : Image.network(
                       '/api/public/providers/companies/$_companyId/cover',
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) =>
+                      errorBuilder: (_, _, _) =>
                           const Icon(Icons.broken_image_outlined),
                     ),
             ),
@@ -917,11 +941,12 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
         _message = 'อัปโหลดรูปปกสมาชิกแล้ว';
       });
     } catch (error) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _messageIsError = true;
           _message = 'อัปโหลดรูปปกสมาชิกไม่สำเร็จ: $error';
         });
+      }
     } finally {
       if (mounted) setState(() => _uploadingMemberCover = false);
     }
@@ -1182,6 +1207,7 @@ class _PartnerInfoItem extends StatelessWidget {
 
 class _LegacySetupCards extends StatelessWidget {
   const _LegacySetupCards({
+    required this.showCompanyCards,
     required this.controllers,
     required this.yearFormat,
     required this.onYearFormatChanged,
@@ -1192,6 +1218,7 @@ class _LegacySetupCards extends StatelessWidget {
   });
 
   final Map<String, TextEditingController> controllers;
+  final bool showCompanyCards;
   final String yearFormat;
   final ValueChanged<String> onYearFormatChanged;
   final int orgStructureType;
@@ -1269,95 +1296,100 @@ class _LegacySetupCards extends StatelessWidget {
                 ],
               ),
             ),
-            SizedBox(
-              width: width,
-              child: _SetupCard(
-                title: 'ข้อมูลการแสดงผลระบบ',
-                icon: Icons.palette_outlined,
-                children: [
-                  _YearFormatField(
-                    value: yearFormat,
-                    onChanged: onYearFormatChanged,
-                  ),
-                  _LegacyField(
-                    label: 'Version',
-                    value: '1.0.0',
-                    controller: controllers['versionId'],
-                  ),
-                  _LegacyField(label: 'Theme', value: 'ตาม Theme Standard'),
-                ],
-              ),
-            ),
-            SizedBox(
-              width: width,
-              child: _SetupCard(
-                title: 'Audit (แถวบน)',
-                icon: Icons.history_rounded,
-                children: [
-                  _LegacyField(label: 'สถานะ', value: 'ใช้งาน'),
-                  _LegacyField(label: 'สร้างเมื่อ', value: '08/08/2569'),
-                  _LegacyField(label: 'แก้ไขล่าสุด', value: '11/08/2569'),
-                ],
-              ),
-            ),
-            SizedBox(
-              width: width,
-              child: _SetupCard(
-                title: 'Email Configuration',
-                icon: Icons.mail_outline_rounded,
-                children: [
-                  _LegacyField(
-                    label: 'Email Host',
-                    value: 'smtp.gmail.com',
-                    controller: controllers['emailHost'],
-                  ),
-                  _LegacyField(
-                    label: 'Email Port',
-                    value: '587',
-                    controller: controllers['emailPort'],
-                  ),
-                  _LegacyField(
-                    label: 'Email Center (ส่งออกอัตโนมัติ)',
-                    value: 'nodfinger@gmail.com',
-                    controller: controllers['emailCenter'],
-                  ),
-                  _LegacyField(
-                    label: 'Email Center (User แจ้งปัญหา)',
-                    value: 'nodfinger@gmail.com',
-                    controller: controllers['emailAdmin'],
-                  ),
-                  if (controllers['emailPasswordCenter'] case final controller?)
-                    _SecretField(
-                      label: 'Email Password / App Password',
-                      controller: controller,
+            if (showCompanyCards)
+              SizedBox(
+                width: width,
+                child: _SetupCard(
+                  title: 'ข้อมูลการแสดงผลระบบ',
+                  icon: Icons.palette_outlined,
+                  children: [
+                    _YearFormatField(
+                      value: yearFormat,
+                      onChanged: onYearFormatChanged,
                     ),
-                ],
+                    _LegacyField(
+                      label: 'Version',
+                      value: '1.0.0',
+                      controller: controllers['versionId'],
+                    ),
+                    _LegacyField(label: 'Theme', value: 'ตาม Theme Standard'),
+                  ],
+                ),
               ),
-            ),
-            SizedBox(
-              width: width,
-              child: _SetupCard(
-                title: 'Security / Secret',
-                icon: Icons.lock_outline_rounded,
-                children: [
-                  _LegacyField(
-                    label: 'Super User',
-                    value: 'ตั้งค่าแล้ว',
-                    controller: controllers['superUserName'],
-                  ),
-                  _LegacyField(
-                    label: 'PasswordCry',
-                    value: 'ตั้งค่าแล้ว',
-                    controller: controllers['passwordCry'],
-                  ),
-                  _LegacyField(
-                    label: 'Password พนักงาน',
-                    value: 'ยังไม่ตั้งค่า',
-                    controller: controllers['passwordEmpDefault'],
-                  ),
-                ],
+            if (showCompanyCards)
+              SizedBox(
+                width: width,
+                child: _SetupCard(
+                  title: 'Audit (แถวบน)',
+                  icon: Icons.history_rounded,
+                  children: [
+                    _LegacyField(label: 'สถานะ', value: 'ใช้งาน'),
+                    _LegacyField(label: 'สร้างเมื่อ', value: '08/08/2569'),
+                    _LegacyField(label: 'แก้ไขล่าสุด', value: '11/08/2569'),
+                  ],
+                ),
               ),
-            ),
+            if (showCompanyCards)
+              SizedBox(
+                width: width,
+                child: _SetupCard(
+                  title: 'Email Configuration',
+                  icon: Icons.mail_outline_rounded,
+                  children: [
+                    _LegacyField(
+                      label: 'Email Host',
+                      value: 'smtp.gmail.com',
+                      controller: controllers['emailHost'],
+                    ),
+                    _LegacyField(
+                      label: 'Email Port',
+                      value: '587',
+                      controller: controllers['emailPort'],
+                    ),
+                    _LegacyField(
+                      label: 'Email Center (ส่งออกอัตโนมัติ)',
+                      value: 'nodfinger@gmail.com',
+                      controller: controllers['emailCenter'],
+                    ),
+                    _LegacyField(
+                      label: 'Email Center (User แจ้งปัญหา)',
+                      value: 'nodfinger@gmail.com',
+                      controller: controllers['emailAdmin'],
+                    ),
+                    if (controllers['emailPasswordCenter']
+                        case final controller?)
+                      _SecretField(
+                        label: 'Email Password / App Password',
+                        controller: controller,
+                      ),
+                  ],
+                ),
+              ),
+            if (showCompanyCards)
+              SizedBox(
+                width: width,
+                child: _SetupCard(
+                  title: 'Security / Secret',
+                  icon: Icons.lock_outline_rounded,
+                  children: [
+                    _LegacyField(
+                      label: 'Super User',
+                      value: 'ตั้งค่าแล้ว',
+                      controller: controllers['superUserName'],
+                    ),
+                    _LegacyField(
+                      label: 'PasswordCry',
+                      value: 'ตั้งค่าแล้ว',
+                      controller: controllers['passwordCry'],
+                    ),
+                    _LegacyField(
+                      label: 'Password พนักงาน',
+                      value: 'ยังไม่ตั้งค่า',
+                      controller: controllers['passwordEmpDefault'],
+                    ),
+                  ],
+                ),
+              ),
             SizedBox(
               width: width,
               child: _SetupCard(

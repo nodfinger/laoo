@@ -5,6 +5,8 @@ using System.Text.RegularExpressions;
 using Microsoft.Data.SqlClient;
 
 var options = RunnerOptions.Parse(args);
+if (options.ValidateOnly && string.IsNullOrWhiteSpace(options.MigrationId))
+    throw new ArgumentException("--validate-only requires --migration.");
 var root = Path.GetFullPath(options.Root);
 var migrationDirectory = ResolveMigrationDirectory(root, options.ProjectCode);
 var files = Directory.Exists(migrationDirectory)
@@ -47,8 +49,10 @@ foreach (var file in files)
     var sql = (await File.ReadAllTextAsync(file, Encoding.UTF8))
         .Replace("\r\n", "\n", StringComparison.Ordinal)
         .Replace('\r', '\n');
+    if (options.ValidateOnly && Regex.IsMatch(sql, @"\b(?:COMMIT|ROLLBACK|BEGIN\s+TRAN(?:SACTION)?|CREATE|ALTER|DROP|TRUNCATE|EXEC(?:UTE)?)\b", RegexOptions.IgnoreCase))
+        throw new InvalidOperationException("Validate-only supports data-only migrations without DDL, EXEC, or transaction-control statements.");
     var checksum = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(sql)));
-    await ApplyMigration(connection, migrationId, options.ProjectCode, checksum, sql, options.AppliedBy);
+    await ApplyMigration(connection, migrationId, options.ProjectCode, checksum, sql, options.AppliedBy, options.ValidateOnly);
 }
 
 static string ResolveMigrationDirectory(string root, string projectCode) =>
@@ -124,7 +128,8 @@ static async Task ApplyMigration(
     string projectCode,
     string checksum,
     string sql,
-    string appliedBy)
+    string appliedBy,
+    bool validateOnly)
 {
     await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync();
     try
@@ -168,6 +173,13 @@ static async Task ApplyMigration(
             await command.ExecuteNonQueryAsync();
         }
 
+        if (validateOnly)
+        {
+            await transaction.RollbackAsync();
+            Console.WriteLine($"VALIDATED {migrationId} (rolled back)");
+            return;
+        }
+
         await using (var record = new SqlCommand(
             "INSERT dbo.TDSTSchemaMigration(MigrationID,ProjectCode,Checksum,AppliedUtc,AppliedBy,SourceMachine) " +
             "VALUES(@id,@project,@checksum,SYSUTCDATETIME(),@by,@machine);",
@@ -197,7 +209,8 @@ internal sealed record RunnerOptions(
     string ProjectCode,
     string AppliedBy,
     string? MigrationId,
-    bool DryRun)
+    bool DryRun,
+    bool ValidateOnly)
 {
     public static RunnerOptions Parse(string[] args)
     {
@@ -214,6 +227,6 @@ internal sealed record RunnerOptions(
             ?? Environment.UserName
             ?? "unknown";
         var migrationId = Value("--migration")?.Trim();
-        return new RunnerOptions(root, project, appliedBy, migrationId, args.Contains("--dry-run"));
+        return new RunnerOptions(root, project, appliedBy, migrationId, args.Contains("--dry-run"), args.Contains("--validate-only"));
     }
 }

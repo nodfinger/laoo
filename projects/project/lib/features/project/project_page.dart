@@ -46,7 +46,7 @@ class _S extends State<ProjectPage> {
   Future<Map<String, dynamic>> load() async {
     final a = map(
       await api.get(
-        '/api/company/project-management/actions/' + widget.menuCode,
+        '/api/company/project-management/actions/${widget.menuCode}',
       ),
     );
     final search = Uri.encodeQueryComponent(q.text.trim());
@@ -60,7 +60,7 @@ class _S extends State<ProjectPage> {
     };
     final result = <String, dynamic>{
       'a': a,
-      'd': await api.get('/api/company/project-management/' + path),
+      'd': await api.get('/api/company/project-management/$path'),
     };
     if (widget.mode == ProjectPageMode.reports) {
       result['o'] = await api.get('/api/company/project-management/options');
@@ -89,9 +89,10 @@ class _S extends State<ProjectPage> {
       child: FutureBuilder<Map<String, dynamic>>(
         future: f,
         builder: (_, s) {
-          if (s.connectionState != ConnectionState.done)
+          if (s.connectionState != ConnectionState.done) {
             return frame(const Center(child: CircularProgressIndicator()));
-          if (s.hasError)
+          }
+          if (s.hasError) {
             return frame(
               Center(
                 child: OutlinedButton.icon(
@@ -101,6 +102,7 @@ class _S extends State<ProjectPage> {
                 ),
               ),
             );
+          }
           final v = s.data!;
           return switch (widget.mode) {
             ProjectPageMode.settings => Settings(
@@ -215,19 +217,14 @@ class _S extends State<ProjectPage> {
                 itemCount: visible.length,
                 itemBuilder: (_, i) => ListTile(
                   title: Text(
-                    txt(visible[i][cat ? 'code' : 'code']) +
-                        ' - ' +
-                        txt(visible[i][cat ? 'name' : 'name']),
+                    '${txt(visible[i][cat ? 'code' : 'code'])} - ${txt(visible[i][cat ? 'name' : 'name'])}',
                   ),
                   subtitle: Text(
                     cat
                         ? (visible[i]['active'] == true
                               ? 'ใช้งาน'
                               : 'ปิดใช้งาน')
-                        : 'ผู้จัดการ ' +
-                              txt(visible[i]['manager']) +
-                              ' • ' +
-                              status(txt(visible[i]['status'])),
+                        : 'ผู้จัดการ ${txt(visible[i]['manager'])} • ${status(txt(visible[i]['status']))}',
                   ),
                   trailing: actions(visible[i], a, cat),
                 ),
@@ -305,11 +302,9 @@ class _S extends State<ProjectPage> {
               color: Colors.red,
               onPressed: () => del(
                 cat
-                    ? '/api/company/project-management/budget-categories/' +
-                          txt(r['id'])
-                    : '/api/company/project-management/projects/' +
-                          txt(r['id']),
-                txt(r['code']) + ' - ' + txt(r['name']),
+                    ? '/api/company/project-management/budget-categories/${txt(r['id'])}'
+                    : '/api/company/project-management/projects/${txt(r['id'])}',
+                '${txt(r['code'])} - ${txt(r['name'])}',
               ),
               icon: const Icon(Icons.delete_outline),
             ),
@@ -325,7 +320,7 @@ class _S extends State<ProjectPage> {
   Future<void> closeProject(Map<String, dynamic> row) async {
     try {
       await api.post(
-        '/api/company/project-management/projects/' + txt(row['id']) + '/close',
+        '/api/company/project-management/projects/${txt(row['id'])}/close',
       );
       showProjectMessage(context, message: 'ปิดโครงการแล้ว');
       reload();
@@ -339,7 +334,7 @@ class _S extends State<ProjectPage> {
         n = TextEditingController(text: txt(r?['name'])),
         o = TextEditingController(text: txt(r?['sortOrder'] ?? 10));
     await dialog(
-      title + ' > ' + (r == null ? 'เพิ่ม' : 'แก้ไข'),
+      '$title > ${r == null ? 'เพิ่ม' : 'แก้ไข'}',
       Icons.category_outlined,
       Column(
         mainAxisSize: MainAxisSize.min,
@@ -359,16 +354,17 @@ class _S extends State<ProjectPage> {
           'remark': '',
           'isActive': true,
         };
-        if (r == null)
+        if (r == null) {
           await api.post(
             '/api/company/project-management/budget-categories',
             body: b,
           );
-        else
+        } else {
           await api.put(
-            '/api/company/project-management/budget-categories/' + txt(r['id']),
+            '/api/company/project-management/budget-categories/${txt(r['id'])}',
             body: b,
           );
+        }
       },
     );
     c.dispose();
@@ -384,13 +380,13 @@ class _S extends State<ProjectPage> {
     if (row != null) {
       detail = map(
         await api.get(
-          '/api/company/project-management/projects/' + txt(row['id']),
+          '/api/company/project-management/projects/${txt(row['id'])}',
         ),
       );
     }
     final key = GlobalKey<ProjectFormState>();
     await dialog(
-      title + ' > ' + (row == null ? 'เพิ่ม' : 'แก้ไข'),
+      '$title > ${row == null ? 'เพิ่ม' : 'แก้ไข'}',
       Icons.account_tree_outlined,
       ProjectForm(key: key, options: options, detail: detail),
       () async {
@@ -403,7 +399,7 @@ class _S extends State<ProjectPage> {
           );
         } else {
           await api.put(
-            '/api/company/project-management/projects/' + txt(row['id']),
+            '/api/company/project-management/projects/${txt(row['id'])}',
             body: body,
           );
         }
@@ -425,7 +421,7 @@ class _S extends State<ProjectPage> {
               ? const Center(child: Text('ไม่พบงานที่ได้รับมอบหมาย'))
               : ListView.separated(
                   itemCount: r.length,
-                  separatorBuilder: (_, __) => const Divider(),
+                  separatorBuilder: (_, _) => const Divider(),
                   itemBuilder: (_, i) => TaskRow(
                     api: api,
                     row: r[i],
@@ -619,8 +615,8 @@ class _S extends State<ProjectPage> {
                         ),
                       ...late.map(
                         (x) => ListTile(
-                          title: Text(txt(x['code']) + ' - ' + txt(x['name'])),
-                          trailing: Text(txt(x['progress']) + '%'),
+                          title: Text('${txt(x['code'])} - ${txt(x['name'])}'),
+                          trailing: Text('${txt(x['progress'])}%'),
                         ),
                       ),
                     ],
@@ -746,7 +742,7 @@ class _S extends State<ProjectPage> {
           side: const BorderSide(color: Colors.red),
         ),
         title: const Text('ยืนยันการลบ', style: TextStyle(color: Colors.red)),
-        content: Text(key + '\nข้อมูลที่ลบไม่สามารถเรียกคืนได้'),
+        content: Text('$key\nข้อมูลที่ลบไม่สามารถเรียกคืนได้'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dc, false),
@@ -760,7 +756,7 @@ class _S extends State<ProjectPage> {
         ],
       ),
     );
-    if (ok == true)
+    if (ok == true) {
       try {
         await api.delete(path);
         showProjectMessage(context, message: 'ลบข้อมูลแล้ว');
@@ -768,6 +764,7 @@ class _S extends State<ProjectPage> {
       } catch (e) {
         showProjectMessage(context, message: e.toString(), error: true);
       }
+    }
   }
 }
 
@@ -1344,7 +1341,7 @@ class _T extends State<TaskRow> {
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       Text(
-        txt(widget.row['projectCode']) + ' • ' + txt(widget.row['projectName']),
+        '${txt(widget.row['projectCode'])} • ${txt(widget.row['projectName'])}',
       ),
       Text(txt(widget.row['name']), style: Theme.of(c).textTheme.titleMedium),
       Wrap(
@@ -1389,7 +1386,7 @@ class _T extends State<TaskRow> {
   Future<void> save() async {
     try {
       await widget.api.put(
-        '/api/company/project-management/my-tasks/' + txt(widget.row['id']),
+        '/api/company/project-management/my-tasks/${txt(widget.row['id'])}',
         body: {
           'status': state,
           'progress': double.tryParse(p.text) ?? 0,

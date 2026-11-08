@@ -129,12 +129,13 @@ extension _PatrolViews on _PatrolPageState {
           onPressed: () async {
             try {
               final raw = await api.get(
-                '/api/company/patrol/options?menuCode=' + widget.menuCode,
+                '/api/company/patrol/options?menuCode=${widget.menuCode}',
               );
               await showCreate(_map(raw), existing: row);
             } catch (e) {
-              if (mounted)
+              if (mounted) {
                 patrolMessage(context, message: e.toString(), error: true);
+              }
             }
           },
           icon: Icon(Icons.edit_outlined, color: patrolTokens.primaryColor),
@@ -170,8 +171,9 @@ extension _PatrolViews on _PatrolPageState {
               );
               await showCreate(_map(raw), existing: row);
             } catch (e) {
-              if (mounted)
+              if (mounted) {
                 patrolMessage(context, message: e.toString(), error: true);
+              }
             }
           },
           icon: Icon(Icons.edit_outlined, color: patrolTokens.primaryColor),
@@ -203,7 +205,7 @@ extension _PatrolViews on _PatrolPageState {
           tooltip: 'ยกเลิกตาราง',
           onPressed: () async {
             final reason = await askPatrolReason('ยกเลิกตารางตรวจ');
-            if (reason != null)
+            if (reason != null) {
               await run(
                 () => api.post(
                   '/api/company/patrol/schedules/$id/cancel',
@@ -211,6 +213,7 @@ extension _PatrolViews on _PatrolPageState {
                 ),
                 'ยกเลิกตารางตรวจแล้ว',
               );
+            }
           },
           icon: const Icon(Icons.cancel_outlined, color: Colors.red),
         ),
@@ -222,7 +225,7 @@ extension _PatrolViews on _PatrolPageState {
           tooltip: 'รับทราบ',
           onPressed: () async {
             final reason = await askPatrolReason('รับทราบรอบตรวจ');
-            if (reason != null)
+            if (reason != null) {
               await run(
                 () => api.put(
                   '/api/company/patrol/monitor/$id/acknowledge',
@@ -230,6 +233,7 @@ extension _PatrolViews on _PatrolPageState {
                 ),
                 'รับทราบรอบตรวจแล้ว',
               );
+            }
           },
           icon: const Icon(Icons.task_alt_outlined),
         ),
@@ -253,7 +257,7 @@ extension _PatrolViews on _PatrolPageState {
           tooltip: 'ยกระดับเหตุ',
           onPressed: () async {
             final reason = await askPatrolReason('ยกระดับเหตุ');
-            if (reason != null)
+            if (reason != null) {
               await run(
                 () => api.put(
                   '/api/company/patrol/incidents/$id/escalate',
@@ -261,6 +265,7 @@ extension _PatrolViews on _PatrolPageState {
                 ),
                 'ยกระดับเหตุแล้ว',
               );
+            }
           },
           icon: const Icon(Icons.trending_up_outlined),
         ),
@@ -286,9 +291,7 @@ extension _PatrolViews on _PatrolPageState {
   Future<void> _deactivate(Map<String, dynamic> row) async {
     final errorColor = Theme.of(context).colorScheme.error;
     final label =
-        (row['code'] ?? row['name'] ?? row['id']).toString() +
-        ' — ' +
-        (row['name'] ?? '').toString();
+        '${row['code'] ?? row['name'] ?? row['id']} — ${row['name'] ?? ''}';
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => Dialog(
@@ -365,7 +368,7 @@ extension _PatrolViews on _PatrolPageState {
     if (confirmed != true) return;
     final id = (row['id'] as num).toInt();
     await run(
-      () => api.delete('/api/company/patrol/' + widget.endpoint + '/$id'),
+      () => api.delete('/api/company/patrol/${widget.endpoint}/$id'),
       'ปิดใช้งานข้อมูลแล้ว',
     );
   }

@@ -7,6 +7,7 @@ class NavigationProject {
     required this.menuGroups,
     this.iconName,
     this.isExpandedDefault = false,
+    this.configuredMenuGroupCount,
   });
 
   final int id;
@@ -15,6 +16,8 @@ class NavigationProject {
   final String type;
   final String? iconName;
   final bool isExpandedDefault;
+  final int? configuredMenuGroupCount;
+  bool get showGroups => configuredMenuGroupCount != 1;
   final List<NavigationMenuGroup> menuGroups;
 
   bool get isCore => type.trim().toUpperCase() == 'CORE';
@@ -27,6 +30,7 @@ class NavigationProject {
         type: json['projectType'] as String,
         iconName: json['iconName'] as String?,
         isExpandedDefault: json['isExpandedDefault'] as bool? ?? false,
+        configuredMenuGroupCount: (json['configuredMenuGroupCount'] as num?)?.toInt(),
         menuGroups: ((json['menuGroups'] as List<dynamic>?) ?? const [])
             .map(
               (group) =>

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
-import '../../../../core/widgets/auto_dismiss_message.dart';
+import 'package:laoo_shared_admin_ui/laoo_shared_admin_ui.dart'
+    show FilterHeightSync;
+import '../../../../core/widgets/timed_snack_bar.dart';
 import '../../../../core/widgets/combo_box_text.dart';
-import '../../../../core/widgets/pinned_data_table.dart';
 
 import '../../../../app/theme/laoo_design_tokens.dart';
+import '../../../../app/theme/laoo_typography.dart';
 import '../../presentation/widgets/support_workspace_shell.dart';
 import '../../../../core/company_setup/company_setup_controller.dart';
 import '../../../../core/api/api_exception.dart';
@@ -43,11 +45,10 @@ class _PartnerListPageState extends State<PartnerListPage> {
   bool _loading = true;
   Object? _error;
   List<Partner> _partners = const [];
-  int? _sortColumnIndex = 1;
+  int? _sortColumnIndex = 2;
   bool _sortAscending = true;
-  String? _message;
-  bool _messageIsError = false;
   int _currentPage = 0;
+  bool _cardMode = false;
 
   int get _pageSize {
     final value = companySetupController.pageSize;
@@ -103,10 +104,7 @@ class _PartnerListPageState extends State<PartnerListPage> {
   }
 
   void _showMessage(String message, {bool error = false}) {
-    setState(() {
-      _message = message;
-      _messageIsError = error;
-    });
+    showTimedSnackBar(context, message: message, error: error);
   }
 
   void _clearFilters() {
@@ -119,6 +117,7 @@ class _PartnerListPageState extends State<PartnerListPage> {
     final editing = partner.partnerAdminUserId != null;
     final result = await showDialog<(String, String)>(
       context: context,
+      barrierDismissible: false,
       builder: (_) => _PartnerAdminDialog(
         initialUsername: partner.partnerAdminUsername,
         editing: editing,
@@ -185,498 +184,339 @@ class _PartnerListPageState extends State<PartnerListPage> {
   @override
   Widget build(BuildContext context) {
     final accent = Theme.of(context).colorScheme.primary;
-
     return ColoredBox(
       color: Theme.of(context).scaffoldBackgroundColor,
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(10),
-                child: Row(
-                  children: [
-                    const Expanded(
-                      child: WorkspacePageTitle(
-                        title: 'Partner',
-                        favoriteKey: 'Partner',
-                      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 900;
+          final cardMode = compact || _cardMode;
+          return Padding(
+            padding: const EdgeInsets.all(LaooLayout.cardMargin),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _section(
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
                     ),
-                    const SizedBox(width: 10),
-                    FilledButton.icon(
-                      onPressed: () async {
-                        await widget.openCreate();
-                        await _load();
-                      },
-                      icon: const Icon(Icons.add_rounded),
-                      label: const Text('เพิ่ม'),
+                    child: Row(
+                      children: [
+                        const Expanded(
+                          child: WorkspacePageTitle(
+                            title: 'Partner',
+                            favoriteKey: 'Partner',
+                          ),
+                        ),
+                        if (!compact) ...[
+                          SizedBox(
+                            width: LaooLayout.listViewToggleSize,
+                            height: LaooLayout.listViewToggleSize,
+                            child: IconButton(
+                              tooltip: cardMode
+                                  ? 'แสดงแบบตาราง'
+                                  : 'แสดงแบบการ์ด',
+                              style: IconButton.styleFrom(
+                                backgroundColor: accent.withValues(alpha: .1),
+                                foregroundColor: accent,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(
+                                    LaooRadius.xs,
+                                  ),
+                                ),
+                              ),
+                              onPressed: () =>
+                                  setState(() => _cardMode = !_cardMode),
+                              icon: Icon(
+                                cardMode
+                                    ? Icons.view_list_outlined
+                                    : Icons.grid_view,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                        ],
+                        SizedBox(
+                          height: LaooTypography.buttonHeight,
+                          child: FilledButton.icon(
+                            onPressed: () async {
+                              await widget.openCreate();
+                              await _load();
+                            },
+                            icon: const Icon(Icons.add_rounded),
+                            label: const Text('เพิ่ม'),
+                            style: FilledButton.styleFrom(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(
+                                  LaooRadius.xs,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            if (_message != null) ...[
-              AutoDismissMessage(
-                message: _message!,
-                error: _messageIsError,
-                onClose: () => setState(() => _message = null),
-              ),
-              const SizedBox(height: 12),
-            ],
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(10),
-                child: _Toolbar(
-                  searchController: _searchController,
-                  activeFilter: _activeFilter,
-                  accent: accent,
-                  onSearch: _load,
-                  onActiveChanged: (value) {
-                    setState(() => _activeFilter = value);
-                    _load();
-                  },
-                  onClear: _clearFilters,
-                  onRefresh: _load,
+                const SizedBox(height: 8),
+                _section(
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: _Toolbar(
+                      searchController: _searchController,
+                      activeFilter: _activeFilter,
+                      onSearch: _load,
+                      onActiveChanged: (value) =>
+                          setState(() => _activeFilter = value),
+                      onClear: _clearFilters,
+                    ),
+                  ),
                 ),
-              ),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: _loading
+                      ? _section(
+                          const Center(child: CircularProgressIndicator()),
+                        )
+                      : _error != null
+                      ? _section(
+                          _StateCard(
+                            icon: Icons.error_outline,
+                            title:
+                                'ไม่สามารถโหลดข้อมูล Partner ได้\nรายละเอียดเพิ่มเติม: กรุณาตรวจสอบการเชื่อมต่อและลองใหม่',
+                            actionLabel: 'ลองใหม่',
+                            onAction: _load,
+                          ),
+                        )
+                      : _partners.isEmpty
+                      ? _section(
+                          _StateCard(
+                            icon: Icons.search_off_rounded,
+                            title: 'ไม่พบข้อมูล Partner',
+                          ),
+                        )
+                      : cardMode
+                      ? _mobileList()
+                      : _tableView(),
+                ),
+                const SizedBox(height: 8),
+                _paginationBar(),
+              ],
             ),
-            const SizedBox(height: 14),
-            Expanded(child: _buildBody(context)),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
 
-  Widget _buildBody(BuildContext context) {
-    if (_loading) {
-      return const Center(child: CircularProgressIndicator());
-    }
+  Widget _section(Widget child) => Card(
+    margin: EdgeInsets.zero,
+    elevation: 0,
+    color: Colors.white,
+    surfaceTintColor: Colors.transparent,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(LaooRadius.xs),
+    ),
+    clipBehavior: Clip.antiAlias,
+    child: child,
+  );
 
-    if (_error != null) {
-      return _StateCard(
-        icon: Icons.error_outline,
-        title: 'ไม่สามารถโหลดข้อมูล Partner ได้',
-        actionLabel: 'ลองใหม่',
-        onAction: _load,
-      );
+  Future<void> _editPartner(Partner partner) async {
+    final updated = await widget.openEdit(partner);
+    if (updated) {
+      await _load();
+      if (mounted) _showMessage('แก้ไขข้อมูล Partner สำเร็จ');
     }
-
-    if (_partners.isEmpty) {
-      return _StateCard(
-        icon: Icons.search_off_rounded,
-        title: _searchController.text.trim().isEmpty && _activeFilter == null
-            ? 'ยังไม่มีข้อมูล Partner'
-            : 'ไม่พบข้อมูลตามเงื่อนไขที่ค้นหา',
-      );
-    }
-
-    if (MediaQuery.sizeOf(context).width < 760) {
-      return Column(
-        children: [
-          Expanded(child: _mobileList()),
-          const SizedBox(height: 10),
-          _paginationBar(),
-        ],
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Expanded(
-          child: Align(
-            alignment: Alignment.topLeft,
-            child: SizedBox(width: double.infinity, child: _tableView()),
-          ),
-        ),
-        const SizedBox(height: 10),
-        Align(alignment: Alignment.centerLeft, child: _paginationBar()),
-      ],
-    );
   }
 
+  Widget _actions(Partner partner) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      TextButton(
+        onPressed: () => _manageAdmin(partner),
+        style: TextButton.styleFrom(
+          padding: EdgeInsets.zero,
+          minimumSize: const Size(40, 40),
+        ),
+        child: const Text('admin'),
+      ),
+      IconButton(
+        tooltip: 'แก้ไข',
+        onPressed: () => _editPartner(partner),
+        icon: Icon(
+          Icons.edit_outlined,
+          color: Theme.of(context).colorScheme.primary,
+        ),
+        constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+        padding: EdgeInsets.zero,
+      ),
+      IconButton(
+        tooltip: 'ลบ',
+        onPressed: () => _confirmDelete(partner),
+        icon: const Icon(Icons.delete_outline_rounded, color: LaooColors.error),
+        constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+        padding: EdgeInsets.zero,
+      ),
+    ],
+  );
+
   Widget _tableView() {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        const minTableWidth = 920.0;
-        const horizontalMargin = 6.0;
-        const columnSpacing = 6.0;
-
-        final availableWidth = constraints.maxWidth;
-        final tableWidth = availableWidth < minTableWidth
-            ? minTableWidth
-            : availableWidth;
-
-        // Fixed columns are intentionally compact so the last Status column
-        // always stays inside the visible table area.
-        const actionWidth = 124.0;
-        const codeWidth = 112.0;
-        const adminWidth = 118.0;
-        const statusWidth = 82.0;
-
-        // DataTable also consumes width for margins, inter-column spacing,
-        // sortable-column arrow/padding and small internal layout overhead.
-        const sortAndInternalReserve = 86.0;
-        final tableOverhead =
-            (horizontalMargin * 2) +
-            (columnSpacing * 5) +
-            sortAndInternalReserve;
-
-        final flexibleWidth =
-            (tableWidth -
-                    actionWidth -
-                    codeWidth -
-                    adminWidth -
-                    statusWidth -
-                    tableOverhead)
-                .clamp(360.0, double.infinity);
-
-        final nameWidth = flexibleWidth * 0.45;
-        final contactWidth = flexibleWidth * 0.31;
-        final phoneWidth = flexibleWidth * 0.24;
-
-        Widget cellText(String text, double width) {
-          return SizedBox(
-            width: width,
-            child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis),
-          );
-        }
-
-        Widget headerText(String text, double width) {
-          return SizedBox(
-            width: width,
-            child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis),
-          );
-        }
-
-        return SizedBox(
-          height: constraints.maxHeight,
-          child: Align(
-            alignment: Alignment.topLeft,
-            child: Card(
-              margin: EdgeInsets.zero,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(LaooRadius.md),
-                side: const BorderSide(color: LaooColors.border),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: SizedBox(
-                  width: tableWidth,
-                  child: SingleChildScrollView(
-                    child: PinnedDataTable(
-                      horizontalMargin: horizontalMargin,
-                      columnSpacing: columnSpacing,
-                      sortColumnIndex: _sortColumnIndex,
-                      sortAscending: _sortAscending,
-                      headingRowColor: WidgetStateProperty.all(
-                        Theme.of(
-                          context,
-                        ).colorScheme.primary.withValues(alpha: 0.12),
-                      ),
-                      headingTextStyle: TextStyle(
-                        color: Theme.of(context).colorScheme.primary,
-                        fontWeight: FontWeight.w700,
-                      ),
-                      dataRowMinHeight: 52,
-                      dataRowMaxHeight: 60,
-                      columns: [
-                        const DataColumn(
-                          label: SizedBox(
-                            width: actionWidth,
-                            child: Center(child: Text('Action')),
-                          ),
-                        ),
-                        DataColumn(
-                          label: headerText('รหัส Partner', codeWidth),
-                          onSort: (index, ascending) => _sortBy(
-                            index,
-                            (p) => p.partnerCode.toLowerCase(),
-                            ascending,
-                          ),
-                        ),
-                        DataColumn(
-                          label: headerText('ชื่อ Partner', nameWidth),
-                          onSort: (index, ascending) => _sortBy(
-                            index,
-                            (p) => p.partnerNameTh.toLowerCase(),
-                            ascending,
-                          ),
-                        ),
-                        const DataColumn(
-                          label: SizedBox(
-                            width: adminWidth,
-                            child: Text('admin'),
-                          ),
-                        ),
-                        DataColumn(
-                          label: headerText('ผู้ติดต่อ', contactWidth),
-                          onSort: (index, ascending) => _sortBy(
-                            index,
-                            (p) => (p.contactName1 ?? '').toLowerCase(),
-                            ascending,
-                          ),
-                        ),
-                        DataColumn(
-                          label: headerText('เบอร์โทรศัพท์', phoneWidth),
-                          onSort: (index, ascending) => _sortBy(
-                            index,
-                            (p) => (p.contactPhone1 ?? '').toLowerCase(),
-                            ascending,
-                          ),
-                        ),
-                        DataColumn(
-                          label: headerText('สถานะ', statusWidth),
-                          onSort: (index, ascending) => _sortBy(
-                            index,
-                            (p) => p.isActive ? 1 : 0,
-                            ascending,
-                          ),
-                        ),
-                      ],
-                      rows: _visiblePartners.map((partner) {
-                        return DataRow(
-                          cells: [
-                            DataCell(
-                              SizedBox(
-                                width: actionWidth,
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    TextButton(
-                                      style: TextButton.styleFrom(
-                                        padding: EdgeInsets.zero,
-                                        minimumSize: const Size(38, 32),
-                                        tapTargetSize:
-                                            MaterialTapTargetSize.shrinkWrap,
-                                      ),
-                                      onPressed: () => _manageAdmin(partner),
-                                      child: const Text('admin'),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    IconButton(
-                                      tooltip: 'แก้ไข',
-                                      visualDensity: VisualDensity.compact,
-                                      padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(
-                                        minWidth: 32,
-                                        minHeight: 32,
-                                      ),
-                                      onPressed: () async {
-                                        final updated = await widget.openEdit(
-                                          partner,
-                                        );
-                                        if (updated) {
-                                          await _load();
-                                          if (mounted) {
-                                            _showMessage(
-                                              'แก้ไขข้อมูล Partner สำเร็จ',
-                                            );
-                                          }
-                                        }
-                                      },
-                                      icon: Icon(
-                                        Icons.edit_outlined,
-                                        size: 18,
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.primary,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    IconButton(
-                                      tooltip: 'ลบ',
-                                      visualDensity: VisualDensity.compact,
-                                      padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(
-                                        minWidth: 32,
-                                        minHeight: 32,
-                                      ),
-                                      onPressed: () => _confirmDelete(partner),
-                                      icon: const Icon(
-                                        Icons.delete_outline_rounded,
-                                        size: 18,
-                                        color: LaooColors.error,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            DataCell(cellText(partner.partnerCode, codeWidth)),
-                            DataCell(
-                              cellText(partner.partnerNameTh, nameWidth),
-                            ),
-                            DataCell(
-                              cellText(
-                                partner.partnerAdminUsername ?? '-',
-                                adminWidth,
-                              ),
-                            ),
-                            DataCell(
-                              cellText(
-                                partner.contactName1 ?? '-',
-                                contactWidth,
-                              ),
-                            ),
-                            DataCell(
-                              cellText(
-                                partner.contactPhone1 ?? '-',
-                                phoneWidth,
-                              ),
-                            ),
-                            DataCell(
-                              SizedBox(
-                                width: statusWidth,
-                                child: Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: FittedBox(
-                                    fit: BoxFit.scaleDown,
-                                    alignment: Alignment.centerLeft,
-                                    child: _StatusChip(
-                                      active: partner.isActive,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        );
-                      }).toList(),
-                    ),
+    final theme = Theme.of(context);
+    final color = theme.colorScheme.primary;
+    final border = theme.dividerColor;
+    final columns = <double>[.45, 2, 2.2, 1.2, 1.4, 1.3, 1.3];
+    Widget row(List<Widget> cells, {bool heading = false}) => Container(
+      height: heading ? 56 : 56,
+      decoration: BoxDecoration(
+        color: heading ? color.withValues(alpha: .12) : Colors.white,
+        border: Border(bottom: BorderSide(color: border, width: .6)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      child: Row(
+        children: [
+          for (var i = 0; i < cells.length; i++)
+            Expanded(flex: (columns[i] * 100).round(), child: cells[i]),
+        ],
+      ),
+    );
+    Widget label(String value) => Text(
+      value,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 14),
+    );
+    Widget value(String value) => Text(
+      value,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: const TextStyle(fontSize: 14),
+    );
+    Widget sortable(
+      String title,
+      int index,
+      Comparable Function(Partner) selector,
+    ) => InkWell(
+      onTap: () => _sortBy(
+        index,
+        selector,
+        _sortColumnIndex == index ? !_sortAscending : true,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Flexible(child: label(title)),
+          if (_sortColumnIndex == index)
+            Icon(
+              _sortAscending ? Icons.arrow_upward : Icons.arrow_downward,
+              size: 16,
+              color: color,
+            ),
+        ],
+      ),
+    );
+    return _section(
+      Column(
+        children: [
+          row([
+            label('ID'),
+            label('Action'),
+            sortable('ชื่อ Partner', 2, (p) => p.partnerNameTh.toLowerCase()),
+            label('admin'),
+            sortable(
+              'ผู้ติดต่อ',
+              3,
+              (p) => (p.contactName1 ?? '').toLowerCase(),
+            ),
+            sortable(
+              'เบอร์โทรศัพท์',
+              4,
+              (p) => (p.contactPhone1 ?? '').toLowerCase(),
+            ),
+            sortable('สถานะ', 5, (p) => p.isActive ? 1 : 0),
+          ], heading: true),
+          Expanded(
+            child: ListView.builder(
+              itemCount: _visiblePartners.length,
+              itemBuilder: (context, index) {
+                final p = _visiblePartners[index];
+                return row([
+                  value('${_currentPage * _pageSize + index + 1}'),
+                  _actions(p),
+                  value(p.partnerNameTh),
+                  value(p.partnerAdminUsername ?? '-'),
+                  value(p.contactName1 ?? '-'),
+                  value(p.contactPhone1 ?? '-'),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: _StatusChip(active: p.isActive),
                   ),
-                ),
-              ),
+                ]);
+              },
             ),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 
   Widget _paginationBar() {
-    final pageCount = _pageCount;
-    final page = _currentPage.clamp(0, pageCount - 1);
-    final firstRow = _partners.isEmpty ? 0 : (page * _pageSize) + 1;
-    final lastRow = _partners.isEmpty
+    final page = _currentPage.clamp(0, _pageCount - 1);
+    final first = _partners.isEmpty ? 0 : page * _pageSize + 1;
+    final last = _partners.isEmpty
         ? 0
         : ((page + 1) * _pageSize).clamp(0, _partners.length);
-
-    final accent = Theme.of(context).colorScheme.primary;
-
-    final pageIndexes = <int>[];
-    if (pageCount <= 7) {
-      for (var i = 0; i < pageCount; i++) {
-        pageIndexes.add(i);
-      }
-    } else {
-      final start = (page - 2).clamp(0, pageCount - 5);
-      final end = (start + 5).clamp(0, pageCount);
-      for (var i = start; i < end; i++) {
-        pageIndexes.add(i);
-      }
-    }
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(10),
-        child: Wrap(
-          spacing: 6,
-          runSpacing: 8,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            OutlinedButton(
-              onPressed: page > 0
-                  ? () => setState(() => _currentPage = page - 1)
-                  : null,
-              style: OutlinedButton.styleFrom(
-                foregroundColor: accent,
-                side: BorderSide(color: accent.withValues(alpha: 0.45)),
-                visualDensity: VisualDensity.compact,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 8,
-                ),
-              ),
-              child: const Text('ก่อนหน้า'),
-            ),
-            if (pageCount > 7 && pageIndexes.first > 0) ...[
-              _pageNumberButton(0, page, accent),
-              if (pageIndexes.first > 1)
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 2),
-                  child: Text('...'),
-                ),
-            ],
-            for (final index in pageIndexes)
-              _pageNumberButton(index, page, accent),
-            if (pageCount > 7 && pageIndexes.last < pageCount - 1) ...[
-              if (pageIndexes.last < pageCount - 2)
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 2),
-                  child: Text('...'),
-                ),
-              _pageNumberButton(pageCount - 1, page, accent),
-            ],
-            OutlinedButton(
-              onPressed: page + 1 < pageCount
-                  ? () => setState(() => _currentPage = page + 1)
-                  : null,
-              style: OutlinedButton.styleFrom(
-                foregroundColor: accent,
-                side: BorderSide(color: accent.withValues(alpha: 0.45)),
-                visualDensity: VisualDensity.compact,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 8,
-                ),
-              ),
-              child: const Text('ถัดไป'),
-            ),
-            Text(
-              '$firstRow-$lastRow จาก ${_partners.length}',
-              style: const TextStyle(color: LaooColors.textSecondary),
-            ),
-          ],
+    final primary = Theme.of(context).colorScheme.primary;
+    Widget button(
+      Widget child,
+      VoidCallback? action, {
+      bool selected = false,
+    }) => SizedBox(
+      width: LaooLayout.paginationButtonSize,
+      height: LaooLayout.paginationButtonSize,
+      child: FilledButton(
+        onPressed: action,
+        style: FilledButton.styleFrom(
+          padding: EdgeInsets.zero,
+          backgroundColor: primary,
+          disabledBackgroundColor: selected ? primary : Colors.grey.shade300,
+          disabledForegroundColor: selected
+              ? Colors.white
+              : Colors.grey.shade700,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(LaooRadius.xs),
+          ),
         ),
+        child: child,
       ),
     );
-  }
-
-  Widget _pageNumberButton(int index, int currentPage, Color accent) {
-    final selected = index == currentPage;
-
-    return SizedBox(
-      width: 36,
-      height: 34,
-      child: selected
-          ? FilledButton(
-              onPressed: () {},
-              style: FilledButton.styleFrom(
-                padding: EdgeInsets.zero,
-                backgroundColor: accent,
-                foregroundColor: Colors.white,
-                visualDensity: VisualDensity.compact,
+    return _section(
+      SizedBox(
+        height: LaooLayout.paginationCardHeight,
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          child: Row(
+            children: [
+              button(
+                const Icon(Icons.chevron_left),
+                page > 0 ? () => setState(() => _currentPage = page - 1) : null,
               ),
-              child: Text('${index + 1}'),
-            )
-          : OutlinedButton(
-              onPressed: () => setState(() => _currentPage = index),
-              style: OutlinedButton.styleFrom(
-                padding: EdgeInsets.zero,
-                foregroundColor: accent,
-                side: BorderSide(color: accent.withValues(alpha: 0.35)),
-                visualDensity: VisualDensity.compact,
+              const SizedBox(width: 6),
+              button(Text('${page + 1}'), null, selected: true),
+              const SizedBox(width: 6),
+              button(
+                const Icon(Icons.chevron_right),
+                page + 1 < _pageCount
+                    ? () => setState(() => _currentPage = page + 1)
+                    : null,
               ),
-              child: Text('${index + 1}'),
-            ),
+              const SizedBox(width: 12),
+              Text('$first-$last จาก ${_partners.length}'),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -744,7 +584,7 @@ class _PartnerListPageState extends State<PartnerListPage> {
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: LaooColors.error.withValues(alpha: 0.055),
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(LaooRadius.xs),
                       ),
                       child: Text.rich(
                         TextSpan(
@@ -842,182 +682,154 @@ class _PartnerListPageState extends State<PartnerListPage> {
     }
   }
 
-  Widget _mobileList() {
-    return ListView.separated(
-      itemCount: _visiblePartners.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 10),
-      itemBuilder: (context, index) {
-        final partner = _visiblePartners[index];
-        return Card(
-          margin: EdgeInsets.zero,
-          color: Colors.white,
-          elevation: 3,
-          shadowColor: Colors.black.withValues(alpha: .14),
-          surfaceTintColor: Colors.transparent,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(LaooRadius.md),
-            side: BorderSide.none,
+  Widget _mobileList() => ListView.separated(
+    itemCount: _visiblePartners.length,
+    separatorBuilder: (_, _) => const SizedBox(height: 8),
+    itemBuilder: (context, index) {
+      final partner = _visiblePartners[index];
+      final primary = Theme.of(context).colorScheme.primary;
+      return _section(
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 10, 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  Text(
+                    partner.partnerNameTh,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: primary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                    ),
+                  ),
+                  _StatusChip(active: partner.isActive),
+                  _actions(partner),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text('Admin: ${partner.partnerAdminUsername ?? '-'}'),
+              Text('ผู้ติดต่อ: ${partner.contactName1 ?? '-'}'),
+              Text('โทรศัพท์: ${partner.contactPhone1 ?? '-'}'),
+            ],
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    IconButton(
-                      tooltip: 'แก้ไข',
-                      onPressed: () async {
-                        final updated = await widget.openEdit(partner);
-                        if (updated) {
-                          await _load();
-                          if (mounted) {
-                            _showMessage('แก้ไขข้อมูล Partner สำเร็จ');
-                          }
-                        }
-                      },
-                      icon: Icon(
-                        Icons.edit_outlined,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                    IconButton(
-                      tooltip: 'ลบ',
-                      onPressed: () => _confirmDelete(partner),
-                      icon: const Icon(
-                        Icons.delete_outline_rounded,
-                        color: LaooColors.error,
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () => _manageAdmin(partner),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        minimumSize: const Size(0, 36),
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                      child: const Text('admin'),
-                    ),
-                    const Spacer(),
-                    _StatusChip(active: partner.isActive),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '${partner.partnerCode} - ${partner.partnerNameTh}',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w800),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Admin: ${partner.partnerAdminUsername ?? '-'}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        partner.contactPhone1 ?? '-',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.right,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
+        ),
+      );
+    },
+  );
 }
 
 class _Toolbar extends StatelessWidget {
   const _Toolbar({
     required this.searchController,
     required this.activeFilter,
-    required this.accent,
     required this.onSearch,
     required this.onActiveChanged,
     required this.onClear,
-    required this.onRefresh,
   });
-
   final TextEditingController searchController;
   final bool? activeFilter;
-  final Color accent;
   final VoidCallback onSearch;
   final ValueChanged<bool?> onActiveChanged;
   final VoidCallback onClear;
-  final VoidCallback onRefresh;
 
   @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        SizedBox(
-          width: 330,
-          child: TextField(
-            controller: searchController,
-            onSubmitted: (_) => onSearch(),
-            decoration: InputDecoration(
-              hintText: 'ค้นหา Partner...',
-              hintStyle: const TextStyle(fontSize: 14),
-              prefixIcon: const Icon(Icons.search_rounded),
-              suffixIcon: IconButton(
-                tooltip: 'ค้นหา',
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final primary = Theme.of(context).colorScheme.primary;
+      final shape = RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(LaooRadius.xs),
+      );
+      return FilterHeightSync(
+        builder: (context, searchKey, height) => Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            SizedBox(
+              width: constraints.maxWidth < 330 ? constraints.maxWidth : 330,
+              child: TextField(
+                key: searchKey,
+                controller: searchController,
+                onSubmitted: (_) => onSearch(),
+                decoration: const InputDecoration(
+                  hintText: 'ค้นหา Partner...',
+                  prefixIcon: Icon(Icons.search_rounded),
+                  isDense: true,
+                ),
+              ),
+            ),
+            SizedBox(
+              height: height,
+              child: FilledButton.icon(
                 onPressed: onSearch,
-                icon: const Icon(Icons.arrow_forward_rounded),
+                style: FilledButton.styleFrom(
+                  shape: shape,
+                  minimumSize: Size(0, height),
+                  maximumSize: Size(double.infinity, height),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  visualDensity: VisualDensity.standard,
+                ),
+                icon: const Icon(Icons.search),
+                label: const Text('ค้นหา'),
               ),
-              isDense: true,
             ),
-          ),
-        ),
-        SizedBox(
-          width: 180,
-          child: DropdownButtonFormField<bool?>(
-            initialValue: activeFilter,
-            decoration: const InputDecoration(
-              labelText: 'สถานะ',
-              isDense: true,
+            SizedBox(
+              height: height,
+              child: OutlinedButton.icon(
+                onPressed: onClear,
+                style: OutlinedButton.styleFrom(
+                  shape: shape,
+                  minimumSize: Size(0, height),
+                  maximumSize: Size(double.infinity, height),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  visualDensity: VisualDensity.standard,
+                  foregroundColor: primary,
+                  side: BorderSide(color: primary),
+                ),
+                icon: const Icon(Icons.filter_alt_off_outlined),
+                label: const Text('ล้าง Filter'),
+              ),
             ),
-            items: const [
-              DropdownMenuItem(value: null, child: LaooComboBoxText('ทั้งหมด')),
-              DropdownMenuItem(
-                value: true,
-                child: LaooComboBoxText('เปิดใช้งาน'),
+            SizedBox(
+              width: 170,
+              child: DropdownButtonFormField<bool?>(
+                initialValue: activeFilter,
+                decoration: const InputDecoration(
+                  labelText: 'สถานะ',
+                  isDense: true,
+                ),
+                items: const [
+                  DropdownMenuItem(
+                    value: null,
+                    child: LaooComboBoxText('ทั้งหมด'),
+                  ),
+                  DropdownMenuItem(
+                    value: true,
+                    child: LaooComboBoxText('เปิดใช้งาน'),
+                  ),
+                  DropdownMenuItem(
+                    value: false,
+                    child: LaooComboBoxText('ระงับใช้งาน'),
+                  ),
+                ],
+                onChanged: onActiveChanged,
               ),
-              DropdownMenuItem(
-                value: false,
-                child: LaooComboBoxText('ระงับใช้งาน'),
-              ),
-            ],
-            onChanged: onActiveChanged,
-          ),
+            ),
+          ],
         ),
-        OutlinedButton.icon(
-          onPressed: onClear,
-          icon: const Icon(Icons.filter_alt_off_outlined, size: 18),
-          label: const Text('ล้าง Filter'),
-        ),
-        IconButton(
-          tooltip: 'Refresh',
-          onPressed: onRefresh,
-          icon: Icon(Icons.refresh_rounded, color: accent),
-        ),
-      ],
-    );
-  }
+      );
+    },
+  );
 }
 
 class _StatusChip extends StatelessWidget {
@@ -1111,101 +923,131 @@ class _PartnerAdminDialogState extends State<_PartnerAdminDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final shape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(LaooRadius.xs),
+    );
     return Dialog(
       backgroundColor: Colors.white,
-      clipBehavior: Clip.antiAlias,
       insetPadding: const EdgeInsets.all(24),
+      shape: shape,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 460),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
-              color: theme.colorScheme.primaryContainer,
-              child: Text(
-                widget.editing ? 'แก้ไข Partner Admin' : 'สร้าง Partner Admin',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
-              child: Column(
-                children: [
-                  TextField(
-                    controller: _username,
-                    decoration: _fieldDecoration('Username Admin'),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _password,
-                    obscureText: _obscurePassword,
-                    decoration: _fieldDecoration(
-                      widget.editing
-                          ? 'Password ใหม่ (เว้นว่างได้)'
-                          : 'Password',
-                      suffixIcon: IconButton(
-                        tooltip: _obscurePassword
-                            ? 'แสดง Password'
-                            : 'ซ่อน Password',
-                        onPressed: () {
-                          setState(() {
-                            _obscurePassword = !_obscurePassword;
-                          });
-                        },
-                        icon: Icon(
-                          _obscurePassword
-                              ? Icons.visibility_outlined
-                              : Icons.visibility_off_outlined,
-                        ),
+        constraints: const BoxConstraints(maxWidth: 480),
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                height: 48,
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.manage_accounts_outlined,
+                      size: 24,
+                      color: theme.colorScheme.primary,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        widget.editing
+                            ? 'แก้ไข Partner Admin'
+                            : 'สร้าง Partner Admin',
+                        style: LaooTypography.pageCaptionStyle,
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Password ใหม่ต้องมีอย่างน้อย 6 ตัวอักษร พร้อมตัวพิมพ์ใหญ่ ตัวพิมพ์เล็ก และอักขระพิเศษ',
-                      style: TextStyle(fontSize: 14),
-                    ),
-                  ),
-                  if (_error != null) ...[
-                    const SizedBox(height: 8),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(_error!, style: TextStyle(color: Colors.red)),
-                    ),
                   ],
-                ],
+                ),
               ),
-            ),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
-              decoration: BoxDecoration(
-                border: Border(top: BorderSide(color: theme.dividerColor)),
+              Divider(color: theme.dividerColor),
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Column(
+                    children: [
+                      TextField(
+                        controller: _username,
+                        style: const TextStyle(
+                          fontSize: LaooTypography.inputText,
+                        ),
+                        decoration: _fieldDecoration('Username Admin'),
+                      ),
+                      const SizedBox(height: 14),
+                      TextField(
+                        controller: _password,
+                        obscureText: _obscurePassword,
+                        style: const TextStyle(
+                          fontSize: LaooTypography.inputText,
+                        ),
+                        decoration: _fieldDecoration(
+                          widget.editing
+                              ? 'Password ใหม่ (เว้นว่างได้)'
+                              : 'Password',
+                          suffixIcon: IconButton(
+                            tooltip: _obscurePassword
+                                ? 'แสดง Password'
+                                : 'ซ่อน Password',
+                            onPressed: () => setState(
+                              () => _obscurePassword = !_obscurePassword,
+                            ),
+                            icon: Icon(
+                              _obscurePassword
+                                  ? Icons.visibility_outlined
+                                  : Icons.visibility_off_outlined,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'Password ใหม่ต้องมีอย่างน้อย 6 ตัวอักษร พร้อมตัวพิมพ์ใหญ่ ตัวพิมพ์เล็ก และอักขระพิเศษ',
+                        ),
+                      ),
+                      if (_error != null) ...[
+                        const SizedBox(height: 8),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            _error!,
+                            style: TextStyle(color: theme.colorScheme.error),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+              Divider(color: theme.dividerColor),
+              const SizedBox(height: 12),
+              Wrap(
+                alignment: WrapAlignment.end,
+                spacing: 8,
+                runSpacing: 8,
                 children: [
                   OutlinedButton.icon(
                     onPressed: () => Navigator.pop(context),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(84, LaooTypography.buttonHeight),
+                      shape: shape,
+                    ),
                     icon: const Icon(Icons.close),
                     label: const Text('ยกเลิก'),
                   ),
-                  const SizedBox(width: 12),
                   FilledButton.icon(
                     onPressed: _submit,
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(100, LaooTypography.buttonHeight),
+                      shape: shape,
+                    ),
                     icon: const Icon(Icons.save_outlined),
                     label: Text(widget.editing ? 'บันทึก' : 'สร้าง Admin'),
                   ),
                 ],
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1224,7 +1066,7 @@ class _PartnerAdminDialogState extends State<_PartnerAdminDialog> {
   InputDecoration _fieldDecoration(String label, {Widget? suffixIcon}) {
     final color = Theme.of(context).colorScheme;
     final border = OutlineInputBorder(
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(LaooRadius.xs),
       borderSide: BorderSide(color: color.outline),
     );
     return InputDecoration(
@@ -1232,7 +1074,7 @@ class _PartnerAdminDialogState extends State<_PartnerAdminDialog> {
       border: border,
       enabledBorder: border,
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(LaooRadius.xs),
         borderSide: BorderSide(color: color.primary, width: 2),
       ),
       suffixIcon: suffixIcon,

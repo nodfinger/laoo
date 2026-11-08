@@ -53,14 +53,48 @@ public sealed class RoleGroupController(IConfiguration configuration) : Controll
     public async Task<ActionResult<RoleGroupResponse>> Create([FromQuery] string scope, RoleGroupUpsertRequest request, CancellationToken token)
     {
         if (!TryScope(scope, out var st, out var screen)) return BadRequest(new { message = "scope ไม่ถูกต้อง" });
-        if (string.IsNullOrWhiteSpace(request.RoleCode) || string.IsNullOrWhiteSpace(request.RoleNameTh)) return BadRequest(new { message = "กรุณาระบุรหัสและชื่อกลุ่มสิทธิ์" });
+        if ((st != 'C' && string.IsNullOrWhiteSpace(request.RoleCode)) || string.IsNullOrWhiteSpace(request.RoleNameTh)) return BadRequest(new { message = "กรุณาระบุข้อมูลกลุ่มสิทธิ์ให้ครบ" });
         await using var c = await OpenAsync(token); if (!await HasPermissionAsync(c, screen, "CREATE", token)) return Forbid();
         var owner = OwnerId(st); var project = ClaimLong("project_id"); if (!owner.HasValue || !project.HasValue) return BadRequest(new { message = "ไม่พบ Scope ของผู้ใช้งาน" });
+        if (st == 'C') return await CreateCompanyRoleAsync(c, project.Value, owner.Value, scope, request, token);
         var duplicate = await DuplicateMessageAsync(c, project.Value, st, owner.Value, request, null, token); if (duplicate != null) return Conflict(new { message = duplicate });
         const string sql = "INSERT dbo.TDADRoleGroup(ProjectID,ScopeType,PartnerID,CompanyID,RoleCode,RoleNameTH,Description,IsActive,CreatedBy) VALUES(@ProjectID,@ScopeType,@PartnerID,@CompanyID,@RoleCode,@RoleNameTH,@Description,@IsActive,N'api'); SELECT CAST(SCOPE_IDENTITY() AS BIGINT);";
         await using var cmd = new SqlCommand(sql, c); BindScope(cmd, project.Value, st, owner.Value); BindRequest(cmd, request);
         try { var id = Convert.ToInt64(await cmd.ExecuteScalarAsync(token)); return Created($"/api/role-groups/{id}", new RoleGroupResponse { RoleGroupId = id, Scope = scope, RoleCode = request.RoleCode.Trim(), RoleNameTh = request.RoleNameTh.Trim(), Description = Null(request.Description), IsActive = request.IsActive }); }
         catch (SqlException ex) when (ex.Number is 2601 or 2627) { return Conflict(new { message = "รหัสกลุ่มสิทธิ์ซ้ำ" }); }
+    }
+
+    private static async Task<ActionResult<RoleGroupResponse>> CreateCompanyRoleAsync(SqlConnection c, long project, long company, string scope, RoleGroupUpsertRequest request, CancellationToken token)
+    {
+        await using var tx = (SqlTransaction)await c.BeginTransactionAsync(token);
+        try
+        {
+            const string sql = """
+DECLARE @lockResult int, @next int;
+EXEC @lockResult=sys.sp_getapplock @Resource=@LockResource, @LockMode=N'Exclusive', @LockOwner=N'Transaction', @LockTimeout=10000;
+IF @lockResult<0 THROW 53001,N'ROLE_CODE_LOCK_FAILED',1;
+IF EXISTS(SELECT 1 FROM dbo.TDADRoleGroup WHERE ProjectID=@ProjectID AND ScopeType='C' AND CompanyID=@CompanyID AND UPPER(LTRIM(RTRIM(RoleNameTH)))=UPPER(LTRIM(RTRIM(@RoleNameTH)))) THROW 53002,N'ROLE_NAME_DUPLICATE',1;
+SELECT @next=ISNULL(MAX(TRY_CONVERT(int,RoleCode)),0)+1 FROM dbo.TDADRoleGroup WHERE ScopeType='C' AND CompanyID=@CompanyID AND LEN(RoleCode)=5 AND RoleCode NOT LIKE '%[^0-9]%';
+IF @next>99999 THROW 53003,N'ROLE_CODE_EXHAUSTED',1;
+SET @RoleCode=RIGHT(N'00000'+CONVERT(nvarchar(5),@next),5);
+INSERT dbo.TDADRoleGroup(ProjectID,ScopeType,PartnerID,CompanyID,RoleCode,RoleNameTH,Description,IsActive,CreatedBy)
+OUTPUT INSERTED.RoleGroupID,INSERTED.RoleCode
+VALUES(@ProjectID,'C',NULL,@CompanyID,@RoleCode,@RoleNameTH,@Description,@IsActive,N'api');
+""";
+            await using var cmd = new SqlCommand(sql, c, tx);
+            Add(cmd, "@ProjectID", SqlDbType.BigInt, project); Add(cmd, "@CompanyID", SqlDbType.BigInt, company);
+            Add(cmd, "@LockResource", SqlDbType.NVarChar, $"role-group-company:{company}", 255);
+            BindRequest(cmd, request);
+            await using var reader = await cmd.ExecuteReaderAsync(token);
+            await reader.ReadAsync(token); var id = reader.GetInt64(0); var code = reader.GetString(1);
+            await reader.CloseAsync(); await tx.CommitAsync(token);
+            return new CreatedResult($"/api/role-groups/{id}", new RoleGroupResponse { RoleGroupId=id, Scope=scope, RoleCode=code, RoleNameTh=request.RoleNameTh.Trim(), Description=Null(request.Description), IsActive=request.IsActive });
+        }
+        catch (SqlException ex) when (ex.Number is 53001 or 53002 or 53003 or 2601 or 2627)
+        {
+            await tx.RollbackAsync(token);
+            return new ConflictObjectResult(new { message = ex.Number == 53002 ? "ชื่อกลุ่มสิทธิ์ซ้ำ" : ex.Number == 53003 ? "รหัสกลุ่มสิทธิ์เต็มแล้ว" : "ไม่สามารถสร้างรหัสกลุ่มสิทธิ์ได้ กรุณาลองใหม่" });
+        }
     }
 
     [HttpPut("{id:long}")]

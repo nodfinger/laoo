@@ -23,6 +23,14 @@ abstract final class ServiceRoutes {
     ),
     FeatureRouteContract(
       projectCode: ServiceProject.code,
+      menuCode: '18002',
+      screenType: 1,
+      routeName: 'serviceRequestSubjects',
+      routePath: '/company/service-request-subjects',
+      isImplemented: true,
+    ),
+    FeatureRouteContract(
+      projectCode: ServiceProject.code,
       menuCode: '09001',
       screenType: 1,
       routeName: 'companyCustomers',

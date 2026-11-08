@@ -2,6 +2,7 @@ using System.Data;
 using System.Globalization;
 using System.Security.Claims;
 using LaooApi.Models;
+using LaooApi.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
@@ -20,11 +21,14 @@ public sealed class MasterDataController : ControllerBase
     public MasterDataController(IConfiguration configuration) => _configuration = configuration;
 
     [HttpGet("groups")]
-    public async Task<ActionResult<List<MasterGroupResponse>>> Groups(CancellationToken cancellationToken)
+    public async Task<ActionResult<List<MasterGroupResponse>>> Groups(CancellationToken cancellationToken, [FromQuery] string? lookup = null)
     {
         await using var connection = await OpenConnectionAsync(cancellationToken);
-        if (!await HasPermissionAsync(connection, "VIEW", cancellationToken)) return Forbid();
-        const string sql = "SELECT Code, Name FROM dbo.TDSTMasterGroup ORDER BY Name, Code;";
+        var employeePosition = lookup == "employee-position";
+        var employeeVehicle = lookup == "employee-vehicle";
+        if (lookup is not null && !employeePosition && !employeeVehicle) return Forbid();
+        if (!await HasPermissionAsync(connection, "VIEW", cancellationToken) && !((employeePosition || employeeVehicle) && await CanReadEmployeePosition(connection, cancellationToken))) return Forbid();
+        var sql = employeePosition ? "SELECT Code, Name FROM dbo.TDSTMasterGroup WHERE Code=N'008' ORDER BY Name, Code;" : employeeVehicle ? "SELECT Code, Name FROM dbo.TDSTMasterGroup WHERE Code IN(N'009',N'010') ORDER BY Name, Code;" : "SELECT Code, Name FROM dbo.TDSTMasterGroup ORDER BY Name, Code;";
         await using var command = new SqlCommand(sql, connection);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         var result = new List<MasterGroupResponse>();
@@ -47,11 +51,14 @@ public sealed class MasterDataController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<List<MasterDataResponse>>> List([FromQuery] string groupCode, [FromQuery] string? search, CancellationToken cancellationToken)
+    public async Task<ActionResult<List<MasterDataResponse>>> List([FromQuery] string groupCode, [FromQuery] string? search, CancellationToken cancellationToken, [FromQuery] string? lookup = null)
     {
         if (string.IsNullOrWhiteSpace(groupCode)) return BadRequest(new { message = "กรุณาระบุกลุ่มข้อมูล" });
         await using var connection = await OpenConnectionAsync(cancellationToken);
-        if (!await HasPermissionAsync(connection, "VIEW", cancellationToken)) return Forbid();
+        var employeePosition = lookup == "employee-position" && groupCode.Trim() == "008";
+        var employeeVehicle = lookup == "employee-vehicle" && groupCode.Trim() is "009" or "010";
+        if (lookup is not null && !employeePosition && !employeeVehicle) return Forbid();
+        if (!await HasPermissionAsync(connection, "VIEW", cancellationToken) && !((employeePosition || employeeVehicle) && await CanReadEmployeePosition(connection, cancellationToken))) return Forbid();
         var scope = ResolveOwner();
         const string sql = @"
 SELECT MasterCode, Name, ISNULL(Seq, 0), NULLIF(ShortCode, N'')
@@ -70,6 +77,11 @@ ORDER BY Seq, Name;";
         while (await reader.ReadAsync(cancellationToken)) result.Add(new(TextValue(reader, 0) ?? string.Empty, TextValue(reader, 1) ?? string.Empty, reader.GetInt32(2), TextValue(reader, 3)));
         return Ok(result);
     }
+
+    private Task<bool> CanReadEmployeePosition(SqlConnection connection, CancellationToken token) =>
+        ResolveOwner().Type == "C"
+            ? CompanyProjectPermission.IsAllowedAsync(connection, User, "10001", "VIEW", token)
+            : Task.FromResult(false);
 
     [HttpPost("{groupCode}")]
     public Task<ActionResult<MasterDataResponse>> Create(string groupCode, MasterDataRequest request, CancellationToken cancellationToken) => Save(groupCode, null, request, cancellationToken);
@@ -99,22 +111,30 @@ ORDER BY Seq, Name;";
         var action = existingCode is null ? "CREATE" : "EDIT";
         if (!await HasPermissionAsync(connection, action, cancellationToken)) return Forbid();
         var scope = ResolveOwner();
+        await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(cancellationToken);
+        await using var lockCommand = new SqlCommand("DECLARE @result int; EXEC @result = sys.sp_getapplock @Resource=@resource, @LockMode='Exclusive', @LockOwner='Transaction', @LockTimeout=10000; SELECT @result;", connection, transaction);
+        lockCommand.Parameters.Add("@resource", SqlDbType.NVarChar, 255).Value = $"master-data:{scope.Type}:{scope.Partner}:{scope.Company}:{groupCode.Trim()}";
+        if (Convert.ToInt32(await lockCommand.ExecuteScalarAsync(cancellationToken)) < 0)
+            return Conflict(new { message = "ข้อมูลกำลังถูกแก้ไข กรุณาลองใหม่อีกครั้ง" });
         var code = existingCode?.Trim();
         if (code is null)
         {
             const string nextSql = "SELECT RIGHT(N'00000' + CAST(ISNULL(MAX(TRY_CONVERT(int, MasterCode)),0)+1 AS nvarchar(10)),5) FROM dbo.TDSTMaster WHERE MasterGroupCode=@GroupCode AND OwnerType=@OwnerType AND ISNULL(OwnerPartnerID,0)=ISNULL(@PartnerID,0) AND ISNULL(OwnerCompanyID,0)=ISNULL(@CompanyID,0);";
-            await using var next = new SqlCommand(nextSql, connection);
+            await using var next = new SqlCommand(nextSql, connection, transaction);
             AddScope(next, scope); next.Parameters.Add("@GroupCode", SqlDbType.NVarChar, 10).Value = groupCode.Trim();
             code = Convert.ToString(await next.ExecuteScalarAsync(cancellationToken)) ?? "00001";
         }
         const string duplicateSql = "SELECT COUNT(1) FROM dbo.TDSTMaster WHERE MasterGroupCode=@GroupCode AND LOWER(REPLACE(Name, N' ', N''))=LOWER(REPLACE(@Name, N' ', N'')) AND MasterCode<>@Code AND OwnerType=@OwnerType AND ISNULL(OwnerPartnerID,0)=ISNULL(@PartnerID,0) AND ISNULL(OwnerCompanyID,0)=ISNULL(@CompanyID,0);";
-        await using var duplicate = new SqlCommand(duplicateSql, connection);
+        await using var duplicate = new SqlCommand(duplicateSql, connection, transaction);
         AddScope(duplicate, scope); duplicate.Parameters.Add("@GroupCode", SqlDbType.NVarChar, 10).Value = groupCode.Trim(); duplicate.Parameters.Add("@Name", SqlDbType.NVarChar, 250).Value = request.Name.Trim(); duplicate.Parameters.Add("@Code", SqlDbType.NVarChar, 10).Value = code;
         if (Convert.ToInt32(await duplicate.ExecuteScalarAsync(cancellationToken)) > 0) return Conflict(new { message = "ชื่อซ้ำในกลุ่มข้อมูลนี้" });
-        const string sql = "IF EXISTS (SELECT 1 FROM dbo.TDSTMaster WHERE MasterGroupCode=@GroupCode AND MasterCode=@Code AND OwnerType=@OwnerType AND ISNULL(OwnerPartnerID,0)=ISNULL(@PartnerID,0) AND ISNULL(OwnerCompanyID,0)=ISNULL(@CompanyID,0)) UPDATE dbo.TDSTMaster SET Name=@Name, Seq=@Seq, ShortCode=@ShortCode, UpdateDate=SYSUTCDATETIME() WHERE MasterGroupCode=@GroupCode AND MasterCode=@Code AND OwnerType=@OwnerType AND ISNULL(OwnerPartnerID,0)=ISNULL(@PartnerID,0) AND ISNULL(OwnerCompanyID,0)=ISNULL(@CompanyID,0); ELSE INSERT dbo.TDSTMaster(MasterGroupCode,MasterCode,Name,Seq,OrderBy,ShortCode,OwnerType,OwnerPartnerID,OwnerCompanyID) VALUES(@GroupCode,@Code,@Name,@Seq,N'Seq',@ShortCode,@OwnerType,@PartnerID,@CompanyID);";
-        await using var command = new SqlCommand(sql, connection); AddScope(command, scope);
+        var sql = existingCode is null
+            ? "INSERT dbo.TDSTMaster(MasterGroupCode,MasterCode,Name,Seq,OrderBy,ShortCode,OwnerType,OwnerPartnerID,OwnerCompanyID) VALUES(@GroupCode,@Code,@Name,@Seq,N'Seq',@ShortCode,@OwnerType,@PartnerID,@CompanyID);"
+            : "UPDATE dbo.TDSTMaster SET Name=@Name, Seq=@Seq, ShortCode=@ShortCode, UpdateDate=SYSUTCDATETIME() WHERE MasterGroupCode=@GroupCode AND MasterCode=@Code AND OwnerType=@OwnerType AND ISNULL(OwnerPartnerID,0)=ISNULL(@PartnerID,0) AND ISNULL(OwnerCompanyID,0)=ISNULL(@CompanyID,0);";
+        await using var command = new SqlCommand(sql, connection, transaction); AddScope(command, scope);
         command.Parameters.Add("@GroupCode", SqlDbType.NVarChar, 10).Value = groupCode.Trim(); command.Parameters.Add("@Code", SqlDbType.NVarChar, 10).Value = code; command.Parameters.Add("@Name", SqlDbType.NVarChar, 250).Value = request.Name.Trim(); command.Parameters.Add("@Seq", SqlDbType.Int).Value = request.Seq; command.Parameters.Add("@ShortCode", SqlDbType.NVarChar, 50).Value = string.IsNullOrWhiteSpace(request.ShortCode) ? DBNull.Value : request.ShortCode.Trim().ToUpperInvariant();
-        await command.ExecuteNonQueryAsync(cancellationToken);
+        if (await command.ExecuteNonQueryAsync(cancellationToken) == 0) return NotFound(new { message = "ไม่พบข้อมูลที่ต้องการแก้ไข" });
+        await transaction.CommitAsync(cancellationToken);
         return Ok(new MasterDataResponse(code, request.Name.Trim(), request.Seq, string.IsNullOrWhiteSpace(request.ShortCode) ? null : request.ShortCode.Trim().ToUpperInvariant()));
     }
 

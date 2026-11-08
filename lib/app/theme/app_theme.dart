@@ -79,6 +79,20 @@ abstract final class AppTheme {
           borderSide: const BorderSide(color: LaooColors.error, width: 1.5),
         ),
       ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          minimumSize: const Size(0, LaooTypography.buttonHeight),
+          maximumSize: const Size(double.infinity, LaooTypography.buttonHeight),
+          visualDensity: VisualDensity.standard,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(LaooRadius.xs),
+          ),
+          textStyle: const TextStyle(
+            fontSize: LaooTypography.button,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           minimumSize: const Size(100, LaooTypography.buttonHeight),

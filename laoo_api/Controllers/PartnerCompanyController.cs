@@ -104,7 +104,7 @@ SELECT F.FeatureCode, F.FeatureName, F.FeatureDescription,
        CONVERT(bit, ISNULL(CF.IsEnabled, 0)) AS IsEnabled, F.SortOrder
 FROM dbo.TDADFeature F
 LEFT JOIN dbo.TDADCompanyFeature CF
-  ON CF.ProjectID=@ProjectID
+  ON CF.ProjectID=(SELECT TOP 1 ProjectID FROM dbo.TDADProject WHERE ProjectCode=N'LAOO' AND IsActive=1)
  AND CF.PartnerID=@PartnerID
  AND CF.CompanyID=@CompanyID
  AND CF.FeatureCode=F.FeatureCode
@@ -290,8 +290,6 @@ END;
         PartnerCompanyFeatureUpdateRequest request,
         CancellationToken cancellationToken)
     {
-        if (PackageSubscriptionIsSourceOfTruth())
-            return Conflict(new { message = "Feature ถูกควบคุมโดย Package Master", code = "PACKAGE_SUBSCRIPTION_REQUIRED" });
         var partnerId = PartnerId();
         var projectId = LongClaim("project_id");
         var partnerUserId = LongClaim("partner_user_id");
@@ -307,6 +305,8 @@ END;
             .ToList();
         if (normalized.Count == 0)
             return BadRequest(new { message = "กรุณาระบุระบบที่ต้องการเปิดหรือปิด" });
+        if (normalized.Any(item => item.FeatureCode != "SALES"))
+            return Conflict(new { message = "Feature อื่นถูกควบคุมโดย Package Master", code = "PACKAGE_SUBSCRIPTION_REQUIRED" });
         if (normalized.Select(item => item.FeatureCode).Distinct(StringComparer.OrdinalIgnoreCase).Count() != normalized.Count)
             return BadRequest(new { message = "พบรหัสระบบซ้ำในคำขอ" });
 
@@ -341,8 +341,8 @@ IF NOT EXISTS
     THROW 50020, 'FEATURE_NOT_FOUND', 1;
 
 UPDATE dbo.TDADCompanyFeature
-SET IsEnabled=@IsEnabled, UpdateDate=SYSUTCDATETIME(), UpdatedBy=@UserID
-WHERE ProjectID=@ProjectID AND PartnerID=@PartnerID
+SET IsEnabled=@IsEnabled, StartDate=NULL, ExpireDate=NULL, UpdateDate=SYSUTCDATETIME(), UpdatedBy=@UserID
+WHERE ProjectID=(SELECT TOP 1 ProjectID FROM dbo.TDADProject WHERE ProjectCode=N'LAOO' AND IsActive=1) AND PartnerID=@PartnerID
   AND CompanyID=@CompanyID AND FeatureCode=@FeatureCode;
 
 IF @@ROWCOUNT=0
@@ -351,7 +351,7 @@ BEGIN
         (ProjectID, PartnerID, CompanyID, FeatureCode, IsEnabled, IsTrial,
          StartDate, ExpireDate, CreateDate, CreatedBy)
     VALUES
-        (@ProjectID, @PartnerID, @CompanyID, @FeatureCode, @IsEnabled, 0,
+        ((SELECT TOP 1 ProjectID FROM dbo.TDADProject WHERE ProjectCode=N'LAOO' AND IsActive=1), @PartnerID, @CompanyID, @FeatureCode, @IsEnabled, 0,
          NULL, NULL, SYSUTCDATETIME(), @UserID);
 END;
 """;
@@ -432,6 +432,25 @@ SELECT @NewCompanyID;
             Add(insert, "@Telephone", SqlDbType.NVarChar, Null(request.Telephone), 50);
             Add(insert, "@AddressText", SqlDbType.NVarChar, Null(request.AddressText), 1000);
             var companyId = Convert.ToInt64(await insert.ExecuteScalarAsync(cancellationToken));
+            // The service module may not be installed. When present, seed a
+            // separate set of editable subjects in the same company transaction.
+            const string seedSubjectsSql = """
+IF OBJECT_ID(N'dbo.TDADServiceRequestSubject',N'U') IS NOT NULL
+ EXEC sys.sp_executesql N'
+ INSERT dbo.TDADServiceRequestSubject
+  (OwnerType,OwnerCompanyID,TemplateSubjectID,SubjectCode,Name,Seq,OrderBy,ShortCode,IsActive)
+ SELECT N''C'',@CompanyID,SubjectID,
+  RIGHT(N''00000''+CONVERT(nvarchar(20),ROW_NUMBER() OVER(ORDER BY Seq,SubjectID)),5),
+  Name,Seq,OrderBy,ShortCode,IsActive
+ FROM dbo.TDADServiceRequestSubject
+ WHERE OwnerType=N''L'' AND ISNULL(OwnerPartnerID,0)=0 AND ISNULL(OwnerCompanyID,0)=0',
+ N'@CompanyID bigint',@CompanyID;
+""";
+            await using (var seedSubjects = new SqlCommand(seedSubjectsSql, connection, transaction))
+            {
+                seedSubjects.Parameters.Add("@CompanyID", SqlDbType.BigInt).Value = companyId;
+                await seedSubjects.ExecuteNonQueryAsync(cancellationToken);
+            }
             const string userSql = """
 IF EXISTS (SELECT 1 FROM dbo.TDADLaooUser WHERE NormalizedUsername=@NormalizedUsername)
    OR EXISTS (SELECT 1 FROM dbo.TDADPartnerUser WHERE NormalizedUsername=@NormalizedUsername)

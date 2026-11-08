@@ -152,123 +152,130 @@ extension _IntranetContentView on _IntranetPageState {
     final pageCount = total == 0
         ? 1
         : (total / _IntranetPageState.pageSize).ceil();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        caption(
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              LaooListCardToggle(
-                tokens: intranetUiTokens,
-                cards: cards,
-                onChanged: (value) => setState(() => cards = value),
-              ),
-              if (actions['create'] == true)
-                FilledButton.icon(
-                  onPressed: () => openContent(null, options),
-                  icon: const Icon(Icons.add),
-                  label: const Text('เพิ่ม'),
-                ),
-            ],
+    return LayoutBuilder(
+      builder: (context, viewport) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          caption(
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (viewport.maxWidth >= 1100)
+                  LaooListCardToggle(
+                    tokens: intranetUiTokens,
+                    cards: cards,
+                    onChanged: (value) => setState(() => cards = value),
+                  ),
+                if (viewport.maxWidth >= 1100 && actions['create'] == true)
+                  const SizedBox(width: 8),
+                if (actions['create'] == true)
+                  FilledButton.icon(
+                    onPressed: () => openContent(null, options),
+                    icon: const Icon(Icons.add),
+                    label: const Text('เพิ่ม'),
+                  ),
+              ],
+            ),
           ),
-        ),
-        SizedBox(height: intranetUiTokens.captionFilterSpacing),
-        LaooFilterCard(
-          tokens: intranetUiTokens,
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              SizedBox(
-                width: 300,
-                child: TextField(
-                  controller: search,
-                  onSubmitted: (_) {
+          SizedBox(height: intranetUiTokens.captionFilterSpacing),
+          LaooFilterCard(
+            tokens: intranetUiTokens,
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                SizedBox(
+                  width: 300,
+                  child: TextField(
+                    controller: search,
+                    onSubmitted: (_) {
+                      page = 1;
+                      reload();
+                    },
+                    decoration: input('ค้นหารหัสหรือชื่อ', icon: Icons.search),
+                  ),
+                ),
+                FilledButton.icon(
+                  onPressed: () {
                     page = 1;
                     reload();
                   },
-                  decoration: input('ค้นหารหัสหรือชื่อ', icon: Icons.search),
+                  icon: const Icon(Icons.search),
+                  label: const Text('ค้นหา'),
                 ),
-              ),
-              SizedBox(
-                width: 220,
-                child: DropdownButtonFormField<String>(
-                  value: status,
-                  decoration: input('สถานะ'),
-                  items: const [
-                    DropdownMenuItem(value: '', child: Text('ทั้งหมด')),
-                    DropdownMenuItem(value: 'DRAFT', child: Text('ฉบับร่าง')),
-                    DropdownMenuItem(
-                      value: 'PENDING_APPROVAL',
-                      child: Text('รออนุมัติ'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'PUBLISHED',
-                      child: Text('เผยแพร่'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'RETURNED',
-                      child: Text('ส่งกลับแก้ไข'),
-                    ),
-                  ],
-                  onChanged: (value) => status = value ?? '',
+                OutlinedButton.icon(
+                  onPressed: () {
+                    search.clear();
+                    status = '';
+                    page = 1;
+                    reload();
+                  },
+                  icon: const Icon(Icons.filter_alt_off_outlined),
+                  label: const Text('ล้าง Filter'),
                 ),
-              ),
-              FilledButton.icon(
-                onPressed: () {
-                  page = 1;
-                  reload();
-                },
-                icon: const Icon(Icons.search),
-                label: const Text('ค้นหา'),
-              ),
-              OutlinedButton.icon(
-                onPressed: () {
-                  search.clear();
-                  status = '';
-                  page = 1;
-                  reload();
-                },
-                icon: const Icon(Icons.filter_alt_off_outlined),
-                label: const Text('ล้าง Filter'),
-              ),
-            ],
+                SizedBox(
+                  width: 220,
+                  child: DropdownButtonFormField<String>(
+                    value: status,
+                    decoration: input('สถานะ'),
+                    items: const [
+                      DropdownMenuItem(value: '', child: Text('ทั้งหมด')),
+                      DropdownMenuItem(value: 'DRAFT', child: Text('ฉบับร่าง')),
+                      DropdownMenuItem(
+                        value: 'PENDING_APPROVAL',
+                        child: Text('รออนุมัติ'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'PUBLISHED',
+                        child: Text('เผยแพร่'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'RETURNED',
+                        child: Text('ส่งกลับแก้ไข'),
+                      ),
+                    ],
+                    onChanged: (value) => status = value ?? '',
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-        SizedBox(height: intranetUiTokens.sectionSpacing),
-        Expanded(
-          child: LaooTableCard(
+          SizedBox(height: intranetUiTokens.sectionSpacing),
+          Expanded(
+            child: LaooTableCard(
+              tokens: intranetUiTokens,
+              child: LayoutBuilder(
+                builder: (context, constraints) => rows.isEmpty
+                    ? const Center(child: Text('ไม่พบข้อมูล'))
+                    : cards || constraints.maxWidth < 1100
+                    ? contentCards(rows, actions, options)
+                    : contentTable(rows, actions, options),
+              ),
+            ),
+          ),
+          SizedBox(height: intranetUiTokens.sectionSpacing),
+          LaooPaginationCard(
             tokens: intranetUiTokens,
-            child: rows.isEmpty
-                ? const Center(child: Text('ไม่พบข้อมูล'))
-                : cards
-                ? contentCards(rows, actions, options)
-                : contentTable(rows, actions, options),
+            page: page,
+            pageCount: pageCount,
+            pageSize: _IntranetPageState.pageSize,
+            total: total,
+            onPrevious: page > 1
+                ? () {
+                    page--;
+                    reload();
+                  }
+                : null,
+            onNext: page < pageCount
+                ? () {
+                    page++;
+                    reload();
+                  }
+                : null,
           ),
-        ),
-        SizedBox(height: intranetUiTokens.sectionSpacing),
-        LaooPaginationCard(
-          tokens: intranetUiTokens,
-          page: page,
-          pageCount: pageCount,
-          pageSize: _IntranetPageState.pageSize,
-          total: total,
-          onPrevious: page > 1
-              ? () {
-                  page--;
-                  reload();
-                }
-              : null,
-          onNext: page < pageCount
-              ? () {
-                  page++;
-                  reload();
-                }
-              : null,
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -315,13 +322,7 @@ extension _IntranetContentView on _IntranetPageState {
               ),
             ),
           ),
-          DataCell(
-            Text(
-              _IntranetPageState.statusLabel(
-                _IntranetPageState.textOf(row, 'status'),
-              ),
-            ),
-          ),
+          DataCell(_contentStatus(row)),
           DataCell(Text(_IntranetPageState.dateOf(row['publishAt']))),
         ],
       );
@@ -335,7 +336,7 @@ extension _IntranetContentView on _IntranetPageState {
   ) => ListView.separated(
     padding: intranetUiTokens.cardPadding,
     itemCount: rows.length,
-    separatorBuilder: (_, _) => SizedBox(height: intranetUiTokens.itemSpacing),
+    separatorBuilder: (_, _) => const SizedBox(height: 8),
     itemBuilder: (_, index) {
       final row = rows[index];
       return Card(
@@ -343,7 +344,7 @@ extension _IntranetContentView on _IntranetPageState {
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(4),
-          side: BorderSide(color: intranetUiTokens.borderColor),
+          side: BorderSide.none,
         ),
         child: Padding(
           padding: intranetUiTokens.cardPadding,
@@ -360,15 +361,17 @@ extension _IntranetContentView on _IntranetPageState {
                   children: [
                     Text(
                       _IntranetPageState.textOf(row, 'title'),
-                      style: intranetUiTokens.sectionStyle,
+                      style: intranetUiTokens.sectionStyle.copyWith(
+                        color: intranetUiTokens.primaryColor,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      _IntranetPageState.textOf(row, 'code') +
-                          ' • ' +
-                          _IntranetPageState.statusLabel(
-                            _IntranetPageState.textOf(row, 'status'),
-                          ),
+                    Text(_IntranetPageState.textOf(row, 'code')),
+                    const SizedBox(height: 4),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: _contentStatus(row),
                     ),
                   ],
                 ),
@@ -380,6 +383,24 @@ extension _IntranetContentView on _IntranetPageState {
       );
     },
   );
+
+  Widget _contentStatus(Map<String, dynamic> row) {
+    final value = _IntranetPageState.textOf(row, 'status');
+    final color = value == 'RETURNED' || value == 'CANCELLED'
+        ? Theme.of(context).colorScheme.error
+        : intranetUiTokens.primaryColor;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: .12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        _IntranetPageState.statusLabel(value),
+        style: TextStyle(color: color, fontWeight: FontWeight.w700),
+      ),
+    );
+  }
 
   Widget contentActions(
     Map<String, dynamic> row,
@@ -732,7 +753,7 @@ class _ContentDialogState extends State<_ContentDialog> {
               controller: code,
               decoration: field('รหัส (สร้างอัตโนมัติได้)'),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: intranetUiTokens.popupFieldSpacing),
             TextFormField(
               controller: title,
               decoration: field('ชื่อเนื้อหา *'),
@@ -740,7 +761,7 @@ class _ContentDialogState extends State<_ContentDialog> {
                   ? 'กรุณาระบุชื่อเนื้อหา'
                   : null,
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: intranetUiTokens.popupFieldSpacing),
             DropdownButtonFormField<String>(
               value: type,
               decoration: field('ประเภท *'),
@@ -752,21 +773,21 @@ class _ContentDialogState extends State<_ContentDialog> {
               ],
               onChanged: (value) => setState(() => type = value ?? 'NEWS'),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: intranetUiTokens.popupFieldSpacing),
             TextFormField(
               controller: summary,
               maxLines: 2,
               decoration: field('ข้อความสรุป'),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: intranetUiTokens.popupFieldSpacing),
             TextFormField(
               controller: body,
               maxLines: 5,
               decoration: field('รายละเอียด'),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: intranetUiTokens.popupFieldSpacing),
             TextFormField(controller: url, decoration: field('ลิงก์อ้างอิง')),
-            const SizedBox(height: 16),
+            SizedBox(height: intranetUiTokens.popupFieldSpacing),
             DropdownButtonFormField<String>(
               value: target,
               decoration: field('กลุ่มเป้าหมาย *'),
@@ -820,13 +841,13 @@ class _ContentDialogState extends State<_ContentDialog> {
                 }).toList(),
               ),
             ],
-            const SizedBox(height: 16),
+            SizedBox(height: intranetUiTokens.popupFieldSpacing),
             TextFormField(
               controller: publish,
               decoration: field('วันเวลาเผยแพร่ * (yyyy-MM-dd HH:mm)'),
               validator: dateValidator,
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: intranetUiTokens.popupFieldSpacing),
             TextFormField(
               controller: expire,
               decoration: field('วันเวลาสิ้นสุด (yyyy-MM-dd HH:mm)'),
@@ -834,7 +855,7 @@ class _ContentDialogState extends State<_ContentDialog> {
                   ? null
                   : dateValidator(value),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: intranetUiTokens.popupFieldSpacing),
             DropdownButtonFormField<int?>(
               value:
                   employeeOptions.any(

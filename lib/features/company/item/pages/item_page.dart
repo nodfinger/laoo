@@ -3,6 +3,8 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:laoo_shared_admin_ui/laoo_shared_admin_ui.dart'
+    show FilterHeightSync, filterActionHeightStyle;
 
 import '../../../../app/theme/laoo_typography.dart';
 import '../../../../app/theme/laoo_design_tokens.dart';
@@ -13,7 +15,6 @@ import '../../../../core/api/api_client.dart';
 import '../../../../core/navigation/navigation_menu_repository.dart';
 import '../../../../core/widgets/timed_snack_bar.dart';
 import '../../../../core/widgets/pinned_data_table.dart';
-import '../../../../features/support/master_data/data/master_data_api.dart';
 import '../../../../features/support/presentation/widgets/support_workspace_shell.dart';
 import '../../../../features/profile/data/user_profile_repository.dart';
 import '../../../access/sub_permission/data/sub_permission_api.dart';
@@ -50,7 +51,6 @@ class _ItemPageState extends State<ItemPage> {
   ];
   final _api = ItemApi();
   final _subPermission = SubPermissionApi();
-  final _master = MasterDataApi();
   final _profile = UserProfileRepository();
   final _search = TextEditingController();
   final _tableHorizontal = ScrollController();
@@ -72,6 +72,8 @@ class _ItemPageState extends State<ItemPage> {
       _showImages = true,
       _filterExpanded = false;
   int _currentPage = 0;
+  int _filterRevision = 0;
+  int _loadRevision = 0;
   String _caption = '';
   bool _formOpen = false;
   Map<String, dynamic>? _formDetail;
@@ -170,11 +172,11 @@ class _ItemPageState extends State<ItemPage> {
     _tableHorizontal.dispose();
     _api.dispose();
     _subPermission.dispose();
-    _master.dispose();
     super.dispose();
   }
 
   Future<void> _load() async {
+    final loadRevision = ++_loadRevision;
     try {
       try {
         await companySetupController.load();
@@ -199,14 +201,14 @@ class _ItemPageState extends State<ItemPage> {
           ),
           'รายการสินค้า',
         ),
-        _withLoadDescription(_master.list('006'), 'กลุ่มสินค้า'),
-        _withLoadDescription(_master.list('007'), 'ประเภทสินค้า'),
-        _withLoadDescription(_master.list('002'), 'หน่วยนับ'),
+        _withLoadDescription(_api.masterOptions('006'), 'กลุ่มสินค้า'),
+        _withLoadDescription(_api.masterOptions('007'), 'ประเภทสินค้า'),
+        _withLoadDescription(_api.masterOptions('002'), 'หน่วยนับ'),
         _withLoadDescription(_api.responsibleDepartments(), 'แผนกที่รับผิดชอบ'),
         _withLoadDescription(_api.projectOptions(), 'Project สินค้า'),
         permissionPoints,
       ]);
-      if (!mounted) return;
+      if (!mounted || loadRevision != _loadRevision) return;
       setState(() {
         _actions = result[0] as Map<String, bool>;
         _codeSettings = result[1] as Map<String, dynamic>;
@@ -223,7 +225,7 @@ class _ItemPageState extends State<ItemPage> {
         _loading = false;
       });
     } catch (e) {
-      if (mounted) {
+      if (mounted && loadRevision == _loadRevision) {
         setState(() => _loading = false);
         _show(_readableError(e));
       }
@@ -1353,7 +1355,10 @@ class _ItemPageState extends State<ItemPage> {
           Column(
             children: [
               Container(
-                padding: const EdgeInsets.all(LaooLayout.cardPadding),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
                 decoration: const BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.all(Radius.circular(4)),
@@ -1373,14 +1378,17 @@ class _ItemPageState extends State<ItemPage> {
                           color: workspaceThemeController.value.primary
                               .withValues(alpha: .10),
                         ),
-                        child: IconButton(
-                          tooltip: _card ? 'แสดงแบบรายการ' : 'แสดงแบบการ์ด',
-                          onPressed: () => setState(() => _card = !_card),
-                          color: workspaceThemeController.value.primary,
-                          icon: Icon(
-                            _card
-                                ? Icons.view_list_outlined
-                                : Icons.grid_view_outlined,
+                        child: SizedBox.square(
+                          dimension: LaooTypography.buttonHeight,
+                          child: IconButton(
+                            tooltip: _card ? 'แสดงแบบรายการ' : 'แสดงแบบการ์ด',
+                            onPressed: () => setState(() => _card = !_card),
+                            color: workspaceThemeController.value.primary,
+                            icon: Icon(
+                              _card
+                                  ? Icons.view_list_outlined
+                                  : Icons.grid_view_outlined,
+                            ),
                           ),
                         ),
                       ),
@@ -1400,7 +1408,7 @@ class _ItemPageState extends State<ItemPage> {
                   ],
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               Container(
                 padding: const EdgeInsets.all(LaooLayout.cardPadding),
                 decoration: const BoxDecoration(
@@ -1438,6 +1446,50 @@ class _ItemPageState extends State<ItemPage> {
                     ),
                     if (_filterExpanded) ...[
                       const SizedBox(height: 10),
+                      LayoutBuilder(
+                        builder: (context, constraints) => FilterHeightSync(
+                          builder: (context, searchKey, height) => Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              SizedBox(
+                                width: constraints.maxWidth < 350
+                                    ? constraints.maxWidth
+                                    : 350,
+                                child: TextField(
+                                  key: searchKey,
+                                  controller: _search,
+                                  onSubmitted: (_) {
+                                    _currentPage = 0;
+                                    _load();
+                                  },
+                                  decoration: const InputDecoration(
+                                    labelText: 'ค้นหารหัส/ชื่อสินค้า',
+                                    prefixIcon: Icon(Icons.search),
+                                  ),
+                                ),
+                              ),
+                              FilledButton.icon(
+                                style: filterActionHeightStyle(height),
+                                onPressed: () {
+                                  _currentPage = 0;
+                                  _load();
+                                },
+                                icon: const Icon(Icons.search),
+                                label: const Text('ค้นหา'),
+                              ),
+                              OutlinedButton.icon(
+                                style: filterActionHeightStyle(height),
+                                onPressed: _clearFilters,
+                                icon: const Icon(Icons.filter_alt_off_outlined),
+                                label: const Text('ล้าง Filter'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
                       LayoutBuilder(
                         builder: (context, constraints) {
                           final filterWidth = constraints.maxWidth < 700
@@ -1503,11 +1555,8 @@ class _ItemPageState extends State<ItemPage> {
                                 width: filterWidth,
                                 child: _filter(
                                   'แผนกที่รับผิดชอบ',
-                                  _responsibleDepartmentId?.toString() ?? '',
-                                  [
-                                    {'code': '', 'name': 'ทั้งหมด'},
-                                    ..._responsibleDepartments,
-                                  ],
+                                  _responsibleDepartmentId?.toString(),
+                                  [..._responsibleDepartments],
                                   (v) {
                                     _responsibleDepartmentId = int.tryParse(
                                       v ?? '',
@@ -1539,21 +1588,8 @@ class _ItemPageState extends State<ItemPage> {
                               ),
                               SizedBox(
                                 width: filterWidth,
-                                child: TextField(
-                                  controller: _search,
-                                  onSubmitted: (_) => _load(),
-                                  decoration: InputDecoration(
-                                    labelText: 'ค้นหารหัส/ชื่อสินค้า',
-                                    suffixIcon: IconButton(
-                                      onPressed: _load,
-                                      icon: const Icon(Icons.arrow_forward),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              SizedBox(
-                                width: filterWidth,
                                 child: DropdownButtonFormField<String>(
+                                  key: ValueKey(('status', _filterRevision)),
                                   isExpanded: true,
                                   initialValue: _statusFilter,
                                   decoration: const InputDecoration(
@@ -1587,6 +1623,7 @@ class _ItemPageState extends State<ItemPage> {
                               SizedBox(
                                 width: filterWidth,
                                 child: DropdownButtonFormField<String>(
+                                  key: ValueKey(('show', _filterRevision)),
                                   isExpanded: true,
                                   initialValue: _showFilter,
                                   decoration: const InputDecoration(
@@ -1651,42 +1688,66 @@ class _ItemPageState extends State<ItemPage> {
     ),
   );
 
+  void _clearFilters() {
+    setState(() {
+      _search.clear();
+      _group = null;
+      _type = null;
+      _itemKind = null;
+      _stockTracking = null;
+      _usageCode = null;
+      _projectId = null;
+      _responsibleDepartmentId = null;
+      _statusFilter = 'all';
+      _showFilter = 'all';
+      _currentPage = 0;
+      _filterRevision++;
+    });
+    _load();
+  }
+
   Widget _filter(
     String label,
     String? value,
     List<Map<String, dynamic>> values,
     ValueChanged<String?> onChanged,
   ) => DropdownButtonFormField<String>(
+    key: ValueKey((label, _filterRevision)),
     isExpanded: true,
-    initialValue: value,
+    initialValue: value ?? '',
     decoration: InputDecoration(labelText: label),
     style: Theme.of(context).textTheme.bodySmall?.copyWith(
       fontSize: LaooTypography.tableBody,
       height: 1.35,
     ),
-    items: values
-        .map(
-          (x) => DropdownMenuItem(
-            value: '${x['code']}',
-            child: Text(
-              '${x['name']}',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                fontSize: LaooTypography.tableBody,
-                height: 1.35,
+    items: [
+      const DropdownMenuItem(value: '', child: Text('ทั้งหมด')),
+      ...values
+          .where((item) => (item['code']?.toString() ?? '').isNotEmpty)
+          .map(
+            (x) => DropdownMenuItem(
+              value: '${x['code']}',
+              child: Text(
+                '${x['name']}',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  fontSize: LaooTypography.tableBody,
+                  height: 1.35,
+                ),
               ),
             ),
           ),
-        )
-        .toList(),
-    onChanged: onChanged,
+    ],
+    onChanged: (selected) =>
+        onChanged(selected == null || selected.isEmpty ? null : selected),
   );
 
   Widget _projectFilter() => DropdownButtonFormField<int>(
+    key: ValueKey(('project', _filterRevision)),
     isExpanded: true,
-    initialValue: _projectId,
+    initialValue: _projectId ?? 0,
     decoration: const InputDecoration(labelText: 'Project ที่นำไปใช้'),
     items: [
-      const DropdownMenuItem<int>(value: null, child: Text('ทั้งหมด')),
+      const DropdownMenuItem<int>(value: 0, child: Text('ทั้งหมด')),
       ..._projects.map(
         (x) => DropdownMenuItem<int>(
           value: (x['projectId'] as num).toInt(),
@@ -1695,11 +1756,60 @@ class _ItemPageState extends State<ItemPage> {
       ),
     ],
     onChanged: (v) {
-      _projectId = v;
+      _projectId = v == 0 ? null : v;
       _currentPage = 0;
       _load();
     },
   );
+
+  Widget _tableActions(Map<String, dynamic> item, Color accent) {
+    Widget action({
+      required String tooltip,
+      required IconData icon,
+      required Color color,
+      required VoidCallback onPressed,
+    }) => IconButton(
+      tooltip: tooltip,
+      onPressed: onPressed,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints.tightFor(width: 28, height: 36),
+      visualDensity: VisualDensity.compact,
+      icon: Icon(icon, color: color, size: 20),
+    );
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (_actions['edit'] == true)
+          action(
+            tooltip: 'แก้ไข',
+            icon: Icons.edit_outlined,
+            color: accent,
+            onPressed: () => _edit(item),
+          ),
+        if (_actions['delete'] == true)
+          action(
+            tooltip: 'ลบ',
+            icon: Icons.delete_outline,
+            color: Theme.of(context).colorScheme.error,
+            onPressed: () => _delete(item),
+          ),
+        if (_canManagePrice)
+          action(
+            tooltip: 'กำหนดราคาขาย',
+            icon: Icons.sell_outlined,
+            color: accent,
+            onPressed: () => _showPriceDialog(item),
+          ),
+        if (_canManagePackUnits)
+          action(
+            tooltip: 'อัตราบรรจุ',
+            icon: Icons.inventory_2_outlined,
+            color: accent,
+            onPressed: () => _showPackUnitsDialog(item),
+          ),
+      ],
+    );
+  }
 
   Widget _table() {
     final theme = Theme.of(context);
@@ -1768,17 +1878,7 @@ class _ItemPageState extends State<ItemPage> {
                         LaooTableColumns.id,
                         const DataColumn(label: Text('รูปสินค้า')),
                         DataColumn(
-                          numeric: true,
-                          label: SizedBox(
-                            width: 84,
-                            child: Center(child: Text('Action')),
-                          ),
-                        ),
-                        DataColumn(
-                          label: SizedBox(
-                            width: 150,
-                            child: Center(child: Text('กำหนด')),
-                          ),
+                          label: SizedBox(width: 112, child: Text('Action')),
                         ),
                         DataColumn(
                           label: SizedBox(width: 78, child: Text('รหัสสินค้า')),
@@ -1847,125 +1947,8 @@ class _ItemPageState extends State<ItemPage> {
                           ),
                           DataCell(
                             SizedBox(
-                              width: 84,
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  if (_actions['edit'] == true)
-                                    IconButton(
-                                      onPressed: () => _edit(x),
-                                      padding: EdgeInsets.zero,
-                                      visualDensity: VisualDensity.compact,
-                                      constraints:
-                                          const BoxConstraints.tightFor(
-                                            width: 24,
-                                            height: 32,
-                                          ),
-                                      icon: Icon(
-                                        Icons.edit_outlined,
-                                        color: accent,
-                                      ),
-                                    ),
-                                  if (false)
-                                    IconButton(
-                                      tooltip: _canManagePackUnits
-                                          ? 'อัตราส่วนการบรรจุ'
-                                          : 'ไม่มีสิทธิ์จัดการอัตราส่วนการบรรจุ',
-                                      onPressed: _canManagePackUnits
-                                          ? () => _showPackUnitsDialog(x)
-                                          : null,
-                                      padding: EdgeInsets.zero,
-                                      visualDensity: VisualDensity.compact,
-                                      constraints:
-                                          const BoxConstraints.tightFor(
-                                            width: 24,
-                                            height: 32,
-                                          ),
-                                      icon: Icon(
-                                        _canManagePackUnits
-                                            ? Icons.inventory_2_outlined
-                                            : Icons.lock_outline,
-                                        color: accent,
-                                      ),
-                                    ),
-                                  if (false && _canManagePrice)
-                                    OutlinedButton.icon(
-                                      onPressed: () => _showPriceDialog(x),
-                                      style: OutlinedButton.styleFrom(
-                                        foregroundColor: accent,
-                                        side: BorderSide.none,
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 6,
-                                        ),
-                                        minimumSize: const Size(0, 32),
-                                        tapTargetSize:
-                                            MaterialTapTargetSize.shrinkWrap,
-                                      ),
-                                      icon: const Icon(
-                                        Icons.sell_outlined,
-                                        size: 16,
-                                      ),
-                                      label: const Text('ราคา'),
-                                    ),
-                                  if (_actions['delete'] == true)
-                                    IconButton(
-                                      onPressed: () => _delete(x),
-                                      padding: EdgeInsets.zero,
-                                      visualDensity: VisualDensity.compact,
-                                      constraints:
-                                          const BoxConstraints.tightFor(
-                                            width: 24,
-                                            height: 32,
-                                          ),
-                                      icon: const Icon(
-                                        Icons.delete_outline,
-                                        color: Colors.red,
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          DataCell(
-                            SizedBox(
-                              width: 150,
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  if (_canManagePrice)
-                                    OutlinedButton.icon(
-                                      onPressed: () => _showPriceDialog(x),
-                                      style: OutlinedButton.styleFrom(
-                                        foregroundColor: accent,
-                                        textStyle: const TextStyle(fontSize: 0),
-                                        side: BorderSide(color: accent),
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 6,
-                                        ),
-                                        minimumSize: const Size(0, 32),
-                                        tapTargetSize:
-                                            MaterialTapTargetSize.shrinkWrap,
-                                      ),
-                                      icon: const Icon(
-                                        Icons.sell_outlined,
-                                        size: 16,
-                                      ),
-                                      label: const Text('ราคา'),
-                                    ),
-                                  if (_canManagePackUnits)
-                                    IconButton(
-                                      tooltip: 'อัตราบรรจุ',
-                                      onPressed: () => _showPackUnitsDialog(x),
-                                      padding: EdgeInsets.zero,
-                                      visualDensity: VisualDensity.compact,
-                                      icon: Icon(
-                                        Icons.inventory_2_outlined,
-                                        color: accent,
-                                      ),
-                                    ),
-                                ],
-                              ),
+                              width: 112,
+                              child: _tableActions(x, accent),
                             ),
                           ),
                           /*
@@ -2004,6 +1987,33 @@ class _ItemPageState extends State<ItemPage> {
                             ),
                           ),
                           DataCell(Text('${x['itemName']}')),
+                          DataCell(
+                            SizedBox(
+                              width: 78,
+                              child: Align(
+                                alignment: Alignment.centerRight,
+                                child: Text(_formatAmount(x['unitPrice'])),
+                              ),
+                            ),
+                          ),
+                          DataCell(
+                            SizedBox(
+                              width: 52,
+                              child: Align(
+                                alignment: Alignment.centerRight,
+                                child: Text('${x['stockBalance']}'),
+                              ),
+                            ),
+                          ),
+                          DataCell(
+                            SizedBox(
+                              width: 48,
+                              child: Text(
+                                '${x['unitCode']}',
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ),
                           DataCell(
                             SizedBox(
                               width: 68,
@@ -2080,49 +2090,8 @@ class _ItemPageState extends State<ItemPage> {
                               ),
                             ),
                           ),
-                          DataCell(
-                            SizedBox(
-                              width: 78,
-                              child: Align(
-                                alignment: Alignment.centerRight,
-                                child: Text(_formatAmount(x['unitPrice'])),
-                              ),
-                            ),
-                          ),
-                          DataCell(
-                            SizedBox(
-                              width: 52,
-                              child: Align(
-                                alignment: Alignment.centerRight,
-                                child: Text('${x['stockBalance']}'),
-                              ),
-                            ),
-                          ),
-                          DataCell(
-                            SizedBox(
-                              width: 48,
-                              child: Text(
-                                '${x['unitCode']}',
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ),
                         ];
-                        return DataRow(
-                          cells: [
-                            cells[0],
-                            cells[1],
-                            cells[2],
-                            cells[3],
-                            cells[4],
-                            cells[5],
-                            cells[8],
-                            cells[9],
-                            cells[10],
-                            cells[6],
-                            cells[7],
-                          ],
-                        );
+                        return DataRow(cells: cells);
                       }).toList(),
                     ),
                   ),
@@ -2437,52 +2406,62 @@ class _ItemPageState extends State<ItemPage> {
                   ],
                 ),
               ),
-              const Divider(height: 24, thickness: 1, color: Color(0xFFF5F6F7)),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  _canManagePrice
-                      ? OutlinedButton.icon(
-                          onPressed: () => _showPriceDialog(x),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: accent,
-                            side: BorderSide.none,
-                            padding: const EdgeInsets.symmetric(horizontal: 10),
-                            minimumSize: const Size(0, 40),
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              if (_canManagePrice || _canManagePackUnits) ...[
+                const Divider(
+                  height: 24,
+                  thickness: 1,
+                  color: Color(0xFFF5F6F7),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    _canManagePrice
+                        ? OutlinedButton.icon(
+                            onPressed: () => _showPriceDialog(x),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: accent,
+                              side: BorderSide.none,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                              ),
+                              minimumSize: const Size(0, 40),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            icon: const Icon(Icons.sell_outlined, size: 18),
+                            label: const Text('ราคา'),
+                          )
+                        : IconButton(
+                            tooltip: 'ไม่มีสิทธิ์กำหนดราคาขาย',
+                            onPressed: null,
+                            icon: Icon(Icons.lock_outline, color: accent),
                           ),
-                          icon: const Icon(Icons.sell_outlined, size: 18),
-                          label: const Text('ราคา'),
-                        )
-                      : IconButton(
-                          tooltip: 'ไม่มีสิทธิ์กำหนดราคาขาย',
-                          onPressed: null,
-                          icon: Icon(Icons.lock_outline, color: accent),
-                        ),
-                  const SizedBox(width: 8),
-                  _canManagePackUnits
-                      ? OutlinedButton.icon(
-                          onPressed: () => _showPackUnitsDialog(x),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: accent,
-                            side: BorderSide.none,
-                            padding: const EdgeInsets.symmetric(horizontal: 10),
-                            minimumSize: const Size(0, 40),
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    const SizedBox(width: 8),
+                    _canManagePackUnits
+                        ? OutlinedButton.icon(
+                            onPressed: () => _showPackUnitsDialog(x),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: accent,
+                              side: BorderSide.none,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                              ),
+                              minimumSize: const Size(0, 40),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            icon: const Icon(
+                              Icons.inventory_2_outlined,
+                              size: 18,
+                            ),
+                            label: const Text('หน่วยนับ'),
+                          )
+                        : IconButton(
+                            tooltip: 'ไม่มีสิทธิ์จัดการอัตราส่วนการบรรจุ',
+                            onPressed: null,
+                            icon: Icon(Icons.lock_outline, color: accent),
                           ),
-                          icon: const Icon(
-                            Icons.inventory_2_outlined,
-                            size: 18,
-                          ),
-                          label: const Text('หน่วยนับ'),
-                        )
-                      : IconButton(
-                          tooltip: 'ไม่มีสิทธิ์จัดการอัตราส่วนการบรรจุ',
-                          onPressed: null,
-                          icon: Icon(Icons.lock_outline, color: accent),
-                        ),
-                ],
-              ),
+                  ],
+                ),
+              ],
             ],
           ),
         ),

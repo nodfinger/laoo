@@ -6,6 +6,71 @@ import 'package:laoo_service/core/widgets/timed_snack_bar.dart';
 
 void main() {
   setUp(companySetupController.clear);
+  tearDown(() {
+    configureServiceAlertPrimary(null);
+    configureServiceAlertDuration(null);
+  });
+
+  testWidgets('embedded alerts dismiss at the host company timeout', (
+    tester,
+  ) async {
+    configureServiceAlertDuration(() => const Duration(seconds: 2));
+    var visible = true;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StatefulBuilder(
+          builder: (context, setState) => Scaffold(
+            body: visible
+                ? AutoDismissMessage(
+                    message: 'Alert',
+                    onClose: () => setState(() => visible = false),
+                  )
+                : const SizedBox.shrink(),
+          ),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 1900));
+    expect(find.byType(AutoDismissMessage), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.byType(AutoDismissMessage), findsNothing);
+  });
+
+  testWidgets(
+    'embedded alerts use the current user color, errors use error color',
+    (tester) async {
+      const purple = Color(0xFF673AB7);
+      const blue = Color(0xFF1565C0);
+      const error = Color(0xFFB00020);
+      var primary = purple;
+      configureServiceAlertPrimary(() => primary);
+      Future<void> show(bool isError) => tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData(
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: Colors.green,
+            ).copyWith(error: error),
+          ),
+          home: Scaffold(
+            body: AutoDismissMessage(
+              message: 'Alert',
+              error: isError,
+              onClose: () {},
+            ),
+          ),
+        ),
+      );
+      Color? cardColor() => tester.widget<Card>(find.byType(Card)).color;
+      await show(false);
+      expect(cardColor(), purple.withValues(alpha: .5));
+      primary = blue;
+      await show(false);
+      expect(cardColor(), blue.withValues(alpha: .5));
+      await show(true);
+      expect(cardColor(), error.withValues(alpha: .5));
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
 
   testWidgets('AutoDismissMessage supports manual close', (tester) async {
     var visible = true;

@@ -10,35 +10,6 @@ namespace LaooApi.Controllers;
 [ApiController, Authorize, Route("api/company/vendors")]
 public sealed class VendorController(IConfiguration configuration, ILogger<VendorController> logger) : ControllerBase
 {
-    public const string AccessSql = """
-WITH Eligible AS (
- SELECT P.ProjectID,M.ScreenType FROM dbo.TDADProject P
- JOIN dbo.TDADProjectMenu PM ON PM.ProjectID=P.ProjectID AND PM.MenuCode='08007' AND PM.IsActive=1
- JOIN dbo.TDADMainMenu M ON M.MenuCode=PM.MenuCode AND M.IsActive=1
- JOIN dbo.TDSTCompanySetUp C ON C.CompanyID=@company AND C.PartnerID=@partner AND C.IsActive=1
- JOIN dbo.TDADPartner B ON B.PartnerID=C.PartnerID AND B.IsActive=1
- JOIN dbo.TDADCompanyProject CP ON CP.CompanyID=C.CompanyID AND CP.PartnerID=C.PartnerID AND CP.ProjectID=P.ProjectID AND CP.IsEnabled=1
- WHERE P.ProjectCode='LAOO' AND P.IsActive=1
- AND (CP.StartDate IS NULL OR CP.StartDate<=CONVERT(date,SYSUTCDATETIME()))
- AND (CP.ExpireDate IS NULL OR CP.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))
- AND (@action='VIEW' OR (M.ScreenType IN(1,4) AND @action IN('CREATE','EDIT','DELETE')) OR (M.ScreenType=2 AND @action='EDIT'))
-)
-SELECT CAST(CASE WHEN EXISTS(
- SELECT 1 FROM dbo.TDADUser U WHERE U.UserID=@user AND U.CompanyID=@company AND U.IsActive=1
- AND EXISTS(SELECT 1 FROM Eligible)
- AND (U.IsCompanyAdmin=1 OR EXISTS(
- SELECT 1 FROM Eligible E JOIN dbo.TDADUserProject UP ON UP.ProjectID=E.ProjectID AND UP.CompanyID=U.CompanyID AND UP.UserID=U.UserID AND UP.IsActive=1
- WHERE EXISTS(SELECT 1 FROM dbo.TDADUserPermission DP JOIN dbo.TDADPermission P ON P.PermissionID=DP.PermissionID AND P.ProjectID=DP.ProjectID
- WHERE DP.UserID=U.UserID AND DP.ProjectID=E.ProjectID AND DP.IsActive=1 AND DP.IsAllowed=1 AND P.IsActive=1 AND P.ScreenCode='08007' AND P.ActionCode=@action)
- OR EXISTS(SELECT 1 FROM dbo.TDADUserEmployee UE
- JOIN dbo.TDADEmployee EMP ON EMP.EmployeeID=UE.EmployeeID AND EMP.CompanyID=U.CompanyID AND EMP.IsActive=1
- JOIN dbo.TDADEmployeeRoleGroup ERG ON ERG.EmployeeID=EMP.EmployeeID AND ERG.IsActive=1
- JOIN dbo.TDADRoleGroup RG ON RG.RoleGroupID=ERG.RoleGroupID AND RG.CompanyID=U.CompanyID AND RG.ScopeType='C' AND RG.IsActive=1 AND RG.ProjectID=E.ProjectID
- JOIN dbo.TDADRoleGroupPermission RP ON RP.RoleGroupID=RG.RoleGroupID AND RP.ProjectID=E.ProjectID AND RP.IsAllowed=1
- WHERE UE.UserID=U.UserID AND UE.CompanyID=U.CompanyID AND UE.IsActive=1 AND RP.MenuCode='08007' AND RP.ActionCode=@action
- AND ERG.EffectiveFrom<=CONVERT(date,SYSUTCDATETIME()) AND (ERG.EffectiveTo IS NULL OR ERG.EffectiveTo>=CONVERT(date,SYSUTCDATETIME())))
- ))) THEN 1 ELSE 0 END AS bit);
-""";
     private const string Columns = "VendorID,VendorCode,VendorName,EntityTypeCode,TaxID,Address,Telephone,Email,ContactName,ContactTelephone,ContactEmail,CreditDays,Remark,IsActive,RowVersion";
     private long Company => Claim("company_id");
     private long Claim(string name) => long.TryParse(User.FindFirstValue(name), out var n) ? n : 0;
@@ -48,10 +19,13 @@ SELECT CAST(CASE WHEN EXISTS(
     }
     private async Task<bool> Can(SqlConnection c,string action,CancellationToken t) {
         if(User.FindFirstValue("user_type")!="COMPANY_USER" || Company<=0 || Claim("user_id")<=0 || Claim("partner_id")<=0) return false;
-        await using var cmd=new SqlCommand(AccessSql,c);
-        cmd.Parameters.AddWithValue("@company",Company); cmd.Parameters.AddWithValue("@partner",Claim("partner_id"));
-        cmd.Parameters.AddWithValue("@user",Claim("user_id")); cmd.Parameters.AddWithValue("@action",action);
-        return Convert.ToBoolean(await cmd.ExecuteScalarAsync(t));
+        await using var screen=new SqlCommand("SELECT ScreenType FROM dbo.TDADMainMenu WHERE MenuCode=N'08007' AND IsActive=1 AND EXISTS(SELECT 1 FROM dbo.TDADPartner WHERE PartnerID=@partner AND IsActive=1)",c);
+        screen.Parameters.AddWithValue("@partner",Claim("partner_id"));
+        var screenType=await screen.ExecuteScalarAsync(t);
+        if(screenType is null || screenType is DBNull)return false;
+        var type=Convert.ToInt32(screenType);
+        if(action!="VIEW" && !(((type is 1 or 4) && (action is "CREATE" or "EDIT" or "DELETE")) || (type==2 && action=="EDIT")))return false;
+        return await Laoo.Shared.Contracts.CompanyMenuAccess.IsAllowedAsync(c,User,"08007",action,t);
     }
     private ObjectResult Denied() => StatusCode(403,new{message="ไม่มีสิทธิ์จัดการผู้ขาย",description="กรุณาตรวจสิทธิ์เมนูผู้ขาย (08007) และขอบเขตบริษัทกับผู้ดูแลระบบ"});
     private ObjectResult Missing() => StatusCode(404,new{message="ไม่พบผู้ขาย",description="รายการนี้อาจถูกลบหรือไม่อยู่ในบริษัทที่กำลังใช้งาน กรุณาโหลดรายการใหม่"});

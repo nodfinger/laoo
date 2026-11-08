@@ -35,7 +35,9 @@ class _ProviderPageState extends State<ProviderPage> {
 
   @override
   void dispose() {
-    for (final c in fields.values) c.dispose();
+    for (final c in fields.values) {
+      c.dispose();
+    }
     disposeProviderApi(api);
     super.dispose();
   }
@@ -57,8 +59,8 @@ class _ProviderPageState extends State<ProviderPage> {
     });
     try {
       final r = await Future.wait([
-        api.get('/api/company/provider/actions/' + widget.menuCode),
-        api.get('/api/company/provider/' + endpoint),
+        api.get('/api/company/provider/actions/${widget.menuCode}'),
+        api.get('/api/company/provider/$endpoint'),
       ]);
       if (widget.menuCode == '51004' || widget.menuCode == '51006') {
         final optionResult = await Future.wait([
@@ -74,19 +76,21 @@ class _ProviderPageState extends State<ProviderPage> {
             .where((x) => x['active'] != false)
             .toList();
       }
-      if (mounted)
+      if (mounted) {
         setState(() {
           actions = _map(r[0]);
           data = r[1];
           loading = false;
           _seedFields();
         });
+      }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           error = e;
           loading = false;
         });
+      }
     }
   }
 
@@ -203,14 +207,15 @@ class _ProviderPageState extends State<ProviderPage> {
   };
   List<Map<String, dynamic>> get rows {
     if (data is List) return (data as List).map(_map).toList();
-    if (data is Map && _map(data)['items'] is List)
+    if (data is Map && _map(data)['items'] is List) {
       return (_map(data)['items'] as List).map(_map).toList();
+    }
     return [];
   }
 
   Widget _records() {
     if (rows.isEmpty) return const Center(child: Text('ยังไม่มีข้อมูล'));
-    if (cards)
+    if (cards) {
       return SingleChildScrollView(
         child: LayoutBuilder(
           builder: (context, c) {
@@ -225,6 +230,7 @@ class _ProviderPageState extends State<ProviderPage> {
           },
         ),
       );
+    }
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: ConstrainedBox(
@@ -341,9 +347,9 @@ class _ProviderPageState extends State<ProviderPage> {
       child: r['coverImagePath'] == null
           ? const Icon(Icons.image_outlined)
           : Image.network(
-              '/' + r['coverImagePath'].toString(),
+              '/${r['coverImagePath']}',
               fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) =>
+              errorBuilder: (_, _, _) =>
                   const Icon(Icons.broken_image_outlined),
             ),
     ),
@@ -468,9 +474,9 @@ class _ProviderPageState extends State<ProviderPage> {
           .toStringAsFixed(1);
   num _n(dynamic v) => v is num ? v : 0;
   void _add() {
-    if (widget.menuCode == '51002')
+    if (widget.menuCode == '51002') {
       _locationDialog(null);
-    else if (widget.menuCode == '51003')
+    } else if (widget.menuCode == '51003')
       _serviceDialog(null);
     else
       _reviewLinkDialog();
@@ -596,7 +602,7 @@ class _ProviderPageState extends State<ProviderPage> {
                 children: [
                   Expanded(
                     child: Text(
-                      'สถานะ: ' + (m['status'] ?? 'NEW').toString(),
+                      'สถานะ: ${m['status'] ?? 'NEW'}',
                       style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
                   ),
@@ -778,14 +784,16 @@ class _ProviderPageState extends State<ProviderPage> {
   final selectedAreas = <int>{};
   List<Map<String, dynamic>> serviceOptions = [], locationOptions = [];
   Widget _profileSelections(Map<String, dynamic> m, bool readOnly) {
-    if (selectedServices.isEmpty && m['serviceTypeIds'] is List)
+    if (selectedServices.isEmpty && m['serviceTypeIds'] is List) {
       selectedServices.addAll(
         (m['serviceTypeIds'] as List).map((x) => (x as num).toInt()),
       );
-    if (selectedAreas.isEmpty && m['areaIds'] is List)
+    }
+    if (selectedAreas.isEmpty && m['areaIds'] is List) {
       selectedAreas.addAll(
         (m['areaIds'] as List).map((x) => (x as num).toInt()),
       );
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -877,8 +885,9 @@ class _ProviderPageState extends State<ProviderPage> {
       if (mounted) providerMessage(context, 'บันทึกโปรไฟล์แล้ว');
       await load();
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         providerMessage(context, 'บันทึกโปรไฟล์ไม่สำเร็จ', error: true);
+      }
     } finally {
       if (mounted) setState(() => saving = false);
     }
@@ -1009,7 +1018,7 @@ class _ProviderPageState extends State<ProviderPage> {
     int? parent = (row?['parentId'] as num?)?.toInt();
     bool active = row?['active'] != false;
     await _dialog(
-      title + ' > ' + (row == null ? 'เพิ่ม' : 'แก้ไข'),
+      '$title > ${row == null ? 'เพิ่ม' : 'แก้ไข'}',
       Icons.location_on_outlined,
       (set) => Column(
         children: [
@@ -1071,7 +1080,7 @@ class _ProviderPageState extends State<ProviderPage> {
         row == null
             ? await api.post('/api/company/provider/locations', body: body)
             : await api.put(
-                '/api/company/provider/locations/' + row['id'].toString(),
+                '/api/company/provider/locations/${row['id']}',
                 body: body,
               );
       },
@@ -1089,7 +1098,7 @@ class _ProviderPageState extends State<ProviderPage> {
         );
     bool active = row?['active'] != false;
     await _dialog(
-      title + ' > ' + (row == null ? 'เพิ่ม' : 'แก้ไข'),
+      '$title > ${row == null ? 'เพิ่ม' : 'แก้ไข'}',
       Icons.home_repair_service_outlined,
       (set) => Column(
         children: [
@@ -1120,7 +1129,7 @@ class _ProviderPageState extends State<ProviderPage> {
         row == null
             ? await api.post('/api/company/provider/service-types', body: body)
             : await api.put(
-                '/api/company/provider/service-types/' + row['id'].toString(),
+                '/api/company/provider/service-types/${row['id']}',
                 body: body,
               );
       },
@@ -1138,7 +1147,7 @@ class _ProviderPageState extends State<ProviderPage> {
           text: DateTime.now().toIso8601String().substring(0, 10),
         );
     await _dialog(
-      title + ' > เพิ่ม',
+      '$title > เพิ่ม',
       Icons.link_outlined,
       (set) => Column(
         children: [
@@ -1173,11 +1182,12 @@ class _ProviderPageState extends State<ProviderPage> {
             },
           ),
         );
-        if (mounted)
+        if (mounted) {
           providerMessage(
             context,
-            'สร้างลิงก์แล้ว: ' + (r['url'] ?? '').toString(),
+            'สร้างลิงก์แล้ว: ${r['url'] ?? ''}',
           );
+        }
       },
     );
   }
@@ -1191,17 +1201,16 @@ class _ProviderPageState extends State<ProviderPage> {
     if (pick == null || pick.files.single.bytes == null) return;
     try {
       await uploadProviderFile(
-        '/api/company/provider/service-types/' +
-            row['id'].toString() +
-            '/cover',
+        '/api/company/provider/service-types/${row['id']}/cover',
         fileName: pick.files.single.name,
         bytes: pick.files.single.bytes!,
       );
       if (mounted) providerMessage(context, 'อัปโหลดรูปปกแล้ว');
       await load();
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         providerMessage(context, 'อัปโหลดรูปปกไม่สำเร็จ', error: true);
+      }
     }
   }
 
@@ -1216,13 +1225,10 @@ class _ProviderPageState extends State<ProviderPage> {
     }
     try {
       await api.post(
-        '/api/company/provider/approvals/' +
-            row['id'].toString() +
-            '/' +
-            action,
+        '/api/company/provider/approvals/${row['id']}/$action',
         body: {'reason': reason.text},
       );
-      if (mounted)
+      if (mounted) {
         providerMessage(
           context,
           action == 'approve'
@@ -1231,6 +1237,7 @@ class _ProviderPageState extends State<ProviderPage> {
               ? 'ส่งกลับแล้ว'
               : 'ระงับแล้ว',
         );
+      }
       await load();
     } catch (e) {
       if (mounted) providerMessage(context, 'ดำเนินการไม่สำเร็จ', error: true);
@@ -1270,11 +1277,12 @@ class _ProviderPageState extends State<ProviderPage> {
     if (!await _confirm(
       'ยกเลิกลิงก์ประเมิน',
       'ลิงก์นี้จะไม่สามารถใช้ตอบแบบประเมินได้',
-    ))
+    )) {
       return;
+    }
     try {
       await api.delete(
-        '/api/company/provider/review-links/' + row['id'].toString(),
+        '/api/company/provider/review-links/${row['id']}',
       );
       if (mounted) providerMessage(context, 'ยกเลิกลิงก์แล้ว');
       await load();
@@ -1288,11 +1296,12 @@ class _ProviderPageState extends State<ProviderPage> {
     if (!await _reasonDialog(
       row['hidden'] == true ? 'เหตุผลที่นำกลับมาแสดง' : 'เหตุผลที่ซ่อนรีวิว',
       reason,
-    ))
+    )) {
       return;
+    }
     try {
       await api.post(
-        '/api/company/provider/reviews/' + row['id'].toString() + '/moderate',
+        '/api/company/provider/reviews/${row['id']}/moderate',
         body: {'hidden': row['hidden'] != true, 'reason': reason.text},
       );
       if (mounted) providerMessage(context, 'บันทึกสถานะรีวิวแล้ว');
@@ -1304,22 +1313,24 @@ class _ProviderPageState extends State<ProviderPage> {
 
   Future<void> _delete(Map<String, dynamic> row) async {
     final name = (row['name'] ?? row['code']).toString();
-    if (!await _confirm('ลบ ' + name, 'เมื่อลบแล้วไม่สามารถเรียกคืนได้'))
+    if (!await _confirm('ลบ $name', 'เมื่อลบแล้วไม่สามารถเรียกคืนได้')) {
       return;
+    }
     final path = widget.menuCode == '51002' ? 'locations' : 'service-types';
     try {
       await api.delete(
-        '/api/company/provider/' + path + '/' + row['id'].toString(),
+        '/api/company/provider/$path/${row['id']}',
       );
       if (mounted) providerMessage(context, 'ลบข้อมูลแล้ว');
       await load();
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         providerMessage(
           context,
           'ลบไม่สำเร็จ รายการอาจถูกใช้งานอยู่',
           error: true,
         );
+      }
     }
   }
 
@@ -1432,21 +1443,24 @@ class _ProviderPageState extends State<ProviderPage> {
                                   set(() => busy = true);
                                   try {
                                     await save();
-                                    if (dialogContext.mounted)
+                                    if (dialogContext.mounted) {
                                       Navigator.pop(dialogContext);
-                                    if (mounted)
+                                    }
+                                    if (mounted) {
                                       providerMessage(
                                         context,
                                         'บันทึกข้อมูลแล้ว',
                                       );
+                                    }
                                     await load();
                                   } catch (e) {
-                                    if (mounted)
+                                    if (mounted) {
                                       providerMessage(
                                         context,
                                         'บันทึกไม่สำเร็จ',
                                         error: true,
                                       );
+                                    }
                                     set(() => busy = false);
                                   }
                                 },

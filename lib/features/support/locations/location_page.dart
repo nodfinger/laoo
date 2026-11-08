@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:laoo_shared_admin_ui/laoo_shared_admin_ui.dart'
+    show FilterHeightSync, filterActionHeightStyle;
 import '../../../app/theme/laoo_design_tokens.dart';
 import '../../../app/theme/laoo_typography.dart';
 import '../../../core/api/api_client.dart';
@@ -319,9 +321,7 @@ class _LocationPageState extends State<LocationPage> {
               children: [
                 Align(
                   alignment: Alignment.centerLeft,
-                  child: Text(
-                    'ห้อง: ${room['code']} | ${room['name']}',
-                  ),
+                  child: Text('ห้อง: ${room['code']} | ${room['name']}'),
                 ),
                 const SizedBox(height: 12),
                 TextField(
@@ -989,56 +989,63 @@ class _LocationPageState extends State<LocationPage> {
                 ),
             ],
           );
-          final searchControls = SizedBox(
-            width: compact ? double.infinity : 438,
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _search,
-                    style: const TextStyle(fontSize: LaooTypography.inputText),
-                    decoration: _controlDecoration(
-                      hintText: 'ค้นหารหัสหรือชื่อ',
-                      prefixIcon: Icons.search,
+          final searchControls = FilterHeightSync(
+            builder: (context, searchKey, height) => SizedBox(
+              width: compact ? double.infinity : 438,
+              child: LayoutBuilder(
+                builder: (context, available) => Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: available.maxWidth < 438
+                          ? available.maxWidth
+                          : 160,
+                      child: TextField(
+                        key: searchKey,
+                        controller: _search,
+                        style: const TextStyle(
+                          fontSize: LaooTypography.inputText,
+                        ),
+                        decoration: _controlDecoration(
+                          hintText: 'ค้นหารหัสหรือชื่อ',
+                          prefixIcon: Icons.search,
+                        ),
+                        onSubmitted: (_) => setState(() {
+                          _query = _search.text.trim();
+                          _page = 0;
+                        }),
+                      ),
                     ),
-                    onSubmitted: (_) => setState(() {
-                      _query = _search.text.trim();
-                      _page = 0;
-                    }),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                SizedBox(
-                  height: 40,
-                  child: FilledButton(
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size(0, 40),
-                      maximumSize: const Size(double.infinity, 40),
+                    SizedBox(
+                      height: height,
+                      child: FilledButton.icon(
+                        style: filterActionHeightStyle(height),
+                        onPressed: () => setState(() {
+                          _query = _search.text.trim();
+                          _page = 0;
+                        }),
+                        icon: const Icon(Icons.search),
+                        label: const Text('ค้นหา'),
+                      ),
                     ),
-                    onPressed: () => setState(() {
-                      _query = _search.text.trim();
-                      _page = 0;
-                    }),
-                    child: const Text('ค้นหา'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                SizedBox(
-                  height: 40,
-                  child: OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(0, 40),
-                      maximumSize: const Size(double.infinity, 40),
+                    SizedBox(
+                      height: height,
+                      child: OutlinedButton.icon(
+                        style: filterActionHeightStyle(height),
+                        onPressed: () => setState(() {
+                          _search.clear();
+                          _query = '';
+                          _page = 0;
+                        }),
+                        icon: const Icon(Icons.filter_alt_off_outlined),
+                        label: const Text('ล้าง Filter'),
+                      ),
                     ),
-                    onPressed: () => setState(() {
-                      _search.clear();
-                      _query = '';
-                      _page = 0;
-                    }),
-                    child: const Text('ล้าง Filter'),
-                  ),
+                  ],
                 ),
-              ],
+              ),
             ),
           );
           return Stack(
@@ -1082,14 +1089,29 @@ class _LocationPageState extends State<LocationPage> {
                                   ]
                                 : [
                                     if (!compact)
-                                      IconButton(
-                                        tooltip: 'สลับ Card/List',
-                                        onPressed: () =>
-                                            setState(() => _cards = !_cards),
-                                        icon: Icon(
-                                          _cards
-                                              ? Icons.view_list
-                                              : Icons.grid_view,
+                                      SizedBox.square(
+                                        dimension: LaooTypography.buttonHeight,
+                                        child: IconButton(
+                                          tooltip: 'สลับ Card/List',
+                                          style: IconButton.styleFrom(
+                                            backgroundColor: primary.withValues(
+                                              alpha: .1,
+                                            ),
+                                            foregroundColor: primary,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(
+                                                    LaooRadius.xs,
+                                                  ),
+                                            ),
+                                          ),
+                                          onPressed: () =>
+                                              setState(() => _cards = !_cards),
+                                          icon: Icon(
+                                            _cards
+                                                ? Icons.view_list
+                                                : Icons.grid_view,
+                                          ),
                                         ),
                                       ),
                                     if (_can('create') &&

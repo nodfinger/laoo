@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/gestures.dart';
+import 'package:laoo_shared_admin_ui/laoo_shared_admin_ui.dart'
+    show FilterHeightSync, filterActionHeightStyle;
 
 import '../../../../app/theme/laoo_typography.dart';
+import '../../../../app/theme/laoo_design_tokens.dart';
 import '../../../../core/widgets/auto_dismiss_message.dart';
-import '../../../../core/widgets/pinned_data_table.dart';
 import '../../../../core/widgets/timed_snack_bar.dart';
 import '../../presentation/widgets/support_workspace_shell.dart';
 import '../data/technical_info_repository.dart';
@@ -65,73 +67,155 @@ class _TechnicalInfoPageState extends State<TechnicalInfoPage> {
   Widget build(BuildContext context) => SupportWorkspaceShell(
     pageTitle: 'ข้อมูลด้านเทคนิค',
     activeMenu: 'technicalInfo',
-    child: Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          WorkspacePageTitle(
-            title: 'ข้อมูลด้านเทคนิค',
-            favoriteKey: 'technicalInfo',
-          ),
-          const SizedBox(height: 12),
-          Row(
+    child: LayoutBuilder(
+      builder: (context, constraints) {
+        final theme = Theme.of(context);
+        final color = theme.colorScheme.primary;
+        final shape = RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
+        );
+        Widget section(Widget child) => Card(
+          margin: EdgeInsets.zero,
+          elevation: 0,
+          color: Colors.white,
+          surfaceTintColor: Colors.transparent,
+          shape: shape,
+          child: child,
+        );
+        return Padding(
+          padding: const EdgeInsets.all(LaooLayout.cardMargin),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(
-                child: TextField(
-                  controller: _query,
-                  onSubmitted: (_) => _search(),
-                  decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.search),
-                    suffixIcon: IconButton(
-                      tooltip: 'ค้นหา',
-                      onPressed: _loading ? null : _search,
-                      icon: const Icon(Icons.arrow_forward),
-                    ),
-                    labelText: 'ค้นหาชื่อเมนู หรือข้อกำหนด',
+              section(
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  child: WorkspacePageTitle(
+                    title: 'ข้อมูลด้านเทคนิค',
+                    favoriteKey: 'technicalInfo',
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
-              OutlinedButton(
-                onPressed: _result == null ? null : _copyAll,
-                child: const Text('Copy'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          if (_error != null) ...[
-            AutoDismissMessage(
-              key: ValueKey(_error),
-              message: _error!,
-              error: true,
-              onClose: _dismissError,
-            ),
-            const SizedBox(height: 8),
-          ],
-          if (_loading) const LinearProgressIndicator(),
-          if (_result != null && !_loading) ...[
-            Expanded(
-              child: SelectionArea(
-                child: ListView(
-                  children: [
-                    _section(
-                      'ข้อมูลเมนู',
-                      'รายละเอียดเมนูที่ใช้งาน',
-                      _result!.menus
-                          .map((x) => '${x['menuName']} (${x['menuCode']})')
-                          .toList(),
+              const SizedBox(height: 8),
+              section(
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: LayoutBuilder(
+                    builder: (context, available) => FilterHeightSync(
+                      builder: (context, searchKey, height) => Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          SizedBox(
+                            width: available.maxWidth < 330
+                                ? available.maxWidth
+                                : 330,
+                            child: TextField(
+                              key: searchKey,
+                              controller: _query,
+                              onSubmitted: (_) => _search(),
+                              decoration: const InputDecoration(
+                                prefixIcon: Icon(Icons.search),
+                                hintText: 'ค้นหาชื่อเมนู หรือข้อกำหนด',
+                                isDense: true,
+                              ),
+                            ),
+                          ),
+                          SizedBox(
+                            height: height,
+                            child: FilledButton.icon(
+                              onPressed: _loading ? null : _search,
+                              style: FilledButton.styleFrom(
+                                shape: shape,
+                              ).merge(filterActionHeightStyle(height)),
+                              icon: const Icon(Icons.search),
+                              label: const Text('ค้นหา'),
+                            ),
+                          ),
+                          SizedBox(
+                            height: height,
+                            child: OutlinedButton.icon(
+                              onPressed: _loading
+                                  ? null
+                                  : () {
+                                      _query.clear();
+                                      _search();
+                                    },
+                              style: OutlinedButton.styleFrom(
+                                shape: shape,
+                                foregroundColor: color,
+                                side: BorderSide(color: color),
+                              ).merge(filterActionHeightStyle(height)),
+                              icon: const Icon(Icons.filter_alt_off_outlined),
+                              label: const Text('ล้าง Filter'),
+                            ),
+                          ),
+                          SizedBox(
+                            height: height,
+                            child: OutlinedButton.icon(
+                              onPressed: _result == null ? null : _copyAll,
+                              style: OutlinedButton.styleFrom(
+                                shape: shape,
+                              ).merge(filterActionHeightStyle(height)),
+                              icon: const Icon(Icons.copy_outlined),
+                              label: const Text('Copy'),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    _dartFileSection(),
-                    _mdSection(),
-                    _tableSection(),
-                  ],
+                  ),
                 ),
               ),
-            ),
-          ],
-        ],
-      ),
+              const SizedBox(height: 8),
+              if (_error != null) ...[
+                AutoDismissMessage(
+                  key: ValueKey(_error),
+                  message:
+                      'ไม่สามารถโหลดข้อมูลด้านเทคนิคได้\nรายละเอียดเพิ่มเติม: กรุณาตรวจสอบการเชื่อมต่อแล้วลองใหม่',
+                  error: true,
+                  onClose: _dismissError,
+                ),
+                const SizedBox(height: 8),
+              ],
+              if (_loading) const LinearProgressIndicator(),
+              if (_result != null && !_loading)
+                Expanded(
+                  child: Theme(
+                    data: theme.copyWith(
+                      cardTheme: CardThemeData(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        elevation: 0,
+                        color: Colors.white,
+                        surfaceTintColor: Colors.transparent,
+                        shape: shape,
+                      ),
+                    ),
+                    child: SelectionArea(
+                      child: ListView(
+                        children: [
+                          _section(
+                            'ข้อมูลเมนู',
+                            'รายละเอียดเมนูที่ใช้งาน',
+                            _result!.menus
+                                .map(
+                                  (x) => '${x['menuName']} (${x['menuCode']})',
+                                )
+                                .toList(),
+                          ),
+                          _dartFileSection(),
+                          _mdSection(),
+                          _tableSection(),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
     ),
   );
 
@@ -220,25 +304,13 @@ class _TechnicalInfoPageState extends State<TechnicalInfoPage> {
                     '${table['tableName']} — ${table['tableMeaning']}',
                   ),
                   children: [
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: PinnedDataTable(
-                        columns: const [
-                          DataColumn(label: Text('ชื่อคอลัมน์')),
-                          DataColumn(label: Text('ประเภทข้อมูล')),
-                          DataColumn(label: Text('ความหมาย')),
-                        ],
-                        rows: ((table['fields'] as List?) ?? const [])
-                            .map(
-                              (field) => DataRow(
-                                cells: [
-                                  DataCell(Text('${field['colName']}')),
-                                  DataCell(Text('${field['dataType']}')),
-                                  DataCell(Text('${field['remark']}')),
-                                ],
-                              ),
-                            )
-                            .toList(),
+                    ...((table['fields'] as List?) ?? const []).map(
+                      (field) => ListTile(
+                        dense: true,
+                        title: Text(
+                          '${field['colName']} — ${field['dataType']}',
+                        ),
+                        subtitle: Text('${field['remark'] ?? ''}'),
                       ),
                     ),
                   ],
@@ -430,45 +502,21 @@ class _TechnicalInfoPageState extends State<TechnicalInfoPage> {
             if (files.isEmpty)
               const Text('ไม่พบข้อมูล')
             else
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: PinnedDataTable(
-                  headingRowColor: WidgetStatePropertyAll(Color(0x12000000)),
-                  columns: const [
-                    DataColumn(label: Text('เปิดไฟล์')),
-                    DataColumn(label: Text('MenuCode')),
-                    DataColumn(label: Text('ชื่อเมนู')),
-                    DataColumn(label: Text('ไฟล์ Dart')),
-                    DataColumn(label: Text('Path')),
-                  ],
-                  rows: files
-                      .map(
-                        (file) => DataRow(
-                          cells: [
-                            DataCell(
-                              IconButton(
-                                tooltip: 'เปิดไฟล์',
-                                onPressed: () =>
-                                    _openFile('${file['fullPath']}'),
-                                icon: Icon(
-                                  Icons.open_in_new,
-                                  color: scheme.primary,
-                                ),
-                              ),
-                            ),
-                            DataCell(Text('${file['menuCode']}')),
-                            DataCell(Text('${file['menuName']}')),
-                            DataCell(Text('${file['fileName']}')),
-                            DataCell(
-                              SelectableText(
-                                '${file['relativePath']}',
-                                onTap: () => _openFile('${file['fullPath']}'),
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                      .toList(),
+              ...files.map(
+                (file) => ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: IconButton(
+                    tooltip: 'เปิดไฟล์',
+                    onPressed: () => _openFile('${file['fullPath']}'),
+                    icon: Icon(Icons.open_in_new, color: scheme.primary),
+                  ),
+                  title: Text(
+                    '${file['menuCode']} | ${file['menuName']} | ${file['fileName']}',
+                  ),
+                  subtitle: SelectableText(
+                    '${file['relativePath']}',
+                    onTap: () => _openFile('${file['fullPath']}'),
+                  ),
                 ),
               ),
           ],

@@ -28,6 +28,35 @@ final ValueNotifier<String?> mobileSelectedMenuGroup = ValueNotifier<String?>(
 );
 final UserFavoriteRepository _userFavoriteRepository = UserFavoriteRepository();
 
+Future<void> _toggleWorkspaceFavorite(
+  BuildContext context,
+  String code,
+  bool selected,
+  Set<String> favorites,
+) async {
+  try {
+    final next = <String>{...favorites};
+    if (selected) {
+      await _userFavoriteRepository.remove(code);
+      next.remove(code);
+    } else {
+      await _userFavoriteRepository.add(code);
+      next.add(code);
+    }
+    supportFavoritePages.value = next;
+    supportFavoriteRefresh.value++;
+  } catch (_) {
+    if (context.mounted) {
+      showTimedSnackBar(
+        context,
+        message:
+            'ไม่สามารถเปลี่ยนเมนูลัดได้\nรายละเอียดเพิ่มเติม: กรุณาตรวจสอบสิทธิ์และการเชื่อมต่อ แล้วลองใหม่อีกครั้ง',
+        error: true,
+      );
+    }
+  }
+}
+
 class _ScopedWorkspaceMenuIcon extends StatefulWidget {
   const _ScopedWorkspaceMenuIcon({required this.menuKey, required this.color});
 
@@ -102,18 +131,12 @@ class _ScopedWorkspaceFavoriteButton extends StatelessWidget {
                 : 'เพิ่มหน้านี้เป็นเมนูลัดของฉัน',
             onPressed: resolved == null || resolved.isEmpty
                 ? null
-                : () async {
-                    final next = <String>{...favorites};
-                    if (selected) {
-                      next.remove(resolved);
-                      await _userFavoriteRepository.remove(resolved);
-                    } else {
-                      next.add(resolved);
-                      await _userFavoriteRepository.add(resolved);
-                    }
-                    supportFavoritePages.value = next;
-                    supportFavoriteRefresh.value++;
-                  },
+                : () => _toggleWorkspaceFavorite(
+                    context,
+                    resolved,
+                    selected,
+                    favorites,
+                  ),
             icon: Icon(
               selected ? Icons.star_rounded : Icons.star_border_rounded,
               color: accent,
@@ -225,20 +248,14 @@ class WorkspacePageTitle extends StatelessWidget {
                         tooltip: selected
                             ? 'นำออกจากเมนูลัดของฉัน'
                             : 'เพิ่มหน้านี้เป็นเมนูลัดของฉัน',
-                        onPressed: () async {
-                          final resolved = snapshot.data?.code.trim();
-                          if (resolved == null || resolved.isEmpty) return;
-                          final next = <String>{...favorites};
-                          if (selected) {
-                            next.remove(resolved);
-                            await _userFavoriteRepository.remove(resolved);
-                          } else {
-                            next.add(resolved);
-                            await _userFavoriteRepository.add(resolved);
-                          }
-                          supportFavoritePages.value = next;
-                          supportFavoriteRefresh.value++;
-                        },
+                        onPressed: snapshot.data?.code.trim().isNotEmpty == true
+                            ? () => _toggleWorkspaceFavorite(
+                                context,
+                                code,
+                                selected,
+                                favorites,
+                              )
+                            : null,
                         icon: Icon(
                           selected
                               ? Icons.star_rounded
@@ -1997,15 +2014,6 @@ class _FavoriteWorkspaceBarState extends State<_FavoriteWorkspaceBar> {
             (item) => visibleCodes.contains(item.menuCode.trim().toUpperCase()),
           )
           .toList();
-      final revokedFavorites = favorites
-          .where(
-            (item) =>
-                !visibleCodes.contains(item.menuCode.trim().toUpperCase()),
-          )
-          .toList();
-      for (final item in revokedFavorites) {
-        await _repository.remove(item.menuCode);
-      }
       if (!mounted) return;
       setState(() {
         _favorites = visibleFavorites;
@@ -2770,6 +2778,26 @@ class _ApiRoleScopedSidebarState extends State<_ApiRoleScopedSidebar> {
                       return spec?.path == currentPath;
                     }),
                   );
+                  List<Widget> menuItems(NavigationMenuGroup group) =>
+                      group.items.map((item) {
+                        final spec = AppMenuRouteRegistry.byMenuCode(item.code);
+                        return _MenuItem(
+                          label: item.name,
+                          icon: _iconFor(item.iconName),
+                          selected: spec?.path == currentPath,
+                          accent: widget.itemForeground,
+                          selectedAccent: widget.preset.primary,
+                          selectedForeground: widget.selectedForeground,
+                          onTap:
+                              spec == null &&
+                                  (item.routePath?.trim().isEmpty ?? true)
+                              ? null
+                              : () {
+                                  final path = spec?.path ?? item.routePath!;
+                                  context.go(path.trim());
+                                },
+                        );
+                      }).toList();
                   return _ProjectMenu(
                     code: project.code,
                     title: project.name,
@@ -2777,46 +2805,28 @@ class _ApiRoleScopedSidebarState extends State<_ApiRoleScopedSidebar> {
                     accent: widget.preset.primary,
                     initiallyExpanded:
                         project.isExpandedDefault || projectActive,
-                    children: project.menuGroups
-                        .where((group) => group.items.isNotEmpty)
-                        .map(
-                          (group) => _MenuGroup(
-                            storageKey: '${project.code}-${group.code}',
-                            title: group.name,
-                            accent: widget.preset.primary,
-                            initiallyExpanded:
-                                group.isExpandedDefault ||
-                                group.items.any((item) {
-                                  final spec = AppMenuRouteRegistry.byMenuCode(
-                                    item.code,
-                                  );
-                                  return spec?.path == currentPath;
-                                }),
-                            children: group.items.map((item) {
-                              final spec = AppMenuRouteRegistry.byMenuCode(
-                                item.code,
-                              );
-                              return _MenuItem(
-                                label: item.name,
-                                icon: _iconFor(item.iconName),
-                                selected: spec?.path == currentPath,
-                                accent: widget.itemForeground,
-                                selectedAccent: widget.preset.primary,
-                                selectedForeground: widget.selectedForeground,
-                                onTap:
-                                    spec == null &&
-                                        (item.routePath?.trim().isEmpty ?? true)
-                                    ? null
-                                    : () {
-                                        final path =
-                                            spec?.path ?? item.routePath!;
-                                        context.go(path.trim());
-                                      },
-                              );
-                            }).toList(),
-                          ),
-                        )
-                        .toList(),
+                    children: !project.showGroups
+                        ? project.menuGroups.expand(menuItems).toList()
+                        : project.menuGroups
+                              .where((group) => group.items.isNotEmpty)
+                              .map(
+                                (group) => _MenuGroup(
+                                  storageKey: '${project.code}-${group.code}',
+                                  title: group.name,
+                                  accent: widget.preset.primary,
+                                  initiallyExpanded:
+                                      group.isExpandedDefault ||
+                                      group.items.any((item) {
+                                        final spec =
+                                            AppMenuRouteRegistry.byMenuCode(
+                                              item.code,
+                                            );
+                                        return spec?.path == currentPath;
+                                      }),
+                                  children: menuItems(group),
+                                ),
+                              )
+                              .toList(),
                   );
                 }),
               ],
@@ -3051,14 +3061,15 @@ class _BrandHeader extends StatelessWidget {
                     : RouteNames.authenticatedHome,
               ),
           child: SizedBox(
-            height: 72,
+            height: compact ? 48 : 72,
             child: Padding(
               padding: EdgeInsets.symmetric(horizontal: compact ? 4 : 16),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Container(
-                    width: compact ? 46 : 32,
-                    height: compact ? 46 : 32,
+                    width: compact ? 40 : 32,
+                    height: compact ? 40 : 32,
                     decoration: BoxDecoration(
                       color: iconBackground,
                       borderRadius: BorderRadius.circular(compact ? 13 : 9),
@@ -3072,14 +3083,14 @@ class _BrandHeader extends StatelessWidget {
                               BoxShadow(
                                 color: preset.primary.withValues(alpha: 0.18),
                                 blurRadius: 10,
-                                offset: const Offset(0, 3),
+                                offset: const Offset(0, 1),
                               ),
                             ]
                           : null,
                     ),
                     alignment: Alignment.center,
                     child: Text(
-                      'L',
+                      'R',
                       style: TextStyle(
                         color: iconColor,
                         fontSize: compact ? 28 : 19,

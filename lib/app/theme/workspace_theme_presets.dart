@@ -53,8 +53,57 @@ class WorkspaceThemePreset {
       fontFamily: LaooTypography.fontFamily,
       fontFamilyFallback: LaooTypography.fontFallback,
     );
+    final dateText =
+        ThemeData.estimateBrightnessForColor(textPrimary) == Brightness.light
+        ? Colors.black87
+        : textPrimary;
 
     return baseTheme.copyWith(
+      datePickerTheme: DatePickerThemeData(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        headerBackgroundColor: Colors.white,
+        headerForegroundColor: dateText,
+        dividerColor: border,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
+        ),
+        weekdayStyle: themedText.bodyMedium?.copyWith(color: dateText),
+        dayStyle: themedText.bodyMedium,
+        yearStyle: themedText.bodyMedium,
+        dayForegroundColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.disabled)) {
+            return textSecondary.withValues(alpha: .5);
+          }
+          if (states.contains(WidgetState.selected)) return scheme.onPrimary;
+          return dateText;
+        }),
+        dayBackgroundColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? primary
+              : Colors.transparent,
+        ),
+        yearForegroundColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.disabled)) {
+            return textSecondary.withValues(alpha: .5);
+          }
+          if (states.contains(WidgetState.selected)) return scheme.onPrimary;
+          return dateText;
+        }),
+        yearBackgroundColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? primary
+              : Colors.transparent,
+        ),
+        todayForegroundColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? scheme.onPrimary
+              : primary,
+        ),
+        todayBorder: BorderSide(color: primary),
+        cancelButtonStyle: TextButton.styleFrom(foregroundColor: primary),
+        confirmButtonStyle: TextButton.styleFrom(foregroundColor: primary),
+      ),
       cardTheme: CardThemeData(
         color: surface,
         elevation: 0,
@@ -185,7 +234,7 @@ class WorkspaceThemePreset {
         contentTextStyle: TextStyle(
           fontFamily: LaooTypography.fontFamily,
           fontFamilyFallback: LaooTypography.fontFallback,
-          fontSize: LaooTypography.inputText,
+          fontSize: LaooTypography.body,
           height: LaooTypography.bodyLineHeight,
           color: LaooColors.textPrimary,
         ),
@@ -193,6 +242,10 @@ class WorkspaceThemePreset {
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
+          minimumSize: const Size(0, LaooTypography.buttonHeight),
+          maximumSize: const Size(double.infinity, LaooTypography.buttonHeight),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          visualDensity: VisualDensity.standard,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(LaooRadius.xs),
           ),
@@ -206,6 +259,7 @@ class WorkspaceThemePreset {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
+          visualDensity: VisualDensity.standard,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(LaooRadius.xs),
           ),
@@ -223,6 +277,7 @@ class WorkspaceThemePreset {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
+          visualDensity: VisualDensity.standard,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(LaooRadius.xs),
           ),
@@ -240,6 +295,7 @@ class WorkspaceThemePreset {
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
+          visualDensity: VisualDensity.standard,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(LaooRadius.xs),
           ),

@@ -53,6 +53,7 @@ void main() {
     EmployeeListController controller, {
     VoidCallback? onAdd,
     EmployeeAction? onEdit,
+    bool canShowImages = true,
   }) => MaterialApp(
     home: Scaffold(
       body: EmployeeListWorkspace(
@@ -68,6 +69,7 @@ void main() {
         onEdit: onEdit ?? (_) {},
         onDelete: (_) {},
         onUser: (_) {},
+        canShowEmployeeImages: canShowImages,
       ),
     ),
   );
@@ -88,10 +90,29 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('พนักงานจากเมนู'), findsOneWidget);
+    final searchHeight = tester.getSize(find.byType(TextField)).height;
+    expect(
+      tester.getSize(find.widgetWithText(FilledButton, 'ค้นหา')).height,
+      searchHeight,
+    );
+    expect(
+      tester.getSize(find.widgetWithText(OutlinedButton, 'ล้าง Filter')).height,
+      searchHeight,
+    );
+    expect(
+      tester.getSize(find.byTooltip('แสดงแบบการ์ด')).height,
+      tester.getSize(find.widgetWithText(FilledButton, 'เพิ่ม')).height,
+    );
     expect(find.text('E001'), findsOneWidget);
     expect(find.text('1-20 จาก 25'), findsOneWidget);
     expect(find.byTooltip('แก้ไข'), findsOneWidget);
-    expect(find.byTooltip('กำหนด User'), findsOneWidget);
+    expect(find.byTooltip('กำหนด User'), findsNothing);
+    expect(find.text('เบอร์ภายใน'), findsOneWidget);
+    expect(find.text('1234'), findsOneWidget);
+    expect(find.text('รูป'), findsNothing);
+    await tester.tap(find.byType(Checkbox));
+    await tester.pumpAndSettle();
+    expect(find.text('รูป'), findsOneWidget);
     expect(find.byTooltip('ลบ'), findsOneWidget);
 
     await tester.tap(find.widgetWithText(FilledButton, 'เพิ่ม'));
@@ -129,7 +150,21 @@ void main() {
 
     expect(find.byType(DataTable), findsNothing);
     expect(find.textContaining('E001 - Employee One'), findsOneWidget);
+    expect(find.text('เบอร์ภายใน: 1234'), findsOneWidget);
+    expect(find.textContaining('แจ้งเตือน:'), findsNothing);
+    await tester.tap(find.byType(Checkbox));
+    await tester.pumpAndSettle();
+    expect(find.byIcon(Icons.person_outline), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('image option is hidden without permission', (tester) async {
+    final value = await createController();
+    addTearDown(value.$1.dispose);
+    await tester.pumpWidget(app(value.$1, canShowImages: false));
+    await tester.pumpAndSettle();
+    expect(find.text('แสดงรูปพนักงาน'), findsNothing);
+    expect(find.byType(Checkbox), findsNothing);
   });
 }
 
@@ -158,6 +193,7 @@ class _FakeApi implements JsonApiClient {
           'fullName': 'Employee One',
           'nickName': 'One',
           'telephone': '020000001',
+          'internalTelephone': '1234',
           'notifyByEmail': true,
           'notifyInSystem': true,
           'isActive': true,

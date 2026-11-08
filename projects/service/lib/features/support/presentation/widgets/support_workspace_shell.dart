@@ -114,10 +114,9 @@ class WorkspacePageTitle extends StatelessWidget {
     final key =
         favoriteKey ?? LaooWorkspaceFavoriteScope.maybeOf(context)?.activeMenu;
 
-    return ValueListenableBuilder<WorkspaceThemePreset>(
-      valueListenable: workspaceThemeController,
-      builder: (context, preset, _) {
-        final accent = preset.primary;
+    return Builder(
+      builder: (context) {
+        final accent = Theme.of(context).colorScheme.primary;
         return Row(
           mainAxisSize: MainAxisSize.min,
           children: [

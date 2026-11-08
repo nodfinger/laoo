@@ -1,5 +1,6 @@
 using System.Data;
 using System.Security.Claims;
+using LaooApi.Security;
 using LaooApi.Models.Navigation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -109,7 +110,8 @@ SELECT PR.ProjectID,PR.ProjectCode,PR.ProjectNameTH,PR.ProjectType,PR.IconName,
        PR.SortOrder,PR.IsExpandedDefault,
        G.MenuGroupCode, G.MenuGroupName, G.IconName AS GroupIconName, G.SortOrder AS GroupSortOrder,
        G.IsExpandedDefault, M.MenuCode, M.MenuName, M.RouteName, M.RoutePath, M.FeatureCode,
-       M.IconName, M.SortOrder, M.IsFavoriteAllowed
+       M.IconName, M.SortOrder, M.IsFavoriteAllowed,
+       (SELECT COUNT(*) FROM dbo.TDADProjectMenuGroup CPG JOIN dbo.TDADMenuGroup CG ON CG.MenuGroupCode=CPG.MenuGroupCode AND CG.IsActive=1 WHERE CPG.ProjectID=PR.ProjectID AND CPG.IsActive=1) AS ConfiguredMenuGroupCount
 FROM AllowedProjects AP
 INNER JOIN dbo.TDADProject PR ON PR.ProjectID=AP.ProjectID AND PR.IsActive=1
 INNER JOIN dbo.TDADProjectMenuGroup PG
@@ -131,12 +133,19 @@ WHERE UPPER(LTRIM(RTRIM(G.AudienceType))) IN (N'A',@AudienceType)
   -- The Company branch menu remains Company-only in the shared settings group.
   AND (M.MenuCode <> N'13001' OR @UserType = N'COMPANY_USER')
   AND (M.MenuCode <> N'14006' OR EXISTS(SELECT 1 FROM dbo.TDSTCompanySetUp CS WHERE CS.CompanyID=@CompanyID AND UPPER(LTRIM(RTRIM(CS.BusinessTypeCode)))=N'DORMITORY'))
+  AND (@UserType<>N'COMPANY_USER' OR M.MenuGroupCode<>N'09' OR PR.ProjectCode=N'LAOO_TRADE' OR EXISTS
+      (SELECT 1 FROM dbo.TDADCompanyFeature SF
+       JOIN dbo.TDADProject CoreProject ON CoreProject.ProjectID=SF.ProjectID AND CoreProject.ProjectCode=N'LAOO' AND CoreProject.IsActive=1
+       JOIN dbo.TDADFeature F ON F.FeatureCode=SF.FeatureCode AND F.IsActive=1
+       WHERE SF.CompanyID=@CompanyID AND SF.PartnerID=(SELECT TOP 1 PartnerID FROM dbo.TDSTCompanySetUp WHERE CompanyID=@CompanyID AND OwnerType=N'C') AND SF.FeatureCode=N'SALES' AND SF.IsEnabled=1
+         AND (SF.StartDate IS NULL OR SF.StartDate<=CONVERT(date,SYSUTCDATETIME()))
+         AND (SF.ExpireDate IS NULL OR SF.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))))
   AND (
         ISNULL(G.OpenOption, 0) = 0
         OR @UserType <> N'COMPANY_USER'
         OR (PR.ProjectType=N'CORE' AND
             ISNULL(G.OpenOption, 0) = 1
-            AND M.FeatureCode IS NOT NULL
+            AND (M.FeatureCode IS NOT NULL OR M.MenuGroupCode=N'09')
             AND EXISTS
             (
                 SELECT 1
@@ -144,7 +153,7 @@ WHERE UPPER(LTRIM(RTRIM(G.AudienceType))) IN (N'A',@AudienceType)
                 INNER JOIN dbo.TDADFeature F ON F.FeatureCode = CF.FeatureCode AND F.IsActive = 1
                 WHERE CF.ProjectID = AP.ProjectID
                   AND CF.CompanyID = @CompanyID
-                  AND CF.FeatureCode = M.FeatureCode
+                  AND CF.FeatureCode = CASE WHEN M.MenuGroupCode=N'09' THEN N'SALES' ELSE M.FeatureCode END
                   AND CF.IsEnabled = 1
                   AND (CF.StartDate IS NULL OR CF.StartDate <= CONVERT(date, SYSUTCDATETIME()))
                   AND (CF.ExpireDate IS NULL OR CF.ExpireDate >= CONVERT(date, SYSUTCDATETIME()))
@@ -173,9 +182,10 @@ ORDER BY PR.SortOrder,PG.SortOrder,PM.SortOrder,M.MenuCode;
         var all = new List<(NavigationProjectResponse Project, NavigationMenuGroupResponse Group, NavigationMenuItemResponse Item)>();
         while (await reader.ReadAsync(cancellationToken))
         {
-            var project = new NavigationProjectResponse { ProjectId = reader.GetInt64(0), ProjectCode = reader.GetString(1), ProjectName = reader.GetString(2), ProjectType = reader.GetString(3), IconName = N(reader, 4), SortOrder = reader.GetInt32(5), IsExpandedDefault = reader.GetBoolean(6) };
+            var project = new NavigationProjectResponse { ProjectId = reader.GetInt64(0), ProjectCode = reader.GetString(1), ProjectName = reader.GetString(2), ProjectType = reader.GetString(3), IconName = N(reader, 4), SortOrder = reader.GetInt32(5), IsExpandedDefault = reader.GetBoolean(6), ConfiguredMenuGroupCount = reader.GetInt32(20) };
             var group = new NavigationMenuGroupResponse { MenuGroupCode = reader.GetString(7).Trim(), MenuGroupName = reader.GetString(8), IconName = N(reader, 9), SortOrder = reader.GetInt32(10), IsExpandedDefault = reader.GetBoolean(11) };
             var item = new NavigationMenuItemResponse { MenuCode = reader.GetString(12), MenuName = reader.GetString(13), RouteName = N(reader, 14), RoutePath = N(reader, 15), FeatureCode = N(reader, 16), IconName = N(reader, 17), SortOrder = reader.GetInt32(18), IsFavoriteAllowed = reader.GetBoolean(19) };
+            if (OwnerMenuVisibility.IsHidden(userType, item.MenuCode, group.MenuGroupCode)) continue;
             if (admin || allowedFeatures!.Contains(item.MenuCode))
                 all.Add((project, group, item));
         }

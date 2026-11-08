@@ -4,6 +4,7 @@ public sealed class MenuPermissionMatrixResponse
 {
     public long? ProjectId { get; init; }
     public string? ProjectName { get; init; }
+    public int? ConfiguredMenuGroupCount { get; init; }
     public string MenuCode { get; init; } = string.Empty;
     public string MenuName { get; init; } = string.Empty;
     public string MenuGroupCode { get; init; } = string.Empty;

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:laoo_shared_admin_ui/laoo_shared_admin_ui.dart'
+    show FilterHeightSync, filterActionHeightStyle;
 import '../../../../app/theme/laoo_design_tokens.dart';
 import '../../../../app/theme/laoo_typography.dart';
 import '../../../../app/theme/workspace_theme_presets.dart';
@@ -335,14 +337,28 @@ class _VendorWorkspaceState extends State<VendorWorkspace> {
                         ),
                       ),
                       if (!narrow)
-                        IconButton(
-                          tooltip: _card ? 'แสดงรายการ' : 'แสดงการ์ด',
-                          onPressed: () => setState(() => _card = !_card),
-                          icon: Icon(
-                            _card ? Icons.view_list : Icons.grid_view,
-                            color: _primary,
+                        SizedBox.square(
+                          dimension: LaooTypography.buttonHeight,
+                          child: IconButton(
+                            tooltip: _card ? 'แสดงรายการ' : 'แสดงการ์ด',
+                            style: IconButton.styleFrom(
+                              backgroundColor: _primary.withValues(alpha: .1),
+                              foregroundColor: _primary,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(
+                                  LaooRadius.xs,
+                                ),
+                              ),
+                            ),
+                            onPressed: () => setState(() => _card = !_card),
+                            icon: Icon(
+                              _card ? Icons.view_list : Icons.grid_view,
+                              color: _primary,
+                            ),
                           ),
                         ),
+                      if (!narrow && _actions['create'] == true)
+                        const SizedBox(width: 8),
                       if (_actions['create'] == true)
                         FilledButton.icon(
                           style: vendorButton(_primary, filled: true),
@@ -358,127 +374,112 @@ class _VendorWorkspaceState extends State<VendorWorkspace> {
                   LayoutBuilder(
                     builder: (context, c) {
                       final compact = c.maxWidth < 560;
-                      return Wrap(
-                        spacing: 10,
-                        runSpacing: 10,
-                        children: [
-                          SizedBox(
-                            width: compact ? c.maxWidth : 490,
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: TextField(
-                                    controller: _search,
-                                    style: const TextStyle(
-                                      fontSize: LaooTypography.inputText,
-                                    ),
-                                    decoration:
-                                        vendorInput(
-                                          'ค้นหารหัส ชื่อ เลขภาษี หรือโทรศัพท์',
-                                          _primary,
-                                        ).copyWith(
-                                          prefixIcon: const Icon(Icons.search),
-                                        ),
-                                    onSubmitted: (_) => _find(),
-                                  ),
+                      return FilterHeightSync(
+                        builder: (context, searchKey, height) => Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            SizedBox(
+                              width: compact ? c.maxWidth : 300,
+                              child: TextField(
+                                key: searchKey,
+                                controller: _search,
+                                style: const TextStyle(
+                                  fontSize: LaooTypography.inputText,
                                 ),
-                                const SizedBox(width: 8),
-                                if (compact) ...[
-                                  IconButton.filled(
-                                    tooltip: 'ค้นหา',
-                                    style: vendorButton(
+                                decoration:
+                                    vendorInput(
+                                      'ค้นหารหัส ชื่อ เลขภาษี หรือโทรศัพท์',
                                       _primary,
-                                      filled: true,
-                                      height: 40,
+                                    ).copyWith(
+                                      prefixIcon: const Icon(Icons.search),
                                     ),
-                                    onPressed: _loading ? null : _find,
-                                    icon: const Icon(Icons.search),
+                                onSubmitted: (_) => _find(),
+                              ),
+                            ),
+                            FilledButton.icon(
+                              style: vendorButton(
+                                _primary,
+                                filled: true,
+                              ).merge(filterActionHeightStyle(height)),
+                              onPressed: _loading ? null : _find,
+                              icon: const Icon(Icons.search),
+                              label: const Text('ค้นหา'),
+                            ),
+                            OutlinedButton.icon(
+                              style: vendorButton(
+                                _primary,
+                              ).merge(filterActionHeightStyle(height)),
+                              onPressed: _loading ? null : _clear,
+                              icon: const Icon(Icons.filter_alt_off_outlined),
+                              label: const Text('ล้าง Filter'),
+                            ),
+                            SizedBox(
+                              width: compact ? c.maxWidth : 160,
+                              child: DropdownButtonFormField<bool>(
+                                initialValue: _active,
+                                key: ValueKey('status-$_active'),
+                                isExpanded: true,
+                                style: TextStyle(
+                                  fontSize: LaooTypography.comboBox,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurface,
+                                ),
+                                decoration: vendorInput('สถานะ', _primary),
+                                items: const [
+                                  DropdownMenuItem(
+                                    value: null,
+                                    child: Text('ทั้งหมด'),
                                   ),
-                                  IconButton.outlined(
-                                    tooltip: 'ล้าง Filter',
-                                    style: vendorButton(_primary, height: 40),
-                                    onPressed: _loading ? null : _clear,
-                                    icon: const Icon(
-                                      Icons.filter_alt_off_outlined,
-                                    ),
+                                  DropdownMenuItem(
+                                    value: true,
+                                    child: Text('ใช้งาน'),
                                   ),
-                                ] else ...[
-                                  FilledButton(
-                                    style: vendorButton(
-                                      _primary,
-                                      filled: true,
-                                      height: 40,
-                                    ),
-                                    onPressed: _loading ? null : _find,
-                                    child: const Text('ค้นหา'),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  OutlinedButton(
-                                    style: vendorButton(_primary, height: 40),
-                                    onPressed: _loading ? null : _clear,
-                                    child: const Text('ล้าง Filter'),
+                                  DropdownMenuItem(
+                                    value: false,
+                                    child: Text('ไม่ใช้งาน'),
                                   ),
                                 ],
-                              ],
-                            ),
-                          ),
-                          SizedBox(
-                            width: compact ? c.maxWidth : 160,
-                            child: DropdownButtonFormField<bool>(
-                              initialValue: _active,
-                              key: ValueKey('status-$_active'),
-                              isExpanded: true,
-                              style: TextStyle(
-                                fontSize: LaooTypography.comboBox,
-                                color: Theme.of(context).colorScheme.onSurface,
+                                onChanged: (v) => setState(() => _active = v),
                               ),
-                              decoration: vendorInput('สถานะ', _primary),
-                              items: const [
-                                DropdownMenuItem(
-                                  value: null,
-                                  child: Text('ทั้งหมด'),
-                                ),
-                                DropdownMenuItem(
-                                  value: true,
-                                  child: Text('ใช้งาน'),
-                                ),
-                                DropdownMenuItem(
-                                  value: false,
-                                  child: Text('ไม่ใช้งาน'),
-                                ),
-                              ],
-                              onChanged: (v) => setState(() => _active = v),
                             ),
-                          ),
-                          SizedBox(
-                            width: compact ? c.maxWidth : 180,
-                            child: DropdownButtonFormField<String>(
-                              initialValue: _type,
-                              key: ValueKey('type-$_type'),
-                              isExpanded: true,
-                              style: TextStyle(
-                                fontSize: LaooTypography.comboBox,
-                                color: Theme.of(context).colorScheme.onSurface,
+                            SizedBox(
+                              width: compact ? c.maxWidth : 180,
+                              child: DropdownButtonFormField<String>(
+                                initialValue: _type,
+                                key: ValueKey('type-$_type'),
+                                isExpanded: true,
+                                style: TextStyle(
+                                  fontSize: LaooTypography.comboBox,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurface,
+                                ),
+                                decoration: vendorInput(
+                                  'ประเภทผู้ขาย',
+                                  _primary,
+                                ),
+                                items: const [
+                                  DropdownMenuItem(
+                                    value: null,
+                                    child: Text('ทั้งหมด'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'PERSON',
+                                    child: Text('บุคคล'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'ORGANIZATION',
+                                    child: Text('นิติบุคคล'),
+                                  ),
+                                ],
+                                onChanged: (v) => setState(() => _type = v),
                               ),
-                              decoration: vendorInput('ประเภทผู้ขาย', _primary),
-                              items: const [
-                                DropdownMenuItem(
-                                  value: null,
-                                  child: Text('ทั้งหมด'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'PERSON',
-                                  child: Text('บุคคล'),
-                                ),
-                                DropdownMenuItem(
-                                  value: 'ORGANIZATION',
-                                  child: Text('นิติบุคคล'),
-                                ),
-                              ],
-                              onChanged: (v) => setState(() => _type = v),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       );
                     },
                   ),

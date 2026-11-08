@@ -15,7 +15,7 @@ public sealed class PetPhotosController(IConfiguration config, IWebHostEnvironme
 
     [HttpPost]
     [RequestSizeLimit(MaxBytes + 65536)]
-    public async Task<IActionResult> Upload([FromForm] long petId, [FromForm] long? stayId, [FromForm] IFormFile file, CancellationToken ct)
+    public async Task<IActionResult> Upload([FromForm] long petId, [FromForm] long? stayId, IFormFile file, CancellationToken ct)
     {
         if (petId < 1 || file is null || file.Length is < 12 or > MaxBytes)
             return Invalid("เลือกรูปภาพขนาดไม่เกิน 2 MB");

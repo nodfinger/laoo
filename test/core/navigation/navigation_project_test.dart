@@ -2,6 +2,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:laoo/core/navigation/navigation_menu.dart';
 
 void main() {
+  test('configured group count controls nesting independently of visible groups', () {
+    NavigationProject project(int? count) => NavigationProject.fromJson({
+      'projectId': 1, 'projectCode': 'TEST', 'projectName': 'Test',
+      'projectType': 'BUSINESS', 'configuredMenuGroupCount': count,
+      'menuGroups': [
+        {'menuGroupCode': '01', 'menuGroupName': 'One', 'items': []},
+      ],
+    });
+    expect(project(1).showGroups, isFalse);
+    expect(project(2).showGroups, isTrue);
+    expect(project(null).showGroups, isTrue);
+  });
   test('parses project, menu group, and main menu hierarchy', () {
     final project = NavigationProject.fromJson({
       'projectId': 4,

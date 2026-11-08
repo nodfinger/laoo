@@ -5,6 +5,18 @@ import '../../app/theme/workspace_theme_presets.dart';
 
 const double _alertBackgroundOpacity = .50;
 
+Color Function()? _hostAlertPrimary;
+Duration Function()? _hostAlertDuration;
+
+/// Use the host application's current user color when this module is embedded.
+void configureServiceAlertPrimary(Color Function()? primary) {
+  _hostAlertPrimary = primary;
+}
+
+void configureServiceAlertDuration(Duration Function()? duration) {
+  _hostAlertDuration = duration;
+}
+
 class AutoDismissMessage extends StatefulWidget {
   const AutoDismissMessage({
     super.key,
@@ -32,7 +44,9 @@ class _AutoDismissMessageState extends State<AutoDismissMessage> {
   void _start() {
     _timer?.cancel();
     _timer = Timer(
-      widget.duration ?? companySetupController.alertDuration,
+      widget.duration ??
+          _hostAlertDuration?.call() ??
+          companySetupController.alertDuration,
       widget.onClose,
     );
   }
@@ -57,10 +71,14 @@ class _AutoDismissMessageState extends State<AutoDismissMessage> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final preset = workspaceThemeController.value;
-    final color = widget.error ? scheme.error : preset.primary;
+    final color = widget.error
+        ? scheme.error
+        : (_hostAlertPrimary?.call() ?? preset.primary);
     final foreground = widget.error
         ? scheme.onError
-        : preset.toThemeData().colorScheme.onPrimary;
+        : (ThemeData.estimateBrightnessForColor(color) == Brightness.dark
+              ? Colors.white
+              : Colors.black);
     return Align(
       alignment: Alignment.topRight,
       child: ConstrainedBox(

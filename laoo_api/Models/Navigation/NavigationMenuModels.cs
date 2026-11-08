@@ -9,6 +9,7 @@ public sealed class NavigationProjectResponse
     public string? IconName { get; init; }
     public int SortOrder { get; init; }
     public bool IsExpandedDefault { get; init; }
+    public int ConfiguredMenuGroupCount { get; init; }
     public List<NavigationMenuGroupResponse> MenuGroups { get; init; } = [];
 }
 

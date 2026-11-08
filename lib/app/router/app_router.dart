@@ -42,7 +42,7 @@ import '../../core/auth/auth_session.dart';
 import '../../core/navigation/navigation_route_authorization.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/reset_password_page.dart';
-import '../../features/landing/presentation/pages/landing_page.dart';
+import '../../features/landing/presentation/pages/home_page_entry.dart';
 import '../../features/home/presentation/pages/authenticated_home_page.dart';
 import '../../features/support/partner/pages/partner_module_page.dart';
 import '../../features/partner/pages/partner_company_page.dart';
@@ -177,7 +177,7 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: RoutePaths.landing,
       name: RouteNames.landing,
-      builder: (context, state) => const LandingPage(),
+      builder: (context, state) => const HomePageEntry(),
     ),
     GoRoute(
       path: RoutePaths.login,
@@ -360,7 +360,9 @@ String? resolveAppRouteRedirect({
   }
   if (path == '/site/customer') return null;
 
-  if (path == RoutePaths.landing || path == RoutePaths.login) {
+  if (path == RoutePaths.landing) return null;
+
+  if (path == RoutePaths.login) {
     if (isCompanyUser &&
         allowedMenuCodes.contains(IntranetMenuCodes.myIntranet)) {
       return IntranetRoutePaths.myIntranet;

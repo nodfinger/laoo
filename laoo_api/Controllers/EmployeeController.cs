@@ -40,7 +40,7 @@ public sealed class EmployeeController(
                    E.NickName,E.PositionCode,E.Email,E.Telephone,E.PersonalTelephone,
                    E.ContName1,E.ContRelation1,E.ContPhone1,E.ContName2,E.ContRelation2,E.ContPhone2,
                    E.StartWorkDate,CASE WHEN EXISTS (SELECT 1 FROM dbo.TDADEmployeeImage EI WHERE EI.EmployeeID=E.EmployeeID AND EI.ImageType=N'FORMAL' AND ISNULL(EI.IsActive,1)=1 AND DATALENGTH(EI.ImageData)>0) THEN 1 ELSE 0 END,E.IsActive,ISNULL(E.IsServiceTechnician,0),ISNULL(E.NotifyInSystem,1)
-                   ,E.CarID1,E.CarColor1,E.CarTypeCode1,E.CarOilType1,E.CarID2,E.CarColor2,E.CarTypeCode2,E.CarOilType2,E.PersonID
+                   ,E.CarID1,E.CarColor1,E.CarTypeCode1,E.CarOilType1,E.CarID2,E.CarColor2,E.CarTypeCode2,E.CarOilType2,E.PersonID,E.InternalTelephone,E.NotifyByEmail
             FROM dbo.TDADEmployee E
             LEFT JOIN dbo.TDADOrganizationUnit DV ON DV.OrgUnitID=E.DivisionOrgUnitID
             LEFT JOIN dbo.TDADOrganizationUnit DP ON DP.OrgUnitID=E.DepartmentOrgUnitID
@@ -77,6 +77,40 @@ public sealed class EmployeeController(
     {
         await using var connection = await Open(token);
         return Ok(new { view = await Allowed(connection, "VIEW", token), create = await Allowed(connection, "CREATE", token), edit = await Allowed(connection, "EDIT", token), delete = await Allowed(connection, "DELETE", token), serviceEnabled = await ServiceEnabled(connection, token) });
+    }
+
+    [HttpGet("organization-options")]
+    public async Task<IActionResult> OrganizationOptions(CancellationToken token)
+    {
+        if (CurrentScreen.Scope != EmployeeOwnerScope.Company) return NotFound();
+        var scope = ResolveScope(null);
+        if (scope?.CompanyId is null) return Forbid();
+        await using var c = await Open(token);
+        if (!await Allowed(c, "VIEW", token)) return Forbid();
+        const string sql = """
+SELECT COALESCE(OrgStructureType,1)
+FROM dbo.TDSTCompanySetUp
+WHERE OwnerType='C' AND CompanyID=@company AND PartnerID=@partner AND IsActive=1;
+SELECT U.OrgUnitID,U.CompanyID,U.UnitType,U.ParentOrgUnitID,U.UnitCode,U.NameTH,U.NameEN,U.IsActive
+FROM dbo.TDADOrganizationUnit U
+JOIN dbo.TDSTCompanySetUp C ON C.CompanyID=U.CompanyID AND C.PartnerID=@partner AND C.OwnerType='C' AND C.IsActive=1
+WHERE U.OwnerType='C' AND U.CompanyID=@company
+ORDER BY U.UnitType,U.UnitCode;
+""";
+        await using var cmd = new SqlCommand(sql, c);
+        Add(cmd, "@company", SqlDbType.BigInt, scope.Value.CompanyId);
+        Add(cmd, "@partner", SqlDbType.BigInt, scope.Value.PartnerId);
+        await using var r = await cmd.ExecuteReaderAsync(token);
+        if (!await r.ReadAsync(token)) return Forbid();
+        var mode = r.GetInt32(0);
+        await r.NextResultAsync(token);
+        var units = new List<object>();
+        while (await r.ReadAsync(token)) units.Add(new {
+            orgUnitId=r.GetInt64(0), companyId=r.GetInt64(1), unitType=r.GetString(2),
+            parentOrgUnitId=NLong(r,3), unitCode=r.GetString(4), nameTh=r.GetString(5),
+            nameEn=NString(r,6), isActive=r.GetBoolean(7)
+        });
+        return Ok(new { orgStructureType=mode, units });
     }
 
     [HttpPost]
@@ -150,6 +184,8 @@ WHERE PersonID=@PersonID AND CompanyID=@company;
     private async Task<IActionResult> Save(long? id, EmployeeUpsertRequest x, CancellationToken token)
     {
         var scope = ResolveScope(x.CompanyId); if (scope is null) return Forbid();
+        if (x.InternalTelephone?.Trim().Length > 50)
+            return BadRequest(new { message = "Internal telephone must not exceed 50 characters." });
         if (string.IsNullOrWhiteSpace(x.EmployeeCode) || string.IsNullOrWhiteSpace(x.FullName))
             return BadRequest(new { message = "เธเธฃเธธเธ“เธฒเธเธฃเธญเธเธฃเธซเธฑเธชเธเธเธฑเธเธเธฒเธเนเธฅเธฐเธเธทเนเธญ-เธเธฒเธกเธชเธเธธเธฅ" });
         await using var c = await Open(token);
@@ -204,8 +240,8 @@ WHERE PersonID=@PersonID AND CompanyID=@company;
             IF EXISTS(SELECT 1 FROM dbo.TDADEmployee WHERE PartnerID=@partner AND ((@company IS NULL AND CompanyID IS NULL) OR CompanyID=@company) AND EmployeeCode=@code AND (@id IS NULL OR EmployeeID<>@id)) THROW 50001,'DUPLICATE_EMPLOYEE_CODE',1;
             IF @division IS NOT NULL AND NOT EXISTS(SELECT 1 FROM dbo.TDADOrganizationUnit WHERE OrgUnitID=@division AND UnitType='DIV' AND IsActive=1 AND ((@company IS NULL AND OwnerType='P' AND PartnerID=@partner) OR (@company IS NOT NULL AND OwnerType='C' AND CompanyID=@company))) THROW 50002,'INVALID_DIVISION',1;
             IF @department IS NOT NULL AND NOT EXISTS(SELECT 1 FROM dbo.TDADOrganizationUnit WHERE OrgUnitID=@department AND UnitType='DEP' AND IsActive=1 AND ((@company IS NULL AND OwnerType='P' AND PartnerID=@partner) OR (@company IS NOT NULL AND OwnerType='C' AND CompanyID=@company))) THROW 50003,'INVALID_DEPARTMENT',1;
-            IF @id IS NULL INSERT dbo.TDADEmployee(PartnerID,CompanyID,DivisionOrgUnitID,DepartmentOrgUnitID,EmployeeCode,FullName,NickName,PositionCode,Email,Telephone,PersonalTelephone,ContName1,ContRelation1,ContPhone1,ContName2,ContRelation2,ContPhone2,StartWorkDate,CarID1,CarColor1,CarTypeCode1,CarOilType1,CarID2,CarColor2,CarTypeCode2,CarOilType2,IsActive,IsServiceTechnician,NotifyInSystem) VALUES(@partner,@company,@division,@department,@code,@name,@nick,@position,@email,@tel,@personal,@contName1,@contRelation1,@contPhone1,@contName2,@contRelation2,@contPhone2,@start,@carId1,@carColor1,@carType1,@carOil1,@carId2,@carColor2,@carType2,@carOil2,@active,@technician,@notify);
-            ELSE UPDATE dbo.TDADEmployee SET PartnerID=@partner,CompanyID=@company,DivisionOrgUnitID=@division,DepartmentOrgUnitID=@department,EmployeeCode=@code,FullName=@name,NickName=@nick,PositionCode=@position,Email=@email,Telephone=@tel,PersonalTelephone=@personal,ContName1=@contName1,ContRelation1=@contRelation1,ContPhone1=@contPhone1,ContName2=@contName2,ContRelation2=@contRelation2,ContPhone2=@contPhone2,StartWorkDate=@start,CarID1=@carId1,CarColor1=@carColor1,CarTypeCode1=@carType1,CarOilType1=@carOil1,CarID2=@carId2,CarColor2=@carColor2,CarTypeCode2=@carType2,CarOilType2=@carOil2,IsActive=@active,IsServiceTechnician=@technician,NotifyInSystem=@notify,UpdateDate=SYSUTCDATETIME() WHERE EmployeeID=@id AND PartnerID=@partner AND ((@company IS NULL AND CompanyID IS NULL) OR CompanyID=@company);
+            IF @id IS NULL INSERT dbo.TDADEmployee(PartnerID,CompanyID,DivisionOrgUnitID,DepartmentOrgUnitID,EmployeeCode,FullName,NickName,PositionCode,Email,Telephone,InternalTelephone,PersonalTelephone,ContName1,ContRelation1,ContPhone1,ContName2,ContRelation2,ContPhone2,StartWorkDate,CarID1,CarColor1,CarTypeCode1,CarOilType1,CarID2,CarColor2,CarTypeCode2,CarOilType2,IsActive,IsServiceTechnician,NotifyInSystem,NotifyByEmail) VALUES(@partner,@company,@division,@department,@code,@name,@nick,@position,@email,@tel,@internalTel,@personal,@contName1,@contRelation1,@contPhone1,@contName2,@contRelation2,@contPhone2,@start,@carId1,@carColor1,@carType1,@carOil1,@carId2,@carColor2,@carType2,@carOil2,@active,@technician,@notify,@notifyEmail);
+            ELSE UPDATE dbo.TDADEmployee SET PartnerID=@partner,CompanyID=@company,DivisionOrgUnitID=@division,DepartmentOrgUnitID=@department,EmployeeCode=@code,FullName=@name,NickName=@nick,PositionCode=@position,Email=@email,Telephone=@tel,InternalTelephone=CASE WHEN @hasInternalTel=1 THEN @internalTel ELSE InternalTelephone END,PersonalTelephone=@personal,ContName1=@contName1,ContRelation1=@contRelation1,ContPhone1=@contPhone1,ContName2=@contName2,ContRelation2=@contRelation2,ContPhone2=@contPhone2,StartWorkDate=@start,CarID1=@carId1,CarColor1=@carColor1,CarTypeCode1=@carType1,CarOilType1=@carOil1,CarID2=@carId2,CarColor2=@carColor2,CarTypeCode2=@carType2,CarOilType2=@carOil2,IsActive=@active,IsServiceTechnician=@technician,NotifyInSystem=@notify,NotifyByEmail=CASE WHEN @hasNotifyEmail=1 THEN @notifyEmail ELSE NotifyByEmail END,UpdateDate=SYSUTCDATETIME() WHERE EmployeeID=@id AND PartnerID=@partner AND ((@company IS NULL AND CompanyID IS NULL) OR CompanyID=@company);
             SELECT CAST(CASE WHEN @id IS NULL THEN SCOPE_IDENTITY() ELSE @id END AS BIGINT);
             """;
         await using var transaction = (SqlTransaction)await c.BeginTransactionAsync(token);
@@ -217,6 +253,8 @@ WHERE PersonID=@PersonID AND CompanyID=@company;
         Add(cmd, "@code", SqlDbType.NVarChar, x.EmployeeCode.Trim().ToUpperInvariant(), 50); Add(cmd, "@name", SqlDbType.NVarChar, x.FullName.Trim(), 200);
         Add(cmd, "@nick", SqlDbType.NVarChar, x.NickName, 100); Add(cmd, "@position", SqlDbType.NVarChar, x.PositionCode, 50); Add(cmd, "@email", SqlDbType.NVarChar, x.Email, 200);
         Add(cmd, "@tel", SqlDbType.NVarChar, x.Telephone, 50); Add(cmd, "@personal", SqlDbType.NVarChar, x.PersonalTelephone, 50); Add(cmd, "@start", SqlDbType.Date, x.StartWorkDate);
+        Add(cmd, "@internalTel", SqlDbType.NVarChar, string.IsNullOrWhiteSpace(x.InternalTelephone) ? null : x.InternalTelephone.Trim(), 50);
+        cmd.Parameters.Add("@hasInternalTel", SqlDbType.Bit).Value = x.InternalTelephoneSpecified;
         Add(cmd, "@contName1", SqlDbType.NVarChar, x.ContName1, 250); Add(cmd, "@contRelation1", SqlDbType.NVarChar, x.ContRelation1, 250); Add(cmd, "@contPhone1", SqlDbType.NVarChar, x.ContPhone1, 250);
         Add(cmd, "@contName2", SqlDbType.NVarChar, x.ContName2, 250); Add(cmd, "@contRelation2", SqlDbType.NVarChar, x.ContRelation2, 250); Add(cmd, "@contPhone2", SqlDbType.NVarChar, x.ContPhone2, 250);
         Add(cmd, "@carId1", SqlDbType.NVarChar, x.CarID1, 50); Add(cmd, "@carColor1", SqlDbType.NVarChar, x.CarColor1, 100); Add(cmd, "@carType1", SqlDbType.NVarChar, x.CarTypeCode1, 50); Add(cmd, "@carOil1", SqlDbType.NVarChar, x.CarOilType1, 50);
@@ -224,6 +262,8 @@ WHERE PersonID=@PersonID AND CompanyID=@company;
         cmd.Parameters.Add("@active", SqlDbType.Bit).Value = x.IsActive;
         cmd.Parameters.Add(new SqlParameter { ParameterName = new string(new[] { '@', 't', 'e', 'c', 'h', 'n', 'i', 'c', 'i', 'a', 'n' }), SqlDbType = SqlDbType.Bit, Value = x.IsServiceTechnician && isCompanyEmployee && await ServiceEnabled(c, token, transaction) });
         cmd.Parameters.Add(new SqlParameter { ParameterName = new string(new[] { '@', 'n', 'o', 't', 'i', 'f', 'y' }), SqlDbType = SqlDbType.Bit, Value = x.NotifyInSystem });
+        cmd.Parameters.Add("@notifyEmail", SqlDbType.Bit).Value = x.NotifyByEmail;
+        cmd.Parameters.Add("@hasNotifyEmail", SqlDbType.Bit).Value = x.NotifyByEmailSpecified;
         try
         {
             var savedId = Convert.ToInt64(await cmd.ExecuteScalarAsync(token));
@@ -620,7 +660,7 @@ WHERE P.ProjectID=@project AND P.IsActive=1
         DepartmentOrgUnitId = NLong(r, 6), DepartmentName = NString(r, 7), EmployeeCode = r.GetString(8), FullName = r.GetString(9),
         NickName = NString(r, 10), PositionCode = NString(r, 11), Email = NString(r, 12), Telephone = NString(r, 13), PersonalTelephone = NString(r, 14),
         ContName1 = NString(r, 15), ContRelation1 = NString(r, 16), ContPhone1 = NString(r, 17), ContName2 = NString(r, 18), ContRelation2 = NString(r, 19), ContPhone2 = NString(r, 20),
-        StartWorkDate = r.IsDBNull(21) ? null : r.GetDateTime(21), HasImage = r.GetInt32(22) != 0, IsActive = r.GetBoolean(23), IsServiceTechnician = r.GetBoolean(24), NotifyInSystem = r.GetBoolean(25), CarID1 = NString(r, 26), CarColor1 = NString(r, 27), CarTypeCode1 = NString(r, 28), CarOilType1 = NString(r, 29), CarID2 = NString(r, 30), CarColor2 = NString(r, 31), CarTypeCode2 = NString(r, 32), CarOilType2 = NString(r, 33)
+        StartWorkDate = r.IsDBNull(21) ? null : r.GetDateTime(21), HasImage = r.GetInt32(22) != 0, IsActive = r.GetBoolean(23), IsServiceTechnician = r.GetBoolean(24), NotifyInSystem = r.GetBoolean(25), CarID1 = NString(r, 26), CarColor1 = NString(r, 27), CarTypeCode1 = NString(r, 28), CarOilType1 = NString(r, 29), CarID2 = NString(r, 30), CarColor2 = NString(r, 31), CarTypeCode2 = NString(r, 32), CarOilType2 = NString(r, 33), InternalTelephone = NString(r, 35), NotifyByEmail = r.GetBoolean(36)
     };
     private static long? NLong(SqlDataReader r, int i) => r.IsDBNull(i) ? null : r.GetInt64(i);
     private static string? NString(SqlDataReader r, int i) => r.IsDBNull(i) ? null : r.GetString(i);

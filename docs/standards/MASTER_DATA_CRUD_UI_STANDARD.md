@@ -26,7 +26,8 @@
 | Caption หน้า/Popup | `18px` | `w700`, line height `1.3` |
 | หัวข้อย่อย | `16px` | `w600-w700` |
 | Floating Label ที่เห็นจริง | `14px` | ใช้ `LaooTypography.materialFloatingLabelSource` เพื่อชดเชย Material scale |
-| TextBox/ComboBox/Table | `14px` | line height `1.45-1.5` |
+| TextBox | `16px` | line height `1.45-1.5` |
+| ComboBox/Table | `14px` | line height `1.45-1.5` |
 | ปุ่ม | `13px` | `w600-w700` |
 | Validation/หมายเหตุ | `12px` | Semantic Error เมื่อผิดพลาด |
 
@@ -47,9 +48,9 @@
 - กว้างเต็ม Content Area, Surface ตาม User Style, ไม่มีกรอบและเงา, มุม `4px`, Padding `16px`
 - Caption Card กับ Filter Card ห่าง `6px`; Filter กับ Result ห่าง `6px`
 - ช่องค้นหากว้าง `280px`; ComboBox กลุ่มข้อมูลกว้าง `280px`
-- TextBox/ComboBox ใช้ Outline Border จาก User Style, Focus เป็น Primary, มุม `4px`, ข้อความ `14px`
+- TextBox/ComboBox ใช้ Outline Border จาก User Style, Focus เป็น Primary, มุม `4px`; ข้อความ TextBox `16px` และ ComboBox `14px`
 - ช่องค้นหามี Icon ค้นหาด้านซ้าย ไม่มีปุ่มลูกศรหรือ Refresh ซ้ำด้านขวา; ค้นหาเมื่อกด Enter หรือปุ่ม `ค้นหา`
-- ปุ่ม `ค้นหา` เป็น Filled Primary และ `ล้าง Filter` เป็น Outlined Primary; สูง `40px`, Font `13px`, มุม `4px`
+- ปุ่ม `ค้นหา` เป็น Filled Primary และ `ล้าง Filter` เป็น Outlined Primary; ความสูงเท่าช่องค้นหาที่แสดงจริงตาม `LIST_CARD_UI_STANDARD.md`, Font `13px`, มุม `4px`
 - ระหว่าง Control ในกลุ่มเดียวกัน `8px`; ระหว่างกลุ่ม Search Action กับ ComboBox `14px`
 - Desktop วางในแถวเดียวเมื่อพื้นที่พอ; พื้นที่แคบจัด Search, ชุดปุ่ม และ ComboBox ลงบรรทัดโดยไม่ Overflow
 
@@ -58,11 +59,11 @@
 - ใช้ Table เมื่อ Content Area กว้างตั้งแต่ `900px` และ User ไม่ได้เลือก Card Mode
 - Result Card กว้างเต็มพื้นที่, Surface ตาม User Style, ไม่มีกรอบ/เงา, มุม `4px`
 - หัวตารางสูง `56px`, พื้น Primary โปร่ง `10%`, ตัวอักษร Primary `14px/w700`
-- แถวข้อมูลสูง `48-56px`, ตัวอักษร `14px`; เส้นคั่นแนวนอน `1px` ใช้ Border ของ User Style
+- แถวข้อมูลสูง `48-56px`, ตัวอักษร `14px`; เส้นคั่นแนวนอน `0.6px` ใช้ Semantic Border Color ของ User Style ใต้หัวตารางและทุกแถวรวมแถวสุดท้าย ตาม `LIST_CARD_UI_STANDARD.md`
 - ไม่มีเส้นแนวตั้งและไม่มีกรอบรอบนอก Table
 - คอลัมน์แรก `ID`; คอลัมน์ที่สอง `Action` กว้าง `100px` และจัด Icon กึ่งกลาง
 - Edit ใช้ Primary; Delete ใช้ Semantic Error; แสดงตาม `EDIT`/`DELETE`
-- รองรับ Horizontal Scroll เมื่อคอลัมน์เกินพื้นที่ และตรึงหัวตารางตาม Shared Table Component
+- ตารางต้องอยู่ภายในพื้นที่หน้าจอโดยไม่เลื่อนแนวนอน จัดสัดส่วนคอลัมน์หรือใช้ Card Mode เมื่อพื้นที่ไม่เพียงพอ และตรึงหัวตารางตาม Shared Table Component เมื่อจำเป็น
 
 ## 7. Card Mode
 
@@ -78,7 +79,7 @@
 
 - Result กับ Pagination ห่าง `6px`; Card สูง `56px` พอดี กว้างเต็มพื้นที่ ไม่มีกรอบ/เงา/Divider ภายใน และมุม `4px`
 - Padding แนวนอน `12px`; เนื้อหาจัดกึ่งกลางแนวตั้งและชิดซ้าย
-- ปุ่ม `<`, เลขหน้า และ `>` ขนาด `34x34px`, มุม `4px`; ระหว่างปุ่ม `6px`
+- ปุ่ม `<`, เลขหน้า และ `>` ขนาด `LaooLayout.paginationButtonSize` (`36x36px`), มุม `4px`; ระหว่างปุ่ม `6px`
 - หน้าปัจจุบัน Filled Primary พร้อมข้อความ `onPrimary`; หน้าอื่น Outlined Primary
 - ปุ่มก่อนหน้า/ถัดไปที่ Disabled ใช้ Text และ Border สีรองของ User Style โดยพื้นยังเป็น Surface
 - ข้อความ `รายการเริ่มต้น-รายการสุดท้าย จาก จำนวนทั้งหมด` อยู่ห่างจากชุดปุ่ม `12px`, ขนาด `14px`
@@ -91,7 +92,7 @@
 - Header สูงขั้นต่ำ `48px`; Icon Primary กับ Caption ห่าง `10px`; Caption รูปแบบ `{MenuName} > {กลุ่มข้อมูล} > {Action}` ขนาด `18px/w700`
 - มี Divider สี Border ใต้ Header; ระยะจาก Divider ถึง Field แรก `12px`
 - TextBox กว้างเต็ม Popup, Outline Border, มุม `4px`, Padding ภายในแนวนอน `14px` แนวตั้ง `12px`
-- Floating Label ที่เห็นจริง `14px`; ข้อความกรอก `14px`; Field แต่ละแถวห่างกัน `16px`
+- Floating Label ที่เห็นจริง `14px`; ข้อความกรอก `16px`; Field แต่ละแถวห่างกัน `14px` ตาม `LaooLayout.popupFieldSpacing`
 - Field Read-only ต้องแยกสถานะด้วยพฤติกรรม ไม่เปลี่ยนเป็นสี Primary จนดูเหมือนแก้ไขได้
 - ก่อน Footer มีระยะ `12px`, Divider Border และระยะถึงปุ่ม `12px`
 - ปุ่ม Footer ชิดขวาและห่างกัน `8px`; `ยกเลิก` Outlined Primary, `บันทึก` Filled Primary; สูง `48px`, Font `13px`, มุม `4px`
@@ -100,7 +101,7 @@
 ## 10. Delete Confirmation
 
 - Popup พื้นสีขาว มีกรอบนอกสี Semantic Error/Delete มุม `4px`
-- Icon ถังขยะ, Caption `18px/w700` และปุ่มยืนยันใช้ Semantic Error/Delete
+- Icon ถังขยะและปุ่มยืนยันใช้ Semantic Error/Delete ส่วน Caption `18px/w700` ใช้สีดำตามมาตรฐาน Popup
 - กล่องรายการที่จะลบใช้ Error โปร่ง `10%`; ต้องแสดง Key/ชื่อและข้อความว่าเรียกคืนไม่ได้
 - `ยกเลิก` เป็น Text Primary; `ลบ` เป็น Filled Error พร้อม Icon ถังขยะ
 
@@ -121,7 +122,7 @@
 - [ ] สี Primary/Surface/Text/Border มาจาก User Style/Theme
 - [ ] Caption, Filter, Result, Pagination กว้างเท่ากันและห่าง `6px`
 - [ ] Table และ Card Mode มีข้อมูล/Empty state ครบ
-- [ ] Pagination สูง `56px` และปุ่ม `34px`
+- [ ] Pagination สูง `56px` และปุ่ม `36px`
 - [ ] Popup Header `48px`, Field gap `16px`, Action `48px`
 - [ ] ไม่มี Overflow ที่ Breakpoint `900px`
 - [ ] Format Source และตรวจภาพจริงก่อนนำไปใช้กับหน้าจออื่น

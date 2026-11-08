@@ -23,7 +23,8 @@ SELECT P.ProjectID,P.ProjectNameTH,M.MenuCode,M.MenuName,G.MenuGroupCode,G.MenuG
  CAST(MAX(CASE WHEN RP.ActionCode='VIEW' AND RP.IsAllowed=1 THEN 1 ELSE 0 END) AS bit),
  CAST(MAX(CASE WHEN RP.ActionCode='CREATE' AND RP.IsAllowed=1 THEN 1 ELSE 0 END) AS bit),
  CAST(MAX(CASE WHEN RP.ActionCode='EDIT' AND RP.IsAllowed=1 THEN 1 ELSE 0 END) AS bit),
- CAST(MAX(CASE WHEN RP.ActionCode='DELETE' AND RP.IsAllowed=1 THEN 1 ELSE 0 END) AS bit)
+ CAST(MAX(CASE WHEN RP.ActionCode='DELETE' AND RP.IsAllowed=1 THEN 1 ELSE 0 END) AS bit),
+ (SELECT COUNT(*) FROM dbo.TDADProjectMenuGroup CPG JOIN dbo.TDADMenuGroup CG ON CG.MenuGroupCode=CPG.MenuGroupCode AND CG.IsActive=1 WHERE CPG.ProjectID=P.ProjectID AND CPG.IsActive=1)
 FROM dbo.TDADProject P
 JOIN dbo.TDSTCompanySetUp C ON C.CompanyID=@Company AND C.PartnerID=@Partner AND C.IsActive=1
 JOIN dbo.TDADUserProject UP ON UP.ProjectID=P.ProjectID AND UP.UserID=@User AND UP.CompanyID=C.CompanyID AND UP.IsActive=1
@@ -35,6 +36,12 @@ JOIN dbo.TDADProjectMenuGroup PG ON PG.ProjectID=P.ProjectID AND PG.MenuGroupCod
 LEFT JOIN dbo.TDADRoleGroupPermission RP ON RP.RoleGroupID=@Role AND RP.ProjectID=P.ProjectID AND RP.MenuCode=M.MenuCode
 WHERE P.IsActive=1 AND UPPER(LTRIM(RTRIM(G.AudienceType))) IN ('A','C') AND UPPER(LTRIM(RTRIM(OG.AudienceType))) IN ('A','C')
  AND G.MenuGroupCode<>'07'
+ AND (M.MenuGroupCode<>N'09' OR P.ProjectCode=N'LAOO_TRADE' OR EXISTS (SELECT 1 FROM dbo.TDADCompanyFeature CF
+       JOIN dbo.TDADProject CoreProject ON CoreProject.ProjectID=CF.ProjectID AND CoreProject.ProjectCode=N'LAOO' AND CoreProject.IsActive=1
+       JOIN dbo.TDADFeature F ON F.FeatureCode=CF.FeatureCode AND F.IsActive=1
+       WHERE CF.CompanyID=C.CompanyID AND CF.PartnerID=C.PartnerID AND CF.FeatureCode=N'SALES' AND CF.IsEnabled=1
+       AND (CF.StartDate IS NULL OR CF.StartDate<=CONVERT(date,SYSUTCDATETIME()))
+       AND (CF.ExpireDate IS NULL OR CF.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))))
  AND ((P.ProjectType=N'CORE' AND EXISTS(SELECT 1 FROM dbo.TDADCompanyProject CP WHERE CP.ProjectID=P.ProjectID AND CP.CompanyID=C.CompanyID AND CP.PartnerID=C.PartnerID AND CP.IsEnabled=1
        AND (CP.StartDate IS NULL OR CP.StartDate<=CONVERT(date,SYSUTCDATETIME())) AND (CP.ExpireDate IS NULL OR CP.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))))
    OR (P.ProjectType<>N'CORE' AND EXISTS(SELECT 1 FROM dbo.TDADCompanyProjectSubscription S
@@ -52,7 +59,7 @@ ORDER BY P.ProjectID,PG.SortOrder,PM.SortOrder,M.MenuCode;
         {
             ProjectId=reader.GetInt64(0), ProjectName=reader.GetString(1), MenuCode=reader.GetString(2), MenuName=reader.GetString(3),
             MenuGroupCode=reader.GetString(4).Trim(), MenuGroupName=reader.GetString(5), ScreenType=reader.IsDBNull(6)?1:reader.GetInt32(6),
-            CanView=reader.GetBoolean(7), CanCreate=reader.GetBoolean(8), CanEdit=reader.GetBoolean(9), CanDelete=reader.GetBoolean(10)
+            CanView=reader.GetBoolean(7), CanCreate=reader.GetBoolean(8), CanEdit=reader.GetBoolean(9), CanDelete=reader.GetBoolean(10), ConfiguredMenuGroupCount=reader.GetInt32(11)
         });
         return Ok(result);
     }
@@ -102,6 +109,12 @@ JOIN dbo.TDADMenuGroup OG ON OG.MenuGroupCode=M.MenuGroupCode AND OG.IsActive=1
 JOIN dbo.TDADProjectMenuGroup PG ON PG.ProjectID=P.ProjectID AND PG.MenuGroupCode=G.MenuGroupCode AND PG.IsActive=1
 WHERE P.ProjectID=@Project AND P.IsActive=1 AND G.MenuGroupCode<>'07'
  AND UPPER(LTRIM(RTRIM(G.AudienceType))) IN ('A','C') AND UPPER(LTRIM(RTRIM(OG.AudienceType))) IN ('A','C')
+ AND (M.MenuGroupCode<>N'09' OR P.ProjectCode=N'LAOO_TRADE' OR EXISTS (SELECT 1 FROM dbo.TDADCompanyFeature CF
+       JOIN dbo.TDADProject CoreProject ON CoreProject.ProjectID=CF.ProjectID AND CoreProject.ProjectCode=N'LAOO' AND CoreProject.IsActive=1
+       JOIN dbo.TDADFeature F ON F.FeatureCode=CF.FeatureCode AND F.IsActive=1
+       WHERE CF.CompanyID=C.CompanyID AND CF.PartnerID=C.PartnerID AND CF.FeatureCode=N'SALES' AND CF.IsEnabled=1
+       AND (CF.StartDate IS NULL OR CF.StartDate<=CONVERT(date,SYSUTCDATETIME()))
+       AND (CF.ExpireDate IS NULL OR CF.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))))
  AND ((P.ProjectType=N'CORE' AND EXISTS(SELECT 1 FROM dbo.TDADCompanyProject CP WHERE CP.ProjectID=P.ProjectID AND CP.CompanyID=C.CompanyID AND CP.PartnerID=C.PartnerID AND CP.IsEnabled=1
        AND (CP.StartDate IS NULL OR CP.StartDate<=CONVERT(date,SYSUTCDATETIME())) AND (CP.ExpireDate IS NULL OR CP.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))))
    OR (P.ProjectType<>N'CORE' AND EXISTS(SELECT 1 FROM dbo.TDADCompanyProjectSubscription S

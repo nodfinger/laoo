@@ -13,10 +13,31 @@ public sealed class BusinessCardOcrController(IConfiguration configuration, IBus
     ILogger<BusinessCardOcrController> logger) : ControllerBase
 {
     private long Company => long.TryParse(User.FindFirst("company_id")?.Value, out var id) ? id : 0;
+    private long Partner => long.TryParse(User.FindFirst("partner_id")?.Value, out var id) ? id : 0;
     private long Actor => long.TryParse(User.FindFirst("user_id")?.Value, out var id) ? id : 0;
     private async Task<SqlConnection> Open(CancellationToken token)
     { var c = new SqlConnection(configuration.GetConnectionString("LaooDatabase")); await c.OpenAsync(token); return c; }
     private static string? Menu(string target) => target switch { "customers" => "09001", "contacts" => "55002", "visitors" => "31002", _ => null };
+    private async Task<bool> HasOcrPackage(SqlConnection c, CancellationToken token)
+    {
+        const string sql = """
+SELECT CAST(CASE WHEN EXISTS (
+ SELECT 1 FROM dbo.TDSTCompanySetUp C
+ JOIN dbo.TDADCompanyProjectSubscription S ON S.CompanyID=C.CompanyID AND S.PartnerID=C.PartnerID
+ JOIN dbo.TDADProject P ON P.ProjectID=S.ProjectID AND P.ProjectCode=N'LAOO_OCR' AND P.ProjectType=N'BUSINESS' AND P.IsActive=1
+ JOIN dbo.TDADProjectPackage PK ON PK.PackageID=S.PackageID AND PK.ProjectID=P.ProjectID AND PK.IsActive=1
+ JOIN dbo.TDADProjectPackageFeature PF ON PF.PackageID=PK.PackageID AND PF.FeatureCode=N'BUSINESS_CARD_OCR' AND PF.IsEnabled=1
+ WHERE C.CompanyID=@company AND C.PartnerID=@partner AND C.IsActive=1
+   AND S.IsCurrent=1 AND S.StatusCode IN(N'ACTIVE',N'TRIAL')
+   AND S.StartDate<=CONVERT(date,SYSUTCDATETIME())
+   AND (S.ExpireDate IS NULL OR S.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))
+) THEN 1 ELSE 0 END AS bit)
+""";
+        await using var cmd = new SqlCommand(sql, c);
+        cmd.Parameters.Add("@company", SqlDbType.BigInt).Value = Company;
+        cmd.Parameters.Add("@partner", SqlDbType.BigInt).Value = Partner;
+        return (bool)(await cmd.ExecuteScalarAsync(token) ?? false);
+    }
     private async Task<bool> Allowed(SqlConnection c, string menu, string action, CancellationToken token)
     {
         if (!await CompanyMenuAccess.IsAllowedAsync(c, User, menu, action, token)) return false;
@@ -70,6 +91,7 @@ VALUES(@company,@enabled,@size,@timeout,@actor);
     {
         using var c=await Open(token);var menu=Menu(target);
         if(menu is null || action is not ("CREATE" or "EDIT") || !await Allowed(c,menu,action,token))return Forbid();
+        if(!await HasOcrPackage(c,token))return Ok(new{isEnabled=false,engineAvailable=false});
         var s=await Setting(c,token);return Ok(new{s.IsEnabled,s.MaxImageSizeMB,s.TimeoutSeconds,engineAvailable=engine.IsAvailable});
     }
     [HttpPost("analyze"),RequestSizeLimit(11*1024*1024)]
@@ -77,6 +99,7 @@ VALUES(@company,@enabled,@size,@timeout,@actor);
     {
         using var c=await Open(token);var menu=Menu(target);
         if(menu is null || action is not ("CREATE" or "EDIT") || !await Allowed(c,menu,action,token))return Forbid();
+        if(!await HasOcrPackage(c,token))return StatusCode(403,new{message="บริษัทไม่ได้เปิดแพ็กเกจ OCR",description="กรุณาให้ผู้ดูแลเปิดแพ็กเกจ OCR ก่อนใช้งาน"});
         if(recordId.HasValue)
         {
             var scope=target switch{
@@ -131,6 +154,7 @@ VALUES(@company,@enabled,@size,@timeout,@actor);
     {
         using var c=await Open(token);var menu=Menu(target);
         if(menu is null || !await Allowed(c,menu,"VIEW",token))return Forbid();
+        if(!await HasOcrPackage(c,token))return Forbid();
         var sql=target switch
         {
         "customers"=>"""

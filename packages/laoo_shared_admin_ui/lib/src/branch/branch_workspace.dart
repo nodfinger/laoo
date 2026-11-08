@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:laoo_shared_admin/laoo_shared_admin.dart';
 
 import '../shared/shared_admin_ui_tokens.dart';
+import '../shared/filter_height_sync.dart';
 
 class BranchCompanyOption {
   const BranchCompanyOption({required this.companyId, required this.name});
@@ -270,10 +271,13 @@ class _BranchWorkspaceState extends State<BranchWorkspace> {
                   widget.caption,
                   true,
                 );
-                final add = FilledButton.icon(
-                  onPressed: canCreate ? () => openForm() : null,
-                  icon: const Icon(Icons.add),
-                  label: const Text('เพิ่ม'),
+                final add = SizedBox(
+                  height: t.filterActionHeight,
+                  child: FilledButton.icon(
+                    onPressed: canCreate ? () => openForm() : null,
+                    icon: const Icon(Icons.add),
+                    label: const Text('เพิ่ม'),
+                  ),
                 );
                 if (constraints.maxWidth < 520) {
                   return Column(
@@ -291,19 +295,27 @@ class _BranchWorkspaceState extends State<BranchWorkspace> {
                   children: [
                     Expanded(child: title),
                     if (constraints.maxWidth >= t.compactBreakpoint) ...[
-                      OutlinedButton(
-                        onPressed: () => setState(() => cardMode = !cardMode),
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size(44, 40),
-                          padding: EdgeInsets.zero,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(t.radius),
+                      SizedBox.square(
+                        dimension: t.filterActionHeight,
+                        child: IconButton(
+                          tooltip: cardMode ? 'แสดงแบบรายการ' : 'แสดงแบบการ์ด',
+                          onPressed: () => setState(() => cardMode = !cardMode),
+                          style: IconButton.styleFrom(
+                            backgroundColor: Theme.of(
+                              context,
+                            ).colorScheme.primary.withValues(alpha: .1),
+                            foregroundColor: Theme.of(
+                              context,
+                            ).colorScheme.primary,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(t.radius),
+                            ),
                           ),
-                        ),
-                        child: Icon(
-                          cardMode
-                              ? Icons.view_list_outlined
-                              : Icons.grid_view_outlined,
+                          icon: Icon(
+                            cardMode
+                                ? Icons.view_list_outlined
+                                : Icons.grid_view_outlined,
+                          ),
                         ),
                       ),
                       SizedBox(width: t.cardSpacing),
@@ -344,77 +356,80 @@ class _BranchWorkspaceState extends State<BranchWorkspace> {
     );
   }
 
-  Widget buildFilters() => Wrap(
-    spacing: widget.tokens.cardSpacing,
-    runSpacing: widget.tokens.cardSpacing,
-    crossAxisAlignment: WrapCrossAlignment.center,
-    children: [
-      SizedBox(
-        width: 260,
-        child: TextField(
-          controller: search,
-          textInputAction: TextInputAction.search,
-          onSubmitted: (_) => load(),
-          decoration: InputDecoration(
-            labelText: 'ค้นหาสาขา',
-            prefixIcon: const Icon(Icons.search),
-          ),
-        ),
-      ),
-      SizedBox(
-        width: 180,
-        child: DropdownButtonFormField<String>(
-          key: ValueKey(status),
-          initialValue: status,
-          isExpanded: true,
-          decoration: const InputDecoration(labelText: 'สถานะ'),
-          items: const [
-            DropdownMenuItem(value: all, child: Text(all)),
-            DropdownMenuItem(value: active, child: Text(active)),
-            DropdownMenuItem(value: inactive, child: Text(inactive)),
-          ],
-          onChanged: (value) => setState(() {
-            status = value ?? all;
-            page = 0;
-          }),
-        ),
-      ),
-      if (!widget.companyScope)
+  Widget buildFilters() => FilterHeightSync(
+    builder: (context, searchKey, height) => Wrap(
+      spacing: widget.tokens.cardSpacing,
+      runSpacing: widget.tokens.cardSpacing,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
         SizedBox(
-          width: 280,
-          child: DropdownButtonFormField<int?>(
-            key: ValueKey(companyFilterId),
-            initialValue: companyFilterId,
-            isExpanded: true,
-            decoration: const InputDecoration(labelText: 'ลูกค้า'),
-            items: [
-              const DropdownMenuItem<int?>(value: null, child: Text(all)),
-              ...companies.map(
-                (company) => DropdownMenuItem<int?>(
-                  value: company.companyId,
-                  child: Text(company.name, overflow: TextOverflow.ellipsis),
-                ),
-              ),
-            ],
-            onChanged: (value) {
-              setState(() => companyFilterId = value);
-              load();
-            },
+          width: 260,
+          child: TextField(
+            key: searchKey,
+            controller: search,
+            textInputAction: TextInputAction.search,
+            onSubmitted: (_) => load(),
+            decoration: InputDecoration(
+              labelText: 'ค้นหาสาขา',
+              prefixIcon: const Icon(Icons.search),
+            ),
           ),
         ),
-      FilledButton.icon(
-        onPressed: load,
-        icon: const Icon(Icons.search),
-        label: const Text('ค้นหา'),
-        style: filterButtonStyle,
-      ),
-      OutlinedButton.icon(
-        onPressed: clearFilters,
-        icon: const Icon(Icons.filter_alt_off_outlined),
-        label: const Text('ล้าง Filter'),
-        style: filterButtonStyle,
-      ),
-    ],
+        FilledButton.icon(
+          onPressed: load,
+          icon: const Icon(Icons.search),
+          label: const Text('ค้นหา'),
+          style: filterButtonStyle.merge(filterActionHeightStyle(height)),
+        ),
+        OutlinedButton.icon(
+          onPressed: clearFilters,
+          icon: const Icon(Icons.filter_alt_off_outlined),
+          label: const Text('ล้าง Filter'),
+          style: filterButtonStyle.merge(filterActionHeightStyle(height)),
+        ),
+        SizedBox(
+          width: 180,
+          child: DropdownButtonFormField<String>(
+            key: ValueKey(status),
+            initialValue: status,
+            isExpanded: true,
+            decoration: const InputDecoration(labelText: 'สถานะ'),
+            items: const [
+              DropdownMenuItem(value: all, child: Text(all)),
+              DropdownMenuItem(value: active, child: Text(active)),
+              DropdownMenuItem(value: inactive, child: Text(inactive)),
+            ],
+            onChanged: (value) => setState(() {
+              status = value ?? all;
+              page = 0;
+            }),
+          ),
+        ),
+        if (!widget.companyScope)
+          SizedBox(
+            width: 280,
+            child: DropdownButtonFormField<int?>(
+              key: ValueKey(companyFilterId),
+              initialValue: companyFilterId,
+              isExpanded: true,
+              decoration: const InputDecoration(labelText: 'ลูกค้า'),
+              items: [
+                const DropdownMenuItem<int?>(value: null, child: Text(all)),
+                ...companies.map(
+                  (company) => DropdownMenuItem<int?>(
+                    value: company.companyId,
+                    child: Text(company.name, overflow: TextOverflow.ellipsis),
+                  ),
+                ),
+              ],
+              onChanged: (value) {
+                setState(() => companyFilterId = value);
+                load();
+              },
+            ),
+          ),
+      ],
+    ),
   );
 
   ButtonStyle get filterButtonStyle => ButtonStyle(
@@ -901,9 +916,16 @@ class _BranchWorkspaceState extends State<BranchWorkspace> {
     final color = value
         ? Theme.of(context).colorScheme.primary
         : Theme.of(context).colorScheme.error;
-    return Text(
-      value ? active : inactive,
-      style: TextStyle(color: color, fontWeight: FontWeight.w700),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: .12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        value ? active : inactive,
+        style: TextStyle(color: color, fontWeight: FontWeight.w700),
+      ),
     );
   }
 

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../app/theme/workspace_theme_presets.dart';
+import '../../../../app/theme/laoo_design_tokens.dart';
+import '../../../../app/theme/laoo_typography.dart';
 import '../../../../core/widgets/timed_snack_bar.dart';
 import '../../presentation/widgets/support_workspace_shell.dart';
 import '../data/global_permission_settings_api.dart';
@@ -49,39 +51,51 @@ class _GlobalPermissionSettingsPageState
     for (final row in _rows) {
       groups.putIfAbsent('${row['menuGroupCode']}', () => []).add(row);
     }
-    final caption = _rows
-        .where((row) => '${row['menuCode']}'.trim() == '01006')
-        .map((row) => '${row['menuName']}'.trim())
-        .firstWhere((value) => value.isNotEmpty, orElse: () => 'สิทธิ์เมนู');
     return SupportWorkspaceShell(
       pageTitle: _caption,
       activeMenu: 'globalPermissionSettings',
       menuScope: WorkspaceMenuScope.support,
-      child: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(20),
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        _caption,
-                        style: TextStyle(
-                          color: accent,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w700,
-                        ),
+      child: LayoutBuilder(
+        builder: (context, constraints) => Padding(
+          padding: EdgeInsets.all(constraints.maxWidth < 600 ? 10 : 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Card(
+                margin: EdgeInsets.zero,
+                elevation: 0,
+                color: Colors.white,
+                surfaceTintColor: Colors.transparent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(LaooRadius.xs),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                  child: WorkspacePageTitle(
+                    title: _caption,
+                    favoriteKey: 'globalPermissionSettings',
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: _loading
+                    ? const Center(child: CircularProgressIndicator())
+                    : groups.isEmpty
+                    ? const Center(child: Text('ไม่พบข้อมูลสิทธิ์'))
+                    : ListView(
+                        children: groups.values
+                            .map((items) => _menuCard(context, items, accent))
+                            .toList(),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                ...groups.values.map(
-                  (items) => _menuCard(context, items, accent),
-                ),
-              ],
-            ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -96,7 +110,13 @@ class _GlobalPermissionSettingsPageState
       menus.putIfAbsent('${item['menuCode']}', () => []).add(item);
     }
     return Card(
-      margin: const EdgeInsets.only(bottom: 14),
+      margin: const EdgeInsets.only(bottom: 8),
+      elevation: 0,
+      color: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(LaooRadius.xs),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -167,9 +187,9 @@ class _GlobalPermissionSettingsPageState
                                   entry.value,
                                   accent,
                                 ),
-                                icon: const Icon(
+                                icon: Icon(
                                   Icons.delete_outline,
-                                  color: Colors.red,
+                                  color: Theme.of(context).colorScheme.error,
                                 ),
                               ),
                               Expanded(
@@ -198,267 +218,201 @@ class _GlobalPermissionSettingsPageState
     BuildContext context,
     Map<String, dynamic> menu,
     Color accent,
-  ) async {
-    final code = TextEditingController();
-    final name = TextEditingController();
-    final description = TextEditingController();
-    final saved = await showDialog<bool>(
-      context: context,
-      builder: (_) => Theme(
-        data: Theme.of(context).copyWith(
-          inputDecorationTheme: InputDecorationTheme(
-            labelStyle: TextStyle(color: accent),
-            enabledBorder: UnderlineInputBorder(
-              borderSide: BorderSide(color: accent),
-            ),
-            focusedBorder: UnderlineInputBorder(
-              borderSide: BorderSide(color: accent, width: 2),
-            ),
-          ),
-        ),
-        child: Dialog(
-          backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-            side: BorderSide(color: accent, width: 1.5),
-          ),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 560),
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'เพิ่มประเภทสิทธิ์',
-                    style: TextStyle(
-                      color: accent,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
-                    ),
-                    decoration: BoxDecoration(
-                      color: accent.withValues(alpha: .10),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      '${menu['menuName']}',
-                      style: TextStyle(
-                        color: accent,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Divider(color: accent),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: code,
-                    decoration: const InputDecoration(labelText: 'รหัส'),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: name,
-                    decoration: const InputDecoration(labelText: 'ประเภท'),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: description,
-                    maxLines: 3,
-                    decoration: const InputDecoration(labelText: 'รายละเอียด'),
-                  ),
-                  const SizedBox(height: 18),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, false),
-                        child: Text('ยกเลิก', style: TextStyle(color: accent)),
-                      ),
-                      const SizedBox(width: 8),
-                      FilledButton(
-                        onPressed: () async {
-                          try {
-                            await _api.addPoint(
-                              menuCode: '${menu['menuCode']}',
-                              code: code.text,
-                              name: name.text,
-                              description: description.text,
-                            );
-                            if (context.mounted) Navigator.pop(context, true);
-                          } catch (e) {
-                            if (context.mounted) {
-                              showTimedSnackBar(
-                                context,
-                                message: e.toString(),
-                                error: true,
-                              );
-                            }
-                          }
-                        },
-                        style: FilledButton.styleFrom(
-                          backgroundColor: accent,
-                          foregroundColor: Colors.white,
-                        ),
-                        child: const Text('บันทึก'),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-    code.dispose();
-    name.dispose();
-    description.dispose();
-    if (saved == true) _load();
-  }
+  ) => _showPointDialog(context, menu, accent);
 
   Future<void> _showEdit(
     BuildContext context,
     Map<String, dynamic> menu,
     Map<String, dynamic> point,
     Color accent,
-  ) async {
+  ) => _showPointDialog(context, menu, accent, point: point);
+
+  Future<void> _showPointDialog(
+    BuildContext context,
+    Map<String, dynamic> menu,
+    Color accent, {
+    Map<String, dynamic>? point,
+  }) async {
+    final editing = point != null;
+    final code = TextEditingController(
+      text: editing ? '${point['permissionPointCode'] ?? ''}' : '',
+    );
     final name = TextEditingController(
-      text: '${point['permissionPointName'] ?? ''}',
+      text: editing ? '${point['permissionPointName'] ?? ''}' : '',
     );
     final description = TextEditingController(
-      text: '${point['permissionPointDescription'] ?? ''}',
+      text: editing ? '${point['permissionPointDescription'] ?? ''}' : '',
     );
+    var saving = false;
     final saved = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => Theme(
-        data: Theme.of(context).copyWith(
-          inputDecorationTheme: InputDecorationTheme(
-            labelStyle: TextStyle(color: accent),
-            enabledBorder: UnderlineInputBorder(
-              borderSide: BorderSide(color: accent),
-            ),
-            focusedBorder: UnderlineInputBorder(
-              borderSide: BorderSide(color: accent, width: 2),
-            ),
-          ),
-        ),
-        child: Dialog(
-          backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-            side: BorderSide(color: accent, width: 1.5),
-          ),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 560),
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'แก้ไขประเภทสิทธิ์',
-                    style: TextStyle(
-                      color: accent,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
-                    ),
-                    decoration: BoxDecoration(
-                      color: accent.withValues(alpha: .10),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      '${menu['menuName']}',
-                      style: TextStyle(
-                        color: accent,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Divider(color: accent),
-                  TextField(
-                    controller: TextEditingController(
-                      text: '${point['permissionPointCode']}',
-                    ),
-                    readOnly: true,
-                    decoration: const InputDecoration(labelText: 'รหัส'),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: name,
-                    decoration: const InputDecoration(labelText: 'ประเภท'),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: description,
-                    maxLines: 3,
-                    decoration: const InputDecoration(labelText: 'รายละเอียด'),
-                  ),
-                  const SizedBox(height: 18),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
+      barrierDismissible: false,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, update) {
+          final theme = Theme.of(dialogContext);
+          final shape = RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(LaooRadius.xs),
+          );
+          return PopScope(
+            canPop: !saving,
+            child: Dialog(
+              backgroundColor: Colors.white,
+              insetPadding: const EdgeInsets.all(24),
+              shape: shape,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 480),
+                child: Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      OutlinedButton.icon(
-                        onPressed: () => Navigator.pop(dialogContext, false),
-                        icon: const Icon(Icons.close),
-                        label: Text('ยกเลิก', style: TextStyle(color: accent)),
-                      ),
-                      const SizedBox(width: 8),
-                      FilledButton(
-                        onPressed: () async {
-                          try {
-                            await _api.updatePoint(
-                              menuCode: '${menu['menuCode']}',
-                              code: '${point['permissionPointCode']}',
-                              name: name.text,
-                              description: description.text,
-                            );
-                            if (dialogContext.mounted) {
-                              Navigator.pop(dialogContext, true);
-                            }
-                          } catch (error) {
-                            if (dialogContext.mounted) {
-                              showTimedSnackBar(
-                                dialogContext,
-                                message: error.toString(),
-                                error: true,
-                              );
-                            }
-                          }
-                        },
-                        style: FilledButton.styleFrom(
-                          backgroundColor: accent,
-                          foregroundColor: Colors.white,
+                      SizedBox(
+                        height: 48,
+                        child: Row(
+                          children: [
+                            Icon(Icons.edit_outlined, color: accent),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                editing
+                                    ? 'แก้ไขประเภทสิทธิ์'
+                                    : 'เพิ่มประเภทสิทธิ์',
+                                style: LaooTypography.pageCaptionStyle,
+                              ),
+                            ),
+                          ],
                         ),
-                        child: const Text('บันทึก'),
+                      ),
+                      Divider(color: theme.dividerColor),
+                      Flexible(
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Text(
+                                '${menu['menuName']}',
+                                style: theme.textTheme.titleSmall,
+                              ),
+                              const SizedBox(height: 14),
+                              TextField(
+                                controller: code,
+                                readOnly: editing,
+                                style: const TextStyle(
+                                  fontSize: LaooTypography.inputText,
+                                ),
+                                decoration: const InputDecoration(
+                                  labelText: 'รหัส',
+                                ),
+                              ),
+                              const SizedBox(height: 14),
+                              TextField(
+                                controller: name,
+                                style: const TextStyle(
+                                  fontSize: LaooTypography.inputText,
+                                ),
+                                decoration: const InputDecoration(
+                                  labelText: 'ประเภท',
+                                ),
+                              ),
+                              const SizedBox(height: 14),
+                              TextField(
+                                controller: description,
+                                maxLines: 3,
+                                style: const TextStyle(
+                                  fontSize: LaooTypography.inputText,
+                                ),
+                                decoration: const InputDecoration(
+                                  labelText: 'รายละเอียด',
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      Divider(color: theme.dividerColor),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        alignment: WrapAlignment.end,
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          OutlinedButton.icon(
+                            onPressed: saving
+                                ? null
+                                : () => Navigator.pop(dialogContext, false),
+                            style: OutlinedButton.styleFrom(
+                              shape: shape,
+                              minimumSize: const Size(
+                                84,
+                                LaooTypography.buttonHeight,
+                              ),
+                            ),
+                            icon: const Icon(Icons.close),
+                            label: const Text('ยกเลิก'),
+                          ),
+                          FilledButton.icon(
+                            onPressed: saving
+                                ? null
+                                : () async {
+                                    update(() => saving = true);
+                                    try {
+                                      if (editing) {
+                                        await _api.updatePoint(
+                                          menuCode: '${menu['menuCode']}',
+                                          code: code.text,
+                                          name: name.text,
+                                          description: description.text,
+                                        );
+                                      } else {
+                                        await _api.addPoint(
+                                          menuCode: '${menu['menuCode']}',
+                                          code: code.text,
+                                          name: name.text,
+                                          description: description.text,
+                                        );
+                                      }
+                                      if (dialogContext.mounted) {
+                                        Navigator.pop(dialogContext, true);
+                                      }
+                                    } catch (_) {
+                                      if (dialogContext.mounted) {
+                                        showTimedSnackBar(
+                                          dialogContext,
+                                          message:
+                                              'ไม่สามารถบันทึกประเภทสิทธิ์ได้\nรายละเอียดเพิ่มเติม: กรุณาตรวจสอบข้อมูลและลองใหม่',
+                                          error: true,
+                                        );
+                                      }
+                                    } finally {
+                                      if (dialogContext.mounted) {
+                                        update(() => saving = false);
+                                      }
+                                    }
+                                  },
+                            style: FilledButton.styleFrom(
+                              shape: shape,
+                              minimumSize: const Size(
+                                100,
+                                LaooTypography.buttonHeight,
+                              ),
+                            ),
+                            icon: const Icon(Icons.save_outlined),
+                            label: Text(saving ? 'กำลังบันทึก...' : 'บันทึก'),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                ],
+                ),
               ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
+    code.dispose();
     name.dispose();
     description.dispose();
     if (saved == true) await _load();

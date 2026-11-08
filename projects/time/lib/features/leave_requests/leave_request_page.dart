@@ -51,8 +51,9 @@ class _LeaveRequestPageState extends State<LeaveRequestPage> {
   Future<void> _initialize() async {
     try {
       final actions = await _repo.actions();
-      if (actions['view'] != true)
+      if (actions['view'] != true) {
         throw StateError('ไม่มีสิทธิ์ดูข้อมูลหน้าจอนี้');
+      }
       if (mounted) setState(() => _actions = actions);
       await _load();
     } catch (error) {
@@ -539,8 +540,9 @@ class _LeaveRequestDialogState extends State<_LeaveRequestDialog> {
     final types = _lookup('leaveTypes');
     final employees = _lookup('employees');
     if (types.isNotEmpty) _leaveTypeId = types.first['LeaveTypeID'] as int?;
-    if (employees.isNotEmpty)
+    if (employees.isNotEmpty) {
       _employeeId = employees.first['EmployeeID'] as int?;
+    }
   }
 
   @override

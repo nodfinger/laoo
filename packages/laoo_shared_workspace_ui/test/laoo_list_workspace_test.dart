@@ -56,12 +56,15 @@ void main() {
       expect(find.text('ตารางข้อมูล'), findsOneWidget);
       expect(find.text('21-40 จาก 45'), findsOneWidget);
       expect(find.byType(LaooSurfaceCard), findsNWidgets(4));
-      final previousButton = find.widgetWithText(OutlinedButton, '<');
+      final previousButton = find.ancestor(
+        of: find.byIcon(Icons.chevron_left),
+        matching: find.byType(FilledButton),
+      );
       final paginationCard = find.ancestor(
         of: previousButton,
         matching: find.byType(LaooSurfaceCard),
       );
-      expect(tester.getSize(previousButton), const Size(34, 34));
+      expect(tester.getSize(previousButton), const Size(36, 36));
       expect(tester.getSize(paginationCard).height, 56);
       final buttonRect = tester.getRect(previousButton);
       final cardRect = tester.getRect(paginationCard);

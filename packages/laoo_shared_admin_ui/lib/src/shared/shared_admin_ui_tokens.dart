@@ -21,6 +21,13 @@ class SharedAdminUiTokens {
     required this.compactBreakpoint,
     required this.paginationHeight,
     required this.captionStyle,
+    this.filterActionHeight = 48,
+    this.listViewToggleSize = 40,
+    this.paginationButtonSize = 36,
+    this.fieldSpacing = 14,
+    this.inputLabelStyle,
+    this.floatingLabelStyle,
+    this.sectionTitleStyle,
   });
 
   final EdgeInsets contentMargin;
@@ -31,4 +38,11 @@ class SharedAdminUiTokens {
   final double compactBreakpoint;
   final double paginationHeight;
   final TextStyle captionStyle;
+  final double filterActionHeight;
+  final double listViewToggleSize;
+  final double paginationButtonSize;
+  final double fieldSpacing;
+  final TextStyle? inputLabelStyle;
+  final TextStyle? floatingLabelStyle;
+  final TextStyle? sectionTitleStyle;
 }

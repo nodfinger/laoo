@@ -8,14 +8,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:laoo/app/app.dart';
 import 'package:laoo/app/router/app_router.dart';
 import 'package:laoo/app/router/route_paths.dart';
 import 'package:laoo/features/auth/presentation/pages/login_page.dart';
 import 'package:laoo/features/landing/presentation/pages/landing_page.dart';
+import 'package:laoo/features/landing/data/home_page_config.dart';
+import 'package:laoo/features/landing/presentation/pages/home_page_entry.dart';
 
 void main() {
+  setUp(() => SharedPreferences.setMockInitialValues({}));
+  setUpAll(() {
+    HomePageEntry.serviceFactory = () =>
+        HomePageConfigService(fetch: () async => {'defaultMode': 3});
+  });
+  tearDownAll(() => HomePageEntry.serviceFactory = HomePageConfigService.new);
   tearDown(() {
     appRouter.go(RoutePaths.landing);
   });

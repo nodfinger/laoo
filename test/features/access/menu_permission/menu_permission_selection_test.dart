@@ -3,6 +3,18 @@ import 'package:laoo/features/access/menu_permission/models/menu_permission_row.
 import 'package:laoo/features/access/menu_permission/models/menu_permission_selection.dart';
 
 void main() {
+  test('permission changes preserve group metadata without sending it to save API', () {
+    final source = MenuPermissionRow.fromJson({
+      'projectId': 10, 'projectName': 'Sales', 'configuredMenuGroupCount': 1,
+      'menuCode': '09001', 'menuName': 'Customers', 'menuGroupCode': '09',
+      'menuGroupName': 'Sales', 'screenType': 1,
+    });
+    final changed = MenuPermissionSelection.applyToRow(source, 'CREATE', true);
+    expect(changed.configuredMenuGroupCount, 1);
+    expect(changed.canView, isTrue);
+    expect(changed.canCreate, isTrue);
+    expect(changed.toJson().containsKey('configuredMenuGroupCount'), isFalse);
+  });
   MenuPermissionRow row(String code, int screenType) => MenuPermissionRow(
     menuCode: code,
     menuName: code,

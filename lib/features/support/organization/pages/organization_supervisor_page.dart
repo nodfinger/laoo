@@ -28,6 +28,7 @@ class _OrganizationSupervisorPageState
   List<Map<String, dynamic>> _employees = [];
   String _caption = 'กำหนดผู้บังคับบัญชา';
   String? _message;
+  bool _messageIsError = false;
   bool _loading = true;
   final Set<int> _saving = {};
 
@@ -68,6 +69,7 @@ class _OrganizationSupervisorPageState
         setState(() {
           _loading = false;
           _message = _error(error, 'โหลดข้อมูลผู้บังคับบัญชาไม่สำเร็จ');
+          _messageIsError = true;
         });
       }
     }
@@ -75,7 +77,7 @@ class _OrganizationSupervisorPageState
 
   String _error(Object error, String fallback) => error is ApiException
       ? '${error.message}${error.description == null ? '' : '\n${error.description}'}'
-      : '$fallback\n$error';
+      : '$fallback\nรายละเอียดเพิ่มเติม: กรุณาตรวจสอบการเชื่อมต่อแล้วลองใหม่';
 
   String _type(Map<String, dynamic> row) =>
       row['unitType'] == 'DIV' ? 'DIVISION_MANAGER' : 'DEPARTMENT_HEAD';
@@ -95,13 +97,17 @@ class _OrganizationSupervisorPageState
     try {
       await _repository.save(unitId, employeeId, _type(row));
       if (!mounted) return;
-      setState(() => _message = 'บันทึกผู้บังคับบัญชาสำเร็จ');
+      setState(() {
+        _message = 'บันทึกผู้บังคับบัญชาสำเร็จ';
+        _messageIsError = false;
+      });
       await _load();
     } catch (error) {
       if (mounted) {
-        setState(
-          () => _message = _error(error, 'บันทึกผู้บังคับบัญชาไม่สำเร็จ'),
-        );
+        setState(() {
+          _message = _error(error, 'บันทึกผู้บังคับบัญชาไม่สำเร็จ');
+          _messageIsError = true;
+        });
       }
     } finally {
       if (mounted) setState(() => _saving.remove(unitId));
@@ -125,23 +131,20 @@ class _OrganizationSupervisorPageState
     return SizedBox(
       width: width ?? 300,
       child: DropdownButtonFormField<int>(
+        isExpanded: true,
         initialValue: selectedId,
         style: TextStyle(
           color: preset.textPrimary,
-          fontSize: LaooTypography.inputText,
+          fontSize: LaooTypography.comboBox,
         ),
         decoration: InputDecoration(
           labelText: _label(row),
-          labelStyle: TextStyle(
-            color: preset.primary,
-            fontSize: LaooTypography.inputLabel,
-          ),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(LaooRadius.xs),
             borderSide: BorderSide(color: preset.border),
           ),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(LaooRadius.xs),
             borderSide: BorderSide(color: preset.primary, width: 2),
           ),
         ),
@@ -152,9 +155,11 @@ class _OrganizationSupervisorPageState
             value: id,
             child: Text(
               '${employee['employeeCode']} | ${employee['fullName']}${nick.isEmpty ? '' : ' | $nick'}',
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
               style: TextStyle(
                 color: preset.textPrimary,
-                fontSize: LaooTypography.inputText,
+                fontSize: LaooTypography.comboBox,
               ),
             ),
           );
@@ -168,53 +173,50 @@ class _OrganizationSupervisorPageState
 
   Widget _row(Map<String, dynamic> row, WorkspaceThemePreset preset) {
     final isDivision = row['unitType'] == 'DIV';
-    return Card(
-      margin: EdgeInsets.only(left: isDivision ? 0 : 28),
-      child: Padding(
-        padding: const EdgeInsets.all(LaooLayout.cardPadding),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final compact = constraints.maxWidth < 900;
-            final title = Row(
-              children: [
-                Icon(
-                  isDivision
-                      ? Icons.account_balance_outlined
-                      : Icons.subdirectory_arrow_right,
-                  color: preset.primary,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    '${row['unitCode']} | ${row['nameTh']}',
-                    style: TextStyle(
-                      color: preset.textPrimary,
-                      fontSize: LaooTypography.inputText,
-                      fontWeight: FontWeight.w600,
-                    ),
+    return Padding(
+      padding: EdgeInsets.only(left: isDivision ? 0 : 28),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 900;
+          final title = Row(
+            children: [
+              Icon(
+                isDivision
+                    ? Icons.account_balance_outlined
+                    : Icons.subdirectory_arrow_right,
+                color: preset.primary,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  '${row['unitCode']} | ${row['nameTh']}',
+                  style: TextStyle(
+                    color: preset.textPrimary,
+                    fontSize: LaooTypography.sectionTitle,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-              ],
-            );
-            if (compact) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  title,
-                  const SizedBox(height: 8),
-                  _employeeDropdown(row, preset, width: double.infinity),
-                ],
-              );
-            }
-            return Row(
+              ),
+            ],
+          );
+          if (compact) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(child: title),
-                const SizedBox(width: 12),
-                _employeeDropdown(row, preset),
+                title,
+                const SizedBox(height: 8),
+                _employeeDropdown(row, preset, width: double.infinity),
               ],
             );
-          },
-        ),
+          }
+          return Row(
+            children: [
+              Expanded(child: title),
+              const SizedBox(width: 12),
+              _employeeDropdown(row, preset),
+            ],
+          );
+        },
       ),
     );
   }
@@ -232,7 +234,7 @@ class _OrganizationSupervisorPageState
         )
         .toList();
     return Container(
-      margin: const EdgeInsets.only(bottom: LaooLayout.cardSpacing),
+      margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
         color: LaooColors.white,
         borderRadius: BorderRadius.circular(LaooRadius.xs),
@@ -241,7 +243,12 @@ class _OrganizationSupervisorPageState
       child: Column(
         children: [
           _row(division, preset),
-          ...children.map((department) => _row(department, preset)),
+          ...children.expand(
+            (department) => [
+              const SizedBox(height: 16),
+              _row(department, preset),
+            ],
+          ),
         ],
       ),
     );
@@ -274,43 +281,49 @@ class _OrganizationSupervisorPageState
 
   @override
   Widget build(BuildContext context) {
-    final preset = workspaceThemeController.value;
-    return SupportWorkspaceShell(
-      menuScope: WorkspaceMenuScope.company,
-      pageTitle: _caption,
-      activeMenu: '10007',
-      child: Stack(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(LaooLayout.cardMargin),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                WorkspaceSectionCard(
-                  child: WorkspacePageTitle(
-                    title: _caption,
-                    favoriteKey: '10007',
+    return ValueListenableBuilder<WorkspaceThemePreset>(
+      valueListenable: workspaceThemeController,
+      builder: (context, preset, _) => SupportWorkspaceShell(
+        menuScope: WorkspaceMenuScope.company,
+        pageTitle: _caption,
+        activeMenu: '10007',
+        child: Stack(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(LaooLayout.cardMargin),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  WorkspaceSectionCard(
+                    child: WorkspacePageTitle(
+                      title: _caption,
+                      favoriteKey: '10007',
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Expanded(
-                  child: _loading
-                      ? const Center(child: CircularProgressIndicator())
-                      : ListView(children: _groupBlocks(preset)),
-                ),
-              ],
-            ),
-          ),
-          if (_message != null)
-            Positioned(
-              top: 12,
-              right: 12,
-              child: AutoDismissMessage(
-                message: _message!,
-                onClose: () => setState(() => _message = null),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: _loading
+                        ? const Center(child: CircularProgressIndicator())
+                        : ListView(
+                            padding: EdgeInsets.zero,
+                            children: _groupBlocks(preset),
+                          ),
+                  ),
+                ],
               ),
             ),
-        ],
+            if (_message != null)
+              Positioned(
+                top: 12,
+                right: 12,
+                child: AutoDismissMessage(
+                  message: _message!,
+                  error: _messageIsError,
+                  onClose: () => setState(() => _message = null),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

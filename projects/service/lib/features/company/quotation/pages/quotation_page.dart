@@ -69,6 +69,7 @@ class _QuotationListPageState extends State<QuotationListPage> {
   List<Map<String, dynamic>> _rows = [];
   Map<String, bool> _actions = {};
   String _menuName = '';
+  String _query = '';
   bool _loading = true, _card = false;
   int? _printingId;
 
@@ -299,7 +300,7 @@ class _QuotationListPageState extends State<QuotationListPage> {
   @override
   Widget build(BuildContext context) {
     final accent = workspaceThemeController.value.primary;
-    final query = _search.text.trim().toLowerCase();
+    final query = _query.toLowerCase();
     final rows = _rows
         .where(
           (e) =>
@@ -340,49 +341,48 @@ class _QuotationListPageState extends State<QuotationListPage> {
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        Text(
-                                          _menuName,
-                                          style: TextStyle(
-                                            color: LaooColors.textPrimary,
-                                            fontSize: LaooTypography.pageTitle,
-                                            fontWeight:
-                                                LaooTypography.pageTitleWeight,
+                                        Flexible(
+                                          child: WorkspacePageTitle(
+                                            title: _menuName,
+                                            favoriteKey: 'companyQuotations',
+                                            titleColor: Colors.black,
                                           ),
                                         ),
-                                        const SizedBox(width: 8),
-                                        Icon(Icons.star_outline, color: accent),
                                       ],
                                     ),
                                   ),
-                                  IconButton(
-                                    style: IconButton.styleFrom(
-                                      foregroundColor: accent,
-                                      backgroundColor: accent.withValues(
-                                        alpha: .10,
-                                      ),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                    ),
-                                    onPressed: () =>
-                                        setState(() => _card = !_card),
-                                    icon: Icon(
-                                      card
-                                          ? Icons.view_list_outlined
-                                          : Icons.grid_view_outlined,
-                                      color: accent,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  FilledButton.icon(
-                                    onPressed: _actions['create'] == false
-                                        ? null
-                                        : () => context.go(
-                                            '/company/quotations?action=new',
+                                  if (constraints.maxWidth >= 900)
+                                    IconButton(
+                                      style: IconButton.styleFrom(
+                                        fixedSize: const Size(48, 48),
+                                        foregroundColor: accent,
+                                        backgroundColor: accent.withValues(
+                                          alpha: .10,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            4,
                                           ),
-                                    icon: const Icon(Icons.add),
-                                    label: const Text('เพิ่มเอกสาร'),
-                                  ),
+                                        ),
+                                      ),
+                                      onPressed: () =>
+                                          setState(() => _card = !_card),
+                                      icon: Icon(
+                                        card
+                                            ? Icons.view_list_outlined
+                                            : Icons.grid_view_outlined,
+                                        color: accent,
+                                      ),
+                                    ),
+                                  const SizedBox(width: 8),
+                                  if (_actions['create'] == true)
+                                    FilledButton.icon(
+                                      onPressed: () => context.go(
+                                        '/company/quotations?action=new',
+                                      ),
+                                      icon: const Icon(Icons.add),
+                                      label: const Text('เพิ่มเอกสาร'),
+                                    ),
                                 ],
                               ),
                             ],
@@ -399,14 +399,46 @@ class _QuotationListPageState extends State<QuotationListPage> {
                         ),
                         child: Padding(
                           padding: const EdgeInsets.all(LaooLayout.cardPadding),
-                          child: TextField(
-                            controller: _search,
-                            onChanged: (_) => setState(() {}),
-                            decoration: const InputDecoration(
-                              prefixIcon: Icon(Icons.search),
-                              labelText: 'ค้นหาเลขที่เอกสาร/ชื่อลูกค้า',
-                              border: OutlineInputBorder(),
-                            ),
+                          child: Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              SizedBox(
+                                width: constraints.maxWidth < 500
+                                    ? (constraints.maxWidth - 48).clamp(
+                                        0.0,
+                                        350.0,
+                                      )
+                                    : 350,
+                                child: TextField(
+                                  controller: _search,
+                                  onSubmitted: (_) => setState(
+                                    () => _query = _search.text.trim(),
+                                  ),
+                                  decoration: const InputDecoration(
+                                    prefixIcon: Icon(Icons.search),
+                                    labelText: 'ค้นหาเลขที่เอกสาร/ชื่อลูกค้า',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                ),
+                              ),
+                              FilledButton.icon(
+                                onPressed: () => setState(
+                                  () => _query = _search.text.trim(),
+                                ),
+                                icon: const Icon(Icons.search),
+                                label: const Text('ค้นหา'),
+                              ),
+                              OutlinedButton.icon(
+                                onPressed: () => setState(() {
+                                  _search.clear();
+                                  _query = '';
+                                }),
+                                icon: const Icon(Icons.filter_alt_off_outlined),
+                                label: const Text('ล้าง Filter'),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -417,7 +449,7 @@ class _QuotationListPageState extends State<QuotationListPage> {
                               physics: const NeverScrollableScrollPhysics(),
                               itemCount: rows.length,
                               separatorBuilder: (_, _) =>
-                                  const SizedBox(height: 6),
+                                  const SizedBox(height: 8),
                               itemBuilder: (context, index) {
                                 final e = rows[index];
                                 return Card(

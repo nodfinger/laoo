@@ -70,10 +70,11 @@ class _State extends State<MeetingFoodDistributionPage> {
         message = null;
       });
     } catch (error) {
-      if (mounted)
+      if (mounted) {
         setState(
           () => message = errorText(error, 'โหลดรายการแจกอาหารไม่สำเร็จ'),
         );
+      }
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -81,7 +82,7 @@ class _State extends State<MeetingFoodDistributionPage> {
 
   String errorText(Object error, String fallback) => error is ApiException
       ? '${error.message}\nรายละเอียดเพิ่มเติม: ${error.description ?? 'กรุณาตรวจสิทธิ์และโหลดข้อมูลล่าสุดอีกครั้ง'}'
-      : '${fallback}\nรายละเอียดเพิ่มเติม: ไม่สามารถเชื่อมต่อระบบได้ กรุณาลองใหม่อีกครั้ง';
+      : '$fallback\nรายละเอียดเพิ่มเติม: ไม่สามารถเชื่อมต่อระบบได้ กรุณาลองใหม่อีกครั้ง';
   String date(DateTime d) =>
       '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
   String dateTime(Object? value) {
@@ -140,11 +141,12 @@ class _State extends State<MeetingFoodDistributionPage> {
         ),
       );
     } catch (error) {
-      if (mounted)
+      if (mounted) {
         setState(
           () =>
               message = errorText(error, 'โหลดรายละเอียดการแจกอาหารไม่สำเร็จ'),
         );
+      }
     }
   }
 
@@ -379,7 +381,9 @@ class _DistributionDialogState extends State<_DistributionDialog> {
   String? error;
   @override
   void dispose() {
-    for (final c in controllers.values) c.dispose();
+    for (final c in controllers.values) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -475,11 +479,12 @@ class _DistributionDialogState extends State<_DistributionDialog> {
                           },
                     ]);
                   } catch (e) {
-                    if (mounted)
+                    if (mounted) {
                       setState(() {
                         saving = false;
                         error = widget.errorText(e, 'บันทึกรับอาหารไม่สำเร็จ');
                       });
+                    }
                   }
                 },
           icon: const Icon(Icons.save_outlined),

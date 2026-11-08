@@ -22,6 +22,8 @@ class EmployeeRecord {
   String get positionCode => (_values['positionCode'] ?? '').toString();
   String get email => (_values['email'] ?? '').toString();
   String get telephone => (_values['telephone'] ?? '').toString();
+  String get internalTelephone => (_values['internalTelephone'] ?? '').toString();
+  bool get hasImage => _asBool(_values['hasImage']);
   bool get notifyByEmail => _asBool(_values['notifyByEmail']);
   bool get notifyInSystem => _asBool(_values['notifyInSystem']);
   String get contName1 => (_values['contName1'] ?? '').toString();

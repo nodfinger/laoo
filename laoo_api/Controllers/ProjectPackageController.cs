@@ -307,6 +307,53 @@ WHERE P.IsActive=1 AND P.ProjectType<>N'CORE' ORDER BY P.SortOrder FOR JSON PATH
         }
     }
 
+    [HttpDelete("{projectId:long}")]
+    public async Task<IActionResult> Clear(long companyId, long projectId, CancellationToken token)
+    {
+        if (!Scope(out var partner, out var actor)) return Forbid();
+        await using var db = await Open(token);
+        if (!await PartnerAllowed(db, partner, "EDIT", token)) return Forbid();
+        await using var tx = (SqlTransaction)await db.BeginTransactionAsync(token);
+        try
+        {
+            const string sql = """
+IF NOT EXISTS(SELECT 1 FROM dbo.TDSTCompanySetUp WITH(UPDLOCK,HOLDLOCK)
+ WHERE CompanyID=@Company AND PartnerID=@Partner AND IsActive=1)
+ THROW 57211,N'COMPANY_SCOPE_INVALID',1;
+IF NOT EXISTS(SELECT 1 FROM dbo.TDADProject WHERE ProjectID=@Project AND IsActive=1 AND ProjectType<>N'CORE')
+ THROW 57212,N'PROJECT_SCOPE_INVALID',1;
+INSERT dbo.TDADCompanyProjectSubscriptionAudit
+ (SubscriptionID,PartnerID,CompanyID,ProjectID,PackageID,ActionCode,BeforeJson,AfterJson,ReasonText,ActorType,ActorID)
+SELECT S.SubscriptionID,S.PartnerID,S.CompanyID,S.ProjectID,S.PackageID,N'CANCEL',
+ (SELECT S.SubscriptionID subscriptionId,S.PackageID packageId,S.StatusCode statusCode,S.StartDate startDate,S.ExpireDate expireDate FOR JSON PATH,WITHOUT_ARRAY_WRAPPER),
+ N'{"packageId":null}',N'ยกเลิกการกำหนดแพ็กเกจ',N'PARTNER_USER',@Actor
+FROM dbo.TDADCompanyProjectSubscription S WITH(UPDLOCK,HOLDLOCK)
+WHERE S.CompanyID=@Company AND S.PartnerID=@Partner AND S.ProjectID=@Project AND S.IsCurrent=1;
+UPDATE dbo.TDADCompanyProjectSubscription SET IsCurrent=0,UpdateDate=SYSUTCDATETIME(),UpdateBy=@Actor
+ WHERE CompanyID=@Company AND PartnerID=@Partner AND ProjectID=@Project AND IsCurrent=1;
+UPDATE dbo.TDADCompanyProject SET IsEnabled=0,IsTrial=0,StartDate=NULL,ExpireDate=NULL,UpdateDate=SYSUTCDATETIME(),UpdatedBy=@Actor
+ WHERE CompanyID=@Company AND PartnerID=@Partner AND ProjectID=@Project;
+UPDATE dbo.TDADCompanyFeature SET IsEnabled=0,UpdateDate=SYSUTCDATETIME(),UpdatedBy=@Actor
+ WHERE CompanyID=@Company AND PartnerID=@Partner AND ProjectID=@Project;
+""";
+            await using var cmd = new SqlCommand(sql, db, tx);
+            Add(cmd, "@Company", SqlDbType.BigInt, companyId);
+            Add(cmd, "@Partner", SqlDbType.BigInt, partner);
+            Add(cmd, "@Project", SqlDbType.BigInt, projectId);
+            Add(cmd, "@Actor", SqlDbType.BigInt, actor);
+            await cmd.ExecuteNonQueryAsync(token);
+            await tx.CommitAsync(token);
+            return NoContent();
+        }
+        catch (SqlException ex) when (ex.Number is 57211 or 57212)
+        {
+            await tx.RollbackAsync(token);
+            return ex.Number == 57211
+                ? NotFound(Problem("ไม่พบผู้ใช้บริการ", "Company ไม่อยู่ภายใต้ Partner ที่ Login"))
+                : BadRequest(Problem("ระบบไม่ถูกต้อง", "ไม่พบระบบที่เลือกหรือไม่สามารถเปลี่ยนระบบส่วนกลางได้"));
+        }
+    }
+
     private bool Scope(out long partner, out long actor)
     {
         partner = 0;

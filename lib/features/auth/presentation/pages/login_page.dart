@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../../../landing/data/home_page_config.dart';
 
 import '../../../../app/router/app_router.dart';
 import '../../../../app/router/route_names.dart';
@@ -13,7 +17,9 @@ import '../../../../core/platform/window_title_service.dart';
 import '../../../../core/widgets/auto_dismiss_message.dart';
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+  const LoginPage({super.key, this.homePageConfig, this.openUrl});
+  final HomePageConfig? homePageConfig;
+  final Future<bool> Function(Uri)? openUrl;
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -24,6 +30,7 @@ class _LoginPageState extends State<LoginPage> {
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
 
+  HomePageConfig? _homePageConfig;
   bool _obscurePassword = true;
   bool _isSubmitting = false;
   bool _rememberLogin = true;
@@ -34,6 +41,13 @@ class _LoginPageState extends State<LoginPage> {
   void initState() {
     super.initState();
     _restoreRememberedUsername();
+    _loadHomePageConfig();
+  }
+
+  Future<void> _loadHomePageConfig() async {
+    final config =
+        widget.homePageConfig ?? await HomePageConfigService().load();
+    if (mounted) setState(() => _homePageConfig = config);
   }
 
   Future<void> _restoreRememberedUsername() async {
@@ -103,7 +117,7 @@ class _LoginPageState extends State<LoginPage> {
         return;
       }
 
-      appRouter.goNamed(RouteNames.landing);
+      appRouter.goNamed(RouteNames.authenticatedHome);
       return;
     } on ApiException catch (error) {
       if (!mounted) {
@@ -225,8 +239,27 @@ class _LoginPageState extends State<LoginPage> {
     _showLoginAlert('ระบบสมัครใช้งานจะพัฒนาในขั้นตอนถัดไป', error: false);
   }
 
-  void _backToLanding() {
-    appRouter.goNamed(RouteNames.landing);
+  Future<void> _backToLanding() async {
+    final config = _homePageConfig;
+    if (config == null) return;
+    if (config.mode != 1) {
+      appRouter.goNamed(RouteNames.landing);
+      return;
+    }
+    final url = config.loginReturnUrl;
+    if (url == null) return;
+    try {
+      final opened =
+          await (widget.openUrl?.call(url) ??
+              launchUrl(url, webOnlyWindowName: '_self'));
+      if (!opened && mounted) {
+        _showLoginAlert('ไม่สามารถเปิดหน้าหลักได้ กรุณาลองใหม่อีกครั้ง');
+      }
+    } catch (_) {
+      if (mounted) {
+        _showLoginAlert('ไม่สามารถเปิดหน้าหลักได้ กรุณาลองใหม่อีกครั้ง');
+      }
+    }
   }
 
   @override
@@ -318,15 +351,6 @@ class _LoginPageState extends State<LoginPage> {
                       height: LaooTypography.titleLineHeight,
                       fontWeight: LaooTypography.pageTitleWeight,
                       color: LaooColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'ยินดีต้อนรับกลับสู่ Laoo Platform',
-                    style: TextStyle(
-                      fontSize: LaooTypography.body,
-                      height: LaooTypography.bodyLineHeight,
-                      color: LaooColors.textSecondary,
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -495,24 +519,27 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  Center(
-                    child: TextButton.icon(
-                      onPressed: _isSubmitting ? null : _backToLanding,
-                      style: TextButton.styleFrom(
-                        foregroundColor: LaooColors.greenDark,
-                        minimumSize: const Size(44, 40),
-                        textStyle: const TextStyle(
-                          fontFamily: LaooTypography.fontFamily,
-                          fontSize: LaooTypography.bodySmall,
-                          fontWeight: LaooTypography.emphasizedWeight,
+                  if (_homePageConfig != null &&
+                      (_homePageConfig!.mode != 1 ||
+                          _homePageConfig!.loginReturnUrl != null))
+                    Center(
+                      child: TextButton.icon(
+                        onPressed: _isSubmitting ? null : _backToLanding,
+                        style: TextButton.styleFrom(
+                          foregroundColor: LaooColors.greenDark,
+                          minimumSize: const Size(44, 40),
+                          textStyle: const TextStyle(
+                            fontFamily: LaooTypography.fontFamily,
+                            fontSize: LaooTypography.bodySmall,
+                            fontWeight: LaooTypography.emphasizedWeight,
+                          ),
                         ),
+                        icon: const Icon(Icons.arrow_back_rounded, size: 17),
+                        label: const Text('กลับหน้าหลัก'),
                       ),
-                      icon: const Icon(Icons.arrow_back_rounded, size: 17),
-                      label: const Text('กลับหน้าหลัก'),
                     ),
-                  ),
                   const Text(
-                    '© Laoo 2026',
+                    '© RYP IT Team 2026',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: LaooColors.textSecondary,
@@ -589,31 +616,21 @@ class _LoginBrandMark extends StatelessWidget {
     return Column(
       children: [
         Image.asset(
-          'assets/images/laoo_app_icon.png',
-          width: 36,
-          height: 36,
+          'assets/images/ryp_login_logo.png',
+          width: 100,
+          height: 100,
+          fit: BoxFit.contain,
           filterQuality: FilterQuality.high,
-          semanticLabel: 'Laoo Solutions',
+          semanticLabel: 'Royal Plus',
         ),
         const SizedBox(height: 5),
-        const Text(
-          'LAOO PLATFORM',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: LaooTypography.sectionTitle,
-            fontWeight: LaooTypography.strongWeight,
-            color: LaooColors.greenDark,
-          ),
-        ),
-        const SizedBox(height: 1),
-        const Text(
-          'Simple today. Ready Tomorrow.',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: LaooTypography.bodySmall,
-            height: LaooTypography.bodyLineHeight,
-            fontWeight: LaooTypography.emphasizedWeight,
-            color: LaooColors.green,
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 260),
+          child: SvgPicture.asset(
+            'assets/images/ryp_value_th.svg',
+            width: 260,
+            fit: BoxFit.contain,
+            semanticsLabel: 'Royal Plus values',
           ),
         ),
       ],

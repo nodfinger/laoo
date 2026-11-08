@@ -25,6 +25,7 @@ class _JobDispatchPageState extends State<JobDispatchPage> {
   bool _loading = true;
   int _page = 1;
   int _total = 0;
+  String _queueFilter = 'all';
   List<Map<String, dynamic>> _items = const [];
 
   @override
@@ -66,11 +67,10 @@ class _JobDispatchPageState extends State<JobDispatchPage> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final value = await _api.list(
+      final value = await _api.dispatchList(
         search: _search.text.trim(),
-        status: 'NEW',
         page: _page,
-        menuCode: '17001',
+        queueJump: _queueFilter == 'all' ? null : _queueFilter == 'yes',
       );
       if (!mounted) return;
       setState(() {
@@ -255,6 +255,43 @@ class _JobDispatchPageState extends State<JobDispatchPage> {
             icon: const Icon(Icons.search),
             label: const Text('ค้นหา'),
           ),
+          OutlinedButton.icon(
+            onPressed: _loading
+                ? null
+                : () {
+                    _search.clear();
+                    _queueFilter = 'all';
+                    _page = 1;
+                    _load();
+                  },
+            icon: const Icon(Icons.filter_alt_off_outlined),
+            label: const Text('ล้าง Filter'),
+          ),
+          SizedBox(
+            width: 200,
+            child: DropdownButtonFormField<String>(
+              initialValue: _queueFilter,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'งานแทรกคิว',
+                border: OutlineInputBorder(),
+              ),
+              items: const [
+                DropdownMenuItem(value: 'all', child: Text('ทั้งหมด')),
+                DropdownMenuItem(value: 'yes', child: Text('แทรกคิว')),
+                DropdownMenuItem(value: 'no', child: Text('ไม่แทรกคิว')),
+              ],
+              onChanged: _loading
+                  ? null
+                  : (value) {
+                      setState(() {
+                        _queueFilter = value ?? 'all';
+                        _page = 1;
+                      });
+                      _load();
+                    },
+            ),
+          ),
           Text('งานใหม่ $_total รายการ'),
         ],
       ),
@@ -278,6 +315,7 @@ class _JobTable extends StatelessWidget {
           DataColumn(label: Text('ผู้แจ้ง')),
           DataColumn(label: Text('สถานที่')),
           DataColumn(label: Text('หัวข้อ')),
+          DataColumn(label: Text('งานแทรกคิว')),
           DataColumn(label: Text('สถานะ')),
           DataColumn(label: Text('Action')),
         ],
@@ -299,6 +337,7 @@ class _JobTable extends StatelessWidget {
                     child: Text(row['subject']?.toString() ?? '-'),
                   ),
                 ),
+                DataCell(_QueueBadge(isQueueJump: row['isQueueJump'] == true)),
                 const DataCell(Text('งานใหม่')),
                 DataCell(
                   onDispatch == null
@@ -345,6 +384,13 @@ class _JobCard extends StatelessWidget {
           Text('ผู้แจ้ง: ${row['requesterName'] ?? '-'}'),
           Text('สถานที่: ${row['locationSnapshot'] ?? '-'}', softWrap: true),
           Text('หัวข้อ: ${row['subject'] ?? '-'}', softWrap: true),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              const Text('งานแทรกคิว: '),
+              _QueueBadge(isQueueJump: row['isQueueJump'] == true),
+            ],
+          ),
           const SizedBox(height: 10),
           if (onDispatch != null)
             Align(
@@ -359,6 +405,28 @@ class _JobCard extends StatelessWidget {
       ),
     ),
   );
+}
+
+class _QueueBadge extends StatelessWidget {
+  const _QueueBadge({required this.isQueueJump});
+  final bool isQueueJump;
+  @override
+  Widget build(BuildContext context) {
+    final color = isQueueJump
+        ? Theme.of(context).colorScheme.primary
+        : Theme.of(context).colorScheme.onSurfaceVariant;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: .12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        isQueueJump ? 'แทรกคิว' : 'ไม่แทรกคิว',
+        style: TextStyle(color: color, fontWeight: FontWeight.w600),
+      ),
+    );
+  }
 }
 
 class _DispatchDialog extends StatefulWidget {

@@ -27,7 +27,7 @@ public sealed partial class RentalController
     [HttpPost("bookings/{bookingId:long}/attachments")]
     [RequestSizeLimit(11_000_000)]
     public async Task<IActionResult> UploadAttachment(long bookingId, [FromForm] string kind,
-        [FromForm] long? bookingLineId, [FromForm] IFormFile file, CancellationToken ct)
+        [FromForm] long? bookingLineId, IFormFile file, CancellationToken ct)
     {
         var isHandover = kind is "HANDOVER_PHOTO" or "HANDOVER_STAFF_SIGN" or "HANDOVER_CUSTOMER_SIGN";
         var isReturn = kind is "RETURN_PHOTO" or "RETURN_STAFF_SIGN" or "RETURN_CUSTOMER_SIGN";

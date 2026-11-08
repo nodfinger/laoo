@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app/theme/laoo_design_tokens.dart';
 import '../../../app/theme/laoo_typography.dart';
+import '../../../app/theme/workspace_theme_presets.dart';
 import '../../../core/widgets/auto_dismiss_message.dart';
 import '../../support/presentation/widgets/support_workspace_shell.dart';
 import '../data/partner_company_repository.dart';
@@ -75,7 +76,7 @@ class _PartnerCompanyModulesPageState extends State<PartnerCompanyModulesPage> {
   }
 
   Future<void> _save() async {
-    if (_saving || _projects.isEmpty) return;
+    if (_saving) return;
     setState(() {
       _saving = true;
       _error = null;
@@ -83,7 +84,24 @@ class _PartnerCompanyModulesPageState extends State<PartnerCompanyModulesPage> {
     try {
       for (final project in _projects) {
         final packageId = _packageByProject[project.projectId];
-        if (packageId == null) continue;
+        if (packageId != null &&
+            packageId == project.packageId &&
+            (_statusByProject[project.projectId] ?? 'ACTIVE') ==
+                (project.statusCode ?? 'ACTIVE') &&
+            (project.startDate == null ||
+                DateUtils.isSameDay(_startByProject[project.projectId], project.startDate)) &&
+            DateUtils.isSameDay(_expireByProject[project.projectId], project.expireDate)) {
+          continue;
+        }
+        if (packageId == null) {
+          if (project.subscriptionId != null) {
+            await _repository.clearCompanySubscription(
+              widget.company.companyId,
+              project.projectId,
+            );
+          }
+          continue;
+        }
         await _repository.updateCompanySubscription(
           widget.company.companyId,
           project.projectId,
@@ -111,84 +129,87 @@ class _PartnerCompanyModulesPageState extends State<PartnerCompanyModulesPage> {
       pageTitle: title,
       activeMenu: 'partnerCompanies',
       menuScope: WorkspaceMenuScope.partner,
-      child: ColoredBox(
-        color: LaooColors.background,
-        child: Stack(
-          children: [
-            SingleChildScrollView(
-              padding: const EdgeInsets.all(LaooLayout.cardMargin),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(LaooRadius.xs),
-                child: ColoredBox(
-                  color: LaooColors.white,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.all(LaooLayout.cardPadding),
-                        child: WorkspaceActionHeader(
-                          title: title,
-                          favoriteKey: 'partnerCompanies',
-                          actions: [
-                            OutlinedButton.icon(
-                              onPressed: _saving
-                                  ? null
-                                  : () => Navigator.of(context).pop(false),
-                              icon: const Icon(Icons.close),
-                              label: const Text('ยกเลิก'),
-                            ),
-                            FilledButton.icon(
-                              onPressed: _saving || _loading ? null : _save,
-                              icon: _saving
-                                  ? const SizedBox.square(
-                                      dimension: 16,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : const Icon(Icons.save_outlined),
-                              label: const Text('บันทึก'),
-                            ),
-                          ],
+      child: ValueListenableBuilder<WorkspaceThemePreset>(
+        valueListenable: workspaceThemeController,
+        builder: (context, preset, _) => ColoredBox(
+          color: LaooColors.background,
+          child: Stack(
+            children: [
+              SingleChildScrollView(
+                padding: const EdgeInsets.all(LaooLayout.cardMargin),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(LaooRadius.xs),
+                  child: ColoredBox(
+                    color: LaooColors.white,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.all(LaooLayout.cardPadding),
+                          child: WorkspaceActionHeader(
+                            title: title,
+                            favoriteKey: 'partnerCompanies',
+                            actions: [
+                              OutlinedButton.icon(
+                                onPressed: _saving
+                                    ? null
+                                    : () => Navigator.of(context).pop(false),
+                                icon: const Icon(Icons.close),
+                                label: const Text('ยกเลิก'),
+                              ),
+                              FilledButton.icon(
+                                onPressed: _saving || _loading ? null : _save,
+                                icon: _saving
+                                    ? const SizedBox.square(
+                                        dimension: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Icon(Icons.save_outlined),
+                                label: const Text('บันทึก'),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      const Divider(height: 1, color: LaooColors.border),
-                      Padding(
-                        padding: const EdgeInsets.all(LaooLayout.cardPadding),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            _companyContext(context, compact: compact),
-                            const SizedBox(height: 12),
-                            _sectionHeader(context),
-                            const SizedBox(height: 12),
-                            if (_loading)
-                              const _LoadingFeatures()
-                            else if (_projects.isEmpty)
-                              const _EmptyFeatures()
-                            else
-                              _featureGrid(context, compact: compact),
-                          ],
+                        const Divider(height: 1, color: LaooColors.border),
+                        Padding(
+                          padding: const EdgeInsets.all(LaooLayout.cardPadding),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _companyContext(context, compact: compact),
+                              const SizedBox(height: 12),
+                              _sectionHeader(context),
+                              const SizedBox(height: 12),
+                              if (_loading)
+                                const _LoadingFeatures()
+                              else if (_projects.isEmpty)
+                                const _EmptyFeatures()
+                              else
+                                _featureGrid(context, compact: compact),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-            if (_error != null)
-              Positioned(
-                top: 12,
-                right: 12,
-                left: compact ? 12 : null,
-                child: AutoDismissMessage(
-                  key: ValueKey(_error),
-                  message: _error!,
-                  error: true,
-                  onClose: () => setState(() => _error = null),
+              if (_error != null)
+                Positioned(
+                  top: 12,
+                  right: 12,
+                  left: compact ? 12 : null,
+                  child: AutoDismissMessage(
+                    key: ValueKey(_error),
+                    message: _error!,
+                    error: true,
+                    onClose: () => setState(() => _error = null),
+                  ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -242,7 +263,7 @@ class _PartnerCompanyModulesPageState extends State<PartnerCompanyModulesPage> {
               Text(
                 'ลูกค้าที่กำหนดระบบ',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: LaooColors.textSecondary,
+                  color: workspaceThemeController.value.textSecondary,
                 ),
               ),
               Text(
@@ -252,7 +273,7 @@ class _PartnerCompanyModulesPageState extends State<PartnerCompanyModulesPage> {
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontSize: LaooTypography.sectionTitle,
                   fontWeight: LaooTypography.emphasizedWeight,
-                  color: LaooColors.textPrimary,
+                  color: workspaceThemeController.value.textPrimary,
                   height: LaooTypography.titleLineHeight,
                 ),
               ),
@@ -266,13 +287,17 @@ class _PartnerCompanyModulesPageState extends State<PartnerCompanyModulesPage> {
   Widget _companyCode(BuildContext context) => Row(
     mainAxisSize: MainAxisSize.min,
     children: [
-      const Icon(Icons.tag_outlined, size: 18, color: LaooColors.textSecondary),
+      Icon(
+        Icons.tag_outlined,
+        size: 18,
+        color: workspaceThemeController.value.textSecondary,
+      ),
       const SizedBox(width: 6),
       Text(
         widget.company.companyCode,
         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
           fontWeight: LaooTypography.emphasizedWeight,
-          color: LaooColors.textPrimary,
+          color: workspaceThemeController.value.textPrimary,
         ),
       ),
     ],
@@ -297,16 +322,16 @@ class _PartnerCompanyModulesPageState extends State<PartnerCompanyModulesPage> {
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 fontSize: LaooTypography.sectionTitle,
                 fontWeight: LaooTypography.emphasizedWeight,
-                color: LaooColors.textPrimary,
+                color: workspaceThemeController.value.textPrimary,
               ),
             ),
           ],
         ),
         Text(
           'กำหนดแล้ว $enabledCount จาก ${_projects.length} ระบบ',
-          style: Theme.of(
-            context,
-          ).textTheme.bodySmall?.copyWith(color: LaooColors.textSecondary),
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: workspaceThemeController.value.textSecondary,
+          ),
         ),
       ],
     );
@@ -316,22 +341,25 @@ class _PartnerCompanyModulesPageState extends State<PartnerCompanyModulesPage> {
     return Column(
       children: [
         for (var index = 0; index < _projects.length; index++) ...[
-          _projectRow(_projects[index]),
-          if (index < _projects.length - 1) const SizedBox(height: 6),
+          _projectRow(context, _projects[index]),
+          if (index < _projects.length - 1)
+            Divider(
+              height: 6,
+              thickness: .6,
+              color: workspaceThemeController.value.border,
+            ),
         ],
       ],
     );
   }
 
-  Widget _projectRow(PartnerCompanySubscription project) {
+  Widget _projectRow(BuildContext context, PartnerCompanySubscription project) {
     final selectedPackage = _packageByProject[project.projectId];
     final primary = Theme.of(context).colorScheme.primary;
     return Container(
       padding: const EdgeInsets.all(LaooLayout.cardPadding),
       decoration: BoxDecoration(
-        color: selectedPackage != null
-            ? primary.withValues(alpha: 0.08)
-            : LaooColors.surfaceSoft,
+        color: LaooColors.white,
         borderRadius: BorderRadius.circular(LaooRadius.xs),
       ),
       child: Column(
@@ -357,19 +385,19 @@ class _PartnerCompanyModulesPageState extends State<PartnerCompanyModulesPage> {
                       project.projectNameTh,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         fontWeight: LaooTypography.emphasizedWeight,
-                        color: LaooColors.textPrimary,
+                        color: workspaceThemeController.value.textPrimary,
                       ),
                     ),
                     Text(
                       project.projectCode,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: LaooColors.textSecondary,
+                        color: workspaceThemeController.value.textSecondary,
                       ),
                     ),
                   ],
                 ),
               ),
-              _accessBadge(project.accessMode),
+              _accessBadge(context, project.accessMode),
             ],
           ),
           const SizedBox(height: 10),
@@ -439,8 +467,11 @@ class _PartnerCompanyModulesPageState extends State<PartnerCompanyModulesPage> {
                             }),
                     ),
                   ),
-                  _dateField(project, start: true),
-                  _dateField(project, start: false),
+                  if ((_statusByProject[project.projectId] ?? 'ACTIVE') !=
+                      'SUSPENDED') ...[
+                    _dateField(context, project, start: true),
+                    _dateField(context, project, start: false),
+                  ],
                 ],
               ],
             ),
@@ -468,7 +499,11 @@ class _PartnerCompanyModulesPageState extends State<PartnerCompanyModulesPage> {
     });
   }
 
-  Widget _dateField(PartnerCompanySubscription project, {required bool start}) {
+  Widget _dateField(
+    BuildContext context,
+    PartnerCompanySubscription project, {
+    required bool start,
+  }) {
     final value = start
         ? _startByProject[project.projectId]
         : _expireByProject[project.projectId];
@@ -511,7 +546,7 @@ class _PartnerCompanyModulesPageState extends State<PartnerCompanyModulesPage> {
     );
   }
 
-  Widget _accessBadge(String? mode) {
+  Widget _accessBadge(BuildContext context, String? mode) {
     final label = switch (mode) {
       'FULL' => 'ใช้งาน',
       'READ_ONLY' => 'อ่านอย่างเดียว',
@@ -521,7 +556,11 @@ class _PartnerCompanyModulesPageState extends State<PartnerCompanyModulesPage> {
     return Text(
       label,
       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-        color: Theme.of(context).colorScheme.primary,
+        color: mode == 'BLOCKED'
+            ? Theme.of(context).colorScheme.error
+            : mode == null
+            ? workspaceThemeController.value.textSecondary
+            : Theme.of(context).colorScheme.primary,
         fontWeight: FontWeight.w700,
       ),
     );

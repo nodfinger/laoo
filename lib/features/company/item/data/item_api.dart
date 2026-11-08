@@ -20,6 +20,15 @@ class ItemApi {
         await _client.get('/api/company/items/image-settings') as Map,
       );
 
+  Future<List<Map<String, dynamic>>> masterOptions(String groupCode) async =>
+      List<Map<String, dynamic>>.from(
+        await _client.get(
+              '/api/company/items/master-options',
+              query: {'groupCode': groupCode},
+            )
+            as List,
+      );
+
   Future<String?> previewCode({String? groupCode, String? typeCode}) async {
     final result = Map<String, dynamic>.from(
       await _client.post(

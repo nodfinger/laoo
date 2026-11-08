@@ -8,17 +8,27 @@ class EmployeeCompanyOption {
 }
 
 class EmployeeRoleGroupOption {
-  const EmployeeRoleGroupOption({required this.id, required this.name});
+  const EmployeeRoleGroupOption({
+    required this.id,
+    required this.name,
+    this.selected = false,
+  });
 
   final int id;
   final String name;
+  final bool selected;
 }
 
 class EmployeeMasterOption {
-  const EmployeeMasterOption({required this.code, required this.name});
+  const EmployeeMasterOption({
+    required this.code,
+    required this.name,
+    this.selected = false,
+  });
 
   final String code;
   final String name;
+  final bool selected;
 }
 
 typedef EmployeeCompanyLoader = Future<List<EmployeeCompanyOption>> Function();

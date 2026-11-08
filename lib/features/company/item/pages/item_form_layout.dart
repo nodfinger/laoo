@@ -12,6 +12,81 @@ import '../../../../app/theme/laoo_typography.dart';
 import '../../../../app/theme/workspace_theme_presets.dart';
 import '../../../../core/widgets/timed_snack_bar.dart';
 import '../data/item_api.dart';
+import '../../../support/master_data/data/master_data_api.dart';
+import '../../../support/master_data/pages/master_data_page.dart';
+import '../../../support/master_data/pages/simple_master_search_dialog.dart';
+import '../../../support/presentation/widgets/support_workspace_shell.dart';
+
+class _UsageHelp extends StatefulWidget {
+  const _UsageHelp({required this.label, required this.message});
+
+  final String label;
+  final String message;
+
+  @override
+  State<_UsageHelp> createState() => _UsageHelpState();
+}
+
+class _UsageHelpState extends State<_UsageHelp> {
+  final _tooltipKey = GlobalKey<TooltipState>();
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+    key: _tooltipKey,
+    message: widget.message,
+    triggerMode: TooltipTriggerMode.manual,
+    child: IconButton(
+      onPressed: () => _tooltipKey.currentState?.ensureTooltipVisible(),
+      icon: Icon(
+        Icons.info_outline,
+        size: 20,
+        semanticLabel: 'คำอธิบาย${widget.label}',
+      ),
+      color: workspaceThemeController.value.primary,
+      visualDensity: VisualDensity.compact,
+      constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+      padding: EdgeInsets.zero,
+      iconSize: 20,
+    ),
+  );
+}
+
+// The item lookup exposes only the three dependencies already authorized for
+// the product screen. Mutations still use MasterDataApi and its own permissions.
+class _ItemMasterLookupApi extends MasterDataApi {
+  _ItemMasterLookupApi(this.groupCode, this.groupName, this.itemApi);
+  final String groupCode;
+  final String groupName;
+  final ItemApi itemApi;
+
+  @override
+  Future<List<Map<String, dynamic>>> groups() async => [
+    {'code': groupCode, 'name': groupName},
+  ];
+
+  @override
+  Future<List<Map<String, dynamic>>> list(
+    String groupCode, {
+    String? search,
+  }) async {
+    final rows = await itemApi.masterOptions(groupCode);
+    final query = search?.trim().toLowerCase() ?? '';
+    if (query.isEmpty) return rows;
+    return rows
+        .where(
+          (item) => '${item['name'] ?? ''} ${item['code'] ?? ''}'
+              .toLowerCase()
+              .contains(query),
+        )
+        .toList();
+  }
+
+  @override
+  void dispose() {
+    itemApi.dispose();
+    super.dispose();
+  }
+}
 
 class _UpperCaseTextFormatter extends TextInputFormatter {
   @override
@@ -74,6 +149,7 @@ class ItemFormLayout extends StatefulWidget {
 }
 
 class _ItemFormLayoutState extends State<ItemFormLayout> {
+  bool _canChangeMasterData = false;
   final _form = GlobalKey<FormState>();
   late final Map<String, dynamic> _data;
   late final TextEditingController _code, _name, _price, _cost, _min, _purchase;
@@ -87,6 +163,10 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
   late final TextEditingController _supplierWarrantyMonths,
       _customerWarrantyMonths;
   String? _group, _type, _unit, _responsibleDepartment;
+  late List<Map<String, dynamic>> _groups = List.of(widget.groups);
+  late List<Map<String, dynamic>> _types = List.of(widget.types);
+  late List<Map<String, dynamic>> _units = List.of(widget.units);
+  int _masterOptionsVersion = 0;
   String _receiveStockPriceModeCode = 'CUSTOM';
   static const _receiveStockPriceModes = [
     {'code': 'CUSTOM', 'name': 'กำหนดเอง'},
@@ -203,9 +283,9 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
       ),
     );
     if (_data['itemID'] == null) {
-      _group ??= _firstCode(widget.groups);
-      _type ??= _firstCode(widget.types);
-      _unit ??= _firstCode(widget.units);
+      _group ??= _firstCode(_groups);
+      _type ??= _firstCode(_types);
+      _unit ??= _firstCode(_units);
     }
     _active = _data['isActive'] != false;
     _showShop = _data['showShop'] == true;
@@ -213,7 +293,27 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
     _images = List<Map<String, dynamic>>.from(_data['images'] ?? []);
     WidgetsBinding.instance.addPostFrameCallback((_) => _previewCode());
     _loadProjects();
+    _loadMasterActions();
     if (_data['itemID'] == null) _loadClassificationDefaults();
+  }
+
+  Future<void> _loadMasterActions() async {
+    final api = MasterDataApi();
+    try {
+      final actions = await api.actions();
+      if (!mounted) return;
+      setState(
+        () => _canChangeMasterData =
+            actions['view'] == true &&
+            (actions['create'] == true ||
+                actions['edit'] == true ||
+                actions['delete'] == true),
+      );
+    } catch (_) {
+      // Keep search-only behavior if permissions cannot be verified.
+    } finally {
+      api.dispose();
+    }
   }
 
   Future<void> _loadClassificationDefaults() async {
@@ -605,9 +705,9 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
           _note3.clear();
           _note4.clear();
           _note5.clear();
-          _group = _firstCode(widget.groups);
-          _type = _firstCode(widget.types);
-          _unit = _firstCode(widget.units);
+          _group = _firstCode(_groups);
+          _type = _firstCode(_types);
+          _unit = _firstCode(_units);
           _responsibleDepartment = null;
           _receiveStockPriceModeCode = widget.defaultReceiveStockPriceModeCode;
           _itemKind = 'GOODS';
@@ -803,30 +903,6 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
           ),
         ],
       ),
-      const SizedBox(height: 12),
-      _row(wide, [
-        _drop('กลุ่มสินค้า', _group, widget.groups, (value) {
-          setState(() => _group = value);
-          _previewCode();
-        }),
-        _drop('ประเภทสินค้า', _type, widget.types, (value) {
-          setState(() => _type = value);
-          _previewCode();
-        }),
-        _dropOptional(
-          'แผนกที่รับผิดชอบ',
-          _responsibleDepartment,
-          widget.responsibleDepartments,
-          (value) => setState(() => _responsibleDepartment = value),
-        ),
-        _drop(
-          'ราคาเริ่มต้นรับเข้าสต๊อก',
-          _receiveStockPriceModeCode,
-          _receiveStockPriceModes,
-          (value) =>
-              setState(() => _receiveStockPriceModeCode = value ?? 'CUSTOM'),
-        ),
-      ]),
       const SizedBox(height: 12),
       _inventoryClassification(wide),
       const SizedBox(height: 12),
@@ -1224,6 +1300,16 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
       'EQUIPMENT': 'อุปกรณ์',
       'SPARE_PART': 'อะไหล่',
     };
+    const usageHelp = {
+      'SALE':
+          'ใช้เลือกในเอกสารระบบขาย เช่น ใบเสนอราคาและใบส่งของ ทั้งนี้ขึ้นอยู่กับชนิดสินค้า แพ็กเกจ และสิทธิ์ผู้ใช้',
+      'MATERIAL':
+          'ใช้ในรายการเบิกจ่ายวัสดุและงานซ่อม โดยขึ้นอยู่กับชนิดสินค้า วิธีควบคุมสต็อก แพ็กเกจ และสิทธิ์ผู้ใช้',
+      'EQUIPMENT':
+          'ใช้เลือกอุปกรณ์ที่แจ้งซ่อมและจัดทำแผนบำรุงรักษา โดยขึ้นอยู่กับสถานะอุปกรณ์ แพ็กเกจ และสิทธิ์ผู้ใช้',
+      'SPARE_PART':
+          'ใช้ในรายการเบิกจ่ายและเลือกเป็นอะไหล่สำหรับงานซ่อม โดยขึ้นอยู่กับชนิดสินค้า วิธีควบคุมสต็อก แพ็กเกจ และสิทธิ์ผู้ใช้',
+    };
     final kindField = DropdownButtonFormField<String>(
       isExpanded: true,
       style: Theme.of(
@@ -1264,6 +1350,26 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
               _stockTracking = value ?? 'NONE';
             }),
     );
+    final groupField = _drop('กลุ่มสินค้า', _group, _groups, (value) {
+      setState(() => _group = value);
+      _previewCode();
+    }, masterGroupCode: '006');
+    final typeField = _drop('ประเภทสินค้า', _type, _types, (value) {
+      setState(() => _type = value);
+      _previewCode();
+    }, masterGroupCode: '007');
+    final departmentField = _dropOptional(
+      'แผนกที่รับผิดชอบ',
+      _responsibleDepartment,
+      widget.responsibleDepartments,
+      (value) => setState(() => _responsibleDepartment = value),
+    );
+    final priceModeField = _drop(
+      'ราคาเริ่มต้นรับเข้าสต๊อก',
+      _receiveStockPriceModeCode,
+      _receiveStockPriceModes,
+      (value) => setState(() => _receiveStockPriceModeCode = value ?? 'CUSTOM'),
+    );
     final usageField = FormField<Set<String>>(
       initialValue: _usageCodes,
       validator: (_) => _usageCodes.isEmpty
@@ -1275,51 +1381,101 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
           errorText: field.errorText,
           contentPadding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
         ),
-        child: Wrap(
-          spacing: 8,
-          runSpacing: 10,
-          children: usages.entries.map((entry) {
-            final selected = _usageCodes.contains(entry.key);
-            return FilterChip(
-              label: Text(entry.value),
-              selected: selected,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              labelPadding: EdgeInsets.zero,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(LaooRadius.xs),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final codes in [
+              const ['SALE', 'MATERIAL'],
+              const ['EQUIPMENT', 'SPARE_PART'],
+            ]) ...[
+              if (codes.first == 'EQUIPMENT') const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: codes.map((code) {
+                  final entry = MapEntry(code, usages[code]!);
+                  final selected = _usageCodes.contains(entry.key);
+                  return Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      FilterChip(
+                        label: Text(entry.value),
+                        selected: selected,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        labelPadding: EdgeInsets.zero,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(LaooRadius.xs),
+                        ),
+                        onSelected: (value) => setState(() {
+                          value
+                              ? _usageCodes.add(entry.key)
+                              : _usageCodes.remove(entry.key);
+                          if (!_usageCodes.contains('SALE')) _showShop = false;
+                          field.didChange(Set<String>.from(_usageCodes));
+                        }),
+                      ),
+                      _UsageHelp(
+                        label: entry.value,
+                        message: usageHelp[entry.key]!,
+                      ),
+                    ],
+                  );
+                }).toList(),
               ),
-              onSelected: (value) => setState(() {
-                value
-                    ? _usageCodes.add(entry.key)
-                    : _usageCodes.remove(entry.key);
-                if (!_usageCodes.contains('SALE')) _showShop = false;
-                field.didChange(Set<String>.from(_usageCodes));
-              }),
-            );
-          }).toList(),
+            ],
+          ],
         ),
       ),
     );
     if (!wide) {
       return Column(
         children: [
+          groupField,
+          const SizedBox(height: 12),
+          typeField,
+          const SizedBox(height: 12),
+          usageField,
+          const SizedBox(height: 12),
           kindField,
           const SizedBox(height: 12),
           trackingField,
           const SizedBox(height: 12),
-          usageField,
+          departmentField,
+          const SizedBox(height: 12),
+          priceModeField,
         ],
       );
     }
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    final fields = Column(
       children: [
-        Expanded(child: kindField),
-        const SizedBox(width: 12),
-        Expanded(child: trackingField),
-        const SizedBox(width: 12),
-        Expanded(flex: 2, child: usageField),
+        _row(true, [groupField, typeField]),
+        const SizedBox(height: 12),
+        _row(true, [kindField, trackingField]),
+        const SizedBox(height: 12),
+        _row(true, [departmentField, priceModeField]),
       ],
+    );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 740) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [fields, const SizedBox(height: 12), usageField],
+          );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(flex: 3, child: fields),
+            const SizedBox(width: 12),
+            Expanded(flex: 2, child: usageField),
+          ],
+        );
+      },
     );
   }
 
@@ -1332,6 +1488,10 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
       required bool fieldsInRow,
     }) {
       final mode = DropdownButtonFormField<String>(
+        isExpanded: true,
+        style: Theme.of(
+          context,
+        ).textTheme.bodyMedium?.copyWith(fontSize: LaooTypography.comboBox),
         initialValue: value,
         decoration: InputDecoration(labelText: label),
         items: const [
@@ -1393,9 +1553,10 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
               children: [
                 Text(
                   'ค่าเริ่มต้นประกัน',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontSize: LaooTypography.sectionTitle,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 if (sideBySide)
@@ -1433,8 +1594,9 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
     final unit = _drop(
       'หน่วยนับมาตรฐาน',
       _unit,
-      widget.units,
+      _units,
       (v) => setState(() => _unit = v),
+      masterGroupCode: '002',
     );
     final price = _text(_price, 'ราคาขายมาตรฐาน', number: true);
     final cost = _text(_cost, 'ราคาต้นทุน', number: true);
@@ -1444,19 +1606,19 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
       return Column(
         children: [
           code,
-          const SizedBox(height: 16),
+          const SizedBox(height: LaooLayout.popupFieldSpacing),
           name,
-          const SizedBox(height: 16),
+          const SizedBox(height: LaooLayout.popupFieldSpacing),
           stock,
-          const SizedBox(height: 16),
+          const SizedBox(height: LaooLayout.popupFieldSpacing),
           unit,
-          const SizedBox(height: 16),
+          const SizedBox(height: LaooLayout.popupFieldSpacing),
           price,
-          const SizedBox(height: 16),
+          const SizedBox(height: LaooLayout.popupFieldSpacing),
           cost,
-          const SizedBox(height: 16),
+          const SizedBox(height: LaooLayout.popupFieldSpacing),
           min,
-          const SizedBox(height: 16),
+          const SizedBox(height: LaooLayout.popupFieldSpacing),
           purchase,
         ],
       );
@@ -1472,7 +1634,7 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
             SizedBox(width: 160, child: stock),
           ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: LaooLayout.popupFieldSpacing),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1576,20 +1738,157 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
     );
   }
 
+  Future<void> _manageMaster(String groupCode, String groupName) async {
+    final lookupApi = _ItemMasterLookupApi(
+      groupCode,
+      groupName,
+      widget.apiFactory?.call() ?? ItemApi(),
+    );
+    try {
+      final actions = await lookupApi.actions().catchError(
+        (_) => <String, bool>{},
+      );
+      final simple =
+          actions['view'] != true ||
+          !(actions['create'] == true ||
+              actions['edit'] == true ||
+              actions['delete'] == true);
+      final rows = simple
+          ? await lookupApi.list(groupCode)
+          : <Map<String, dynamic>>[];
+      if (simple) lookupApi.dispose();
+      if (!mounted) return;
+      final selectedCode = await showDialog<String>(
+        context: context,
+        builder: (dialogContext) => simple
+            ? SimpleMasterSearchDialog(title: groupName, rows: rows)
+            : Theme(
+                data: workspaceThemeController.value.toThemeData(),
+                child: Dialog(
+                  insetPadding: const EdgeInsets.all(24),
+                  clipBehavior: Clip.antiAlias,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(LaooRadius.xs),
+                  ),
+                  child: SizedBox(
+                    width: 1000,
+                    height: (MediaQuery.sizeOf(dialogContext).height - 48)
+                        .clamp(0.0, 700.0),
+                    child: Column(
+                      children: [
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: IconButton(
+                            tooltip: 'ปิด',
+                            onPressed: () => Navigator.of(dialogContext).pop(),
+                            icon: const Icon(Icons.close),
+                          ),
+                        ),
+                        Expanded(
+                          child: MasterDataPage(
+                            menuScope: WorkspaceMenuScope.company,
+                            embedded: true,
+                            masterGroupCode: groupCode,
+                            simpleWhenReadOnly: true,
+                            api: lookupApi,
+                            onSelected: (code) =>
+                                Navigator.of(dialogContext).pop(code),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+      );
+      // The dialog disposes its API; reload using a fresh product client.
+      if (!mounted) return;
+      final api = widget.apiFactory?.call() ?? ItemApi();
+      try {
+        final options = await api.masterOptions(groupCode);
+        if (!mounted) return;
+        final exists =
+            selectedCode != null &&
+            options.any((item) => item['code']?.toString() == selectedCode);
+        setState(() {
+          if (groupCode == '006') {
+            _groups = options;
+            if (exists) {
+              _group = selectedCode;
+            } else if (!options.any(
+              (item) => item['code']?.toString() == _group,
+            )) {
+              _group = null;
+            }
+          } else if (groupCode == '007') {
+            _types = options;
+            if (exists) {
+              _type = selectedCode;
+            } else if (!options.any(
+              (item) => item['code']?.toString() == _type,
+            )) {
+              _type = null;
+            }
+          } else {
+            _units = options;
+            if (exists) {
+              _unit = selectedCode;
+            } else if (!options.any(
+              (item) => item['code']?.toString() == _unit,
+            )) {
+              _unit = null;
+            }
+          }
+          _masterOptionsVersion++;
+        });
+        if (exists && groupCode != '002') _previewCode();
+      } finally {
+        api.dispose();
+      }
+    } catch (_) {
+      if (mounted) {
+        showTimedSnackBar(
+          context,
+          message: 'ไม่สามารถโหลดรหัสพื้นฐานได้ กรุณาลองใหม่',
+          error: true,
+        );
+      }
+    }
+  }
+
   Widget _drop(
     String label,
     String? value,
     List<Map<String, dynamic>> values,
-    ValueChanged<String?> onChanged,
-  ) {
-    final comboStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
-      fontSize: LaooTypography.tableBody,
+    ValueChanged<String?> onChanged, {
+    String? masterGroupCode,
+  }) {
+    final comboStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(
+      fontSize: LaooTypography.comboBox,
       height: 1.35,
     );
     return DropdownButtonFormField<String>(
       isExpanded: true,
+      key: ValueKey('$label-$_masterOptionsVersion'),
       initialValue: value,
-      decoration: InputDecoration(labelText: '* $label'),
+      decoration: InputDecoration(
+        labelText: '* $label',
+        suffixIcon: masterGroupCode == null
+            ? null
+            : IconButton(
+                tooltip: _canChangeMasterData
+                    ? 'จัดการ $label'
+                    : 'ค้นหา $label',
+                onPressed: _saving
+                    ? null
+                    : () => _manageMaster(masterGroupCode, label),
+                icon: Icon(
+                  _canChangeMasterData
+                      ? Icons.edit_note_outlined
+                      : Icons.search,
+                ),
+              ),
+      ),
       style: comboStyle,
       validator: (v) => v == null ? 'กรุณาเลือก$label' : null,
       items: values
@@ -1604,20 +1903,114 @@ class _ItemFormLayoutState extends State<ItemFormLayout> {
     );
   }
 
+  Future<void> _searchDepartment() async {
+    var query = '';
+    final selected = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, update) {
+          final rows = widget.responsibleDepartments.where((item) {
+            final name = (item['name']?.toString() ?? '').toLowerCase();
+            final code = (item['code']?.toString() ?? '').toLowerCase();
+            return name.contains(query) || code.contains(query);
+          }).toList();
+          final colors = Theme.of(context).colorScheme;
+          return AlertDialog(
+            backgroundColor: Colors.white,
+            surfaceTintColor: Colors.transparent,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(LaooRadius.xs),
+            ),
+            title: Row(
+              children: [
+                Icon(Icons.search, color: colors.primary),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text(
+                    'ค้นหา แผนกที่รับผิดชอบ',
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontSize: LaooTypography.workspaceCaption,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: 480,
+              height: 360,
+              child: Column(
+                children: [
+                  TextField(
+                    autofocus: true,
+                    decoration: const InputDecoration(
+                      labelText: 'ค้นหา',
+                      prefixIcon: Icon(Icons.search),
+                      border: OutlineInputBorder(),
+                    ),
+                    onChanged: (value) => update(() {
+                      query = value.trim().toLowerCase();
+                    }),
+                  ),
+                  const SizedBox(height: LaooLayout.popupFieldSpacing),
+                  Expanded(
+                    child: rows.isEmpty
+                        ? const Center(child: Text('ไม่พบข้อมูล'))
+                        : ListView.separated(
+                            itemCount: rows.length,
+                            separatorBuilder: (_, _) =>
+                                const Divider(height: 1),
+                            itemBuilder: (_, index) => ListTile(
+                              title: Text(
+                                rows[index]['name']?.toString() ?? '-',
+                              ),
+                              onTap: () => Navigator.pop(
+                                dialogContext,
+                                rows[index]['code'].toString(),
+                              ),
+                            ),
+                          ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              OutlinedButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('ยกเลิก'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    if (!mounted || selected == null) return;
+    setState(() => _responsibleDepartment = selected);
+  }
+
   Widget _dropOptional(
     String label,
     String? value,
     List<Map<String, dynamic>> values,
     ValueChanged<String?> onChanged,
   ) {
-    final comboStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
-      fontSize: LaooTypography.tableBody,
+    final comboStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(
+      fontSize: LaooTypography.comboBox,
       height: 1.35,
     );
     return DropdownButtonFormField<String>(
+      key: ValueKey((label, value)),
       isExpanded: true,
       initialValue: value,
-      decoration: InputDecoration(labelText: label),
+      decoration: InputDecoration(
+        labelText: label,
+        suffixIcon: IconButton(
+          tooltip: 'ค้นหา แผนกที่รับผิดชอบ',
+          onPressed: _saving ? null : _searchDepartment,
+          icon: const Icon(Icons.search),
+        ),
+      ),
       style: comboStyle,
       items: [
         DropdownMenuItem<String>(

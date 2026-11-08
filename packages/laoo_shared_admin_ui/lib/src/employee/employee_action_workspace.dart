@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:laoo_shared_admin/laoo_shared_admin.dart';
 
 import '../shared/shared_admin_ui_tokens.dart';
+import '../organization/organization_structure_workspace.dart';
 import 'employee_workspace_dependencies.dart';
 
 typedef EmployeeImagePicker = Future<EmployeeImageInput?> Function();
@@ -17,6 +18,10 @@ class EmployeeActionWorkspace extends StatefulWidget {
     super.key,
     required this.caption,
     required this.repository,
+    this.organizationRepository,
+    this.organizationCaption = 'โครงสร้างองค์กร',
+    this.onOrganizationChanged,
+    this.organizationMessageBuilder,
     required this.employee,
     required this.companyId,
     required this.customerScope,
@@ -24,8 +29,14 @@ class EmployeeActionWorkspace extends StatefulWidget {
     required this.organizationUnits,
     required this.organizationMode,
     required this.roleGroups,
+    this.manageRoleGroups,
     required this.carTypes,
     required this.oilTypes,
+    this.positions = const [],
+    this.managePositions,
+    this.manageCarTypes,
+    this.manageOilTypes,
+    this.canChangeMasterData = true,
     required this.canSave,
     this.serviceEntitled = false,
     required this.titleBuilder,
@@ -40,6 +51,10 @@ class EmployeeActionWorkspace extends StatefulWidget {
 
   final String caption;
   final EmployeeRepository repository;
+  final OrganizationRepository? organizationRepository;
+  final String organizationCaption;
+  final ValueChanged<List<OrganizationUnitRecord>>? onOrganizationChanged;
+  final SharedAdminMessageBuilder? organizationMessageBuilder;
   final EmployeeRecord? employee;
   final int? companyId;
   final bool customerScope;
@@ -47,8 +62,14 @@ class EmployeeActionWorkspace extends StatefulWidget {
   final List<OrganizationUnitRecord> organizationUnits;
   final int organizationMode;
   final List<EmployeeRoleGroupOption> roleGroups;
+  final Future<List<EmployeeRoleGroupOption>?> Function()? manageRoleGroups;
   final List<EmployeeMasterOption> carTypes;
   final List<EmployeeMasterOption> oilTypes;
+  final List<EmployeeMasterOption> positions;
+  final Future<List<EmployeeMasterOption>?> Function()? managePositions;
+  final Future<List<EmployeeMasterOption>?> Function()? manageCarTypes;
+  final Future<List<EmployeeMasterOption>?> Function()? manageOilTypes;
+  final bool canChangeMasterData;
   final bool canSave;
   final bool serviceEntitled;
   final SharedAdminTitleBuilder titleBuilder;
@@ -75,6 +96,7 @@ class _EmployeeActionWorkspaceState extends State<EmployeeActionWorkspace> {
       'position',
       'email',
       'telephone',
+      'internalTelephone',
       'username',
       'password',
       'confirmPassword',
@@ -107,6 +129,13 @@ class _EmployeeActionWorkspaceState extends State<EmployeeActionWorkspace> {
   bool _notifySystem = true;
   bool _saving = false;
   bool _mediaBusy = false;
+  int _selectedTab = 0;
+  late List<OrganizationUnitRecord> _organizationUnits;
+  late List<EmployeeRoleGroupOption> _roleGroupOptions;
+  late List<EmployeeMasterOption> _carTypeOptions;
+  late List<EmployeeMasterOption> _oilTypeOptions;
+  late List<EmployeeMasterOption> _positionOptions;
+  bool _canManageOrganization = false;
   Uint8List? _formalImage;
   Uint8List? _carImage1;
   Uint8List? _carImage2;
@@ -120,7 +149,7 @@ class _EmployeeActionWorkspaceState extends State<EmployeeActionWorkspace> {
   bool get loginRequired => false;
   TextEditingController field(String key) => _fields[key]!;
 
-  List<OrganizationUnitRecord> get _scopedUnits => widget.organizationUnits
+  List<OrganizationUnitRecord> get _scopedUnits => _organizationUnits
       .where(
         (unit) =>
             unit.isActive &&
@@ -147,8 +176,228 @@ class _EmployeeActionWorkspaceState extends State<EmployeeActionWorkspace> {
   @override
   void initState() {
     super.initState();
+    _organizationUnits = widget.organizationUnits;
+    _roleGroupOptions = widget.roleGroups;
+    _carTypeOptions = widget.carTypes;
+    _oilTypeOptions = widget.oilTypes;
+    _positionOptions = widget.positions;
+    _loadOrganizationPermissions();
     _seedEmployee();
     if (editing) _loadRelatedData();
+  }
+
+  Future<void> _managePositions() async {
+    final manage = widget.managePositions;
+    if (manage == null) return;
+    try {
+      final options = await manage();
+      if (mounted && options != null) {
+        setState(() {
+          _positionOptions = options;
+          final selected = options.where((item) => item.selected);
+          if (selected.isNotEmpty) field('position').text = selected.first.code;
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        widget.onMessage(
+          'จัดการตำแหน่งไม่สำเร็จ กรุณาลองใหม่อีกครั้ง: ${widget.errorText(error)}',
+          true,
+        );
+      }
+    }
+  }
+
+  Widget _positionField() {
+    final current = field('position').text.trim();
+    final options = <EmployeeMasterOption>[..._positionOptions];
+    if (current.isNotEmpty && !options.any((item) => item.code == current)) {
+      options.add(
+        EmployeeMasterOption(code: current, name: 'ข้อมูลเดิม: $current'),
+      );
+    }
+    return _masterField(
+      'ตำแหน่ง',
+      current.isEmpty ? null : current,
+      options,
+      (value) => setState(() => field('position').text = value ?? ''),
+      manage: widget.managePositions == null ? null : _managePositions,
+    );
+  }
+
+  Future<void> _manageVehicleMaster({
+    required bool carType,
+    required int number,
+  }) async {
+    final manage = carType ? widget.manageCarTypes : widget.manageOilTypes;
+    if (manage == null) return;
+    try {
+      final options = await manage();
+      if (!mounted || options == null) return;
+      setState(() {
+        final selected = options.where((item) => item.selected);
+        if (carType) {
+          _carTypeOptions = options;
+          if (!options.any((item) => item.code == _carType1)) _carType1 = null;
+          if (!options.any((item) => item.code == _carType2)) _carType2 = null;
+          if (selected.isNotEmpty) {
+            if (number == 1) {
+              _carType1 = selected.first.code;
+            } else {
+              _carType2 = selected.first.code;
+            }
+          }
+        } else {
+          _oilTypeOptions = options;
+          if (!options.any((item) => item.code == _carOil1)) _carOil1 = null;
+          if (!options.any((item) => item.code == _carOil2)) _carOil2 = null;
+          if (selected.isNotEmpty) {
+            if (number == 1) {
+              _carOil1 = selected.first.code;
+            } else {
+              _carOil2 = selected.first.code;
+            }
+          }
+        }
+      });
+    } catch (error) {
+      if (mounted) {
+        widget.onMessage(
+          'จัดการข้อมูลไม่สำเร็จ กรุณาลองใหม่อีกครั้ง: ${widget.errorText(error)}',
+          true,
+        );
+      }
+    }
+  }
+
+  Future<void> _manageRoleGroups() async {
+    final manage = widget.manageRoleGroups;
+    if (manage == null) return;
+    try {
+      final roles = await manage();
+      if (!mounted || roles == null) return;
+      setState(() {
+        _roleGroupOptions = roles;
+        final selected = roles.where((role) => role.selected).firstOrNull;
+        if (selected != null) {
+          _roleGroupId = selected.id;
+        } else if (!roles.any((role) => role.id == _roleGroupId)) {
+          _roleGroupId = null;
+        }
+      });
+    } catch (error) {
+      if (mounted) {
+        widget.onMessage(
+          'จัดการกลุ่มสิทธิ์ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง: ${widget.errorText(error)}',
+          true,
+        );
+      }
+    }
+  }
+
+  Future<void> _loadOrganizationPermissions() async {
+    final repository = widget.organizationRepository;
+    if (repository == null || repository.contract.screenType != 1) return;
+    try {
+      final actions = await repository.actions();
+      if (!mounted) return;
+      setState(
+        () => _canManageOrganization =
+            actions['view'] == true &&
+            (actions['create'] == true ||
+                actions['edit'] == true ||
+                actions['delete'] == true),
+      );
+    } catch (_) {
+      if (mounted) setState(() => _canManageOrganization = false);
+    }
+  }
+
+  Future<void> _manageOrganization() async {
+    final repository = widget.organizationRepository;
+    final messageBuilder = widget.organizationMessageBuilder;
+    if (repository == null ||
+        repository.contract.screenType != 1 ||
+        messageBuilder == null) {
+      return;
+    }
+    try {
+      final actions = await repository.actions();
+      if (!mounted) return;
+      if (actions['view'] != true ||
+          !(actions['create'] == true ||
+              actions['edit'] == true ||
+              actions['delete'] == true)) {
+        setState(() => _canManageOrganization = false);
+        widget.onMessage(
+          'ไม่มีสิทธิ์จัดการฝ่ายหรือแผนก กรุณาติดต่อผู้ดูแลระบบ',
+          true,
+        );
+        return;
+      }
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => Dialog(
+          insetPadding: const EdgeInsets.all(24),
+          clipBehavior: Clip.antiAlias,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(widget.tokens.radius),
+          ),
+          child: SizedBox(
+            width: 900,
+            height: (MediaQuery.sizeOf(dialogContext).height - 48).clamp(
+              0.0,
+              650.0,
+            ),
+            child: Column(
+              children: [
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: IconButton(
+                    tooltip: 'ปิดหน้าจัดการฝ่ายและแผนก',
+                    onPressed: () => Navigator.of(dialogContext).pop(),
+                    icon: const Icon(Icons.close),
+                  ),
+                ),
+                Expanded(
+                  child: OrganizationStructureWorkspace(
+                    caption: widget.organizationCaption,
+                    repository: repository,
+                    errorText: widget.errorText,
+                    titleBuilder: (_, title, _) =>
+                        Text(title, style: widget.tokens.captionStyle),
+                    messageBuilder: messageBuilder,
+                    tokens: widget.tokens,
+                    screenType: repository.contract.screenType,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      final snapshot = await repository.load();
+      if (!mounted) return;
+      setState(() {
+        _organizationUnits = snapshot.units;
+        if (!_divisions.any((item) => item.orgUnitId == _divisionId)) {
+          _divisionId = null;
+        }
+        if (!_departments.any((item) => item.orgUnitId == _departmentId)) {
+          _departmentId = null;
+        }
+      });
+      widget.onOrganizationChanged?.call(snapshot.units);
+      await _loadOrganizationPermissions();
+    } catch (error) {
+      if (mounted) {
+        widget.onMessage(
+          'ไม่สามารถจัดการฝ่ายและแผนกได้ กรุณาลองใหม่อีกครั้ง: ${widget.errorText(error)}',
+          true,
+        );
+      }
+    }
   }
 
   void _seedEmployee() {
@@ -167,6 +416,7 @@ class _EmployeeActionWorkspaceState extends State<EmployeeActionWorkspace> {
     field('position').text = value?.positionCode ?? '';
     field('email').text = value?.email ?? '';
     field('telephone').text = value?.telephone ?? '';
+    field('internalTelephone').text = value?.internalTelephone ?? '';
     field('contactName1').text = value?.contName1 ?? '';
     field('contactRelation1').text = value?.contRelation1 ?? '';
     field('contactPhone1').text = value?.contPhone1 ?? '';
@@ -231,23 +481,42 @@ class _EmployeeActionWorkspaceState extends State<EmployeeActionWorkspace> {
   }
 
   @override
-  Widget build(BuildContext context) => Material(
-    color: Theme.of(context).colorScheme.surface,
-    borderRadius: BorderRadius.circular(widget.tokens.radius),
-    clipBehavior: Clip.antiAlias,
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _header(),
-        const Divider(height: 1),
-        Expanded(
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Material(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(widget.tokens.radius),
+        child: _header(),
+      ),
+      SizedBox(height: widget.tokens.cardSpacing),
+      Expanded(
+        child: Theme(
+          data: Theme.of(context).copyWith(
+            inputDecorationTheme: Theme.of(context).inputDecorationTheme
+                .copyWith(
+                  labelStyle: widget.tokens.inputLabelStyle?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                  floatingLabelStyle: WidgetStateTextStyle.resolveWith(
+                    (states) =>
+                        (widget.tokens.floatingLabelStyle ?? const TextStyle())
+                            .copyWith(
+                              color: states.contains(WidgetState.error)
+                                  ? Theme.of(context).colorScheme.error
+                                  : states.contains(WidgetState.disabled)
+                                  ? Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant
+                                  : Theme.of(context).colorScheme.primary,
+                            ),
+                  ),
+                ),
+          ),
           child: Form(
             key: _formKey,
             child: SingleChildScrollView(
               padding: EdgeInsets.only(
-                left: widget.tokens.cardPadding.left,
-                top: widget.tokens.cardPadding.top,
-                right: widget.tokens.cardPadding.right,
                 bottom: widget.tokens.cardPadding.bottom * 2,
               ),
               child: Column(
@@ -255,16 +524,14 @@ class _EmployeeActionWorkspaceState extends State<EmployeeActionWorkspace> {
                 children: [
                   _generalSection(),
                   SizedBox(height: widget.tokens.cardSpacing),
-                  _emergencySection(),
-                  SizedBox(height: widget.tokens.cardSpacing),
-                  _vehicleSection(),
+                  _detailsTabs(),
                 ],
               ),
             ),
           ),
         ),
-      ],
-    ),
+      ),
+    ],
   );
 
   Widget _header() => Padding(
@@ -329,27 +596,34 @@ class _EmployeeActionWorkspaceState extends State<EmployeeActionWorkspace> {
     icon: Icons.badge_outlined,
     child: LayoutBuilder(
       builder: (context, constraints) {
-        final form = Column(
+        Widget form(double width) => Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _status(),
             SizedBox(height: widget.tokens.cardSpacing),
-            _fieldGrid(constraints.maxWidth, [
-              if (widget.customerScope) _companyField(),
+            if (widget.customerScope) ...[
+              _generalRow(width, [_companyField()]),
+              SizedBox(height: widget.tokens.fieldSpacing),
+            ],
+            _generalRow(width, [
               if (widget.organizationMode == 2) _divisionField(),
               _departmentField(),
+              _dateField(),
+            ]),
+            SizedBox(height: widget.tokens.fieldSpacing),
+            _generalRow(width, [
               _textField('รหัสพนักงาน *', 'employeeCode', required: true),
               _textField('ชื่อ-นามสกุล *', 'fullName', required: true),
               _textField('ชื่อเล่น', 'nickName'),
-              _textField('ตำแหน่ง', 'position'),
-              _emailField(),
-              _textField('โทรศัพท์', 'telephone'),
-              _dateField(),
             ]),
-            SizedBox(height: widget.tokens.cardSpacing),
-            _notificationField(),
-            SizedBox(height: widget.tokens.cardSpacing),
-            _userSection(constraints.maxWidth),
+            SizedBox(height: widget.tokens.fieldSpacing),
+            _generalRow(width, [_positionField(), _emailField()]),
+            SizedBox(height: widget.tokens.fieldSpacing),
+            _generalRow(width, [
+              _textField('โทรศัพท์', 'telephone'),
+              _textField('เบอร์ภายใน', 'internalTelephone'),
+              _notificationField(),
+            ]),
           ],
         );
         if (constraints.maxWidth < widget.tokens.compactBreakpoint) {
@@ -358,19 +632,84 @@ class _EmployeeActionWorkspaceState extends State<EmployeeActionWorkspace> {
             children: [
               _formalImageCard(),
               SizedBox(height: widget.tokens.cardSpacing),
-              form,
+              form(constraints.maxWidth),
             ],
           );
         }
         return Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(child: form),
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, inner) => form(inner.maxWidth),
+              ),
+            ),
             SizedBox(width: widget.tokens.cardSpacing),
             SizedBox(width: 160, child: _formalImageCard()),
           ],
         );
       },
+    ),
+  );
+
+  Widget _detailsTabs() => Material(
+    color: Theme.of(context).colorScheme.surface,
+    borderRadius: BorderRadius.circular(widget.tokens.radius),
+    clipBehavior: Clip.antiAlias,
+    child: Padding(
+      padding: widget.tokens.cardPadding,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (final (index, label) in [
+                  'User Login',
+                  'กรณีฉุกเฉิน',
+                  'ยานพาหนะ',
+                ].indexed)
+                  Padding(
+                    padding: EdgeInsets.only(right: widget.tokens.itemSpacing),
+                    child: TextButton(
+                      onPressed: () => setState(() => _selectedTab = index),
+                      style: TextButton.styleFrom(
+                        foregroundColor: _selectedTab == index
+                            ? Theme.of(context).colorScheme.primary
+                            : Theme.of(context).colorScheme.onSurfaceVariant,
+                        backgroundColor: _selectedTab == index
+                            ? Theme.of(
+                                context,
+                              ).colorScheme.primary.withValues(alpha: .10)
+                            : Colors.transparent,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(
+                            widget.tokens.radius,
+                          ),
+                        ),
+                      ),
+                      child: Text(label),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          SizedBox(height: widget.tokens.cardSpacing),
+          LayoutBuilder(
+            builder: (context, constraints) => IndexedStack(
+              index: _selectedTab,
+              sizing: StackFit.passthrough,
+              children: [
+                _userSection(constraints.maxWidth),
+                _emergencySection(),
+                _vehicleSection(),
+              ],
+            ),
+          ),
+        ],
+      ),
     ),
   );
 
@@ -381,6 +720,7 @@ class _EmployeeActionWorkspaceState extends State<EmployeeActionWorkspace> {
       SizedBox(width: widget.tokens.itemSpacing),
       Switch(
         value: _active,
+        activeTrackColor: Theme.of(context).colorScheme.primary,
         onChanged: (value) => setState(() => _active = value),
       ),
       Text(_active ? 'เปิดใช้งาน' : 'ปิดใช้งาน'),
@@ -444,7 +784,12 @@ class _EmployeeActionWorkspaceState extends State<EmployeeActionWorkspace> {
     key: ValueKey((label, value, _companyId, _divisionId)),
     initialValue: value,
     isExpanded: true,
-    decoration: InputDecoration(labelText: label),
+    decoration: InputDecoration(
+      labelText: label,
+      suffixIcon: _canManageOrganization
+          ? _manageComboButton('จัดการฝ่ายและแผนก', _manageOrganization)
+          : null,
+    ),
     validator: (selected) =>
         selected == null ? 'กรุณาเลือก${label.replaceAll(' *', '')}' : null,
     items: values
@@ -461,6 +806,17 @@ class _EmployeeActionWorkspaceState extends State<EmployeeActionWorkspace> {
     onChanged: onChanged,
   );
 
+  Widget _manageComboButton(
+    String tooltip,
+    VoidCallback onPressed, {
+    bool searchOnly = false,
+  }) => IconButton(
+    tooltip: tooltip,
+    onPressed: onPressed,
+    color: Theme.of(context).colorScheme.primary,
+    icon: Icon(searchOnly ? Icons.search : Icons.edit_note_outlined),
+  );
+
   Widget _textField(
     String label,
     String key, {
@@ -469,10 +825,15 @@ class _EmployeeActionWorkspaceState extends State<EmployeeActionWorkspace> {
   }) => TextFormField(
     controller: field(key),
     readOnly: readOnly,
+    keyboardType: key == 'internalTelephone' ? TextInputType.phone : null,
     onTap: key == 'password' && field(key).text == '****'
         ? field(key).clear
         : null,
-    validator: required
+    validator: key == 'internalTelephone'
+        ? (value) => (value?.trim().length ?? 0) > 50
+              ? 'เบอร์ภายในต้องไม่เกิน 50 ตัวอักษร'
+              : null
+        : required
         ? (value) => value == null || value.trim().isEmpty
               ? 'กรุณากรอก${label.replaceAll(' *', '')}'
               : null
@@ -584,13 +945,17 @@ class _EmployeeActionWorkspaceState extends State<EmployeeActionWorkspace> {
     children: [
       _sectionTitle(Icons.manage_accounts_outlined, 'User Login'),
       SizedBox(height: widget.tokens.cardSpacing),
-      _fieldGrid(width, [
+      _generalRow(width, [
+        _roleGroupField(),
         _textField(
           loginRequired ? 'Username *' : 'Username',
           'username',
           required: loginRequired,
           readOnly: editing && loginRequired,
         ),
+      ]),
+      SizedBox(height: widget.tokens.fieldSpacing),
+      _generalRow(width, [
         TextFormField(
           controller: field('password'),
           obscureText: true,
@@ -625,28 +990,34 @@ class _EmployeeActionWorkspaceState extends State<EmployeeActionWorkspace> {
             labelText: editing ? 'ยืนยัน Password ใหม่' : 'ยืนยัน Password',
           ),
         ),
-        DropdownButtonFormField<int>(
-          key: ValueKey(('role', _roleGroupId)),
-          initialValue: _roleGroupId,
-          isExpanded: true,
-          validator: (value) =>
-              (loginRequired || field('username').text.trim().isNotEmpty) &&
-                  value == null
-              ? 'กรุณาเลือกกลุ่มสิทธิ์'
-              : null,
-          decoration: const InputDecoration(labelText: 'กลุ่มสิทธิ์'),
-          items: widget.roleGroups
-              .map(
-                (item) => DropdownMenuItem(
-                  value: item.id,
-                  child: Text(item.name, overflow: TextOverflow.ellipsis),
-                ),
-              )
-              .toList(growable: false),
-          onChanged: (value) => setState(() => _roleGroupId = value),
-        ),
       ]),
     ],
+  );
+
+  Widget _roleGroupField() => DropdownButtonFormField<int>(
+    key: ValueKey(('role', _roleGroupId)),
+    initialValue: _roleGroupId,
+    isExpanded: true,
+    validator: (value) =>
+        (loginRequired || field('username').text.trim().isNotEmpty) &&
+            value == null
+        ? 'กรุณาเลือกกลุ่มสิทธิ์'
+        : null,
+    decoration: InputDecoration(
+      labelText: 'กลุ่มสิทธิ์',
+      suffixIcon: widget.manageRoleGroups != null
+          ? _manageComboButton('จัดการกลุ่มสิทธิ์', _manageRoleGroups)
+          : null,
+    ),
+    items: _roleGroupOptions
+        .map(
+          (item) => DropdownMenuItem(
+            value: item.id,
+            child: Text(item.name, overflow: TextOverflow.ellipsis),
+          ),
+        )
+        .toList(growable: false),
+    onChanged: (value) => setState(() => _roleGroupId = value),
   );
 
   Widget _emergencySection() => _section(
@@ -660,7 +1031,7 @@ class _EmployeeActionWorkspaceState extends State<EmployeeActionWorkspace> {
             _textField('ความสัมพันธ์', 'contactRelation1'),
             _textField('โทรศัพท์', 'contactPhone1'),
           ]),
-          SizedBox(height: widget.tokens.cardSpacing),
+          SizedBox(height: widget.tokens.fieldSpacing),
           _fieldGrid(constraints.maxWidth, [
             _textField('ผู้ติดต่อคนที่ 2', 'contactName2'),
             _textField('ความสัมพันธ์', 'contactRelation2'),
@@ -685,7 +1056,14 @@ class _EmployeeActionWorkspaceState extends State<EmployeeActionWorkspace> {
             _carType1,
             _carOil1,
           ),
-          SizedBox(height: widget.tokens.cardSpacing),
+          Padding(
+            padding: EdgeInsets.symmetric(vertical: widget.tokens.fieldSpacing),
+            child: Divider(
+              height: 1,
+              thickness: 1,
+              color: Theme.of(context).dividerColor,
+            ),
+          ),
           _vehicleRow(
             constraints.maxWidth,
             2,
@@ -719,7 +1097,7 @@ class _EmployeeActionWorkspaceState extends State<EmployeeActionWorkspace> {
             _masterField(
               'ประเภทรถ',
               carType,
-              widget.carTypes,
+              _carTypeOptions,
               (value) => setState(() {
                 if (number == 1) {
                   _carType1 = value;
@@ -727,11 +1105,14 @@ class _EmployeeActionWorkspaceState extends State<EmployeeActionWorkspace> {
                   _carType2 = value;
                 }
               }),
+              manage: widget.manageCarTypes == null
+                  ? null
+                  : () => _manageVehicleMaster(carType: true, number: number),
             ),
             _masterField(
               'เชื้อเพลิง',
               oilType,
-              widget.oilTypes,
+              _oilTypeOptions,
               (value) => setState(() {
                 if (number == 1) {
                   _carOil1 = value;
@@ -739,6 +1120,9 @@ class _EmployeeActionWorkspaceState extends State<EmployeeActionWorkspace> {
                   _carOil2 = value;
                 }
               }),
+              manage: widget.manageOilTypes == null
+                  ? null
+                  : () => _manageVehicleMaster(carType: false, number: number),
             ),
           ]);
           if (width < widget.tokens.compactBreakpoint) {
@@ -770,12 +1154,22 @@ class _EmployeeActionWorkspaceState extends State<EmployeeActionWorkspace> {
     String label,
     String? value,
     List<EmployeeMasterOption> values,
-    ValueChanged<String?> changed,
-  ) => DropdownButtonFormField<String>(
+    ValueChanged<String?> changed, {
+    VoidCallback? manage,
+  }) => DropdownButtonFormField<String>(
     key: ValueKey((label, value)),
     initialValue: value,
     isExpanded: true,
-    decoration: InputDecoration(labelText: label),
+    decoration: InputDecoration(
+      labelText: label,
+      suffixIcon: manage == null
+          ? null
+          : _manageComboButton(
+              widget.canChangeMasterData ? 'จัดการ$label' : 'ค้นหา$label',
+              manage,
+              searchOnly: !widget.canChangeMasterData,
+            ),
+    ),
     items: values
         .map(
           (item) => DropdownMenuItem(
@@ -939,13 +1333,34 @@ class _EmployeeActionWorkspaceState extends State<EmployeeActionWorkspace> {
       Expanded(
         child: Text(
           title,
-          style: Theme.of(
-            context,
-          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+          style:
+              (widget.tokens.sectionTitleStyle ??
+                      Theme.of(context).textTheme.titleMedium)
+                  ?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontWeight: FontWeight.w700,
+                  ),
         ),
       ),
     ],
   );
+
+  Widget _generalRow(double width, List<Widget> fields) {
+    final columns = width >= 900
+        ? fields.length
+        : width >= 600
+        ? 2
+        : 1;
+    final fieldWidth =
+        (width - widget.tokens.fieldSpacing * (columns - 1)) / columns;
+    return Wrap(
+      spacing: widget.tokens.fieldSpacing,
+      runSpacing: widget.tokens.fieldSpacing,
+      children: [
+        for (final item in fields) SizedBox(width: fieldWidth, child: item),
+      ],
+    );
+  }
 
   Widget _fieldGrid(double width, List<Widget> fields) {
     final columns = width >= 960
@@ -954,10 +1369,10 @@ class _EmployeeActionWorkspaceState extends State<EmployeeActionWorkspace> {
         ? 2
         : 1;
     final fieldWidth =
-        (width - (widget.tokens.cardSpacing * (columns - 1))) / columns;
+        (width - (widget.tokens.fieldSpacing * (columns - 1))) / columns;
     return Wrap(
-      spacing: widget.tokens.cardSpacing,
-      runSpacing: widget.tokens.cardSpacing,
+      spacing: widget.tokens.fieldSpacing,
+      runSpacing: widget.tokens.fieldSpacing,
       children: fields
           .map((item) => SizedBox(width: fieldWidth, child: item))
           .toList(growable: false),
@@ -965,7 +1380,10 @@ class _EmployeeActionWorkspaceState extends State<EmployeeActionWorkspace> {
   }
 
   Future<void> _save() async {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
+    if (!(_formKey.currentState?.validate() ?? false)) {
+      setState(() => _selectedTab = 0);
+      return;
+    }
     setState(() => _saving = true);
     try {
       final input = _buildInput();
@@ -1002,6 +1420,7 @@ class _EmployeeActionWorkspaceState extends State<EmployeeActionWorkspace> {
     notifyByEmail: _notifyEmail,
     notifyInSystem: _notifySystem,
     telephone: field('telephone').text,
+    internalTelephone: field('internalTelephone').text,
     contact1: EmployeeEmergencyContactInput(
       name: field('contactName1').text,
       relation: field('contactRelation1').text,

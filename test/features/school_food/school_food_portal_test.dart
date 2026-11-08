@@ -21,12 +21,13 @@ Future<dynamic> history(
   Map<String, dynamic>? body,
   String? token,
 }) async {
-  if (path.endsWith('/children'))
+  if (path.endsWith('/children')) {
     return {
       'children': [
         {'id': 1, 'name': 'นักเรียนทดสอบชื่อภาษาไทยยาวสำหรับผู้ปกครอง'},
       ],
     };
+  }
   return {
     'balance': 445,
     'total': 1,
@@ -96,8 +97,9 @@ void main() {
     final calls = <String>[];
     configure((path, {body, token}) async {
       calls.add(path);
-      if (path.endsWith('/login'))
+      if (path.endsWith('/login')) {
         return {'accessToken': 'fixture', 'mustChangePassword': true};
+      }
       if (path.endsWith('/change-password')) return {'reauthenticate': true};
       throw StateError('Should not load purchases before password change');
     });

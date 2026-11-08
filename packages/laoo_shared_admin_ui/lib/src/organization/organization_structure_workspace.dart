@@ -13,6 +13,9 @@ class OrganizationStructureWorkspace extends StatefulWidget {
     required this.messageBuilder,
     required this.tokens,
     required this.screenType,
+    this.inputTextStyle,
+    this.inputLabelStyle,
+    this.floatingLabelStyle,
   });
 
   final String caption;
@@ -22,6 +25,9 @@ class OrganizationStructureWorkspace extends StatefulWidget {
   final SharedAdminMessageBuilder messageBuilder;
   final SharedAdminUiTokens tokens;
   final int screenType;
+  final TextStyle? inputTextStyle;
+  final TextStyle? inputLabelStyle;
+  final TextStyle? floatingLabelStyle;
 
   @override
   State<OrganizationStructureWorkspace> createState() =>
@@ -48,6 +54,8 @@ class _OrganizationStructureWorkspaceState
   bool _canDelete = false;
   String? _message;
   bool _messageError = false;
+  StateSetter? _dialogSetState;
+  BuildContext? _dialogContext;
 
   @override
   void initState() {
@@ -133,6 +141,7 @@ class _OrganizationStructureWorkspaceState
       _message = value;
       _messageError = error;
     });
+    _dialogSetState?.call(() {});
   }
 
   @override
@@ -143,10 +152,7 @@ class _OrganizationStructureWorkspaceState
       child: Stack(
         fit: StackFit.expand,
         children: [
-          Padding(
-            padding: tokens.contentMargin,
-            child: _formType == null ? _buildList() : _buildForm(),
-          ),
+          Padding(padding: tokens.contentMargin, child: _buildList()),
           if (_message != null)
             Positioned(
               top: tokens.contentMargin.top,
@@ -391,159 +397,225 @@ class _OrganizationStructureWorkspaceState
 
   Widget _buildForm() {
     final tokens = widget.tokens;
+    final scheme = Theme.of(context).colorScheme;
     final action = _editing == null ? 'เพิ่ม' : 'แก้ไข';
     final unitName = _formType == OrganizationUnitTypes.division
         ? 'ฝ่าย'
         : 'แผนก';
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _surface(
-          borderRadius: BorderRadius.vertical(
-            top: Radius.circular(tokens.radius),
-          ),
-          child: Padding(
-            padding: tokens.cardPadding,
-            child: Column(
-              children: [
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final title = widget.titleBuilder(
-                      context,
-                      '${widget.caption} > $action$unitName',
-                      false,
-                    );
-                    final buttons = _formButtons();
-                    if (constraints.maxWidth < tokens.compactBreakpoint) {
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          title,
-                          SizedBox(height: tokens.cardSpacing),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: buttons,
-                          ),
-                        ],
-                      );
-                    }
-                    return Row(
-                      children: [
-                        Expanded(child: title),
-                        buttons,
-                      ],
-                    );
-                  },
-                ),
-                Divider(color: Theme.of(context).dividerColor),
-              ],
-            ),
-          ),
-        ),
-        Expanded(
-          child: _surface(
-            borderRadius: BorderRadius.vertical(
-              bottom: Radius.circular(tokens.radius),
-            ),
-            child: SingleChildScrollView(
-              padding: tokens.cardPadding,
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+    return Dialog(
+      insetPadding: const EdgeInsets.all(24),
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(tokens.radius),
+      ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 10, 10, 0),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 48),
+                child: Row(
                   children: [
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text('สถานะ'),
-                        SizedBox(width: tokens.cardSpacing),
-                        Switch(
-                          value: _active,
-                          onChanged: _saving
-                              ? null
-                              : (value) => setState(() => _active = value),
-                        ),
-                        Text(_active ? 'ใช้งาน' : 'ไม่ใช้งาน'),
-                      ],
-                    ),
-                    SizedBox(height: tokens.cardSpacing + 2),
-                    if (_formType == OrganizationUnitTypes.department &&
-                        _mode == 2) ...[
-                      DropdownButtonFormField<int>(
-                        key: ValueKey(_selectedDivisionId),
-                        isExpanded: true,
-                        initialValue: _selectedDivisionId,
-                        decoration: const InputDecoration(labelText: 'ฝ่าย *'),
-                        items: _units
-                            .where(
-                              (unit) =>
-                                  unit.unitType ==
-                                  OrganizationUnitTypes.division,
-                            )
-                            .map(
-                              (unit) => DropdownMenuItem<int>(
-                                value: unit.orgUnitId,
-                                child: Text(
-                                  '${unit.unitCode} - ${unit.nameTh}',
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            )
-                            .toList(growable: false),
-                        onChanged: _saving
-                            ? null
-                            : (value) =>
-                                  setState(() => _selectedDivisionId = value),
-                        validator: (value) =>
-                            value == null ? 'กรุณาเลือกฝ่าย' : null,
-                      ),
-                      SizedBox(height: tokens.cardSpacing + 2),
-                    ],
-                    TextFormField(
-                      controller: _code,
-                      enabled: !_saving,
-                      decoration: InputDecoration(labelText: 'รหัส$unitName *'),
-                      validator: _required,
-                    ),
-                    SizedBox(height: tokens.cardSpacing + 2),
-                    TextFormField(
-                      controller: _name,
-                      enabled: !_saving,
-                      decoration: InputDecoration(labelText: 'ชื่อ$unitName *'),
-                      validator: _required,
-                    ),
-                    SizedBox(height: tokens.cardSpacing + 2),
-                    TextFormField(
-                      controller: _nameEn,
-                      enabled: !_saving,
-                      decoration: InputDecoration(
-                        labelText: 'ชื่อ$unitName (ภาษาอังกฤษ)',
+                    Icon(Icons.edit_outlined, color: scheme.primary, size: 24),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        '${widget.caption} > $action$unitName',
+                        style: widget.tokens.captionStyle,
                       ),
                     ),
                   ],
                 ),
               ),
             ),
-          ),
+            const SizedBox(height: 10),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 10),
+              child: Divider(height: 1),
+            ),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(10, 12, 10, 12),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'สถานะ',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                          SizedBox(width: tokens.cardSpacing),
+                          Switch(
+                            value: _active,
+                            activeTrackColor: scheme.primary,
+                            onChanged: _saving
+                                ? null
+                                : (value) => _dialogSetState?.call(
+                                    () => _active = value,
+                                  ),
+                          ),
+                          Text(
+                            _active ? 'ใช้งาน' : 'ไม่ใช้งาน',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      if (_formType == OrganizationUnitTypes.department &&
+                          _mode == 2) ...[
+                        DropdownButtonFormField<int>(
+                          key: ValueKey(_selectedDivisionId),
+                          isExpanded: true,
+                          initialValue: _selectedDivisionId,
+                          style: Theme.of(context).textTheme.titleMedium,
+                          decoration: _formDecoration('ฝ่าย *'),
+                          items: _units
+                              .where(
+                                (unit) =>
+                                    unit.unitType ==
+                                    OrganizationUnitTypes.division,
+                              )
+                              .map(
+                                (unit) => DropdownMenuItem<int>(
+                                  value: unit.orgUnitId,
+                                  child: Text(
+                                    '${unit.unitCode} - ${unit.nameTh}',
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              )
+                              .toList(growable: false),
+                          onChanged: _saving
+                              ? null
+                              : (value) => _dialogSetState?.call(
+                                  () => _selectedDivisionId = value,
+                                ),
+                          validator: (value) =>
+                              value == null ? 'กรุณาเลือกฝ่าย' : null,
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                      TextFormField(
+                        controller: _code,
+                        style: widget.inputTextStyle,
+                        enabled: !_saving,
+                        decoration: _formDecoration('รหัส$unitName *'),
+                        validator: _required,
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _name,
+                        style: widget.inputTextStyle,
+                        enabled: !_saving,
+                        decoration: _formDecoration('ชื่อ$unitName *'),
+                        validator: _required,
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _nameEn,
+                        style: widget.inputTextStyle,
+                        enabled: !_saving,
+                        decoration: _formDecoration(
+                          'ชื่อ$unitName (ภาษาอังกฤษ)',
+                        ),
+                      ),
+                      if (_message != null) ...[
+                        const SizedBox(height: 12),
+                        Text(
+                          _message!,
+                          style: TextStyle(
+                            color: _messageError
+                                ? scheme.error
+                                : scheme.primary,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 10),
+              child: Divider(height: 1),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 12, 10, 10),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: _formButtons(),
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 
   String? _required(String? value) =>
       value == null || value.trim().isEmpty ? 'กรุณาระบุข้อมูล' : null;
 
+  InputDecoration _formDecoration(String label) {
+    final scheme = Theme.of(context).colorScheme;
+    OutlineInputBorder border(Color color, [double width = 1]) =>
+        OutlineInputBorder(
+          borderRadius: BorderRadius.circular(widget.tokens.radius),
+          borderSide: BorderSide(color: color, width: width),
+        );
+    return InputDecoration(
+      labelText: label,
+      labelStyle: widget.inputLabelStyle,
+      floatingLabelStyle: WidgetStateTextStyle.resolveWith(
+        (states) => (widget.floatingLabelStyle ?? const TextStyle()).copyWith(
+          color: states.contains(WidgetState.error)
+              ? scheme.error
+              : states.contains(WidgetState.focused)
+              ? scheme.primary
+              : scheme.onSurfaceVariant,
+        ),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      border: border(scheme.outlineVariant),
+      enabledBorder: border(scheme.outlineVariant),
+      disabledBorder: border(scheme.outlineVariant),
+      focusedBorder: border(scheme.primary, 1.5),
+      errorBorder: border(scheme.error),
+      focusedErrorBorder: border(scheme.error, 1.5),
+    );
+  }
+
   Widget _formButtons() => Wrap(
-    spacing: widget.tokens.cardSpacing,
+    spacing: 8,
     children: [
       OutlinedButton.icon(
         onPressed: _saving ? null : _closeForm,
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size(84, 48),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(widget.tokens.radius),
+          ),
+        ),
         icon: const Icon(Icons.close),
         label: const Text('ยกเลิก'),
       ),
       if ((_editing == null && _canCreate) || (_editing != null && _canEdit))
         FilledButton.icon(
           onPressed: _saving ? null : _save,
+          style: FilledButton.styleFrom(
+            minimumSize: const Size(100, 48),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(widget.tokens.radius),
+            ),
+          ),
           icon: _saving
               ? const SizedBox.square(
                   dimension: 18,
@@ -568,17 +640,47 @@ class _OrganizationStructureWorkspaceState
       }
       _message = null;
     });
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Theme.of(context).colorScheme.scrim.withValues(alpha: .54),
+      builder: (dialogContext) {
+        _dialogContext = dialogContext;
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            _dialogSetState = setDialogState;
+            return _buildForm();
+          },
+        );
+      },
+    ).whenComplete(() {
+      _dialogSetState = null;
+      _dialogContext = null;
+      if (mounted && _formType != null) {
+        setState(() {
+          _formType = null;
+          _editing = null;
+        });
+      }
+    });
   }
 
-  void _closeForm() => setState(() {
-    _formType = null;
-    _editing = null;
-    _message = null;
-  });
+  void _closeForm() {
+    final dialogContext = _dialogContext;
+    _dialogContext = null;
+    _dialogSetState = null;
+    if (dialogContext != null) Navigator.of(dialogContext).pop();
+    setState(() {
+      _formType = null;
+      _editing = null;
+      _message = null;
+    });
+  }
 
   Future<void> _save() async {
     if (_saving || !_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
+    _dialogSetState?.call(() {});
     try {
       final request = OrganizationUnitUpsertRequest(
         unitType: _formType!,
@@ -607,7 +709,10 @@ class _OrganizationStructureWorkspaceState
     } catch (error) {
       _showMessage(widget.errorText(error), error: true);
     } finally {
-      if (mounted) setState(() => _saving = false);
+      if (mounted) {
+        setState(() => _saving = false);
+        _dialogSetState?.call(() {});
+      }
     }
   }
 
@@ -616,6 +721,12 @@ class _OrganizationStructureWorkspaceState
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(widget.tokens.radius),
+          side: BorderSide(color: scheme.error),
+        ),
         title: Row(
           children: [
             Icon(Icons.delete_outline, color: scheme.error),
@@ -623,7 +734,7 @@ class _OrganizationStructureWorkspaceState
             Expanded(
               child: Text(
                 'ยืนยันการลบข้อมูล',
-                style: widget.tokens.captionStyle,
+                style: widget.tokens.captionStyle.copyWith(color: scheme.error),
               ),
             ),
           ],
@@ -642,7 +753,7 @@ class _OrganizationStructureWorkspaceState
                 padding: widget.tokens.cardPadding,
                 child: Text(
                   '${item.unitCode} - ${item.nameTh}',
-                  style: TextStyle(color: scheme.onErrorContainer),
+                  style: TextStyle(color: scheme.error),
                 ),
               ),
             ),
@@ -654,6 +765,7 @@ class _OrganizationStructureWorkspaceState
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
+            style: TextButton.styleFrom(foregroundColor: scheme.primary),
             child: const Text('ยกเลิก'),
           ),
           FilledButton.icon(

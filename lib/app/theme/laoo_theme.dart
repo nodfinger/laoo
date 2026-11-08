@@ -47,7 +47,33 @@ abstract final class LaooTheme {
           : LaooColors.background,
     );
 
+    final buttonStyle = ButtonStyle(
+      minimumSize: const WidgetStatePropertyAll(
+        Size(0, LaooTypography.buttonHeight),
+      ),
+      maximumSize: const WidgetStatePropertyAll(
+        Size(double.infinity, LaooTypography.buttonHeight),
+      ),
+      visualDensity: VisualDensity.standard,
+      shape: WidgetStatePropertyAll(
+        RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
+        ),
+      ),
+      textStyle: const WidgetStatePropertyAll(
+        TextStyle(
+          fontFamily: LaooTypography.fontFamily,
+          fontSize: LaooTypography.button,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+
     return base.copyWith(
+      elevatedButtonTheme: ElevatedButtonThemeData(style: buttonStyle),
+      filledButtonTheme: FilledButtonThemeData(style: buttonStyle),
+      outlinedButtonTheme: OutlinedButtonThemeData(style: buttonStyle),
+      textButtonTheme: TextButtonThemeData(style: buttonStyle),
       progressIndicatorTheme: ProgressIndicatorThemeData(
         color: base.colorScheme.primary,
         linearTrackColor: base.colorScheme.primary.withValues(alpha: 0.14),

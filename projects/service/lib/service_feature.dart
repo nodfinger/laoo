@@ -1,4 +1,6 @@
 export 'features/service/service_route_contract.dart';
+export 'core/widgets/auto_dismiss_message.dart'
+    show configureServiceAlertPrimary, configureServiceAlertDuration;
 export 'features/service/service_go_routes.dart';
 export 'features/support/presentation/widgets/support_workspace_shell.dart'
     show configureServiceWorkspaceShell;

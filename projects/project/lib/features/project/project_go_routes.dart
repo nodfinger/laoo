@@ -43,6 +43,6 @@ GoRoute _r(String p, String n, String m, String t, ProjectPageMode mode) =>
     GoRoute(
       path: p,
       name: n,
-      builder: (_, __) =>
+      builder: (_, _) =>
           ProjectPage(menuCode: m, fallbackTitle: t, mode: mode),
     );

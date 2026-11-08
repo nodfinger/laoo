@@ -165,4 +165,10 @@ class PartnerCompanyRepository {
       },
     );
   }
+
+  Future<void> clearCompanySubscription(int companyId, int projectId) async {
+    await _api.delete(
+      '/api/partner/companies/$companyId/subscriptions/$projectId',
+    );
+  }
 }

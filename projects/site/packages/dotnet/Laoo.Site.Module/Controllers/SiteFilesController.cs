@@ -52,7 +52,7 @@ public sealed class SiteFilesController(IConfiguration config,IWebHostEnvironmen
     [HttpPost]
     [RequestSizeLimit(22_000_000)]
     public async Task<IActionResult> Upload([FromForm] long projectId,[FromForm] string ownerType,
-        [FromForm] long ownerId,[FromForm] IFormFile file,CancellationToken ct)
+        [FromForm] long ownerId,IFormFile file,CancellationToken ct)
     {
         if(projectId<=0||ownerId<=0||file is null||file.Length<=0)return Invalid("กรุณาเลือกไฟล์ภาพ");
         var menu=Menu(ownerType);var column=OwnerColumn(ownerType);var table=OwnerTable(ownerType);

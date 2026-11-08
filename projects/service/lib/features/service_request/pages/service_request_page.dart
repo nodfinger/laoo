@@ -3,14 +3,92 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image/image.dart' as img;
+import 'package:laoo_shared_admin_ui/laoo_shared_admin_ui.dart'
+    show FilterHeightSync, filterActionHeightStyle;
 
 import '../../../app/theme/laoo_design_tokens.dart';
+import '../../../app/theme/laoo_typography.dart';
 import '../../../core/api/api_exception.dart';
+import '../../../core/api/api_client.dart';
 import '../../../core/navigation/navigation_menu_repository.dart';
 import '../../../core/widgets/timed_snack_bar.dart';
 import '../../support/presentation/widgets/support_workspace_shell.dart';
 import '../data/service_request_api.dart';
 import '../../service_request_qr/data/service_request_qr_api.dart';
+import '../../service_request_subject/pages/service_request_subject_page.dart';
+
+Future<Map<String, dynamic>?> _searchPicker(
+  BuildContext context, {
+  required String label,
+  required Future<List<Map<String, dynamic>>> Function(String) load,
+  required String Function(Map<String, dynamic>) describe,
+}) async {
+  var future = load('');
+  return showDialog<Map<String, dynamic>>(
+    context: context,
+    builder: (dialogContext) => StatefulBuilder(
+      builder: (context, setDialogState) => AlertDialog(
+        title: Text(label),
+        content: SizedBox(
+          width: 480,
+          height: 420,
+          child: Column(
+            children: [
+              TextField(
+                autofocus: true,
+                decoration: const InputDecoration(
+                  labelText: 'ค้นหา',
+                  prefixIcon: Icon(Icons.search),
+                  border: OutlineInputBorder(),
+                ),
+                onChanged: (value) {
+                  final next = load(value);
+                  setDialogState(() {
+                    future = next;
+                  });
+                },
+              ),
+              const SizedBox(height: 12),
+              Expanded(
+                child: FutureBuilder<List<Map<String, dynamic>>>(
+                  future: future,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState != ConnectionState.done) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    if (snapshot.hasError) {
+                      return const Center(
+                        child: Text('ไม่สามารถโหลดข้อมูลได้ กรุณาลองใหม่'),
+                      );
+                    }
+                    final rows = snapshot.data ?? const [];
+                    if (rows.isEmpty) {
+                      return const Center(child: Text('ไม่พบข้อมูล'));
+                    }
+                    return ListView.separated(
+                      itemCount: rows.length,
+                      separatorBuilder: (_, _) => const Divider(height: 1),
+                      itemBuilder: (_, index) => ListTile(
+                        title: Text(describe(rows[index])),
+                        onTap: () => Navigator.pop(dialogContext, rows[index]),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('ปิด'),
+          ),
+        ],
+      ),
+    ),
+  );
+}
 
 class ServiceRequestPage extends StatefulWidget {
   const ServiceRequestPage({
@@ -22,6 +100,7 @@ class ServiceRequestPage extends StatefulWidget {
     this.routeName,
     this.fixedStatus,
     this.api,
+    this.subjectApi,
   });
   final bool selfService;
   final String? qrToken;
@@ -30,6 +109,7 @@ class ServiceRequestPage extends StatefulWidget {
   final String? routeName;
   final String? fixedStatus;
   final ServiceRequestApi? api;
+  final ApiClient? subjectApi;
   @override
   State<ServiceRequestPage> createState() => _ServiceRequestPageState();
 }
@@ -38,8 +118,15 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
   late final ServiceRequestApi _api = widget.api ?? ServiceRequestApi();
   final _search = TextEditingController();
   String _status = '';
+  String _priorityFilter = '';
+  List<Map<String, dynamic>> _priorities = const [
+    {'code': '0', 'name': 'ปกติ'},
+    {'code': '1', 'name': 'ด่วน'},
+    {'code': '2', 'name': 'ด่วนมาก'},
+  ];
   int _page = 1;
   bool _loading = true;
+  bool _cardView = false;
   bool _canCreate = false;
   bool _canEdit = false;
   bool _canDelete = false;
@@ -55,6 +142,7 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
     if (widget.selfService) _menuName = 'แจ้งซ่อม / ขอใช้บริการ';
     _load();
     _loadActions();
+    _loadPriorities();
     _loadMenuName();
   }
 
@@ -67,18 +155,36 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final value = await _api.list(
-        search: _search.text.trim(),
-        status: _status,
-        selfService: widget.selfService,
-        page: _page,
-        menuCode: _menuCode,
-      );
+      final value = _priorityFilter.isEmpty
+          ? await _api.list(
+              search: _search.text.trim(),
+              status: _status,
+              selfService: widget.selfService,
+              page: _page,
+              menuCode: _menuCode,
+            )
+          : await _api.filteredList(
+              search: _search.text.trim(),
+              status: _status,
+              selfService: widget.selfService,
+              page: _page,
+              menuCode: _menuCode,
+              priority: _priorityFilter,
+            );
       if (mounted) setState(() => _data = value);
     } catch (error) {
       if (mounted) _message(error);
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _loadPriorities() async {
+    try {
+      final values = await _api.priorities();
+      if (mounted && values.isNotEmpty) setState(() => _priorities = values);
+    } catch (_) {
+      /* Keep the standard values if the lookup is unavailable. */
     }
   }
 
@@ -126,64 +232,164 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
     showTimedSnackBar(context, message: text, error: errorState);
   }
 
-  Future<void> _create() async {
+  Future<void> _create(BuildContext context) async {
     if (!_canCreate) return;
     final lookup = await _api.lookup(selfService: widget.selfService);
-    if (!mounted) return;
+    if (!mounted || !context.mounted) return;
     final saved = await showDialog<bool>(
       context: context,
+      barrierDismissible: false,
       builder: (_) => _RequestDialog(
         api: _api,
         lookup: lookup,
         selfService: widget.selfService,
         qrToken: widget.qrToken,
+        caption: _menuName,
+        subjectApi: widget.subjectApi,
       ),
     );
     if (saved == true && mounted) {
       _page = 1;
       await _load();
-      if (!mounted) return;
+      if (!mounted || !context.mounted) return;
       showTimedSnackBar(context, message: 'บันทึกใบแจ้งซ่อมเรียบร้อยแล้ว');
     }
   }
 
-  Future<void> _edit(Map<String, dynamic> row) async {
+  Future<void> _edit(Map<String, dynamic> row, BuildContext context) async {
     if (!_canEdit || row['statusCode'] != 'NEW') return;
     final id = (row['requestId'] as num?)?.toInt();
     if (id == null) return;
     try {
       final detail = await _api.detail(id, menuCode: _menuCode);
-      if (!mounted) return;
+      if (!mounted || !context.mounted) return;
       if (detail['statusCode'] != 'NEW') {
         await _load();
         return;
       }
+      final attachments = await _api.attachments(id, menuCode: _menuCode);
+      final priorities = await _api.priorities();
+      final subjects = await _api.subjectOptions(
+        selfService: widget.selfService,
+      );
+      final equipment = await _api.equipmentOptions(
+        selfService: widget.selfService,
+      );
+      if (!mounted || !context.mounted) return;
       final saved = await showDialog<bool>(
         context: context,
+        barrierDismissible: false,
         builder: (_) => _RequestEditDialog(
           api: _api,
           requestId: id,
           data: detail,
           caption: _menuName,
           selfService: widget.selfService,
+          menuCode: _menuCode,
+          attachments: attachments,
+          priorities: priorities,
+          subjects: subjects,
+          equipment: equipment,
+          subjectApi: widget.subjectApi,
         ),
       );
       if (saved == true && mounted) {
         await _load();
-        if (mounted) showTimedSnackBar(context, message: 'บันทึกการแก้ไขแล้ว');
+        if (context.mounted) {
+          showTimedSnackBar(context, message: 'บันทึกการแก้ไขแล้ว');
+        }
       }
     } catch (error) {
       if (mounted) _message(error);
     }
   }
 
-  Future<void> _delete(Map<String, dynamic> row) async {
+  Future<void> _openImages(
+    Map<String, dynamic> row,
+    BuildContext context,
+  ) async {
+    final id = (row['requestId'] as num?)?.toInt();
+    if (id == null) return;
+    try {
+      final files = await _api.attachments(id, menuCode: _menuCode);
+      if (!mounted || !context.mounted) return;
+      final images = files
+          .where(
+            (file) => (file['contentType']?.toString() ?? '')
+                .toLowerCase()
+                .startsWith('image/'),
+          )
+          .toList();
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(LaooRadius.xs),
+          ),
+          title: const Text(
+            'รูปภาพแนบ',
+            style: TextStyle(
+              color: Colors.black,
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          content: SizedBox(
+            width: 480,
+            child: SingleChildScrollView(
+              child: images.isEmpty
+                  ? const Text('ไม่พบรูปภาพแนบ')
+                  : Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final image in images)
+                          _RemoteAttachmentTile(
+                            api: _api,
+                            requestId: id,
+                            item: image,
+                            menuCode: _menuCode,
+                            canDelete: false,
+                            onDelete: () {},
+                          ),
+                      ],
+                    ),
+            ),
+          ),
+          actions: [
+            OutlinedButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('ปิด'),
+            ),
+          ],
+        ),
+      );
+    } catch (error) {
+      if (mounted) _message(error);
+    }
+  }
+
+  Widget _imageAction(Map<String, dynamic> row, BuildContext context) =>
+      row['hasImages'] == true
+      ? IconButton(
+          tooltip: 'ดูรูปแนบ',
+          onPressed: () => _openImages(row, context),
+          icon: Icon(
+            Icons.image_outlined,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+        )
+      : const SizedBox.shrink();
+
+  Future<void> _delete(Map<String, dynamic> row, BuildContext context) async {
     if (!_canDelete || row['statusCode'] != 'NEW') return;
     final id = (row['requestId'] as num?)?.toInt();
     if (id == null) return;
     try {
       final detail = await _api.detail(id, menuCode: _menuCode);
-      if (!mounted) return;
+      if (!mounted || !context.mounted) return;
       if (detail['statusCode'] != 'NEW') {
         await _load();
         return;
@@ -214,7 +420,7 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
                         Text(
                           'ลบใบแจ้งซ่อม',
                           style: TextStyle(
-                            color: colors.error,
+                            color: Colors.black,
                             fontSize: 18,
                             fontWeight: FontWeight.w700,
                           ),
@@ -239,9 +445,10 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        TextButton(
+                        OutlinedButton.icon(
                           onPressed: () => Navigator.pop(dialogContext, false),
-                          child: const Text('ยกเลิก'),
+                          icon: const Icon(Icons.close),
+                          label: const Text('ยกเลิก'),
                         ),
                         const SizedBox(width: 8),
                         FilledButton.icon(
@@ -270,13 +477,15 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
       );
       if (_page > 1 && ((_data['items'] as List?)?.length ?? 0) == 1) _page--;
       await _load();
-      if (mounted) showTimedSnackBar(context, message: 'ลบใบแจ้งซ่อมแล้ว');
+      if (context.mounted) {
+        showTimedSnackBar(context, message: 'ลบใบแจ้งซ่อมแล้ว');
+      }
     } catch (error) {
       if (mounted) _message(error);
     }
   }
 
-  Widget _rowActions(Map<String, dynamic> row) {
+  Widget _rowActions(Map<String, dynamic> row, BuildContext context) {
     if (row['statusCode'] != 'NEW' || (!_canEdit && !_canDelete)) {
       return const SizedBox.shrink();
     }
@@ -286,7 +495,7 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
         if (_canEdit)
           IconButton(
             tooltip: 'แก้ไข',
-            onPressed: () => _edit(row),
+            onPressed: () => _edit(row, context),
             icon: Icon(
               Icons.edit_outlined,
               color: Theme.of(context).colorScheme.primary,
@@ -295,7 +504,7 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
         if (_canDelete)
           IconButton(
             tooltip: 'ลบ',
-            onPressed: () => _delete(row),
+            onPressed: () => _delete(row, context),
             icon: Icon(
               Icons.delete_outline,
               color: Theme.of(context).colorScheme.error,
@@ -305,14 +514,17 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
     );
   }
 
-  Future<void> _openDetail(Map<String, dynamic> row) async {
+  Future<void> _openDetail(
+    Map<String, dynamic> row,
+    BuildContext context,
+  ) async {
     final id = (row['requestId'] as num?)?.toInt();
     if (id == null) return;
     try {
       final detail = await _api.detail(id, menuCode: _menuCode);
-      if (!mounted) return;
+      if (!mounted || !context.mounted) return;
       final attachments = await _api.attachments(id, menuCode: _menuCode);
-      if (!mounted) return;
+      if (!mounted || !context.mounted) return;
       final changed = await showDialog<bool>(
         context: context,
         builder: (_) => _RequestDetailDialog(
@@ -343,295 +555,445 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
           widget.routeName ??
           (widget.selfService ? 'portalRequest' : 'cmTickets'),
       menuScope: WorkspaceMenuScope.company,
-      child: Container(
-        width: double.infinity,
-        color: Colors.white,
-        padding: const EdgeInsets.all(LaooLayout.cardPadding),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Wrap(
-              alignment: WrapAlignment.spaceBetween,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              runSpacing: 10,
+      child: Builder(
+        builder: (context) {
+          final colors = Theme.of(context).colorScheme;
+          return Padding(
+            padding: const EdgeInsets.all(LaooLayout.cardMargin),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.build_outlined),
-                    const SizedBox(width: 10),
-                    Flexible(
-                      child: Text(
-                        _menuName,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
+                _surface(
+                  Row(
+                    children: [
+                      Expanded(
+                        child: WorkspacePageTitle(
+                          title: _menuName,
+                          favoriteKey: _menuCode,
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                if (_canCreate)
-                  FilledButton.icon(
-                    onPressed: _create,
-                    icon: const Icon(Icons.add),
-                    label: Text(
-                      widget.selfService ? 'แจ้งซ่อม' : 'เพิ่มใบแจ้งซ่อม',
-                    ),
-                  ),
-              ],
-            ),
-            const Divider(height: 24),
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: [
-                SizedBox(
-                  width: 300,
-                  child: TextField(
-                    controller: _search,
-                    onSubmitted: (_) {
-                      _page = 1;
-                      _load();
-                    },
-                    decoration: _input(
-                      hint: 'ค้นหาเลขที่ ผู้แจ้ง หัวข้อ หรือสถานที่',
-                      icon: Icons.search,
-                    ),
-                  ),
-                ),
-                if (widget.fixedStatus == null)
-                  SizedBox(
-                    width: 180,
-                    child: DropdownButtonFormField<String>(
-                      isExpanded: true,
-                      initialValue: _status,
-                      decoration: _input(label: 'สถานะ'),
-                      items: const [
-                        DropdownMenuItem(value: '', child: Text('ทั้งหมด')),
-                        DropdownMenuItem(
-                          value: 'NEW',
-                          child: Text('สร้างใหม่'),
+                      IconButton(
+                        tooltip: _cardView ? 'แสดงแบบตาราง' : 'แสดงแบบการ์ด',
+                        onPressed: () => setState(() => _cardView = !_cardView),
+                        icon: Icon(
+                          _cardView ? Icons.view_list : Icons.grid_view,
+                          color: colors.primary,
                         ),
-                        DropdownMenuItem(
-                          value: 'RECEIVED',
-                          child: Text('รับเรื่องแล้ว'),
+                        style: IconButton.styleFrom(
+                          minimumSize: const Size(48, 48),
+                          backgroundColor: colors.primary.withValues(alpha: .1),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(LaooRadius.xs),
+                          ),
                         ),
-                        DropdownMenuItem(
-                          value: 'IN_PROGRESS',
-                          child: Text('กำลังดำเนินการ'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'COMPLETED',
-                          child: Text('เสร็จสิ้น'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'CANCELLED',
-                          child: Text('ยกเลิก'),
+                      ),
+                      if (_canCreate) ...[
+                        const SizedBox(width: 8),
+                        FilledButton.icon(
+                          onPressed: () => _create(context),
+                          icon: const Icon(Icons.add),
+                          label: Text(
+                            widget.selfService ? 'แจ้งซ่อม' : 'เพิ่มใบแจ้งซ่อม',
+                          ),
                         ),
                       ],
-                      onChanged: (value) {
-                        _status = value ?? '';
-                        _page = 1;
-                        _load();
-                      },
-                    ),
-                  )
-                else
-                  Chip(label: Text(_statusText(widget.fixedStatus!))),
-                FilledButton.icon(
-                  onPressed: () {
-                    _page = 1;
-                    _load();
-                  },
-                  icon: const Icon(Icons.search),
-                  label: const Text('ค้นหา'),
+                    ],
+                  ),
                 ),
-                OutlinedButton(
-                  onPressed: () {
-                    _search.clear();
-                    _status = widget.fixedStatus ?? '';
-                    _page = 1;
-                    _load();
-                  },
-                  child: const Text('ล้าง Filter'),
+                const SizedBox(height: 8),
+                _surface(
+                  FilterHeightSync(
+                    builder: (context, searchKey, height) => Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: 300,
+                          child: TextField(
+                            key: searchKey,
+                            controller: _search,
+                            onSubmitted: (_) {
+                              _page = 1;
+                              _load();
+                            },
+                            decoration: _input(
+                              hint: 'ค้นหาเลขที่ ผู้แจ้ง หัวข้อ หรือสถานที่',
+                              icon: Icons.search,
+                            ),
+                          ),
+                        ),
+                        FilledButton.icon(
+                          style: filterActionHeightStyle(height),
+                          onPressed: () {
+                            _page = 1;
+                            _load();
+                          },
+                          icon: const Icon(Icons.search),
+                          label: const Text('ค้นหา'),
+                        ),
+                        OutlinedButton.icon(
+                          style: filterActionHeightStyle(height),
+                          onPressed: () {
+                            _search.clear();
+                            _status = widget.fixedStatus ?? '';
+                            _priorityFilter = '';
+                            _page = 1;
+                            _load();
+                          },
+                          icon: const Icon(Icons.filter_alt_off_outlined),
+                          label: const Text('ล้าง Filter'),
+                        ),
+                        if (widget.fixedStatus == null)
+                          SizedBox(
+                            width: 180,
+                            child: DropdownButtonFormField<String>(
+                              isExpanded: true,
+                              initialValue: _status,
+                              decoration: _input(label: 'สถานะ'),
+                              items: const [
+                                DropdownMenuItem(
+                                  value: '',
+                                  child: Text('ทั้งหมด'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'NEW',
+                                  child: Text('สร้างใหม่'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'RECEIVED',
+                                  child: Text('รับเรื่องแล้ว'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'IN_PROGRESS',
+                                  child: Text('กำลังดำเนินการ'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'COMPLETED',
+                                  child: Text('เสร็จสิ้น'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'CANCELLED',
+                                  child: Text('ยกเลิก'),
+                                ),
+                              ],
+                              onChanged: (value) {
+                                _status = value ?? '';
+                                _page = 1;
+                                _load();
+                              },
+                            ),
+                          )
+                        else
+                          Chip(label: Text(_statusText(widget.fixedStatus!))),
+                        SizedBox(
+                          width: 180,
+                          child: DropdownButtonFormField<String>(
+                            key: ValueKey('priority-filter-$_priorityFilter'),
+                            initialValue: _priorityFilter,
+                            isExpanded: true,
+                            decoration: _input(label: 'ระดับงาน'),
+                            items: [
+                              const DropdownMenuItem(
+                                value: '',
+                                child: Text('ทั้งหมด'),
+                              ),
+                              for (final item in _priorities)
+                                DropdownMenuItem(
+                                  value: item['code'].toString(),
+                                  child: Text(item['name'].toString()),
+                                ),
+                            ],
+                            onChanged: (value) {
+                              setState(() => _priorityFilter = value ?? '');
+                              _page = 1;
+                              _load();
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: _surface(
+                    _loading
+                        ? const Center(child: CircularProgressIndicator())
+                        : items.isEmpty
+                        ? const Center(
+                            child: Text('ไม่พบใบแจ้งซ่อมตามเงื่อนไขที่เลือก'),
+                          )
+                        : LayoutBuilder(
+                            builder: (context, constraints) {
+                              if (_cardView || constraints.maxWidth < 850) {
+                                return _requestCards(items);
+                              }
+                              return _requestTable(items, context);
+                            },
+                          ),
+                    padding: EdgeInsets.zero,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _surface(
+                  _pagination(total, context),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: LaooLayout.cardPadding,
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            if (_loading) const LinearProgressIndicator(),
-            if (!_loading && items.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 36),
-                child: Column(
-                  children: [
-                    Icon(
-                      Icons.inbox_outlined,
-                      size: 40,
-                      color: Theme.of(context).colorScheme.outline,
-                    ),
-                    const SizedBox(height: 8),
-                    const Text('ไม่พบใบแจ้งซ่อมตามเงื่อนไขที่เลือก'),
-                  ],
-                ),
-              ),
-            if (items.isNotEmpty)
-              LayoutBuilder(
-                builder: (context, constraints) => constraints.maxWidth < 720
-                    ? Column(
-                        children: [
-                          for (final row in items)
-                            Card(
-                              child: Padding(
-                                padding: const EdgeInsets.all(
-                                  LaooLayout.cardPadding,
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            row['requestNo']?.toString() ?? '-',
-                                            style: TextStyle(
-                                              color: Theme.of(
-                                                context,
-                                              ).colorScheme.primary,
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                          ),
-                                        ),
-                                        _rowActions(row),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 6),
-                                    Text(row['subject']?.toString() ?? '-'),
-                                    Text(
-                                      row['requesterName']?.toString() ?? '-',
-                                    ),
-                                    Text(
-                                      _statusText(
-                                        row['statusCode']?.toString() ?? '',
-                                      ),
-                                    ),
-                                    Align(
-                                      alignment: Alignment.centerRight,
-                                      child: TextButton(
-                                        onPressed: () => _openDetail(row),
-                                        child: const Text('ดูรายละเอียด'),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                        ],
-                      )
-                    : SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: DataTable(
-                          columns: [
-                            const DataColumn(label: Text('Action')),
-                            DataColumn(label: Text('เลขที่')),
-                            DataColumn(label: Text('ผู้แจ้ง')),
-                            DataColumn(label: Text('สถานที่')),
-                            DataColumn(label: Text('หัวข้อ')),
-                            DataColumn(label: Text('สถานะ')),
-                            DataColumn(label: Text('วันที่')),
-                          ],
-                          rows: [
-                            for (final row in items)
-                              DataRow(
-                                cells: [
-                                  DataCell(_rowActions(row)),
-                                  DataCell(
-                                    InkWell(
-                                      onTap: () => _openDetail(row),
-                                      child: Text(
-                                        row['requestNo']?.toString() ?? '-',
-                                        style: TextStyle(
-                                          color: Theme.of(
-                                            context,
-                                          ).colorScheme.primary,
-                                          decoration: TextDecoration.underline,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  DataCell(
-                                    Text(
-                                      row['requesterName']?.toString() ?? '-',
-                                    ),
-                                  ),
-                                  DataCell(
-                                    Text(
-                                      row['locationSnapshot']?.toString() ??
-                                          '-',
-                                    ),
-                                  ),
-                                  DataCell(
-                                    Text(row['subject']?.toString() ?? '-'),
-                                  ),
-                                  DataCell(
-                                    Text(
-                                      _statusText(
-                                        row['statusCode']?.toString() ?? '',
-                                      ),
-                                    ),
-                                  ),
-                                  DataCell(
-                                    Text(row['requestDate']?.toString() ?? '-'),
-                                  ),
-                                ],
-                              ),
-                          ],
-                        ),
-                      ),
-              ),
-            const SizedBox(height: 12),
-            _pagination(total),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
 
-  Widget _pagination(int total) {
+  Widget _surface(
+    Widget child, {
+    EdgeInsetsGeometry padding = const EdgeInsets.all(LaooLayout.cardPadding),
+  }) => Container(
+    width: double.infinity,
+    padding: padding,
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(LaooRadius.xs),
+    ),
+    child: child,
+  );
+
+  Widget _requestCards(List<Map<String, dynamic>> items) => ListView.separated(
+    padding: const EdgeInsets.all(LaooLayout.cardPadding),
+    itemCount: items.length,
+    separatorBuilder: (_, _) => const SizedBox(height: 8),
+    itemBuilder: (context, index) {
+      final row = items[index];
+      return Container(
+        padding: const EdgeInsets.all(LaooLayout.cardPadding),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: TextButton(
+                    onPressed: () => _openDetail(row, context),
+                    style: TextButton.styleFrom(
+                      alignment: Alignment.centerLeft,
+                      padding: EdgeInsets.zero,
+                    ),
+                    child: Text(row['requestNo']?.toString() ?? '-'),
+                  ),
+                ),
+                _statusBadge(row, context),
+                _imageAction(row, context),
+                _rowActions(row, context),
+              ],
+            ),
+            Text(row['subject']?.toString() ?? '-'),
+            Row(
+              children: [
+                const Text('ระดับงาน: '),
+                _priorityBadge(row, context),
+              ],
+            ),
+            Text(row['requesterName']?.toString() ?? '-'),
+            Text(row['locationSnapshot']?.toString() ?? '-'),
+            Text(row['requestDate']?.toString() ?? '-'),
+          ],
+        ),
+      );
+    },
+  );
+
+  Widget _priorityBadge(Map<String, dynamic> row, BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final color = (row['priorityCode']?.toString() ?? '0') == '0'
+        ? colors.primary
+        : colors.error;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: .12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        row['priorityName']?.toString() ?? 'ปกติ',
+        style: TextStyle(color: color, fontWeight: FontWeight.w700),
+      ),
+    );
+  }
+
+  Widget _statusBadge(Map<String, dynamic> row, BuildContext context) {
+    final code = row['statusCode']?.toString() ?? '';
+    final colors = Theme.of(context).colorScheme;
+    final abnormal = code == 'CANCELLED';
+    final color = abnormal ? colors.error : colors.primary;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: .12),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        _statusText(code),
+        style: TextStyle(color: color, fontWeight: FontWeight.w600),
+      ),
+    );
+  }
+
+  Widget _requestTable(List<Map<String, dynamic>> items, BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    Widget cell(Widget child) => Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+      child: child,
+    );
+    Widget value(Object? text) => Text(
+      text?.toString() ?? '-',
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+    );
+    return SingleChildScrollView(
+      child: Table(
+        columnWidths: const {
+          0: FixedColumnWidth(42),
+          1: FixedColumnWidth(116),
+          2: FixedColumnWidth(60),
+          3: FlexColumnWidth(1.1),
+          4: FlexColumnWidth(1.2),
+          5: FlexColumnWidth(1.2),
+          6: FlexColumnWidth(1.8),
+          7: FlexColumnWidth(1.1),
+          8: FlexColumnWidth(1.0),
+          9: FlexColumnWidth(1.0),
+        },
+        defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+        children: [
+          TableRow(
+            decoration: BoxDecoration(
+              color: colors.primary.withValues(alpha: .12),
+            ),
+            children: [
+              for (final label in [
+                'ID',
+                'Action',
+                'รูป',
+                'เลขที่',
+                'ผู้แจ้ง',
+                'สถานที่',
+                'หัวข้อ',
+                'ระดับงาน',
+                'สถานะ',
+                'วันที่',
+              ])
+                cell(
+                  Text(
+                    label,
+                    style: TextStyle(
+                      color: colors.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          for (final (index, row) in items.indexed)
+            TableRow(
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(color: colors.outlineVariant, width: .6),
+                ),
+              ),
+              children: [
+                cell(Text('${((_page - 1) * 20) + index + 1}')),
+                cell(_rowActions(row, context)),
+                cell(_imageAction(row, context)),
+                cell(
+                  InkWell(
+                    onTap: () => _openDetail(row, context),
+                    child: Text(
+                      row['requestNo']?.toString() ?? '-',
+                      style: TextStyle(color: colors.primary),
+                    ),
+                  ),
+                ),
+                cell(value(row['requesterName'])),
+                cell(value(row['locationSnapshot'])),
+                cell(value(row['subject'])),
+                cell(_priorityBadge(row, context)),
+                cell(_statusBadge(row, context)),
+                cell(value(row['requestDate'])),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _pagination(int total, BuildContext context) {
     final pages = total == 0 ? 1 : (total / 20).ceil();
     final end = (_page * 20).clamp(0, total);
     final range = total == 0
         ? '0-0 จาก 0'
-        : '${_page == 1 ? '1-' : '${((_page - 1) * 20) + 1}-'}$end จาก $total';
+        : '${((_page - 1) * 20) + 1}-$end จาก $total';
+    final colors = Theme.of(context).colorScheme;
+    Widget button(
+      Widget child,
+      VoidCallback? onPressed, {
+      bool active = false,
+    }) => SizedBox(
+      width: LaooLayout.paginationButtonSize,
+      height: LaooLayout.paginationButtonSize,
+      child: FilledButton(
+        onPressed: onPressed,
+        style: FilledButton.styleFrom(
+          padding: EdgeInsets.zero,
+          backgroundColor: colors.primary,
+          disabledBackgroundColor: active
+              ? colors.primary
+              : colors.surfaceContainerHighest,
+          disabledForegroundColor: active
+              ? colors.onPrimary
+              : colors.onSurfaceVariant,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(LaooRadius.xs),
+          ),
+        ),
+        child: child,
+      ),
+    );
     return SizedBox(
       height: LaooLayout.paginationCardHeight,
-      child: Wrap(
-        spacing: 6,
-        crossAxisAlignment: WrapCrossAlignment.center,
+      child: Row(
         children: [
-          OutlinedButton(
-            onPressed: _page > 1
+          button(
+            const Icon(Icons.chevron_left),
+            _page > 1
                 ? () {
                     _page--;
                     _load();
                   }
                 : null,
-            child: const Text('<'),
           ),
-          FilledButton(onPressed: null, child: Text(_page.toString())),
-          OutlinedButton(
-            onPressed: _page < pages
+          const SizedBox(width: 6),
+          button(Text('$_page'), null, active: true),
+          const SizedBox(width: 6),
+          button(
+            const Icon(Icons.chevron_right),
+            _page < pages
                 ? () {
                     _page++;
                     _load();
                   }
                 : null,
-            child: const Text('>'),
           ),
-          const SizedBox(width: 6),
-          Text(range),
+          const SizedBox(width: 12),
+          Flexible(child: Text(range, overflow: TextOverflow.ellipsis)),
         ],
       ),
     );
@@ -665,12 +1027,24 @@ class _RequestEditDialog extends StatefulWidget {
     required this.data,
     required this.caption,
     required this.selfService,
+    required this.menuCode,
+    required this.attachments,
+    required this.priorities,
+    required this.subjects,
+    required this.equipment,
+    this.subjectApi,
   });
   final ServiceRequestApi api;
   final int requestId;
   final Map<String, dynamic> data;
   final String caption;
   final bool selfService;
+  final String menuCode;
+  final List<Map<String, dynamic>> attachments;
+  final List<Map<String, dynamic>> priorities;
+  final List<Map<String, dynamic>> subjects;
+  final List<Map<String, dynamic>> equipment;
+  final ApiClient? subjectApi;
 
   @override
   State<_RequestEditDialog> createState() => _RequestEditDialogState();
@@ -678,6 +1052,15 @@ class _RequestEditDialog extends StatefulWidget {
 
 class _RequestEditDialogState extends State<_RequestEditDialog> {
   final _form = GlobalKey<FormState>();
+  late final List<Map<String, dynamic>> _files = List.of(widget.attachments);
+  bool _attachmentsChanged = false;
+  late String _priority = widget.data['priorityCode']?.toString() ?? '0';
+  late final List<Map<String, dynamic>> _equipmentOptions = List.of(
+    widget.equipment,
+  );
+  late int? _equipmentId = (widget.data['equipmentItemId'] as num?)?.toInt();
+  bool _equipmentChanged = false;
+  int _equipmentVersion = 0;
   late final TextEditingController _subject = TextEditingController(
     text: widget.data['subject']?.toString() ?? '',
   );
@@ -685,6 +1068,263 @@ class _RequestEditDialogState extends State<_RequestEditDialog> {
     text: widget.data['detail']?.toString() ?? '',
   );
   bool _saving = false;
+  late List<Map<String, dynamic>> _subjects = List.of(widget.subjects);
+  late final ApiClient _subjectApi = widget.subjectApi ?? ApiClient();
+  String? _subjectCode;
+  bool _canManageSubjects = false;
+  int _subjectVersion = 0;
+  static const _legacySubject = '__legacy__';
+
+  @override
+  void initState() {
+    super.initState();
+    final match = _subjects
+        .where((item) => item['name']?.toString() == _subject.text)
+        .firstOrNull;
+    _subjectCode = match?['code']?.toString() ?? _legacySubject;
+    _loadSubjectPermission();
+  }
+
+  Future<void> _loadSubjectPermission() async {
+    try {
+      final actions = await _subjectApi.get(
+        '/api/service/request-subjects/actions',
+      );
+      if (mounted && actions is Map) {
+        setState(() => _canManageSubjects = actions['view'] == true);
+      }
+    } catch (_) {
+      /* Lookup action is unavailable without the corresponding permission. */
+    }
+  }
+
+  void _selectSubject(String? code) {
+    final selected = _subjects
+        .where((item) => item['code']?.toString() == code)
+        .firstOrNull;
+    setState(() {
+      _subjectCode = code;
+      if (code != _legacySubject) {
+        _subject.text = selected?['shortCode']?.toString() == 'OTHER'
+            ? ''
+            : selected?['name']?.toString() ?? '';
+      }
+    });
+  }
+
+  Future<void> _manageSubjects() async {
+    final selectedCode = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
+        ),
+        child: SizedBox(
+          width: 1200,
+          height: MediaQuery.sizeOf(dialogContext).height * .85,
+          child: Column(
+            children: [
+              Align(
+                alignment: Alignment.centerRight,
+                child: IconButton(
+                  tooltip: 'ปิด',
+                  onPressed: () => Navigator.pop(dialogContext),
+                  icon: const Icon(Icons.close),
+                ),
+              ),
+              Expanded(
+                child: ServiceRequestSubjectPage(
+                  embedded: true,
+                  api: _subjectApi,
+                  onSelected: (code) => Navigator.pop(dialogContext, code),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (!mounted) return;
+    try {
+      final subjects = await widget.api.subjectOptions(
+        selfService: widget.selfService,
+      );
+      if (!mounted) return;
+      setState(() {
+        _subjects = subjects;
+        _subjectVersion++;
+      });
+      if (selectedCode != null &&
+          subjects.any((item) => item['code']?.toString() == selectedCode)) {
+        _selectSubject(selectedCode);
+      } else if (_subjectCode != _legacySubject &&
+          !subjects.any((item) => item['code']?.toString() == _subjectCode)) {
+        setState(() => _subjectCode = _legacySubject);
+      }
+    } catch (_) {
+      if (mounted) {
+        showTimedSnackBar(
+          context,
+          message: 'ไม่สามารถโหลดหัวข้อได้',
+          error: true,
+        );
+      }
+    }
+  }
+
+  Future<void> _searchEquipment() async {
+    final selected = await _searchPicker(
+      context,
+      label: 'อุปกรณ์ที่แจ้งซ่อม',
+      load: (query) => widget.api.equipmentOptions(
+        selfService: widget.selfService,
+        search: query,
+      ),
+      describe: (item) => '${item['itemCode']} | ${item['itemName']}',
+    );
+    if (!mounted || selected == null) return;
+    setState(() {
+      if (!_equipmentOptions.any(
+        (item) => item['itemID'] == selected['itemID'],
+      )) {
+        _equipmentOptions.add(selected);
+      }
+      _equipmentId = (selected['itemID'] as num).toInt();
+      _equipmentChanged = true;
+      _equipmentVersion++;
+    });
+  }
+
+  Future<void> _searchSubject() async {
+    final selected = await _searchPicker(
+      context,
+      label: 'หัวข้อ',
+      load: (query) async => _subjects
+          .where(
+            (item) => (item['name']?.toString() ?? '').toLowerCase().contains(
+              query.toLowerCase(),
+            ),
+          )
+          .toList(),
+      describe: (item) => item['name']?.toString() ?? '-',
+    );
+    if (mounted && selected != null) {
+      _selectSubject(selected['code']?.toString());
+      setState(() => _subjectVersion++);
+    }
+  }
+
+  Future<void> _pickImages() async {
+    final selection = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['jpg', 'jpeg', 'png', 'webp'],
+      allowMultiple: true,
+      withData: true,
+    );
+    if (!mounted || selection == null) return;
+    setState(() => _saving = true);
+    try {
+      for (final file in selection.files) {
+        if (file.bytes == null) {
+          throw StateError('ไม่สามารถอ่านไฟล์ ${file.name}');
+        }
+        final added = await widget.api.uploadAttachment(
+          widget.requestId,
+          fileName: file.name,
+          bytes: file.bytes!,
+          editSelf: widget.selfService,
+          editNew: true,
+        );
+        _attachmentsChanged = true;
+        if (mounted) setState(() => _files.add(added));
+      }
+    } catch (error) {
+      if (mounted) {
+        showTimedSnackBar(
+          context,
+          message: error is ApiException
+              ? error.message
+              : 'เพิ่มรูปไม่สำเร็จ กรุณาตรวจสอบไฟล์แล้วลองใหม่',
+          error: true,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _removeImage(Map<String, dynamic> file) async {
+    final errorColor = Theme.of(context).colorScheme.error;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
+          side: BorderSide(color: errorColor),
+        ),
+        title: Row(
+          children: [
+            Icon(Icons.delete_outline, color: errorColor),
+            const SizedBox(width: 8),
+            const Expanded(child: Text('ยืนยันการลบข้อมูล')),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              color: errorColor.withValues(alpha: .1),
+              child: Text('${file['fileName'] ?? 'รูปภาพ'}'),
+            ),
+            const SizedBox(height: 12),
+            const Text('รูปที่ลบแล้วไม่สามารถกู้คืนได้'),
+            const Divider(),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('ยกเลิก'),
+          ),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(backgroundColor: errorColor),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            icon: const Icon(Icons.delete_outline),
+            label: const Text('ลบ'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted || _saving) return;
+    setState(() => _saving = true);
+    try {
+      await widget.api.deleteAttachment(
+        widget.requestId,
+        (file['attachmentId'] as num).toInt(),
+        editSelf: widget.selfService,
+        editNew: true,
+      );
+      _attachmentsChanged = true;
+      if (mounted) setState(() => _files.remove(file));
+    } catch (error) {
+      if (mounted) {
+        showTimedSnackBar(
+          context,
+          message: error is ApiException
+              ? error.message
+              : 'ลบรูปไม่สำเร็จ กรุณาลองใหม่อีกครั้ง',
+          error: true,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -697,13 +1337,26 @@ class _RequestEditDialogState extends State<_RequestEditDialog> {
     if (_saving || !_form.currentState!.validate()) return;
     setState(() => _saving = true);
     try {
-      await widget.api.edit(
-        widget.requestId,
-        selfService: widget.selfService,
-        subject: _subject.text.trim(),
-        detail: _detail.text.trim(),
-        rowVersion: widget.data['rowVersion'].toString(),
-      );
+      if (_equipmentChanged) {
+        await widget.api.editEquipment(
+          widget.requestId,
+          selfService: widget.selfService,
+          subject: _subject.text.trim(),
+          detail: _detail.text.trim(),
+          rowVersion: widget.data['rowVersion'].toString(),
+          priorityCode: _priority,
+          equipmentItemId: _equipmentId,
+        );
+      } else {
+        await widget.api.edit(
+          widget.requestId,
+          selfService: widget.selfService,
+          subject: _subject.text.trim(),
+          detail: _detail.text.trim(),
+          rowVersion: widget.data['rowVersion'].toString(),
+          priorityCode: _priority,
+        );
+      }
       if (mounted) Navigator.pop(context, true);
     } catch (error) {
       if (mounted) {
@@ -717,89 +1370,306 @@ class _RequestEditDialogState extends State<_RequestEditDialog> {
     }
   }
 
+  TextStyle _floatingLabelStyle(ColorScheme colors) =>
+      WidgetStateTextStyle.resolveWith(
+        (states) => TextStyle(
+          fontSize: LaooTypography.materialFloatingLabelSource,
+          color: states.contains(WidgetState.error)
+              ? colors.error
+              : colors.primary,
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    return Dialog(
+    return AlertDialog(
       backgroundColor: Colors.white,
+      surfaceTintColor: Colors.transparent,
       insetPadding: const EdgeInsets.all(LaooLayout.dialogInsetPadding),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(LaooRadius.xs),
       ),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 520),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(LaooLayout.cardPadding),
-          child: Form(
-            key: _form,
+      title: Row(
+        children: [
+          Icon(Icons.edit_outlined, color: colors.primary),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              '${widget.caption} > แก้ไข',
+              style: const TextStyle(
+                color: Colors.black,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+      content: SizedBox(
+        width: 480,
+        child: Form(
+          key: _form,
+          child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
-                  '${widget.caption} > แก้ไข',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 12),
                 Divider(color: colors.outlineVariant),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
                 Text('เลขที่ ${widget.data['requestNo']}'),
                 const SizedBox(height: LaooLayout.popupFieldSpacing),
                 Text('ผู้แจ้ง ${widget.data['requesterName']}'),
                 const SizedBox(height: LaooLayout.popupFieldSpacing),
-                TextFormField(
-                  controller: _subject,
-                  maxLength: 200,
-                  decoration: const InputDecoration(
-                    labelText: 'หัวข้อ *',
+                DropdownButtonFormField<int>(
+                  key: ValueKey('edit-equipment-$_equipmentVersion'),
+                  initialValue: _equipmentId,
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    labelText: 'อุปกรณ์ที่แจ้งซ่อม',
+                    labelStyle: const TextStyle(
+                      fontSize: LaooTypography.inputLabel,
+                    ),
+                    floatingLabelStyle: _floatingLabelStyle(colors),
+                    border: const OutlineInputBorder(),
+                    suffixIcon: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (widget.data['requireEquipment'] == false &&
+                            _equipmentId != null)
+                          IconButton(
+                            tooltip: 'ล้างอุปกรณ์ที่เลือก',
+                            onPressed: _saving
+                                ? null
+                                : () => setState(() {
+                                    _equipmentId = null;
+                                    _equipmentChanged = true;
+                                    _equipmentVersion++;
+                                  }),
+                            icon: const Icon(Icons.clear),
+                          ),
+                        IconButton(
+                          tooltip: 'ค้นหา อุปกรณ์ที่แจ้งซ่อม',
+                          onPressed: _saving ? null : _searchEquipment,
+                          icon: const Icon(Icons.search),
+                        ),
+                      ],
+                    ),
+                  ),
+                  items: [
+                    for (final item in _equipmentOptions)
+                      DropdownMenuItem(
+                        value: (item['itemID'] as num).toInt(),
+                        child: Text(
+                          '${item['itemCode']} | ${item['itemName']}',
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                  onChanged: _saving
+                      ? null
+                      : (value) => setState(() {
+                          _equipmentId = value;
+                          _equipmentChanged = true;
+                        }),
+                ),
+                const SizedBox(height: LaooLayout.popupFieldSpacing),
+                DropdownButtonFormField<String>(
+                  initialValue: _priority,
+                  decoration: InputDecoration(
+                    floatingLabelStyle: _floatingLabelStyle(colors),
+                    labelStyle: const TextStyle(
+                      fontSize: LaooTypography.inputLabel,
+                    ),
+                    labelText: 'ระดับงาน',
                     border: OutlineInputBorder(),
                   ),
-                  validator: (value) => value == null || value.trim().isEmpty
-                      ? 'กรุณาระบุหัวข้อ'
-                      : null,
+                  items:
+                      (widget.priorities.isEmpty
+                              ? [
+                                  {'code': '0', 'name': 'ปกติ'},
+                                ]
+                              : widget.priorities)
+                          .map(
+                            (item) => DropdownMenuItem(
+                              value: item['code'].toString(),
+                              child: Text(item['name'].toString()),
+                            ),
+                          )
+                          .toList(),
+                  onChanged: _saving
+                      ? null
+                      : (value) => setState(() => _priority = value ?? '0'),
                 ),
+                const SizedBox(height: LaooLayout.popupFieldSpacing),
+                DropdownButtonFormField<String>(
+                  key: ValueKey('edit-subject-$_subjectVersion'),
+                  initialValue: _subjectCode,
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    floatingLabelStyle: _floatingLabelStyle(colors),
+                    labelStyle: const TextStyle(
+                      fontSize: LaooTypography.inputLabel,
+                    ),
+                    labelText: 'หัวข้อ *',
+                    border: const OutlineInputBorder(),
+                    suffixIcon: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          tooltip: 'ค้นหา หัวข้อ',
+                          onPressed: _saving ? null : _searchSubject,
+                          icon: const Icon(Icons.search),
+                        ),
+                        if (_canManageSubjects)
+                          IconButton(
+                            tooltip: 'ค้นหาหัวข้อ',
+                            onPressed: _saving ? null : _manageSubjects,
+                            icon: const Icon(Icons.edit_note_outlined),
+                          ),
+                      ],
+                    ),
+                  ),
+                  items: [
+                    if (_subjectCode == _legacySubject)
+                      DropdownMenuItem(
+                        value: _legacySubject,
+                        child: Text(
+                          _subject.text,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    for (final item in _subjects)
+                      DropdownMenuItem(
+                        value: item['code'].toString(),
+                        child: Text(
+                          item['name'].toString(),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                  onChanged: _saving ? null : _selectSubject,
+                  validator: (value) =>
+                      value == null ? 'กรุณาเลือกหัวข้อ' : null,
+                ),
+                if (_subjects.any(
+                  (item) =>
+                      item['code']?.toString() == _subjectCode &&
+                      item['shortCode']?.toString() == 'OTHER',
+                )) ...[
+                  const SizedBox(height: LaooLayout.popupFieldSpacing),
+                  TextFormField(
+                    controller: _subject,
+                    maxLength: 200,
+                    decoration: InputDecoration(
+                      floatingLabelStyle: _floatingLabelStyle(colors),
+                      labelStyle: const TextStyle(
+                        fontSize: LaooTypography.inputLabel,
+                      ),
+                      labelText: 'ระบุหัวข้อ *',
+                      counterText: '',
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (value) => value == null || value.trim().isEmpty
+                        ? 'กรุณาระบุหัวข้อ'
+                        : null,
+                  ),
+                ],
                 const SizedBox(height: LaooLayout.popupFieldSpacing),
                 TextFormField(
                   controller: _detail,
                   maxLength: 2000,
                   minLines: 3,
                   maxLines: 6,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
+                    floatingLabelStyle: _floatingLabelStyle(colors),
+                    labelStyle: const TextStyle(
+                      fontSize: LaooTypography.inputLabel,
+                    ),
                     labelText: 'รายละเอียด *',
+                    counterText: '',
                     border: OutlineInputBorder(),
                   ),
                   validator: (value) => value == null || value.trim().isEmpty
                       ? 'กรุณาระบุรายละเอียด'
                       : null,
                 ),
-                const SizedBox(height: 12),
-                Divider(color: colors.outlineVariant),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(
-                      onPressed: _saving
-                          ? null
-                          : () => Navigator.pop(context, false),
-                      child: const Text('ยกเลิก'),
-                    ),
-                    const SizedBox(width: 8),
-                    FilledButton.icon(
-                      onPressed: _saving ? null : _save,
-                      icon: const Icon(Icons.save_outlined),
-                      label: const Text('บันทึก'),
-                    ),
-                  ],
+                const SizedBox(height: LaooLayout.popupFieldSpacing),
+                const Text(
+                  'รูปภาพแนบ',
+                  style: TextStyle(fontWeight: FontWeight.w700),
                 ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: OutlinedButton.icon(
+                    onPressed: _saving ? null : _pickImages,
+                    icon: const Icon(Icons.attach_file),
+                    label: const Text('เลือกไฟล์'),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'รองรับ JPG, PNG, WEBP | ไม่จำกัดจำนวน | ระบบลดขนาดอัตโนมัติ',
+                ),
+                const Text('การเพิ่มหรือลบรูปจะบันทึกทันที'),
+                if (_files.any(
+                  (file) => (file['contentType']?.toString() ?? '')
+                      .toLowerCase()
+                      .startsWith('image/'),
+                )) ...[
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final file in _files)
+                        if ((file['contentType']?.toString() ?? '')
+                            .toLowerCase()
+                            .startsWith('image/'))
+                          _RemoteAttachmentTile(
+                            api: widget.api,
+                            requestId: widget.requestId,
+                            item: file,
+                            menuCode: widget.menuCode,
+                            canDelete: !_saving,
+                            onDelete: () => _removeImage(file),
+                          ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
         ),
       ),
+      actions: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Divider(color: colors.outlineVariant),
+            Wrap(
+              alignment: WrapAlignment.end,
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: _saving
+                      ? null
+                      : () => Navigator.pop(context, _attachmentsChanged),
+                  icon: const Icon(Icons.close),
+                  label: const Text('ยกเลิก'),
+                ),
+                FilledButton.icon(
+                  onPressed: _saving ? null : _save,
+                  icon: const Icon(Icons.save_outlined),
+                  label: const Text('บันทึก'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -807,14 +1677,18 @@ class _RequestEditDialogState extends State<_RequestEditDialog> {
 class _RequestDialog extends StatefulWidget {
   const _RequestDialog({
     required this.api,
+    required this.caption,
     this.lookup,
     this.selfService = false,
     this.qrToken,
+    this.subjectApi,
   });
   final ServiceRequestApi api;
+  final String caption;
   final Map<String, dynamic>? lookup;
   final bool selfService;
   final String? qrToken;
+  final ApiClient? subjectApi;
   @override
   State<_RequestDialog> createState() => _RequestDialogState();
 }
@@ -825,8 +1699,20 @@ class _RequestDialogState extends State<_RequestDialog> {
   final _detail = TextEditingController();
   Map<String, dynamic>? _requester;
   Map<String, dynamic>? _equipment;
+  late final List<Map<String, dynamic>> _requesterOptions = _maps(
+    widget.lookup?['requesters'],
+  );
+  late final List<Map<String, dynamic>> _equipmentOptions = _maps(
+    widget.lookup?['equipment'],
+  );
+  int _lookupVersion = 0;
   Map<String, dynamic>? _qrContext;
   String? _subjectCode;
+  String _priority = '0';
+  int _subjectOptionsVersion = 0;
+  late List<Map<String, dynamic>> _subjects = _maps(widget.lookup?['subjects']);
+  late final _subjectApi = widget.subjectApi ?? ApiClient();
+  bool _canManageSubjects = false;
   final List<PlatformFile> _attachments = [];
   bool _saving = false;
 
@@ -834,6 +1720,161 @@ class _RequestDialogState extends State<_RequestDialog> {
   void initState() {
     super.initState();
     _loadQrContext();
+    _loadSubjectPermission();
+  }
+
+  Future<void> _searchRequester() async {
+    final selected = await _searchPicker(
+      context,
+      label: 'ผู้แจ้ง',
+      load: (query) async => _maps(
+        (await widget.api.lookup(
+          search: query,
+          selfService: false,
+        ))['requesters'],
+      ),
+      describe: _requesterLabel,
+    );
+    if (!mounted || selected == null) return;
+    setState(() {
+      if (!_requesterOptions.any(
+        (item) =>
+            item['id'] == selected['id'] &&
+            item['requesterType'] == selected['requesterType'],
+      )) {
+        _requesterOptions.add(selected);
+      }
+      _requester = selected;
+      _lookupVersion++;
+    });
+  }
+
+  Future<void> _searchEquipment() async {
+    final selected = await _searchPicker(
+      context,
+      label: 'อุปกรณ์ที่แจ้งซ่อม',
+      load: (query) => widget.api.equipmentOptions(
+        selfService: widget.selfService,
+        search: query,
+      ),
+      describe: (item) => '${item['itemCode']} | ${item['itemName']}',
+    );
+    if (!mounted || selected == null) return;
+    setState(() {
+      if (!_equipmentOptions.any(
+        (item) => item['itemID'] == selected['itemID'],
+      )) {
+        _equipmentOptions.add(selected);
+      }
+      _equipment = selected;
+      _lookupVersion++;
+    });
+  }
+
+  Future<void> _searchSubject() async {
+    final selected = await _searchPicker(
+      context,
+      label: 'หัวข้อ',
+      load: (query) async => _subjects
+          .where(
+            (item) => (item['name']?.toString() ?? '').toLowerCase().contains(
+              query.toLowerCase(),
+            ),
+          )
+          .toList(),
+      describe: (item) => item['name']?.toString() ?? '-',
+    );
+    if (!mounted || selected == null) return;
+    setState(() {
+      _subjectCode = selected['code']?.toString();
+      _subject.text = selected['shortCode']?.toString() == 'OTHER'
+          ? ''
+          : selected['name']?.toString() ?? '';
+      _subjectOptionsVersion++;
+    });
+  }
+
+  Future<void> _loadSubjectPermission() async {
+    try {
+      final actions = await _subjectApi.get(
+        '/api/service/request-subjects/actions',
+      );
+      if (mounted && actions is Map) {
+        setState(() => _canManageSubjects = actions['view'] == true);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _canManageSubjects = false);
+    }
+  }
+
+  Future<void> _manageSubjects() async {
+    final selectedCode = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
+        ),
+        child: SizedBox(
+          width: 1200,
+          height: MediaQuery.sizeOf(dialogContext).height * .85,
+          child: Column(
+            children: [
+              Align(
+                alignment: Alignment.centerRight,
+                child: IconButton(
+                  tooltip: 'ปิด',
+                  onPressed: () => Navigator.pop(dialogContext),
+                  icon: const Icon(Icons.close),
+                ),
+              ),
+              Expanded(
+                child: ServiceRequestSubjectPage(
+                  embedded: true,
+                  api: _subjectApi,
+                  onSelected: (code) => Navigator.pop(dialogContext, code),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (!mounted) return;
+    try {
+      final lookup = await widget.api.lookup(selfService: widget.selfService);
+      if (!mounted) return;
+      final subjects = _maps(lookup['subjects']);
+      final selected = subjects
+          .where(
+            (item) =>
+                item['code']?.toString() == (selectedCode ?? _subjectCode),
+          )
+          .firstOrNull;
+      setState(() {
+        _subjects = subjects;
+        _subjectOptionsVersion++;
+        if (selected == null) {
+          _subjectCode = null;
+          _subject.clear();
+        } else if (selected['shortCode']?.toString() != 'OTHER') {
+          _subjectCode = selected['code'].toString();
+          _subject.text = selected['name']?.toString() ?? '';
+        } else if (selectedCode != null) {
+          _subjectCode = selectedCode;
+          _subject.clear();
+        }
+      });
+    } catch (_) {
+      if (mounted) {
+        showTimedSnackBar(
+          context,
+          message:
+              'ไม่สามารถโหลดหัวข้อแจ้งซ่อมได้\nรายละเอียดเพิ่มเติม: กรุณาลองใหม่อีกครั้ง',
+          error: true,
+        );
+      }
+    }
   }
 
   Future<void> _loadQrContext() async {
@@ -865,6 +1906,7 @@ class _RequestDialogState extends State<_RequestDialog> {
 
   @override
   void dispose() {
+    if (widget.subjectApi == null) _subjectApi.dispose();
     _subject.dispose();
     _detail.dispose();
     super.dispose();
@@ -882,6 +1924,7 @@ class _RequestDialogState extends State<_RequestDialog> {
         subject: _subject.text.trim(),
         detail: _detail.text.trim(),
         qrToken: widget.qrToken,
+        priorityCode: _priority,
       );
       final requestId = (created['requestId'] as num?)?.toInt();
       final uploadErrors = <String>[];
@@ -982,38 +2025,42 @@ class _RequestDialogState extends State<_RequestDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final requesters = _maps(widget.lookup?['requesters']);
-    final equipment = _maps(widget.lookup?['equipment']);
-    final subjects = _maps(widget.lookup?['subjects']);
+    final requesters = _requesterOptions;
+    final equipment = _equipmentOptions;
+    final subjects = _subjects;
     final byKey = {
       for (final item in requesters)
         '${item['requesterType']}:${item['id']}': item,
     };
-    final dialogWidth = (MediaQuery.sizeOf(context).width - 32).clamp(
-      280.0,
-      520.0,
-    );
     return AlertDialog(
       backgroundColor: Colors.white,
       surfaceTintColor: Colors.transparent,
-      insetPadding: const EdgeInsets.all(16),
+      insetPadding: const EdgeInsets.all(LaooLayout.dialogInsetPadding),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(LaooRadius.xs),
       ),
       title: Row(
         children: [
-          const Icon(Icons.build_outlined),
+          Icon(
+            Icons.build_outlined,
+            color: Theme.of(context).colorScheme.primary,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              widget.selfService ? 'แจ้งซ่อมด้วยตนเอง' : 'เพิ่มใบแจ้งซ่อม',
+              '${widget.caption} > เพิ่ม',
+              style: const TextStyle(
+                color: Colors.black,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
               overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
       ),
       content: SizedBox(
-        width: dialogWidth,
+        width: 480,
         child: Form(
           key: _form,
           child: SingleChildScrollView(
@@ -1024,7 +2071,18 @@ class _RequestDialogState extends State<_RequestDialog> {
                 const Divider(),
                 if (!widget.selfService)
                   DropdownButtonFormField<String>(
-                    decoration: _input(label: 'ผู้แจ้ง *'),
+                    key: ValueKey('requester-$_lookupVersion'),
+                    initialValue: _requester == null
+                        ? null
+                        : '${_requester!['requesterType']}:${_requester!['id']}',
+                    isExpanded: true,
+                    decoration: _input(label: 'ผู้แจ้ง *').copyWith(
+                      suffixIcon: IconButton(
+                        tooltip: 'ค้นหา ผู้แจ้ง',
+                        onPressed: _saving ? null : _searchRequester,
+                        icon: const Icon(Icons.search),
+                      ),
+                    ),
                     items: [
                       for (final entry in byKey.entries)
                         DropdownMenuItem(
@@ -1059,10 +2117,43 @@ class _RequestDialogState extends State<_RequestDialog> {
                 ],
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
+                  key: ValueKey('equipment-$_lookupVersion'),
+                  isExpanded: true,
                   initialValue: _equipment == null
                       ? null
                       : _equipment!['itemID'].toString(),
-                  decoration: _input(label: 'อุปกรณ์ที่แจ้งซ่อม *'),
+                  decoration:
+                      _input(
+                        label: widget.lookup?['requireEquipment'] == false
+                            ? 'อุปกรณ์ที่แจ้งซ่อม'
+                            : 'อุปกรณ์ที่แจ้งซ่อม *',
+                      ).copyWith(
+                        suffixIcon: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (widget.lookup?['requireEquipment'] == false &&
+                                _qrContext == null &&
+                                _equipment != null)
+                              IconButton(
+                                tooltip: 'ล้างอุปกรณ์ที่เลือก',
+                                onPressed: _saving
+                                    ? null
+                                    : () => setState(() {
+                                        _equipment = null;
+                                        _lookupVersion++;
+                                      }),
+                                icon: const Icon(Icons.clear),
+                              ),
+                            IconButton(
+                              tooltip: 'ค้นหา อุปกรณ์ที่แจ้งซ่อม',
+                              onPressed: _saving || _qrContext != null
+                                  ? null
+                                  : _searchEquipment,
+                              icon: const Icon(Icons.search),
+                            ),
+                          ],
+                        ),
+                      ),
                   items: [
                     for (final item in equipment)
                       DropdownMenuItem(
@@ -1082,14 +2173,55 @@ class _RequestDialogState extends State<_RequestDialog> {
                                 ),
                         )
                       : null,
-                  validator: (_) => _equipment == null
+                  validator: (_) =>
+                      _equipment == null &&
+                          widget.lookup?['requireEquipment'] != false
                       ? 'กรุณาเลือกอุปกรณ์ที่แจ้งซ่อม'
                       : null,
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
+                  initialValue: _priority,
+                  decoration: _input(label: 'ระดับงาน'),
+                  items:
+                      (_maps(widget.lookup?['priorities']).isEmpty
+                              ? [
+                                  {'code': '0', 'name': 'ปกติ'},
+                                ]
+                              : _maps(widget.lookup?['priorities']))
+                          .map(
+                            (item) => DropdownMenuItem(
+                              value: item['code'].toString(),
+                              child: Text(item['name'].toString()),
+                            ),
+                          )
+                          .toList(),
+                  onChanged: _saving
+                      ? null
+                      : (value) => setState(() => _priority = value ?? '0'),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  key: ValueKey('subject-options-$_subjectOptionsVersion'),
                   initialValue: _subjectCode,
-                  decoration: _input(label: 'หัวข้อ *'),
+                  decoration: _input(label: 'หัวข้อ *').copyWith(
+                    suffixIcon: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          tooltip: 'ค้นหา หัวข้อ',
+                          onPressed: _saving ? null : _searchSubject,
+                          icon: const Icon(Icons.search),
+                        ),
+                        if (_canManageSubjects)
+                          IconButton(
+                            tooltip: 'จัดการหัวข้อแจ้งซ่อม',
+                            onPressed: _saving ? null : _manageSubjects,
+                            icon: const Icon(Icons.edit_note_outlined),
+                          ),
+                      ],
+                    ),
+                  ),
                   items: [
                     for (final item in subjects)
                       DropdownMenuItem(
@@ -1125,6 +2257,9 @@ class _RequestDialogState extends State<_RequestDialog> {
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: _subject,
+                    style: const TextStyle(
+                      fontSize: LaooTypography.popupInputText,
+                    ),
                     decoration: _input(label: 'ระบุหัวข้อ *'),
                     validator: (value) => value == null || value.trim().isEmpty
                         ? 'กรุณาระบุหัวข้อ'
@@ -1134,6 +2269,9 @@ class _RequestDialogState extends State<_RequestDialog> {
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _detail,
+                  style: const TextStyle(
+                    fontSize: LaooTypography.popupInputText,
+                  ),
                   minLines: 4,
                   maxLines: 7,
                   decoration: _input(label: 'รายละเอียด *'),
@@ -1148,29 +2286,36 @@ class _RequestDialogState extends State<_RequestDialog> {
                   onPick: _pickAttachments,
                   onRemove: (file) => setState(() => _attachments.remove(file)),
                 ),
-                const SizedBox(height: 14),
-                const Divider(),
-                Wrap(
-                  alignment: WrapAlignment.end,
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    TextButton(
-                      onPressed: _saving ? null : () => Navigator.pop(context),
-                      child: const Text('ยกเลิก'),
-                    ),
-                    FilledButton.icon(
-                      onPressed: _saving ? null : _save,
-                      icon: const Icon(Icons.save_outlined),
-                      label: Text(_saving ? 'กำลังบันทึก' : 'บันทึก'),
-                    ),
-                  ],
-                ),
               ],
             ),
           ),
         ),
       ),
+      actions: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Divider(color: Theme.of(context).colorScheme.outlineVariant),
+            Wrap(
+              alignment: WrapAlignment.end,
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: _saving ? null : () => Navigator.pop(context),
+                  icon: const Icon(Icons.close),
+                  label: const Text('ยกเลิก'),
+                ),
+                FilledButton.icon(
+                  onPressed: _saving ? null : _save,
+                  icon: const Icon(Icons.save_outlined),
+                  label: Text(_saving ? 'กำลังบันทึก' : 'บันทึก'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -1189,11 +2334,23 @@ class _RequestDialogState extends State<_RequestDialog> {
     final prefix = value['requesterType']?.toString() == 'SERVICE_CUSTOMER'
         ? 'ผู้ใช้บริการ Walk-in: '
         : '';
-    return prefix + (value['name']?.toString() ?? '-');
+    final nickname = value['nickName']?.toString().trim() ?? '';
+    final location = value['locationSnapshot']?.toString().trim() ?? '';
+    final employee = value['requesterType']?.toString() == 'EMPLOYEE';
+    return '$prefix${value['name'] ?? '-'}${nickname.isEmpty ? '' : ' ($nickname)'}${employee && location.isNotEmpty ? ' | $location' : ''}';
   }
 
   InputDecoration _input({String? label}) => InputDecoration(
     labelText: label,
+    labelStyle: const TextStyle(fontSize: LaooTypography.inputLabel),
+    floatingLabelStyle: WidgetStateTextStyle.resolveWith(
+      (states) => TextStyle(
+        fontSize: LaooTypography.materialFloatingLabelSource,
+        color: states.contains(WidgetState.error)
+            ? Theme.of(context).colorScheme.error
+            : Theme.of(context).colorScheme.primary,
+      ),
+    ),
     border: OutlineInputBorder(
       borderRadius: BorderRadius.circular(LaooRadius.xs),
     ),
@@ -1216,21 +2373,20 @@ class _AttachmentPicker extends StatelessWidget {
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      Row(
-        children: [
-          const Expanded(
-            child: Text(
-              'รูปภาพแนบ (ไม่บังคับ)',
-              style: TextStyle(fontWeight: FontWeight.w700),
-            ),
-          ),
-          OutlinedButton.icon(
-            onPressed: enabled ? onPick : null,
-            icon: const Icon(Icons.attach_file),
-            label: const Text('เลือกไฟล์'),
-          ),
-        ],
+      const Text(
+        'รูปภาพแนบ (ไม่บังคับ)',
+        style: TextStyle(fontWeight: FontWeight.w700),
       ),
+      const SizedBox(height: 8),
+      Align(
+        alignment: Alignment.centerLeft,
+        child: OutlinedButton.icon(
+          onPressed: enabled ? onPick : null,
+          icon: const Icon(Icons.attach_file),
+          label: const Text('เลือกไฟล์'),
+        ),
+      ),
+      const SizedBox(height: 8),
       const Text(
         'รองรับ JPG, PNG, WEBP | ไม่จำกัดจำนวน | ระบบลดขนาดอัตโนมัติ',
         softWrap: true,
@@ -1358,6 +2514,7 @@ class _RequestDetailDialogState extends State<_RequestDetailDialog> {
     final controller = TextEditingController();
     final value = await showDialog<String>(
       context: context,
+      barrierDismissible: false,
       builder: (_) => _ReasonDialog(
         title: 'ยกเลิกใบแจ้งซ่อม',
         label: 'เหตุผลการยกเลิก *',
@@ -1373,12 +2530,27 @@ class _RequestDetailDialogState extends State<_RequestDetailDialog> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('ลบรูปแนบ'),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(LaooLayout.dialogInsetPadding),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
+          side: BorderSide(color: Theme.of(context).colorScheme.error),
+        ),
+        title: const Text(
+          'ลบรูปแนบ',
+          style: TextStyle(
+            color: Colors.black,
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
         content: Text('ต้องการลบ ${item['fileName'] ?? 'รูปภาพ'} หรือไม่'),
         actions: [
-          TextButton(
+          OutlinedButton.icon(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('ยกเลิก'),
+            icon: const Icon(Icons.close),
+            label: const Text('ยกเลิก'),
           ),
           FilledButton.icon(
             onPressed: () => Navigator.pop(context, true),
@@ -1416,10 +2588,22 @@ class _RequestDetailDialogState extends State<_RequestDetailDialog> {
   Widget build(BuildContext context) {
     final status = _status;
     return AlertDialog(
-      insetPadding: const EdgeInsets.all(16),
-      title: Text(_data['requestNo']?.toString() ?? 'รายละเอียดใบแจ้งซ่อม'),
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      insetPadding: const EdgeInsets.all(LaooLayout.dialogInsetPadding),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(LaooRadius.xs),
+      ),
+      title: Text(
+        _data['requestNo']?.toString() ?? 'รายละเอียดใบแจ้งซ่อม',
+        style: const TextStyle(
+          color: Colors.black,
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
       content: SizedBox(
-        width: (MediaQuery.sizeOf(context).width - 32).clamp(280.0, 620.0),
+        width: 480,
         child: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1614,7 +2798,20 @@ class _ReasonDialog extends StatelessWidget {
   final TextEditingController controller;
   @override
   Widget build(BuildContext context) => AlertDialog(
-    title: Text(title),
+    backgroundColor: Colors.white,
+    surfaceTintColor: Colors.transparent,
+    insetPadding: const EdgeInsets.all(LaooLayout.dialogInsetPadding),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(LaooRadius.xs),
+    ),
+    title: Text(
+      title,
+      style: const TextStyle(
+        color: Colors.black,
+        fontSize: 18,
+        fontWeight: FontWeight.w700,
+      ),
+    ),
     content: SizedBox(
       width: 460,
       child: TextField(
@@ -1628,9 +2825,10 @@ class _ReasonDialog extends StatelessWidget {
       ),
     ),
     actions: [
-      TextButton(
+      OutlinedButton.icon(
         onPressed: () => Navigator.pop(context),
-        child: const Text('ยกเลิก'),
+        icon: const Icon(Icons.close),
+        label: const Text('ยกเลิก'),
       ),
       FilledButton(
         onPressed: () => Navigator.pop(context, controller.text),

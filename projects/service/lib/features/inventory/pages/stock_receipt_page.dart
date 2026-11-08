@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:laoo_shared_admin_ui/laoo_shared_admin_ui.dart'
+    show FilterHeightSync, filterActionHeightStyle;
 import 'package:laoo_shared_workspace_ui/laoo_shared_workspace_ui.dart';
 import '../../../app/theme/laoo_design_tokens.dart';
 import '../../../app/theme/laoo_typography.dart';
@@ -527,12 +529,22 @@ class _StockReceiptWorkspaceState extends State<StockReceiptWorkspace> {
         children: [
           _title([
             if (box.maxWidth >= 900)
-              IconButton(
-                tooltip: 'สลับ List/Card',
-                onPressed: () => setState(() => _card = !_card),
-                icon: Icon(
-                  _card ? Icons.table_rows_outlined : Icons.grid_view,
-                  color: _primary,
+              SizedBox.square(
+                dimension: LaooTypography.buttonHeight,
+                child: IconButton(
+                  tooltip: 'สลับ List/Card',
+                  style: IconButton.styleFrom(
+                    backgroundColor: _primary.withValues(alpha: .1),
+                    foregroundColor: _primary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(LaooRadius.xs),
+                    ),
+                  ),
+                  onPressed: () => setState(() => _card = !_card),
+                  icon: Icon(
+                    _card ? Icons.table_rows_outlined : Icons.grid_view,
+                    color: _primary,
+                  ),
                 ),
               ),
             if (_actions['create'] == true)
@@ -546,117 +558,131 @@ class _StockReceiptWorkspaceState extends State<StockReceiptWorkspace> {
           const SizedBox(height: 6),
           _surface(
             LayoutBuilder(
-              builder: (_, constraints) => Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  SizedBox(
-                    width: constraints.maxWidth < 260
-                        ? constraints.maxWidth
-                        : 260,
-                    child: TextField(
-                      key: const ValueKey('stock-receipt-search-filter'),
-                      controller: _search,
-                      style: const TextStyle(
-                        fontSize: LaooTypography.inputText,
+              builder: (_, constraints) => FilterHeightSync(
+                builder: (context, searchKey, height) => Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    SizedBox(
+                      key: searchKey,
+                      width: constraints.maxWidth < 260
+                          ? constraints.maxWidth
+                          : 260,
+                      child: TextField(
+                        key: const ValueKey('stock-receipt-search-filter'),
+                        controller: _search,
+                        style: const TextStyle(
+                          fontSize: LaooTypography.inputText,
+                        ),
+                        decoration: receiptInput(
+                          'ค้นหาเลขที่ / อ้างอิง / หมายเหตุ / ผู้ส่งมอบ',
+                          _primary,
+                        ),
+                        onSubmitted: (_) => _load(),
                       ),
-                      decoration: receiptInput(
-                        'ค้นหาเลขที่ / อ้างอิง / หมายเหตุ / ผู้ส่งมอบ',
+                    ),
+                    FilledButton.icon(
+                      style: receiptButton(
                         _primary,
-                      ),
-                      onSubmitted: (_) => _load(),
+                        compact: true,
+                      ).merge(filterActionHeightStyle(height)),
+                      onPressed: _busy ? null : _load,
+                      icon: const Icon(Icons.search),
+                      label: const Text('ค้นหา'),
                     ),
-                  ),
-                  SizedBox(
-                    width: constraints.maxWidth < 280
-                        ? constraints.maxWidth
-                        : 280,
-                    child: DropdownButtonFormField<int>(
-                      key: ValueKey('stock-receipt-vendor-filter-$_listVendor'),
-                      initialValue: _listVendor,
-                      isExpanded: true,
-                      style: const TextStyle(
-                        fontSize: LaooTypography.comboBox,
-                        color: LaooColors.textPrimary,
-                      ),
-                      decoration: receiptInput('ผู้ขาย', _primary).copyWith(
-                        prefixIcon: IconButton(
-                          tooltip: 'ค้นหาผู้ขาย',
-                          onPressed: _busy ? null : _findListVendor,
-                          icon: Icon(Icons.search, color: _primary),
-                        ),
-                      ),
-                      items: [
-                        const DropdownMenuItem<int>(
-                          value: null,
-                          child: Text('ทั้งหมด'),
-                        ),
-                        for (final vendor in _vendors)
-                          DropdownMenuItem<int>(
-                            value: (vendor['vendorID'] as num).toInt(),
-                            child: Text(
-                              '${vendor['vendorCode']} | ${vendor['vendorName']}',
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                      ],
-                      onChanged: _busy
+                    OutlinedButton.icon(
+                      style: receiptButton(
+                        _primary,
+                        compact: true,
+                      ).merge(filterActionHeightStyle(height)),
+                      onPressed: _busy
                           ? null
-                          : (value) => setState(() => _listVendor = value),
+                          : () {
+                              _search.clear();
+                              _listVendor = null;
+                              _listWarehouse = null;
+                              _load();
+                            },
+                      icon: const Icon(Icons.filter_alt_off_outlined),
+                      label: const Text('ล้าง Filter'),
                     ),
-                  ),
-                  SizedBox(
-                    width: constraints.maxWidth < 280
-                        ? constraints.maxWidth
-                        : 280,
-                    child: DropdownButtonFormField<int>(
-                      key: ValueKey(
-                        'stock-receipt-warehouse-filter-$_listWarehouse',
-                      ),
-                      initialValue: _listWarehouse,
-                      isExpanded: true,
-                      style: const TextStyle(
-                        fontSize: LaooTypography.comboBox,
-                        color: LaooColors.textPrimary,
-                      ),
-                      decoration: receiptInput('คลัง', _primary),
-                      items: [
-                        const DropdownMenuItem<int>(
-                          value: null,
-                          child: Text('ทั้งหมด'),
+                    SizedBox(
+                      width: constraints.maxWidth < 280
+                          ? constraints.maxWidth
+                          : 280,
+                      child: DropdownButtonFormField<int>(
+                        key: ValueKey(
+                          'stock-receipt-vendor-filter-$_listVendor',
                         ),
-                        for (final warehouse in _warehouses)
-                          DropdownMenuItem<int>(
-                            value: (warehouse['warehouseID'] as num).toInt(),
-                            child: Text(
-                              '${warehouse['warehouseCode']} | ${warehouse['warehouseName']}',
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                        initialValue: _listVendor,
+                        isExpanded: true,
+                        style: const TextStyle(
+                          fontSize: LaooTypography.comboBox,
+                          color: LaooColors.textPrimary,
+                        ),
+                        decoration: receiptInput('ผู้ขาย', _primary).copyWith(
+                          prefixIcon: IconButton(
+                            tooltip: 'ค้นหาผู้ขาย',
+                            onPressed: _busy ? null : _findListVendor,
+                            icon: Icon(Icons.search, color: _primary),
                           ),
-                      ],
-                      onChanged: _busy
-                          ? null
-                          : (value) => setState(() => _listWarehouse = value),
+                        ),
+                        items: [
+                          const DropdownMenuItem<int>(
+                            value: null,
+                            child: Text('ทั้งหมด'),
+                          ),
+                          for (final vendor in _vendors)
+                            DropdownMenuItem<int>(
+                              value: (vendor['vendorID'] as num).toInt(),
+                              child: Text(
+                                '${vendor['vendorCode']} | ${vendor['vendorName']}',
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                        ],
+                        onChanged: _busy
+                            ? null
+                            : (value) => setState(() => _listVendor = value),
+                      ),
                     ),
-                  ),
-                  FilledButton(
-                    style: receiptButton(_primary, compact: true),
-                    onPressed: _busy ? null : _load,
-                    child: const Text('ค้นหา'),
-                  ),
-                  OutlinedButton(
-                    style: receiptButton(_primary, compact: true),
-                    onPressed: _busy
-                        ? null
-                        : () {
-                            _search.clear();
-                            _listVendor = null;
-                            _listWarehouse = null;
-                            _load();
-                          },
-                    child: const Text('ล้าง Filter'),
-                  ),
-                ],
+                    SizedBox(
+                      width: constraints.maxWidth < 280
+                          ? constraints.maxWidth
+                          : 280,
+                      child: DropdownButtonFormField<int>(
+                        key: ValueKey(
+                          'stock-receipt-warehouse-filter-$_listWarehouse',
+                        ),
+                        initialValue: _listWarehouse,
+                        isExpanded: true,
+                        style: const TextStyle(
+                          fontSize: LaooTypography.comboBox,
+                          color: LaooColors.textPrimary,
+                        ),
+                        decoration: receiptInput('คลัง', _primary),
+                        items: [
+                          const DropdownMenuItem<int>(
+                            value: null,
+                            child: Text('ทั้งหมด'),
+                          ),
+                          for (final warehouse in _warehouses)
+                            DropdownMenuItem<int>(
+                              value: (warehouse['warehouseID'] as num).toInt(),
+                              child: Text(
+                                '${warehouse['warehouseCode']} | ${warehouse['warehouseName']}',
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                        ],
+                        onChanged: _busy
+                            ? null
+                            : (value) => setState(() => _listWarehouse = value),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
             key: const ValueKey('stock-receipt-filter-card'),
@@ -843,16 +869,15 @@ class _StockReceiptWorkspaceState extends State<StockReceiptWorkspace> {
       : SizedBox(
           width: LaooLayout.paginationButtonSize,
           height: LaooLayout.paginationButtonSize,
-          child: OutlinedButton(
+          child: FilledButton(
             onPressed: onPressed,
-            style: OutlinedButton.styleFrom(
+            style: FilledButton.styleFrom(
               padding: EdgeInsets.zero,
               minimumSize: Size.zero,
-              backgroundColor: current ? _primary : Colors.white,
-              foregroundColor: current ? Colors.white : _primary,
-              side: BorderSide(
-                color: onPressed == null ? Colors.grey : _primary,
-              ),
+              backgroundColor: _primary,
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: Colors.grey.shade300,
+              disabledForegroundColor: Colors.grey.shade600,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(LaooRadius.xs),
               ),

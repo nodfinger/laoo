@@ -21,9 +21,10 @@ class LaooWorkspaceUiTokens {
     required this.borderColor,
     required this.backgroundColor,
     this.surfaceColor = Colors.white,
-    this.paginationButtonSize = 34,
+    this.paginationButtonSize = 36,
     this.dialogInsetPadding = 24,
     this.popupHeaderMinHeight = 48,
+    this.popupFieldSpacing = 14,
     this.popupMaxWidth = 480,
   });
 
@@ -48,6 +49,7 @@ class LaooWorkspaceUiTokens {
   final double paginationButtonSize;
   final double dialogInsetPadding;
   final double popupHeaderMinHeight;
+  final double popupFieldSpacing;
   final double popupMaxWidth;
 }
 
@@ -214,7 +216,7 @@ class LaooCaptionCard extends StatelessWidget {
                       children: [
                         if (captionIcon != null) ...[
                           captionIcon,
-                          SizedBox(width: tokens.itemSpacing),
+                          const SizedBox(width: 8),
                         ],
                         Expanded(
                           child: Text(
@@ -235,7 +237,7 @@ class LaooCaptionCard extends StatelessWidget {
                   children: [
                     if (captionIcon != null) ...[
                       captionIcon,
-                      SizedBox(width: tokens.itemSpacing),
+                      const SizedBox(width: 8),
                     ],
                     Flexible(
                       fit: FlexFit.loose,
@@ -330,12 +332,20 @@ class LaooWorkspaceDataTable extends StatelessWidget {
                   dataRowMaxHeight: 56,
                   horizontalMargin: 14,
                   columnSpacing: 20,
-                  dividerThickness: 1,
+                  dividerThickness: .6,
                   border: TableBorder(
-                    horizontalInside: BorderSide(color: tokens.borderColor),
-                    bottom: BorderSide(color: tokens.borderColor),
+                    horizontalInside: BorderSide(
+                      color: tokens.borderColor,
+                      width: .6,
+                    ),
+                    bottom: BorderSide(color: tokens.borderColor, width: .6),
                   ),
-                  headingRowColor: headingRowColor,
+                  headingRowColor:
+                      headingRowColor ??
+                      WidgetStatePropertyAll(
+                        tokens.primaryColor.withValues(alpha: .12),
+                      ),
+                  dataRowColor: WidgetStatePropertyAll(tokens.surfaceColor),
                   headingTextStyle:
                       headingTextStyle ??
                       tokens.tableStyle.copyWith(
@@ -534,38 +544,36 @@ class LaooPaginationCard extends StatelessWidget {
       height: tokens.paginationHeight,
       child: LaooSurfaceCard(
         tokens: tokens,
-        padding: EdgeInsets.symmetric(
-          horizontal: tokens.cardPadding.horizontal / 2,
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 10),
         child: Align(
           alignment: Alignment.centerLeft,
           child: Wrap(
             alignment: WrapAlignment.start,
             crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: tokens.itemSpacing * 2,
+            spacing: 12,
             runSpacing: tokens.itemSpacing,
             children: [
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  OutlinedButton(
+                  FilledButton(
                     onPressed: onPrevious,
                     style: _buttonStyle(tokens),
-                    child: const Text('<'),
+                    child: const Icon(Icons.chevron_left, size: 22),
                   ),
-                  SizedBox(width: tokens.itemSpacing),
+                  const SizedBox(width: 6),
                   IgnorePointer(
                     child: FilledButton(
                       onPressed: () {},
-                      style: _buttonStyle(tokens, current: true),
+                      style: _buttonStyle(tokens),
                       child: Text('$page'),
                     ),
                   ),
-                  SizedBox(width: tokens.itemSpacing),
-                  OutlinedButton(
+                  const SizedBox(width: 6),
+                  FilledButton(
                     onPressed: onNext,
                     style: _buttonStyle(tokens),
-                    child: const Text('>'),
+                    child: const Icon(Icons.chevron_right, size: 22),
                   ),
                 ],
               ),
@@ -578,16 +586,17 @@ class LaooPaginationCard extends StatelessWidget {
   }
 
   ButtonStyle _buttonStyle(
-    LaooWorkspaceUiTokens tokens, {
-    bool current = false,
-  }) => OutlinedButton.styleFrom(
+    LaooWorkspaceUiTokens tokens,
+  ) => FilledButton.styleFrom(
     minimumSize: Size(tokens.paginationButtonSize, tokens.paginationButtonSize),
     maximumSize: Size(tokens.paginationButtonSize, tokens.paginationButtonSize),
     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
     padding: EdgeInsets.zero,
     textStyle: tokens.buttonStyle,
-    foregroundColor: current ? Colors.white : tokens.primaryColor,
-    backgroundColor: current ? tokens.primaryColor : tokens.surfaceColor,
+    foregroundColor: Colors.white,
+    backgroundColor: tokens.primaryColor,
+    disabledBackgroundColor: Colors.grey.shade300,
+    disabledForegroundColor: Colors.grey.shade700,
     side: BorderSide(color: tokens.primaryColor),
     shape: RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(tokens.radius),

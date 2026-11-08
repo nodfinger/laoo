@@ -72,11 +72,12 @@ class _ProviderPortfolioPageState extends State<ProviderPortfolioPage> {
         loading = false;
       });
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           error = e;
           loading = false;
         });
+      }
     }
   }
 
@@ -311,7 +312,7 @@ class _ProviderPortfolioPageState extends State<ProviderPortfolioPage> {
           : Image.network(
               '/api/public/providers/portfolio/${row['id']}/cover',
               fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) =>
+              errorBuilder: (_, _, _) =>
                   const Icon(Icons.broken_image_outlined),
             ),
     );
@@ -389,12 +390,13 @@ class _ProviderPortfolioPageState extends State<ProviderPortfolioPage> {
                     'active': active,
                   },
                 );
-                if (cover != null)
+                if (cover != null) {
                   await uploadProviderFile(
                     '/api/company/provider/portfolio/$id/cover',
                     fileName: cover!.fileName,
                     bytes: cover!.bytes,
                   );
+                }
               } else {
                 final response = _map(
                   await uploadProviderFile(
@@ -426,12 +428,13 @@ class _ProviderPortfolioPageState extends State<ProviderPortfolioPage> {
               if (dialogContext.mounted) Navigator.pop(dialogContext);
               if (!editing && mounted) _openForm();
             } catch (_) {
-              if (mounted)
+              if (mounted) {
                 providerMessage(
                   this.context,
                   'บันทึกผลงานไม่สำเร็จ',
                   error: true,
                 );
+              }
               setDialogState(() => saving = false);
             }
           }
@@ -651,7 +654,7 @@ class _ProviderPortfolioPageState extends State<ProviderPortfolioPage> {
                         ? '/api/public/providers/portfolio/${photo['id']}/cover'
                         : '/api/public/providers/portfolio/photos/${photo['id']}',
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) =>
+                    errorBuilder: (_, _, _) =>
                         const Icon(Icons.broken_image_outlined),
                   ),
                 ),

@@ -38,6 +38,12 @@ public sealed class RequireCompanyFeatureFilter(
         await using var connection = new SqlConnection(
             configuration.GetConnectionString("LaooDatabase"));
         await connection.OpenAsync(context.HttpContext.RequestAborted);
+        if (string.Equals(featureCode.Trim(), "SALES", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!await Laoo.Shared.Contracts.CompanyMenuAccess.IsSalesEnabledAsync(connection, user, context.HttpContext.RequestAborted))
+                Deny(context, "ระบบขายยังไม่ได้เปิดใช้งานสำหรับบริษัทนี้");
+            return;
+        }
         const string sql = """
 SELECT CASE WHEN EXISTS
 (

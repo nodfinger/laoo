@@ -75,6 +75,14 @@ https://localhost:7080/swagger
 
 ## local.json
 
+### ตั้งค่าหน้าแรก
+
+ตั้งค่า `HomePage:DefaultMode` ใน `appsettings.json`, `local.json` หรือ environment variable `HomePage__DefaultMode` เป็น `1` (Login), `2` (URL ภายนอก), `3` (ค้นหาช่าง ค่าเริ่มต้น) หรือ `4` (หน้า Intranet สาธารณะ) โดยตั้ง URL ของแบบ 2 ที่ `HomePage:Options:2:Url` หรือ `HomePage__Options__2__Url` ตัวอย่างอยู่ใน `appsettings.json` ไม่ต้องระบุข้อมูลลับในส่วนนี้
+
+สำหรับแบบ 2 ตั้ง `HomePage:Options:2:ShowLoginButton` เป็น `true` เพื่อแสดงเว็บปลายทางในกรอบพร้อมปุ่มเข้าสู่ระบบของแอปและปุ่มเปิดเว็บไซต์ หรือ `false` เพื่อเปลี่ยนไปยัง URL โดยตรงเหมือนเดิม ค่าเริ่มต้นคือ `false` เว็บไซต์ปลายทางบางแห่งอาจไม่อนุญาตให้แสดงในกรอบ ให้ใช้ปุ่มเปิดเว็บไซต์ในกรณีดังกล่าว
+
+เมื่อ API ไม่พร้อม เว็บใช้ค่าหน้าแรกที่เคยอ่านได้ล่าสุดสำหรับ API นั้น หรือแสดงหน้าค้นหาช่างหากยังไม่มีค่าเก็บไว้ การปรับค่าในไฟล์ที่รองรับ reload จะเห็นเมื่อเปิดหรือโหลดหน้าแรกใหม่ ส่วน environment variable ต้องเริ่ม API ใหม่
+
 ```json
 {
   "ConnectionStrings": {

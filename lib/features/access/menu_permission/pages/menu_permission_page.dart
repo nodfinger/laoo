@@ -1,10 +1,9 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../../app/theme/laoo_design_tokens.dart';
 import '../../../../app/theme/laoo_typography.dart';
 import '../../../../core/api/api_exception.dart';
-import '../../../../core/company_setup/company_setup_controller.dart';
+import '../../../../core/widgets/auto_dismiss_message.dart';
 import '../../../../features/support/presentation/widgets/support_workspace_shell.dart';
 import '../../../../app/theme/workspace_theme_presets.dart';
 import '../../role_group/data/role_group_repository.dart';
@@ -41,7 +40,7 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
   bool _canEdit = false, _canDelete = false;
   String? _message;
   bool _error = false;
-  Timer? _alertTimer;
+  int _alertSerial = 0;
   bool _card = false;
   final Set<String> _collapsedMenuGroups = <String>{};
 
@@ -63,12 +62,6 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
         );
       }
     } catch (_) {}
-  }
-
-  @override
-  void dispose() {
-    _alertTimer?.cancel();
-    super.dispose();
   }
 
   Future<void> _loadActions() async {
@@ -267,14 +260,11 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
   }
 
   void _notice(String text, {bool error = false}) {
-    _alertTimer?.cancel();
     if (!mounted) return;
     setState(() {
       _message = text;
       _error = error;
-    });
-    _alertTimer = Timer(companySetupController.alertDuration, () {
-      if (mounted) setState(() => _message = null);
+      _alertSerial++;
     });
   }
 
@@ -406,17 +396,22 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
                                     context,
                                   ).colorScheme.primary.withValues(alpha: .10),
                                 ),
-                                child: IconButton(
-                                  tooltip: _card
-                                      ? 'แสดงแบบรายการ'
-                                      : 'แสดงแบบการ์ด',
-                                  color: Theme.of(context).colorScheme.primary,
-                                  onPressed: () =>
-                                      setState(() => _card = !_card),
-                                  icon: Icon(
-                                    _card
-                                        ? Icons.view_list_outlined
-                                        : Icons.grid_view_outlined,
+                                child: SizedBox.square(
+                                  dimension: LaooTypography.buttonHeight,
+                                  child: IconButton(
+                                    tooltip: _card
+                                        ? 'แสดงแบบรายการ'
+                                        : 'แสดงแบบการ์ด',
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.primary,
+                                    onPressed: () =>
+                                        setState(() => _card = !_card),
+                                    icon: Icon(
+                                      _card
+                                          ? Icons.view_list_outlined
+                                          : Icons.grid_view_outlined,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -563,10 +558,13 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
                                   ],
                                   onChanged: (value) => setState(() {
                                     _selectedSystemLevel = value;
-                                    _selectedMenuGroup = null;
+                                    final groups = _menuGroups;
+                                    _selectedMenuGroup = value != null && groups.length == 1 && groups.first.configuredMenuGroupCount == 1 ? groups.first.groupKey : null;
+                                    if (_selectedMenuGroup != null) _collapsedMenuGroups.remove(_selectedMenuGroup);
                                   }),
                                 ),
                               ),
+                              if (!(_selectedSystemLevel != null && _menuGroups.length == 1 && _menuGroups.first.configuredMenuGroupCount == 1))
                               SizedBox(
                                 width: fieldWidth,
                                 child: DropdownButtonFormField<String>(
@@ -635,43 +633,14 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
               Positioned(
                 top: 12,
                 right: 24,
-                child: Material(
-                  elevation: 8,
-                  color:
-                      (_error
-                              ? Colors.red
-                              : Theme.of(context).colorScheme.primary)
-                          .withValues(alpha: .88),
-                  borderRadius: BorderRadius.circular(14),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 10,
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          _error
-                              ? Icons.error_outline
-                              : Icons.check_circle_outline,
-                          color: Colors.white,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          _message!,
-                          style: const TextStyle(color: Colors.white),
-                        ),
-                        IconButton(
-                          onPressed: () {
-                            _alertTimer?.cancel();
-                            setState(() => _message = null);
-                          },
-                          icon: const Icon(Icons.close, color: Colors.white),
-                        ),
-                      ],
-                    ),
-                  ),
+                left: 24,
+                child: AutoDismissMessage(
+                  key: ValueKey(_alertSerial),
+                  message: _message!,
+                  error: _error,
+                  onClose: () {
+                    if (mounted) setState(() => _message = null);
+                  },
                 ),
               ),
           ],
@@ -770,7 +739,7 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
             children: [
               Container(
                 padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-                color: primary.withValues(alpha: .07),
+                color: Colors.white,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -924,9 +893,7 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
         final collapsed = _isGroupCollapsed(row.groupKey);
         result.add(
           DataRow(
-            color: WidgetStatePropertyAll(
-              Theme.of(tableContext).colorScheme.primary.withValues(alpha: .06),
-            ),
+            color: const WidgetStatePropertyAll(Colors.white),
             cells: [
               DataCell(
                 SizedBox(
@@ -1105,7 +1072,7 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
     required String semanticLabel,
     bool tristate = false,
   }) {
-    final primary = Theme.of(context).colorScheme.primary;
+    final primary = workspaceThemeController.value.primary;
     return Checkbox(
       value: value,
       tristate: tristate,

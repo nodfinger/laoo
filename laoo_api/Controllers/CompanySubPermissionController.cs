@@ -1,5 +1,6 @@
 using System.Data;
 using System.Security.Claims;
+using LaooApi.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
@@ -170,12 +171,8 @@ FROM dbo.TDADEmployee E WHERE E.EmployeeID=@employee AND E.CompanyID=@company AN
         catch { await tx.RollbackAsync(token); throw; }
     }
 
-    private async Task<bool> CanAsync(SqlConnection c, string action, CancellationToken token)
-    {
-        const string sql = "SELECT CAST(CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADUser WHERE UserID=@user AND CompanyID=@company AND IsActive=1 AND IsCompanyAdmin=1) OR EXISTS(SELECT 1 FROM dbo.TDADUserPermission UP INNER JOIN dbo.TDADPermission P ON P.PermissionID=UP.PermissionID AND P.ProjectID=UP.ProjectID WHERE UP.UserID=@user AND UP.ProjectID=@project AND UP.IsAllowed=1 AND UP.IsActive=1 AND P.IsActive=1 AND P.ScreenCode=@screen AND P.ActionCode=@action) THEN 1 ELSE 0 END AS bit)";
-        await using var cmd = new SqlCommand(sql, c); Add(cmd,"@user",SqlDbType.BigInt,UserID()); Add(cmd,"@company",SqlDbType.BigInt,CompanyID()); Add(cmd,"@project",SqlDbType.BigInt,ProjectID()); Add(cmd,"@screen",SqlDbType.NVarChar,ScreenCode,20); Add(cmd,"@action",SqlDbType.NVarChar,action,20);
-        return (bool)(await cmd.ExecuteScalarAsync(token) ?? false);
-    }
+    private Task<bool> CanAsync(SqlConnection c, string action, CancellationToken token) =>
+        CompanyProjectPermission.IsAllowedAsync(c, User, ScreenCode, action, token);
     private long UserID()=>long.TryParse(User.FindFirstValue("user_id"),out var x)?x:0;
     private long CompanyID()=>long.TryParse(User.FindFirstValue("company_id"),out var x)?x:0;
     private long ProjectID()=>long.TryParse(User.FindFirstValue("project_id"),out var x)?x:0;

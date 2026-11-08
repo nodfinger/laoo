@@ -252,7 +252,7 @@ class _MeetingRoomUsagePageState extends State<MeetingRoomUsagePage> {
                   child: _loading
                       ? const Center(child: CircularProgressIndicator())
                       : _items.isEmpty
-                      ? Center(child: Text('ไม่พบ' + _caption))
+                      ? Center(child: Text('ไม่พบ$_caption'))
                       : ListView.separated(
                           itemCount: _items.length,
                           separatorBuilder: (_, _) => const Divider(
@@ -307,12 +307,12 @@ class _MeetingRoomUsagePageState extends State<MeetingRoomUsagePage> {
       OutlinedButton.icon(
         onPressed: () => _pick(true),
         icon: const Icon(Icons.calendar_today_outlined),
-        label: Text('จาก ' + _date(_from)),
+        label: Text('จาก ${_date(_from)}'),
       ),
       OutlinedButton.icon(
         onPressed: () => _pick(false),
         icon: const Icon(Icons.calendar_today_outlined),
-        label: Text('ถึง ' + _date(_to)),
+        label: Text('ถึง ${_date(_to)}'),
       ),
       if (widget.mode != _UsageMode.utilization)
         SizedBox(
@@ -332,7 +332,7 @@ class _MeetingRoomUsagePageState extends State<MeetingRoomUsagePage> {
       SizedBox(
         width: 220,
         child: DropdownButtonFormField<int?>(
-          value: _roomId,
+          initialValue: _roomId,
           decoration: const InputDecoration(labelText: 'ห้อง'),
           items: [
             const DropdownMenuItem(value: null, child: Text('ทุกห้อง')),
@@ -340,7 +340,7 @@ class _MeetingRoomUsagePageState extends State<MeetingRoomUsagePage> {
               (x) => DropdownMenuItem(
                 value: (x['roomId'] as num).toInt(),
                 child: Text(
-                  x['code'].toString() + ' | ' + x['name'].toString(),
+                  '${x['code']} | ${x['name']}',
                 ),
               ),
             ),
@@ -355,7 +355,7 @@ class _MeetingRoomUsagePageState extends State<MeetingRoomUsagePage> {
         SizedBox(
           width: 190,
           child: DropdownButtonFormField<String?>(
-            value: _status,
+            initialValue: _status,
             decoration: const InputDecoration(labelText: 'สถานะ'),
             items: const [
               DropdownMenuItem(value: null, child: Text('ทั้งหมด')),
@@ -454,23 +454,23 @@ class _MeetingRoomUsagePageState extends State<MeetingRoomUsagePage> {
           children: [
             Expanded(
               child: Text(
-                x['bookingNo'].toString() + ' | ' + x['subject'].toString(),
+                '${x['bookingNo']} | ${x['subject']}',
                 style: Theme.of(context).textTheme.titleSmall,
               ),
             ),
             Chip(label: Text(_state(state))),
           ],
         ),
-        Text(x['roomCode'].toString() + ' | ' + x['roomName'].toString()),
+        Text('${x['roomCode']} | ${x['roomName']}'),
         Text(
-          _dateTime(x['startDateTime']) + ' – ' + _dateTime(x['endDateTime']),
+          '${_dateTime(x['startDateTime'])} – ${_dateTime(x['endDateTime'])}',
         ),
         if (x['checkInDate'] != null)
-          Text('เช็กอินห้อง: ' + _dateTime(x['checkInDate'])),
+          Text('เช็กอินห้อง: ${_dateTime(x['checkInDate'])}'),
         if (x['returnDate'] != null)
-          Text('คืนห้อง: ' + _dateTime(x['returnDate'])),
+          Text('คืนห้อง: ${_dateTime(x['returnDate'])}'),
         if ((x['returnRemark'] ?? '').toString().isNotEmpty)
-          Text('หมายเหตุ: ' + x['returnRemark'].toString()),
+          Text('หมายเหตุ: ${x['returnRemark']}'),
         const SizedBox(height: 8),
         Wrap(
           spacing: 8,
@@ -497,26 +497,14 @@ class _MeetingRoomUsagePageState extends State<MeetingRoomUsagePage> {
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       Text(
-        _date(x['date']) +
-            ' | ' +
-            x['roomCode'].toString() +
-            ' ' +
-            x['roomName'].toString(),
+        '${_date(x['date'])} | ${x['roomCode']} ${x['roomName']}',
         style: Theme.of(context).textTheme.titleSmall,
       ),
       Text(
-        'รอบจอง ' +
-            x['bookingSlots'].toString() +
-            ' รอบ | เวลาตามจอง ' +
-            _mins(x['scheduledMinutes']),
+        'รอบจอง ${x['bookingSlots']} รอบ | เวลาตามจอง ${_mins(x['scheduledMinutes'])}',
       ),
       Text(
-        'เช็กอิน ' +
-            x['checkedIn'].toString() +
-            ' รอบ | คืนห้อง ' +
-            x['returned'].toString() +
-            ' รอบ | ใช้จริง ' +
-            _mins(x['actualMinutes']),
+        'เช็กอิน ${x['checkedIn']} รอบ | คืนห้อง ${x['returned']} รอบ | ใช้จริง ${_mins(x['actualMinutes'])}',
       ),
     ],
   );
@@ -524,17 +512,13 @@ class _MeetingRoomUsagePageState extends State<MeetingRoomUsagePage> {
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       Text(
-        x['name'].toString() + ' | ' + (x['employeeCode'] ?? '-').toString(),
+        '${x['name']} | ${x['employeeCode'] ?? '-'}',
         style: Theme.of(context).textTheme.titleSmall,
       ),
-      Text('แผนก: ' + (x['department'] ?? '-').toString()),
-      Text(x['bookingNo'].toString() + ' | ' + x['subject'].toString()),
+      Text('แผนก: ${x['department'] ?? '-'}'),
+      Text('${x['bookingNo']} | ${x['subject']}'),
       Text(
-        x['roomCode'].toString() +
-            ' | ' +
-            x['roomName'].toString() +
-            ' | ' +
-            _dateTime(x['startDateTime']),
+        '${x['roomCode']} | ${x['roomName']} | ${_dateTime(x['startDateTime'])}',
       ),
       const Text('สถานะ: No-show'),
     ],
@@ -542,12 +526,12 @@ class _MeetingRoomUsagePageState extends State<MeetingRoomUsagePage> {
   int _number(String key) => (_summary[key] as num?)?.toInt() ?? 0;
   String _hours(String key) => _mins(_summary[key]);
   String _mins(Object? x) =>
-      (((x as num?)?.toInt() ?? 0) / 60).toStringAsFixed(1) + ' ชม.';
+      '${(((x as num?)?.toInt() ?? 0) / 60).toStringAsFixed(1)} ชม.';
   String _rate() {
     final all = _number('accepted');
     return all == 0
         ? '0%'
-        : (_number('noShow') * 100 / all).toStringAsFixed(1) + '%';
+        : '${(_number('noShow') * 100 / all).toStringAsFixed(1)}%';
   }
 
   String _state(String x) => switch (x) {
@@ -562,28 +546,17 @@ class _MeetingRoomUsagePageState extends State<MeetingRoomUsagePage> {
     final d = x is DateTime ? x : DateTime.tryParse(x.toString());
     return d == null
         ? '-'
-        : d.day.toString().padLeft(2, '0') +
-              '/' +
-              d.month.toString().padLeft(2, '0') +
-              '/' +
-              d.year.toString();
+        : '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
   }
 
   String _dateTime(Object? x) {
     final d = x is DateTime ? x : DateTime.tryParse(x.toString());
     return d == null
         ? '-'
-        : _date(d) +
-              ' ' +
-              d.hour.toString().padLeft(2, '0') +
-              ':' +
-              d.minute.toString().padLeft(2, '0');
+        : '${_date(d)} ${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
   }
 
   String _error(Object e, String fallback) => e is ApiException
-      ? e.message +
-            '\nรายละเอียดเพิ่มเติม: ' +
-            (e.description ?? 'กรุณาโหลดข้อมูลล่าสุดแล้วลองอีกครั้ง')
-      : fallback +
-            '\nรายละเอียดเพิ่มเติม: กรุณาตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง';
+      ? '${e.message}\nรายละเอียดเพิ่มเติม: ${e.description ?? 'กรุณาโหลดข้อมูลล่าสุดแล้วลองอีกครั้ง'}'
+      : '$fallback\nรายละเอียดเพิ่มเติม: กรุณาตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง';
 }

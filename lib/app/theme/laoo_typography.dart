@@ -30,7 +30,7 @@ abstract final class LaooTypography {
   static const double caption = 11;
 
   // Form / input
-  static const double inputText = 14;
+  static const double inputText = 16;
   static const double inputLabel = 16;
   static const double floatingLabel = 14;
   static const double materialFloatingLabelScale = 0.75;

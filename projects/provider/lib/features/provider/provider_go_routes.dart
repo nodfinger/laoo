@@ -8,7 +8,7 @@ List<GoRoute> buildProviderFeatureRoutes() => ProviderRoutes.all
       (r) => GoRoute(
         path: r.routePath,
         name: r.routeName,
-        builder: (_, __) => r.menuCode == ProviderMenuCodes.portfolio
+        builder: (_, _) => r.menuCode == ProviderMenuCodes.portfolio
             ? const ProviderPortfolioPage()
             : ProviderPage(
                 menuCode: r.menuCode,

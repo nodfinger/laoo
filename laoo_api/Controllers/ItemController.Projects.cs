@@ -8,6 +8,35 @@ namespace LaooApi.Controllers;
 
 public sealed partial class ItemController
 {
+    // Read-only dependencies of the item screen; this does not grant access
+    // to the master-data management screen or to any master-data mutations.
+    [HttpGet("master-options")]
+    public async Task<IActionResult> MasterOptions([FromQuery] string? groupCode, CancellationToken token)
+    {
+        var group = groupCode?.Trim();
+        if (group is not ("002" or "006" or "007"))
+            return BadRequest(new { message = "กลุ่มข้อมูลไม่รองรับ", description = "เลือกได้เฉพาะหน่วยนับ กลุ่มสินค้า หรือประเภทสินค้า" });
+
+        await using var c = await OpenAsync(token);
+        if (!await CanAsync(c, "VIEW", token)) return Forbid();
+        const string sql = """
+SELECT MasterCode,Name,ISNULL(Seq,0),NULLIF(ShortCode,N'')
+FROM dbo.TDSTMaster
+WHERE MasterGroupCode=@group AND OwnerType=N'C'
+  AND ISNULL(OwnerPartnerID,0)=0 AND OwnerCompanyID=@company
+ORDER BY Seq,Name;
+""";
+        await using var cmd = new SqlCommand(sql, c);
+        Add(cmd, "@group", SqlDbType.NVarChar, group, 10);
+        Add(cmd, "@company", SqlDbType.BigInt, CompanyID());
+        await using var reader = await cmd.ExecuteReaderAsync(token);
+        var rows = new List<MasterDataResponse>();
+        while (await reader.ReadAsync(token))
+            rows.Add(new MasterDataResponse(TextValue(reader, 0) ?? string.Empty,
+                TextValue(reader, 1) ?? string.Empty, Convert.ToInt32(reader.GetValue(2)), TextValue(reader, 3)));
+        return Ok(rows);
+    }
+
     private const string EnabledItemProjects = """
 SELECT P.ProjectID,P.ProjectCode,P.ProjectNameTH
 FROM dbo.TDADProject P

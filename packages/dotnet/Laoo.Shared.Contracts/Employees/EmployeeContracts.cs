@@ -54,6 +54,7 @@ public sealed class EmployeeResponse
     public bool NotifyByEmail { get; init; }
     public bool NotifyInSystem { get; init; } = true;
     public string? Telephone { get; init; }
+    public string? InternalTelephone { get; init; }
     public string? PersonalTelephone { get; init; }
     public string? ContName1 { get; init; }
     public string? ContRelation1 { get; init; }
@@ -77,6 +78,10 @@ public sealed class EmployeeResponse
 
 public sealed class EmployeeUpsertRequest
 {
+    private string? _internalTelephone;
+    private bool _notifyByEmail;
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool InternalTelephoneSpecified { get; private set; }
     public long? CompanyId { get; init; }
     public long? DivisionOrgUnitId { get; init; }
     public long? DepartmentOrgUnitId { get; init; }
@@ -85,9 +90,20 @@ public sealed class EmployeeUpsertRequest
     public string? NickName { get; init; }
     public string? PositionCode { get; init; }
     public string? Email { get; init; }
-    public bool NotifyByEmail { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool NotifyByEmailSpecified { get; private set; }
+    public bool NotifyByEmail
+    {
+        get => _notifyByEmail;
+        init { _notifyByEmail = value; NotifyByEmailSpecified = true; }
+    }
     public bool NotifyInSystem { get; init; } = true;
     public string? Telephone { get; init; }
+    public string? InternalTelephone
+    {
+        get => _internalTelephone;
+        init { _internalTelephone = value; InternalTelephoneSpecified = true; }
+    }
     public string? PersonalTelephone { get; init; }
     public string? ContName1 { get; init; }
     public string? ContRelation1 { get; init; }

@@ -16,14 +16,14 @@
 - พื้นหลังทุกหน้าจอใช้ `LaooColors.background` (`#F8F9FB`)
 - สีหลักและสีสถานะใช้งานอ่านจาก `workspaceThemeController.value.primary` หรือ `WorkspaceThemePreset.primary` ของ User ที่ Login
 - Card ใช้พื้นสีขาว ไม่มีเส้นกรอบสี และมุมโค้ง `LaooRadius.xs` (`4px`)
-- Margin รอบ Content ใช้ `LaooLayout.cardMargin` (`10px`)
+- Margin รอบ Content ทั่วไปใช้ `LaooLayout.cardMargin` (`10px`); หน้า List ใช้ `24px` ตาม `LIST_CARD_UI_STANDARD.md`
 - Padding ภายใน Card ใช้ `LaooLayout.cardPadding` (`10px`)
-- ระยะทั่วไประหว่าง Card/Section ใช้ `LaooLayout.cardSpacing` (`10px`); หน้าจอ List/CRUD ใช้ `LaooLayout.listSectionSpacing` (`6px`) และ Card รายการใช้ `LaooLayout.listItemSpacing` (`6px`)
-- เส้นคั่นใช้ `LaooColors.border` สีเทาอ่อนและบาง
+- ระยะทั่วไประหว่าง Card/Section ใช้ `LaooLayout.cardSpacing` (`10px`); หน้า List ใช้ระยะระหว่าง Section และ Card รายการ `8px` ตาม `LIST_CARD_UI_STANDARD.md`
+- เส้นคั่นทั่วไปใช้ `LaooColors.border` สีเทาอ่อนและบาง; เส้นคั่นใน Table/List ใช้ Semantic Border Color ตาม User Style และความหนาตาม `LIST_CARD_UI_STANDARD.md`
 - TextBox และ ComboBox ทุกหน้าจอ โดยเฉพาะภายใน Popup ต้องเป็นกรอบรอบช่องแบบ `OutlineInputBorder` เส้นสีเทาจางจาก Neutral/Border Token กลาง และมุมโค้ง `LaooRadius.xs` (`4px`) เสมอ ห้ามใช้เฉพาะเส้นใต้ ห้ามไม่มีกรอบ และห้ามใช้สี Primary เป็นกรอบในสถานะปกติ
-- สีที่สื่อการโต้ตอบหรือเอกลักษณ์ของผู้ใช้ เช่น Focus Border, Floating Label ขณะ Focus, Cursor, Selected Item, Icon และปุ่ม Action ต้องอ่านจาก `workspaceThemeController.value`/User Profile Theme ผ่าน Semantic Token กลาง ห้าม hardcode สีรายหน้าจอ
+- สีที่สื่อการโต้ตอบหรือเอกลักษณ์ของผู้ใช้ เช่น Focus Border, Floating Label เมื่อช่องมีข้อมูลหรือ Focus, Cursor, Selected Item, Icon และปุ่ม Action ต้องอ่านจาก `workspaceThemeController.value`/User Profile Theme ผ่าน Semantic Token กลาง ห้าม hardcode สีรายหน้าจอ; สีข้อความข้อมูลใช้ Semantic Text Color ของ Theme
 - สีพื้นขาว สีเทากลาง และสีสถานะ Error/Delete/Warning เป็น Semantic Color ตามมาตรฐาน ไม่ถูกแทนด้วยสี Primary ของ User; สถานะ Disabled ต้องใช้ Disabled/Neutral Token และยังคงกรอบเทาจางกับมุม `4px`
-- Caption หลักของหน้า `List`, `Card`, `Action` และ `Popup/Dialog` ใช้ `fontSize: 18`, `fontWeight: FontWeight.w700` และ `LaooColors.pageCaption` ซึ่งต้องเป็นสีดำ ส่วน Icon ใช้สีหลักของ User Style; ยกเว้น Popup ยืนยันลบ ให้ Caption และ Icon ใช้สี Error/Delete ตาม `alertdelete.md`
+- Caption หลักของหน้า `List`, `Card`, `Action` และ `Popup/Dialog` ทุกประเภทใช้ `fontSize: 18`, `fontWeight: FontWeight.w700` และ `LaooColors.pageCaption` ซึ่งต้องเป็นสีดำ ส่วน Icon ใช้สีหลักของ User Style; Popup ยืนยันลบใช้ Icon สี Error/Delete และ Caption สีดำ
 - ห้ามใช้ `Colors.green`, `Colors.blue` หรือสีหลักแบบ hardcode; สีแดงใช้ได้เฉพาะ Error, Delete, Offline หรือสถานะไม่ใช้งานตามข้อกำหนด
 - เมื่อ User เปลี่ยน Style สีทุกส่วนที่อิง User Styleต้องเปลี่ยนทันทีและต้องไม่กระทบ User คนอื่น
 
@@ -35,9 +35,13 @@
 - คำสั่งออกจากระบบอยู่ภายใน User Menu เพียงตำแหน่งเดียว ห้ามวางปุ่มซ้ำบน Workspace Header
 - Caption และชื่อเมนูต้องอ่านจาก Navigation API/`TDADMainMenu.MenuName` ผ่าน Resolver กลาง ห้าม hardcode แยกจาก Sidebar
 - ทุกหน้าจอที่ผูก MenuCode ต้องมีปุ่ม Icon ดาวอยู่ถัดจาก Caption เพื่อเพิ่ม/นำออกจากเมนูลัดของผู้ Login และสถานะต้องเชื่อมกับเมนูลัดส่วนกลางทันที
+- ดาวโปร่งคือยังไม่เป็นเมนูลัด ดาวทึบคือเป็นเมนูลัด; กดเพื่อสลับสถานะและบันทึกเฉพาะ User ที่ Login เมื่อสำเร็จให้อัปเดตดาวและแถบเมนูลัดทันที หากบันทึกไม่สำเร็จให้คงสถานะเดิมและแจ้งข้อผิดพลาด
+- มุมมอง Card ของหน้ารายการใช้หน้ากลุ่มสิทธิ์ `10003` เป็น Visual Reference ตามรายละเอียดใน `LIST_CARD_UI_STANDARD.md` โดยใช้สีจาก User Style และแสดง Action ตาม Permission
 - ทุกหน้าจอต้องเต็ม Content Area ภายใน Shared Workspace และไม่สร้าง Shell ซ้อน
 - เมื่อ Content Area แคบกว่า `900px` ต้องใช้ Responsive Layout ที่ไม่เกิด Overflow
 - Action ทุกชนิดต้องตรวจทั้ง `ScreenType` และ Permission ของ User; Backend ต้องตรวจซ้ำ
+- ผู้ใช้ที่มีสิทธิ์แสดงหน้าจอหลักต้องอ่านข้อมูลประกอบที่จำเป็นต่อหน้าจอนั้นได้อย่างน้อยแบบอ่านอย่างเดียว แม้ไม่มีสิทธิ์เข้าหน้าจัดการข้อมูลประกอบ เช่น รหัสพื้นฐาน โดย Backend ต้องตรวจสิทธิ์หน้าจอหลัก แพ็กเกจและขอบเขตเจ้าของข้อมูลทุกครั้ง และจำกัดเฉพาะข้อมูลที่หน้าจอนั้นจำเป็นต้องใช้
+- สิทธิ์อ่านข้อมูลประกอบไม่ถือเป็นสิทธิ์เข้าหน้าจัดการข้อมูลหลักทั้งหมด และไม่ให้สิทธิ์เพิ่ม แก้ไข หรือลบโดยอัตโนมัติ; แต่ละหน้าต้องกำหนดรายการข้อมูลประกอบที่อนุญาตอย่างชัดเจนและตรวจสิทธิ์ดำเนินการแยกตามปกติ
 - Error ทุกหน้าจอต้องแสดงข้อความหลักพร้อม `รายละเอียดเพิ่มเติม` ที่บอกสาเหตุหรือสิ่งที่ผู้ใช้ควรทำต่อ ตาม `POPUP_UI_STANDARD.md`; ห้ามแสดงข้อความ API แบบกว้างเพียงบรรทัดเดียว
 - แก้ UX/UI โดยไม่เปลี่ยน API, SQL, Repository หรือ Business Logic เว้นแต่คำสั่งระบุชัดเจน
 - หลังแก้ต้องตรวจ Responsive, Overflow, `dart format` และ `dart analyze` พร้อมสรุปไฟล์ที่แก้

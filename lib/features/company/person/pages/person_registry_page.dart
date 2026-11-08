@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:laoo_shared_admin_ui/laoo_shared_admin_ui.dart'
+    show FilterHeightSync, filterActionHeightStyle;
 
 import '../../../../app/theme/laoo_design_tokens.dart';
 import '../../../../app/theme/laoo_typography.dart';
@@ -235,12 +237,27 @@ class _PersonRegistryWorkspaceState extends State<PersonRegistryWorkspace> {
                       ),
                     ),
                     if (!compact)
-                      IconButton(
-                        tooltip: 'สลับ Card/List',
-                        color: _primary,
-                        onPressed: () => setState(() => _cards = !_cards),
-                        icon: Icon(_cards ? Icons.view_list : Icons.grid_view),
+                      SizedBox.square(
+                        dimension: LaooTypography.buttonHeight,
+                        child: IconButton(
+                          tooltip: 'สลับ Card/List',
+                          color: _primary,
+                          style: IconButton.styleFrom(
+                            backgroundColor: _primary.withValues(alpha: .1),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(
+                                LaooRadius.xs,
+                              ),
+                            ),
+                          ),
+                          onPressed: () => setState(() => _cards = !_cards),
+                          icon: Icon(
+                            _cards ? Icons.view_list : Icons.grid_view,
+                          ),
+                        ),
                       ),
+                    if (!compact && _actions['create'] == true)
+                      const SizedBox(width: 8),
                     if (_actions['create'] == true)
                       FilledButton.icon(
                         style: registryButton(_primary, filled: true),
@@ -253,69 +270,85 @@ class _PersonRegistryWorkspaceState extends State<PersonRegistryWorkspace> {
               ),
               const SizedBox(height: 6),
               registrySurface(
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    SizedBox(
-                      width: compact ? box.maxWidth - 40 : 360,
-                      child: TextField(
-                        key: const ValueKey('person-search'),
-                        controller: _search,
-                        decoration: registryInput(
-                          context,
-                          hint: 'ค้นหาชื่อ ชื่อเล่น โทรศัพท์ หรืออีเมล',
-                          icon: Icons.search,
-                        ),
-                        onSubmitted: (_) {
-                          _query = _search.text.trim();
-                          _page = 1;
-                          _load();
-                        },
-                      ),
-                    ),
-                    SizedBox(
-                      width: compact ? box.maxWidth - 40 : 180,
-                      child: DropdownButtonFormField<bool?>(
-                        initialValue: _active,
-                        decoration: registryInput(context, label: 'สถานะ'),
-                        items: const [
-                          DropdownMenuItem(value: null, child: Text('ทั้งหมด')),
-                          DropdownMenuItem(value: true, child: Text('ใช้งาน')),
-                          DropdownMenuItem(
-                            value: false,
-                            child: Text('ไม่ใช้งาน'),
+                FilterHeightSync(
+                  builder: (context, searchKey, height) => Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      SizedBox(
+                        key: searchKey,
+                        width: compact ? box.maxWidth - 40 : 360,
+                        child: TextField(
+                          key: const ValueKey('person-search'),
+                          controller: _search,
+                          decoration: registryInput(
+                            context,
+                            hint: 'ค้นหาชื่อ ชื่อเล่น โทรศัพท์ หรืออีเมล',
+                            icon: Icons.search,
                           ),
-                        ],
-                        onChanged: (value) => setState(() => _active = value),
+                          onSubmitted: (_) {
+                            _query = _search.text.trim();
+                            _page = 1;
+                            _load();
+                          },
+                        ),
                       ),
-                    ),
-                    FilledButton(
-                      style: registryButton(_primary, filled: true),
-                      onPressed: _loading
-                          ? null
-                          : () {
-                              _query = _search.text.trim();
-                              _page = 1;
-                              _load();
-                            },
-                      child: const Text('ค้นหา'),
-                    ),
-                    OutlinedButton(
-                      style: registryButton(_primary),
-                      onPressed: _loading
-                          ? null
-                          : () {
-                              _search.clear();
-                              _query = '';
-                              _active = null;
-                              _page = 1;
-                              _load();
-                            },
-                      child: const Text('ล้าง Filter'),
-                    ),
-                  ],
+                      FilledButton.icon(
+                        style: registryButton(
+                          _primary,
+                          filled: true,
+                        ).merge(filterActionHeightStyle(height)),
+                        onPressed: _loading
+                            ? null
+                            : () {
+                                _query = _search.text.trim();
+                                _page = 1;
+                                _load();
+                              },
+                        icon: const Icon(Icons.search),
+                        label: const Text('ค้นหา'),
+                      ),
+                      OutlinedButton.icon(
+                        style: registryButton(
+                          _primary,
+                        ).merge(filterActionHeightStyle(height)),
+                        onPressed: _loading
+                            ? null
+                            : () {
+                                _search.clear();
+                                _query = '';
+                                _active = null;
+                                _page = 1;
+                                _load();
+                              },
+                        icon: const Icon(Icons.filter_alt_off_outlined),
+                        label: const Text('ล้าง Filter'),
+                      ),
+                      SizedBox(
+                        width: compact ? box.maxWidth - 40 : 180,
+                        child: DropdownButtonFormField<bool?>(
+                          initialValue: _active,
+                          decoration: registryInput(context, label: 'สถานะ'),
+                          items: const [
+                            DropdownMenuItem(
+                              value: null,
+                              child: Text('ทั้งหมด'),
+                            ),
+                            DropdownMenuItem(
+                              value: true,
+                              child: Text('ใช้งาน'),
+                            ),
+                            DropdownMenuItem(
+                              value: false,
+                              child: Text('ไม่ใช้งาน'),
+                            ),
+                          ],
+                          onChanged: (value) => setState(() => _active = value),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(height: LaooLayout.cardSpacing),
@@ -557,7 +590,7 @@ class _PersonRegistryFormState extends State<PersonRegistryForm> {
         ],
       ),
       content: SizedBox(
-        width: 560,
+        width: 480,
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Form(
@@ -586,7 +619,10 @@ class _PersonRegistryFormState extends State<PersonRegistryForm> {
                 TextFormField(
                   controller: _name,
                   maxLength: 200,
-                  decoration: registryInput(context, label: 'ชื่อ-นามสกุล *'),
+                  decoration: registryInput(
+                    context,
+                    label: 'ชื่อ-นามสกุล *',
+                  ).copyWith(counterText: ''),
                   validator: (v) => v == null || v.trim().isEmpty
                       ? 'กรุณาระบุชื่อ-นามสกุล'
                       : null,
@@ -595,7 +631,10 @@ class _PersonRegistryFormState extends State<PersonRegistryForm> {
                 TextFormField(
                   controller: _nick,
                   maxLength: 100,
-                  decoration: registryInput(context, label: 'ชื่อเล่น'),
+                  decoration: registryInput(
+                    context,
+                    label: 'ชื่อเล่น',
+                  ).copyWith(counterText: ''),
                 ),
                 const SizedBox(height: 12),
                 LayoutBuilder(
@@ -604,13 +643,19 @@ class _PersonRegistryFormState extends State<PersonRegistryForm> {
                     final phone = TextFormField(
                       controller: _mobile,
                       maxLength: 50,
-                      decoration: registryInput(context, label: 'โทรศัพท์'),
+                      decoration: registryInput(
+                        context,
+                        label: 'โทรศัพท์',
+                      ).copyWith(counterText: ''),
                     );
                     final email = TextFormField(
                       controller: _email,
                       maxLength: 320,
                       keyboardType: TextInputType.emailAddress,
-                      decoration: registryInput(context, label: 'อีเมล'),
+                      decoration: registryInput(
+                        context,
+                        label: 'อีเมล',
+                      ).copyWith(counterText: ''),
                     );
                     return compact
                         ? Column(
@@ -639,15 +684,17 @@ class _PersonRegistryFormState extends State<PersonRegistryForm> {
       ),
       actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
       actions: [
-        OutlinedButton(
+        OutlinedButton.icon(
           style: registryButton(primary),
           onPressed: _saving ? null : () => Navigator.pop(context),
-          child: const Text('ยกเลิก'),
+          icon: const Icon(Icons.close),
+          label: const Text('ยกเลิก'),
         ),
-        FilledButton(
+        FilledButton.icon(
           style: registryButton(primary, filled: true),
           onPressed: _saving ? null : _save,
-          child: Text(_saving ? 'กำลังบันทึก…' : 'บันทึก'),
+          icon: const Icon(Icons.save_outlined),
+          label: Text(_saving ? 'กำลังบันทึก…' : 'บันทึก'),
         ),
       ],
     );

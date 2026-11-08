@@ -59,7 +59,7 @@ class _MyTrainingPageState extends State<MyTrainingPage> {
                 'pageSize': trainingPageSize.toString(),
                 if (_courseController.text.trim().isNotEmpty)
                   'course': _courseController.text.trim(),
-                if (_resultStatus != null) 'resultStatus': _resultStatus!,
+                'resultStatus': ?_resultStatus,
               },
             )
             as Map,
@@ -89,7 +89,7 @@ class _MyTrainingPageState extends State<MyTrainingPage> {
     try {
       final data = Map<String, dynamic>.from(
         await _api.get(
-              '/api/company/my-training/' + item['participantId'].toString(),
+              '/api/company/my-training/${item['participantId']}',
             )
             as Map,
       );
@@ -156,7 +156,7 @@ class _MyTrainingPageState extends State<MyTrainingPage> {
                   TrainingFilterField(
                     width: 220,
                     child: DropdownButtonFormField<String?>(
-                      value: _resultStatus,
+                      initialValue: _resultStatus,
                       decoration: const InputDecoration(
                         labelText: 'ผลสอบ',
                         border: OutlineInputBorder(),
@@ -322,12 +322,8 @@ class _MyTrainingPageState extends State<MyTrainingPage> {
                                     ),
                                     DataCell(
                                       Text(
-                                        (x['roomCode']?.toString() ?? '-') +
-                                            ' | ' +
-                                            (x['roomName']?.toString() ?? '-') +
-                                            '\n' +
-                                            (x['startDateTime']?.toString() ??
-                                                '-'),
+                                        '${x['roomCode']?.toString() ?? '-'} | ${x['roomName']?.toString() ?? '-'}\n${x['startDateTime']?.toString() ??
+                                                '-'}',
                                       ),
                                     ),
                                     DataCell(
@@ -393,13 +389,7 @@ class _MyTrainingPageState extends State<MyTrainingPage> {
           : x['submitted'] == true
           ? 'ไม่ผ่าน'
           : 'กำลังทำ';
-      return x['score'].toString() +
-          '/' +
-          (x['maxScore']?.toString() ?? '-') +
-          ' (' +
-          (x['percent']?.toString() ?? '-') +
-          '%) ' +
-          result;
+      return '${x['score']}/${x['maxScore']?.toString() ?? '-'} (${x['percent']?.toString() ?? '-'}%) $result';
     }
     return switch (x['status']?.toString()) {
       'NOT_ELIGIBLE' => 'ไม่มีสิทธิ์สอบ',
@@ -427,8 +417,8 @@ class _DetailDialog extends StatelessWidget {
           style: trainingUiTokens.workspace.sectionStyle,
         ),
         const SizedBox(height: 16),
-        Text('เลขที่จอง: ' + (data['bookingNo']?.toString() ?? '-')),
-        Text('สถานะคำเชิญ: ' + (data['invitationStatus']?.toString() ?? '-')),
+        Text('เลขที่จอง: ${data['bookingNo']?.toString() ?? '-'}'),
+        Text('สถานะคำเชิญ: ${data['invitationStatus']?.toString() ?? '-'}'),
         const SizedBox(height: 12),
         for (final raw in (data['results'] as List? ?? const []))
           Builder(
@@ -445,9 +435,7 @@ class _DetailDialog extends StatelessWidget {
                   ),
                   subtitle: Text(item['status']?.toString() ?? '-'),
                   trailing: Text(
-                    (item['score']?.toString() ?? '-') +
-                        ' / ' +
-                        (item['maxScore']?.toString() ?? '-'),
+                    '${item['score']?.toString() ?? '-'} / ${item['maxScore']?.toString() ?? '-'}',
                   ),
                 ),
               );

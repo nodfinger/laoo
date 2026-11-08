@@ -670,6 +670,8 @@ void main() {
   );
   configureMeetingFeatureHost(_buildMeetingWorkspaceShell);
   configureServiceWorkspaceShell(_buildMeetingWorkspaceShell);
+  configureServiceAlertPrimary(() => workspaceThemeController.value.primary);
+  configureServiceAlertDuration(() => companySetupController.alertDuration);
   configureGatePassFeatureHost(
     _buildMeetingWorkspaceShell,
     apiClientFactory: ApiClient.new,

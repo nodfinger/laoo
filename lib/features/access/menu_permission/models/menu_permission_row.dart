@@ -2,6 +2,7 @@ class MenuPermissionRow {
   const MenuPermissionRow({
     this.projectId,
     this.projectName,
+    this.configuredMenuGroupCount,
     required this.menuCode,
     required this.menuName,
     required this.menuGroupCode,
@@ -14,6 +15,7 @@ class MenuPermissionRow {
   });
   final int? projectId;
   final String? projectName;
+  final int? configuredMenuGroupCount;
   String get groupKey =>
       projectId == null ? menuGroupCode : '$projectId:$menuGroupCode';
   String get groupLabel => projectName == null || projectName!.isEmpty
@@ -26,6 +28,7 @@ class MenuPermissionRow {
       MenuPermissionRow(
         projectId: (json['projectId'] as num?)?.toInt(),
         projectName: json['projectName'] as String?,
+        configuredMenuGroupCount: (json['configuredMenuGroupCount'] as num?)?.toInt(),
         menuCode: json['menuCode'] as String? ?? '',
         menuName: json['menuName'] as String? ?? '',
         menuGroupCode: json['menuGroupCode'] as String? ?? '',
@@ -52,6 +55,7 @@ class MenuPermissionRow {
   }) => MenuPermissionRow(
     projectId: projectId,
     projectName: projectName,
+    configuredMenuGroupCount: configuredMenuGroupCount,
     menuCode: menuCode,
     menuName: menuName,
     menuGroupCode: menuGroupCode,

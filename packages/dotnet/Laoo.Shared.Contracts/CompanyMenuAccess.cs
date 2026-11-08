@@ -7,6 +7,30 @@ namespace Laoo.Shared.Contracts;
 /// <summary>Company role membership is central; permission rows retain their target ProjectID.</summary>
 public static class CompanyMenuAccess
 {
+    public static async Task<bool> IsSalesEnabledAsync(DbConnection connection, ClaimsPrincipal user, CancellationToken token)
+    {
+        if (!long.TryParse(user.FindFirst("company_id")?.Value, out var companyId)
+            || !long.TryParse(user.FindFirst("partner_id")?.Value, out var partnerId)) return false;
+        await using var cmd = connection.CreateCommand();
+        cmd.CommandText = """
+SELECT CAST(CASE WHEN EXISTS (
+ SELECT 1 FROM dbo.TDADCompanyProjectSubscription S
+ JOIN dbo.TDADProject P ON P.ProjectID=S.ProjectID AND P.ProjectCode=N'LAOO_TRADE' AND P.IsActive=1
+ JOIN dbo.TDADProjectPackage PK ON PK.PackageID=S.PackageID AND PK.ProjectID=P.ProjectID AND PK.IsActive=1
+ JOIN dbo.TDADProjectPackageFeature PF ON PF.PackageID=PK.PackageID AND PF.FeatureCode=N'SALES' AND PF.IsEnabled=1
+ WHERE S.CompanyID=@CompanyID AND S.PartnerID=@PartnerID AND S.IsCurrent=1 AND S.StatusCode IN(N'ACTIVE',N'TRIAL')
+ AND S.StartDate<=CONVERT(date,SYSUTCDATETIME()) AND (S.ExpireDate IS NULL OR S.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))
+) OR (NOT EXISTS(SELECT 1 FROM dbo.TDADProject WHERE ProjectCode=N'LAOO_TRADE' AND IsActive=1) AND EXISTS (SELECT 1 FROM dbo.TDADCompanyFeature CF
+ JOIN dbo.TDADProject P ON P.ProjectID=CF.ProjectID AND P.ProjectCode=N'LAOO' AND P.IsActive=1
+ JOIN dbo.TDADFeature F ON F.FeatureCode=CF.FeatureCode AND F.IsActive=1
+ WHERE CF.CompanyID=@CompanyID AND CF.PartnerID=@PartnerID AND CF.FeatureCode=N'SALES' AND CF.IsEnabled=1
+ AND (CF.StartDate IS NULL OR CF.StartDate<=CONVERT(date,SYSUTCDATETIME()))
+ AND (CF.ExpireDate IS NULL OR CF.ExpireDate>=CONVERT(date,SYSUTCDATETIME())))) THEN 1 ELSE 0 END AS bit)
+""";
+        Add(cmd, "@CompanyID", DbType.Int64, companyId);
+        Add(cmd, "@PartnerID", DbType.Int64, partnerId);
+        return Convert.ToBoolean(await cmd.ExecuteScalarAsync(token));
+    }
     public static async Task<bool> IsAllowedAsync(DbConnection connection, ClaimsPrincipal user,
         string menu, string action, CancellationToken token)
     {
@@ -32,6 +56,13 @@ WITH Eligible AS
  JOIN dbo.TDSTCompanySetUp C ON C.CompanyID=@CompanyID AND C.PartnerID=@PartnerID AND C.IsActive=1
  JOIN dbo.TDADUserProject UP ON UP.ProjectID=P.ProjectID AND UP.UserID=@UserID AND UP.CompanyID=C.CompanyID AND UP.IsActive=1
  WHERE PM.MenuCode=@MenuCode AND PM.IsActive=1
+ AND (M.MenuGroupCode<>N'09' OR P.ProjectCode=N'LAOO_TRADE' OR EXISTS
+   (SELECT 1 FROM dbo.TDADCompanyFeature CF
+    JOIN dbo.TDADProject CoreProject ON CoreProject.ProjectID=CF.ProjectID AND CoreProject.ProjectCode=N'LAOO' AND CoreProject.IsActive=1
+    JOIN dbo.TDADFeature F ON F.FeatureCode=CF.FeatureCode AND F.IsActive=1
+    WHERE CF.PartnerID=@PartnerID AND CF.CompanyID=@CompanyID AND CF.FeatureCode=N'SALES' AND CF.IsEnabled=1
+      AND (CF.StartDate IS NULL OR CF.StartDate<=CONVERT(date,SYSUTCDATETIME()))
+      AND (CF.ExpireDate IS NULL OR CF.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))))
  AND
  (
    (P.ProjectType=N'CORE' AND EXISTS

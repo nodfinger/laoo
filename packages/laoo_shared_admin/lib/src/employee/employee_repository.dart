@@ -5,6 +5,7 @@ import 'package:laoo_shared_core/laoo_shared_core.dart';
 
 import 'employee_models.dart';
 import 'employee_screen_contracts.dart';
+import '../organization/organization_models.dart';
 
 class EmployeeRepository {
   EmployeeRepository(this._api, {required this.scope});
@@ -14,6 +15,13 @@ class EmployeeRepository {
 
   ScreenContract get contract => EmployeeScreenContracts.forScope(scope);
   bool get usesCompanyPerson => scope != EmployeeOwnerScope.partner;
+
+  Future<OrganizationStructureSnapshot> organizationOptions() async {
+    final data = await _api.get('${contract.apiPath}/organization-options');
+    return OrganizationStructureSnapshot.fromJson(
+      Map<String, dynamic>.from(data as Map),
+    );
+  }
 
   Future<Map<String, bool>> actions() async {
     final data = await _api.get('${contract.apiPath}/actions');

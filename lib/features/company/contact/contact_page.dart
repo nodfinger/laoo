@@ -196,13 +196,33 @@ class _ContactPageState extends State<ContactPage> {
         ),
     ],
   );
+  Widget _status(Map<String, dynamic> row) {
+    final active = row['isActive'] == true;
+    final color = active
+        ? businessCardOcrUi(context).primaryColor
+        : Theme.of(context).colorScheme.error;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: .12),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        child: Text(
+          active ? 'ใช้งาน' : 'ไม่ใช้งาน',
+          style: TextStyle(color: color),
+        ),
+      ),
+    );
+  }
+
   Widget _result(bool cards) {
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_rows.isEmpty) return const Center(child: Text('ไม่พบข้อมูลผู้ติดต่อ'));
     if (cards) {
       return ListView.separated(
         itemCount: _rows.length,
-        separatorBuilder: (_, _) => const SizedBox(height: 6),
+        separatorBuilder: (_, _) => const SizedBox(height: 8),
         itemBuilder: (_, i) {
           final row = _rows[i];
           return LaooSurfaceCard(
@@ -230,7 +250,7 @@ class _ContactPageState extends State<ContactPage> {
                           (row['email'] ?? ''),
                         ].where((e) => e.toString().isNotEmpty).join(' • '),
                       ),
-                      Text(row['isActive'] == true ? 'ใช้งาน' : 'ไม่ใช้งาน'),
+                      _status(row),
                     ],
                   ),
                 ),
@@ -264,9 +284,7 @@ class _ContactPageState extends State<ContactPage> {
               DataCell(Text((_rows[i]['position'] ?? '').toString())),
               DataCell(Text((_rows[i]['phone'] ?? '').toString())),
               DataCell(Text((_rows[i]['email'] ?? '').toString())),
-              DataCell(
-                Text(_rows[i]['isActive'] == true ? 'ใช้งาน' : 'ไม่ใช้งาน'),
-              ),
+              DataCell(_status(_rows[i])),
             ],
           ),
       ],
@@ -280,7 +298,7 @@ class _ContactPageState extends State<ContactPage> {
     menuScope: WorkspaceMenuScope.company,
     child: LayoutBuilder(
       builder: (context, box) {
-        final compact = box.maxWidth < 900, t = businessCardOcrUi(context);
+        final compact = box.maxWidth < 1100, t = businessCardOcrUi(context);
         final pages = _total == 0 ? 1 : (_total / _pageSize).ceil();
         return ColoredBox(
           color: t.backgroundColor,
@@ -337,10 +355,18 @@ class _ContactPageState extends State<ContactPage> {
                           _page = 1;
                           _load();
                         },
+                  style: FilledButton.styleFrom(
+                    minimumSize: Size(0, t.buttonHeight),
+                    maximumSize: Size(double.infinity, t.buttonHeight),
+                  ),
                   icon: const Icon(Icons.search),
                   label: const Text('ค้นหา'),
                 ),
                 OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: Size(0, t.buttonHeight),
+                    maximumSize: Size(double.infinity, t.buttonHeight),
+                  ),
                   onPressed: _loading
                       ? null
                       : () {
