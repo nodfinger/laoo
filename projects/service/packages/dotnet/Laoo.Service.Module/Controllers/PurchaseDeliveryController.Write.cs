@@ -37,7 +37,7 @@ public sealed partial class PurchaseDeliveryController
             if(!edit)
             {
                 await using var n=new SqlCommand("SELECT ISNULL(MAX(TRY_CONVERT(int,SUBSTRING(DeliveryCode,3,20))),0)+1 FROM dbo.TDAPPurchaseDelivery WITH(UPDLOCK,HOLDLOCK) WHERE CompanyID=@c AND DeliveryCode LIKE N'PD%'",c,tx);
-                P(n,"@c",SqlDbType.BigInt,CompanyId);code=$"PD{Convert.ToInt32(await n.ExecuteScalarAsync(ct)):D6}";
+                P(n,"@c",SqlDbType.BigInt,CompanyId);code=await LaooServiceModule.Infrastructure.ConfiguredDocumentNumber.Get(c,tx,CompanyId,"09009",ct) ?? $"PD{Convert.ToInt32(await n.ExecuteScalarAsync(ct)):D6}";
                 await using var q=new SqlCommand("INSERT dbo.TDAPPurchaseDelivery(CompanyID,BranchID,VendorID,DeliveryCode,SupplierDocumentCode,DeliveryDate,PaymentType,CreditDays,DueDate,TotalAmount,StatusCode,Remark,CreatedBy) OUTPUT INSERTED.PurchaseDeliveryID VALUES(@c,@b,@v,@code,@supplier,@date,@type,@days,@due,@total,N'DRAFT',@remark,@user)",c,tx);
                 Bind(q,x,total,due);P(q,"@c",SqlDbType.BigInt,CompanyId);P(q,"@v",SqlDbType.BigInt,x.VendorId);P(q,"@code",SqlDbType.NVarChar,code,30);P(q,"@user",SqlDbType.BigInt,UserId);id=Convert.ToInt64(await q.ExecuteScalarAsync(ct));
             }

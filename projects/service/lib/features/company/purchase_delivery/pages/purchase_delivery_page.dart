@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../../app/theme/laoo_design_tokens.dart';
+import '../../../../app/theme/laoo_typography.dart';
 import '../../../../app/theme/workspace_theme_presets.dart';
 import '../../../../core/api/api_client.dart';
 import '../../../../core/company_setup/company_setup_controller.dart';
@@ -411,6 +412,24 @@ class _PurchaseDeliveryPageState extends State<PurchaseDeliveryPage> {
     child: child,
   );
 
+  Widget _pageButton(IconData icon, VoidCallback? onPressed) => SizedBox.square(
+    dimension: LaooLayout.paginationButtonSize,
+    child: IconButton.filled(
+      padding: EdgeInsets.zero,
+      onPressed: onPressed,
+      style: IconButton.styleFrom(
+        backgroundColor: _primary,
+        foregroundColor: Theme.of(context).colorScheme.onPrimary,
+        disabledBackgroundColor: Colors.grey.shade300,
+        disabledForegroundColor: Colors.grey.shade700,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
+        ),
+      ),
+      icon: Icon(icon, size: 22),
+    ),
+  );
+
   Widget _list() => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
@@ -496,13 +515,25 @@ class _PurchaseDeliveryPageState extends State<PurchaseDeliveryPage> {
                 },
               ),
             ),
-            OutlinedButton.icon(
+            FilledButton.icon(
               onPressed: () {
                 _page = 1;
                 _load();
               },
               icon: const Icon(Icons.search),
               label: const Text('\u{e04}\u{e49}\u{e19}\u{e2b}\u{e32}'),
+            ),
+            OutlinedButton.icon(
+              onPressed: () {
+                _search.clear();
+                setState(() {
+                  _statusFilter = 'ALL';
+                  _page = 1;
+                });
+                _load();
+              },
+              icon: const Icon(Icons.filter_alt_off_outlined),
+              label: const Text('ล้าง Filter'),
             ),
           ],
         ),
@@ -514,6 +545,19 @@ class _PurchaseDeliveryPageState extends State<PurchaseDeliveryPage> {
                 scrollDirection: Axis.horizontal,
                 child: DataTable(
                   columnSpacing: 22,
+                  headingRowColor: WidgetStatePropertyAll(
+                    _primary.withValues(alpha: .10),
+                  ),
+                  headingTextStyle: TextStyle(
+                    color: _primary,
+                    fontSize: LaooTypography.tableHeader,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  dataTextStyle: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontSize: LaooTypography.tableBody,
+                  ),
+                  dividerThickness: .6,
                   columns: const [
                     DataColumn(
                       label: Text('\u{e08}\u{e31}\u{e14}\u{e01}\u{e32}\u{e23}'),
@@ -616,31 +660,53 @@ class _PurchaseDeliveryPageState extends State<PurchaseDeliveryPage> {
               ),
       ),
       _surface(
-        Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            Text(
-              '\u{e2b}\u{e19}\u{e49}\u{e32} $_page / $_pages \u{2022} $_total \u{e23}\u{e32}\u{e22}\u{e01}\u{e32}\u{e23}',
-            ),
-            IconButton(
-              onPressed: _page > 1
-                  ? () {
-                      setState(() => _page--);
-                      _load();
-                    }
-                  : null,
-              icon: const Icon(Icons.chevron_left),
-            ),
-            IconButton(
-              onPressed: _page < _pages
-                  ? () {
-                      setState(() => _page++);
-                      _load();
-                    }
-                  : null,
-              icon: const Icon(Icons.chevron_right),
-            ),
-          ],
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              _pageButton(
+                Icons.chevron_left,
+                _page > 1
+                    ? () {
+                        setState(() => _page--);
+                        _load();
+                      }
+                    : null,
+              ),
+              const SizedBox(width: 6),
+              SizedBox.square(
+                dimension: LaooLayout.paginationButtonSize,
+                child: FilledButton(
+                  onPressed: null,
+                  style: FilledButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    disabledBackgroundColor: _primary,
+                    disabledForegroundColor: Theme.of(
+                      context,
+                    ).colorScheme.onPrimary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(LaooRadius.xs),
+                    ),
+                  ),
+                  child: Text('$_page'),
+                ),
+              ),
+              const SizedBox(width: 6),
+              _pageButton(
+                Icons.chevron_right,
+                _page < _pages
+                    ? () {
+                        setState(() => _page++);
+                        _load();
+                      }
+                    : null,
+              ),
+              const SizedBox(width: 12),
+              Text(
+                '${_total == 0 ? 0 : (_page - 1) * _pageSize + 1}-${math.min(_page * _pageSize, _total)} จาก $_total',
+              ),
+            ],
+          ),
         ),
       ),
     ],

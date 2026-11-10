@@ -138,6 +138,40 @@ ORDER BY F.SortOrder, F.FeatureCode;
         }
     }
 
+    [HttpGet("{companyId:long}/ai-chat")]
+    public async Task<IActionResult> GetAiChat(long companyId, CancellationToken token)
+    {
+        var partner = PartnerId();
+        if (partner is null || User.FindFirstValue("user_type") != "PARTNER_USER") return Forbid();
+        await using var db = await OpenConnectionAsync(token);
+        var canEdit = await IsPartnerAdminAsync(db, token);
+        if (!canEdit && !await AllowedAsync(db, "VIEW", token)) return Forbid();
+        await using var cmd = new SqlCommand("SELECT AiChatEnabled FROM dbo.TDSTCompanySetUp WHERE CompanyID=@company AND PartnerID=@partner AND OwnerType='C' AND IsActive=1", db);
+        cmd.Parameters.Add("@company", SqlDbType.BigInt).Value = companyId;
+        cmd.Parameters.Add("@partner", SqlDbType.BigInt).Value = partner.Value;
+        var value = await cmd.ExecuteScalarAsync(token);
+        return value is bool enabled ? Ok(new { enabled, canEdit }) : NotFound();
+    }
+
+    public sealed record AiChatToggle(bool Enabled);
+
+    [HttpPut("{companyId:long}/ai-chat")]
+    public async Task<IActionResult> SetAiChat(long companyId, AiChatToggle request, CancellationToken token)
+    {
+        var partner = PartnerId();
+        if (partner is null || User.FindFirstValue("user_type") != "PARTNER_USER") return Forbid();
+        await using var db = await OpenConnectionAsync(token);
+        if (!await IsPartnerAdminAsync(db, token)) return Forbid();
+        await using var project = new SqlCommand("SELECT COUNT_BIG(*) FROM dbo.TDADProject WHERE ProjectCode=N'LAOO_AI' AND IsActive=1", db);
+        if (Convert.ToInt64(await project.ExecuteScalarAsync(token)) != 0)
+            return Conflict(new { message = "กรุณาเปิดหรือปิดระบบ AI ผ่านแพ็กเกจของบริษัท" });
+        await using var cmd = new SqlCommand("UPDATE dbo.TDSTCompanySetUp SET AiChatEnabled=@enabled WHERE CompanyID=@company AND PartnerID=@partner AND OwnerType='C' AND IsActive=1", db);
+        cmd.Parameters.Add("@enabled", SqlDbType.Bit).Value = request.Enabled;
+        cmd.Parameters.Add("@company", SqlDbType.BigInt).Value = companyId;
+        cmd.Parameters.Add("@partner", SqlDbType.BigInt).Value = partner.Value;
+        return await cmd.ExecuteNonQueryAsync(token) == 1 ? NoContent() : NotFound();
+    }
+
     [HttpGet("{companyId:long}/projects")]
     public async Task<ActionResult<List<PartnerCompanyProjectResponse>>> GetProjects(
         long companyId,

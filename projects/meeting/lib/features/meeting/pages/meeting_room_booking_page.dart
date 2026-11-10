@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../widgets/meeting_pagination_card.dart';
 
 import '../widgets/meeting_popup.dart';
 import '../widgets/meeting_participant_dialog.dart';
@@ -3522,29 +3523,32 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
     );
   }
 
-  Widget _bookingList(WorkspaceThemePreset preset) => WorkspaceSectionCard(
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _sectionTitle(
-          Icons.list_alt_outlined,
-          _myBookingsOnly ? 'รายการจองของฉัน' : 'รายการจอง',
-          preset,
-        ),
-        const Divider(color: LaooColors.border),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            if (constraints.maxWidth < 900) {
-              return ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: _bookings.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 6),
-                itemBuilder: (context, index) =>
-                    _bookingCard(_bookings[index], preset),
-              );
-            }
-            return _bookingTable(preset); /*
+  Widget _bookingList(WorkspaceThemePreset preset) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      WorkspaceSectionCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _sectionTitle(
+              Icons.list_alt_outlined,
+              _myBookingsOnly ? 'รายการจองของฉัน' : 'รายการจอง',
+              preset,
+            ),
+            const Divider(color: LaooColors.border),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                if (constraints.maxWidth < 900) {
+                  return ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: _bookings.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 6),
+                    itemBuilder: (context, index) =>
+                        _bookingCard(_bookings[index], preset),
+                  );
+                }
+                return _bookingTable(preset); /*
               scrollDirection: Axis.horizontal,
               child: ConstrainedBox(
                 constraints: BoxConstraints(minWidth: constraints.maxWidth),
@@ -3608,14 +3612,14 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
                 ),
               ),
             );*/
-          },
+              },
+            ),
+          ],
         ),
-        const SizedBox(height: 8),
-        const Divider(height: 1, color: LaooColors.border),
-        const SizedBox(height: 8),
-        _pagination(preset),
-      ],
-    ),
+      ),
+      const SizedBox(height: 8),
+      _pagination(preset),
+    ],
   );
 
   Widget _bookingTable(WorkspaceThemePreset preset) => Column(
@@ -4255,53 +4259,23 @@ class _MeetingRoomBookingPageState extends State<MeetingRoomBookingPage> {
 
   Widget _pagination(WorkspaceThemePreset preset) {
     final pages = (_total / _pageSize).ceil().clamp(1, 999999);
-    final start = _total == 0 ? 0 : (_page - 1) * _pageSize + 1;
-    final end = (_page * _pageSize).clamp(0, _total);
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        IconButton.filled(
-          style: IconButton.styleFrom(
-            backgroundColor: Theme.of(
-              context,
-            ).colorScheme.surfaceContainerHighest,
-            foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-          onPressed: _page > 1
-              ? () async {
-                  setState(() => _page--);
-                  await _loadBookings();
-                }
-              : null,
-          icon: const Icon(Icons.chevron_left),
-        ),
-        FilledButton(
-          onPressed: null,
-          style: FilledButton.styleFrom(
-            disabledBackgroundColor: preset.primary,
-            disabledForegroundColor: Theme.of(context).colorScheme.onPrimary,
-          ),
-          child: Text('$_page'),
-        ),
-        IconButton.filled(
-          style: IconButton.styleFrom(
-            backgroundColor: Theme.of(
-              context,
-            ).colorScheme.surfaceContainerHighest,
-            foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-          onPressed: _page < pages
-              ? () async {
-                  setState(() => _page++);
-                  await _loadBookings();
-                }
-              : null,
-          icon: const Icon(Icons.chevron_right),
-        ),
-        Text('$start-$end จาก $_total'),
-      ],
+    return MeetingPaginationCard(
+      total: _total,
+      pageIndex: _page - 1,
+      pageSize: _pageSize,
+      primary: preset.primary,
+      onPrevious: _page > 1
+          ? () async {
+              setState(() => _page--);
+              await _loadBookings();
+            }
+          : null,
+      onNext: _page < pages
+          ? () async {
+              setState(() => _page++);
+              await _loadBookings();
+            }
+          : null,
     );
   }
 

@@ -1,3 +1,4 @@
+import '../../../../core/widgets/standard_pagination_card.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -314,54 +315,13 @@ class _TaxInvoiceListPageState extends State<_TaxInvoiceListPage> {
     ),
   );
 
-  Widget _pagination(Color accent) => _surface(
-    height: LaooLayout.paginationCardHeight,
-    child: Row(
-      children: [
-        _pageButton(
-          icon: Icons.chevron_left,
-          onTap: _page > 0 ? () => setState(() => _page--) : null,
-        ),
-        const SizedBox(width: 4),
-        Container(
-          width: 36,
-          height: 36,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: accent,
-            borderRadius: BorderRadius.circular(LaooRadius.xs),
-          ),
-          child: Text(
-            '${_page + 1}',
-            style: const TextStyle(color: Colors.white),
-          ),
-        ),
-        const SizedBox(width: 4),
-        _pageButton(
-          icon: Icons.chevron_right,
-          onTap: _page + 1 < _pages ? () => setState(() => _page++) : null,
-        ),
-        const SizedBox(width: 8),
-        Text(
-          '${_rows.isEmpty ? 0 : _page * _pageSize + 1}-${math.min((_page + 1) * _pageSize, _rows.length)} จาก ${_rows.length}',
-        ),
-      ],
-    ),
-  );
-
-  Widget _pageButton({required IconData icon, VoidCallback? onTap}) => InkWell(
-    onTap: onTap,
-    borderRadius: BorderRadius.circular(LaooRadius.xs),
-    child: Container(
-      width: 36,
-      height: 36,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: Colors.grey.shade200,
-        borderRadius: BorderRadius.circular(LaooRadius.xs),
-      ),
-      child: Icon(icon, color: Colors.grey),
-    ),
+  Widget _pagination(Color accent) => StandardPaginationCard(
+    pageIndex: _page,
+    pageSize: _pageSize,
+    total: _rows.length,
+    primary: accent,
+    onPrevious: _page > 0 ? () => setState(() => _page--) : null,
+    onNext: _page + 1 < _pages ? () => setState(() => _page++) : null,
   );
 
   @override

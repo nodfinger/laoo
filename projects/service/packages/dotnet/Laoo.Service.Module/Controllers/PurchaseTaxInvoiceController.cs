@@ -179,7 +179,7 @@ public sealed class PurchaseTaxInvoiceController(IConfiguration configuration) :
             {
                 await using var number=new SqlCommand("SELECT ISNULL(MAX(TRY_CONVERT(int,SUBSTRING(InternalCode,3,20))),0)+1 FROM dbo.TDAPTaxInvoice WITH(UPDLOCK,HOLDLOCK) WHERE CompanyID=@company AND InternalCode LIKE N'PI%'",c,tx);
                 P(number,"@company",SqlDbType.BigInt,CompanyId);
-                var code=$"PI{Convert.ToInt32(await number.ExecuteScalarAsync(ct)):D6}";
+                var code=await LaooServiceModule.Infrastructure.ConfiguredDocumentNumber.Get(c,tx,CompanyId,"09010",ct) ?? $"PI{Convert.ToInt32(await number.ExecuteScalarAsync(ct)):D6}";
                 await using var cmd=new SqlCommand("""
                     INSERT dbo.TDAPTaxInvoice(CompanyID,BranchID,VendorID,VendorNameSnapshot,VendorTaxIDSnapshot,VendorTaxBranchCode,
                     InternalCode,SupplierInvoiceCode,InvoiceDate,ReceivedDate,TaxYear,TaxMonth,TaxBase,TaxRate,TaxAmount,

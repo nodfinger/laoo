@@ -59,6 +59,26 @@ void main() {
     expect(api.lastBody?['serviceEnabled'], true);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('supervisor delete settings are saved independently', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 700));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final api = _SettingsApi(canEdit: true);
+    await tester.pumpWidget(MaterialApp(home: ServiceSettingsPage(api: api)));
+    await tester.pumpAndSettle();
+    final head = find.text('อนุญาตให้หัวหน้าแผนกลบข้อมูลภายในแผนก');
+    await tester.ensureVisible(head);
+    await tester.tap(head);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('บันทึก'));
+    await tester.tap(find.text('บันทึก'));
+    await tester.pumpAndSettle();
+    expect(api.lastBody?['selfDepartmentHeadDelete'], true);
+    expect(api.lastBody?['selfDivisionManagerDelete'], false);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 class _SettingsApi extends ServiceSettingsApi {

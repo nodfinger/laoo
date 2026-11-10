@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
+import 'service_attachment_picker.dart';
 import 'package:image/image.dart' as img;
 import 'package:laoo_shared_admin_ui/laoo_shared_admin_ui.dart'
     show FilterHeightSync, filterActionHeightStyle;
@@ -10,6 +11,7 @@ import '../../../app/theme/laoo_design_tokens.dart';
 import '../../../app/theme/laoo_typography.dart';
 import '../../../core/api/api_exception.dart';
 import '../../../core/api/api_client.dart';
+import '../../../core/company_setup/company_setup_service.dart';
 import '../../../core/navigation/navigation_menu_repository.dart';
 import '../../../core/widgets/timed_snack_bar.dart';
 import '../../support/presentation/widgets/support_workspace_shell.dart';
@@ -88,6 +90,27 @@ Future<Map<String, dynamic>?> _searchPicker(
       ),
     ),
   );
+}
+
+Future<String?> _pickEquipmentSerial(
+  BuildContext context,
+  ApiClient api,
+  int itemId,
+) async {
+  final selected = await _searchPicker(
+    context,
+    label: 'ค้นหา Serial',
+    load: (query) async =>
+        (await api.get(
+                  '/api/company/item-instances',
+                  query: {'search': query, 'itemID': '$itemId'},
+                )
+                as List)
+            .map((row) => Map<String, dynamic>.from(row as Map))
+            .toList(),
+    describe: (row) => '${row['serialNo']} | ${row['itemName']}',
+  );
+  return selected?['serialNo']?.toString();
 }
 
 class ServiceRequestPage extends StatefulWidget {
@@ -257,7 +280,11 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
   }
 
   Future<void> _edit(Map<String, dynamic> row, BuildContext context) async {
-    if (!_canEdit || row['statusCode'] != 'NEW') return;
+    if (!_canEdit ||
+        (widget.selfService && row['selfCanEdit'] != true) ||
+        row['statusCode'] != 'NEW') {
+      return;
+    }
     final id = (row['requestId'] as num?)?.toInt();
     if (id == null) return;
     try {
@@ -322,48 +349,24 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
           .toList();
       await showDialog<void>(
         context: context,
-        builder: (context) => AlertDialog(
-          backgroundColor: Colors.white,
-          surfaceTintColor: Colors.transparent,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(LaooRadius.xs),
-          ),
-          title: const Text(
-            'รูปภาพแนบ',
-            style: TextStyle(
-              color: Colors.black,
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          content: SizedBox(
-            width: 480,
-            child: SingleChildScrollView(
-              child: images.isEmpty
-                  ? const Text('ไม่พบรูปภาพแนบ')
-                  : Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        for (final image in images)
-                          _RemoteAttachmentTile(
-                            api: _api,
-                            requestId: id,
-                            item: image,
-                            menuCode: _menuCode,
-                            canDelete: false,
-                            onDelete: () {},
-                          ),
-                      ],
-                    ),
-            ),
-          ),
-          actions: [
-            OutlinedButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('ปิด'),
-            ),
-          ],
+        builder: (context) => _AttachmentImageDialog(
+          child: images.isEmpty
+              ? const Text('ไม่พบรูปภาพแนบ')
+              : Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final image in images)
+                      _RemoteAttachmentTile(
+                        api: _api,
+                        requestId: id,
+                        item: image,
+                        menuCode: _menuCode,
+                        canDelete: false,
+                        onDelete: () {},
+                      ),
+                  ],
+                ),
         ),
       );
     } catch (error) {
@@ -376,6 +379,9 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
       ? IconButton(
           tooltip: 'ดูรูปแนบ',
           onPressed: () => _openImages(row, context),
+          alignment: Alignment.centerLeft,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
           icon: Icon(
             Icons.image_outlined,
             color: Theme.of(context).colorScheme.primary,
@@ -486,25 +492,35 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
   }
 
   Widget _rowActions(Map<String, dynamic> row, BuildContext context) {
-    if (row['statusCode'] != 'NEW' || (!_canEdit && !_canDelete)) {
+    final canEdit =
+        _canEdit && (!widget.selfService || row['selfCanEdit'] == true);
+    final canDelete =
+        _canDelete && (!widget.selfService || row['selfCanDelete'] == true);
+    if (row['statusCode'] != 'NEW' || (!canEdit && !canDelete)) {
       return const SizedBox.shrink();
     }
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (_canEdit)
+        if (canEdit)
           IconButton(
             tooltip: 'แก้ไข',
             onPressed: () => _edit(row, context),
+            alignment: Alignment.centerLeft,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
             icon: Icon(
               Icons.edit_outlined,
               color: Theme.of(context).colorScheme.primary,
             ),
           ),
-        if (_canDelete)
+        if (canDelete)
           IconButton(
             tooltip: 'ลบ',
             onPressed: () => _delete(row, context),
+            alignment: Alignment.centerLeft,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
             icon: Icon(
               Icons.delete_outline,
               color: Theme.of(context).colorScheme.error,
@@ -618,7 +634,8 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
                               _load();
                             },
                             decoration: _input(
-                              hint: 'ค้นหาเลขที่ ผู้แจ้ง หัวข้อ หรือสถานที่',
+                              hint:
+                                  'ค้นหาเลขที่ ผู้แจ้ง หัวข้อ หรือสถานที่ / อุปกรณ์แจ้งซ่อม / Serial',
                               icon: Icons.search,
                             ),
                           ),
@@ -796,6 +813,8 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
               ],
             ),
             Text(row['subject']?.toString() ?? '-'),
+            Text('อุปกรณ์แจ้งซ่อม: ${row['equipmentName'] ?? '-'}'),
+            Text('Serial: ${row['equipmentSerial'] ?? '-'}'),
             Row(
               children: [
                 const Text('ระดับงาน: '),
@@ -871,6 +890,8 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
           7: FlexColumnWidth(1.1),
           8: FlexColumnWidth(1.0),
           9: FlexColumnWidth(1.0),
+          10: FlexColumnWidth(1.0),
+          11: FlexColumnWidth(1.0),
         },
         defaultVerticalAlignment: TableCellVerticalAlignment.middle,
         children: [
@@ -886,6 +907,8 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
                 'เลขที่',
                 'ผู้แจ้ง',
                 'สถานที่',
+                'อุปกรณ์แจ้งซ่อม',
+                'Serial',
                 'หัวข้อ',
                 'ระดับงาน',
                 'สถานะ',
@@ -924,6 +947,8 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
                 ),
                 cell(value(row['requesterName'])),
                 cell(value(row['locationSnapshot'])),
+                cell(value(row['equipmentName'])),
+                cell(value(row['equipmentSerial'])),
                 cell(value(row['subject'])),
                 cell(_priorityBadge(row, context)),
                 cell(_statusBadge(row, context)),
@@ -1052,6 +1077,7 @@ class _RequestEditDialog extends StatefulWidget {
 
 class _RequestEditDialogState extends State<_RequestEditDialog> {
   final _form = GlobalKey<FormState>();
+  final _attachmentPreviewKey = GlobalKey();
   late final List<Map<String, dynamic>> _files = List.of(widget.attachments);
   bool _attachmentsChanged = false;
   late String _priority = widget.data['priorityCode']?.toString() ?? '0';
@@ -1060,6 +1086,10 @@ class _RequestEditDialogState extends State<_RequestEditDialog> {
   );
   late int? _equipmentId = (widget.data['equipmentItemId'] as num?)?.toInt();
   bool _equipmentChanged = false;
+  bool _serialChanged = false;
+  late final TextEditingController _serial = TextEditingController(
+    text: widget.data['equipmentSerial']?.toString() ?? '',
+  );
   int _equipmentVersion = 0;
   late final TextEditingController _subject = TextEditingController(
     text: widget.data['subject']?.toString() ?? '',
@@ -1190,6 +1220,9 @@ class _RequestEditDialogState extends State<_RequestEditDialog> {
       )) {
         _equipmentOptions.add(selected);
       }
+      if (_equipmentId != (selected['itemID'] as num).toInt()) {
+        _serial.clear();
+      }
       _equipmentId = (selected['itemID'] as num).toInt();
       _equipmentChanged = true;
       _equipmentVersion++;
@@ -1216,12 +1249,7 @@ class _RequestEditDialogState extends State<_RequestEditDialog> {
   }
 
   Future<void> _pickImages() async {
-    final selection = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: const ['jpg', 'jpeg', 'png', 'webp'],
-      allowMultiple: true,
-      withData: true,
-    );
+    final selection = await pickServiceAttachmentImages();
     if (!mounted || selection == null) return;
     setState(() => _saving = true);
     try {
@@ -1238,6 +1266,18 @@ class _RequestEditDialogState extends State<_RequestEditDialog> {
         );
         _attachmentsChanged = true;
         if (mounted) setState(() => _files.add(added));
+      }
+      if (mounted && selection.files.isNotEmpty) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          final preview = _attachmentPreviewKey.currentContext;
+          if (mounted && preview != null) {
+            Scrollable.ensureVisible(
+              preview,
+              duration: const Duration(milliseconds: 200),
+              alignment: 1,
+            );
+          }
+        });
       }
     } catch (error) {
       if (mounted) {
@@ -1328,6 +1368,7 @@ class _RequestEditDialogState extends State<_RequestEditDialog> {
 
   @override
   void dispose() {
+    _serial.dispose();
     _subject.dispose();
     _detail.dispose();
     super.dispose();
@@ -1337,7 +1378,7 @@ class _RequestEditDialogState extends State<_RequestEditDialog> {
     if (_saving || !_form.currentState!.validate()) return;
     setState(() => _saving = true);
     try {
-      if (_equipmentChanged) {
+      if (_equipmentChanged || _serialChanged) {
         await widget.api.editEquipment(
           widget.requestId,
           selfService: widget.selfService,
@@ -1346,6 +1387,8 @@ class _RequestEditDialogState extends State<_RequestEditDialog> {
           rowVersion: widget.data['rowVersion'].toString(),
           priorityCode: _priority,
           equipmentItemId: _equipmentId,
+          equipmentSerial: _serial.text.trim(),
+          updateSerial: _serialChanged,
         );
       } else {
         await widget.api.edit(
@@ -1443,6 +1486,7 @@ class _RequestEditDialogState extends State<_RequestEditDialog> {
                                 ? null
                                 : () => setState(() {
                                     _equipmentId = null;
+                                    _serial.clear();
                                     _equipmentChanged = true;
                                     _equipmentVersion++;
                                   }),
@@ -1470,8 +1514,57 @@ class _RequestEditDialogState extends State<_RequestEditDialog> {
                       ? null
                       : (value) => setState(() {
                           _equipmentId = value;
+                          _serial.clear();
                           _equipmentChanged = true;
                         }),
+                ),
+                const SizedBox(height: LaooLayout.popupFieldSpacing),
+                TextFormField(
+                  controller: _serial,
+                  readOnly: true,
+                  style: const TextStyle(fontSize: LaooTypography.inputText),
+                  decoration: InputDecoration(
+                    labelText: 'Serial อุปกรณ์ (ไม่บังคับ)',
+                    labelStyle: const TextStyle(
+                      fontSize: LaooTypography.inputLabel,
+                    ),
+                    floatingLabelStyle: _floatingLabelStyle(colors),
+                    border: const OutlineInputBorder(),
+                    suffixIcon: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (_serial.text.isNotEmpty)
+                          IconButton(
+                            tooltip: 'ล้าง Serial',
+                            onPressed: _saving
+                                ? null
+                                : () => setState(() {
+                                    _serial.clear();
+                                    _serialChanged = true;
+                                  }),
+                            icon: const Icon(Icons.clear),
+                          ),
+                        IconButton(
+                          tooltip: 'ค้นหา Serial',
+                          onPressed: _saving || _equipmentId == null
+                              ? null
+                              : () async {
+                                  final value = await _pickEquipmentSerial(
+                                    context,
+                                    _subjectApi,
+                                    _equipmentId!,
+                                  );
+                                  if (mounted && value != null)
+                                    setState(() {
+                                      _serial.text = value;
+                                      _serialChanged = true;
+                                    });
+                                },
+                          icon: const Icon(Icons.search),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
                 const SizedBox(height: LaooLayout.popupFieldSpacing),
                 DropdownButtonFormField<String>(
@@ -1620,6 +1713,7 @@ class _RequestEditDialogState extends State<_RequestEditDialog> {
                 )) ...[
                   const SizedBox(height: 8),
                   Wrap(
+                    key: _attachmentPreviewKey,
                     spacing: 8,
                     runSpacing: 8,
                     children: [
@@ -1695,8 +1789,10 @@ class _RequestDialog extends StatefulWidget {
 
 class _RequestDialogState extends State<_RequestDialog> {
   final _form = GlobalKey<FormState>();
+  final _attachmentPreviewKey = GlobalKey();
   final _subject = TextEditingController();
   final _detail = TextEditingController();
+  final _serial = TextEditingController();
   Map<String, dynamic>? _requester;
   Map<String, dynamic>? _equipment;
   late final List<Map<String, dynamic>> _requesterOptions = _maps(
@@ -1715,12 +1811,25 @@ class _RequestDialogState extends State<_RequestDialog> {
   bool _canManageSubjects = false;
   final List<PlatformFile> _attachments = [];
   bool _saving = false;
+  String _employeeNameDisplay = 'FULL';
 
   @override
   void initState() {
     super.initState();
     _loadQrContext();
     _loadSubjectPermission();
+    _loadEmployeeNameSetting();
+  }
+
+  Future<void> _loadEmployeeNameSetting() async {
+    try {
+      final settings = await CompanySetupService().loadRuntime();
+      if (mounted) {
+        setState(() => _employeeNameDisplay = settings.employeeNameDisplay);
+      }
+    } catch (_) {
+      // Keep the existing full-name display when settings are unavailable.
+    }
   }
 
   Future<void> _searchRequester() async {
@@ -1765,6 +1874,9 @@ class _RequestDialogState extends State<_RequestDialog> {
         (item) => item['itemID'] == selected['itemID'],
       )) {
         _equipmentOptions.add(selected);
+      }
+      if (_equipment?['itemID'] != selected['itemID']) {
+        _serial.clear();
       }
       _equipment = selected;
       _lookupVersion++;
@@ -1909,6 +2021,7 @@ class _RequestDialogState extends State<_RequestDialog> {
     if (widget.subjectApi == null) _subjectApi.dispose();
     _subject.dispose();
     _detail.dispose();
+    _serial.dispose();
     super.dispose();
   }
 
@@ -1925,6 +2038,7 @@ class _RequestDialogState extends State<_RequestDialog> {
         detail: _detail.text.trim(),
         qrToken: widget.qrToken,
         priorityCode: _priority,
+        equipmentSerial: _serial.text.trim(),
       );
       final requestId = (created['requestId'] as num?)?.toInt();
       final uploadErrors = <String>[];
@@ -1968,12 +2082,7 @@ class _RequestDialogState extends State<_RequestDialog> {
   }
 
   Future<void> _pickAttachments() async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: const ['jpg', 'jpeg', 'png', 'webp'],
-      allowMultiple: true,
-      withData: true,
-    );
+    final result = await pickServiceAttachmentImages();
     if (!mounted || result == null) return;
     final accepted = <PlatformFile>[];
     final rejected = <String>[];
@@ -1986,6 +2095,18 @@ class _RequestDialogState extends State<_RequestDialog> {
     }
     if (!mounted) return;
     setState(() => _attachments.addAll(accepted));
+    if (accepted.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final preview = _attachmentPreviewKey.currentContext;
+        if (mounted && preview != null) {
+          Scrollable.ensureVisible(
+            preview,
+            duration: const Duration(milliseconds: 200),
+            alignment: 1,
+          );
+        }
+      });
+    }
     if (rejected.isNotEmpty) {
       showTimedSnackBar(
         context,
@@ -2140,6 +2261,7 @@ class _RequestDialogState extends State<_RequestDialog> {
                                     ? null
                                     : () => setState(() {
                                         _equipment = null;
+                                        _serial.clear();
                                         _lookupVersion++;
                                       }),
                                 icon: const Icon(Icons.clear),
@@ -2165,19 +2287,59 @@ class _RequestDialogState extends State<_RequestDialog> {
                       ),
                   ],
                   onChanged: _qrContext == null
-                      ? (value) => setState(
-                          () => _equipment = value == null
+                      ? (value) => setState(() {
+                          if (_equipment?['itemID']?.toString() != value) {
+                            _serial.clear();
+                          }
+                          _equipment = value == null
                               ? null
                               : equipment.firstWhere(
                                   (item) => item['itemID'].toString() == value,
-                                ),
-                        )
+                                );
+                        })
                       : null,
                   validator: (_) =>
                       _equipment == null &&
                           widget.lookup?['requireEquipment'] != false
                       ? 'กรุณาเลือกอุปกรณ์ที่แจ้งซ่อม'
                       : null,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _serial,
+                  readOnly: true,
+                  style: const TextStyle(fontSize: LaooTypography.inputText),
+                  decoration: _input(label: 'Serial อุปกรณ์ (ไม่บังคับ)')
+                      .copyWith(
+                        suffixIcon: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (_serial.text.isNotEmpty)
+                              IconButton(
+                                tooltip: 'ล้าง Serial',
+                                onPressed: _saving
+                                    ? null
+                                    : () => setState(_serial.clear),
+                                icon: const Icon(Icons.clear),
+                              ),
+                            IconButton(
+                              tooltip: 'ค้นหา Serial',
+                              onPressed: _saving || _equipment == null
+                                  ? null
+                                  : () async {
+                                      final value = await _pickEquipmentSerial(
+                                        context,
+                                        _subjectApi,
+                                        (_equipment!['itemID'] as num).toInt(),
+                                      );
+                                      if (mounted && value != null)
+                                        setState(() => _serial.text = value);
+                                    },
+                              icon: const Icon(Icons.search),
+                            ),
+                          ],
+                        ),
+                      ),
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
@@ -2282,6 +2444,7 @@ class _RequestDialogState extends State<_RequestDialog> {
                 const SizedBox(height: 14),
                 _AttachmentPicker(
                   files: _attachments,
+                  previewKey: _attachmentPreviewKey,
                   enabled: !_saving,
                   onPick: _pickAttachments,
                   onRemove: (file) => setState(() => _attachments.remove(file)),
@@ -2337,7 +2500,16 @@ class _RequestDialogState extends State<_RequestDialog> {
     final nickname = value['nickName']?.toString().trim() ?? '';
     final location = value['locationSnapshot']?.toString().trim() ?? '';
     final employee = value['requesterType']?.toString() == 'EMPLOYEE';
-    return '$prefix${value['name'] ?? '-'}${nickname.isEmpty ? '' : ' ($nickname)'}${employee && location.isNotEmpty ? ' | $location' : ''}';
+    final name = value['name']?.toString().trim() ?? '';
+    final mode = _employeeNameDisplay;
+    final display = !employee || nickname.isEmpty
+        ? name
+        : switch (mode) {
+            'NICK' => nickname,
+            'BOTH' => name.isEmpty ? nickname : '$name ($nickname)',
+            _ => name,
+          };
+    return '$prefix${display.isEmpty ? '-' : display}${employee && location.isNotEmpty ? ' | $location' : ''}';
   }
 
   InputDecoration _input({String? label}) => InputDecoration(
@@ -2360,11 +2532,13 @@ class _RequestDialogState extends State<_RequestDialog> {
 class _AttachmentPicker extends StatelessWidget {
   const _AttachmentPicker({
     required this.files,
+    required this.previewKey,
     required this.enabled,
     required this.onPick,
     required this.onRemove,
   });
   final List<PlatformFile> files;
+  final GlobalKey previewKey;
   final bool enabled;
   final VoidCallback onPick;
   final ValueChanged<PlatformFile> onRemove;
@@ -2394,6 +2568,7 @@ class _AttachmentPicker extends StatelessWidget {
       if (files.isNotEmpty) ...[
         const SizedBox(height: 10),
         Wrap(
+          key: previewKey,
           spacing: 8,
           runSpacing: 8,
           children: [
@@ -2426,7 +2601,10 @@ class _AttachmentPreview extends StatelessWidget {
           clipBehavior: Clip.antiAlias,
           child: file.bytes == null
               ? const Icon(Icons.image_not_supported_outlined)
-              : Image.memory(file.bytes!, fit: BoxFit.cover),
+              : InkWell(
+                  onTap: () => _showAttachmentImage(context, file.bytes!),
+                  child: Image.memory(file.bytes!, fit: BoxFit.cover),
+                ),
         ),
         Positioned(
           right: 2,
@@ -2733,16 +2911,9 @@ class _RemoteAttachmentTile extends StatelessWidget {
             ),
             builder: (context, snapshot) => InkWell(
               onTap: snapshot.hasData
-                  ? () => showDialog<void>(
-                      context: context,
-                      builder: (_) => Dialog(
-                        child: InteractiveViewer(
-                          child: Image.memory(
-                            Uint8List.fromList(snapshot.data!),
-                            fit: BoxFit.contain,
-                          ),
-                        ),
-                      ),
+                  ? () => _showAttachmentImage(
+                      context,
+                      Uint8List.fromList(snapshot.data!),
                     )
                   : null,
               child: Container(
@@ -2782,6 +2953,84 @@ class _RemoteAttachmentTile extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+Future<void> _showAttachmentImage(BuildContext context, Uint8List bytes) =>
+    showDialog<void>(
+      context: context,
+      builder: (context) => _AttachmentImageDialog(
+        child: SizedBox(
+          height: MediaQuery.sizeOf(context).height * .55,
+          child: InteractiveViewer(
+            child: Center(child: Image.memory(bytes, fit: BoxFit.contain)),
+          ),
+        ),
+      ),
+    );
+
+class _AttachmentImageDialog extends StatelessWidget {
+  const _AttachmentImageDialog({required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
+    final maxHeight = MediaQuery.sizeOf(context).height * .8;
+    return Dialog(
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      insetPadding: const EdgeInsets.all(LaooLayout.dialogInsetPadding),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(LaooRadius.xs),
+      ),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: 480, maxHeight: maxHeight),
+        child: Padding(
+          padding: const EdgeInsets.all(LaooLayout.cardPadding),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.image_outlined, color: primary, size: 24),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text(
+                      'รูปภาพแนบ',
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              const Divider(height: 1, thickness: 1, color: LaooColors.border),
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: child,
+                ),
+              ),
+              const Divider(height: 1, thickness: 1, color: LaooColors.border),
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerRight,
+                child: OutlinedButton.icon(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close),
+                  label: const Text('ปิด'),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -11,7 +11,8 @@
 ## ScreenType 1: Required Popup Action Style
 
 - ใช้ Popup `รหัสพื้นฐาน > จังหวัด > เพิ่ม` เป็นภาพอ้างอิงกลางสำหรับ Layout และระยะ ตามหัวข้อ `ต้นแบบ Popup Action ส่วนกลาง` ใน `POPUP_UI_STANDARD.md`; ให้ยึดข้อกำหนด Header/Scrollable Content/Footer และ Permission ตามเอกสารมาตรฐาน ไม่คัดลอก Field หรือ Business Logic ของต้นแบบ
-- หน้า Add/Edit/View ของ CRUD (`ScreenType = 1`) ต้องเปิดเป็น Popup Action Form เหนือหน้า List; ห้ามเปลี่ยนไปเป็นหน้าเต็ม Content Area เว้นแต่พ่ออนุมัติหน้าจอนั้นโดยตรง
+- สำหรับหน้าจอใหม่ ให้นับช่องกรอกหรือเลือกข้อมูลของ Action Form ทั้งหมด รวมทุกแท็บและส่วนที่บันทึกในแบบฟอร์มเดียวกัน โดยไม่นับปุ่มคำสั่งหรือช่องค้นหาของหน้า List: หากมีไม่เกิน 10 ช่อง ให้สร้าง Popup ได้ทันที เว้นแต่ผู้ใช้กำหนดรูปแบบอื่น; หากเกิน 10 ช่อง ให้ถามผู้ใช้ก่อนสร้าง Action ว่าต้องการ Popup หรือหน้าจอเต็ม เว้นแต่ผู้ใช้ระบุรูปแบบไว้แล้ว
+- หน้า Add/Edit/View ของ CRUD (`ScreenType = 1`) ใช้ Popup Action Form เหนือหน้า List ตามเกณฑ์จำนวนช่องข้างต้น; เมื่อผู้ใช้เลือกรูปแบบหน้าจอเต็ม ให้ใช้มาตรฐาน Action และจัด Card ตามมาตรฐาน
 - พื้นผิวกรอบหน้า Action, Header Card และ Form Card เป็นสีขาว ขอบมุมโค้ง `LaooRadius.xs` (`4px`); พื้นที่ Workspace รอบนอกยังใช้ Theme กลาง
 - Caption เป็นสีดำตาม `LaooColors.pageCaption` และมี Icon ด้านหน้าใช้สี Primary ของ User ที่ Login
 - ปุ่ม Action ทุกปุ่มต้องกำหนดมุมโค้ง `LaooRadius.xs` (`4px`) อย่างชัดเจน ห้ามใช้มุมทรงแคปซูลหรือค่าเริ่มต้นของ Widget ที่ต่างจากมาตรฐาน
@@ -24,10 +25,11 @@
 ## Flow
 
 - Action Screen ต้องสืบทอด `MenuCode`, `ScreenType` และ Permission Context จากหน้าจอแม่
-- งาน Form หลาย Field ของ `ScreenType = 1` อยู่ใน Popup เดียว ไม่สร้าง Shell หรือ Route ใหม่; Popup ต้องแบ่งเป็น Header, Scrollable Content และ Footer โดยเลื่อนเฉพาะ Content เมื่อพื้นที่ไม่พอ ห้ามให้ Footer บัง Field หรือ ComboBox ด้านล่าง
+- เมื่อใช้ Popup สำหรับ `ScreenType = 1` ให้อยู่ใน Popup เดียว ไม่สร้าง Shell หรือ Route ใหม่; Popup ต้องแบ่งเป็น Header, Scrollable Content และ Footer โดยเลื่อนเฉพาะ Content เมื่อพื้นที่ไม่พอ ห้ามให้ Footer บัง Field หรือ ComboBox ด้านล่าง
 - ตรวจ ActionCode, Flow และปลายทางหลัง Save/Cancel จาก Feature Specification ก่อนแก้ไข
 - ปุ่มและความสามารถต้องแสดงตาม ScreenType และ Permission
 - ComboBox ที่รองรับการจัดการ แต่ผู้ Login ไม่มีสิทธิ์เพิ่ม แก้ไข หรือลบและมีสิทธิ์ค้นหา/อ่าน ให้ใช้ Icon ค้นหาภายในช่องเปิด Popup ค้นหาแบบง่ายตาม `POPUP_UI_STANDARD.md`; หากมีสิทธิ์จัดการให้แสดง Action ตามสิทธิ์จริง
+- ช่องค้นหา/ComboBox ที่เปิด Popup เลือกข้อมูลและอนุญาตค่าว่าง ต้องมีปุ่มล้างค่าภายในช่องเมื่อมีค่าที่เลือก โดยกดแล้วคืนค่าว่างได้โดยไม่กระทบ Field อื่น ตาม `UX_UI_STANDARD.md`
 
 ## Header Card
 
@@ -59,5 +61,5 @@
 ## Prompt สำหรับส่งให้ AI
 
 ```text
-ปรับหน้า Action ของ ScreenType = 1 เป็น Popup สีขาว แบ่ง Panel เมื่อมีหลาย Field ตาม ACTION_UI_STANDARD.md และ POPUP_UI_STANDARD.md Caption เป็น {MenuName} > {Action} สีดำ 18px Icon ตาม User Style ปุ่มยกเลิก/บันทึกอยู่ด้านล่างขวาชุดเดียว Font ปุ่ม 13px สูง 48px ข้อความ TextBox 16px และ ComboBox 14px TextBox/ComboBox ต้องมีกรอบเทาจางแบบ Outline และมุมโค้ง 4px ทุกสถานะ สี Focus/Icon/Selection/Action อ่านจาก User Profile Theme ปุ่มมุมโค้ง 4px ระยะระหว่างแถว 14px ตรวจ Responsive, Overflow, dart format และ dart analyze ไม่เปลี่ยน Business Logic เว้นแต่ได้รับคำสั่ง
+เมื่อกำหนดรูปแบบ Action เป็น Popup แล้ว ให้ปรับหน้า Action ของ ScreenType = 1 เป็น Popup สีขาว แบ่ง Panel เมื่อมีหลาย Field ตาม ACTION_UI_STANDARD.md และ POPUP_UI_STANDARD.md Caption เป็น {MenuName} > {Action} สีดำ 18px Icon ตาม User Style ปุ่มยกเลิก/บันทึกอยู่ด้านล่างขวาชุดเดียว Font ปุ่ม 13px สูง 48px ข้อความ TextBox 16px และ ComboBox 14px TextBox/ComboBox ต้องมีกรอบเทาจางแบบ Outline และมุมโค้ง 4px ทุกสถานะ สี Focus/Icon/Selection/Action อ่านจาก User Profile Theme ปุ่มมุมโค้ง 4px ระยะระหว่างแถว 14px ตรวจ Responsive, Overflow, dart format และ dart analyze ไม่เปลี่ยน Business Logic เว้นแต่ได้รับคำสั่ง
 ```

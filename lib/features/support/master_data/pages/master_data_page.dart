@@ -12,6 +12,7 @@ import '../../../../app/theme/laoo_design_tokens.dart';
 import '../../../../app/theme/workspace_theme_presets.dart';
 import '../../../../core/company_setup/company_setup_controller.dart';
 import '../data/master_data_api.dart';
+import 'simple_master_search_dialog.dart';
 import '../../../support/presentation/widgets/support_workspace_shell.dart';
 import '../../../profile/data/user_profile_repository.dart';
 
@@ -717,22 +718,41 @@ class _MasterDataPageState extends State<MasterDataPage> {
                           labelText: 'ค้นหารหัสหรือชื่อ',
                         ),
                       );
-                      final group = DropdownButtonFormField<String>(
-                        initialValue: _selectedGroup,
-                        decoration: const InputDecoration(
-                          labelText: 'กลุ่มข้อมูล',
+                      final group = Semantics(
+                        button: true,
+                        enabled: widget.masterGroupCode == null,
+                        label: 'ค้นหากลุ่มข้อมูล',
+                        child: InkWell(
+                          onTap: widget.masterGroupCode == null
+                              ? () async {
+                                  final selected = await showDialog<String>(
+                                    context: context,
+                                    builder: (_) => SimpleMasterSearchDialog(
+                                      title: 'กลุ่มข้อมูล',
+                                      rows: _groups
+                                          .map(
+                                            (item) => <String, dynamic>{
+                                              'code': item.code,
+                                              'name': item.name,
+                                            },
+                                          )
+                                          .toList(),
+                                    ),
+                                  );
+                                  if (selected != null && mounted) {
+                                    _selectGroup(selected);
+                                  }
+                                }
+                              : null,
+                          child: InputDecorator(
+                            decoration: InputDecoration(
+                              labelText: 'กลุ่มข้อมูล',
+                              enabled: widget.masterGroupCode == null,
+                              suffixIcon: const Icon(Icons.search),
+                            ),
+                            child: LaooComboBoxText(_group.name),
+                          ),
                         ),
-                        items: _groups
-                            .map(
-                              (item) => DropdownMenuItem(
-                                value: item.code,
-                                child: LaooComboBoxText(item.name),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: widget.masterGroupCode == null
-                            ? _selectGroup
-                            : null,
                       );
                       final searchButton = FilledButton.icon(
                         onPressed: _applySearch,
@@ -811,106 +831,110 @@ class _MasterDataPageState extends State<MasterDataPage> {
                     ),
                     elevation: 0,
                     clipBehavior: Clip.antiAlias,
-                    child: PinnedDataTable(
-                      showCheckboxColumn: false,
-                      horizontalMargin: 8,
-                      columnSpacing: 20,
-                      headingRowHeight: 56,
-                      maxBodyHeight: (constraints.maxHeight - 56).clamp(
-                        0.0,
-                        double.infinity,
-                      ),
-                      dataRowMinHeight: 48,
-                      dataRowMaxHeight: 56,
-                      dividerThickness: .6,
-                      headingRowColor: WidgetStatePropertyAll(
-                        accent.withValues(alpha: .12),
-                      ),
-                      headingTextStyle: TextStyle(
-                        fontSize: LaooTypography.tableHeader,
-                        fontWeight: FontWeight.w700,
-                        color: accent,
-                      ),
-                      dataTextStyle: TextStyle(
-                        fontSize: LaooTypography.tableBody,
-                        color: theme.colorScheme.onSurface,
-                      ),
-                      columns: [
-                        LaooTableColumns.id,
-                        const DataColumn(
-                          label: SizedBox(
-                            width: 100,
-                            child: Padding(
-                              padding: EdgeInsets.only(left: 12),
-                              child: Align(
-                                alignment: Alignment.centerLeft,
-                                child: Text('Action'),
-                              ),
-                            ),
-                          ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(LaooLayout.cardPadding),
+                      child: PinnedDataTable(
+                        showCheckboxColumn: false,
+                        horizontalMargin: 8,
+                        columnSpacing: 20,
+                        headingRowHeight: 56,
+                        maxBodyHeight:
+                            (constraints.maxHeight -
+                                    56 -
+                                    2 * LaooLayout.cardPadding)
+                                .clamp(0.0, double.infinity),
+                        dataRowMinHeight: 48,
+                        dataRowMaxHeight: 56,
+                        dividerThickness: .6,
+                        headingRowColor: WidgetStatePropertyAll(
+                          accent.withValues(alpha: .12),
                         ),
-                        const DataColumn(label: Text('ชื่อ')),
-                        const DataColumn(label: Text('เรียงลำดับแสดง')),
-                        const DataColumn(label: Text('รหัสย่อ')),
-                      ],
-                      rows: _filteredRows.asMap().entries.map((entry) {
-                        final row = entry.value;
-                        return DataRow(
-                          onSelectChanged: widget.onSelected == null
-                              ? null
-                              : (_) => widget.onSelected!(row.code),
-                          cells: [
-                            DataCell(
-                              Text(
-                                '${(_currentPage * _pageSize) + entry.key + 1}',
-                              ),
-                            ),
-                            DataCell(
-                              SizedBox(
-                                width: 100,
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.start,
-                                  children: [
-                                    if (_canEdit)
-                                      IconButton(
-                                        tooltip: 'แก้ไข',
-                                        onPressed: () => _startEdit(row),
-                                        icon: Icon(
-                                          Icons.edit_outlined,
-                                          color: accent,
-                                        ),
-                                      ),
-                                    if (widget.embedded && !_canEdit)
-                                      const IconButton(
-                                        onPressed: null,
-                                        tooltip: 'ไม่มีสิทธิ์แก้ไข',
-                                        icon: Icon(Icons.lock_outline),
-                                      ),
-                                    if (_canDelete)
-                                      IconButton(
-                                        tooltip: 'ลบ',
-                                        onPressed: () => _delete(row),
-                                        icon: Icon(
-                                          Icons.delete_outline,
-                                          color: theme.colorScheme.error,
-                                        ),
-                                      ),
-                                    if (widget.embedded && !_canDelete)
-                                      const IconButton(
-                                        onPressed: null,
-                                        tooltip: 'ไม่มีสิทธิ์ลบ',
-                                        icon: Icon(Icons.lock_outline),
-                                      ),
-                                  ],
+                        headingTextStyle: TextStyle(
+                          fontSize: LaooTypography.tableHeader,
+                          fontWeight: FontWeight.w700,
+                          color: accent,
+                        ),
+                        dataTextStyle: TextStyle(
+                          fontSize: LaooTypography.tableBody,
+                          color: theme.colorScheme.onSurface,
+                        ),
+                        columns: [
+                          LaooTableColumns.id,
+                          const DataColumn(
+                            label: SizedBox(
+                              width: 100,
+                              child: Padding(
+                                padding: EdgeInsets.only(left: 12),
+                                child: Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Text('Action'),
                                 ),
                               ),
                             ),
-                            DataCell(Text(row.name)),
-                            DataCell(Text('${row.seq}')),
-                            DataCell(Text(row.shortCode)),
-                          ],
-                        );
-                      }).toList(),
+                          ),
+                          const DataColumn(label: Text('ชื่อ')),
+                          const DataColumn(label: Text('เรียงลำดับแสดง')),
+                          const DataColumn(label: Text('รหัสย่อ')),
+                        ],
+                        rows: _filteredRows.asMap().entries.map((entry) {
+                          final row = entry.value;
+                          return DataRow(
+                            onSelectChanged: widget.onSelected == null
+                                ? null
+                                : (_) => widget.onSelected!(row.code),
+                            cells: [
+                              DataCell(
+                                Text(
+                                  '${(_currentPage * _pageSize) + entry.key + 1}',
+                                ),
+                              ),
+                              DataCell(
+                                SizedBox(
+                                  width: 100,
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.start,
+                                    children: [
+                                      if (_canEdit)
+                                        IconButton(
+                                          tooltip: 'แก้ไข',
+                                          onPressed: () => _startEdit(row),
+                                          icon: Icon(
+                                            Icons.edit_outlined,
+                                            color: accent,
+                                          ),
+                                        ),
+                                      if (widget.embedded && !_canEdit)
+                                        const IconButton(
+                                          onPressed: null,
+                                          tooltip: 'ไม่มีสิทธิ์แก้ไข',
+                                          icon: Icon(Icons.lock_outline),
+                                        ),
+                                      if (_canDelete)
+                                        IconButton(
+                                          tooltip: 'ลบ',
+                                          onPressed: () => _delete(row),
+                                          icon: Icon(
+                                            Icons.delete_outline,
+                                            color: theme.colorScheme.error,
+                                          ),
+                                        ),
+                                      if (widget.embedded && !_canDelete)
+                                        const IconButton(
+                                          onPressed: null,
+                                          tooltip: 'ไม่มีสิทธิ์ลบ',
+                                          icon: Icon(Icons.lock_outline),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              DataCell(Text(row.name)),
+                              DataCell(Text('${row.seq}')),
+                              DataCell(Text(row.shortCode)),
+                            ],
+                          );
+                        }).toList(),
+                      ),
                     ),
                   );
                 },

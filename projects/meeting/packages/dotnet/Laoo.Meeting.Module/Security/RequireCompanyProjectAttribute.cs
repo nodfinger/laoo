@@ -36,7 +36,7 @@ public sealed class RequireCompanyProjectFilter(
         await using var connection = new SqlConnection(
             configuration.GetConnectionString("LaooDatabase"));
         await connection.OpenAsync(context.HttpContext.RequestAborted);
-        const string sql = """
+        var sql = $$"""
 SELECT CASE WHEN EXISTS
 (
     SELECT 1
@@ -50,16 +50,15 @@ SELECT CASE WHEN EXISTS
      AND ACP.IsEnabled=1
      AND (ACP.StartDate IS NULL OR ACP.StartDate<=CONVERT(date,SYSUTCDATETIME()))
      AND (ACP.ExpireDate IS NULL OR ACP.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))
-    INNER JOIN dbo.TDADUserProject AUP
-      ON AUP.ProjectID=AP.ProjectID AND AUP.CompanyID=C.CompanyID AND AUP.UserID=@UserID AND AUP.IsActive=1
     INNER JOIN dbo.TDADCompanyProject CP
       ON CP.ProjectID=P.ProjectID AND CP.CompanyID=C.CompanyID AND CP.PartnerID=C.PartnerID
      AND CP.IsEnabled=1
      AND (CP.StartDate IS NULL OR CP.StartDate<=CONVERT(date,SYSUTCDATETIME()))
      AND (CP.ExpireDate IS NULL OR CP.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))
-    INNER JOIN dbo.TDADUserProject UP
-      ON UP.ProjectID=P.ProjectID AND UP.CompanyID=C.CompanyID AND UP.UserID=@UserID AND UP.IsActive=1
+    INNER JOIN dbo.TDADUser AccessUser ON AccessUser.UserID=@UserID AND AccessUser.CompanyID=C.CompanyID
     WHERE C.CompanyID=@CompanyID AND C.PartnerID=@PartnerID AND C.IsActive=1
+      AND {{Laoo.Shared.Contracts.CompanyProjectAccess.ForUser("AccessUser", "P.ProjectID", allowCoreShell: true)}}
+      AND {{Laoo.Shared.Contracts.CompanyProjectAccess.ForUser("AccessUser", "AP.ProjectID", allowCoreShell: true)}}
 ) THEN CAST(1 AS bit) ELSE CAST(0 AS bit) END;
 """;
         await using var command = new SqlCommand(sql, connection);

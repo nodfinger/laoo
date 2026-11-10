@@ -51,6 +51,7 @@ class HttpService {
     String path, {
     Object? body,
     bool authenticated = true,
+    Duration? timeout,
   }) async {
     final uri = _buildUri(path);
 
@@ -60,7 +61,7 @@ class HttpService {
           headers: await _headers(authenticated: authenticated),
           body: body == null ? null : jsonEncode(body),
         )
-        .timeout(ApiConfig.requestTimeout);
+        .timeout(timeout ?? ApiConfig.requestTimeout);
 
     return _decode(response);
   }

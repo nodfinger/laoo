@@ -22,6 +22,27 @@ public sealed class ServiceRequestController(
 {
     private const long MaxAttachmentBytes = 1_048_576;
     private const long MaxIncomingAttachmentBytes = 25_000_000;
+    // Display-only: never alter the historical requester snapshot.
+    private const string RequesterDisplaySql = """
+CASE WHEN R.RequesterType=N'EMPLOYEE' THEN COALESCE((
+    SELECT TOP (1) CASE COALESCE(S.EmployeeNameDisplay,'FULL')
+      WHEN 'NICK' THEN COALESCE(NULLIF(LTRIM(RTRIM(Emp.NickName)),N''),R.RequesterNameSnapshot)
+      WHEN 'BOTH' THEN CASE WHEN NULLIF(LTRIM(RTRIM(Emp.NickName)),N'') IS NULL THEN R.RequesterNameSnapshot ELSE CONCAT(R.RequesterNameSnapshot,N' (',LTRIM(RTRIM(Emp.NickName)),N')') END
+      ELSE R.RequesterNameSnapshot END
+    FROM dbo.TDADEmployee Emp
+    LEFT JOIN dbo.TDSTCompanySetUp S ON S.CompanyID=R.CompanyID AND S.OwnerType='C'
+    WHERE Emp.CompanyID=R.CompanyID AND Emp.PersonID=R.RequesterID
+    ORDER BY Emp.EmployeeID
+),R.RequesterNameSnapshot) ELSE R.RequesterNameSnapshot END
+""";
+    private const string AssignedDisplaySql = """
+COALESCE((SELECT TOP (1) CASE COALESCE(S.EmployeeNameDisplay,'FULL')
+    WHEN 'NICK' THEN COALESCE(NULLIF(LTRIM(RTRIM(Emp.NickName)),N''),R.AssignedEmployeeNameSnapshot)
+    WHEN 'BOTH' THEN CASE WHEN NULLIF(LTRIM(RTRIM(Emp.NickName)),N'') IS NULL THEN R.AssignedEmployeeNameSnapshot ELSE CONCAT(R.AssignedEmployeeNameSnapshot,N' (',LTRIM(RTRIM(Emp.NickName)),N')') END
+    ELSE R.AssignedEmployeeNameSnapshot END
+    FROM dbo.TDADEmployee Emp LEFT JOIN dbo.TDSTCompanySetUp S ON S.CompanyID=R.CompanyID AND S.OwnerType='C'
+    WHERE Emp.CompanyID=R.CompanyID AND Emp.EmployeeID=R.AssignedEmployeeID),R.AssignedEmployeeNameSnapshot)
+""";
     private long CompanyId => ClaimLong("company_id");
     private long UserId => ClaimLong("user_id");
     private long? PersonId => ClaimLongNullable("person_id");
@@ -147,7 +168,7 @@ ORDER BY Seq,Name,SubjectCode;
             while (await reader.ReadAsync(token)) priorities.Add(new { code = reader.GetString(0), name = reader.GetString(1) });
         }
         var settings = await ReadSettings(c, token);
-        return Ok(new { businessTypeCode = type, requesters = rows, equipment, subjects, priorities, requireEquipment = settings.RequireEquipment });
+        return Ok(new { businessTypeCode = type, requesters = rows, equipment, subjects, priorities, requireEquipment = settings.RequireEquipment, attachmentRequired = settings.AttachmentRequired });
     }
 
     [HttpGet("equipment-options")]
@@ -194,7 +215,7 @@ ORDER BY Seq,Name,SubjectCode;
     }
 
     [HttpGet]
-    public async Task<IActionResult> List([FromQuery] string? search, [FromQuery] string? status, [FromQuery] bool self = false, [FromQuery] int page = 1, [FromQuery] int pageSize = 20, [FromQuery] string? menuCode = null, CancellationToken token = default, [FromQuery] bool? queueJump = null, [FromQuery] string? priority = null)
+    public async Task<IActionResult> List([FromQuery] string? search, [FromQuery] string? status, [FromQuery] bool self = false, [FromQuery] int page = 1, [FromQuery] int pageSize = 20, [FromQuery] string? menuCode = null, CancellationToken token = default, [FromQuery] bool? queueJump = null, [FromQuery] string? priority = null, [FromQuery] bool strictOwn = false)
     {
         await using var c = await Open(token);
         if (!await InService(c, token)) return Forbid();
@@ -218,27 +239,41 @@ ORDER BY Seq,Name,SubjectCode;
             if (self ? !canManage && !canSelfView : !canManage) return Forbid();
         }
         page = Math.Max(1, page); pageSize = Math.Clamp(pageSize, 1, 100);
-        const string sql = """
-SELECT COUNT_BIG(1) OVER(),RequestID,RequestNo,RequesterType,RequesterNameSnapshot,LocationSnapshot,
-       EquipmentNameSnapshot,Subject,StatusCode,AssignedEmployeeNameSnapshot,ReceivedDate,StartedDate,RequestDate,RowVersion,
+        var canViewSerial = await Laoo.Shared.Contracts.CompanyMenuAccess.IsAllowedForProjectAsync(c, User, "LAOO_STOCK", "08006", "VIEW", token);
+        var sql = $$"""
+SELECT COUNT_BIG(1) OVER(),RequestID,RequestNo,RequesterType,{{RequesterDisplaySql}},LocationSnapshot,
+       EquipmentNameSnapshot,Subject,StatusCode,{{AssignedDisplaySql}},ReceivedDate,StartedDate,RequestDate,RowVersion,
        CAST(CASE WHEN EXISTS (SELECT 1 FROM dbo.TDADServiceRequestAttachment A
             WHERE A.CompanyID=R.CompanyID AND A.RequestID=R.RequestID AND A.IsActive=1
               AND A.ContentType LIKE N'image/%') THEN 1 ELSE 0 END AS bit) AS HasImages,
-       R.PriorityCode, (SELECT TOP(1) C.Name FROM dbo.TDSTMasterCont C WHERE C.GroupCode=N'006' AND C.Code=R.PriorityCode ORDER BY C.Seq) AS PriorityName, R.IsQueueJump
+       R.PriorityCode, (SELECT TOP(1) C.Name FROM dbo.TDSTMasterCont C WHERE C.GroupCode=N'006' AND C.Code=R.PriorityCode ORDER BY C.Seq) AS PriorityName, R.IsQueueJump,
+       CAST(CASE WHEN {{SelfEditPredicate}} THEN 1 ELSE 0 END AS bit), CAST(CASE WHEN {{SelfDeletePredicate}} THEN 1 ELSE 0 END AS bit), E.SerialNo
 FROM dbo.TDADServiceRequest R
-WHERE CompanyID=@company AND IsActive=1
-  AND (@self=0 OR CreateBy=@user)
+OUTER APPLY (
+    SELECT X.SerialNo FROM dbo.TDIVItemInstance X
+    JOIN dbo.TDIVItem I ON I.ItemID=X.ItemID AND I.CompanyID=X.CompanyID
+    LEFT JOIN dbo.TDIVWarehouse W ON W.WarehouseID=X.WarehouseID AND W.CompanyID=X.CompanyID
+    LEFT JOIN dbo.TDADBranch B ON B.BranchID=W.BranchID AND B.CompanyID=W.CompanyID AND B.IsActive=1
+    WHERE @canSerial=1 AND X.CompanyID=R.CompanyID AND X.ItemInstanceID=R.EquipmentInstanceID
+      AND X.ItemID=R.EquipmentItemID
+      AND (X.WarehouseID IS NULL OR {{InventoryWarehouseAccess.WarehouseAliasPredicate}})
+) E
+WHERE R.CompanyID=@company AND R.IsActive=1
+  AND (@self=0 OR {{SelfViewPredicate}})
+  AND (@strictOwn=0 OR R.CreateBy=@user)
   AND (@queueJump IS NULL OR R.IsQueueJump=@queueJump)
   AND (@priority IS NULL OR R.PriorityCode=@priority)
   AND (@status IN(N'',N'ALL')
        OR (@status=N'OPEN' AND StatusCode IN(N'RECEIVED',N'IN_PROGRESS'))
        OR (@status NOT IN(N'',N'ALL',N'OPEN') AND StatusCode=@status))
-  AND (@q=N'' OR RequestNo LIKE N'%'+@q+N'%' OR RequesterNameSnapshot LIKE N'%'+@q+N'%' OR Subject LIKE N'%'+@q+N'%')
+  AND (@q=N'' OR R.RequestNo LIKE N'%'+@q+N'%' OR R.RequesterNameSnapshot LIKE N'%'+@q+N'%' OR R.Subject LIKE N'%'+@q+N'%' OR R.LocationSnapshot LIKE N'%'+@q+N'%' OR R.EquipmentNameSnapshot LIKE N'%'+@q+N'%' OR R.EquipmentCodeSnapshot LIKE N'%'+@q+N'%' OR E.SerialNo LIKE N'%'+@q+N'%')
 ORDER BY RequestDate DESC,RequestID DESC OFFSET @offset ROWS FETCH NEXT @take ROWS ONLY;
 """;
         await using var cmd = new SqlCommand(sql, c);
         Add(cmd, "@company", SqlDbType.BigInt, CompanyId);
         Add(cmd, "@self", SqlDbType.Bit, self); Add(cmd, "@user", SqlDbType.BigInt, UserId);
+        Add(cmd, "@canSerial", SqlDbType.Bit, canViewSerial);
+        Add(cmd, "@strictOwn", SqlDbType.Bit, strictOwn);
         Add(cmd, "@queueJump", SqlDbType.Bit, queueJump);
         Add(cmd, "@priority", SqlDbType.NVarChar, string.IsNullOrEmpty(priority) ? null : priority, 1);
         Add(cmd, "@status", SqlDbType.NVarChar, status?.Trim() ?? string.Empty, 30);
@@ -254,7 +289,7 @@ ORDER BY RequestDate DESC,RequestID DESC OFFSET @offset ROWS FETCH NEXT @take RO
             {
                 ["requestId"] = r.GetInt64(1), ["requestNo"] = r.GetString(2),
                 ["requesterType"] = r.GetString(3), ["requesterName"] = r.GetString(4),
-                ["locationSnapshot"] = Text(r, 5), ["equipmentName"] = Text(r, 6),
+                ["locationSnapshot"] = Text(r, 5), ["equipmentName"] = Text(r, 6), ["equipmentSerial"] = Text(r, 20),
                 ["subject"] = r.GetString(7), ["statusCode"] = r.GetString(8),
                 ["assignedEmployeeName"] = Text(r, 9), ["receivedDate"] = DateTimeValue(r, 10),
                 ["startedDate"] = DateTimeValue(r, 11), ["requestDate"] = r.GetDateTime(12),
@@ -262,10 +297,181 @@ ORDER BY RequestDate DESC,RequestID DESC OFFSET @offset ROWS FETCH NEXT @take RO
                 ["hasImages"] = r.GetBoolean(14), ["priorityCode"] = r.GetString(15), ["priorityName"] = Text(r, 16)
             };
             if (menuCode == "17001") item["isQueueJump"] = r.GetBoolean(17);
+            if (self) { item["selfCanEdit"] = r.GetBoolean(18); item["selfCanDelete"] = r.GetBoolean(19); }
             items.Add(item);
         }
         return Ok(new { items, total, page, pageSize });
     }
+
+    [HttpGet("assistant/self")]
+    public async Task<IActionResult> AssistantOwnRequests(CancellationToken token)
+    {
+        await using var db = await Open(token);
+        if (!await LaooApi.Services.Assistant.AssistantCapabilityAccess.IsAllowed(db, User, "repair.track_own", token)) return Forbid();
+        return await List(null, null, true, 1, 20, "20002", token, strictOwn: true);
+    }
+
+    [HttpGet("assistant/pending")]
+    public async Task<IActionResult> AssistantPendingRequests(CancellationToken token)
+    {
+        await using var db = await Open(token);
+        if (!await LaooApi.Services.Assistant.AssistantCapabilityAccess.IsAllowed(db, User, "repair.pending", token)) return Forbid();
+        // Reuse the dispatch screen's company scope, permission and NEW status checks.
+        return await List(null, null, false, 1, 20, "17001", token);
+    }
+
+    [HttpGet("assistant/parts-cost")]
+    public async Task<IActionResult> AssistantPartsCost([FromQuery] DateTime? from, [FromQuery] DateTime? to, CancellationToken token)
+    {
+        if ((from.HasValue && from.Value.TimeOfDay != TimeSpan.Zero) ||
+            (to.HasValue && to.Value.TimeOfDay != TimeSpan.Zero) ||
+            (from.HasValue && to.HasValue && from.Value.Date > to.Value.Date) ||
+            (to.HasValue && to.Value.Date == DateTime.MaxValue.Date))
+            return BadRequest(new { message = "ช่วงวันที่ไม่ถูกต้อง" });
+        await using var db = await Open(token);
+        if (!await InService(db, token) || !await LaooApi.Services.Assistant.AssistantCapabilityAccess.IsAllowed(db, User, "repair.parts_cost", token)) return Forbid();
+        var companyScope = await ScreenType(db, "19002", token) == 3 && await Allowed(db, "19002", "VIEW", token);
+        var sql = $$"""
+SELECT COUNT_BIG(*), COALESCE(SUM(P.PartsTotal), 0)
+FROM dbo.TDADServiceRequest R
+OUTER APPLY (SELECT COALESCE(SUM(TotalCost),0) PartsTotal FROM dbo.TDADServiceRequestPart P
+ WHERE P.CompanyID=R.CompanyID AND P.RequestID=R.RequestID AND P.IsActive=1) P
+WHERE R.CompanyID=@company AND R.IsActive=1 AND R.StatusCode=N'COMPLETED'
+  AND (@companyScope=1 OR {{SelfViewPredicate}})
+  AND (@from IS NULL OR R.CompletedDate>=@from)
+  AND (@until IS NULL OR R.CompletedDate<@until)
+""";
+        await using var command = new SqlCommand(sql, db);
+        Add(command, "@company", SqlDbType.BigInt, CompanyId);
+        Add(command, "@user", SqlDbType.BigInt, UserId);
+        Add(command, "@companyScope", SqlDbType.Bit, companyScope);
+        Add(command, "@from", SqlDbType.DateTime2, from?.Date);
+        Add(command, "@until", SqlDbType.DateTime2, to?.Date.AddDays(1));
+        await using var reader = await command.ExecuteReaderAsync(token);
+        await reader.ReadAsync(token);
+        return Ok(new { count = reader.GetInt64(0), partsTotal = reader.GetDecimal(1),
+            scope = companyScope ? "company" : "self", from, to,
+            description = "ต้นทุนอะไหล่ของงานที่เสร็จ ไม่รวมค่าแรงและค่าบริการอื่น" });
+    }
+
+    [HttpGet("assistant/serial-history")]
+    public async Task<IActionResult> AssistantSerialHistory([FromQuery] string? serial, CancellationToken token)
+    {
+        serial = serial?.Trim();
+        if (string.IsNullOrWhiteSpace(serial) || serial.Length > 200) return BadRequest(new { message = "กรุณาระบุ Serial ที่ถูกต้อง" });
+        await using var db = await Open(token);
+        if (!await InService(db, token) || !await LaooApi.Services.Assistant.AssistantCapabilityAccess.IsAllowed(db, User, "repair.serial_history", token)) return Forbid();
+        var companyScope = await ScreenType(db, "19002", token) == 3 && await Allowed(db, "19002", "VIEW", token);
+        var selfTracking = await ScreenType(db, "20002", token) == 3 && await Allowed(db, "20002", "VIEW", token);
+        var selfHistory = await ScreenType(db, "20003", token) == 3 && await Allowed(db, "20003", "VIEW", token);
+        var sql = $$"""
+SELECT TOP (20) R.RequestNo,R.Subject,R.StatusCode,R.CompletedDate
+FROM dbo.TDADServiceRequest R
+WHERE R.CompanyID=@company AND R.IsActive=1
+ AND EXISTS (SELECT 1 FROM dbo.TDIVItemInstance X WHERE X.CompanyID=R.CompanyID
+             AND X.ItemInstanceID=R.EquipmentInstanceID AND X.ItemID=R.EquipmentItemID AND X.SerialNo=@serial)
+ AND ((@companyScope=1 AND R.StatusCode=N'COMPLETED') OR (@selfTracking=1 AND {{SelfViewPredicate}})
+      OR (@selfHistory=1 AND R.StatusCode=N'COMPLETED' AND {{SelfViewPredicate}}))
+ORDER BY R.RequestDate DESC,R.RequestID DESC
+""";
+        await using var q = new SqlCommand(sql, db);
+        Add(q, "@company", SqlDbType.BigInt, CompanyId); Add(q, "@serial", SqlDbType.NVarChar, serial, 200);
+        Add(q, "@user", SqlDbType.BigInt, UserId); Add(q, "@companyScope", SqlDbType.Bit, companyScope);
+        Add(q, "@selfTracking", SqlDbType.Bit, selfTracking); Add(q, "@selfHistory", SqlDbType.Bit, selfHistory);
+        var items = new List<object>();
+        await using var reader = await q.ExecuteReaderAsync(token);
+        while (await reader.ReadAsync(token)) items.Add(new { requestNo = reader.GetString(0), subject = reader.GetString(1), statusCode = reader.GetString(2), completedDate = DateTimeValue(reader, 3) });
+        return Ok(new { items });
+    }
+
+    [HttpGet("assistant/created/{id:long}")]
+    public async Task<IActionResult> AssistantCreatedRequest(long id, CancellationToken token)
+    {
+        await using var db = await Open(token);
+        if (!await InService(db, token) || !await LaooApi.Services.Assistant.AssistantCapabilityAccess.IsAllowed(db, User, "repair.create_own", token)) return Forbid();
+        await using var query = new SqlCommand("SELECT RequestNo,Subject,Detail,StatusCode FROM dbo.TDADServiceRequest WHERE CompanyID=@company AND RequestID=@id AND CreateBy=@user AND RequestChannelCode=N'2' AND IsActive=1", db);
+        Add(query, "@company", SqlDbType.BigInt, CompanyId); Add(query, "@id", SqlDbType.BigInt, id); Add(query, "@user", SqlDbType.BigInt, UserId);
+        await using var reader = await query.ExecuteReaderAsync(token);
+        if (!await reader.ReadAsync(token)) return NotFound();
+        return Ok(new { requestNo=reader.GetString(0), subject=reader.GetString(1), detail=reader.GetString(2), statusCode=reader.GetString(3) });
+    }
+
+    public sealed record AssistantEmailRequest(string? Email, DateTime? From, DateTime? To, bool Confirmed, string? CapabilityCode = null, long? RequestId = null);
+
+    [HttpPost("assistant/parts-cost/email")]
+    [HttpPost("assistant/report/email")]
+    public async Task<IActionResult> AssistantEmailPartsCost(AssistantEmailRequest request, CancellationToken token)
+    {
+        if (!request.Confirmed || string.IsNullOrWhiteSpace(request.Email) || request.Email.Length > 320 ||
+            !System.Net.Mail.MailAddress.TryCreate(request.Email.Trim(), out var address) || address.Address != request.Email.Trim())
+            return BadRequest(new { message = "กรุณาระบุอีเมลที่ถูกต้องและยืนยันการส่ง" });
+        await using var db = await Open(token);
+        var code = request.CapabilityCode ?? "repair.parts_cost";
+        if (code is not ("repair.parts_cost" or "repair.track_own" or "repair.create_own")) return BadRequest(new { message = "ไม่รองรับรายงานนี้" });
+        if (!await LaooApi.Services.Assistant.AssistantCapabilityAccess.IsAllowed(db, User, code, token)) return Forbid();
+        await using (var permission = new SqlCommand("SELECT AllowEmail FROM dbo.TDADAiCapabilityCompany WHERE CompanyID=@company AND CapabilityCode=@code AND IsEnabled=1", db))
+        {
+            Add(permission, "@company", SqlDbType.BigInt, CompanyId);
+            Add(permission, "@code", SqlDbType.NVarChar, code, 100);
+            if (Convert.ToBoolean(await permission.ExecuteScalarAsync(token) ?? false) != true) return Forbid();
+        }
+        string body;
+        if (code == "repair.parts_cost")
+        {
+            var calculation = await AssistantPartsCost(request.From, request.To, token);
+            if (calculation is not OkObjectResult ok) return calculation;
+            using var data = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(ok.Value));
+            var root = data.RootElement;
+            var scope = root.GetProperty("scope").GetString() == "company" ? "ทั้งบริษัท" : "ตามขอบเขตบริการตนเอง";
+            body = $"สรุปต้นทุนอะไหล่งานซ่อม ({scope})\nช่วงวันที่: {request.From?.ToString("dd/MM/yyyy") ?? "เริ่มต้น"} - {request.To?.ToString("dd/MM/yyyy") ?? "ปัจจุบัน"}\nจำนวนงาน: {root.GetProperty("count")}\nต้นทุนอะไหล่: {root.GetProperty("partsTotal")} บาท\nไม่รวมค่าแรงและค่าบริการอื่น";
+        }
+        else if (code == "repair.track_own")
+        {
+            var result = await AssistantOwnRequests(token);
+            if (result is not OkObjectResult ok) return result;
+            using var data = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(ok.Value));
+            body = "รายการแจ้งซ่อมของคุณ (ล่าสุดไม่เกิน 20 รายการ)\n" + string.Join("\n", data.RootElement.GetProperty("items").EnumerateArray().Select(x => $"{x.GetProperty("requestNo")} • {x.GetProperty("subject")} • {AssistantStatus(x.GetProperty("statusCode").GetString())}"));
+        }
+        else
+        {
+            if (request.RequestId is not > 0) return BadRequest(new { message = "ไม่พบเลขที่รายการ" });
+            var result = await AssistantCreatedRequest(request.RequestId.Value, token);
+            if (result is not OkObjectResult ok) return result;
+            using var data = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(ok.Value));
+            var item = data.RootElement;
+            body = $"แจ้งซ่อมสำเร็จ\nเลขที่: {item.GetProperty("requestNo")}\nหัวข้อ: {item.GetProperty("subject")}\nรายละเอียด: {item.GetProperty("detail")}\nสถานะ: {AssistantStatus(item.GetProperty("statusCode").GetString())}";
+        }
+        await using var config = new SqlCommand("SELECT EmailHost,EmailPort,EmailCenter,EmailPasswordCenter FROM dbo.TDSTCompanySetUp WHERE CompanyID=@company AND IsActive=1", db);
+        Add(config, "@company", SqlDbType.BigInt, CompanyId);
+        await using var reader = await config.ExecuteReaderAsync(token);
+        if (!await reader.ReadAsync(token)) return BadRequest(new { message = "ไม่พบการตั้งค่าอีเมลของบริษัท" });
+        var host = reader.IsDBNull(0) ? null : reader.GetString(0);
+        var port = reader.IsDBNull(1) ? 587 : Convert.ToInt32(reader.GetValue(1));
+        var sender = reader.IsDBNull(2) ? null : reader.GetString(2);
+        var protectedPassword = reader.IsDBNull(3) ? null : reader.GetString(3);
+        await reader.DisposeAsync();
+        var password = HttpContext.RequestServices.GetRequiredService<CompanySetupSecretService>().Unprotect(protectedPassword);
+        if (string.IsNullOrWhiteSpace(host) || string.IsNullOrWhiteSpace(sender) || string.IsNullOrWhiteSpace(password) || port is < 1 or > 65535)
+            return BadRequest(new { message = "ยังตั้งค่าอีเมลบริษัทไม่ครบ กรุณาติดต่อผู้ดูแลระบบ" });
+        try
+        {
+            using var mail = new System.Net.Mail.MailMessage(sender, address.Address, "ข้อมูลระบบแจ้งซ่อม", body);
+            using var smtp = new System.Net.Mail.SmtpClient(host, port) { EnableSsl = true, Credentials = new System.Net.NetworkCredential(sender, password) };
+            await smtp.SendMailAsync(mail, token);
+            return Ok(new { message = "ส่งอีเมลแล้ว" });
+        }
+        catch (Exception ex) when (ex is System.Net.Mail.SmtpException or System.IO.IOException or InvalidOperationException or FormatException)
+        {
+            logger.LogWarning("AI report email delivery failed for company {CompanyId}", CompanyId);
+            return StatusCode(503, new { message = "ส่งอีเมลไม่สำเร็จ กรุณาตรวจสอบการตั้งค่าอีเมลและลองใหม่" });
+        }
+    }
+
+    private static string AssistantStatus(string? status) => status switch
+    {
+        "NEW" => "สร้างใหม่", "RECEIVED" => "รับงานแล้ว", "IN_PROGRESS" => "กำลังดำเนินการ",
+        "COMPLETED" => "เสร็จแล้ว", "CANCELLED" => "ยกเลิก", _ => status ?? "-"
+    };
 
     [HttpGet("repair-history")]
     public async Task<IActionResult> RepairHistory([FromQuery] string? search, [FromQuery] int page = 1, [FromQuery] int pageSize = 20, CancellationToken token = default)
@@ -343,10 +549,11 @@ ORDER BY R.CompletedDate DESC,R.RequestID DESC OFFSET @offset ROWS FETCH NEXT @t
             canHistoryView = await Allowed(c, "19002", "VIEW", token);
             if (!canManage && !canSelfView && !canHistoryView) return Forbid();
         }
-        const string sql = "SELECT RequestID,RequestNo,RequesterType,RequesterID,RequesterNameSnapshot,RequesterPhoneSnapshot,RequesterEmailSnapshot,LocationSnapshot,EquipmentItemID,EquipmentCodeSnapshot,EquipmentNameSnapshot,Subject,Detail,StatusCode,RequestDate,AssignedEmployeeID,AssignedEmployeeNameSnapshot,ReceivedDate,StartedDate,CompletedDate,ResolutionDetail,CancellationReason,RowVersion,PriorityCode,RequestChannelCode FROM dbo.TDADServiceRequest WHERE CompanyID=@company AND RequestID=@id AND IsActive=1 AND (@manage=1 OR (@history=1 AND StatusCode=N'COMPLETED') OR (@owner=1 AND CreateBy=@user)) AND (@requiredStatus=N'' OR StatusCode=@requiredStatus)";
+        var sql = $"SELECT RequestID,RequestNo,RequesterType,RequesterID,{RequesterDisplaySql},RequesterPhoneSnapshot,RequesterEmailSnapshot,LocationSnapshot,EquipmentItemID,EquipmentCodeSnapshot,EquipmentNameSnapshot,Subject,Detail,StatusCode,RequestDate,AssignedEmployeeID,{AssignedDisplaySql},ReceivedDate,StartedDate,CompletedDate,ResolutionDetail,CancellationReason,RowVersion,PriorityCode,RequestChannelCode,R.EquipmentInstanceID FROM dbo.TDADServiceRequest R WHERE CompanyID=@company AND RequestID=@id AND IsActive=1 AND (@manage=1 OR (@history=1 AND StatusCode=N'COMPLETED') OR (@owner=1 AND {SelfViewPredicate})) AND (@requiredStatus=N'' OR StatusCode=@requiredStatus)";
         await using var q = new SqlCommand(sql, c); Add(q, "@company", SqlDbType.BigInt, CompanyId); Add(q, "@id", SqlDbType.BigInt, id); Add(q, "@manage", SqlDbType.Bit, canManage); Add(q, "@history", SqlDbType.Bit, canHistoryView); Add(q, "@owner", SqlDbType.Bit, canSelfView); Add(q, "@user", SqlDbType.BigInt, UserId); Add(q, "@requiredStatus", SqlDbType.NVarChar, requiredStatus, 30);
         await using var r = await q.ExecuteReaderAsync(token);
         if (!await r.ReadAsync(token)) return NotFound();
+        var equipmentInstanceId = Long(r, 25);
         var response = new Dictionary<string, object?>
         {
             ["requestId"] = r.GetInt64(0),
@@ -375,6 +582,15 @@ ORDER BY R.CompletedDate DESC,R.RequestID DESC OFFSET @offset ROWS FETCH NEXT @t
             ["priorityCode"] = r.GetString(23), ["requestChannelCode"] = Text(r, 24)
         };
         await r.DisposeAsync();
+        if (equipmentInstanceId is long serialId && response["equipmentItemId"] is long itemId &&
+            await Laoo.Shared.Contracts.CompanyMenuAccess.IsAllowedForProjectAsync(c, User, "LAOO_STOCK", "08006", "VIEW", token))
+        {
+            await using var serialQuery = new SqlCommand("SELECT SerialNo FROM dbo.TDIVItemInstance WHERE CompanyID=@company AND ItemInstanceID=@id", c);
+            Add(serialQuery, "@company", SqlDbType.BigInt, CompanyId); Add(serialQuery, "@id", SqlDbType.BigInt, serialId);
+            var serial = Convert.ToString(await serialQuery.ExecuteScalarAsync(token));
+            if (!string.IsNullOrWhiteSpace(serial) && await FindAccessibleEquipmentSerial(serial, itemId, token) == serialId)
+                response["equipmentSerial"] = serial;
+        }
         response["requireEquipment"] = (await ReadSettings(c, token)).RequireEquipment;
         var parts = new List<object>(); decimal partsTotal = 0;
         const string partSql = "SELECT P.ServiceRequestPartID,P.WarehouseID,P.ItemID,P.ItemCodeSnapshot,P.ItemNameSnapshot,P.UnitCodeSnapshot,P.Quantity,P.UnitCostSnapshot,P.TotalCost,W.WarehouseName,(SELECT STRING_AGG(X.SerialNo,N', ') FROM dbo.TDIVStockIssueSerial S JOIN dbo.TDIVItemInstance X ON X.ItemInstanceID=S.ItemInstanceID WHERE S.StockIssueDetailID=P.StockIssueDetailID) SerialNos FROM dbo.TDADServiceRequestPart P JOIN dbo.TDIVWarehouse W ON W.CompanyID=P.CompanyID AND W.WarehouseID=P.WarehouseID WHERE P.CompanyID=@company AND P.RequestID=@request AND P.IsActive=1 ORDER BY P.ServiceRequestPartID";
@@ -463,9 +679,9 @@ ORDER BY R.CompletedDate DESC,R.RequestID DESC OFFSET @offset ROWS FETCH NEXT @t
         if (!access.Found) return NotFound();
         if (access.Status is "COMPLETED" or "CANCELLED") return Conflict(new { message = "ไม่สามารถเพิ่มรูปในใบแจ้งซ่อมที่ปิดแล้ว" });
         var canManage = !editSelf && await Allowed(c, "15001", "EDIT", token);
-        var canOwner = access.CreatedBy == UserId && (editSelf
-            ? await ScreenType(c, "20001", token) == 1 && await Allowed(c, "20001", "EDIT", token)
-            : await Allowed(c, "20001", "CREATE", token));
+        var canOwner = editSelf
+            ? await ScreenType(c, "20001", token) == 1 && await Allowed(c, "20001", "EDIT", token) && await HasSelfScope(c, id, false, token) && await HasSelfScope(c, id, true, token)
+            : access.CreatedBy == UserId && await Allowed(c, "20001", "CREATE", token);
         if (!canManage && !canOwner) return Forbid();
         if ((editSelf || editNew || !canManage) && access.Status != "NEW") return Conflict(new { message = "เพิ่มรูปได้เฉพาะใบแจ้งซ่อมสถานะสร้างใหม่" });
         if (file is null || file.Length == 0) return BadRequest(new { message = "กรุณาเลือกไฟล์รูปภาพ" });
@@ -505,7 +721,7 @@ ORDER BY R.CompletedDate DESC,R.RequestID DESC OFFSET @offset ROWS FETCH NEXT @t
         var menu = editSelf ? "20001" : "15001";
         if (!await InService(c, token) || await ScreenType(c, menu, token) != 1 || !await Allowed(c, menu, "EDIT", token)) return Forbid();
         var access = await RequestAccess(c, id, token); if (!access.Found) return NotFound();
-        if (editSelf && access.CreatedBy != UserId) return Forbid();
+        if (editSelf && (!await HasSelfScope(c, id, false, token) || !await HasSelfScope(c, id, true, token))) return Forbid();
         if ((editSelf || editNew) && access.Status != "NEW") return Conflict(new { message = "ลบรูปได้เฉพาะใบแจ้งซ่อมสถานะสร้างใหม่" });
         if (access.Status is "COMPLETED" or "CANCELLED") return Conflict(new { message = "ไม่สามารถลบรูปในใบแจ้งซ่อมที่ปิดแล้ว" });
         await using var tx = (SqlTransaction)await c.BeginTransactionAsync(token);
@@ -528,7 +744,7 @@ ORDER BY R.CompletedDate DESC,R.RequestID DESC OFFSET @offset ROWS FETCH NEXT @t
 
     private async Task<bool> LockNewRequest(SqlConnection c, SqlTransaction tx, long id, bool self, CancellationToken token)
     {
-        await using var q = new SqlCommand("SELECT 1 FROM dbo.TDADServiceRequest WITH (UPDLOCK, HOLDLOCK) WHERE CompanyID=@company AND RequestID=@request AND (@self=0 OR CreateBy=@user) AND IsActive=1 AND StatusCode=N'NEW'", c, tx);
+        await using var q = new SqlCommand($"SELECT 1 FROM dbo.TDADServiceRequest R WITH (UPDLOCK, HOLDLOCK) WHERE CompanyID=@company AND RequestID=@request AND (@self=0 OR ({SelfViewPredicate} AND {SelfEditPredicate})) AND IsActive=1 AND StatusCode=N'NEW'", c, tx);
         Add(q, "@company", SqlDbType.BigInt, CompanyId);
         Add(q, "@request", SqlDbType.BigInt, id);
         Add(q, "@user", SqlDbType.BigInt, UserId);
@@ -718,7 +934,10 @@ WHERE R.CompanyID=@company
         foreach (var warehouseGroup in parts.GroupBy(p => p.WarehouseId))
         {
             if (!await InventoryWarehouseAccess.CanAccessAsync(c, tx, CompanyId, UserId, warehouseGroup.Key, token)) throw new InvalidOperationException("ไม่มีสิทธิ์เข้าถึงคลังที่เลือก");
-            var issueCode = $"IS{DateTime.UtcNow:yyyyMMddHHmmssfff}{warehouseGroup.Key % 1000:000}";
+            await using var issueNumber = new SqlCommand(Laoo.Shared.Contracts.DocumentNumbering.Sql("08003"), c, tx);
+            issueNumber.Parameters.Add("@company", SqlDbType.BigInt).Value = CompanyId;
+            var configuredNumber = await issueNumber.ExecuteScalarAsync(token);
+            var issueCode = configuredNumber is null or DBNull ? $"IS{DateTime.UtcNow:yyyyMMddHHmmssfff}{warehouseGroup.Key % 1000:000}" : Convert.ToString(configuredNumber)!;
             await using var header = new SqlCommand("INSERT dbo.TDIVStockIssue(CompanyID,WarehouseID,IssueCode,IssueDate,WorkOrderID,WorkOrderCode,StatusCode,Remark,CreatedBy,ConfirmDate,ConfirmedBy) OUTPUT INSERTED.StockIssueID VALUES(@company,@warehouse,@code,CONVERT(date,SYSUTCDATETIME()),@request,@requestNo,N'CONFIRMED',N'เบิกอะไหล่จากงานซ่อม',@user,SYSUTCDATETIME(),@user)", c, tx);
             Add(header, "@company", SqlDbType.BigInt, CompanyId); Add(header, "@warehouse", SqlDbType.BigInt, warehouseGroup.Key); Add(header, "@code", SqlDbType.NVarChar, issueCode, 30); Add(header, "@request", SqlDbType.BigInt, requestId); Add(header, "@requestNo", SqlDbType.NVarChar, requestNo, 50); Add(header, "@user", SqlDbType.BigInt, UserId);
             var issueId = Convert.ToInt64(await header.ExecuteScalarAsync(token)); var lineNo = 0;
@@ -805,20 +1024,32 @@ WHERE R.CompanyID=@company
         }
         if (x.UpdateEquipment && !x.EquipmentItemId.HasValue && (await ReadSettings(c, token)).RequireEquipment)
             return BadRequest(new { message = "กรุณาเลือกอุปกรณ์" });
-        await using var q = new SqlCommand("""
-UPDATE dbo.TDADServiceRequest SET Subject=@subject,Detail=@detail,PriorityCode=COALESCE(@priority,PriorityCode),
+        long? equipmentInstanceId = null;
+        if (x.UpdateSerial && !string.IsNullOrWhiteSpace(x.EquipmentSerial))
+        {
+            if (!x.EquipmentItemId.HasValue || x.EquipmentSerial.Trim().Length > 200)
+                return BadRequest(new { message = "กรุณาเลือกอุปกรณ์และระบุ Serial ที่ถูกต้อง" });
+            if (!await Laoo.Shared.Contracts.CompanyMenuAccess.IsAllowedForProjectAsync(c, User, "LAOO_STOCK", "08006", "VIEW", token)) return Forbid();
+            equipmentInstanceId = await FindAccessibleEquipmentSerial(x.EquipmentSerial.Trim(), x.EquipmentItemId.Value, token);
+            if (!equipmentInstanceId.HasValue) return BadRequest(new { message = "ไม่พบ Serial ของอุปกรณ์ที่เลือก" });
+        }
+        await using var q = new SqlCommand($$"""
+UPDATE R SET Subject=@subject,Detail=@detail,PriorityCode=COALESCE(@priority,PriorityCode),
     EquipmentItemID=CASE WHEN @updateEquipment=1 THEN @equipmentId ELSE EquipmentItemID END,
+    EquipmentInstanceID=CASE WHEN @updateSerial=1 THEN @equipmentInstance WHEN @updateEquipment=1 AND ISNULL(EquipmentItemID,0)<>ISNULL(@equipmentId,0) THEN NULL ELSE EquipmentInstanceID END,
     EquipmentCodeSnapshot=CASE WHEN @updateEquipment=1 THEN @equipmentCode ELSE EquipmentCodeSnapshot END,
     EquipmentNameSnapshot=CASE WHEN @updateEquipment=1 THEN @equipmentName ELSE EquipmentNameSnapshot END,
     UpdateDate=SYSUTCDATETIME(),UpdateBy=@user
-WHERE CompanyID=@company AND RequestID=@id AND IsActive=1 AND StatusCode=N'NEW'
-    AND RowVersion=@version AND (@self=0 OR CreateBy=@user);
+FROM dbo.TDADServiceRequest R WHERE CompanyID=@company AND RequestID=@id AND IsActive=1 AND StatusCode=N'NEW'
+    AND RowVersion=@version AND (@self=0 OR ({{SelfViewPredicate}} AND {{SelfEditPredicate}}));
 """, c);
         Add(q, "@subject", SqlDbType.NVarChar, subject, 200);
         Add(q, "@detail", SqlDbType.NVarChar, detail, 2000);
         Add(q, "@priority", SqlDbType.NVarChar, x.PriorityCode, 1);
         Add(q, "@updateEquipment", SqlDbType.Bit, x.UpdateEquipment);
         Add(q, "@equipmentId", SqlDbType.BigInt, x.EquipmentItemId);
+        Add(q, "@updateSerial", SqlDbType.Bit, x.UpdateSerial);
+        Add(q, "@equipmentInstance", SqlDbType.BigInt, equipmentInstanceId);
         Add(q, "@equipmentCode", SqlDbType.NVarChar, equipmentCode, 50);
         Add(q, "@equipmentName", SqlDbType.NVarChar, equipmentName, 200);
         Add(q, "@user", SqlDbType.BigInt, UserId);
@@ -850,10 +1081,10 @@ WHERE CompanyID=@company AND RequestID=@id AND IsActive=1 AND StatusCode=N'NEW'
             return BadRequest(new { message = "ข้อมูลรุ่นรายการไม่ถูกต้อง" });
         await using var tx = (SqlTransaction)await c.BeginTransactionAsync(IsolationLevel.Serializable, token);
         var paths = new List<string>();
-        await using (var q = new SqlCommand("""
-SELECT StatusCode,RowVersion FROM dbo.TDADServiceRequest WITH(UPDLOCK,HOLDLOCK)
+        await using (var q = new SqlCommand($$"""
+SELECT StatusCode,RowVersion FROM dbo.TDADServiceRequest R WITH(UPDLOCK,HOLDLOCK)
 WHERE CompanyID=@company AND RequestID=@id AND IsActive=1
-    AND (@self=0 OR CreateBy=@user);
+    AND (@self=0 OR ({{SelfViewPredicate}} AND {{SelfDeletePredicate}}));
 """, c, tx))
         {
             Add(q, "@company", SqlDbType.BigInt, CompanyId);
@@ -885,11 +1116,12 @@ WHERE CompanyID=@company AND RequestID=@id;
             await using var r = await q.ExecuteReaderAsync(token);
             while (await r.ReadAsync(token)) paths.Add(r.GetString(0));
         }
-        await using (var q = new SqlCommand("""
+        await using (var q = new SqlCommand($$"""
 DELETE FROM dbo.TDADServiceRequestAttachment WHERE CompanyID=@company AND RequestID=@id;
-DELETE FROM dbo.TDADServiceRequest WHERE CompanyID=@company AND RequestID=@id
+DELETE R FROM dbo.TDADServiceRequest R WHERE CompanyID=@company AND RequestID=@id
     AND StatusCode=N'NEW' AND RowVersion=@version
-    AND (@self=0 OR CreateBy=@user);
+    AND (@self=0 OR ({{SelfViewPredicate}} AND {{SelfDeletePredicate}}));
+IF @@ROWCOUNT <> 1 THROW 52973, 'REQUEST_DELETE_CONFLICT', 1;
 """, c, tx))
         {
             Add(q, "@company", SqlDbType.BigInt, CompanyId);
@@ -897,7 +1129,12 @@ DELETE FROM dbo.TDADServiceRequest WHERE CompanyID=@company AND RequestID=@id
             Add(q, "@version", SqlDbType.VarBinary, version, 8);
             Add(q, "@self", SqlDbType.Bit, self);
             Add(q, "@user", SqlDbType.BigInt, UserId);
-            await q.ExecuteNonQueryAsync(token);
+            try { await q.ExecuteNonQueryAsync(token); }
+            catch (SqlException e) when (e.Number == 52973)
+            {
+                await tx.RollbackAsync(token);
+                return Conflict(new { message = "ไม่สามารถลบใบแจ้งซ่อมได้", description = "รายการหรือสิทธิ์เปลี่ยนแปลง กรุณาโหลดข้อมูลใหม่และลองอีกครั้ง" });
+            }
         }
         await tx.CommitAsync(token);
         foreach (var path in paths) TryDelete(path);
@@ -929,13 +1166,55 @@ DELETE FROM dbo.TDADServiceRequest WHERE CompanyID=@company AND RequestID=@id
         }
     }
 
-    private async Task<IActionResult> Save(CreateRequest x, bool self, CancellationToken token)
+    public sealed record AiImage(string? FileName, string? DataBase64);
+    public sealed record AiCreateRequest(string? Subject, string? Detail, Guid RequestKey, long? EquipmentItemId, IReadOnlyList<AiImage>? Images, string? EquipmentSerial = null);
+    private sealed record AiPreparedImage(string Name, ProcessedImage Image);
+
+    [HttpPost("assistant/self"), RequestSizeLimit(36_000_000)]
+    public async Task<IActionResult> AssistantCreate(AiCreateRequest request, CancellationToken token)
+    {
+        if (request.RequestKey == Guid.Empty) return BadRequest(new { message = "ไม่พบรหัสยืนยันรายการ" });
+        await using var db = await Open(token);
+        if (!await LaooApi.Services.Assistant.AssistantCapabilityAccess.IsAllowed(db, User, "repair.create_own", token)) return Forbid();
+        await using (var schema = new SqlCommand("SELECT CASE WHEN COL_LENGTH(N'dbo.TDADServiceRequest',N'AiRequestKey') IS NULL THEN 0 ELSE 1 END", db))
+            if (Convert.ToInt32(await schema.ExecuteScalarAsync(token)) == 0)
+                return StatusCode(503, new { message = "การแจ้งซ่อมผ่าน AI ยังไม่พร้อม", description = "กรุณาใช้หน้าแจ้งซ่อมปกติ" });
+        var settings = await ReadSettings(db, token);
+        var images = new List<AiPreparedImage>();
+        long totalBytes = 0;
+        if (request.Images?.Count > 10) return BadRequest(new { message = "แนบรูปได้ไม่เกิน 10 รูป" });
+        foreach (var image in request.Images ?? Array.Empty<AiImage>())
+        {
+            byte[] bytes;
+            try { bytes = Convert.FromBase64String(image.DataBase64 ?? ""); }
+            catch (FormatException) { return BadRequest(new { message = "ข้อมูลรูปภาพไม่ถูกต้อง" }); }
+            totalBytes += bytes.Length;
+            if (bytes.Length == 0 || totalBytes > MaxIncomingAttachmentBytes) return BadRequest(new { message = "ไฟล์รูปต้นฉบับรวมกันต้องไม่เกิน 25 MB" });
+            await using var stream = new MemoryStream(bytes);
+            var file = new FormFile(stream, 0, bytes.Length, "file", image.FileName ?? "") { Headers = new HeaderDictionary(), ContentType = "application/octet-stream" };
+            var processed = await ProcessImage(file, token);
+            if (processed.Error is not null) return BadRequest(new { message = processed.Error });
+            images.Add(new AiPreparedImage(SafeOriginalName(file.FileName), processed));
+        }
+        if (settings.AttachmentRequired && images.Count == 0) return BadRequest(new { message = "บริษัทกำหนดให้แนบรูปก่อนแจ้งซ่อม" });
+        await using (var subject = new SqlCommand("SELECT COUNT_BIG(*) FROM dbo.TDADServiceRequestSubject WHERE OwnerType=N'C' AND OwnerCompanyID=@company AND IsActive=1 AND Name=@name", db))
+        {
+            Add(subject, "@company", SqlDbType.BigInt, CompanyId);
+            Add(subject, "@name", SqlDbType.NVarChar, request.Subject?.Trim(), 200);
+            if (Convert.ToInt64(await subject.ExecuteScalarAsync(token)) != 1)
+                return BadRequest(new { message = "ไม่พบหัวข้องานซ่อม", description = "กรุณาเลือกหัวข้อที่เปิดใช้งาน หรือใช้หน้าแจ้งซ่อมปกติ" });
+        }
+        return await Save(new CreateRequest(null, null, request.EquipmentItemId, request.Subject, request.Detail, EquipmentSerial: request.EquipmentSerial), true, token, request.RequestKey, images);
+    }
+
+    private async Task<IActionResult> Save(CreateRequest x, bool self, CancellationToken token, Guid? aiRequestKey = null, IReadOnlyList<AiPreparedImage>? aiImages = null)
     {
         if (x.PriorityCode is not null && x.PriorityCode is not ("0" or "1" or "2")) return BadRequest(new { message = "ระดับงานไม่ถูกต้อง" });
         await using var c = await Open(token);
         var screen = self ? "20001" : "15001";
         if (!await InService(c, token) || await ScreenType(c, screen, token) != 1 || !await Allowed(c, screen, "CREATE", token)) return Forbid();
         var settings = await ReadSettings(c, token);
+        if (aiRequestKey.HasValue && settings.AttachmentRequired && (aiImages?.Count ?? 0) == 0) return BadRequest(new { message = "บริษัทกำหนดให้แนบรูปก่อนแจ้งซ่อม" });
         if (!settings.ServiceEnabled)
             return BadRequest(new { message = "ระบบบริการปิดใช้งาน", description = "กรุณาติดต่อผู้ดูแลระบบเพื่อเปิดใช้งานระบบบริการ" });
         if (string.IsNullOrWhiteSpace(x.Subject) || string.IsNullOrWhiteSpace(x.Detail))
@@ -946,6 +1225,17 @@ DELETE FROM dbo.TDADServiceRequest WHERE CompanyID=@company AND RequestID=@id
         if (!string.IsNullOrWhiteSpace(x.QrToken) && qr is null)
             return BadRequest(new { message = "QR Code ไม่ถูกต้อง", description = "QR นี้ปิดใช้งาน ไม่พบข้อมูล หรือไม่ได้อยู่ใน Company ปัจจุบัน" });
         var equipmentItemId = qr?.ItemId ?? x.EquipmentItemId;
+        long? equipmentInstanceId = qr?.InstanceId;
+        if (!string.IsNullOrWhiteSpace(x.EquipmentSerial))
+        {
+            if (!equipmentItemId.HasValue || x.EquipmentSerial.Trim().Length > 200)
+                return BadRequest(new { message = "กรุณาเลือกอุปกรณ์และระบุ Serial ที่ถูกต้อง" });
+            if (!await Laoo.Shared.Contracts.CompanyMenuAccess.IsAllowedForProjectAsync(c, User, "LAOO_STOCK", "08006", "VIEW", token)) return Forbid();
+            var selectedInstanceId = await FindAccessibleEquipmentSerial(x.EquipmentSerial.Trim(), equipmentItemId.Value, token);
+            if (!selectedInstanceId.HasValue || (qr is not null && qr.InstanceId != selectedInstanceId.Value))
+                return BadRequest(new { message = "ไม่พบ Serial ของอุปกรณ์ที่เลือก", description = "ตรวจสอบ Serial และสิทธิ์เข้าถึงคลังสินค้า" });
+            equipmentInstanceId = selectedInstanceId;
+        }
         if (settings.RequireEquipment && !equipmentItemId.HasValue)
             return BadRequest(new { message = "กรุณาเลือกอุปกรณ์", description = "รายการแจ้งซ่อมต้องระบุอุปกรณ์ที่ใช้กับระบบ Service" });
         string? equipmentCode = null, equipmentName = null;
@@ -958,51 +1248,94 @@ DELETE FROM dbo.TDADServiceRequest WHERE CompanyID=@company AND RequestID=@id
             equipmentCode = equipmentReader.GetString(0); equipmentName = equipmentReader.GetString(1);
         }
         await using var tx = (SqlTransaction)await c.BeginTransactionAsync(token);
+        var savedAiPaths = new List<string>();
         try
         {
+            await using (var numberLock = new SqlCommand(Laoo.Shared.Contracts.ServiceRequestNumbering.AcquireLockSql, c, tx))
+            {
+                Add(numberLock, "@company", SqlDbType.BigInt, CompanyId);
+                await numberLock.ExecuteNonQueryAsync(token);
+            }
+            if (aiRequestKey.HasValue)
+            {
+                await using var existing = new SqlCommand("SELECT RequestID,RequestNo,RequestDate FROM dbo.TDADServiceRequest WITH(UPDLOCK,HOLDLOCK) WHERE CompanyID=@company AND CreateBy=@user AND AiRequestKey=@key", c, tx);
+                Add(existing, "@company", SqlDbType.BigInt, CompanyId); Add(existing, "@user", SqlDbType.BigInt, UserId); Add(existing, "@key", SqlDbType.UniqueIdentifier, aiRequestKey);
+                await using var reader = await existing.ExecuteReaderAsync(token);
+                if (await reader.ReadAsync(token))
+                {
+                    var existingId = reader.GetInt64(0); var existingNo = reader.GetString(1); var existingDate = DateTime.SpecifyKind(reader.GetDateTime(2), DateTimeKind.Utc);
+                    await reader.DisposeAsync(); await tx.CommitAsync(token);
+                    return Ok(new { requestId = existingId, requestNo = existingNo, requestDate = existingDate, duplicate = true });
+                }
+            }
             var resolved = await Resolve(c, tx, x, type, self, token);
             if (resolved is null)
                 return BadRequest(new { message = "ผู้แจ้งไม่ถูกต้อง", description = "ไม่พบข้อมูลผู้แจ้งที่ใช้งานอยู่ใน Company นี้" });
             if (!settings.AllowWalkIn && resolved.Type == "SERVICE_CUSTOMER")
                 return BadRequest(new { message = "ไม่อนุญาตผู้แจ้ง Walk-in", description = "ผู้ดูแลระบบปิดการรับแจ้งจากลูกค้าภายนอกไว้" });
 
-            const string nextNo = """
-SELECT N'SR'+CONVERT(nvarchar(8),CONVERT(date,SYSUTCDATETIME()),112)
- +RIGHT(N'000000'+CONVERT(nvarchar(6),ISNULL(MAX(TRY_CONVERT(int,RIGHT(RequestNo,6))),0)+1),6)
-FROM dbo.TDADServiceRequest WITH(UPDLOCK,HOLDLOCK)
-WHERE CompanyID=@company AND RequestNo LIKE N'SR'+CONVERT(nvarchar(8),CONVERT(date,SYSUTCDATETIME()),112)+N'%';
-""";
+            var nextNo = Laoo.Shared.Contracts.ServiceRequestNumbering.AllocateSql + "\nSELECT @requestNo;";
             await using var no = new SqlCommand(nextNo, c, tx);
             Add(no, "@company", SqlDbType.BigInt, CompanyId);
             var requestNo = Convert.ToString(await no.ExecuteScalarAsync(token))!;
-            const string insert = """
+            var insert = """
 INSERT dbo.TDADServiceRequest
 (CompanyID,RequestNo,RequesterType,RequesterID,RequesterNameSnapshot,RequesterPhoneSnapshot,RequesterEmailSnapshot,
- ServiceCustomerID,ResidentID,TenantID,TenantContactID,RoomID,HouseID,LocationSnapshot,EquipmentItemID,EquipmentCodeSnapshot,EquipmentNameSnapshot,Subject,Detail,PriorityCode,RequestChannelCode,CreateBy)
-OUTPUT INSERTED.RequestID
-VALUES(@company,@no,@rtype,@rid,@name,@phone,@email,@sc,@res,@tenant,@contact,@room,@house,@location,@equipment,@equipmentCode,@equipmentName,@subject,@detail,@priority,@channel,@user);
+ ServiceCustomerID,ResidentID,TenantID,TenantContactID,RoomID,HouseID,LocationSnapshot,EquipmentItemID,EquipmentInstanceID,EquipmentCodeSnapshot,EquipmentNameSnapshot,Subject,Detail,PriorityCode,RequestChannelCode,CreateBy)
+OUTPUT INSERTED.RequestID, INSERTED.RequestDate
+VALUES(@company,@no,@rtype,@rid,@name,@phone,@email,@sc,@res,@tenant,@contact,@room,@house,@location,@equipment,@equipmentInstance,@equipmentCode,@equipmentName,@subject,@detail,@priority,@channel,@user);
 """;
+            if (aiRequestKey.HasValue) insert = insert.Replace("RequestChannelCode,CreateBy)", "RequestChannelCode,CreateBy,AiRequestKey)").Replace("@priority,@channel,@user)", "@priority,@channel,@user,@aiKey)");
             await using var cmd = new SqlCommand(insert, c, tx);
             Add(cmd, "@company", SqlDbType.BigInt, CompanyId); Add(cmd, "@no", SqlDbType.NVarChar, requestNo, 30);
             Add(cmd, "@rtype", SqlDbType.NVarChar, resolved.Type, 30); Add(cmd, "@rid", SqlDbType.BigInt, resolved.PersonId);
             Add(cmd, "@name", SqlDbType.NVarChar, resolved.Name, 200); Add(cmd, "@phone", SqlDbType.NVarChar, resolved.Phone, 50); Add(cmd, "@email", SqlDbType.NVarChar, resolved.Email, 320);
             Add(cmd, "@sc", SqlDbType.BigInt, resolved.ServiceCustomerId); Add(cmd, "@res", SqlDbType.BigInt, resolved.ResidentId); Add(cmd, "@tenant", SqlDbType.BigInt, resolved.TenantId); Add(cmd, "@contact", SqlDbType.BigInt, resolved.ContactId);
+            Add(cmd, "@equipmentInstance", SqlDbType.BigInt, equipmentInstanceId);
             Add(cmd, "@room", SqlDbType.BigInt, resolved.RoomId); Add(cmd, "@house", SqlDbType.BigInt, resolved.HouseId); Add(cmd, "@location", SqlDbType.NVarChar, qr?.LocationSnapshot ?? resolved.Location, 500); Add(cmd, "@equipment", SqlDbType.BigInt, equipmentItemId); Add(cmd, "@equipmentCode", SqlDbType.NVarChar, equipmentCode, 50); Add(cmd, "@equipmentName", SqlDbType.NVarChar, equipmentName, 200);
             Add(cmd, "@subject", SqlDbType.NVarChar, x.Subject.Trim(), 200); Add(cmd, "@detail", SqlDbType.NVarChar, x.Detail.Trim(), 2000); Add(cmd, "@user", SqlDbType.BigInt, UserId);
             Add(cmd, "@priority", SqlDbType.NVarChar, x.PriorityCode ?? "0", 1);
-            Add(cmd, "@channel", SqlDbType.NVarChar, self || (PersonId.HasValue && resolved.PersonId == PersonId) ? "0" : "1", 1);
-            var id = Convert.ToInt64(await cmd.ExecuteScalarAsync(token));
+            Add(cmd, "@channel", SqlDbType.NVarChar, aiRequestKey.HasValue ? "2" : self || (PersonId.HasValue && resolved.PersonId == PersonId) ? "0" : "1", 1);
+            Add(cmd, "@aiKey", SqlDbType.UniqueIdentifier, aiRequestKey);
+            long id; DateTime requestDate;
+            await using (var inserted = await cmd.ExecuteReaderAsync(token))
+            {
+                await inserted.ReadAsync(token);
+                id = inserted.GetInt64(0); requestDate = DateTime.SpecifyKind(inserted.GetDateTime(1), DateTimeKind.Utc);
+            }
+            foreach (var attachment in aiImages ?? Array.Empty<AiPreparedImage>())
+            {
+                var p = attachment.Image;
+                const string sql = "INSERT dbo.TDADServiceRequestAttachment(CompanyID,RequestID,FileName,StoredPath,ContentType,FileSize,ImageWidth,ImageHeight,CreateBy) OUTPUT INSERTED.AttachmentID VALUES(@company,@request,@name,N'',@type,@size,@width,@height,@user)";
+                await using var a = new SqlCommand(sql, c, tx);
+                Add(a, "@company", SqlDbType.BigInt, CompanyId); Add(a, "@request", SqlDbType.BigInt, id); Add(a, "@name", SqlDbType.NVarChar, attachment.Name, 255); Add(a, "@type", SqlDbType.NVarChar, p.ContentType, 100); Add(a, "@size", SqlDbType.BigInt, p.Bytes.Length); Add(a, "@width", SqlDbType.Int, p.Width); Add(a, "@height", SqlDbType.Int, p.Height); Add(a, "@user", SqlDbType.BigInt, UserId);
+                var attachmentId = Convert.ToInt64(await a.ExecuteScalarAsync(token));
+                var path = $"uploads/service-requests/{CompanyId}/{id}/{attachmentId}{p.Extension}";
+                var fullPath = SafeFilePath(path) ?? throw new InvalidOperationException("Invalid attachment path");
+                savedAiPaths.Add(path); Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+                await System.IO.File.WriteAllBytesAsync(fullPath, p.Bytes, token);
+                await using var update = new SqlCommand("UPDATE dbo.TDADServiceRequestAttachment SET StoredPath=@path,UpdateDate=SYSUTCDATETIME(),UpdateBy=@user WHERE CompanyID=@company AND AttachmentID=@attachment", c, tx);
+                Add(update, "@path", SqlDbType.NVarChar, path, 500); Add(update, "@user", SqlDbType.BigInt, UserId); Add(update, "@company", SqlDbType.BigInt, CompanyId); Add(update, "@attachment", SqlDbType.BigInt, attachmentId); await update.ExecuteNonQueryAsync(token);
+            }
             await tx.CommitAsync(token);
-            return Ok(new { requestId = id, requestNo });
+            return Ok(new { requestId = id, requestNo, requestDate });
+        }
+        catch (SqlException ex) when (ex.Number == 53965)
+        {
+            await tx.RollbackAsync(token);
+            foreach (var path in savedAiPaths) TryDelete(path);
+            return Conflict(new { message = "ออกเลขที่ใบแจ้งซ่อมไม่สำเร็จ", description = "กรุณาตรวจสอบรูปแบบและจำนวนหลักเลขลำดับ หรือติดต่อผู้ดูแลระบบ" });
         }
         catch (SqlException ex) when (ex.Number is 2601 or 2627)
         {
             await tx.RollbackAsync(token);
+            foreach (var path in savedAiPaths) TryDelete(path);
             return Conflict(new { message = "บันทึกไม่สำเร็จ", description = "เลขที่ใบแจ้งซ่อมซ้ำ กรุณาลองใหม่" });
         }
         catch
         {
             await tx.RollbackAsync(token);
+            foreach (var path in savedAiPaths) TryDelete(path);
             throw;
         }
     }
@@ -1104,11 +1437,58 @@ WHERE C.CompanyID=@company AND (C.TenantContactID=@id OR C.PersonID=@id) AND C.I
         return Convert.ToInt32(await q.ExecuteScalarAsync(token) ?? 0);
     }
 
+    // Scope is derived solely from the authenticated company/user and active employee relationships.
+    private const string SelfViewPredicate = """
+      (R.CreateBy=@user OR EXISTS (
+        SELECT 1 FROM dbo.TDSTCompanySetupSystemService S
+        JOIN dbo.TDADProject P ON P.ProjectID=S.ProjectID AND P.ProjectCode=N'LAOO_SERVICE' AND P.IsActive=1
+        JOIN dbo.TDADUserEmployee UE ON UE.CompanyID=R.CompanyID AND UE.UserID=@user AND UE.IsActive=1
+        JOIN dbo.TDADEmployee ME ON ME.CompanyID=R.CompanyID AND ME.EmployeeID=UE.EmployeeID AND ME.IsActive=1
+        JOIN dbo.TDADEmployee RE ON RE.CompanyID=R.CompanyID AND RE.PersonID=R.RequesterID AND RE.IsActive=1
+        WHERE S.CompanyID=R.CompanyID AND R.RequesterType=N'EMPLOYEE'
+          AND ((S.SelfViewScope='DEPARTMENT' AND ME.DepartmentOrgUnitID IS NOT NULL AND ME.DepartmentOrgUnitID=RE.DepartmentOrgUnitID)
+            OR (S.SelfViewScope='DIVISION' AND ME.DivisionOrgUnitID IS NOT NULL AND ME.DivisionOrgUnitID=RE.DivisionOrgUnitID))))
+      """;
+    private const string SelfEditPredicate = """
+      (R.CreateBy=@user OR EXISTS (
+        SELECT 1 FROM dbo.TDSTCompanySetupSystemService S
+        JOIN dbo.TDADProject P ON P.ProjectID=S.ProjectID AND P.ProjectCode=N'LAOO_SERVICE' AND P.IsActive=1
+        JOIN dbo.TDADUserEmployee UE ON UE.CompanyID=R.CompanyID AND UE.UserID=@user AND UE.IsActive=1
+        JOIN dbo.TDADEmployee ME ON ME.CompanyID=R.CompanyID AND ME.EmployeeID=UE.EmployeeID AND ME.IsActive=1
+        JOIN dbo.TDADEmployee RE ON RE.CompanyID=R.CompanyID AND RE.PersonID=R.RequesterID AND RE.IsActive=1
+        JOIN dbo.TDADOrganizationSupervisor OS ON OS.CompanyID=R.CompanyID AND OS.EmployeeID=ME.EmployeeID AND OS.IsActive=1
+        JOIN dbo.TDADOrganizationUnit OU ON OU.CompanyID=R.CompanyID AND OU.OrgUnitID=OS.OrgUnitID AND OU.IsActive=1
+        WHERE S.CompanyID=R.CompanyID AND R.RequesterType=N'EMPLOYEE'
+          AND ((S.SelfDepartmentHeadEdit=1 AND OS.SupervisorType=N'DEPARTMENT_HEAD' AND OU.UnitType=N'DEP' AND OS.OrgUnitID=RE.DepartmentOrgUnitID)
+            OR (S.SelfDivisionManagerEdit=1 AND OS.SupervisorType=N'DIVISION_MANAGER' AND OU.UnitType=N'DIV' AND OS.OrgUnitID=RE.DivisionOrgUnitID))))
+      """;
+    private const string SelfDeletePredicate = """
+      (R.CreateBy=@user OR EXISTS (
+        SELECT 1 FROM dbo.TDSTCompanySetupSystemService S
+        JOIN dbo.TDADProject P ON P.ProjectID=S.ProjectID AND P.ProjectCode=N'LAOO_SERVICE' AND P.IsActive=1
+        JOIN dbo.TDADUserEmployee UE ON UE.CompanyID=R.CompanyID AND UE.UserID=@user AND UE.IsActive=1
+        JOIN dbo.TDADEmployee ME ON ME.CompanyID=R.CompanyID AND ME.EmployeeID=UE.EmployeeID AND ME.IsActive=1
+        JOIN dbo.TDADEmployee RE ON RE.CompanyID=R.CompanyID AND RE.PersonID=R.RequesterID AND RE.IsActive=1
+        JOIN dbo.TDADOrganizationSupervisor OS ON OS.CompanyID=R.CompanyID AND OS.EmployeeID=ME.EmployeeID AND OS.IsActive=1
+        JOIN dbo.TDADOrganizationUnit OU ON OU.CompanyID=R.CompanyID AND OU.OrgUnitID=OS.OrgUnitID AND OU.IsActive=1
+        WHERE S.CompanyID=R.CompanyID AND R.RequesterType=N'EMPLOYEE'
+          AND ((S.SelfDepartmentHeadDelete=1 AND OS.SupervisorType=N'DEPARTMENT_HEAD' AND OU.UnitType=N'DEP' AND OS.OrgUnitID=RE.DepartmentOrgUnitID)
+            OR (S.SelfDivisionManagerDelete=1 AND OS.SupervisorType=N'DIVISION_MANAGER' AND OU.UnitType=N'DIV' AND OS.OrgUnitID=RE.DivisionOrgUnitID))))
+      """;
+
+    private async Task<bool> HasSelfScope(SqlConnection c, long id, bool edit, CancellationToken token)
+    {
+        var predicate = edit ? SelfEditPredicate : SelfViewPredicate;
+        await using var q = new SqlCommand($"SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADServiceRequest R WHERE R.CompanyID=@company AND R.RequestID=@id AND R.IsActive=1 AND {predicate}) THEN 1 ELSE 0 END", c);
+        Add(q, "@company", SqlDbType.BigInt, CompanyId); Add(q, "@id", SqlDbType.BigInt, id); Add(q, "@user", SqlDbType.BigInt, UserId);
+        return Convert.ToInt32(await q.ExecuteScalarAsync(token)) == 1;
+    }
+
     private async Task<bool> CanReadRequest(SqlConnection c, RequestAccessInfo access, string? menuCode, CancellationToken token)
     {
         if (menuCode is null)
             return await Allowed(c, "15001", "VIEW", token) ||
-                   access.CreatedBy == UserId && await Allowed(c, "20001", "VIEW", token) ||
+                   await Allowed(c, "20001", "VIEW", token) && await HasSelfScope(c, access.RequestId, false, token) ||
                    access.Status == "COMPLETED" && await Allowed(c, "19002", "VIEW", token);
         if (menuCode is not ("15001" or "17001" or "17002" or "19002" or "20001" or "20002" or "20003"))
             return false;
@@ -1119,10 +1499,23 @@ WHERE C.CompanyID=@company AND (C.TenantContactID=@id OR C.PersonID=@id) AND C.I
         {
             "17001" => access.Status == "NEW",
             "19002" => access.Status == "COMPLETED",
-            "20001" or "20002" => access.CreatedBy == UserId,
-            "20003" => access.CreatedBy == UserId && access.Status == "COMPLETED",
+            "20001" or "20002" => await HasSelfScope(c, access.RequestId, false, token),
+            "20003" => access.Status == "COMPLETED" && await HasSelfScope(c, access.RequestId, false, token),
             _ => true
         };
+    }
+
+    private async Task<long?> FindAccessibleEquipmentSerial(string serial, long itemId, CancellationToken token)
+    {
+        // Reuse the inventory registry's company, menu and warehouse filtering.
+        var registry = new LaooServiceModule.Controllers.ItemInstanceController(configuration) { ControllerContext = ControllerContext };
+        var result = await registry.List(serial, null, null, itemId, token);
+        if (result is not OkObjectResult ok) return null;
+        var rows = System.Text.Json.JsonSerializer.SerializeToElement(ok.Value);
+        foreach (var row in rows.EnumerateArray())
+            if (string.Equals(row.GetProperty("serialNo").GetString(), serial, StringComparison.OrdinalIgnoreCase))
+                return row.GetProperty("itemInstanceID").GetInt64();
+        return null;
     }
 
     private async Task<string> BusinessType(SqlConnection c, CancellationToken t)
@@ -1134,7 +1527,7 @@ WHERE C.CompanyID=@company AND (C.TenantContactID=@id OR C.PersonID=@id) AND C.I
     private async Task<QrContext?> ResolveQrContext(SqlConnection c, string tokenValue, CancellationToken token)
     {
         const string sql = """
-SELECT X.ItemID,CONCAT_WS(N' / ',NULLIF(B.BuildingNameTH,N''),NULLIF(F.FloorNameTH,N''),NULLIF(R.RoomCode,N''))
+SELECT X.ItemID,CONCAT_WS(N' / ',NULLIF(B.BuildingNameTH,N''),NULLIF(F.FloorNameTH,N''),NULLIF(R.RoomCode,N'')),X.ItemInstanceID
 FROM dbo.TDADServiceRequestQrPortal Q
 JOIN dbo.TDIVItemInstance X ON X.ItemInstanceID=Q.ItemInstanceID AND X.CompanyID=Q.CompanyID AND X.StatusCode IN(N'INSTALLED',N'REPAIR')
 JOIN dbo.TDIVItem I ON I.ItemID=X.ItemID AND I.CompanyID=X.CompanyID AND I.IsActive=1
@@ -1146,7 +1539,7 @@ WHERE Q.CompanyID=@company AND Q.QrToken=@token AND Q.IsActive=1;
 """;
         await using var q = new SqlCommand(sql, c); Add(q, "@company", SqlDbType.BigInt, CompanyId); Add(q, "@token", SqlDbType.NVarChar, tokenValue.Trim(), 100);
         await using var r = await q.ExecuteReaderAsync(token);
-        return await r.ReadAsync(token) ? new(r.GetInt64(0), Text(r, 1)) : null;
+        return await r.ReadAsync(token) ? new(r.GetInt64(0), Text(r, 1), r.GetInt64(2)) : null;
     }
 
     private async Task<ServiceSettingsState> ReadSettings(SqlConnection c, CancellationToken token)
@@ -1189,7 +1582,7 @@ SELECT CASE WHEN EXISTS
     {
         await using var q = new SqlCommand("SELECT StatusCode,CreateBy FROM dbo.TDADServiceRequest WHERE CompanyID=@company AND RequestID=@id AND IsActive=1", c);
         Add(q, "@company", SqlDbType.BigInt, CompanyId); Add(q, "@id", SqlDbType.BigInt, id); await using var r = await q.ExecuteReaderAsync(token);
-        return await r.ReadAsync(token) ? new(true, r.GetString(0), r.IsDBNull(1) ? null : r.GetInt64(1)) : new(false, string.Empty, null);
+        return await r.ReadAsync(token) ? new(true, r.GetString(0), r.IsDBNull(1) ? null : r.GetInt64(1), id) : new(false, string.Empty, null, id);
     }
 
     private async Task<ProcessedImage> ProcessImage(IFormFile file, CancellationToken token)
@@ -1248,15 +1641,15 @@ SELECT CASE WHEN EXISTS
     private static DateTime? DateTimeValue(SqlDataReader r, int index) => r.IsDBNull(index) ? null : r.GetDateTime(index);
     private static void Add(SqlCommand c, string name, SqlDbType type, object? value, int size = 0) { var p = size == 0 ? c.Parameters.Add(name, type) : c.Parameters.Add(name, type, size); p.Value = value ?? DBNull.Value; }
 
-    public sealed record CreateRequest(string? RequesterType, long? RequesterId, long? EquipmentItemId, string? Subject, string? Detail, string? QrToken = null, string? PriorityCode = null);
-    public sealed record EditRequest(string? Subject, string? Detail, string? RowVersion, string? PriorityCode = null, long? EquipmentItemId = null, bool UpdateEquipment = false);
+    public sealed record CreateRequest(string? RequesterType, long? RequesterId, long? EquipmentItemId, string? Subject, string? Detail, string? QrToken = null, string? PriorityCode = null, string? EquipmentSerial = null);
+    public sealed record EditRequest(string? Subject, string? Detail, string? RowVersion, string? PriorityCode = null, long? EquipmentItemId = null, bool UpdateEquipment = false, string? EquipmentSerial = null, bool UpdateSerial = false);
     public sealed record ActionRequest(long? AssignedEmployeeId, string? ResolutionDetail, string? CancellationReason, IReadOnlyList<ServicePartRequest>? Parts = null, long? EvaluationTemplateId = null);
     public sealed record ServicePartRequest(long WarehouseId, long ItemId, decimal Quantity, IReadOnlyList<long>? SerialInstanceIds = null);
-    private sealed record RequestAccessInfo(bool Found, string Status, long? CreatedBy);
+    private sealed record RequestAccessInfo(bool Found, string Status, long? CreatedBy, long RequestId);
     private sealed record ProcessedImage(byte[] Bytes, string ContentType, string Extension, int Width, int Height, string? Error)
     {
         public static ProcessedImage Rejected(string error) => new(Array.Empty<byte>(), string.Empty, string.Empty, 0, 0, error);
     }
     private sealed record Resolved(string Type, long PersonId, string Name, string? Phone, string? Email, long? ServiceCustomerId, long? ResidentId, long? TenantId, long? ContactId, long? RoomId, long? HouseId, string? Location);
-    private sealed record QrContext(long ItemId, string? LocationSnapshot);
+    private sealed record QrContext(long ItemId, string? LocationSnapshot, long InstanceId);
 }

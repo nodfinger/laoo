@@ -69,6 +69,12 @@ abstract final class RoutePaths {
   static const String companyEmployees = '/company/employees';
   static const String companyUsers = '/company/users';
   static const String companyRoleGroups = '/company/role-groups';
+  static const String companyAiCapabilities = '/company/ai-capabilities';
+  static const String companyAiIntentTest = '/company/ai-intent-test';
+  static const String companyAiSettings = '/company/ai-settings';
+  static const String companyAiAgents = '/company/ai-agents';
+  static const String companyDocumentNumberFormat =
+      '/company/document-number-format';
   static const String companyMenuPermissions = '/company/menu-permissions';
   static const String companySubPermissions = '/company/sub-permissions';
   static const String partnerEmployees = '/partner/employees';

@@ -73,18 +73,19 @@ public sealed class NavigationController : ControllerBase
         if (canViewMyTraining)
             allowedFeatures?.Add("37006");
         var audienceType = userType == "PARTNER_USER" ? "P" : userType == "COMPANY_USER" ? "C" : "L";
-        const string sql = """
+        var sql = $$"""
 WITH AllowedProjects AS
 (
     SELECT @ProjectID AS ProjectID
     WHERE @UserType <> N'COMPANY_USER'
     UNION
-    SELECT UPR.ProjectID
-    FROM dbo.TDADUserProject UPR
-    INNER JOIN dbo.TDADProject PR ON PR.ProjectID=UPR.ProjectID AND PR.IsActive=1
-    INNER JOIN dbo.TDSTCompanySetUp C ON C.CompanyID=UPR.CompanyID AND C.IsActive=1
+    SELECT PR.ProjectID
+    FROM dbo.TDADUser U
+    INNER JOIN dbo.TDADProject PR ON PR.IsActive=1
+    INNER JOIN dbo.TDSTCompanySetUp C ON C.CompanyID=U.CompanyID AND C.IsActive=1
     WHERE @UserType=N'COMPANY_USER'
-      AND UPR.UserID=@UserID AND UPR.CompanyID=@CompanyID AND UPR.IsActive=1
+      AND U.UserID=@UserID AND U.CompanyID=@CompanyID
+      AND {{Laoo.Shared.Contracts.CompanyProjectAccess.ForUser("U", "PR.ProjectID", allowCoreShell: true)}}
       AND ((PR.ProjectType=N'CORE' AND EXISTS(SELECT 1 FROM dbo.TDADCompanyProject CP
              WHERE CP.ProjectID=PR.ProjectID AND CP.CompanyID=C.CompanyID AND CP.PartnerID=C.PartnerID
                AND CP.IsEnabled=1 AND (CP.StartDate IS NULL OR CP.StartDate<=CONVERT(date,SYSUTCDATETIME()))
@@ -132,6 +133,17 @@ WHERE UPPER(LTRIM(RTRIM(G.AudienceType))) IN (N'A',@AudienceType)
   AND (@UserType <> N'COMPANY_USER' OR G.MenuGroupCode <> N'07')
   -- The Company branch menu remains Company-only in the shared settings group.
   AND (M.MenuCode <> N'13001' OR @UserType = N'COMPANY_USER')
+  AND (M.MenuCode NOT IN(N'10008',N'64001',N'64002',N'64003') OR (@UserType=N'COMPANY_USER' AND
+       ((PR.ProjectCode=N'LAOO_AI' AND EXISTS
+         (SELECT 1 FROM dbo.TDSTCompanySetUp AC
+          JOIN dbo.TDADCompanyProjectSubscription S ON S.CompanyID=AC.CompanyID AND S.PartnerID=AC.PartnerID AND S.ProjectID=PR.ProjectID AND S.IsCurrent=1
+          JOIN dbo.TDADProjectPackage PK ON PK.PackageID=S.PackageID AND PK.ProjectID=PR.ProjectID AND PK.IsActive=1
+          JOIN dbo.TDADProjectPackageFeature PF ON PF.PackageID=PK.PackageID AND PF.FeatureCode=N'AI_ASSISTANT' AND PF.IsEnabled=1
+          WHERE AC.CompanyID=@CompanyID AND AC.OwnerType=N'C' AND AC.IsActive=1 AND S.StatusCode IN(N'ACTIVE',N'TRIAL')
+            AND S.StartDate<=CONVERT(date,SYSUTCDATETIME()) AND (S.ExpireDate IS NULL OR S.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))))
+        OR (M.MenuCode=N'10008' AND PR.ProjectCode<>N'LAOO_AI'
+            AND NOT EXISTS(SELECT 1 FROM dbo.TDADProject WHERE ProjectCode=N'LAOO_AI' AND IsActive=1)
+            AND EXISTS (SELECT 1 FROM dbo.TDSTCompanySetUp AC WHERE AC.CompanyID=@CompanyID AND AC.IsActive=1 AND AC.AiChatEnabled=1)))))
   AND (M.MenuCode <> N'14006' OR EXISTS(SELECT 1 FROM dbo.TDSTCompanySetUp CS WHERE CS.CompanyID=@CompanyID AND UPPER(LTRIM(RTRIM(CS.BusinessTypeCode)))=N'DORMITORY'))
   AND (@UserType<>N'COMPANY_USER' OR M.MenuGroupCode<>N'09' OR PR.ProjectCode=N'LAOO_TRADE' OR EXISTS
       (SELECT 1 FROM dbo.TDADCompanyFeature SF
@@ -186,7 +198,12 @@ ORDER BY PR.SortOrder,PG.SortOrder,PM.SortOrder,M.MenuCode;
             var group = new NavigationMenuGroupResponse { MenuGroupCode = reader.GetString(7).Trim(), MenuGroupName = reader.GetString(8), IconName = N(reader, 9), SortOrder = reader.GetInt32(10), IsExpandedDefault = reader.GetBoolean(11) };
             var item = new NavigationMenuItemResponse { MenuCode = reader.GetString(12), MenuName = reader.GetString(13), RouteName = N(reader, 14), RoutePath = N(reader, 15), FeatureCode = N(reader, 16), IconName = N(reader, 17), SortOrder = reader.GetInt32(18), IsFavoriteAllowed = reader.GetBoolean(19) };
             if (OwnerMenuVisibility.IsHidden(userType, item.MenuCode, group.MenuGroupCode)) continue;
-            if (admin || allowedFeatures!.Contains(item.MenuCode))
+            var canView = userType == "COMPANY_USER"
+                ? allowedFeatures?.Contains($"{project.ProjectId}:{item.MenuCode}") == true
+                  || (project.ProjectCode == "LAOO_TRAINING" &&
+                      ((item.MenuCode == "37005" && canViewTrainingResults) || (item.MenuCode == "37006" && canViewMyTraining)))
+                : allowedFeatures?.Contains(item.MenuCode) == true;
+            if (admin || canView)
                 all.Add((project, group, item));
         }
 
@@ -363,21 +380,19 @@ WHERE U.PartnerUserID=@ID AND U.PartnerID=@OwnerID AND U.IsActive=1 AND ERG.IsAc
             userId = companyUserId;
             ownerId = companyId;
             sql = """
-SELECT P.ScreenCode
+SELECT CONCAT(UP.ProjectID,N':',P.ScreenCode)
 FROM dbo.TDADUserPermission UP
 INNER JOIN dbo.TDADPermission P ON P.PermissionID=UP.PermissionID AND P.ProjectID=UP.ProjectID
 INNER JOIN dbo.TDADUser U ON U.UserID=UP.UserID AND U.IsActive=1
-INNER JOIN dbo.TDADUserProject UPR ON UPR.UserID=U.UserID AND UPR.CompanyID=U.CompanyID AND UPR.ProjectID=UP.ProjectID AND UPR.IsActive=1
 WHERE U.UserID=@ID AND U.CompanyID=@OwnerID AND UP.IsAllowed=1 AND UP.IsActive=1 AND P.IsActive=1 AND P.ActionCode='VIEW'
 UNION
-SELECT RP.MenuCode
+SELECT CONCAT(RP.ProjectID,N':',RP.MenuCode)
 FROM dbo.TDADUser U
 INNER JOIN dbo.TDADUserEmployee UE ON UE.UserID=U.UserID AND UE.CompanyID=U.CompanyID AND UE.IsActive=1
 INNER JOIN dbo.TDADEmployee E ON E.EmployeeID=UE.EmployeeID AND E.CompanyID=U.CompanyID AND E.IsActive=1
 INNER JOIN dbo.TDADEmployeeRoleGroup ERG ON ERG.EmployeeID=UE.EmployeeID
 INNER JOIN dbo.TDADRoleGroup RG ON RG.RoleGroupID=ERG.RoleGroupID AND RG.ScopeType='C' AND RG.CompanyID=U.CompanyID AND RG.IsActive=1
 INNER JOIN dbo.TDADRoleGroupPermission RP ON RP.RoleGroupID=RG.RoleGroupID AND RP.ActionCode='VIEW' AND RP.IsAllowed=1
-INNER JOIN dbo.TDADUserProject UPR ON UPR.UserID=U.UserID AND UPR.CompanyID=U.CompanyID AND UPR.ProjectID=RP.ProjectID AND UPR.IsActive=1
 WHERE U.UserID=@ID AND U.CompanyID=@OwnerID AND U.IsActive=1 AND ERG.IsActive=1
  AND (RG.ProjectID=RP.ProjectID OR EXISTS(SELECT 1 FROM dbo.TDADProject Core WHERE Core.ProjectID=RG.ProjectID AND Core.ProjectCode='LAOO' AND Core.IsActive=1))
  AND ERG.EffectiveFrom<=CONVERT(date,SYSUTCDATETIME()) AND (ERG.EffectiveTo IS NULL OR ERG.EffectiveTo>=CONVERT(date,SYSUTCDATETIME()));

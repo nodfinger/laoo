@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../laoo_api/Services/Assistant/AssistantCapability.cs" Link="AssistantCapability.cs" />
+    <Compile Include="../../laoo_api/Services/Assistant/AssistantAgentRegistry.cs" Link="AssistantAgentRegistry.cs" />
+    <Compile Include="../../laoo_api/Services/Assistant/AssistantAgentRouter.cs" Link="AssistantAgentRouter.cs" />
+    <Compile Include="../../laoo_api/Services/Assistant/Agents/ServiceAssistantAgent.cs" Link="ServiceAssistantAgent.cs" />
+    <Compile Include="../../laoo_api/Services/Assistant/Agents/StockAssistantAgent.cs" Link="StockAssistantAgent.cs" />
+    <Compile Include="../../laoo_api/Services/Assistant/Agents/MeetingAssistantAgent.cs" Link="MeetingAssistantAgent.cs" />
+    <Compile Include="../../laoo_api/Services/Assistant/AssistantIntentClassifier.cs" Link="AssistantIntentClassifier.cs" />
+    <Compile Include="../../laoo_api/Services/Assistant/ChatReviewPolicy.cs" Link="ChatReviewPolicy.cs" />
+  </ItemGroup>
+</Project>

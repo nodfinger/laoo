@@ -1,3 +1,4 @@
+import '../../../../core/widgets/standard_pagination_card.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -5,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../app/theme/laoo_design_tokens.dart';
+import '../../../../app/theme/laoo_typography.dart';
 import '../../../../app/theme/workspace_theme_presets.dart';
 import '../../../../core/auth/app_auth_controller.dart';
 import '../../../../core/company_setup/company_date_formatter.dart';
@@ -231,7 +233,7 @@ class _DeliveryNoteListPageState extends State<_DeliveryNoteListPage> {
   Widget _surface({required Widget child, double? height}) => Container(
     height: height,
     width: double.infinity,
-    padding: const EdgeInsets.all(16),
+    padding: const EdgeInsets.all(LaooLayout.cardPadding),
     decoration: BoxDecoration(
       color: Colors.white,
       borderRadius: BorderRadius.circular(4),
@@ -366,9 +368,13 @@ class _DeliveryNoteListPageState extends State<_DeliveryNoteListPage> {
       width: width,
       child: PinnedDataTable(
         headingRowColor: WidgetStatePropertyAll(accent.withValues(alpha: .10)),
-        headingTextStyle: const TextStyle(color: Colors.black),
+        headingTextStyle: TextStyle(
+          color: accent,
+          fontWeight: FontWeight.w700,
+          fontSize: LaooTypography.tableHeader,
+        ),
         dataTextStyle: const TextStyle(color: Colors.black),
-        dividerThickness: .5,
+        dividerThickness: .6,
         columnSpacing: 22,
         columns: const [
           LaooTableColumns.id,
@@ -403,58 +409,13 @@ class _DeliveryNoteListPageState extends State<_DeliveryNoteListPage> {
     ),
   );
 
-  Widget _pagination(Color accent) => _surface(
-    height: LaooLayout.paginationCardHeight,
-    child: Row(
-      children: [
-        InkWell(
-          onTap: _page > 0 ? () => setState(() => _page--) : null,
-          borderRadius: BorderRadius.circular(4),
-          child: Container(
-            width: 36,
-            height: 36,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade200,
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: const Icon(Icons.chevron_left, color: Colors.grey),
-          ),
-        ),
-        const SizedBox(width: 4),
-        Container(
-          width: 36,
-          height: 36,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: accent,
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Text(
-            '${_page + 1}',
-            style: const TextStyle(color: Colors.white),
-          ),
-        ),
-        InkWell(
-          onTap: _page + 1 < _pages ? () => setState(() => _page++) : null,
-          borderRadius: BorderRadius.circular(4),
-          child: Container(
-            width: 36,
-            height: 36,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade200,
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: const Icon(Icons.chevron_right, color: Colors.grey),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Text(
-          '${_rows.isEmpty ? 0 : _page * _pageSize + 1}-${math.min((_page + 1) * _pageSize, _rows.length)} จาก ${_rows.length}',
-        ),
-      ],
-    ),
+  Widget _pagination(Color accent) => StandardPaginationCard(
+    pageIndex: _page,
+    pageSize: _pageSize,
+    total: _rows.length,
+    primary: accent,
+    onPrevious: _page > 0 ? () => setState(() => _page--) : null,
+    onNext: _page + 1 < _pages ? () => setState(() => _page++) : null,
   );
 
   @override
@@ -473,7 +434,7 @@ class _DeliveryNoteListPageState extends State<_DeliveryNoteListPage> {
                   final compact = constraints.maxWidth < 900;
                   final cardMode = compact || _card;
                   return ListView(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(LaooLayout.cardMargin),
                     children: [
                       _surface(
                         child: Row(
@@ -746,10 +707,10 @@ class _DeliveryNoteActionPageState extends State<DeliveryNoteActionPage> {
       showTimedSnackBar(context, message: '$m\nรายละเอียด: $e', error: true);
   Widget _surface({required Widget child}) => Container(
     width: double.infinity,
-    padding: const EdgeInsets.all(16),
+    padding: const EdgeInsets.all(LaooLayout.cardPadding),
     decoration: BoxDecoration(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(4),
+      borderRadius: BorderRadius.circular(LaooRadius.xs),
     ),
     child: child,
   );
@@ -1096,7 +1057,7 @@ class _DeliveryNoteActionPageState extends State<DeliveryNoteActionPage> {
                   return Form(
                     key: _form,
                     child: ListView(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(LaooLayout.cardMargin),
                       children: [
                         _surface(
                           child: WorkspaceActionHeader(

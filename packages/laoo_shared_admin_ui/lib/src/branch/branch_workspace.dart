@@ -343,7 +343,10 @@ class _BranchWorkspaceState extends State<BranchWorkspace> {
                               constraints.maxWidth < t.compactBreakpoint ||
                                   cardMode
                               ? buildCards()
-                              : buildTable(),
+                              : Padding(
+                                  padding: t.cardPadding,
+                                  child: buildTable(),
+                                ),
                         ),
                 ),
               ],

@@ -568,53 +568,59 @@ class _WarehousePageState extends State<WarehousePage> {
               itemBuilder: (context, index) =>
                   _warehouseCard(context, pageRows[index], primary),
             )
-          : LayoutBuilder(
-              builder: (context, constraints) => SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: SizedBox(
-                  width: constraints.maxWidth < 900
-                      ? 900
-                      : constraints.maxWidth,
-                  child: DataTable(
-                    headingRowColor: WidgetStatePropertyAll(
-                      primary.withValues(alpha: .10),
-                    ),
-                    headingTextStyle: TextStyle(
-                      color: primary,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                    ),
-                    dataTextStyle: const TextStyle(
-                      color: LaooColors.textPrimary,
-                      fontSize: 13,
-                    ),
-                    dataRowMinHeight: 48,
-                    dataRowMaxHeight: 56,
-                    columns: const [
-                      DataColumn(label: Text('ID')),
-                      DataColumn(
-                        label: SizedBox(
-                          width: 132,
-                          child: Center(child: Text('Action')),
-                        ),
+          : Padding(
+              padding: const EdgeInsets.all(LaooLayout.cardPadding),
+              child: LayoutBuilder(
+                builder: (context, constraints) => SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: SizedBox(
+                    width: constraints.maxWidth < 900
+                        ? 900
+                        : constraints.maxWidth,
+                    child: DataTable(
+                      headingRowColor: WidgetStatePropertyAll(
+                        primary.withValues(alpha: .10),
                       ),
-                      DataColumn(label: Text('สาขา')),
-                      DataColumn(label: Text('รหัสคลัง')),
-                      DataColumn(label: Text('ชื่อคลัง')),
-                      DataColumn(label: Text('คลังหลัก')),
-                      DataColumn(label: Text('สถานะ')),
-                    ],
-                    rows: pageRows
-                        .asMap()
-                        .entries
-                        .map(
-                          (entry) => _warehouseDataRow(
-                            entry.value,
-                            primary,
-                            displayId: start + entry.key + 1,
+                      headingTextStyle: TextStyle(
+                        color: primary,
+                        fontSize: LaooTypography.tableHeader,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      dataTextStyle: const TextStyle(
+                        color: LaooColors.textPrimary,
+                        fontSize: LaooTypography.tableBody,
+                      ),
+                      dataRowMinHeight: 48,
+                      dataRowMaxHeight: 56,
+                      columns: const [
+                        DataColumn(label: Text('ID')),
+                        DataColumn(
+                          label: SizedBox(
+                            width: 132,
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text('Action'),
+                            ),
                           ),
-                        )
-                        .toList(),
+                        ),
+                        DataColumn(label: Text('สาขา')),
+                        DataColumn(label: Text('รหัสคลัง')),
+                        DataColumn(label: Text('ชื่อคลัง')),
+                        DataColumn(label: Text('คลังหลัก')),
+                        DataColumn(label: Text('สถานะ')),
+                      ],
+                      rows: pageRows
+                          .asMap()
+                          .entries
+                          .map(
+                            (entry) => _warehouseDataRow(
+                              entry.value,
+                              primary,
+                              displayId: start + entry.key + 1,
+                            ),
+                          )
+                          .toList(),
+                    ),
                   ),
                 ),
               ),
@@ -630,7 +636,13 @@ class _WarehousePageState extends State<WarehousePage> {
     cells: [
       DataCell(Text('$displayId')),
       DataCell(
-        SizedBox(width: 132, child: Center(child: _rowActions(row, primary))),
+        SizedBox(
+          width: 132,
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: _rowActions(row, primary),
+          ),
+        ),
       ),
       DataCell(Text('${row['branchName']}')),
       DataCell(Text('${row['warehouseCode']}')),
@@ -1502,6 +1514,9 @@ class _SerialRegistryPageState extends State<SerialRegistryPage> {
                               ? const Center(child: CircularProgressIndicator())
                               : LayoutBuilder(
                                   builder: (context, constraints) => SingleChildScrollView(
+                                    padding: const EdgeInsets.all(
+                                      LaooLayout.cardPadding,
+                                    ),
                                     scrollDirection: Axis.horizontal,
                                     child: SizedBox(
                                       width: math.max(
@@ -1518,13 +1533,13 @@ class _SerialRegistryPageState extends State<SerialRegistryPage> {
                                             context,
                                           ).colorScheme.primary,
                                           fontWeight: FontWeight.w700,
-                                          fontSize: LaooTypography.inputText,
+                                          fontSize: LaooTypography.tableHeader,
                                         ),
                                         dataTextStyle: const TextStyle(
                                           color: LaooColors.textPrimary,
-                                          fontSize: LaooTypography.inputText,
+                                          fontSize: LaooTypography.tableBody,
                                         ),
-                                        dividerThickness: .5,
+                                        dividerThickness: .6,
                                         dataRowMinHeight: 56,
                                         dataRowMaxHeight: 64,
                                         columns: const [
@@ -3078,6 +3093,7 @@ class _InventoryIssuePageState extends State<InventoryIssuePage> {
                     ],
                   )
                 : SingleChildScrollView(
+                    padding: const EdgeInsets.all(LaooLayout.cardPadding),
                     scrollDirection: Axis.horizontal,
                     child: DataTable(
                       headingRowColor: WidgetStatePropertyAll(
@@ -3086,7 +3102,7 @@ class _InventoryIssuePageState extends State<InventoryIssuePage> {
                       headingTextStyle: TextStyle(
                         color: primary,
                         fontWeight: FontWeight.w700,
-                        fontSize: LaooTypography.inputText,
+                        fontSize: LaooTypography.tableHeader,
                       ),
                       columns: const [
                         DataColumn(label: Text('ID')),
@@ -3246,8 +3262,12 @@ class _InventoryIssuePageState extends State<InventoryIssuePage> {
           Card(
             margin: EdgeInsets.zero,
             color: Colors.white,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(LaooRadius.xs),
+            ),
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(LaooLayout.cardPadding),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [

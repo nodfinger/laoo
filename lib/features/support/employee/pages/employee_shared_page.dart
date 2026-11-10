@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 
-import 'package:file_picker/file_picker.dart';
+import 'employee_image_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:image/image.dart' as img;
 import 'package:laoo_shared_admin/laoo_shared_admin.dart';
@@ -444,21 +444,26 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
       .toList(growable: false);
 
   Future<EmployeeImageInput?> _pickImage() async {
-    final picked = await FilePicker.platform.pickFiles(
-      type: FileType.image,
-      withData: true,
-    );
+    final picked = await pickEmployeeImage();
     final source = picked?.files.single.bytes;
     if (source == null) return null;
     final decoded = img.decodeImage(source);
     if (decoded == null) {
       throw StateError('ไม่สามารถอ่านไฟล์รูปภาพได้ กรุณาเลือกไฟล์ใหม่');
     }
+    var image = decoded;
     var quality = 85;
-    var bytes = Uint8List.fromList(img.encodeJpg(decoded, quality: quality));
-    while (bytes.length > 102400 && quality > 20) {
+    var bytes = Uint8List.fromList(img.encodeJpg(image, quality: quality));
+    while (bytes.length > 102400 && quality > 25) {
       quality -= 10;
-      bytes = Uint8List.fromList(img.encodeJpg(decoded, quality: quality));
+      bytes = Uint8List.fromList(img.encodeJpg(image, quality: quality));
+    }
+    while (bytes.length > 102400 && image.width > 1 && image.height > 1) {
+      image = img.copyResize(
+        image,
+        width: (image.width * .8).round().clamp(1, image.width),
+      );
+      bytes = Uint8List.fromList(img.encodeJpg(image, quality: quality));
     }
     if (bytes.length > 102400) {
       throw StateError(
@@ -468,8 +473,8 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
     return EmployeeImageInput(
       bytes: bytes,
       fileName: picked!.files.single.name,
-      width: decoded.width,
-      height: decoded.height,
+      width: image.width,
+      height: image.height,
     );
   }
 

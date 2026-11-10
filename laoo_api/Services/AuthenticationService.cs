@@ -272,7 +272,7 @@ public sealed class AuthenticationService
         string? projectCode,
         CancellationToken cancellationToken)
     {
-        const string sql = """
+        var sql = $$"""
             SELECT TOP (1) project.ProjectID, project.ProjectCode
             FROM dbo.TDADProject AS project
             WHERE project.IsActive = 1
@@ -294,9 +294,6 @@ public sealed class AuthenticationService
                   (
                       SELECT 1
                       FROM dbo.TDADUser AS u
-                      INNER JOIN dbo.TDADUserProject AS up
-                          ON up.UserID=u.UserID AND up.CompanyID=u.CompanyID
-                         AND up.ProjectID=project.ProjectID AND up.IsActive=1
                       INNER JOIN dbo.TDSTCompanySetUp AS company
                           ON company.CompanyID=u.CompanyID AND company.IsActive=1
                       INNER JOIN dbo.TDADPartner AS partner
@@ -309,6 +306,7 @@ public sealed class AuthenticationService
                          AND (companyProject.StartDate IS NULL OR companyProject.StartDate<=CONVERT(date,SYSUTCDATETIME()))
                          AND (companyProject.ExpireDate IS NULL OR companyProject.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))
                       WHERE u.NormalizedUsername=@Username AND u.IsActive=1
+                        AND {{Laoo.Shared.Contracts.CompanyProjectAccess.ForUser("u", "project.ProjectID", allowCoreShell: true)}}
                   )
                   OR EXISTS
                   (

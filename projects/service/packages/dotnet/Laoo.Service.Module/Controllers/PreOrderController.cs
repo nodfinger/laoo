@@ -591,6 +591,9 @@ public sealed class PreOrderController(IConfiguration configuration) : Controlle
 
     private async Task<string> NextCode(SqlConnection connection, SqlTransaction transaction, CancellationToken token)
     {
+        var configured = await LaooServiceModule.Infrastructure.ConfiguredDocumentNumber.Get(connection, transaction, CompanyId(), "09004", token);
+        if (configured is not null) return configured;
+
         const string sql = "SELECT ISNULL(MAX(TRY_CONVERT(int,RIGHT(PreOrderCode,6))),0)+1 FROM dbo.TDARPreOrder WITH (UPDLOCK,HOLDLOCK) WHERE CompanyID=@company AND PreOrderCode LIKE N'PO%';";
         await using var command = new SqlCommand(sql, connection, transaction);
         Add(command, "@company", SqlDbType.BigInt, CompanyId());

@@ -22,7 +22,7 @@ public sealed class ItemCatalogProjectFilter(IConfiguration configuration) : IAs
 
 public static class ItemCatalogAuthorization
 {
-    public const string SessionSql = """
+    public static readonly string SessionSql = $$"""
 SELECT CAST(CASE WHEN EXISTS(
  SELECT 1 FROM dbo.TDADUser U
  JOIN dbo.TDSTCompanySetUp C ON C.CompanyID=U.CompanyID AND C.IsActive=1
@@ -32,7 +32,7 @@ SELECT CAST(CASE WHEN EXISTS(
  WHERE U.UserID=@user AND U.CompanyID=@company AND U.IsActive=1 AND C.PartnerID=@partner
  AND (CP.StartDate IS NULL OR CP.StartDate<=CONVERT(date,SYSUTCDATETIME()))
  AND (CP.ExpireDate IS NULL OR CP.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))
- AND (U.IsCompanyAdmin=1 OR EXISTS(SELECT 1 FROM dbo.TDADUserProject UP WHERE UP.UserID=U.UserID AND UP.CompanyID=U.CompanyID AND UP.ProjectID=P.ProjectID AND UP.IsActive=1))
+ AND {{Laoo.Shared.Contracts.CompanyProjectAccess.ForUser("U", "P.ProjectID", allowCoreShell: true)}}
 ) THEN 1 ELSE 0 END AS bit);
 """;
 

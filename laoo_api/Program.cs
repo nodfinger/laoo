@@ -36,6 +36,7 @@ using Microsoft.OpenApi.Models;
 using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddHostedService<LaooApi.Services.Assistant.ChatReviewRetentionWorker>();
 
 builder.Configuration
     .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)

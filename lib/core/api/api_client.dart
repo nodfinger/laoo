@@ -22,8 +22,8 @@ class ApiClient implements JsonApiClient {
   }) => _http.getBytes(path, query: query, authenticated: authenticated);
 
   @override
-  Future<dynamic> post(String path, {Object? body, bool authenticated = true}) {
-    return _http.post(path, body: body, authenticated: authenticated);
+  Future<dynamic> post(String path, {Object? body, bool authenticated = true, Duration? timeout}) {
+    return _http.post(path, body: body, authenticated: authenticated, timeout: timeout);
   }
 
   @override

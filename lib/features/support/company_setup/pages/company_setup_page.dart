@@ -30,6 +30,7 @@ class CompanySetupPage extends StatefulWidget {
 
 class _CompanySetupPageState extends State<CompanySetupPage> {
   final _formKey = GlobalKey<FormState>();
+  final _basicSectionKey = GlobalKey<_CollapsibleSectionState>();
   final _ownerCode = TextEditingController(text: 'C000001');
   final _ownerName = TextEditingController(text: 'Laoo Foods');
   final _titleHeader = TextEditingController(text: 'Laoo Foods');
@@ -61,6 +62,7 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
   bool _messageIsError = false;
   String _yearFormat = CompanySetupConstants.yearFormatAd;
   int _orgStructureType = 1;
+  String _employeeNameDisplay = CompanySetupConstants.employeeNameFull;
   String _businessTypeCode = 'COMPANY';
   String _requesterCaption = 'ผู้แจ้งซ่อม';
   bool _isBusinessTypeLocked = false;
@@ -152,6 +154,12 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
       _customerDigit.text = setup.customerDigit.toString();
       _markCus.text = setup.markCus ?? '';
       _orgStructureType = setup.orgStructureType;
+      _employeeNameDisplay =
+          CompanySetupConstants.employeeNameOptions.contains(
+            setup.employeeNameDisplay,
+          )
+          ? setup.employeeNameDisplay
+          : CompanySetupConstants.employeeNameFull;
       _businessTypeCode = setup.businessTypeCode;
       _requesterCaption = setup.requesterCaption;
       _isBusinessTypeLocked = setup.isBusinessTypeLocked;
@@ -264,7 +272,10 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
       });
       return;
     }
-    if (!(_formKey.currentState?.validate() ?? false)) return;
+    if (!(_formKey.currentState?.validate() ?? false)) {
+      _basicSectionKey.currentState?.expand();
+      return;
+    }
     setState(() => _saving = true);
     if (DateTime.now().millisecondsSinceEpoch >= 0) {
       try {
@@ -290,6 +301,7 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
             markCus: _markCus.text,
             customerDigit: int.tryParse(_customerDigit.text) ?? 5,
             orgStructureType: _orgStructureType,
+            employeeNameDisplay: _employeeNameDisplay,
             businessTypeCode: _businessTypeCode,
             passwordPolicyCode: _passwordPolicyCode,
             yearFormat: _yearFormat,
@@ -681,146 +693,147 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
           children: [
             _loading
                 ? const Center(child: CircularProgressIndicator())
-                : ListView(
+                : SingleChildScrollView(
                     padding: const EdgeInsets.fromLTRB(
                       LaooLayout.cardMargin,
                       LaooLayout.cardMargin,
                       LaooLayout.cardMargin,
                       20,
                     ),
-                    children: [
-                      Card(
-                        margin: EdgeInsets.zero,
-                        color: Colors.white,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(4),
-                          side: BorderSide.none,
-                        ),
-                        child: Container(
-                          decoration: const BoxDecoration(
-                            border: Border(
-                              bottom: BorderSide(color: Color(0xFFF5F6F7)),
-                            ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Card(
+                          margin: EdgeInsets.zero,
+                          color: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(4),
+                            side: BorderSide.none,
                           ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 16,
-                          ),
-                          child: WorkspaceActionHeader(
-                            title: widget.additionalOnly
-                                ? 'กำหนดค่าระบบเพิ่มเติม'
-                                : 'กำหนดค่าระบบ',
-                            favoriteKey: widget.additionalOnly
-                                ? '05003'
-                                : '05001',
-                            actions: [
-                              _TopActions(
-                                saving: _saving,
-                                canSave: _canEdit,
-                                onCancel: _cancel,
-                                onSave: _save,
+                          child: Container(
+                            decoration: const BoxDecoration(
+                              border: Border(
+                                bottom: BorderSide(color: Color(0xFFF5F6F7)),
                               ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: LaooLayout.cardSpacing),
-                      if (!widget.additionalOnly) ...[
-                        _CompanySetupUxForm(
-                          ownerCode: _ownerCode,
-                          ownerName: _ownerName,
-                          titleHeader: _titleHeader,
-                          customerNameTh: _customerNameTh,
-                          customerNameEn: _customerNameEn,
-                          address: _address,
-                          telephone: _telephone,
-                          taxId: _taxId,
-                          email: _email,
-                        ),
-                        const SizedBox(height: 8),
-                        if (_ownerType == 'C') ...[
-                          _memberCoverCard(preset.primary),
-                          const SizedBox(height: 8),
-                          _CompanyBusinessTypeCard(
-                            value: _businessTypeCode,
-                            options: _businessTypeOptions,
-                            requesterCaption: _requesterCaption,
-                            locked: _isBusinessTypeLocked,
-                            enabled: _canEdit,
-                            onChanged: (value) =>
-                                setState(() => _businessTypeCode = value),
-                          ),
-                          const SizedBox(height: 8),
-                          _PartnerInfoCard(
-                            nameTh: _partnerNameTh,
-                            address: _partnerAddress,
-                            telephone: _partnerTelephone,
-                            email: _partnerEmail,
-                          ),
-                          const SizedBox(height: 8),
-                        ],
-                      ],
-                      if (widget.additionalOnly) ...[
-                        _runItemCard(preset.primary),
-                        if (_meetingSettingsVisible) ...[
-                          const SizedBox(height: 8),
-                          _meetingSettingsCard(preset.primary),
-                        ],
-                        if (_trainingSettingsVisible) ...[
-                          const SizedBox(height: 8),
-                          _trainingSettingsCard(preset.primary),
-                        ],
-                      ],
-                      if (!widget.additionalOnly) ...[
-                        const SizedBox(height: 8),
-                        ListenableBuilder(
-                          listenable: appAuthController,
-                          builder: (context, _) {
-                            final showCompanyCards =
-                                !appAuthController.isLaooSupport &&
-                                !appAuthController.isPartnerUser;
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                if (showCompanyCards) ...[
-                                  const CompanySubscriptionCard(),
-                                  const SizedBox(height: 8),
-                                ],
-                                _LegacySetupCards(
-                                  showCompanyCards: showCompanyCards,
-                                  controllers: {
-                                    'rowStd': _rowStd,
-                                    'rowCardStd': _rowCardStd,
-                                    'timeAlert': _timeAlert,
-                                    'versionId': _versionId,
-                                    'emailHost': _emailHost,
-                                    'emailPort': _emailPort,
-                                    'emailCenter': _emailCenter,
-                                    'emailAdmin': _emailAdmin,
-                                    'emailPasswordCenter': _emailPasswordCenter,
-                                    'superUserName': _superUserName,
-                                    'passwordCry': _passwordCry,
-                                    'passwordEmpDefault': _passwordEmpDefault,
-                                  },
-                                  yearFormat: _yearFormat,
-                                  onYearFormatChanged: (value) =>
-                                      setState(() => _yearFormat = value),
-                                  orgStructureType: _orgStructureType,
-                                  onOrgStructureTypeChanged: (value) =>
-                                      setState(() => _orgStructureType = value),
-                                  passwordPolicyCode: _passwordPolicyCode,
-                                  onPasswordPolicyCodeChanged: (value) =>
-                                      setState(
-                                        () => _passwordPolicyCode = value,
-                                      ),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 16,
+                            ),
+                            child: WorkspaceActionHeader(
+                              title: widget.additionalOnly
+                                  ? 'กำหนดค่าระบบเพิ่มเติม'
+                                  : 'กำหนดค่าระบบ',
+                              favoriteKey: widget.additionalOnly
+                                  ? '05003'
+                                  : '05001',
+                              actions: [
+                                _TopActions(
+                                  saving: _saving,
+                                  canSave: _canEdit,
+                                  onCancel: _cancel,
+                                  onSave: _save,
                                 ),
                               ],
-                            );
-                          },
+                            ),
+                          ),
                         ),
+                        const SizedBox(height: LaooLayout.cardSpacing),
+                        if (!widget.additionalOnly) ...[
+                          _CollapsibleSection(
+                            key: _basicSectionKey,
+                            title: 'ข้อมูลพื้นฐาน',
+                            icon: Icons.business_outlined,
+                            child: _CompanySetupUxForm(
+                              ownerCode: _ownerCode,
+                              ownerName: _ownerName,
+                              titleHeader: _titleHeader,
+                              customerNameTh: _customerNameTh,
+                              customerNameEn: _customerNameEn,
+                              address: _address,
+                              telephone: _telephone,
+                              taxId: _taxId,
+                              email: _email,
+                              businessType: _ownerType == 'C'
+                                  ? _CompanyBusinessTypeField(
+                                      value: _businessTypeCode,
+                                      options: _businessTypeOptions,
+                                      requesterCaption: _requesterCaption,
+                                      locked: _isBusinessTypeLocked,
+                                      enabled: _canEdit,
+                                      onChanged: (value) => setState(
+                                        () => _businessTypeCode = value,
+                                      ),
+                                    )
+                                  : null,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          _legacySetupCards(
+                            showCompanyCards:
+                                !appAuthController.isLaooSupport &&
+                                !appAuthController.isPartnerUser,
+                            configurationOnly: true,
+                          ),
+                          const SizedBox(height: 8),
+                          if (_ownerType == 'C') ...[
+                            _CollapsibleSection(
+                              title: 'รูปปกสมาชิก',
+                              icon: Icons.image_outlined,
+                              child: _memberCoverCard(preset.primary),
+                            ),
+                            const SizedBox(height: 8),
+                            _CollapsibleSection(
+                              title: 'Partner',
+                              icon: Icons.handshake_outlined,
+                              child: _PartnerInfoCard(
+                                nameTh: _partnerNameTh,
+                                address: _partnerAddress,
+                                telephone: _partnerTelephone,
+                                email: _partnerEmail,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                          ],
+                        ],
+                        if (widget.additionalOnly) ...[
+                          _runItemCard(preset.primary),
+                          if (_meetingSettingsVisible) ...[
+                            const SizedBox(height: 8),
+                            _meetingSettingsCard(preset.primary),
+                          ],
+                          if (_trainingSettingsVisible) ...[
+                            const SizedBox(height: 8),
+                            _trainingSettingsCard(preset.primary),
+                          ],
+                        ],
+                        if (!widget.additionalOnly) ...[
+                          const SizedBox(height: 8),
+                          ListenableBuilder(
+                            listenable: appAuthController,
+                            builder: (context, _) {
+                              final showCompanyCards =
+                                  !appAuthController.isLaooSupport &&
+                                  !appAuthController.isPartnerUser;
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  if (showCompanyCards) ...[
+                                    const CompanySubscriptionCard(),
+                                    const SizedBox(height: 8),
+                                  ],
+                                  _legacySetupCards(
+                                    showCompanyCards: showCompanyCards,
+                                    configurationOnly: false,
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
             if (_message != null)
               Positioned(
@@ -838,6 +851,39 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
       ),
     );
   }
+
+  Widget _legacySetupCards({
+    required bool showCompanyCards,
+    required bool configurationOnly,
+  }) => _LegacySetupCards(
+    showCompanyCards: showCompanyCards,
+    configurationOnly: configurationOnly,
+    controllers: {
+      'rowStd': _rowStd,
+      'rowCardStd': _rowCardStd,
+      'timeAlert': _timeAlert,
+      'versionId': _versionId,
+      'emailHost': _emailHost,
+      'emailPort': _emailPort,
+      'emailCenter': _emailCenter,
+      'emailAdmin': _emailAdmin,
+      'emailPasswordCenter': _emailPasswordCenter,
+      'superUserName': _superUserName,
+      'passwordCry': _passwordCry,
+      'passwordEmpDefault': _passwordEmpDefault,
+    },
+    yearFormat: _yearFormat,
+    onYearFormatChanged: (value) => setState(() => _yearFormat = value),
+    orgStructureType: _orgStructureType,
+    employeeNameDisplay: _employeeNameDisplay,
+    onEmployeeNameDisplayChanged: (value) =>
+        setState(() => _employeeNameDisplay = value),
+    onOrgStructureTypeChanged: (value) =>
+        setState(() => _orgStructureType = value),
+    passwordPolicyCode: _passwordPolicyCode,
+    onPasswordPolicyCodeChanged: (value) =>
+        setState(() => _passwordPolicyCode = value),
+  );
 
   Widget _memberCoverCard(Color accent) => Card(
     margin: EdgeInsets.zero,
@@ -879,11 +925,6 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'รูปปกสมาชิก',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 6),
                 const Text(
                   'รูปสี่เหลี่ยมจัตุรัส ระบบจะครอปกึ่งกลางและลดขนาดอัตโนมัติให้ไม่เกิน 1 MB',
                   style: TextStyle(fontSize: 14),
@@ -953,8 +994,8 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
   }
 }
 
-class _CompanyBusinessTypeCard extends StatelessWidget {
-  const _CompanyBusinessTypeCard({
+class _CompanyBusinessTypeField extends StatelessWidget {
+  const _CompanyBusinessTypeField({
     required this.value,
     required this.options,
     required this.requesterCaption,
@@ -972,57 +1013,30 @@ class _CompanyBusinessTypeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final primary = Theme.of(context).colorScheme.primary;
     final selectable = options.any((item) => item['code']?.toString() == value);
 
-    return Card(
-      margin: EdgeInsets.zero,
-      color: Colors.white,
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(4),
-        side: BorderSide.none,
+    return DropdownButtonFormField<String>(
+      initialValue: selectable ? value : null,
+      isExpanded: true,
+      decoration: InputDecoration(
+        labelText: 'ประเภทธุรกิจ *',
+        helperText: locked
+            ? 'ไม่สามารถเปลี่ยนได้ เนื่องจาก Company มีข้อมูลบุคคลแล้ว'
+            : 'ใบแจ้งซ่อมจะอ้างอิงผู้แจ้งเป็น $requesterCaption',
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const _SectionHeader(title: 'ลักษณะธุรกิจ'),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              initialValue: selectable ? value : null,
-              isExpanded: true,
-              decoration: const InputDecoration(labelText: 'ประเภทธุรกิจ *'),
-              items: options
-                  .map(
-                    (item) => DropdownMenuItem<String>(
-                      value: item['code']?.toString(),
-                      child: Text(item['name']?.toString() ?? ''),
-                    ),
-                  )
-                  .toList(),
-              onChanged: enabled && !locked
-                  ? (next) {
-                      if (next != null) onChanged(next);
-                    }
-                  : null,
+      items: options
+          .map(
+            (item) => DropdownMenuItem<String>(
+              value: item['code']?.toString(),
+              child: Text(item['name']?.toString() ?? ''),
             ),
-            const SizedBox(height: 10),
-            Text(
-              locked
-                  ? 'ไม่สามารถเปลี่ยนได้ เนื่องจาก Company มีข้อมูลบุคคลแล้ว'
-                  : 'ใบแจ้งซ่อมจะอ้างอิงผู้แจ้งเป็น $requesterCaption',
-              style: TextStyle(
-                color: locked
-                    ? Theme.of(context).colorScheme.onSurfaceVariant
-                    : primary,
-                fontSize: 13,
-              ),
-            ),
-          ],
-        ),
-      ),
+          )
+          .toList(),
+      onChanged: enabled && !locked
+          ? (next) {
+              if (next != null) onChanged(next);
+            }
+          : null,
     );
   }
 }
@@ -1208,10 +1222,13 @@ class _PartnerInfoItem extends StatelessWidget {
 class _LegacySetupCards extends StatelessWidget {
   const _LegacySetupCards({
     required this.showCompanyCards,
+    required this.configurationOnly,
     required this.controllers,
     required this.yearFormat,
     required this.onYearFormatChanged,
     required this.orgStructureType,
+    required this.employeeNameDisplay,
+    required this.onEmployeeNameDisplayChanged,
     required this.onOrgStructureTypeChanged,
     required this.passwordPolicyCode,
     required this.onPasswordPolicyCodeChanged,
@@ -1219,65 +1236,58 @@ class _LegacySetupCards extends StatelessWidget {
 
   final Map<String, TextEditingController> controllers;
   final bool showCompanyCards;
+  final bool configurationOnly;
   final String yearFormat;
   final ValueChanged<String> onYearFormatChanged;
   final int orgStructureType;
+  final String employeeNameDisplay;
+  final ValueChanged<String> onEmployeeNameDisplayChanged;
   final ValueChanged<int> onOrgStructureTypeChanged;
   final int passwordPolicyCode;
   final ValueChanged<int> onPasswordPolicyCodeChanged;
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        const gap = 6.0;
-        final columns = constraints.maxWidth >= 1050
-            ? 3
-            : constraints.maxWidth >= 700
-            ? 2
-            : 1;
-        final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
-
-        return Wrap(
-          spacing: gap,
-          runSpacing: gap,
-          children: [
-            SizedBox(
-              width: width,
-              child: _SetupCard(
-                title: 'โครงสร้างองค์กร',
-                icon: Icons.account_tree_outlined,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (configurationOnly)
+          _SetupCard(
+            title: 'กำหนดข้อมูล',
+            icon: Icons.settings_outlined,
+            collapsible: true,
+            children: [
+              _ResponsiveSetupFields(
+                maxColumns: 3,
                 children: [
                   _OrgStructureField(
                     value: orgStructureType,
                     onChanged: onOrgStructureTypeChanged,
                   ),
+                  if (showCompanyCards)
+                    DropdownButtonFormField<String>(
+                      initialValue: employeeNameDisplay,
+                      decoration: const InputDecoration(
+                        labelText: 'รูปแบบแสดงชื่อพนักงาน',
+                      ),
+                      items: CompanySetupConstants.employeeNameOptions
+                          .map(
+                            (value) => DropdownMenuItem(
+                              value: value,
+                              child: Text(
+                                CompanySetupConstants.employeeNameLabel(value),
+                              ),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) {
+                        if (value != null) onEmployeeNameDisplayChanged(value);
+                      },
+                    ),
                   _PasswordPolicyField(
                     value: passwordPolicyCode,
                     onChanged: onPasswordPolicyCodeChanged,
                   ),
-                ],
-              ),
-            ),
-            if (DateTime.now().millisecondsSinceEpoch < 0)
-              SizedBox(
-                width: width,
-                child: _SetupCard(
-                  title: 'ข้อมูลบริษัท',
-                  icon: Icons.apartment_outlined,
-                  children: [
-                    _LegacyField(label: 'รหัสเจ้าของ', value: 'C000001'),
-                    _LegacyField(label: 'ชื่อเจ้าของระบบ', value: 'Laoo Foods'),
-                    _LegacyField(label: 'หัวข้อระบบ', value: 'Laoo Foods'),
-                  ],
-                ),
-              ),
-            SizedBox(
-              width: width,
-              child: _SetupCard(
-                title: 'การแสดงผล',
-                icon: Icons.monitor_outlined,
-                children: [
                   _LegacyField(
                     label: 'จำนวนแถว List',
                     value: '30',
@@ -1293,16 +1303,7 @@ class _LegacySetupCards extends StatelessWidget {
                     value: '30',
                     controller: controllers['timeAlert'],
                   ),
-                ],
-              ),
-            ),
-            if (showCompanyCards)
-              SizedBox(
-                width: width,
-                child: _SetupCard(
-                  title: 'ข้อมูลการแสดงผลระบบ',
-                  icon: Icons.palette_outlined,
-                  children: [
+                  if (showCompanyCards) ...[
                     _YearFormatField(
                       value: yearFormat,
                       onChanged: onYearFormatChanged,
@@ -1314,115 +1315,215 @@ class _LegacySetupCards extends StatelessWidget {
                     ),
                     _LegacyField(label: 'Theme', value: 'ตาม Theme Standard'),
                   ],
-                ),
+                ],
               ),
-            if (showCompanyCards)
-              SizedBox(
-                width: width,
-                child: _SetupCard(
-                  title: 'Audit (แถวบน)',
-                  icon: Icons.history_rounded,
-                  children: [
-                    _LegacyField(label: 'สถานะ', value: 'ใช้งาน'),
-                    _LegacyField(label: 'สร้างเมื่อ', value: '08/08/2569'),
-                    _LegacyField(label: 'แก้ไขล่าสุด', value: '11/08/2569'),
-                  ],
-                ),
-              ),
-            if (showCompanyCards)
-              SizedBox(
-                width: width,
-                child: _SetupCard(
-                  title: 'Email Configuration',
-                  icon: Icons.mail_outline_rounded,
-                  children: [
-                    _LegacyField(
-                      label: 'Email Host',
-                      value: 'smtp.gmail.com',
-                      controller: controllers['emailHost'],
-                    ),
-                    _LegacyField(
-                      label: 'Email Port',
-                      value: '587',
-                      controller: controllers['emailPort'],
-                    ),
-                    _LegacyField(
-                      label: 'Email Center (ส่งออกอัตโนมัติ)',
-                      value: 'nodfinger@gmail.com',
-                      controller: controllers['emailCenter'],
-                    ),
-                    _LegacyField(
-                      label: 'Email Center (User แจ้งปัญหา)',
-                      value: 'nodfinger@gmail.com',
-                      controller: controllers['emailAdmin'],
-                    ),
-                    if (controllers['emailPasswordCenter']
-                        case final controller?)
-                      _SecretField(
-                        label: 'Email Password / App Password',
-                        controller: controller,
-                      ),
-                  ],
-                ),
-              ),
-            if (showCompanyCards)
-              SizedBox(
-                width: width,
-                child: _SetupCard(
-                  title: 'Security / Secret',
-                  icon: Icons.lock_outline_rounded,
-                  children: [
-                    _LegacyField(
-                      label: 'Super User',
-                      value: 'ตั้งค่าแล้ว',
-                      controller: controllers['superUserName'],
-                    ),
-                    _LegacyField(
-                      label: 'PasswordCry',
-                      value: 'ตั้งค่าแล้ว',
-                      controller: controllers['passwordCry'],
-                    ),
-                    _LegacyField(
-                      label: 'Password พนักงาน',
-                      value: 'ยังไม่ตั้งค่า',
-                      controller: controllers['passwordEmpDefault'],
-                    ),
-                  ],
-                ),
-              ),
-            SizedBox(
-              width: width,
-              child: _SetupCard(
-                title: 'สถานะและ Audit',
-                icon: Icons.history_rounded,
+            ],
+          ),
+        if (showCompanyCards && !configurationOnly) ...[
+          _SetupCard(
+            title: 'Audit (แถวบน)',
+            icon: Icons.history_rounded,
+            children: [
+              _ResponsiveSetupFields(
+                maxColumns: 3,
                 children: [
                   _LegacyField(label: 'สถานะ', value: 'ใช้งาน'),
                   _LegacyField(label: 'สร้างเมื่อ', value: '08/08/2569'),
                   _LegacyField(label: 'แก้ไขล่าสุด', value: '11/08/2569'),
                 ],
               ),
-            ),
-          ],
-        );
-      },
+            ],
+          ),
+          const SizedBox(height: LaooLayout.cardSpacing),
+          _SetupCard(
+            title: 'Email Configuration',
+            icon: Icons.mail_outline_rounded,
+            children: [
+              _ResponsiveSetupFields(
+                maxColumns: 5,
+                children: [
+                  _LegacyField(
+                    label: 'Email Host',
+                    value: 'smtp.gmail.com',
+                    controller: controllers['emailHost'],
+                  ),
+                  _LegacyField(
+                    label: 'Email Port',
+                    value: '587',
+                    controller: controllers['emailPort'],
+                  ),
+                  _LegacyField(
+                    label: 'Email Center (ส่งออกอัตโนมัติ)',
+                    value: 'nodfinger@gmail.com',
+                    controller: controllers['emailCenter'],
+                  ),
+                  _LegacyField(
+                    label: 'Email Center (User แจ้งปัญหา)',
+                    value: 'nodfinger@gmail.com',
+                    controller: controllers['emailAdmin'],
+                  ),
+                  if (controllers['emailPasswordCenter'] case final controller?)
+                    _SecretField(
+                      label: 'Email Password / App Password',
+                      controller: controller,
+                    ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: LaooLayout.cardSpacing),
+          _SetupCard(
+            title: 'Security / Secret',
+            icon: Icons.lock_outline_rounded,
+            children: [
+              _ResponsiveSetupFields(
+                maxColumns: 3,
+                children: [
+                  _LegacyField(
+                    label: 'Super User',
+                    value: 'ตั้งค่าแล้ว',
+                    controller: controllers['superUserName'],
+                  ),
+                  _LegacyField(
+                    label: 'PasswordCry',
+                    value: 'ตั้งค่าแล้ว',
+                    controller: controllers['passwordCry'],
+                  ),
+                  _LegacyField(
+                    label: 'Password พนักงาน',
+                    value: 'ยังไม่ตั้งค่า',
+                    controller: controllers['passwordEmpDefault'],
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ],
     );
   }
 }
 
-class _SetupCard extends StatelessWidget {
+/// Keep each settings card full-width and wrap fields on smaller screens.
+class _ResponsiveSetupFields extends StatelessWidget {
+  const _ResponsiveSetupFields({
+    required this.maxColumns,
+    required this.children,
+  });
+  final int maxColumns;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      const gap = 14.0;
+      final columns = ((constraints.maxWidth + gap) / (190 + gap))
+          .floor()
+          .clamp(1, maxColumns);
+      final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
+      return Wrap(
+        spacing: gap,
+        children: [
+          for (final child in children) SizedBox(width: width, child: child),
+        ],
+      );
+    },
+  );
+}
+
+class _CollapsibleSection extends StatefulWidget {
+  const _CollapsibleSection({
+    super.key,
+    required this.title,
+    required this.icon,
+    required this.child,
+  });
+
+  final String title;
+  final IconData icon;
+  final Widget child;
+
+  @override
+  State<_CollapsibleSection> createState() => _CollapsibleSectionState();
+}
+
+class _CollapsibleSectionState extends State<_CollapsibleSection> {
+  bool _expanded = false;
+
+  void expand() {
+    if (!_expanded) setState(() => _expanded = true);
+  }
+
+  @override
+  Widget build(BuildContext context) => Card(
+    margin: EdgeInsets.zero,
+    color: Colors.white,
+    elevation: 0,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(18, 8, 10, 8),
+          child: Row(
+            children: [
+              Icon(
+                widget.icon,
+                color: Theme.of(context).colorScheme.primary,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  widget.title,
+                  style: const TextStyle(
+                    color: Colors.black,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: '${_expanded ? 'ย่อ' : 'ขยาย'}${widget.title}',
+                onPressed: () => setState(() => _expanded = !_expanded),
+                icon: Icon(_expanded ? Icons.expand_less : Icons.expand_more),
+              ),
+            ],
+          ),
+        ),
+        Visibility(
+          visible: _expanded,
+          maintainState: true,
+          child: widget.child,
+        ),
+      ],
+    ),
+  );
+}
+
+class _SetupCard extends StatefulWidget {
   const _SetupCard({
     required this.title,
     required this.icon,
     required this.children,
+    this.collapsible = true,
   });
 
   final String title;
   final IconData icon;
   final List<Widget> children;
+  final bool collapsible;
+
+  @override
+  State<_SetupCard> createState() => _SetupCardState();
+}
+
+class _SetupCardState extends State<_SetupCard> {
+  bool _expanded = false;
 
   @override
   Widget build(BuildContext context) {
-    if (title.endsWith('Audit')) return const SizedBox.shrink();
+    if (widget.title.endsWith('Audit')) return const SizedBox.shrink();
     final accent = Theme.of(context).colorScheme.primary;
     return Card(
       margin: EdgeInsets.zero,
@@ -1439,11 +1540,11 @@ class _SetupCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(icon, color: accent, size: 20),
+                Icon(widget.icon, color: accent, size: 20),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    title,
+                    widget.title,
                     style: TextStyle(
                       color: Colors.black,
                       fontSize: 16,
@@ -1451,10 +1552,26 @@ class _SetupCard extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (widget.collapsible)
+                  IconButton(
+                    tooltip: _expanded
+                        ? 'ย่อ${widget.title}'
+                        : 'ขยาย${widget.title}',
+                    onPressed: () => setState(() => _expanded = !_expanded),
+                    icon: Icon(
+                      _expanded ? Icons.expand_less : Icons.expand_more,
+                    ),
+                  ),
               ],
             ),
-            const SizedBox(height: 16),
-            ...children,
+            Visibility(
+              visible: _expanded,
+              maintainState: true,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [const SizedBox(height: 16), ...widget.children],
+              ),
+            ),
           ],
         ),
       ),
@@ -1536,16 +1653,19 @@ class _OrgStructureField extends StatelessWidget {
   final ValueChanged<int> onChanged;
 
   @override
-  Widget build(BuildContext context) => DropdownButtonFormField<int>(
-    initialValue: value,
-    decoration: const InputDecoration(labelText: 'โครงสร้างองค์กร'),
-    items: const [
-      DropdownMenuItem(value: 1, child: LaooComboBoxText('แผนกเท่านั้น')),
-      DropdownMenuItem(value: 2, child: LaooComboBoxText('ฝ่าย > แผนก')),
-    ],
-    onChanged: (next) {
-      if (next != null) onChanged(next);
-    },
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 12),
+    child: DropdownButtonFormField<int>(
+      initialValue: value,
+      decoration: const InputDecoration(labelText: 'โครงสร้างองค์กร'),
+      items: const [
+        DropdownMenuItem(value: 1, child: LaooComboBoxText('แผนกเท่านั้น')),
+        DropdownMenuItem(value: 2, child: LaooComboBoxText('ฝ่าย > แผนก')),
+      ],
+      onChanged: (next) {
+        if (next != null) onChanged(next);
+      },
+    ),
   );
 }
 
@@ -1557,7 +1677,7 @@ class _PasswordPolicyField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(top: 8, bottom: 12),
+    padding: const EdgeInsets.only(bottom: 12),
     child: DropdownButtonFormField<int>(
       initialValue: const [1, 2, 3].contains(value) ? value : 3,
       style: Theme.of(
@@ -1638,6 +1758,7 @@ class _CompanySetupUxForm extends StatelessWidget {
     required this.telephone,
     required this.taxId,
     required this.email,
+    this.businessType,
   });
 
   final TextEditingController ownerCode;
@@ -1649,6 +1770,7 @@ class _CompanySetupUxForm extends StatelessWidget {
   final TextEditingController telephone;
   final TextEditingController taxId;
   final TextEditingController email;
+  final Widget? businessType;
 
   @override
   Widget build(BuildContext context) {
@@ -1669,6 +1791,10 @@ class _CompanySetupUxForm extends StatelessWidget {
             final twoColumns = constraints.maxWidth >= 620;
             final thirdWidth = (constraints.maxWidth - gap * 2) / 3;
             final halfWidth = (constraints.maxWidth - gap) / 2;
+            final firstRowWidth =
+                businessType != null && constraints.maxWidth >= 1100
+                ? (constraints.maxWidth - gap * 3) / 4
+                : (businessType != null && twoColumns ? halfWidth : thirdWidth);
 
             SizedBox field(Widget child, double width) =>
                 SizedBox(width: width, child: child);
@@ -1676,31 +1802,40 @@ class _CompanySetupUxForm extends StatelessWidget {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const _SectionHeader(title: 'ข้อมูลพื้นฐาน'),
-                const SizedBox(height: 18),
                 Wrap(
                   spacing: gap,
                   runSpacing: 14,
                   children: [
                     field(
                       _text(ownerCode, 'รหัสเจ้าของ', readOnly: true),
-                      threeColumns ? thirdWidth : constraints.maxWidth,
+                      threeColumns || (businessType != null && twoColumns)
+                          ? firstRowWidth
+                          : constraints.maxWidth,
                     ),
                     field(
                       _text(ownerName, 'ข้อความแสดง title bar'),
-                      threeColumns ? thirdWidth : constraints.maxWidth,
+                      threeColumns || (businessType != null && twoColumns)
+                          ? firstRowWidth
+                          : constraints.maxWidth,
                     ),
                     field(
                       _text(titleHeader, 'หัวข้อระบบ'),
-                      threeColumns ? thirdWidth : constraints.maxWidth,
+                      threeColumns || (businessType != null && twoColumns)
+                          ? firstRowWidth
+                          : constraints.maxWidth,
                     ),
+                    if (businessType != null)
+                      field(
+                        businessType!,
+                        twoColumns ? firstRowWidth : constraints.maxWidth,
+                      ),
                     field(
                       _text(
                         customerNameTh,
                         'ชื่อลูกค้า (ภาษาไทย)',
                         required: true,
                       ),
-                      constraints.maxWidth,
+                      twoColumns ? halfWidth : constraints.maxWidth,
                     ),
                     field(
                       _text(
@@ -1708,7 +1843,7 @@ class _CompanySetupUxForm extends StatelessWidget {
                         'ชื่อลูกค้า (ภาษาอังกฤษ)',
                         required: false,
                       ),
-                      constraints.maxWidth,
+                      twoColumns ? halfWidth : constraints.maxWidth,
                     ),
                     field(
                       _text(address, 'ที่อยู่', maxLines: 2),
@@ -1720,11 +1855,11 @@ class _CompanySetupUxForm extends StatelessWidget {
                         'โทรศัพท์',
                         keyboardType: TextInputType.phone,
                       ),
-                      constraints.maxWidth,
+                      twoColumns ? thirdWidth : constraints.maxWidth,
                     ),
                     field(
                       _text(taxId, 'เลขผู้เสียภาษี'),
-                      twoColumns ? halfWidth : constraints.maxWidth,
+                      twoColumns ? thirdWidth : constraints.maxWidth,
                     ),
                     field(
                       _text(
@@ -1732,7 +1867,7 @@ class _CompanySetupUxForm extends StatelessWidget {
                         'Email',
                         keyboardType: TextInputType.emailAddress,
                       ),
-                      twoColumns ? halfWidth : constraints.maxWidth,
+                      twoColumns ? thirdWidth : constraints.maxWidth,
                     ),
                   ],
                 ),

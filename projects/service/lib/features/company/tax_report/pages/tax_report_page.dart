@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import '../../../../app/theme/laoo_design_tokens.dart';
+import '../../../../app/theme/laoo_typography.dart';
 import '../../../../app/theme/workspace_theme_presets.dart';
 import '../../../../core/api/api_client.dart';
 import '../../../../core/company_setup/company_setup_controller.dart';
@@ -42,6 +43,25 @@ class _TaxReportPageState extends State<TaxReportPage> {
   int get _pages => math.max(1, (_rows.length / _pageSize).ceil());
   List<Map<String, dynamic>> get _visible =>
       _rows.skip(_page * _pageSize).take(_pageSize).toList();
+
+  Widget _pageButton(IconData icon, VoidCallback? onPressed, Color primary) =>
+      SizedBox.square(
+        dimension: LaooLayout.paginationButtonSize,
+        child: IconButton.filled(
+          padding: EdgeInsets.zero,
+          onPressed: onPressed,
+          style: IconButton.styleFrom(
+            backgroundColor: primary,
+            foregroundColor: Theme.of(context).colorScheme.onPrimary,
+            disabledBackgroundColor: Colors.grey.shade300,
+            disabledForegroundColor: Colors.grey.shade700,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(LaooRadius.xs),
+            ),
+          ),
+          icon: Icon(icon, size: 22),
+        ),
+      );
 
   @override
   void initState() {
@@ -395,6 +415,19 @@ class _TaxReportPageState extends State<TaxReportPage> {
                         child: SizedBox(
                           width: math.max(size.maxWidth - 40, 1200),
                           child: DataTable(
+                            headingRowColor: WidgetStatePropertyAll(
+                              accent.withValues(alpha: .10),
+                            ),
+                            headingTextStyle: TextStyle(
+                              color: accent,
+                              fontSize: LaooTypography.tableHeader,
+                              fontWeight: FontWeight.w700,
+                            ),
+                            dataTextStyle: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurface,
+                              fontSize: LaooTypography.tableBody,
+                            ),
+                            dividerThickness: .6,
                             columns: const [
                               DataColumn(label: Text('ID')),
                               DataColumn(label: Text('เลขใบกำกับฯ')),
@@ -463,26 +496,49 @@ class _TaxReportPageState extends State<TaxReportPage> {
               ),
               const SizedBox(height: LaooLayout.listSectionSpacing),
               _surface(
-                Row(
-                  children: [
-                    IconButton(
-                      onPressed: _page > 0
-                          ? () => setState(() => _page--)
-                          : null,
-                      icon: const Icon(Icons.chevron_left),
-                    ),
-                    Text('${_page + 1}'),
-                    IconButton(
-                      onPressed: _page + 1 < _pages
-                          ? () => setState(() => _page++)
-                          : null,
-                      icon: const Icon(Icons.chevron_right),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      '${_rows.isEmpty ? 0 : _page * _pageSize + 1}-${math.min((_page + 1) * _pageSize, _rows.length)} จาก ${_rows.length}',
-                    ),
-                  ],
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _pageButton(
+                        Icons.chevron_left,
+                        _page > 0 ? () => setState(() => _page--) : null,
+                        accent,
+                      ),
+                      const SizedBox(width: 6),
+                      SizedBox.square(
+                        dimension: LaooLayout.paginationButtonSize,
+                        child: FilledButton(
+                          onPressed: null,
+                          style: FilledButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            disabledBackgroundColor: accent,
+                            disabledForegroundColor: Theme.of(
+                              context,
+                            ).colorScheme.onPrimary,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(
+                                LaooRadius.xs,
+                              ),
+                            ),
+                          ),
+                          child: Text('${_page + 1}'),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      _pageButton(
+                        Icons.chevron_right,
+                        _page + 1 < _pages
+                            ? () => setState(() => _page++)
+                            : null,
+                        accent,
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        '${_rows.isEmpty ? 0 : _page * _pageSize + 1}-${math.min((_page + 1) * _pageSize, _rows.length)} จาก ${_rows.length}',
+                      ),
+                    ],
+                  ),
                 ),
                 height: LaooLayout.paginationCardHeight,
               ),

@@ -531,8 +531,11 @@ class _VendorWorkspaceState extends State<VendorWorkspace> {
                                   ),
                                   Text('${row['vendorName']}'),
                                   Text(
-                                    '${row['entityTypeCode'] == 'PERSON' ? 'บุคคล' : 'นิติบุคคล'} • ${row['isActive'] == true ? 'ใช้งาน' : 'ไม่ใช้งาน'}',
+                                    row['entityTypeCode'] == 'PERSON'
+                                        ? 'บุคคล'
+                                        : 'นิติบุคคล',
                                   ),
+                                  _status(row['isActive'] == true),
                                   if (row['telephone'] != null)
                                     Text('โทรศัพท์ ${row['telephone']}'),
                                 ],
@@ -562,9 +565,8 @@ class _VendorWorkspaceState extends State<VendorWorkspace> {
                               columns: const [
                                 LaooTableColumns.id,
                                 DataColumn(
-                                  label: Center(child: Text('Action')),
+                                  label: Text('Action'),
                                   columnWidth: FixedColumnWidth(128),
-                                  headingRowAlignment: MainAxisAlignment.center,
                                 ),
                                 DataColumn(label: Text('รหัสผู้ขาย')),
                                 DataColumn(
@@ -584,9 +586,7 @@ class _VendorWorkspaceState extends State<VendorWorkspace> {
                                           '${(_page - 1) * _pageSize + i + 1}',
                                         ),
                                       ),
-                                      DataCell(
-                                        Center(child: _actionsFor(_rows[i])),
-                                      ),
+                                      DataCell(_actionsFor(_rows[i])),
                                       DataCell(
                                         Text('${_rows[i]['vendorCode']}'),
                                       ),
@@ -608,18 +608,13 @@ class _VendorWorkspaceState extends State<VendorWorkspace> {
                                         Text('${_rows[i]['telephone'] ?? '-'}'),
                                       ),
                                       DataCell(
-                                        Text(
-                                          _rows[i]['isActive'] == true
-                                              ? 'ใช้งาน'
-                                              : 'ไม่ใช้งาน',
-                                        ),
+                                        _status(_rows[i]['isActive'] == true),
                                       ),
                                     ],
                                   ),
                               ],
                             ),
                           ),
-                          padding: EdgeInsets.zero,
                         ),
                 ),
                 const SizedBox(height: LaooLayout.cardSpacing),
@@ -640,8 +635,8 @@ class _VendorWorkspaceState extends State<VendorWorkspace> {
                         ),
                         const SizedBox(width: 6),
                         Container(
-                          width: 34,
-                          height: 34,
+                          width: LaooLayout.paginationButtonSize,
+                          height: LaooLayout.paginationButtonSize,
                           alignment: Alignment.center,
                           decoration: BoxDecoration(
                             color: _primary,
@@ -683,20 +678,37 @@ class _VendorWorkspaceState extends State<VendorWorkspace> {
       ),
     ),
   );
+  Widget _status(bool active) {
+    final color = active ? _primary : LaooColors.error;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: .12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        active ? 'ใช้งาน' : 'ไม่ใช้งาน',
+        style: TextStyle(color: color, fontWeight: FontWeight.w700),
+      ),
+    );
+  }
+
   Widget _pageButton(IconData icon, VoidCallback? callback) => SizedBox(
-    width: 34,
-    height: 34,
-    child: OutlinedButton(
-      style: OutlinedButton.styleFrom(
+    width: LaooLayout.paginationButtonSize,
+    height: LaooLayout.paginationButtonSize,
+    child: FilledButton(
+      style: FilledButton.styleFrom(
         padding: EdgeInsets.zero,
-        foregroundColor: _primary,
-        side: BorderSide(color: callback == null ? LaooColors.gray : _primary),
+        backgroundColor: _primary,
+        foregroundColor: Theme.of(context).colorScheme.onPrimary,
+        disabledBackgroundColor: Colors.grey.shade300,
+        disabledForegroundColor: Colors.grey.shade700,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(LaooRadius.xs),
         ),
       ),
       onPressed: callback,
-      child: Icon(icon, size: 20),
+      child: Icon(icon, size: 22),
     ),
   );
   void _clear() {

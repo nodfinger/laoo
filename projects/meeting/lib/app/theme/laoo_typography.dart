@@ -28,11 +28,11 @@ abstract final class LaooTypography {
   static const double bodySmall = 14;
   static const double caption = 11;
 
-  // Form / input standard: TextBox and ComboBox 14px, Label 16px.
-  static const double inputText = 14;
+  // Form / input standard: TextBox 16px, Label 16px.
+  static const double inputText = 16;
   static const double inputLabel = 16;
   static const double materialFloatingLabelSource = 14 / .75;
-  static const double inputHint = 12;
+  static const double inputHint = 14;
   static const double validation = 12;
   static const double comboBox = 14;
 

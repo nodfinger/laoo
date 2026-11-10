@@ -2,6 +2,8 @@ using System.Data;
 using System.Security.Claims;
 using LaooApi.Models;
 using LaooApi.Security;
+using LaooApi.Services.Assistant;
+using Laoo.Shared.Contracts;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
@@ -28,6 +30,114 @@ public sealed class CompanySetupController : ControllerBase
         _passwordService = passwordService;
         _secretService = secretService;
         _environment = environment;
+    }
+
+    [HttpGet("ai-chat")]
+    public async Task<IActionResult> GetAiChat(CancellationToken token)
+    {
+        var company = AiChatSettingsStore.CompanyId(User);
+        if (company is null) return Forbid();
+        await using var db = CreateConnection();
+        await db.OpenAsync(token);
+        if (!await AiChatSettingsStore.IsEnabledAsync(db, User, token) || !await AllowedAiAsync(db, "VIEW", token)) return Forbid();
+        var settings = await AiChatSettingsStore.ReadAsync(db, company.Value, null, token);
+        if (settings is null) return NotFound();
+        var hasImage = !string.IsNullOrEmpty(settings.ImagePath);
+        settings.ImagePath = null;
+        var canEdit = await AllowedAiAsync(db, "EDIT", token);
+        return Ok(new { settings, hasImage, canEdit });
+    }
+
+    [HttpPut("ai-chat")]
+    public async Task<IActionResult> SaveAiChat(AiChatSettings settings, CancellationToken token)
+    {
+        var company = AiChatSettingsStore.CompanyId(User);
+        if (company is null) return Forbid();
+        var texts = new[] { settings.Name, settings.Pronoun, settings.MorningText, settings.LateMorningText, settings.AfternoonText, settings.EveningText, settings.NightText };
+        if (settings.RetentionDays is <= 0 or > 3650 || string.IsNullOrWhiteSpace(settings.Name) || string.IsNullOrWhiteSpace(settings.Pronoun) ||
+            settings.Name.Length > 100 || settings.Pronoun.Length > 50 || texts.Any(x => x is null || x.Length > 200) || settings.GreetingMode is not (1 or 2))
+            return BadRequest(new { message = "กรุณาตรวจสอบชื่อ คำเรียก และข้อความทักทาย" });
+        var raw = new[] { settings.MorningStart, settings.MorningEnd, settings.LateMorningStart, settings.LateMorningEnd,
+            settings.AfternoonStart, settings.AfternoonEnd, settings.EveningStart, settings.EveningEnd, settings.NightStart, settings.NightEnd };
+        var nightUnset = string.IsNullOrWhiteSpace(settings.NightStart) && string.IsNullOrWhiteSpace(settings.NightEnd);
+        var times = new TimeSpan[raw.Length];
+        for (var i=0; i<raw.Length; i++)
+        {
+            if (i >= 8 && nightUnset) continue;
+            if (!TimeSpan.TryParseExact(raw[i], @"hh\:mm", System.Globalization.CultureInfo.InvariantCulture, out times[i]) || times[i] >= TimeSpan.FromDays(1))
+                return BadRequest(new { message = "กรุณาระบุเวลาเป็น HH:mm" });
+        }
+        var occupied = new bool[1440];
+        for (var i=0; i<raw.Length; i+=2)
+        {
+            if (i == 8 && nightUnset) continue;
+            var start = (int)times[i].TotalMinutes; var end = (int)times[i+1].TotalMinutes;
+            if (start == end) return BadRequest(new { message = "เวลาเริ่มและสิ้นสุดต้องต่างกัน" });
+            for (var minute=start; minute!=end; minute=(minute+1)%1440)
+            {
+                if (occupied[minute]) return BadRequest(new { message = "ช่วงเวลาทักทายต้องไม่ทับซ้อนกัน" });
+                occupied[minute] = true;
+            }
+        }
+        await using var db = CreateConnection();
+        await db.OpenAsync(token);
+        if (!await AllowedAiAsync(db, "EDIT", token) || !await AiChatSettingsStore.IsEnabledAsync(db, User, token)) return Forbid();
+        const string sql = """
+UPDATE dbo.TDSTCompanySetUp SET AiChatName=@name,AiChatPronoun=@pronoun,AiChatGreetingMode=@mode,
+AiChatMorningStart=@t0,AiChatMorningEnd=@t1,AiChatMorningText=@m0,
+AiChatLateMorningStart=@t2,AiChatLateMorningEnd=@t3,AiChatLateMorningText=@m1,
+AiChatAfternoonStart=@t4,AiChatAfternoonEnd=@t5,AiChatAfternoonText=@m2,
+AiChatEveningStart=@t6,AiChatEveningEnd=@t7,AiChatEveningText=@m3,
+AiChatNightStart=@t8,AiChatNightEnd=@t9,AiChatNightText=@m4,
+AiChatShowUserImage=@userImage,AiChatShowAiImage=@aiImage,AiChatRetentionDays=COALESCE(@retention,AiChatRetentionDays)
+WHERE OwnerType='C' AND CompanyID=@company AND IsActive=1
+""";
+        await using var cmd = new SqlCommand(sql, db);
+        cmd.Parameters.Add("@name", SqlDbType.NVarChar,100).Value=settings.Name.Trim();
+        cmd.Parameters.Add("@pronoun", SqlDbType.NVarChar,50).Value=settings.Pronoun.Trim();
+        cmd.Parameters.Add("@mode",SqlDbType.TinyInt).Value=settings.GreetingMode;
+        for (var i=0;i<times.Length;i++) cmd.Parameters.Add("@t"+i, SqlDbType.Time).Value=i >= 8 && nightUnset ? DBNull.Value : times[i];
+        for (var i=0;i<5;i++) cmd.Parameters.Add("@m"+i,SqlDbType.NVarChar,200).Value=texts[i+2].Trim();
+        cmd.Parameters.Add("@userImage",SqlDbType.Bit).Value=settings.ShowUserImage;
+        cmd.Parameters.Add("@aiImage",SqlDbType.Bit).Value=settings.ShowAiImage;
+        cmd.Parameters.Add("@retention",SqlDbType.Int).Value=(object?)settings.RetentionDays ?? DBNull.Value;
+        cmd.Parameters.Add("@company",SqlDbType.BigInt).Value=company.Value;
+        return await cmd.ExecuteNonQueryAsync(token)==1 ? NoContent() : NotFound();
+    }
+
+    [HttpPost("ai-chat/image"), RequestSizeLimit(1024 * 1024 + 65536)]
+    public async Task<IActionResult> UploadAiChatImage(IFormFile file, CancellationToken token)
+    {
+        var company = AiChatSettingsStore.CompanyId(User);
+        if (company is null) return Forbid();
+        if (file is null || file.Length <= 0 || file.Length > 1024*1024) return BadRequest(new { message="รูปต้องมีขนาดไม่เกิน 1 MB" });
+        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (ext is not (".png" or ".jpg" or ".jpeg" or ".webp")) return BadRequest(new { message="รองรับ JPG, PNG, WEBP" });
+        await using var input = file.OpenReadStream();
+        var header = new byte[12]; var count = await input.ReadAsync(header.AsMemory(0,12), token);
+        var valid = ext switch { ".png" => count>=8 && header.AsSpan(0,8).SequenceEqual(new byte[]{137,80,78,71,13,10,26,10}),
+            ".webp" => count>=12 && header.AsSpan(0,4).SequenceEqual("RIFF"u8) && header.AsSpan(8,4).SequenceEqual("WEBP"u8),
+            _ => count>=3 && header[0]==255 && header[1]==216 && header[2]==255 };
+        if (!valid) return BadRequest(new { message="รูปภาพไม่ถูกต้อง" });
+        await using var db = CreateConnection(); await db.OpenAsync(token);
+        if (!await AllowedAiAsync(db,"EDIT",token) || !await AiChatSettingsStore.IsEnabledAsync(db,User,token)) return Forbid();
+        var dir=Path.Combine(_environment.ContentRootPath,"uploads","ai-chat",company.Value.ToString()); Directory.CreateDirectory(dir);
+        var name=Guid.NewGuid().ToString("N")+ext; var path=Path.Combine(dir,name);
+        try {
+            await using (var output=System.IO.File.Create(path)) await file.CopyToAsync(output,token);
+            await using var cmd=new SqlCommand("UPDATE dbo.TDSTCompanySetUp SET AiChatImagePath=@path WHERE CompanyID=@company AND OwnerType='C' AND IsActive=1",db);
+            cmd.Parameters.Add("@path",SqlDbType.NVarChar,1000).Value=name; cmd.Parameters.Add("@company",SqlDbType.BigInt).Value=company.Value;
+            if (await cmd.ExecuteNonQueryAsync(token)!=1) { System.IO.File.Delete(path); return NotFound(); }
+        } catch { if (System.IO.File.Exists(path)) System.IO.File.Delete(path); throw; }
+        return NoContent();
+    }
+
+    private async Task<bool> AllowedAiAsync(SqlConnection db, string action, CancellationToken token)
+    {
+        await using var query = new SqlCommand("SELECT COUNT_BIG(*) FROM dbo.TDADProject WHERE ProjectCode=N'LAOO_AI' AND IsActive=1", db);
+        return Convert.ToInt64(await query.ExecuteScalarAsync(token)) > 0
+            ? await CompanyMenuAccess.IsAllowedForProjectAsync(db, User, "LAOO_AI", "64002", action, token)
+            : await AllowedAsync(db, action, token);
     }
 
     [HttpGet]
@@ -128,6 +238,7 @@ SET
     ReceiveStockImmediately = @ReceiveStockImmediately,
     ReceiveStockPriceModeCode = @ReceiveStockPriceModeCode,
     OrgStructureType = @OrgStructureType,
+    EmployeeNameDisplay = COALESCE(@EmployeeNameDisplay, EmployeeNameDisplay),
     {{businessTypeSet}}
     PasswordPolicyCode = @PasswordPolicyCode,
     YearFormat = @YearFormat,
@@ -170,6 +281,7 @@ WHERE OwnerType = @OwnerType
         Add(command, "@ReceiveStockImmediately", SqlDbType.Bit, request.ReceiveStockImmediately);
         Add(command, "@ReceiveStockPriceModeCode", SqlDbType.NVarChar, request.ReceiveStockPriceModeCode.Trim().ToUpperInvariant(), 20);
         Add(command, "@OrgStructureType", SqlDbType.Int, request.OrgStructureType);
+        Add(command, "@EmployeeNameDisplay", SqlDbType.VarChar, request.EmployeeNameDisplay?.Trim().ToUpperInvariant(), 10);
         Add(command, "@BusinessTypeCode", SqlDbType.NVarChar, requestedBusinessType, 20);
         Add(command, "@PasswordPolicyCode", SqlDbType.TinyInt, PasswordService.NormalizePolicyCode(request.PasswordPolicyCode));
         Add(command, "@YearFormat", SqlDbType.NVarChar, NullIfBlank(request.YearFormat), 10);
@@ -536,6 +648,7 @@ SELECT
     S.ReceiveStockImmediately,
     COALESCE(S.ReceiveStockPriceModeCode,N'CUSTOM') AS ReceiveStockPriceModeCode,
     S.OrgStructureType,
+    S.EmployeeNameDisplay,
     {{businessTypeProjection}} AS BusinessTypeCode,
     CAST(COALESCE(S.PasswordPolicyCode, 3) AS tinyint) AS PasswordPolicyCode,
     S.YearFormat,
@@ -662,7 +775,8 @@ WHERE S.OwnerType = @OwnerType
             reader.GetBoolean(reader.GetOrdinal("HasPasswordCry")),
             reader.GetBoolean(reader.GetOrdinal("HasEmailPasswordCenter")),
             reader.GetBoolean(reader.GetOrdinal("HasPasswordEmpDefault")),
-            reader.GetBoolean(reader.GetOrdinal("HasPasswordDirect")));
+            reader.GetBoolean(reader.GetOrdinal("HasPasswordDirect")),
+            reader.GetString(reader.GetOrdinal("EmployeeNameDisplay")));
     }
 
     private static async Task<bool> HasBusinessTypeColumnAsync(
@@ -801,6 +915,8 @@ SELECT CASE WHEN COL_LENGTH(N'dbo.TDSTCompanySetUp',N'MemberCoverImagePath') IS 
             return "จำนวนหลักของลูกค้าต้องอยู่ระหว่าง 1 ถึง 10";
         if (request.OrgStructureType is not (1 or 2))
             return "รูปแบบโครงสร้างองค์กรต้องเป็น 1 หรือ 2";
+        if (request.EmployeeNameDisplay is not null && request.EmployeeNameDisplay.Trim().ToUpperInvariant() is not ("FULL" or "NICK" or "BOTH"))
+            return "รูปแบบชื่อพนักงานไม่ถูกต้อง";
         if (request.PasswordPolicyCode is not (1 or 2 or 3))
             return "รูปแบบ Password ต้องเป็น 1, 2 หรือ 3";
         if (request.EmailPort is < 1 or > 65535)

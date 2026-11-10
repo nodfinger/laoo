@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import 'dart:convert';
+import 'dart:math';
+import 'dart:typed_data';
+import 'package:image/image.dart' as img;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:laoo_service/core/api/api_client.dart';
 import 'package:laoo_service/features/service_request/data/service_request_api.dart';
@@ -46,6 +50,73 @@ void main() {
     );
     await tester.pumpAndSettle();
   }
+
+  testWidgets('selected attachment preview is visible in the add dialog', (
+    tester,
+  ) async {
+    FilePicker.platform = _FakeImagePicker();
+    await showPage(
+      tester,
+      _FakeRequestApi()..canCreate = true,
+      size: const Size(1100, 800),
+    );
+    await tester.tap(find.text('แจ้งซ่อม').last);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('เลือกไฟล์'));
+    await tester.tap(find.text('เลือกไฟล์'));
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining('selected-test.png').hitTestable(),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('selected attachment preview is visible in the edit dialog', (
+    tester,
+  ) async {
+    FilePicker.platform = _FakeImagePicker();
+    await showPage(
+      tester,
+      _FakeRequestApi()..canEdit = true,
+      size: const Size(1100, 800),
+    );
+    await tester.tap(find.byTooltip('แก้ไข'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('เลือกไฟล์'));
+    await tester.tap(find.text('เลือกไฟล์'));
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining('selected-test.png').hitTestable(),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('image larger than one MB is compressed and previewed', (
+    tester,
+  ) async {
+    final image = img.Image(width: 700, height: 700);
+    final random = Random(123);
+    for (final pixel in image) {
+      pixel.setRgb(
+        random.nextInt(256),
+        random.nextInt(256),
+        random.nextInt(256),
+      );
+    }
+    final bytes = Uint8List.fromList(img.encodePng(image));
+    expect(bytes.length, greaterThan(1048576));
+    FilePicker.platform = _FakeImagePicker(bytes: bytes);
+    await showPage(tester, _FakeRequestApi()..canCreate = true);
+    await tester.tap(find.text('แจ้งซ่อม').last);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('เลือกไฟล์'));
+    await tester.tap(find.text('เลือกไฟล์'));
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining('selected-test.jpg').hitTestable(),
+      findsOneWidget,
+    );
+  });
 
   testWidgets('view-only subject permission opens lookup with locked actions', (
     tester,
@@ -320,6 +391,32 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('self page honors per-row edit and delete scope', (tester) async {
+    final api = _FakeRequestApi()
+      ..canEdit = true
+      ..canDelete = true
+      ..rowCanEdit = true
+      ..rowCanDelete = false;
+    await showPage(tester, api);
+    expect(find.byTooltip('แก้ไข'), findsOneWidget);
+    expect(find.byTooltip('ลบ'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('self page shows delete only when row permits it', (
+    tester,
+  ) async {
+    final api = _FakeRequestApi()
+      ..canEdit = true
+      ..canDelete = true
+      ..rowCanEdit = false
+      ..rowCanDelete = true;
+    await showPage(tester, api);
+    expect(find.byTooltip('แก้ไข'), findsNothing);
+    expect(find.byTooltip('ลบ'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('self delete confirms and calls owner-scoped API', (
     tester,
   ) async {
@@ -400,7 +497,7 @@ void main() {
     await showPage(tester, api);
     await tester.tap(find.byTooltip('แก้ไข'));
     await tester.pumpAndSettle();
-    expect(find.text('เพิ่มรูป'), findsOneWidget);
+    expect(find.text('เลือกไฟล์'), findsOneWidget);
     await tester.ensureVisible(find.byIcon(Icons.delete_outline).last);
     await tester.tap(find.byIcon(Icons.delete_outline).last);
     await tester.pumpAndSettle();
@@ -446,17 +543,54 @@ void main() {
     final api = _FakeRequestApi()..canEdit = true;
     await showPage(tester, api);
     expect(find.text('SR42'), findsOneWidget);
+    expect(find.text('Test Printer'), findsOneWidget);
+    expect(find.text('SN-123'), findsOneWidget);
     expect(find.byTooltip('แก้ไข'), findsOneWidget);
     await tester.tap(find.byTooltip('แสดงแบบการ์ด'));
     await tester.pumpAndSettle();
     expect(find.byTooltip('แสดงแบบตาราง'), findsOneWidget);
     expect(find.text('SR42'), findsOneWidget);
+    expect(find.textContaining('Test Printer'), findsOneWidget);
+    expect(find.text('Serial: SN-123'), findsOneWidget);
     expect(find.byTooltip('แก้ไข'), findsOneWidget);
     await tester.tap(find.byTooltip('แสดงแบบตาราง'));
     await tester.pumpAndSettle();
     expect(find.text('SR42'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+}
+
+class _FakeImagePicker extends FilePicker {
+  _FakeImagePicker({this.bytes});
+  final Uint8List? bytes;
+  @override
+  Future<FilePickerResult?> pickFiles({
+    String? dialogTitle,
+    String? initialDirectory,
+    FileType type = FileType.any,
+    List<String>? allowedExtensions,
+    Function(FilePickerStatus)? onFileLoading,
+    bool allowCompression = false,
+    int compressionQuality = 0,
+    bool allowMultiple = false,
+    bool withData = false,
+    bool withReadStream = false,
+    bool lockParentWindow = false,
+    bool readSequential = false,
+  }) async {
+    final resultBytes =
+        bytes ??
+        base64Decode(
+          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/aZkAAAAASUVORK5CYII=',
+        );
+    return FilePickerResult([
+      PlatformFile(
+        name: 'selected-test.png',
+        size: resultBytes.length,
+        bytes: resultBytes,
+      ),
+    ]);
+  }
 }
 
 class _ViewOnlySubjectApi extends ApiClient {
@@ -503,6 +637,19 @@ class _ViewOnlySubjectApi extends ApiClient {
 }
 
 class _FakeRequestApi extends ServiceRequestApi {
+  @override
+  Future<Map<String, dynamic>> uploadAttachment(
+    int requestId, {
+    required String fileName,
+    required List<int> bytes,
+    bool editSelf = false,
+    bool editNew = false,
+  }) async => {
+    'attachmentId': 3,
+    'fileName': fileName,
+    'contentType': 'image/png',
+    'fileSize': bytes.length,
+  };
   int? updatedEquipment;
   String? equipmentSearch;
   String? requesterSearch;
@@ -515,6 +662,8 @@ class _FakeRequestApi extends ServiceRequestApi {
     required String rowVersion,
     required String priorityCode,
     required int? equipmentItemId,
+    String? equipmentSerial,
+    bool updateSerial = false,
   }) async {
     updatedEquipment = equipmentItemId;
   }
@@ -559,6 +708,8 @@ class _FakeRequestApi extends ServiceRequestApi {
 
   int screenType = 1;
   bool canEdit = false;
+  bool rowCanEdit = true;
+  bool rowCanDelete = true;
   bool canCreate = false;
   bool canDelete = false;
   bool hasImages = false;
@@ -639,9 +790,13 @@ class _FakeRequestApi extends ServiceRequestApi {
             {
               'requestId': 42,
               'requestNo': 'SR42',
+              'equipmentName': 'Test Printer',
+              'equipmentSerial': 'SN-123',
               'requesterName': 'ผู้แจ้ง',
               'subject': 'ไฟไม่ติด',
               'statusCode': 'NEW',
+              'selfCanEdit': rowCanEdit,
+              'selfCanDelete': rowCanDelete,
               'requestDate': '2026-09-29',
               'hasImages': hasImages,
             },

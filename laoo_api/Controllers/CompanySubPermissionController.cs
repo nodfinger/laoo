@@ -1,6 +1,7 @@
 using System.Data;
 using System.Security.Claims;
 using LaooApi.Security;
+using LaooApi.Services.Assistant;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
@@ -27,11 +28,11 @@ public sealed class CompanySubPermissionController(IConfiguration configuration)
         }
 
         const string sql = """
-SELECT G.MenuGroupCode,G.MenuGroupName,M.MenuCode,M.MenuName,
+SELECT G.MenuGroupCode,CASE WHEN M.MenuCode='10008' THEN COALESCE((SELECT TOP 1 ProjectNameTH FROM dbo.TDADProject WHERE ProjectCode=N'LAOO_AI' AND IsActive=1),G.MenuGroupName) ELSE G.MenuGroupName END,M.MenuCode,M.MenuName,
        N.PermissionPointCode,N.PermissionPointName,N.PermissionPointDescription,
        Assigned.EmployeeNames
 FROM dbo.TDADMainMenu M
-INNER JOIN dbo.TDADMenuGroup G ON G.MenuGroupCode=M.MenuGroupCode AND G.IsActive=1
+INNER JOIN dbo.TDADMenuGroup G ON G.MenuGroupCode=CASE WHEN M.MenuCode='10008' AND EXISTS (SELECT 1 FROM dbo.TDADProjectMenu PM JOIN dbo.TDADProject PR ON PR.ProjectID=PM.ProjectID AND PR.ProjectCode=N'LAOO_AI' AND PR.IsActive=1 WHERE PM.MenuCode=M.MenuCode AND PM.IsActive=1) THEN '64' ELSE M.MenuGroupCode END AND G.IsActive=1
 INNER JOIN dbo.TDADUserPermissionPointName N
   ON N.MenuCode=CONVERT(nvarchar(20),M.MenuCode) AND N.IsActive=1
 OUTER APPLY
@@ -49,11 +50,12 @@ OUTER APPLY
       AND P.PermissionPointCode=N.PermissionPointCode
       AND P.IsActive=1 AND P.IsAllowed=1
 ) Assigned
-WHERE M.IsActive=1 AND M.IsVisible=1 AND M.ShowPermissionPoint=1
+WHERE M.IsActive=1 AND M.IsVisible=1 AND M.ShowPermissionPoint=1 AND (M.MenuCode<>'10008' OR @aiEnabled=1)
 ORDER BY G.SortOrder,M.SortOrder,M.MenuCode,N.SortOrder,N.PermissionPointName;
 """;
         await using var cmd = new SqlCommand(sql, c);
         Add(cmd, "@project", SqlDbType.BigInt, ProjectID()); Add(cmd, "@company", SqlDbType.BigInt, CompanyID());
+        Add(cmd, "@aiEnabled", SqlDbType.Bit, await AiChatSettingsStore.IsEnabledAsync(c, User, token));
         await using var r = await cmd.ExecuteReaderAsync(token);
         var rows = new List<object>();
         while (await r.ReadAsync(token)) rows.Add(new

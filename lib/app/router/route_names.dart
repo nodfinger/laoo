@@ -67,6 +67,12 @@ abstract final class RouteNames {
   static const String companyEmployees = 'companyEmployees';
   static const String companyUsers = 'companyUsers';
   static const String companyRoleGroups = 'companyRoleGroups';
+  static const String companyAiCapabilities = 'companyAiCapabilities';
+  static const String companyAiIntentTest = 'companyAiIntentTest';
+  static const String companyAiSettings = 'companyAiSettings';
+  static const String companyAiAgents = 'companyAiAgents';
+  static const String companyDocumentNumberFormat =
+      'companyDocumentNumberFormat';
   static const String companyMenuPermissions = 'companyMenuPermissions';
   static const String companySubPermissions = 'companySubPermissions';
   static const String partnerEmployees = 'partnerEmployees';

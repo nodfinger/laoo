@@ -69,6 +69,8 @@ class ServiceRequestApi {
     required String rowVersion,
     required String priorityCode,
     required int? equipmentItemId,
+    String? equipmentSerial,
+    bool updateSerial = false,
   }) => _client.put(
     selfService
         ? '/api/service/requests/self/$id'
@@ -80,6 +82,8 @@ class ServiceRequestApi {
       'priorityCode': priorityCode,
       'equipmentItemId': equipmentItemId,
       'updateEquipment': true,
+      'equipmentSerial': equipmentSerial,
+      'updateSerial': updateSerial,
     },
   );
 
@@ -152,6 +156,7 @@ class ServiceRequestApi {
     required String detail,
     String? qrToken,
     String priorityCode = '0',
+    String? equipmentSerial,
   }) async => Map<String, dynamic>.from(
     await _client.post(
           selfService ? '/api/service/requests/self' : '/api/service/requests',
@@ -163,6 +168,7 @@ class ServiceRequestApi {
             'detail': detail,
             'qrToken': qrToken,
             'priorityCode': priorityCode,
+            'equipmentSerial': equipmentSerial,
           },
         )
         as Map,

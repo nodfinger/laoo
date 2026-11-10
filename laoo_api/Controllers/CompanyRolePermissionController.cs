@@ -27,7 +27,6 @@ SELECT P.ProjectID,P.ProjectNameTH,M.MenuCode,M.MenuName,G.MenuGroupCode,G.MenuG
  (SELECT COUNT(*) FROM dbo.TDADProjectMenuGroup CPG JOIN dbo.TDADMenuGroup CG ON CG.MenuGroupCode=CPG.MenuGroupCode AND CG.IsActive=1 WHERE CPG.ProjectID=P.ProjectID AND CPG.IsActive=1)
 FROM dbo.TDADProject P
 JOIN dbo.TDSTCompanySetUp C ON C.CompanyID=@Company AND C.PartnerID=@Partner AND C.IsActive=1
-JOIN dbo.TDADUserProject UP ON UP.ProjectID=P.ProjectID AND UP.UserID=@User AND UP.CompanyID=C.CompanyID AND UP.IsActive=1
 JOIN dbo.TDADProjectMenu PM ON PM.ProjectID=P.ProjectID AND PM.IsActive=1
 JOIN dbo.TDADMainMenu M ON M.MenuCode=PM.MenuCode AND M.IsActive=1 AND M.IsVisible=1
 JOIN dbo.TDADMenuGroup G ON G.MenuGroupCode=PM.MenuGroupCode AND G.IsActive=1
@@ -49,7 +48,7 @@ WHERE P.IsActive=1 AND UPPER(LTRIM(RTRIM(G.AudienceType))) IN ('A','C') AND UPPE
        WHERE S.ProjectID=P.ProjectID AND S.CompanyID=C.CompanyID AND S.PartnerID=C.PartnerID AND S.IsCurrent=1
          AND S.StatusCode IN(N'ACTIVE',N'TRIAL') AND S.StartDate<=CONVERT(date,SYSUTCDATETIME())
          AND (S.ExpireDate IS NULL OR S.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))
-         AND (NULLIF(LTRIM(RTRIM(M.FeatureCode)),N'') IS NULL OR EXISTS(SELECT 1 FROM dbo.TDADProjectPackageFeature PF WHERE PF.PackageID=PK.PackageID AND PF.FeatureCode=M.FeatureCode AND PF.IsEnabled=1)))))
+         AND (ISNULL(G.OpenOption,0)=0 OR NULLIF(LTRIM(RTRIM(M.FeatureCode)),N'') IS NULL OR EXISTS(SELECT 1 FROM dbo.TDADProjectPackageFeature PF WHERE PF.PackageID=PK.PackageID AND PF.FeatureCode=M.FeatureCode AND PF.IsEnabled=1)))))
 GROUP BY P.ProjectID,P.ProjectNameTH,M.MenuCode,M.MenuName,G.MenuGroupCode,G.MenuGroupName,M.ScreenType,PG.SortOrder,PM.SortOrder
 ORDER BY P.ProjectID,PG.SortOrder,PM.SortOrder,M.MenuCode;
 """;
@@ -101,7 +100,6 @@ ORDER BY P.ProjectID,PG.SortOrder,PM.SortOrder,M.MenuCode;
 DECLARE @Type int;
 SELECT @Type=M.ScreenType FROM dbo.TDADProject P
 JOIN dbo.TDSTCompanySetUp C ON C.CompanyID=@Company AND C.PartnerID=@Partner AND C.IsActive=1
-JOIN dbo.TDADUserProject UP ON UP.ProjectID=P.ProjectID AND UP.UserID=@User AND UP.CompanyID=C.CompanyID AND UP.IsActive=1
 JOIN dbo.TDADProjectMenu PM ON PM.ProjectID=P.ProjectID AND PM.MenuCode=@Menu AND PM.IsActive=1
 JOIN dbo.TDADMainMenu M ON M.MenuCode=PM.MenuCode AND M.IsActive=1 AND M.IsVisible=1
 JOIN dbo.TDADMenuGroup G ON G.MenuGroupCode=PM.MenuGroupCode AND G.IsActive=1
@@ -122,7 +120,7 @@ WHERE P.ProjectID=@Project AND P.IsActive=1 AND G.MenuGroupCode<>'07'
        WHERE S.ProjectID=P.ProjectID AND S.CompanyID=C.CompanyID AND S.PartnerID=C.PartnerID AND S.IsCurrent=1
          AND S.StatusCode IN(N'ACTIVE',N'TRIAL') AND S.StartDate<=CONVERT(date,SYSUTCDATETIME())
          AND (S.ExpireDate IS NULL OR S.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))
-         AND (NULLIF(LTRIM(RTRIM(M.FeatureCode)),N'') IS NULL OR EXISTS(SELECT 1 FROM dbo.TDADProjectPackageFeature PF WHERE PF.PackageID=PK.PackageID AND PF.FeatureCode=M.FeatureCode AND PF.IsEnabled=1)))));
+         AND (ISNULL(G.OpenOption,0)=0 OR NULLIF(LTRIM(RTRIM(M.FeatureCode)),N'') IS NULL OR EXISTS(SELECT 1 FROM dbo.TDADProjectPackageFeature PF WHERE PF.PackageID=PK.PackageID AND PF.FeatureCode=M.FeatureCode AND PF.IsEnabled=1)))));
 IF @Type IS NULL THROW 50010,'MENU_SCOPE_INVALID',1;
 DELETE FROM dbo.TDADRoleGroupPermission WHERE RoleGroupID=@Role AND ProjectID=@Project AND MenuCode=@Menu;
 INSERT dbo.TDADRoleGroupPermission(RoleGroupID,ProjectID,MenuCode,ActionCode,IsAllowed,CreatedBy)

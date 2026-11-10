@@ -46,6 +46,35 @@ SELECT CAST(CASE WHEN EXISTS (
         return Convert.ToBoolean(await cmd.ExecuteScalarAsync(token));
     }
 
+    // Restrict eligibility and the resulting action grant to the named project.
+    public static async Task<bool> IsAllowedForProjectAsync(DbConnection connection, ClaimsPrincipal user,
+        string projectCode, string menu, string action, CancellationToken token)
+    {
+        if (user.FindFirst("user_type")?.Value != "COMPANY_USER"
+            || !long.TryParse(user.FindFirst("user_id")?.Value, out var userId)
+            || !long.TryParse(user.FindFirst("company_id")?.Value, out var companyId)
+            || !long.TryParse(user.FindFirst("partner_id")?.Value, out var partnerId)) return false;
+        await using var cmd = connection.CreateCommand();
+        const string eligibleClause = "WHERE PM.MenuCode=@MenuCode AND PM.IsActive=1";
+        if (!Sql.Contains(eligibleClause, StringComparison.Ordinal))
+            throw new InvalidOperationException("Cannot safely restrict menu permission to a project.");
+        cmd.CommandText = Sql.Replace(eligibleClause,
+            """
+WHERE PM.MenuCode=@MenuCode AND PM.IsActive=1 AND P.ProjectCode=@ProjectCode
+ AND (P.ProjectType=N'CORE' OR EXISTS
+  (SELECT 1 FROM dbo.TDADCompanyProjectSubscription AI_S
+   JOIN dbo.TDADProjectPackage AI_PK ON AI_PK.PackageID=AI_S.PackageID AND AI_PK.ProjectID=AI_S.ProjectID AND AI_PK.IsActive=1
+   WHERE AI_S.CompanyID=@CompanyID AND AI_S.PartnerID=@PartnerID AND AI_S.ProjectID=P.ProjectID
+    AND AI_S.IsCurrent=1 AND AI_S.StatusCode IN(N'ACTIVE',N'TRIAL')
+    AND AI_S.StartDate<=CONVERT(date,SYSUTCDATETIME())
+    AND (AI_S.ExpireDate IS NULL OR AI_S.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))))
+""", StringComparison.Ordinal);
+        Add(cmd, "@UserID", DbType.Int64, userId); Add(cmd, "@CompanyID", DbType.Int64, companyId);
+        Add(cmd, "@PartnerID", DbType.Int64, partnerId); Add(cmd, "@ProjectCode", DbType.String, projectCode);
+        Add(cmd, "@MenuCode", DbType.String, menu); Add(cmd, "@Action", DbType.String, action);
+        return Convert.ToBoolean(await cmd.ExecuteScalarAsync(token));
+    }
+
     public const string Sql = """
 WITH Eligible AS
 (
@@ -54,7 +83,6 @@ WITH Eligible AS
  JOIN dbo.TDADProject P ON P.ProjectID=PM.ProjectID AND P.IsActive=1
  JOIN dbo.TDADMainMenu M ON M.MenuCode=PM.MenuCode AND M.IsActive=1
  JOIN dbo.TDSTCompanySetUp C ON C.CompanyID=@CompanyID AND C.PartnerID=@PartnerID AND C.IsActive=1
- JOIN dbo.TDADUserProject UP ON UP.ProjectID=P.ProjectID AND UP.UserID=@UserID AND UP.CompanyID=C.CompanyID AND UP.IsActive=1
  WHERE PM.MenuCode=@MenuCode AND PM.IsActive=1
  AND (M.MenuGroupCode<>N'09' OR P.ProjectCode=N'LAOO_TRADE' OR EXISTS
    (SELECT 1 FROM dbo.TDADCompanyFeature CF

@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:file_picker/file_picker.dart';
+import 'package:file_picker/file_picker.dart' show FilePickerResult;
 import 'package:flutter/material.dart';
 
 import '../../../app/theme/laoo_typography.dart';
@@ -11,6 +11,8 @@ import '../../../core/auth/auth_session.dart';
 import '../../../core/navigation/menu_style_preferences.dart';
 import '../../../core/widgets/auto_dismiss_message.dart';
 import '../data/user_profile_repository.dart';
+import 'profile_image_picker.dart';
+import 'list_display_dialog.dart';
 
 Future<void> saveUserProfileTheme(String themeCode) =>
     UserProfileRepository().saveTheme(themeCode);
@@ -235,20 +237,27 @@ class _UserProfileDialogState extends State<_UserProfileDialog> {
   }
 
   Future<void> _pickImage() async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.image,
-      withData: true,
-    );
-    final file = result?.files.single;
-    if (file?.bytes == null) {
+    final FilePickerResult? result;
+    try {
+      result = await pickProfileImage();
+    } catch (_) {
+      if (mounted) setState(() => _error = 'ไม่สามารถเลือกรูปได้ กรุณาลองใหม่');
       return;
     }
-    if (file!.bytes!.length > 2 * 1024 * 1024) {
+    if (!mounted || result == null) return;
+    final file = result.files.single;
+    final bytes = file.bytes;
+    if (bytes == null) {
+      setState(() => _error = 'ไม่สามารถอ่านไฟล์รูปได้ กรุณาเลือกไฟล์ใหม่');
+      return;
+    }
+    if (bytes.length > 2 * 1024 * 1024) {
       setState(() => _error = 'รูปโปรไฟล์ต้องมีขนาดไม่เกิน 2 MB');
       return;
     }
     setState(() {
-      _avatarBase64 = base64Encode(file.bytes!);
+      _error = null;
+      _avatarBase64 = base64Encode(bytes);
       _avatarName = file.name;
       _removeAvatar = false;
       _avatarType = switch (file.extension?.toLowerCase()) {
@@ -494,14 +503,11 @@ class _UserProfileDialogState extends State<_UserProfileDialog> {
             child: preview == null ? const Icon(Icons.person_outline) : null,
           ),
           const SizedBox(width: 12),
-          Text(
-            'ข้อมูลส่วนตัว',
-            style: LaooTypography.popupTitleStyle,
-          ),
+          Text('ข้อมูลส่วนตัว', style: LaooTypography.popupTitleStyle),
         ],
       ),
       content: SizedBox(
-        width: 520,
+        width: 760,
         child: _loading
             ? const SizedBox(
                 height: 140,
@@ -515,23 +521,72 @@ class _UserProfileDialogState extends State<_UserProfileDialog> {
                     const SizedBox(height: 12),
                     if (_error != null) _errorBox(theme),
                     _section(theme, 'ข้อมูลเข้าสู่ระบบ', [
-                      TextField(
-                        controller: _username,
-                        decoration: const InputDecoration(
-                          labelText: 'Username',
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _currentPassword,
-                        obscureText: true,
-                        decoration: const InputDecoration(labelText: 'Password เดิม'),
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final username = TextField(
+                            controller: _username,
+                            decoration: const InputDecoration(
+                              labelText: 'Username',
+                            ),
+                          );
+                          final current = TextField(
+                            controller: _currentPassword,
+                            obscureText: true,
+                            decoration: const InputDecoration(
+                              labelText: 'Password เดิม',
+                            ),
+                          );
+                          final next = TextField(
+                            controller: _newPassword,
+                            obscureText: true,
+                            decoration: const InputDecoration(
+                              labelText: 'Password ใหม่ (ถ้าต้องการเปลี่ยน)',
+                            ),
+                          );
+                          if (constraints.maxWidth < 600) {
+                            return Column(
+                              children: [
+                                username,
+                                const SizedBox(height: 14),
+                                current,
+                                const SizedBox(height: 14),
+                                next,
+                              ],
+                            );
+                          }
+                          return Row(
+                            children: [
+                              Expanded(child: username),
+                              const SizedBox(width: 12),
+                              Expanded(child: current),
+                              const SizedBox(width: 12),
+                              Expanded(child: next),
+                            ],
+                          );
+                        },
                       ),
                       const SizedBox(height: 14),
-                      TextField(
-                        controller: _newPassword,
-                        obscureText: true,
-                        decoration: const InputDecoration(labelText: 'Password ใหม่ (ถ้าต้องการเปลี่ยน)'),
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          if (constraints.maxWidth < 440) {
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _viewModeSelector(theme),
+                                const SizedBox(height: 14),
+                                _menuStyleSelector(theme),
+                              ],
+                            );
+                          }
+                          return Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(child: _viewModeSelector(theme)),
+                              const SizedBox(width: 14),
+                              Expanded(child: _menuStyleSelector(theme)),
+                            ],
+                          );
+                        },
                       ),
                     ]),
                     const SizedBox(height: 12),
@@ -565,6 +620,7 @@ class _UserProfileDialogState extends State<_UserProfileDialog> {
                                 const SizedBox(height: 6),
                                 Wrap(
                                   spacing: 8,
+                                  runSpacing: 10,
                                   children: [
                                     OutlinedButton.icon(
                                       onPressed: _pickImage,
@@ -587,6 +643,53 @@ class _UserProfileDialogState extends State<_UserProfileDialog> {
                                           style: TextStyle(color: Colors.red),
                                         ),
                                       ),
+                                    OutlinedButton.icon(
+                                      onPressed: _chooseTheme,
+                                      icon: Icon(
+                                        Icons.palette_outlined,
+                                        color: theme.colorScheme.primary,
+                                      ),
+                                      label: const Text('เลือกโทนสี'),
+                                    ),
+                                    if (appAuthController.isCompanyUser)
+                                      OutlinedButton.icon(
+                                        onPressed: () async {
+                                          try {
+                                            await showListDisplayDialog(
+                                              context,
+                                            );
+                                          } catch (_) {
+                                            if (context.mounted) {
+                                              await showDialog<void>(
+                                                context: context,
+                                                builder: (context) => AlertDialog(
+                                                  title: const Text(
+                                                    'ไม่สามารถโหลดรายการหน้าจอ',
+                                                  ),
+                                                  content: const Text(
+                                                    'กรุณาตรวจสอบการเชื่อมต่อและสิทธิ์ แล้วลองใหม่',
+                                                  ),
+                                                  actions: [
+                                                    TextButton(
+                                                      onPressed: () =>
+                                                          Navigator.pop(
+                                                            context,
+                                                          ),
+                                                      child: const Text('ปิด'),
+                                                    ),
+                                                  ],
+                                                ),
+                                              );
+                                            }
+                                          }
+                                        },
+                                        icon: const Icon(
+                                          Icons.view_column_outlined,
+                                        ),
+                                        label: const Text(
+                                          'กำหนดแสดง/จัดเรียงข้อมูล',
+                                        ),
+                                      ),
                                   ],
                                 ),
                               ],
@@ -603,35 +706,6 @@ class _UserProfileDialogState extends State<_UserProfileDialog> {
                           labelText: 'ข้อความแนะนำ',
                           counterText: '',
                         ),
-                      ),
-                      const SizedBox(height: 14),
-                      OutlinedButton.icon(
-                        onPressed: _chooseTheme,
-                        icon: Icon(Icons.palette_outlined, color: theme.colorScheme.primary),
-                        label: const Text('เลือกโทนสี'),
-                      ),
-                      const SizedBox(height: 14),
-                      LayoutBuilder(
-                        builder: (context, constraints) {
-                          if (constraints.maxWidth < 440) {
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _viewModeSelector(theme),
-                                const SizedBox(height: 14),
-                                _menuStyleSelector(theme),
-                              ],
-                            );
-                          }
-                          return Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(child: _viewModeSelector(theme)),
-                              const SizedBox(width: 14),
-                              Expanded(child: _menuStyleSelector(theme)),
-                            ],
-                          );
-                        },
                       ),
                     ]),
                   ],

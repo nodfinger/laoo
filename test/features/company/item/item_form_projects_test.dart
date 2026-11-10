@@ -218,7 +218,7 @@ void main() {
     Finder dropdown(String label) => find.byWidgetPredicate(
       (widget) =>
           widget is DropdownButtonFormField<String> &&
-          widget.decoration?.labelText == label,
+          widget.decoration.labelText == label,
     );
     final group = tester.getTopLeft(dropdown('* กลุ่มสินค้า'));
     final type = tester.getTopLeft(dropdown('* ประเภทสินค้า'));

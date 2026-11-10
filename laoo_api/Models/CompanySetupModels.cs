@@ -54,7 +54,8 @@ public sealed record CompanySetupResponse(
     bool HasPasswordCry,
     bool HasEmailPasswordCenter,
     bool HasPasswordEmpDefault,
-    bool HasPasswordDirect);
+    bool HasPasswordDirect,
+    string EmployeeNameDisplay);
     
 
 public sealed class CompanySetupUpdateRequest
@@ -79,6 +80,7 @@ public sealed class CompanySetupUpdateRequest
     public bool ReceiveStockImmediately { get; init; } = true;
     public string ReceiveStockPriceModeCode { get; init; } = "CUSTOM";
     public int OrgStructureType { get; init; } = 1;
+    public string? EmployeeNameDisplay { get; init; }
     public string? BusinessTypeCode { get; init; }
     public int PasswordPolicyCode { get; init; } = 3;
     public string? YearFormat { get; init; }

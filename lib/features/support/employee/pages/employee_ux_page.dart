@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../app/theme/laoo_design_tokens.dart';
 import '../../../../app/theme/workspace_theme_presets.dart';
 import 'dart:typed_data';
 import 'dart:convert';
@@ -1205,9 +1206,11 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
         if (_card || constraints.maxWidth < 1100) {
           return _employeeMobileCards();
         }
-        final tableWidth = constraints.maxWidth < minTableWidth
+        final availableTableWidth =
+            constraints.maxWidth - 2 * LaooLayout.cardPadding;
+        final tableWidth = availableTableWidth < minTableWidth
             ? minTableWidth
-            : constraints.maxWidth;
+            : availableTableWidth;
         const idWidth = 16.0;
         const statusWidth = 110.0;
         const tableRightPadding = 16.0;
@@ -1251,195 +1254,201 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
               side: BorderSide.none,
             ),
             clipBehavior: Clip.antiAlias,
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minWidth: tableWidth),
-                child: PinnedDataTable(
-                  horizontalMargin: horizontalMargin,
-                  columnSpacing: columnSpacing,
-                  sortColumnIndex: sortColumn,
-                  sortAscending: sortAscending,
-                  headingRowColor: WidgetStateProperty.all(
-                    primary.withValues(alpha: 0.12),
-                  ),
-                  headingTextStyle: TextStyle(
-                    color: primary,
-                    fontWeight: FontWeight.w700,
-                  ),
-                  dataRowMinHeight: 42,
-                  dataRowMaxHeight: 48,
-                  columns: [
-                    DataColumn(
-                      columnWidth: const FixedColumnWidth(
-                        LaooTableColumns.idWidth,
-                      ),
-                      label: const Text('ID'),
-                      onSort: (index, ascending) => _sortBy(index, ascending),
+            child: Padding(
+              padding: const EdgeInsets.all(LaooLayout.cardPadding),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minWidth: tableWidth),
+                  child: PinnedDataTable(
+                    horizontalMargin: horizontalMargin,
+                    columnSpacing: columnSpacing,
+                    sortColumnIndex: sortColumn,
+                    sortAscending: sortAscending,
+                    headingRowColor: WidgetStateProperty.all(
+                      primary.withValues(alpha: 0.12),
                     ),
-                    DataColumn(
-                      label: SizedBox(
-                        width: actionWidth,
-                        child: const Center(child: Text('Action')),
-                      ),
+                    headingTextStyle: TextStyle(
+                      color: primary,
+                      fontWeight: FontWeight.w700,
                     ),
-                    DataColumn(
-                      label: headerText('แผนก', departmentWidth),
-                      onSort: (index, ascending) => _sortBy(index, ascending),
-                    ),
-                    DataColumn(
-                      label: headerText('รหัสพนักงาน', employeeCodeWidth),
-                      onSort: (index, ascending) => _sortBy(index, ascending),
-                    ),
-                    DataColumn(
-                      label: headerText('ชื่อ-นามสกุล', employeeNameWidth),
-                      onSort: (index, ascending) => _sortBy(index, ascending),
-                    ),
-                    DataColumn(
-                      label: headerText('ชื่อเล่น', nicknameWidth),
-                      onSort: (index, ascending) => _sortBy(index, ascending),
-                    ),
-                    DataColumn(
-                      label: headerText('โทรศัพท์', phoneWidth),
-                      onSort: (index, ascending) => _sortBy(index, ascending),
-                    ),
-                    DataColumn(
-                      label: headerText('รูปแบบแจ้งเตือน', notificationWidth),
-                      onSort: (index, ascending) => _sortBy(index, ascending),
-                    ),
-                    DataColumn(
-                      label: SizedBox(
-                        width: statusWidth,
-                        child: const Center(child: Text('สถานะ')),
-                      ),
-                      onSort: (index, ascending) => _sortBy(index, ascending),
-                    ),
-                    const DataColumn(label: SizedBox(width: tableRightPadding)),
-                  ],
-                  rows: rows.asMap().entries.map((entry) {
-                    final row = entry.value;
-                    final displayId =
-                        ((_currentPage - 1) * _pageSize) + entry.key + 1;
-                    return DataRow(
-                      cells: [
-                        DataCell(
-                          SizedBox(width: idWidth, child: Text('$displayId')),
+                    dataRowMinHeight: 42,
+                    dataRowMaxHeight: 48,
+                    columns: [
+                      DataColumn(
+                        columnWidth: const FixedColumnWidth(
+                          LaooTableColumns.idWidth,
                         ),
-                        DataCell(
-                          SizedBox(
-                            width: actionWidth,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                if (_canEdit)
-                                  IconButton(
-                                    tooltip: 'แก้ไข',
-                                    visualDensity: VisualDensity.compact,
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(
-                                      minWidth: 32,
-                                      minHeight: 32,
-                                    ),
-                                    onPressed: () => _openEmployeeEdit(row.$4),
-                                    icon: Icon(
-                                      Icons.edit_outlined,
-                                      color: primary,
-                                    ),
-                                  ),
-                                if (_canDelete)
-                                  IconButton(
-                                    tooltip: 'ลบ',
-                                    visualDensity: VisualDensity.compact,
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(
-                                      minWidth: 32,
-                                      minHeight: 32,
-                                    ),
-                                    onPressed: () => _deleteEmployee(row.$4),
-                                    icon: const Icon(
-                                      Icons.delete_outline,
-                                      color: Colors.red,
-                                    ),
-                                  ),
-                                if (_canEdit)
-                                  IconButton(
-                                    tooltip: 'ผู้ใช้งาน',
-                                    visualDensity: VisualDensity.compact,
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(
-                                      minWidth: 32,
-                                      minHeight: 32,
-                                    ),
-                                    onPressed: () =>
-                                        _openEmployeeUserForm(row.$1, row.$5),
-                                    icon: Icon(
-                                      Icons.person_add_alt_1_outlined,
-                                      color: primary,
-                                    ),
-                                  ),
-                              ],
-                            ),
+                        label: const Text('ID'),
+                        onSort: (index, ascending) => _sortBy(index, ascending),
+                      ),
+                      DataColumn(
+                        label: SizedBox(
+                          width: actionWidth,
+                          child: const Center(child: Text('Action')),
+                        ),
+                      ),
+                      DataColumn(
+                        label: headerText('แผนก', departmentWidth),
+                        onSort: (index, ascending) => _sortBy(index, ascending),
+                      ),
+                      DataColumn(
+                        label: headerText('รหัสพนักงาน', employeeCodeWidth),
+                        onSort: (index, ascending) => _sortBy(index, ascending),
+                      ),
+                      DataColumn(
+                        label: headerText('ชื่อ-นามสกุล', employeeNameWidth),
+                        onSort: (index, ascending) => _sortBy(index, ascending),
+                      ),
+                      DataColumn(
+                        label: headerText('ชื่อเล่น', nicknameWidth),
+                        onSort: (index, ascending) => _sortBy(index, ascending),
+                      ),
+                      DataColumn(
+                        label: headerText('โทรศัพท์', phoneWidth),
+                        onSort: (index, ascending) => _sortBy(index, ascending),
+                      ),
+                      DataColumn(
+                        label: headerText('รูปแบบแจ้งเตือน', notificationWidth),
+                        onSort: (index, ascending) => _sortBy(index, ascending),
+                      ),
+                      DataColumn(
+                        label: SizedBox(
+                          width: statusWidth,
+                          child: const Center(child: Text('สถานะ')),
+                        ),
+                        onSort: (index, ascending) => _sortBy(index, ascending),
+                      ),
+                      const DataColumn(
+                        label: SizedBox(width: tableRightPadding),
+                      ),
+                    ],
+                    rows: rows.asMap().entries.map((entry) {
+                      final row = entry.value;
+                      final displayId =
+                          ((_currentPage - 1) * _pageSize) + entry.key + 1;
+                      return DataRow(
+                        cells: [
+                          DataCell(
+                            SizedBox(width: idWidth, child: Text('$displayId')),
                           ),
-                        ),
-                        DataCell(cellText(row.$3, departmentWidth)),
-                        DataCell(cellText(row.$4, employeeCodeWidth)),
-                        DataCell(
-                          SizedBox(
-                            width: employeeNameWidth,
-                            child: Row(
-                              children: [
-                                if (showEmployeeImage) ...[
-                                  _employeeImageThumbnail(
-                                    int.tryParse(row.$1) ?? 0,
-                                  ),
-                                  const SizedBox(width: 8),
+                          DataCell(
+                            SizedBox(
+                              width: actionWidth,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  if (_canEdit)
+                                    IconButton(
+                                      tooltip: 'แก้ไข',
+                                      visualDensity: VisualDensity.compact,
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(
+                                        minWidth: 32,
+                                        minHeight: 32,
+                                      ),
+                                      onPressed: () =>
+                                          _openEmployeeEdit(row.$4),
+                                      icon: Icon(
+                                        Icons.edit_outlined,
+                                        color: primary,
+                                      ),
+                                    ),
+                                  if (_canDelete)
+                                    IconButton(
+                                      tooltip: 'ลบ',
+                                      visualDensity: VisualDensity.compact,
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(
+                                        minWidth: 32,
+                                        minHeight: 32,
+                                      ),
+                                      onPressed: () => _deleteEmployee(row.$4),
+                                      icon: const Icon(
+                                        Icons.delete_outline,
+                                        color: Colors.red,
+                                      ),
+                                    ),
+                                  if (_canEdit)
+                                    IconButton(
+                                      tooltip: 'ผู้ใช้งาน',
+                                      visualDensity: VisualDensity.compact,
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(
+                                        minWidth: 32,
+                                        minHeight: 32,
+                                      ),
+                                      onPressed: () =>
+                                          _openEmployeeUserForm(row.$1, row.$5),
+                                      icon: Icon(
+                                        Icons.person_add_alt_1_outlined,
+                                        color: primary,
+                                      ),
+                                    ),
                                 ],
-                                Flexible(
-                                  child: Text(
-                                    '${row.$5}${row.$6.trim().isEmpty ? '' : ' | ${row.$6}'}',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ),
+                          DataCell(cellText(row.$3, departmentWidth)),
+                          DataCell(cellText(row.$4, employeeCodeWidth)),
+                          DataCell(
+                            SizedBox(
+                              width: employeeNameWidth,
+                              child: Row(
+                                children: [
+                                  if (showEmployeeImage) ...[
+                                    _employeeImageThumbnail(
+                                      int.tryParse(row.$1) ?? 0,
+                                    ),
+                                    const SizedBox(width: 8),
+                                  ],
+                                  Flexible(
+                                    child: Text(
+                                      '${row.$5}${row.$6.trim().isEmpty ? '' : ' | ${row.$6}'}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          DataCell(cellText(row.$6, nicknameWidth)),
+                          DataCell(cellText(row.$7, phoneWidth)),
+                          DataCell(cellText(row.$8, notificationWidth)),
+                          DataCell(
+                            Center(
+                              child: Container(
+                                width: statusWidth - 12,
+                                height: 24,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                ),
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: row.$2 == 'ปกติ'
+                                      ? primary.withValues(alpha: 0.12)
+                                      : Colors.red.withValues(alpha: 0.16),
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                                child: Text(
+                                  row.$2,
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: row.$2 == 'ปกติ'
+                                        ? primary
+                                        : Colors.red.shade800,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        DataCell(cellText(row.$6, nicknameWidth)),
-                        DataCell(cellText(row.$7, phoneWidth)),
-                        DataCell(cellText(row.$8, notificationWidth)),
-                        DataCell(
-                          Center(
-                            child: Container(
-                              width: statusWidth - 12,
-                              height: 24,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                              ),
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                color: row.$2 == 'ปกติ'
-                                    ? primary.withValues(alpha: 0.12)
-                                    : Colors.red.withValues(alpha: 0.16),
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                              child: Text(
-                                row.$2,
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: row.$2 == 'ปกติ'
-                                      ? primary
-                                      : Colors.red.shade800,
-                                  fontWeight: FontWeight.w600,
-                                ),
                               ),
                             ),
                           ),
-                        ),
-                        const DataCell(SizedBox(width: tableRightPadding)),
-                      ],
-                    );
-                  }).toList(),
+                          const DataCell(SizedBox(width: tableRightPadding)),
+                        ],
+                      );
+                    }).toList(),
+                  ),
                 ),
               ),
             ),

@@ -7,6 +7,7 @@ class CompanySetupContext {
     required this.timeAlert,
     required this.receiveStockPriceModeCode,
     required this.orgStructureType,
+    this.employeeNameDisplay = 'FULL',
     required this.businessTypeCode,
     required this.requesterMode,
     required this.requesterCaption,
@@ -29,6 +30,7 @@ class CompanySetupContext {
   final int timeAlert;
   final String receiveStockPriceModeCode;
   final int orgStructureType;
+  final String employeeNameDisplay;
   final String businessTypeCode;
   final String requesterMode;
   final String requesterCaption;
@@ -58,6 +60,7 @@ class CompanySetupContext {
           (json['orgStructureType'] as num?)?.toInt() ??
           int.tryParse('${json['orgStructureType']}') ??
           1,
+      employeeNameDisplay: _text(json['employeeNameDisplay'], 'FULL'),
       businessTypeCode: _text(json['businessTypeCode'], 'COMPANY'),
       requesterMode: _text(json['requesterMode'], 'EMPLOYEE'),
       requesterCaption: _text(json['requesterCaption'], 'ผู้แจ้งซ่อม'),

@@ -6,6 +6,24 @@ class PartnerCompanyRepository {
     : _api = apiClient ?? ApiClient();
   final ApiClient _api;
 
+  Future<Map<String, bool>> getAiChatEnabled(int companyId) async {
+    final data = await _api.get('/api/partner/companies/$companyId/ai-chat');
+    if (data is! Map || data['enabled'] is! bool) {
+      throw StateError('ไม่สามารถอ่านสถานะ AI Chat');
+    }
+    return {
+      'enabled': data['enabled'] == true,
+      'canEdit': data['canEdit'] == true,
+    };
+  }
+
+  Future<void> setAiChatEnabled(int companyId, bool enabled) async {
+    await _api.put(
+      '/api/partner/companies/$companyId/ai-chat',
+      body: {'enabled': enabled},
+    );
+  }
+
   Future<Map<String, bool>> actions({bool support = false}) async {
     final data = await _api.get(
       support

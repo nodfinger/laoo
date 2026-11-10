@@ -23,6 +23,7 @@ class CompanySetupModel {
     this.receiveStockImmediately = true,
     this.receiveStockPriceModeCode = 'CUSTOM',
     required this.orgStructureType,
+    this.employeeNameDisplay = 'FULL',
     required this.businessTypeCode,
     required this.requesterMode,
     required this.requesterCaption,
@@ -89,6 +90,7 @@ class CompanySetupModel {
   final bool receiveStockImmediately;
   final String receiveStockPriceModeCode;
   final int orgStructureType;
+  final String employeeNameDisplay;
   final String businessTypeCode;
   final String requesterMode;
   final String requesterCaption;
@@ -154,6 +156,7 @@ class CompanySetupModel {
           json['receiveStockPriceModeCode']?.toString().toUpperCase() ??
           'CUSTOM',
       orgStructureType: asInt(json['orgStructureType']) ?? 1,
+      employeeNameDisplay: json['employeeNameDisplay']?.toString() ?? 'FULL',
       businessTypeCode: json['businessTypeCode']?.toString() ?? 'COMPANY',
       requesterMode: json['requesterMode']?.toString() ?? 'EMPLOYEE',
       requesterCaption: json['requesterCaption']?.toString() ?? 'ผู้แจ้งซ่อม',
@@ -201,6 +204,7 @@ class CompanySetupUpdateInput {
     this.receiveStockImmediately = true,
     this.receiveStockPriceModeCode = 'CUSTOM',
     required this.orgStructureType,
+    this.employeeNameDisplay = 'FULL',
     this.businessTypeCode,
     this.passwordPolicyCode = 3,
     this.yearFormat,
@@ -236,6 +240,7 @@ class CompanySetupUpdateInput {
   final bool receiveStockImmediately;
   final String receiveStockPriceModeCode;
   final int orgStructureType;
+  final String employeeNameDisplay;
   final String? businessTypeCode;
   final int passwordPolicyCode;
   final String? yearFormat;
@@ -271,6 +276,7 @@ class CompanySetupUpdateInput {
     'receiveStockImmediately': receiveStockImmediately,
     'receiveStockPriceModeCode': receiveStockPriceModeCode,
     'orgStructureType': orgStructureType,
+    'employeeNameDisplay': employeeNameDisplay,
     'businessTypeCode': businessTypeCode,
     'passwordPolicyCode': passwordPolicyCode,
     'yearFormat': yearFormat,

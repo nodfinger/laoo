@@ -177,7 +177,10 @@ class _SalesPageState extends State<SalesPage> {
                 ? empty()
                 : cards
                 ? cardRows(visible, actions, options)
-                : tableRows(visible, actions, options),
+                : Padding(
+                    padding: salesUiTokens.cardPadding,
+                    child: tableRows(visible, actions, options),
+                  ),
           ),
         ),
         SizedBox(height: salesUiTokens.sectionSpacing),
@@ -594,24 +597,27 @@ class _SalesPageState extends State<SalesPage> {
             tokens: salesUiTokens,
             child: pipeline.isEmpty
                 ? empty()
-                : LaooWorkspaceDataTable(
-                    tokens: salesUiTokens,
-                    columns: const [
-                      DataColumn(label: Text('ขั้นตอน')),
-                      DataColumn(label: Text('จำนวน')),
-                      DataColumn(label: Text('มูลค่า')),
-                    ],
-                    rows: pipeline
-                        .map(
-                          (e) => DataRow(
-                            cells: [
-                              DataCell(Text('${e['stage']}')),
-                              DataCell(Text('${e['itemCount']}')),
-                              DataCell(Text('${e['amount']}')),
-                            ],
-                          ),
-                        )
-                        .toList(),
+                : Padding(
+                    padding: salesUiTokens.cardPadding,
+                    child: LaooWorkspaceDataTable(
+                      tokens: salesUiTokens,
+                      columns: const [
+                        DataColumn(label: Text('ขั้นตอน')),
+                        DataColumn(label: Text('จำนวน')),
+                        DataColumn(label: Text('มูลค่า')),
+                      ],
+                      rows: pipeline
+                          .map(
+                            (e) => DataRow(
+                              cells: [
+                                DataCell(Text('${e['stage']}')),
+                                DataCell(Text('${e['itemCount']}')),
+                                DataCell(Text('${e['amount']}')),
+                              ],
+                            ),
+                          )
+                          .toList(),
+                    ),
                   ),
           ),
         ),

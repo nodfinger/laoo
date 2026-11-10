@@ -828,22 +828,22 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
       ),
       floatingLabelStyle: TextStyle(
         color: preset.primary,
-        fontSize: LaooTypography.inputLabel,
+        fontSize: LaooTypography.materialFloatingLabelSource,
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(LaooRadius.xs),
         borderSide: BorderSide(color: preset.border),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(LaooRadius.xs),
         borderSide: BorderSide(color: preset.primary, width: 2),
       ),
       errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(LaooRadius.xs),
         borderSide: BorderSide(color: ThemeData.fallback().colorScheme.error),
       ),
       focusedErrorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(LaooRadius.xs),
         borderSide: BorderSide(
           color: ThemeData.fallback().colorScheme.error,
           width: 2,
@@ -1268,18 +1268,20 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                     itemBuilder: (context, i) => _roomCard(_filtered[i], p),
                   )
                 : WorkspaceSectionCard(
-                    padding: EdgeInsets.zero,
                     child: SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       child: ConstrainedBox(
-                        constraints: BoxConstraints(minWidth: c.maxWidth),
+                        constraints: BoxConstraints(
+                          minWidth: (c.maxWidth - 2 * LaooLayout.cardPadding)
+                              .clamp(0, double.infinity),
+                        ),
                         child: DataTable(
                           horizontalMargin: LaooDataTable.horizontalMargin,
                           dividerThickness: LaooDataTable.dividerThickness,
                           border: TableBorder(
                             horizontalInside: BorderSide(
                               color: LaooColors.border.withValues(alpha: .45),
-                              width: .25,
+                              width: .6,
                             ),
                           ),
                           dataRowMinHeight: 56,
@@ -1309,12 +1311,12 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                             DataColumn(
                               label: SizedBox(
                                 width: 100,
-                                child: Center(child: Text('Action')),
+                                child: Text('Action'),
                               ),
                             ),
-                            DataColumn(label: Center(child: Text('Admin'))),
-                            DataColumn(label: Center(child: Text('กฎ'))),
-                            DataColumn(label: Center(child: Text('อุปกรณ์'))),
+                            DataColumn(label: Text('Admin')),
+                            DataColumn(label: Text('กฎ')),
+                            DataColumn(label: Text('อุปกรณ์')),
                             DataColumn(label: Text('รูปห้อง/แผนผัง')),
                             DataColumn(label: Text('สถานที่ตั้ง')),
                             DataColumn(
@@ -1336,9 +1338,7 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
                                     DataCell(
                                       SizedBox(
                                         width: 100,
-                                        child: Center(
-                                          child: _actionsRow(e.value, p),
-                                        ),
+                                        child: _actionsRow(e.value, p),
                                       ),
                                     ),
                                     DataCell(
@@ -1387,18 +1387,18 @@ class _MeetingRoomPageState extends State<MeetingRoomPage> {
         ),
         floatingLabelStyle: TextStyle(
           color: p.primary,
-          fontSize: LaooTypography.inputLabel,
+          fontSize: LaooTypography.materialFloatingLabelSource,
         ),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
           borderSide: BorderSide(color: p.border),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
           borderSide: BorderSide(color: p.border),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
           borderSide: BorderSide(color: p.primary, width: 1.5),
         ),
       );

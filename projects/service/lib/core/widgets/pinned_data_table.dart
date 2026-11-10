@@ -48,6 +48,7 @@ class PinnedDataTable extends StatefulWidget {
     this.border,
     this.clipBehavior = Clip.hardEdge,
     this.maxBodyHeight = 420,
+    this.padding = EdgeInsets.zero,
   });
 
   final List<DataColumn> columns;
@@ -72,6 +73,7 @@ class PinnedDataTable extends StatefulWidget {
   final TableBorder? border;
   final Clip clipBehavior;
   final double maxBodyHeight;
+  final EdgeInsetsGeometry padding;
 
   @override
   State<PinnedDataTable> createState() => _PinnedDataTableState();
@@ -104,53 +106,58 @@ class _PinnedDataTableState extends State<PinnedDataTable> {
     final showVerticalScrollbar = naturalBodyHeight > widget.maxBodyHeight;
     final desktop = MediaQuery.sizeOf(context).width >= 900;
 
-    return LayoutBuilder(
-      builder: (context, constraints) => Scrollbar(
-        controller: _horizontalController,
-        thumbVisibility: desktop,
-        notificationPredicate: (notification) => notification.depth == 0,
-        child: SingleChildScrollView(
+    return Padding(
+      padding: widget.padding,
+      child: LayoutBuilder(
+        builder: (context, constraints) => Scrollbar(
           controller: _horizontalController,
-          scrollDirection: Axis.horizontal,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              minWidth: constraints.hasBoundedWidth ? constraints.maxWidth : 0,
-            ),
-            child: IntrinsicWidth(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  SizedBox(
-                    height: headingHeight,
-                    child: ClipRect(
-                      child: OverflowBox(
-                        alignment: Alignment.topLeft,
-                        minHeight: 0,
-                        maxHeight: double.infinity,
-                        child: _table(
-                          dataRowMinHeight: rowMinHeight,
-                          dataRowMaxHeight: rowMaxHeight,
-                        ),
-                      ),
-                    ),
-                  ),
-                  if (widget.rows.isNotEmpty)
+          thumbVisibility: desktop,
+          notificationPredicate: (notification) => notification.depth == 0,
+          child: SingleChildScrollView(
+            controller: _horizontalController,
+            scrollDirection: Axis.horizontal,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minWidth: constraints.hasBoundedWidth
+                    ? constraints.maxWidth
+                    : 0,
+              ),
+              child: IntrinsicWidth(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
                     SizedBox(
-                      height: bodyHeight,
-                      child: Scrollbar(
-                        controller: _verticalController,
-                        thumbVisibility: desktop && showVerticalScrollbar,
-                        child: SingleChildScrollView(
-                          controller: _verticalController,
+                      height: headingHeight,
+                      child: ClipRect(
+                        child: OverflowBox(
+                          alignment: Alignment.topLeft,
+                          minHeight: 0,
+                          maxHeight: double.infinity,
                           child: _table(
-                            headingRowHeight: 0,
                             dataRowMinHeight: rowMinHeight,
                             dataRowMaxHeight: rowMaxHeight,
                           ),
                         ),
                       ),
                     ),
-                ],
+                    if (widget.rows.isNotEmpty)
+                      SizedBox(
+                        height: bodyHeight,
+                        child: Scrollbar(
+                          controller: _verticalController,
+                          thumbVisibility: desktop && showVerticalScrollbar,
+                          child: SingleChildScrollView(
+                            controller: _verticalController,
+                            child: _table(
+                              headingRowHeight: 0,
+                              dataRowMinHeight: rowMinHeight,
+                              dataRowMaxHeight: rowMaxHeight,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
           ),

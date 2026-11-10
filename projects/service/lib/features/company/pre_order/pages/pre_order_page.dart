@@ -1,3 +1,4 @@
+import '../../../../core/widgets/standard_pagination_card.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -242,7 +243,7 @@ class _PreOrderListPageState extends State<PreOrderListPage> {
       surfaceTintColor: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
       child: Padding(
-        padding: padding ?? const EdgeInsets.all(12),
+        padding: padding ?? const EdgeInsets.all(LaooLayout.cardPadding),
         child: child,
       ),
     );
@@ -392,67 +393,14 @@ class _PreOrderListPageState extends State<PreOrderListPage> {
     );
   }
 
-  Widget _pagination(Color accent) {
-    final start = _rows.isEmpty ? 0 : _page * _pageSize + 1;
-    final end = math.min((_page + 1) * _pageSize, _rows.length);
-    return SizedBox(
-      height: LaooLayout.paginationCardHeight,
-      child: Row(
-        children: [
-          InkWell(
-            onTap: _page > 0 ? () => setState(() => _page--) : null,
-            borderRadius: BorderRadius.circular(4),
-            child: Container(
-              width: 36,
-              height: 36,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade200,
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: const Icon(Icons.chevron_left, color: Colors.grey),
-            ),
-          ),
-          const SizedBox(width: 4),
-          Container(
-            width: 36,
-            height: 36,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: accent,
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Text(
-              '${_page + 1}',
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-          const SizedBox(width: 4),
-          InkWell(
-            onTap: _page + 1 < _pageCount
-                ? () => setState(() => _page++)
-                : null,
-            borderRadius: BorderRadius.circular(4),
-            child: Container(
-              width: 36,
-              height: 36,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade200,
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: const Icon(Icons.chevron_right, color: Colors.grey),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text('$start-$end จาก ${_rows.length}'),
-        ],
-      ),
-    );
-  }
+  Widget _pagination(Color accent) => StandardPaginationCard(
+    pageIndex: _page,
+    pageSize: _pageSize,
+    total: _rows.length,
+    primary: accent,
+    onPrevious: _page > 0 ? () => setState(() => _page--) : null,
+    onNext: _page + 1 < _pageCount ? () => setState(() => _page++) : null,
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -470,7 +418,7 @@ class _PreOrderListPageState extends State<PreOrderListPage> {
                   final compact = constraints.maxWidth < 900;
                   final cardMode = compact || _card;
                   return ListView(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(LaooLayout.cardMargin),
                     children: [
                       _surface(
                         child: Row(
@@ -644,10 +592,7 @@ class _PreOrderListPageState extends State<PreOrderListPage> {
                         child: cardMode ? _cardList(accent) : _table(accent),
                       ),
                       const SizedBox(height: 8),
-                      _surface(
-                        padding: EdgeInsets.zero,
-                        child: _pagination(accent),
-                      ),
+                      _pagination(accent),
                     ],
                   );
                 },

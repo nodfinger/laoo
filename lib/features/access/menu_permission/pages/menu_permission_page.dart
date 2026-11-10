@@ -559,61 +559,77 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
                                   onChanged: (value) => setState(() {
                                     _selectedSystemLevel = value;
                                     final groups = _menuGroups;
-                                    _selectedMenuGroup = value != null && groups.length == 1 && groups.first.configuredMenuGroupCount == 1 ? groups.first.groupKey : null;
-                                    if (_selectedMenuGroup != null) _collapsedMenuGroups.remove(_selectedMenuGroup);
+                                    _selectedMenuGroup =
+                                        value != null &&
+                                            groups.length == 1 &&
+                                            groups
+                                                    .first
+                                                    .configuredMenuGroupCount ==
+                                                1
+                                        ? groups.first.groupKey
+                                        : null;
+                                    if (_selectedMenuGroup != null)
+                                      _collapsedMenuGroups.remove(
+                                        _selectedMenuGroup,
+                                      );
                                   }),
                                 ),
                               ),
-                              if (!(_selectedSystemLevel != null && _menuGroups.length == 1 && _menuGroups.first.configuredMenuGroupCount == 1))
-                              SizedBox(
-                                width: fieldWidth,
-                                child: DropdownButtonFormField<String>(
-                                  initialValue: _selectedMenuGroup,
-                                  isExpanded: true,
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.onSurface,
-                                  ),
-                                  decoration: InputDecoration(
-                                    labelText: 'กลุ่มเมนู',
-                                    labelStyle: TextStyle(
-                                      fontSize: 16,
+                              if (!(_selectedSystemLevel != null &&
+                                  _menuGroups.length == 1 &&
+                                  _menuGroups.first.configuredMenuGroupCount ==
+                                      1))
+                                SizedBox(
+                                  width: fieldWidth,
+                                  child: DropdownButtonFormField<String>(
+                                    initialValue: _selectedMenuGroup,
+                                    isExpanded: true,
+                                    style: TextStyle(
+                                      fontSize: 14,
                                       color: Theme.of(
                                         context,
-                                      ).colorScheme.primary,
+                                      ).colorScheme.onSurface,
                                     ),
-                                    floatingLabelStyle: TextStyle(
-                                      fontSize: 16,
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.primary,
-                                    ),
-                                  ),
-                                  items: [
-                                    const DropdownMenuItem<String>(
-                                      value: null,
-                                      child: Text(
-                                        'ทั้งหมด',
-                                        style: TextStyle(fontSize: 14),
+                                    decoration: InputDecoration(
+                                      labelText: 'กลุ่มเมนู',
+                                      labelStyle: TextStyle(
+                                        fontSize: 16,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.primary,
+                                      ),
+                                      floatingLabelStyle: TextStyle(
+                                        fontSize: 16,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.primary,
                                       ),
                                     ),
-                                    ..._menuGroups.map(
-                                      (g) => DropdownMenuItem<String>(
-                                        value: g.groupKey,
+                                    items: [
+                                      const DropdownMenuItem<String>(
+                                        value: null,
                                         child: Text(
-                                          g.menuGroupName,
-                                          style: const TextStyle(fontSize: 14),
+                                          'ทั้งหมด',
+                                          style: TextStyle(fontSize: 14),
                                         ),
                                       ),
+                                      ..._menuGroups.map(
+                                        (g) => DropdownMenuItem<String>(
+                                          value: g.groupKey,
+                                          child: Text(
+                                            g.menuGroupName,
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                    onChanged: (value) => setState(
+                                      () => _selectedMenuGroup = value,
                                     ),
-                                  ],
-                                  onChanged: (value) => setState(
-                                    () => _selectedMenuGroup = value,
                                   ),
                                 ),
-                              ),
                             ],
                           );
                         },
@@ -661,6 +677,7 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
         ).colorScheme.primary.withValues(alpha: .10);
         return Container(
           width: double.infinity,
+          padding: const EdgeInsets.all(LaooLayout.cardPadding),
           decoration: const BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.all(Radius.circular(4)),
@@ -668,7 +685,10 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
           child: Column(
             children: [
               ConstrainedBox(
-                constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                constraints: BoxConstraints(
+                  minWidth: (constraints.maxWidth - 2 * LaooLayout.cardPadding)
+                      .clamp(0.0, double.infinity),
+                ),
                 child: DataTable(
                   columnSpacing: 12,
                   horizontalMargin: 16,
@@ -681,7 +701,11 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.only(bottom: 24),
                   child: ConstrainedBox(
-                    constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                    constraints: BoxConstraints(
+                      minWidth:
+                          (constraints.maxWidth - 2 * LaooLayout.cardPadding)
+                              .clamp(0.0, double.infinity),
+                    ),
                     child: DataTable(
                       columnSpacing: 12,
                       horizontalMargin: 16,

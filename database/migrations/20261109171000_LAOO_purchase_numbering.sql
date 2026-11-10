@@ -1,0 +1,4 @@
+SET XACT_ABORT ON;
+SET NOCOUNT ON;
+UPDATE dbo.TDADMainMenu SET RunData=1
+WHERE MenuCode IN (N'09009',N'09010') AND ScreenType=4 AND IsActive=1 AND RunData=0;

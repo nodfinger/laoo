@@ -32,6 +32,9 @@ class _PartnerCompanyModulesPageState extends State<PartnerCompanyModulesPage> {
   Map<int, DateTime?> _expireByProject = const {};
   bool _loading = true;
   bool _saving = false;
+  bool _aiChatEnabled = false;
+  bool _originalAiChatEnabled = false;
+  bool _canEditAiChat = false;
   String? _error;
 
   @override
@@ -49,9 +52,15 @@ class _PartnerCompanyModulesPageState extends State<PartnerCompanyModulesPage> {
       final projects = await _repository.getCompanySubscriptions(
         widget.company.companyId,
       );
+      final aiEnabled = await _repository.getAiChatEnabled(
+        widget.company.companyId,
+      );
       if (!mounted) return;
       setState(() {
         _projects = projects;
+        _aiChatEnabled = aiEnabled['enabled'] == true;
+        _originalAiChatEnabled = _aiChatEnabled;
+        _canEditAiChat = aiEnabled['canEdit'] == true;
         final today = DateUtils.dateOnly(DateTime.now());
         _packageByProject = {
           for (final project in projects) project.projectId: project.packageId,
@@ -89,8 +98,14 @@ class _PartnerCompanyModulesPageState extends State<PartnerCompanyModulesPage> {
             (_statusByProject[project.projectId] ?? 'ACTIVE') ==
                 (project.statusCode ?? 'ACTIVE') &&
             (project.startDate == null ||
-                DateUtils.isSameDay(_startByProject[project.projectId], project.startDate)) &&
-            DateUtils.isSameDay(_expireByProject[project.projectId], project.expireDate)) {
+                DateUtils.isSameDay(
+                  _startByProject[project.projectId],
+                  project.startDate,
+                )) &&
+            DateUtils.isSameDay(
+              _expireByProject[project.projectId],
+              project.expireDate,
+            )) {
           continue;
         }
         if (packageId == null) {
@@ -110,6 +125,13 @@ class _PartnerCompanyModulesPageState extends State<PartnerCompanyModulesPage> {
           startDate: _startByProject[project.projectId]!,
           expireDate: _expireByProject[project.projectId],
         );
+      }
+      if (_aiChatEnabled != _originalAiChatEnabled) {
+        await _repository.setAiChatEnabled(
+          widget.company.companyId,
+          _aiChatEnabled,
+        );
+        _originalAiChatEnabled = _aiChatEnabled;
       }
       if (mounted) Navigator.of(context).pop(true);
     } catch (error) {
@@ -180,6 +202,18 @@ class _PartnerCompanyModulesPageState extends State<PartnerCompanyModulesPage> {
                             children: [
                               _companyContext(context, compact: compact),
                               const SizedBox(height: 12),
+                              if (!_projects.any((p) => p.projectCode == 'LAOO_AI')) SwitchListTile(
+                                contentPadding: EdgeInsets.zero,
+                                title: const Text('เปิดใช้ AI Chat'),
+                                value: _aiChatEnabled,
+                                onChanged:
+                                    _loading || _saving || !_canEditAiChat
+                                    ? null
+                                    : (value) => setState(
+                                        () => _aiChatEnabled = value,
+                                      ),
+                              ),
+                              if (!_projects.any((p) => p.projectCode == 'LAOO_AI')) const SizedBox(height: 12),
                               _sectionHeader(context),
                               const SizedBox(height: 12),
                               if (_loading)

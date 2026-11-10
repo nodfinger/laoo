@@ -62,6 +62,34 @@ class AppMenuRouteSpec {
 
 abstract final class AppMenuRouteRegistry {
   static final Map<String, AppMenuRouteSpec> _byMenuCode = {
+    '65001': AppMenuRouteSpec(
+      menuCode: '65001',
+      databaseRouteName: 'mySystemSettings',
+      goRouteName: 'mySystemSettings',
+      path: '/company/my-system/settings',
+      scope: AppMenuScope.company,
+    ),
+    '65002': AppMenuRouteSpec(
+      menuCode: '65002',
+      databaseRouteName: 'mySystemSapPms',
+      goRouteName: 'mySystemSapPms',
+      path: '/company/my-system/sap-pms',
+      scope: AppMenuScope.company,
+    ),
+    '66001': AppMenuRouteSpec(
+      menuCode: '66001',
+      databaseRouteName: 'mySystemTravel',
+      goRouteName: 'mySystemTravel',
+      path: '/company/my-system/travel',
+      scope: AppMenuScope.company,
+    ),
+    '66002': AppMenuRouteSpec(
+      menuCode: '66002',
+      databaseRouteName: 'mySystemPurchase',
+      goRouteName: 'mySystemPurchase',
+      path: '/company/my-system/purchase',
+      scope: AppMenuScope.company,
+    ),
     '55001': AppMenuRouteSpec(
       menuCode: '55001',
       databaseRouteName: 'companyBusinessCardOcrSettings',
@@ -502,6 +530,41 @@ abstract final class AppMenuRouteRegistry {
       databaseRouteName: 'companyRoleGroups',
       goRouteName: RouteNames.companyRoleGroups,
       path: RoutePaths.companyRoleGroups,
+      scope: AppMenuScope.company,
+    ),
+    '05004': AppMenuRouteSpec(
+      menuCode: '05004',
+      databaseRouteName: 'companyDocumentNumberFormat',
+      goRouteName: RouteNames.companyDocumentNumberFormat,
+      path: RoutePaths.companyDocumentNumberFormat,
+      scope: AppMenuScope.company,
+    ),
+    '64003': AppMenuRouteSpec(
+      menuCode: '64003',
+      databaseRouteName: 'companyAiAgents',
+      goRouteName: RouteNames.companyAiAgents,
+      path: RoutePaths.companyAiAgents,
+      scope: AppMenuScope.company,
+    ),
+    '64002': AppMenuRouteSpec(
+      menuCode: '64002',
+      databaseRouteName: 'companyAiSettings',
+      goRouteName: RouteNames.companyAiSettings,
+      path: RoutePaths.companyAiSettings,
+      scope: AppMenuScope.company,
+    ),
+    '64001': AppMenuRouteSpec(
+      menuCode: '64001',
+      databaseRouteName: 'companyAiIntentTest',
+      goRouteName: RouteNames.companyAiIntentTest,
+      path: RoutePaths.companyAiIntentTest,
+      scope: AppMenuScope.company,
+    ),
+    '10008': AppMenuRouteSpec(
+      menuCode: '10008',
+      databaseRouteName: 'companyAiCapabilities',
+      goRouteName: RouteNames.companyAiCapabilities,
+      path: RoutePaths.companyAiCapabilities,
       scope: AppMenuScope.company,
     ),
     '10004': AppMenuRouteSpec(

@@ -38,9 +38,9 @@ abstract final class LaooLayout {
   static const double captionCardPaddingVertical = 12;
   static const double dialogInsetPadding = 24;
   static const double popupHeaderMinHeight = 48;
-  static const double popupFieldSpacing = 16;
+  static const double popupFieldSpacing = 14;
   static const double paginationCardHeight = 56;
-  static const double paginationButtonSize = 34;
+  static const double paginationButtonSize = 36;
 }
 
 abstract final class LaooRadius {

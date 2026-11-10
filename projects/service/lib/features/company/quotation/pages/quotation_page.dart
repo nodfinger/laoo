@@ -1,3 +1,4 @@
+import '../../../../core/widgets/standard_pagination_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -508,75 +509,13 @@ class _QuotationListPageState extends State<QuotationListPage> {
                             )
                           : _table(rows, accent),
                       const SizedBox(height: 8),
-                      Card(
-                        margin: EdgeInsets.zero,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(4),
-                          side: BorderSide.none,
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: LaooLayout.cardPadding,
-                            vertical: 10,
-                          ),
-                          child: Column(
-                            children: [
-                              const SizedBox.shrink(),
-                              Row(
-                                children: [
-                                  Container(
-                                    width: 36,
-                                    height: 36,
-                                    alignment: Alignment.center,
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey.shade200,
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: const Icon(
-                                      Icons.chevron_left,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Container(
-                                    width: 36,
-                                    height: 36,
-                                    alignment: Alignment.center,
-                                    decoration: BoxDecoration(
-                                      color: accent,
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: const Text(
-                                      '1',
-                                      style: TextStyle(color: Colors.white),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Container(
-                                    width: 36,
-                                    height: 36,
-                                    alignment: Alignment.center,
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey.shade200,
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: const Icon(
-                                      Icons.chevron_right,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    rows.isEmpty
-                                        ? '0-0 จาก 0'
-                                        : '1-${rows.length} จาก ${rows.length}',
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
+                      StandardPaginationCard(
+                        pageIndex: 0,
+                        pageSize: rows.isEmpty ? 1 : rows.length,
+                        total: rows.length,
+                        primary: accent,
+                        onPrevious: null,
+                        onNext: null,
                       ),
                     ],
                   );
@@ -595,6 +534,7 @@ class _QuotationListPageState extends State<QuotationListPage> {
     child: ClipRRect(
       borderRadius: BorderRadius.circular(4),
       child: PinnedDataTable(
+        padding: const EdgeInsets.all(LaooLayout.cardPadding),
         headingRowColor: WidgetStatePropertyAll(accent.withValues(alpha: .10)),
         headingTextStyle: TextStyle(color: accent, fontWeight: FontWeight.w700),
         columns: const [

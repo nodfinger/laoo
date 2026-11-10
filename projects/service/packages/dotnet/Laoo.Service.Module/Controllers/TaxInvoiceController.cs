@@ -658,6 +658,9 @@ public sealed class TaxInvoiceController(IConfiguration configuration) : Control
 
     private async Task<string> NextCode(SqlConnection c, SqlTransaction tx, CancellationToken token)
     {
+        var configured = await LaooServiceModule.Infrastructure.ConfiguredDocumentNumber.Get(c, tx, CompanyId(), "09007", token);
+        if (configured is not null) return configured;
+
         await using var cmd = new SqlCommand("SELECT ISNULL(MAX(TRY_CONVERT(int,RIGHT(TaxInvoiceCode,6))),0)+1 FROM dbo.TDARTaxInvoice WITH(UPDLOCK,HOLDLOCK) WHERE CompanyID=@company AND TaxInvoiceCode LIKE N'TI%'", c, tx);
         Add(cmd, "@company", SqlDbType.BigInt, CompanyId()); return $"TI{Convert.ToInt32(await cmd.ExecuteScalarAsync(token)):D6}";
     }

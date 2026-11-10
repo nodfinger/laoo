@@ -19,26 +19,27 @@ public sealed class ServiceSettingsController(IConfiguration configuration) : Co
         if (!await CompanyProjectPermission.IsAllowedAsync(c, User, "18001", "VIEW", token)) return Forbid();
         var canEdit = await CompanyProjectPermission.IsAllowedAsync(c, User, "18001", "EDIT", token);
         var projectId = await ProjectId(c, token);
-        const string sql = "SELECT COALESCE(ServiceEnabled,1),COALESCE(AllowWalkIn,1),COALESCE(RequireEquipment,1),COALESCE(AttachmentRequired,0),COALESCE(WorkflowEnabled,1),COALESCE(AttachmentMaxBytes,1048576) FROM dbo.TDSTCompanySetupSystemService WHERE CompanyID=@company AND ProjectID=@project";
+        const string sql = "SELECT COALESCE(ServiceEnabled,1),COALESCE(AllowWalkIn,1),COALESCE(RequireEquipment,1),COALESCE(AttachmentRequired,0),COALESCE(WorkflowEnabled,1),COALESCE(AttachmentMaxBytes,1048576),SelfViewScope,SelfDepartmentHeadEdit,SelfDivisionManagerEdit,SelfDepartmentHeadDelete,SelfDivisionManagerDelete FROM dbo.TDSTCompanySetupSystemService WHERE CompanyID=@company AND ProjectID=@project";
         await using var q = new SqlCommand(sql, c); Add(q, "@company", SqlDbType.BigInt, CompanyId); Add(q, "@project", SqlDbType.BigInt, projectId);
         await using var r = await q.ExecuteReaderAsync(token);
         if (!await r.ReadAsync(token)) return Ok(Default(projectId, canEdit));
-        return Ok(new { companyId = CompanyId, projectId, canEdit, serviceEnabled = Flag(r, 0), allowWalkIn = Flag(r, 1), requireEquipment = Flag(r, 2), attachmentRequired = Flag(r, 3), workflowEnabled = Flag(r, 4), attachmentMaxBytes = r.GetInt32(5) });
+        return Ok(new { companyId = CompanyId, projectId, canEdit, serviceEnabled = Flag(r, 0), allowWalkIn = Flag(r, 1), requireEquipment = Flag(r, 2), attachmentRequired = Flag(r, 3), workflowEnabled = Flag(r, 4), attachmentMaxBytes = r.GetInt32(5), selfViewScope = r.GetString(6), selfDepartmentHeadEdit = Flag(r,7), selfDivisionManagerEdit = Flag(r,8), selfDepartmentHeadDelete = Flag(r,9), selfDivisionManagerDelete = Flag(r,10) });
     }
 
     [HttpPut]
     public async Task<IActionResult> Update([FromBody] ServiceSettingsRequest request, CancellationToken token)
     {
+        if (request.SelfViewScope is not ("SELF" or "DEPARTMENT" or "DIVISION")) return BadRequest(new { message = "ขอบเขตการแสดงงานซ่อมไม่ถูกต้อง" });
         await using var c = await RegistryControllerSupport.Open(configuration, token);
         if (!await CompanyProjectPermission.IsAllowedAsync(c, User, "18001", "EDIT", token)) return Forbid();
         var projectId = await ProjectId(c, token);
         const string sql = """
 MERGE dbo.TDSTCompanySetupSystemService AS target
 USING (SELECT @company AS CompanyID,@project AS ProjectID) AS source ON target.CompanyID=source.CompanyID AND target.ProjectID=source.ProjectID
-WHEN MATCHED THEN UPDATE SET ServiceEnabled=@enabled,AllowWalkIn=@walkin,RequireEquipment=@equipment,AttachmentRequired=@attachment,WorkflowEnabled=@workflow,AttachmentMaxBytes=1048576,UpdateBy=@user,UpdateDate=SYSUTCDATETIME()
-WHEN NOT MATCHED THEN INSERT(CompanyID,ProjectID,ServiceEnabled,AllowWalkIn,RequireEquipment,AttachmentRequired,WorkflowEnabled,AttachmentMaxBytes,CreateBy) VALUES(@company,@project,@enabled,@walkin,@equipment,@attachment,@workflow,1048576,@user);
+WHEN MATCHED THEN UPDATE SET ServiceEnabled=@enabled,AllowWalkIn=@walkin,RequireEquipment=@equipment,AttachmentRequired=@attachment,WorkflowEnabled=@workflow,AttachmentMaxBytes=1048576,SelfViewScope=@scope,SelfDepartmentHeadEdit=@depEdit,SelfDivisionManagerEdit=@divEdit,SelfDepartmentHeadDelete=@depDelete,SelfDivisionManagerDelete=@divDelete,UpdateBy=@user,UpdateDate=SYSUTCDATETIME()
+WHEN NOT MATCHED THEN INSERT(CompanyID,ProjectID,ServiceEnabled,AllowWalkIn,RequireEquipment,AttachmentRequired,WorkflowEnabled,AttachmentMaxBytes,SelfViewScope,SelfDepartmentHeadEdit,SelfDivisionManagerEdit,SelfDepartmentHeadDelete,SelfDivisionManagerDelete,CreateBy) VALUES(@company,@project,@enabled,@walkin,@equipment,@attachment,@workflow,1048576,@scope,@depEdit,@divEdit,@depDelete,@divDelete,@user);
 """;
-        await using var q = new SqlCommand(sql, c); Add(q, "@company", SqlDbType.BigInt, CompanyId); Add(q, "@project", SqlDbType.BigInt, projectId); Add(q, "@enabled", SqlDbType.Bit, request.ServiceEnabled); Add(q, "@walkin", SqlDbType.Bit, request.AllowWalkIn); Add(q, "@equipment", SqlDbType.Bit, request.RequireEquipment); Add(q, "@attachment", SqlDbType.Bit, request.AttachmentRequired); Add(q, "@workflow", SqlDbType.Bit, request.WorkflowEnabled); Add(q, "@user", SqlDbType.BigInt, UserId); await q.ExecuteNonQueryAsync(token);
+        await using var q = new SqlCommand(sql, c); Add(q, "@company", SqlDbType.BigInt, CompanyId); Add(q, "@project", SqlDbType.BigInt, projectId); Add(q, "@enabled", SqlDbType.Bit, request.ServiceEnabled); Add(q, "@walkin", SqlDbType.Bit, request.AllowWalkIn); Add(q, "@equipment", SqlDbType.Bit, request.RequireEquipment); Add(q, "@attachment", SqlDbType.Bit, request.AttachmentRequired); Add(q, "@workflow", SqlDbType.Bit, request.WorkflowEnabled); Add(q, "@scope", SqlDbType.VarChar, request.SelfViewScope); Add(q, "@depEdit", SqlDbType.Bit, request.SelfDepartmentHeadEdit); Add(q, "@divEdit", SqlDbType.Bit, request.SelfDivisionManagerEdit); Add(q, "@depDelete", SqlDbType.Bit, request.SelfDepartmentHeadDelete); Add(q, "@divDelete", SqlDbType.Bit, request.SelfDivisionManagerDelete); Add(q, "@user", SqlDbType.BigInt, UserId); await q.ExecuteNonQueryAsync(token);
         return Ok(new { saved = true, attachmentMaxBytes = 1048576 });
     }
 
@@ -48,10 +49,10 @@ WHEN NOT MATCHED THEN INSERT(CompanyID,ProjectID,ServiceEnabled,AllowWalkIn,Requ
         var value = await q.ExecuteScalarAsync(token); return Convert.ToInt64(value);
     }
 
-    private static object Default(long projectId, bool canEdit) => new { companyId = 0L, projectId, canEdit, serviceEnabled = true, allowWalkIn = true, requireEquipment = true, attachmentRequired = false, workflowEnabled = true, attachmentMaxBytes = 1048576 };
+    private static object Default(long projectId, bool canEdit) => new { companyId = 0L, projectId, canEdit, serviceEnabled = true, allowWalkIn = true, requireEquipment = true, attachmentRequired = false, workflowEnabled = true, attachmentMaxBytes = 1048576, selfViewScope = "SELF", selfDepartmentHeadEdit = false, selfDivisionManagerEdit = false, selfDepartmentHeadDelete = false, selfDivisionManagerDelete = false };
     private static bool Flag(SqlDataReader reader, int ordinal) =>
         !reader.IsDBNull(ordinal) && Convert.ToInt32(reader.GetValue(ordinal)) != 0;
     private static void Add(SqlCommand command, string name, SqlDbType type, object? value) => command.Parameters.Add(name, type).Value = value ?? DBNull.Value;
 }
 
-public sealed record ServiceSettingsRequest(bool ServiceEnabled, bool AllowWalkIn, bool RequireEquipment, bool AttachmentRequired, bool WorkflowEnabled);
+public sealed record ServiceSettingsRequest(bool ServiceEnabled, bool AllowWalkIn, bool RequireEquipment, bool AttachmentRequired, bool WorkflowEnabled, string SelfViewScope = "SELF", bool SelfDepartmentHeadEdit = false, bool SelfDivisionManagerEdit = false, bool SelfDepartmentHeadDelete = false, bool SelfDivisionManagerDelete = false);

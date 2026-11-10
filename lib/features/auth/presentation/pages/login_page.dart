@@ -16,6 +16,8 @@ import '../../../../core/company_setup/company_setup_controller.dart';
 import '../../../../core/platform/window_title_service.dart';
 import '../../../../core/widgets/auto_dismiss_message.dart';
 
+const _buildVersion = String.fromEnvironment('LAOO_BUILD_VERSION');
+
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key, this.homePageConfig, this.openUrl});
   final HomePageConfig? homePageConfig;
@@ -538,10 +540,10 @@ class _LoginPageState extends State<LoginPage> {
                         label: const Text('กลับหน้าหลัก'),
                       ),
                     ),
-                  const Text(
-                    '© RYP IT Team 2026',
+                  Text(
+                    '© RYP IT Team 2026${_buildVersion.isEmpty ? '' : '  V. $_buildVersion'}',
                     textAlign: TextAlign.center,
-                    style: TextStyle(
+                    style: const TextStyle(
                       color: LaooColors.textSecondary,
                       fontSize: LaooTypography.caption,
                     ),

@@ -1,5 +1,6 @@
 import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
+import '../../features/support/document_number_format/document_number_format_page.dart';
 import '../../features/company/vendor/data/vendor_api.dart';
 import '../../core/navigation/navigation_menu_repository.dart';
 import '../../features/company/vendor/pages/vendor_page.dart';
@@ -63,6 +64,11 @@ import '../../features/support/menu_management/pages/laoo_menu_management_page.d
 import '../../features/support/qr_code_generator/qr_code_generator_page.dart';
 import '../../features/support/partner_user/pages/partner_user_page.dart';
 import '../../features/access/role_group/pages/role_group_page.dart';
+import '../../features/assistant/ai_capabilities_page.dart';
+import '../../features/assistant/ai_intent_test_page.dart';
+import '../../features/my_system/my_system_placeholder_page.dart';
+import '../../features/assistant/ai_system_settings_page.dart';
+import '../../features/assistant/ai_agents_page.dart';
 import '../../features/access/menu_permission/pages/menu_permission_page.dart';
 import '../../features/access/sub_permission/pages/sub_permission_page.dart';
 import '../../features/support/organization/pages/organization_supervisor_page.dart';
@@ -489,6 +495,55 @@ Future<void> refreshNavigationRoutePermissions() async {
 }
 
 final List<GoRoute> _placeholderRoutes = [
+  GoRoute(
+    path: '/company/my-system/settings',
+    name: 'mySystemSettings',
+    builder: (context, state) =>
+        const MySystemPlaceholderPage(menuCode: '65001'),
+  ),
+  GoRoute(
+    path: '/company/my-system/sap-pms',
+    name: 'mySystemSapPms',
+    builder: (context, state) =>
+        const MySystemPlaceholderPage(menuCode: '65002'),
+  ),
+  GoRoute(
+    path: '/company/my-system/travel',
+    name: 'mySystemTravel',
+    builder: (context, state) =>
+        const MySystemPlaceholderPage(menuCode: '66001'),
+  ),
+  GoRoute(
+    path: '/company/my-system/purchase',
+    name: 'mySystemPurchase',
+    builder: (context, state) =>
+        const MySystemPlaceholderPage(menuCode: '66002'),
+  ),
+  GoRoute(
+    path: RoutePaths.companyDocumentNumberFormat,
+    name: RouteNames.companyDocumentNumberFormat,
+    builder: (context, state) => const DocumentNumberFormatPage(),
+  ),
+  GoRoute(
+    path: RoutePaths.companyAiAgents,
+    name: RouteNames.companyAiAgents,
+    builder: (context, state) => const AiAgentsPage(),
+  ),
+  GoRoute(
+    path: RoutePaths.companyAiSettings,
+    name: RouteNames.companyAiSettings,
+    builder: (context, state) => const AiSystemSettingsPage(),
+  ),
+  GoRoute(
+    path: RoutePaths.companyAiIntentTest,
+    name: RouteNames.companyAiIntentTest,
+    builder: (context, state) => const AiIntentTestPage(),
+  ),
+  GoRoute(
+    path: RoutePaths.companyAiCapabilities,
+    name: RouteNames.companyAiCapabilities,
+    builder: (context, state) => const AiCapabilitiesPage(),
+  ),
   GoRoute(
     path: RoutePaths.companyEmployees,
     name: RouteNames.companyEmployees,

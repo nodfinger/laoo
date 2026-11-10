@@ -50,17 +50,6 @@ internal static class AuthenticationProjectAccess
         )
         """;
 
-    internal const string CompanySql = """
-        (
-            EXISTS
-            (
-                SELECT 1
-                FROM dbo.TDADUserProject AS userProject
-                WHERE userProject.UserID = u.UserID
-                  AND userProject.CompanyID = u.CompanyID
-                  AND userProject.ProjectID = @ProjectID
-                  AND userProject.IsActive = 1
-            )
-        )
-        """;
+    internal static readonly string CompanySql =
+        Laoo.Shared.Contracts.CompanyProjectAccess.ForUser("u", "@ProjectID", allowCoreShell: true);
 }

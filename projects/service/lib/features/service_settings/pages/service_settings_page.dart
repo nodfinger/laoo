@@ -28,6 +28,11 @@ class _ServiceSettingsPageState extends State<ServiceSettingsPage> {
   bool _requireEquipment = true;
   bool _attachmentRequired = false;
   bool _workflowEnabled = true;
+  String _selfViewScope = 'SELF';
+  bool _departmentHeadEdit = false;
+  bool _divisionManagerEdit = false;
+  bool _departmentHeadDelete = false;
+  bool _divisionManagerDelete = false;
   int _attachmentMaxBytes = 1048576;
 
   @override
@@ -63,6 +68,11 @@ class _ServiceSettingsPageState extends State<ServiceSettingsPage> {
         _requireEquipment = value['requireEquipment'] == true;
         _attachmentRequired = value['attachmentRequired'] == true;
         _workflowEnabled = value['workflowEnabled'] == true;
+        _selfViewScope = (value['selfViewScope'] as String?) ?? 'SELF';
+        _departmentHeadEdit = value['selfDepartmentHeadEdit'] == true;
+        _divisionManagerEdit = value['selfDivisionManagerEdit'] == true;
+        _departmentHeadDelete = value['selfDepartmentHeadDelete'] == true;
+        _divisionManagerDelete = value['selfDivisionManagerDelete'] == true;
         _attachmentMaxBytes =
             (value['attachmentMaxBytes'] as num?)?.toInt() ?? 1048576;
         _loading = false;
@@ -89,6 +99,11 @@ class _ServiceSettingsPageState extends State<ServiceSettingsPage> {
         'requireEquipment': _requireEquipment,
         'attachmentRequired': _attachmentRequired,
         'workflowEnabled': _workflowEnabled,
+        'selfViewScope': _selfViewScope,
+        'selfDepartmentHeadEdit': _departmentHeadEdit,
+        'selfDivisionManagerEdit': _divisionManagerEdit,
+        'selfDepartmentHeadDelete': _departmentHeadDelete,
+        'selfDivisionManagerDelete': _divisionManagerDelete,
       });
       await _load();
       if (mounted) {
@@ -145,6 +160,18 @@ class _ServiceSettingsPageState extends State<ServiceSettingsPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                Card(
+                  margin: EdgeInsets.zero,
+                  child: Padding(
+                    padding: const EdgeInsets.all(LaooLayout.cardPadding),
+                    child: WorkspaceActionHeader(
+                      title: _caption,
+                      favoriteKey: '18001',
+                      actions: [if (_canEdit) _saveButton()],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: LaooLayout.cardSpacing),
                 _section(
                   icon: Icons.settings_outlined,
                   title: 'การรับแจ้งบริการ',
@@ -171,6 +198,89 @@ class _ServiceSettingsPageState extends State<ServiceSettingsPage> {
                       value: _requireEquipment,
                       onChanged: _canEdit && _serviceEnabled
                           ? (value) => setState(() => _requireEquipment = value)
+                          : null,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: LaooLayout.cardSpacing),
+                _section(
+                  icon: Icons.person_outline,
+                  title: 'งานซ่อมแบบบริการตนเอง',
+                  children: [
+                    _subheading('เงื่อนไขการแสดงข้อมูล'),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      initialValue: _selfViewScope,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'ขอบเขตการแสดงข้อมูล',
+                      ),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'SELF',
+                          child: Text(
+                            'แสดงเฉพาะของตัวเอง',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        DropdownMenuItem(
+                          value: 'DEPARTMENT',
+                          child: Text(
+                            'แสดงเฉพาะในแผนก',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        DropdownMenuItem(
+                          value: 'DIVISION',
+                          child: Text(
+                            'แสดงเฉพาะในฝ่าย',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                      onChanged: _canEdit && _serviceEnabled
+                          ? (value) =>
+                                setState(() => _selfViewScope = value ?? 'SELF')
+                          : null,
+                    ),
+                    const SizedBox(height: 16),
+                    _subheading('เงื่อนไขการแก้ไขข้อมูล'),
+                    _setting(
+                      title: 'อนุญาตให้หัวหน้าแผนกแก้ไขข้อมูลภายในแผนก',
+                      detail: 'ต้องมีสิทธิ์แก้ไขเมนูแจ้งซ่อม',
+                      value: _departmentHeadEdit,
+                      onChanged: _canEdit && _serviceEnabled
+                          ? (value) =>
+                                setState(() => _departmentHeadEdit = value)
+                          : null,
+                    ),
+                    _setting(
+                      title: 'อนุญาตให้ผู้จัดการฝ่ายแก้ไขข้อมูลภายในฝ่าย',
+                      detail: 'ต้องมีสิทธิ์แก้ไขเมนูแจ้งซ่อม',
+                      value: _divisionManagerEdit,
+                      onChanged: _canEdit && _serviceEnabled
+                          ? (value) =>
+                                setState(() => _divisionManagerEdit = value)
+                          : null,
+                    ),
+                    const SizedBox(height: 16),
+                    _subheading('เงื่อนไขการลบข้อมูล'),
+                    _setting(
+                      title: 'อนุญาตให้หัวหน้าแผนกลบข้อมูลภายในแผนก',
+                      detail: 'ต้องมีสิทธิ์ลบเมนูแจ้งซ่อม',
+                      value: _departmentHeadDelete,
+                      onChanged: _canEdit && _serviceEnabled
+                          ? (value) =>
+                                setState(() => _departmentHeadDelete = value)
+                          : null,
+                    ),
+                    _setting(
+                      title: 'อนุญาตให้ผู้จัดการฝ่ายลบข้อมูลภายในฝ่าย',
+                      detail: 'ต้องมีสิทธิ์ลบเมนูแจ้งซ่อม',
+                      value: _divisionManagerDelete,
+                      onChanged: _canEdit && _serviceEnabled
+                          ? (value) =>
+                                setState(() => _divisionManagerDelete = value)
                           : null,
                     ),
                   ],
@@ -214,34 +324,6 @@ class _ServiceSettingsPageState extends State<ServiceSettingsPage> {
                     ),
                   ],
                 ),
-                if (_canEdit) ...[
-                  const SizedBox(height: LaooLayout.cardSpacing),
-                  Card(
-                    margin: EdgeInsets.zero,
-                    child: Padding(
-                      padding: const EdgeInsets.all(LaooLayout.cardPadding),
-                      child: Align(
-                        alignment: Alignment.centerRight,
-                        child: FilledButton.icon(
-                          onPressed: _saving ? null : _save,
-                          icon: const Icon(Icons.save_outlined),
-                          label: Text(_saving ? 'กำลังบันทึก...' : 'บันทึก'),
-                          style: FilledButton.styleFrom(
-                            minimumSize: const Size(
-                              120,
-                              LaooTypography.buttonHeight,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(
-                                LaooRadius.xs,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
               ],
             ),
           ),
@@ -268,7 +350,8 @@ class _ServiceSettingsPageState extends State<ServiceSettingsPage> {
               Expanded(
                 child: Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.primary,
                     fontSize: LaooTypography.sectionTitle,
                     fontWeight: FontWeight.w700,
                   ),
@@ -279,6 +362,23 @@ class _ServiceSettingsPageState extends State<ServiceSettingsPage> {
           const Divider(height: 24),
           ...children,
         ],
+      ),
+    ),
+  );
+
+  Widget _subheading(String text) => Text(
+    text,
+    style: TextStyle(color: Theme.of(context).colorScheme.primary),
+  );
+
+  Widget _saveButton() => FilledButton.icon(
+    onPressed: _saving ? null : _save,
+    icon: const Icon(Icons.save_outlined),
+    label: Text(_saving ? 'กำลังบันทึก...' : 'บันทึก'),
+    style: FilledButton.styleFrom(
+      minimumSize: const Size(120, LaooTypography.buttonHeight),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(LaooRadius.xs),
       ),
     ),
   );

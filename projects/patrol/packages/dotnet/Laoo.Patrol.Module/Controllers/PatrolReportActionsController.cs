@@ -67,12 +67,8 @@ WHERE I.CompanyID=@co AND I.IncidentID=@id;
                 await transaction.CommitAsync(cancellationToken);
                 return Ok(new { requestId = incident["ServiceRequestID"], duplicate = true });
             }
-            var requestNoRows = await PatrolDb.Rows(database, transaction, """
-SELECT N'SR'+CONVERT(nvarchar(8),CONVERT(date,SYSUTCDATETIME()),112)
- +RIGHT(N'000000'+CONVERT(nvarchar(6),ISNULL(MAX(TRY_CONVERT(int,RIGHT(RequestNo,6))),0)+1),6) RequestNo
-FROM dbo.TDADServiceRequest WITH(UPDLOCK,HOLDLOCK)
-WHERE CompanyID=@co AND RequestNo LIKE N'SR'+CONVERT(nvarchar(8),CONVERT(date,SYSUTCDATETIME()),112)+N'%';
-""", cancellationToken, ("@co", Company));
+            var requestNoSql = "DECLARE @company bigint=@co;\n" + Laoo.Shared.Contracts.ServiceRequestNumbering.AllocateSql + "\nSELECT @requestNo AS RequestNo;";
+            var requestNoRows = await PatrolDb.Rows(database, transaction, requestNoSql, cancellationToken, ("@co", Company));
             var requestNo = Convert.ToString(requestNoRows[0]["RequestNo"])!;
             var detail = $"Patrol incident {incident["IncidentCode"]}: {incident["Detail"]}";
             var requestId = await PatrolDb.Id(database, transaction, """

@@ -257,7 +257,10 @@ class _EmployeeListWorkspaceState extends State<EmployeeListWorkspace> {
                             builder: (_, constraints) =>
                                 _cardMode || constraints.maxWidth < 1000
                                 ? _cards()
-                                : _table(),
+                                : Padding(
+                                    padding: widget.tokens.cardPadding,
+                                    child: _table(),
+                                  ),
                           ),
                   ),
                 ],

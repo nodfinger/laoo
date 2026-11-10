@@ -26,6 +26,7 @@ final ValueNotifier<int> supportFavoriteRefresh = ValueNotifier<int>(0);
 final ValueNotifier<String?> mobileSelectedMenuGroup = ValueNotifier<String?>(
   null,
 );
+final ValueNotifier<int> _buttonMenuHomeRequest = ValueNotifier<int>(0);
 final UserFavoriteRepository _userFavoriteRepository = UserFavoriteRepository();
 
 Future<void> _toggleWorkspaceFavorite(
@@ -1252,6 +1253,22 @@ class _ButtonMenuWorkspaceState extends State<_ButtonMenuWorkspace> {
     super.initState();
     _menus = NavigationMenuRepository().getMenus();
     _loadFavorites();
+    _buttonMenuHomeRequest.addListener(_resetButtonMenuHome);
+    if (widget.compact) {
+      mobileSelectedMenuGroup.value = null;
+      _setDefaultMobileGroup();
+    }
+  }
+
+  @override
+  void dispose() {
+    _buttonMenuHomeRequest.removeListener(_resetButtonMenuHome);
+    super.dispose();
+  }
+
+  void _resetButtonMenuHome() {
+    if (!mounted) return;
+    setState(() => _selectedGroup = null);
     if (widget.compact) {
       mobileSelectedMenuGroup.value = null;
       _setDefaultMobileGroup();
@@ -1334,7 +1351,7 @@ class _ButtonMenuWorkspaceState extends State<_ButtonMenuWorkspace> {
             : groups.firstWhere((item) => item.code == selected);
         return LayoutBuilder(
           builder: (context, constraints) {
-            const menuWidth = 180.0;
+            const menuWidth = 172.0;
             return Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -1346,22 +1363,25 @@ class _ButtonMenuWorkspaceState extends State<_ButtonMenuWorkspace> {
                     surfaceTintColor: Colors.transparent,
                     elevation: 0,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(22),
+                      borderRadius: BorderRadius.circular(LaooRadius.xs),
                       side: BorderSide.none,
                     ),
                     child: Container(
                       width: double.infinity,
                       decoration: BoxDecoration(
                         color: widget.preset.surface,
-                        borderRadius: BorderRadius.circular(22),
+                        borderRadius: BorderRadius.circular(LaooRadius.xs),
                       ),
-                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 8,
+                      ),
                       child: SingleChildScrollView(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: groups.map((item) {
                             return Padding(
-                              padding: EdgeInsets.zero,
+                              padding: const EdgeInsets.only(bottom: 6),
                               child: SizedBox(
                                 width: double.infinity,
                                 height: 56,
@@ -1370,13 +1390,17 @@ class _ButtonMenuWorkspaceState extends State<_ButtonMenuWorkspace> {
                                   elevation: 0,
                                   margin: EdgeInsets.zero,
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
+                                    borderRadius: BorderRadius.circular(
+                                      LaooRadius.xs,
+                                    ),
                                     side: BorderSide.none,
                                   ),
                                   child: Container(
                                     decoration: BoxDecoration(
                                       color: widget.preset.surface,
-                                      borderRadius: BorderRadius.circular(12),
+                                      borderRadius: BorderRadius.circular(
+                                        LaooRadius.xs,
+                                      ),
                                       boxShadow: const [
                                         BoxShadow(
                                           color: Color(0x12000000),
@@ -1389,7 +1413,9 @@ class _ButtonMenuWorkspaceState extends State<_ButtonMenuWorkspace> {
                                       onTap: () => setState(
                                         () => _selectedGroup = item.code,
                                       ),
-                                      borderRadius: BorderRadius.circular(12),
+                                      borderRadius: BorderRadius.circular(
+                                        LaooRadius.xs,
+                                      ),
                                       child: Row(
                                         mainAxisAlignment:
                                             MainAxisAlignment.start,
@@ -1407,11 +1433,14 @@ class _ButtonMenuWorkspaceState extends State<_ButtonMenuWorkspace> {
                                           ),
                                           const SizedBox(width: 8),
                                           Flexible(
-                                            child: Text(
-                                              item.name,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              textAlign: TextAlign.left,
+                                            child: Tooltip(
+                                              message: item.name,
+                                              child: Text(
+                                                item.name,
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                                textAlign: TextAlign.left,
+                                              ),
                                             ),
                                           ),
                                         ],
@@ -1818,14 +1847,14 @@ class _ButtonMenuWorkspaceState extends State<_ButtonMenuWorkspace> {
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(LaooRadius.xs),
         side: BorderSide.none,
       ),
       margin: const EdgeInsets.fromLTRB(0, 0, 16, 16),
       child: Container(
         decoration: BoxDecoration(
           color: widget.preset.surface,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
         ),
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
         child: Column(
@@ -1848,7 +1877,7 @@ class _ButtonMenuWorkspaceState extends State<_ButtonMenuWorkspace> {
                         color: Colors.transparent,
                         elevation: 0,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(LaooRadius.xs),
                           side: BorderSide.none,
                         ),
                         child: Container(
@@ -1870,7 +1899,7 @@ class _ButtonMenuWorkspaceState extends State<_ButtonMenuWorkspace> {
                                       Color(0xFFFFFFFF),
                                     ],
                             ),
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(LaooRadius.xs),
                             boxShadow: const [
                               BoxShadow(
                                 color: Color(0x12000000),
@@ -1881,7 +1910,7 @@ class _ButtonMenuWorkspaceState extends State<_ButtonMenuWorkspace> {
                           ),
                           child: InkWell(
                             onTap: () => context.goNamed(spec.goRouteName),
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(LaooRadius.xs),
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
@@ -3055,11 +3084,16 @@ class _BrandHeader extends StatelessWidget {
         return GestureDetector(
           onTap:
               onTap ??
-              () => context.goNamed(
-                appAuthController.isLaooSupport
-                    ? RouteNames.supportHome
-                    : RouteNames.authenticatedHome,
-              ),
+              () {
+                if (workspaceButtonMenu.value) {
+                  _buttonMenuHomeRequest.value++;
+                }
+                context.goNamed(
+                  appAuthController.isLaooSupport
+                      ? RouteNames.supportHome
+                      : RouteNames.authenticatedHome,
+                );
+              },
           child: SizedBox(
             height: compact ? 48 : 72,
             child: Padding(

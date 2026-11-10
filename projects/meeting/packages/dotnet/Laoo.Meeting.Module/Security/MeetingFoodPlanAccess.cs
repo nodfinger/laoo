@@ -26,7 +26,6 @@ SELECT CASE WHEN EXISTS
  (SELECT 1 FROM dbo.TDADMainMenu WHERE MenuCode=@screen AND IsActive=1
   AND (@action='VIEW' OR ScreenType IN (1,4) OR (@action='EDIT' AND ScreenType=2)))
  AND EXISTS (SELECT 1 FROM dbo.TDADUser WHERE UserID=@user AND CompanyID=@company AND IsActive=1)
- AND EXISTS (SELECT 1 FROM dbo.TDADUserProject WHERE UserID=@user AND CompanyID=@company AND ProjectID=@meetingProject AND IsActive=1)
  AND (
  EXISTS (SELECT 1 FROM dbo.TDADUser WHERE UserID=@user AND CompanyID=@company AND IsCompanyAdmin=1)
  OR EXISTS

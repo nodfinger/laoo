@@ -46,17 +46,17 @@ class MeetingPaginationCard extends StatelessWidget {
         child: OutlinedButton(
           style: OutlinedButton.styleFrom(
             padding: EdgeInsets.zero,
-            backgroundColor: LaooColors.white,
-            disabledBackgroundColor: LaooColors.white,
-            foregroundColor: onPressed == null ? mutedText : primary,
+            backgroundColor: primary,
+            disabledBackgroundColor: Colors.grey.shade300,
+            foregroundColor: onPrimary,
             disabledForegroundColor: mutedText,
             side: BorderSide(
-              color: onPressed == null ? LaooColors.border : primary,
+              color: onPressed == null ? Colors.grey.shade300 : primary,
             ),
             shape: shape,
           ),
           onPressed: onPressed,
-          child: Icon(icon, size: 20),
+          child: Icon(icon, size: 22),
         ),
       ),
     );

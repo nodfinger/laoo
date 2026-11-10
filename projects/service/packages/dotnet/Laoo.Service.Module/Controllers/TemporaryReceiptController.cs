@@ -368,7 +368,10 @@ public sealed class TemporaryReceiptController(IConfiguration configuration) : C
         await using var sum = new SqlCommand(sumSql, c, tx); Add(sum, "@company", SqlDbType.BigInt, CompanyId()); Add(sum, "@source", SqlDbType.BigInt, id); Add(sum, "@current", SqlDbType.BigInt, currentId); return new(amount, Convert.ToDecimal(await sum.ExecuteScalarAsync(token)), null);
     }
 
-    private async Task<string> NextCode(SqlConnection c, SqlTransaction tx, CancellationToken token) { await using var cmd = new SqlCommand("SELECT ISNULL(MAX(TRY_CONVERT(int,RIGHT(ReceiptCode,6))),0)+1 FROM dbo.TDARTemporaryReceipt WITH(UPDLOCK,HOLDLOCK) WHERE CompanyID=@company AND ReceiptCode LIKE N'TR%'", c, tx); Add(cmd, "@company", SqlDbType.BigInt, CompanyId()); return $"TR{Convert.ToInt32(await cmd.ExecuteScalarAsync(token)):D6}"; }
+    private async Task<string> NextCode(SqlConnection c, SqlTransaction tx, CancellationToken token) {
+        var configured = await LaooServiceModule.Infrastructure.ConfiguredDocumentNumber.Get(c, tx, CompanyId(), "09005", token);
+        if (configured is not null) return configured;
+ await using var cmd = new SqlCommand("SELECT ISNULL(MAX(TRY_CONVERT(int,RIGHT(ReceiptCode,6))),0)+1 FROM dbo.TDARTemporaryReceipt WITH(UPDLOCK,HOLDLOCK) WHERE CompanyID=@company AND ReceiptCode LIKE N'TR%'", c, tx); Add(cmd, "@company", SqlDbType.BigInt, CompanyId()); return $"TR{Convert.ToInt32(await cmd.ExecuteScalarAsync(token)):D6}"; }
 
     private async Task<List<object>> ReadRows<T>(SqlConnection c, string sql, CancellationToken token, Func<SqlDataReader, T> map, long? id = null) where T : class
     { await using var cmd = new SqlCommand(sql, c); Add(cmd, id.HasValue ? "@id" : "@company", SqlDbType.BigInt, id ?? CompanyId()); var rows = new List<object>(); await using var r = await cmd.ExecuteReaderAsync(token); while (await r.ReadAsync(token)) rows.Add(map(r)); return rows; }

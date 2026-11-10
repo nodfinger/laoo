@@ -559,7 +559,31 @@ public sealed class QuotationController(IConfiguration configuration, IWebHostEn
     private async Task<(string Code, string Name, string? Unit)?> ReadItem(SqlConnection c, SqlTransaction tx, long id, CancellationToken token)
     { await ItemProjectAccess.EnsureAsync(c,tx,CompanyId(),id,token); await using var cmd=new SqlCommand("SELECT ItemCode,ItemName,UnitCode FROM dbo.TDIVItem I WHERE ItemID=@id AND CompanyID=@company AND IsActive=1 AND EXISTS(SELECT 1 FROM dbo.TDIVItemUsage U WHERE U.CompanyID=I.CompanyID AND U.ItemID=I.ItemID AND U.UsageCode=N'SALE')",c,tx); Add(cmd,"@id",SqlDbType.BigInt,id); Add(cmd,"@company",SqlDbType.BigInt,CompanyId()); await using var r=await cmd.ExecuteReaderAsync(token); return await r.ReadAsync(token)?(r.GetString(0),r.GetString(1),Text(r,2)):null; }
     private async Task<string> NextCode(SqlConnection c, SqlTransaction tx, CancellationToken token)
-    { await using var cmd=new SqlCommand("SELECT ISNULL(MAX(TRY_CONVERT(int,RIGHT(QuoteCode,6))),0)+1 FROM dbo.TDARQuotation WITH (UPDLOCK,HOLDLOCK) WHERE CompanyID=@company AND QuoteCode LIKE N'QT%';",c,tx); Add(cmd,"@company",SqlDbType.BigInt,CompanyId()); return $"QT{Convert.ToInt32(await cmd.ExecuteScalarAsync(token)):D6}"; }
+    {
+        string prefix="QT", dateFormat="NONE", afterPrefix="", beforeSequence=""; var digits=6;
+        await using (var exists=new SqlCommand("SELECT CASE WHEN OBJECT_ID(N'dbo.TDADDocumentNumberFormat',N'U') IS NULL THEN 0 ELSE 1 END",c,tx))
+        if(Convert.ToInt32(await exists.ExecuteScalarAsync(token))==1)
+        {
+            await using var config=new SqlCommand("SELECT Prefix,DateFormat,Digits,AfterPrefix,BeforeSequence FROM dbo.TDADDocumentNumberFormat WITH (HOLDLOCK) WHERE CompanyID=@company AND MenuCode=N'09003'",c,tx);
+            Add(config,"@company",SqlDbType.BigInt,CompanyId());
+            await using var r=await config.ExecuteReaderAsync(token);
+            if(await r.ReadAsync(token)){prefix=r.GetString(0);dateFormat=r.GetString(1);digits=r.GetInt32(2);afterPrefix=r.GetString(3);beforeSequence=r.GetString(4);}
+        }
+        if(dateFormat is not ("NONE" or "yy" or "yyyy" or "MM" or "dd" or "MMdd" or "yyMM" or "yydd" or "yyMMdd" or "yyyyMM" or "yyyydd" or "yyyyMMdd") || digits is <1 or >9) throw new InvalidOperationException("Invalid quotation numbering configuration.");
+        var head=prefix+afterPrefix+(dateFormat=="NONE"?"":DateTime.UtcNow.ToString(dateFormat,System.Globalization.CultureInfo.InvariantCulture))+beforeSequence;
+        if(head.Length+digits>30) throw new InvalidOperationException("Quotation number format is too long.");
+        await using var cmd=new SqlCommand("""
+SELECT ISNULL(MAX(TRY_CONVERT(bigint,SUBSTRING(QuoteCode,LEN(@head)+1,30))),0)+1
+FROM dbo.TDARQuotation WITH (TABLOCKX,HOLDLOCK)
+WHERE CompanyID=@company AND LEFT(QuoteCode,LEN(@head))=@head
+ AND LEN(QuoteCode)>LEN(@head) AND SUBSTRING(QuoteCode,LEN(@head)+1,30) NOT LIKE N'%[^0-9]%'
+""",c,tx);
+        Add(cmd,"@company",SqlDbType.BigInt,CompanyId()); Add(cmd,"@head",SqlDbType.NVarChar,head,30);
+        var number=Convert.ToInt64(await cmd.ExecuteScalarAsync(token));
+        var suffix=number.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        if(suffix.Length>digits) throw new InvalidOperationException("Quotation number sequence is exhausted for the configured digit count.");
+        return head+suffix.PadLeft(digits,'0');
+    }
     private Task<bool> Can(SqlConnection c,string action,CancellationToken token) =>
         Laoo.Shared.Contracts.CompanyMenuAccess.IsAllowedAsync(c, User, ScreenCode, action, token);
     private async Task<SqlConnection> Open(CancellationToken t){var c=new SqlConnection(_configuration.GetConnectionString("LaooDatabase"));await c.OpenAsync(t);return c;}

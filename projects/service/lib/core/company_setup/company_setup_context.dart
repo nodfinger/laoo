@@ -8,6 +8,7 @@ class CompanySetupContext {
     required this.receiveStockPriceModeCode,
     required this.receiveStockImmediately,
     required this.orgStructureType,
+    this.employeeNameDisplay = 'FULL',
     required this.yearFormat,
     required this.versionId,
     required this.themeName,
@@ -28,6 +29,7 @@ class CompanySetupContext {
   final String receiveStockPriceModeCode;
   final bool receiveStockImmediately;
   final int orgStructureType;
+  final String employeeNameDisplay;
   final String yearFormat;
   final String versionId;
   final String? themeName;
@@ -55,6 +57,7 @@ class CompanySetupContext {
           (json['orgStructureType'] as num?)?.toInt() ??
           int.tryParse('${json['orgStructureType']}') ??
           1,
+      employeeNameDisplay: _text(json['employeeNameDisplay'], 'FULL'),
       yearFormat: _text(json['yearFormat'], 'C').toUpperCase(),
       versionId: _text(json['versionID'] ?? json['versionId'], ''),
       themeName: _nullableText(json['themeName']),

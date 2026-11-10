@@ -1,3 +1,4 @@
+import '../../../../core/widgets/standard_pagination_card.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -413,9 +414,9 @@ class _TemporaryReceiptListPageState extends State<TemporaryReceiptListPage> {
 
   Widget _table(Color accent, double width) {
     return _surface(
-      padding: EdgeInsets.zero,
+      padding: const EdgeInsets.all(LaooLayout.cardPadding),
       child: SizedBox(
-        width: width,
+        width: math.max(0, width - 2 * LaooLayout.cardPadding),
         child: PinnedDataTable(
           headingRowColor: WidgetStatePropertyAll(
             accent.withValues(alpha: .09),
@@ -461,67 +462,14 @@ class _TemporaryReceiptListPageState extends State<TemporaryReceiptListPage> {
     );
   }
 
-  Widget _pagination(Color accent) {
-    final start = _rows.isEmpty ? 0 : _page * _pageSize + 1;
-    final end = math.min((_page + 1) * _pageSize, _rows.length);
-    return _surface(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: SizedBox(
-        height: LaooLayout.paginationCardHeight,
-        child: Row(
-          children: [
-            InkWell(
-              onTap: _page > 0 ? () => setState(() => _page--) : null,
-              borderRadius: BorderRadius.circular(4),
-              child: Container(
-                width: 36,
-                height: 36,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade200,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: const Icon(Icons.chevron_left, color: Colors.grey),
-              ),
-            ),
-            const SizedBox(width: 4),
-            Container(
-              width: 36,
-              height: 36,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: accent,
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(
-                '${_page + 1}',
-                style: const TextStyle(color: Colors.white),
-              ),
-            ),
-            const SizedBox(width: 4),
-            InkWell(
-              onTap: _page + 1 < _pageCount
-                  ? () => setState(() => _page++)
-                  : null,
-              borderRadius: BorderRadius.circular(4),
-              child: Container(
-                width: 36,
-                height: 36,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade200,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: const Icon(Icons.chevron_right, color: Colors.grey),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text('$start-$end จาก ${_rows.length}'),
-          ],
-        ),
-      ),
-    );
-  }
+  Widget _pagination(Color accent) => StandardPaginationCard(
+    pageIndex: _page,
+    pageSize: _pageSize,
+    total: _rows.length,
+    primary: accent,
+    onPrevious: _page > 0 ? () => setState(() => _page--) : null,
+    onNext: _page + 1 < _pageCount ? () => setState(() => _page++) : null,
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -539,7 +487,7 @@ class _TemporaryReceiptListPageState extends State<TemporaryReceiptListPage> {
                   final compact = constraints.maxWidth < 900;
                   final cardMode = compact || _card;
                   return ListView(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(LaooLayout.cardMargin),
                     children: [
                       _surface(
                         child: Row(

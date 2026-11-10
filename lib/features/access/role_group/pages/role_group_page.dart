@@ -8,6 +8,8 @@ import '../../../../core/api/api_exception.dart';
 import '../../../../core/company_setup/company_setup_controller.dart';
 import '../../../../core/navigation/navigation_menu_repository.dart';
 import '../../../../core/widgets/pinned_data_table.dart';
+import '../../../../core/widgets/list_display_preferences.dart';
+import '../../../../core/api/api_client.dart';
 import '../../../../app/theme/workspace_theme_presets.dart';
 import '../../../support/presentation/widgets/support_workspace_shell.dart';
 import '../data/role_group_repository.dart';
@@ -812,6 +814,82 @@ class _ListState extends State<_List> {
   String appliedStatusFilter = 'all';
   int? sortColumn;
   bool sortAscending = true;
+  ListDisplayPreferences? _displayPreferences;
+
+  List<Widget> actions(RoleGroup item) => [
+    if (widget.canEdit)
+      IconButton(
+        tooltip: 'แก้ไข',
+        onPressed: () => widget.onEdit(item),
+        icon: Icon(
+          Icons.edit_outlined,
+          color: Theme.of(context).colorScheme.primary,
+        ),
+      ),
+    if (widget.canDelete)
+      IconButton(
+        tooltip: 'ลบ',
+        onPressed: () => widget.onDelete(item),
+        icon: Icon(
+          Icons.delete_outline,
+          color: Theme.of(context).colorScheme.error,
+        ),
+      ),
+  ];
+
+  Widget statusBadge(RoleGroup item) {
+    final theme = Theme.of(context);
+    final color = item.isActive
+        ? theme.colorScheme.primary
+        : theme.colorScheme.error;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: .12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        child: Text(
+          item.isActive ? 'เปิด' : 'ปิด',
+          style: TextStyle(color: color, fontWeight: FontWeight.w700),
+        ),
+      ),
+    );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    listDisplayPreferencesRevision.addListener(_loadDisplayPreferences);
+    _loadDisplayPreferences();
+  }
+
+  @override
+  void dispose() {
+    listDisplayPreferencesRevision.removeListener(_loadDisplayPreferences);
+    super.dispose();
+  }
+
+  Future<void> _loadDisplayPreferences() async {
+    if (widget.favoriteKey != '10003' || widget.onSelected != null) return;
+    final api = ApiClient();
+    try {
+      final value = await api.get('/api/user-list-display/10003');
+      if (mounted && value is Map) {
+        setState(
+          () => _displayPreferences = value.isEmpty
+              ? null
+              : ListDisplayPreferences.fromJson(
+                  Map<String, dynamic>.from(value),
+                ),
+        );
+      }
+    } catch (_) {
+      // Use the standard display until preferences are available.
+    } finally {
+      api.dispose();
+    }
+  }
 
   void _sort(int column, bool ascending) => setState(() {
     sortColumn = column;
@@ -1119,9 +1197,14 @@ class _ListState extends State<_List> {
                                     );
                                   }
                                   return Container(
+                                    padding: const EdgeInsets.all(
+                                      LaooLayout.cardPadding,
+                                    ),
                                     decoration: BoxDecoration(
                                       color: Colors.white,
-                                      borderRadius: BorderRadius.circular(4),
+                                      borderRadius: BorderRadius.circular(
+                                        LaooRadius.xs,
+                                      ),
                                     ),
                                     clipBehavior: Clip.antiAlias,
                                     child: SizedBox(
@@ -1150,6 +1233,18 @@ class _ListState extends State<_List> {
                                                 ),
                                           ),
                                           child: PinnedDataTable(
+                                            columnKeys:
+                                                widget.hideAutoCode &&
+                                                    widget.onSelected == null
+                                                ? const [
+                                                    'id',
+                                                    'action',
+                                                    'name',
+                                                    'status',
+                                                  ]
+                                                : null,
+                                            displayPreferences:
+                                                _displayPreferences,
                                             showCheckboxColumn: false,
                                             horizontalMargin: 8,
                                             columnSpacing: 20,
@@ -1425,6 +1520,16 @@ class _ListState extends State<_List> {
                 children: [
                   Row(
                     children: [
+                      if (_displayPreferences != null &&
+                          !_displayPreferences!.actionOnRight)
+                        ...actions(item),
+                      if (!(_displayPreferences?.hidden.contains('status') ??
+                              false) &&
+                          (_displayPreferences?.order.firstOrNull ==
+                              'status')) ...[
+                        statusBadge(item),
+                        const SizedBox(width: 8),
+                      ],
                       Expanded(
                         child: Text(
                           widget.hideAutoCode ? item.name : item.code,
@@ -1434,46 +1539,13 @@ class _ListState extends State<_List> {
                           ),
                         ),
                       ),
-                      DecoratedBox(
-                        decoration: BoxDecoration(
-                          color:
-                              (item.isActive
-                                      ? primary
-                                      : theme.colorScheme.error)
-                                  .withValues(alpha: .12),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
-                          child: Text(
-                            item.isActive ? 'เปิด' : 'ปิด',
-                            style: TextStyle(
-                              color: item.isActive
-                                  ? primary
-                                  : theme.colorScheme.error,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ),
-                      if (widget.canEdit)
-                        IconButton(
-                          tooltip: 'แก้ไข',
-                          onPressed: () => widget.onEdit(item),
-                          icon: Icon(Icons.edit_outlined, color: primary),
-                        ),
-                      if (widget.canDelete)
-                        IconButton(
-                          tooltip: 'ลบ',
-                          onPressed: () => widget.onDelete(item),
-                          icon: Icon(
-                            Icons.delete_outline,
-                            color: theme.colorScheme.error,
-                          ),
-                        ),
+                      if (!(_displayPreferences?.hidden.contains('status') ??
+                              false) &&
+                          (_displayPreferences?.order.firstOrNull != 'status'))
+                        statusBadge(item),
+                      if (_displayPreferences == null ||
+                          _displayPreferences!.actionOnRight)
+                        ...actions(item),
                     ],
                   ),
                   if (!widget.hideAutoCode) ...[

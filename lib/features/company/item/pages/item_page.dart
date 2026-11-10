@@ -1844,6 +1844,7 @@ class _ItemPageState extends State<ItemPage> {
                       ),
                     ),
                     child: PinnedDataTable(
+                      padding: const EdgeInsets.all(LaooLayout.cardPadding),
                       horizontalMargin: 6,
                       columnSpacing: 2,
                       dataRowMinHeight: 58,
