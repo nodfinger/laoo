@@ -9,6 +9,7 @@
 - Section/หัวข้อย่อย: `16px`, น้ำหนัก `600-700`, line height ประมาณ `1.3`
 - Label ทั่วไป: `16px`, line height ประมาณ `1.4`; Floating Label ของ TextBox/ComboBox ที่เห็นจริงใช้ `14px` และอ้าง `LaooTypography.materialFloatingLabelSource` เมื่อ Flutter มีการ Scale ตอนวาด
 - **ข้อบังคับสำหรับหน้าจอใหม่ทุกหน้า:** ตรวจ Caption/Label บน TextBox และ ComboBox ทุกช่อง รวมถึง Filter และ Popup ให้ Floating Label มีขนาดที่แสดงจริง `14px` โดยใช้ `LaooTypography.materialFloatingLabelSource` เมื่อ Flutter ย่อขนาด Label; เมื่อมีข้อมูลหรือ Focus ใช้สี Primary จาก User Style และสถานะ Disabled ใช้สี Disabled ของ Theme ห้ามกำหนดสีหรือขนาดตายตัวรายหน้าจอ ตรวจทั้งตอนช่องว่าง มีข้อมูล Focus และ Disabled
+- **Popup ค้นหาทุกหน้า:** ช่องค้นหาและ Caption บนช่องต้องใช้ข้อกำหนด TextBox และ Floating Label เดียวกัน ทั้ง Popup ค้นหา เลือกข้อมูล และกำหนดสิทธิ์ แม้ช่องนั้นมีเพียง Icon ค้นหาและไม่มีปุ่มค้นหา
 - ข้อความที่กรอกใน TextBox: `16px` ใช้ `LaooTypography.inputText`, line height `1.5` และสีข้อความจาก Theme ผู้ Login; ComboBox และ Table: `14px` ใช้ Token กลางตามประเภท; Floating Label เมื่อมีข้อมูลหรือ Focus ใช้ Primary ของ User Style
 - Button: `13px`, น้ำหนัก `600-700`; ความสูงมาตรฐานอ่านจาก `LaooTypography.buttonHeight` (`48px`) ยกเว้นปุ่มค้นหาและล้าง Filter ในหน้า List/Card ซึ่งต้องสูงเท่าช่องค้นหาที่แสดงจริงตาม `LIST_CARD_UI_STANDARD.md`
 - Hint/Validation/หมายเหตุ: `12px`

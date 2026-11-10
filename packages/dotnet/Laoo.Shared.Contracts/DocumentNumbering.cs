@@ -16,6 +16,7 @@ public static class DocumentNumbering
             "09015" => ("TDAPPayment", "PaymentCode"),
             "08005" => ("TDIVStockReceipt", "ReceiptCode"),
             "08003" => ("TDIVStockIssue", "IssueCode"),
+            "66001" => ("TDSTTravelClaim", "ClaimNo"),
             _ => throw new ArgumentOutOfRangeException(nameof(menuCode))
         };
         return $$"""

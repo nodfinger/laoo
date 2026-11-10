@@ -10,6 +10,7 @@ abstract final class MasterGroupCodes {
   static const position = '008';
   static const carType = '009';
   static const oilType = '010';
+  static const jobPositionLevel = '016';
 
   static const variableNames = <String, String>{
     province: 'MsProv',
@@ -22,6 +23,7 @@ abstract final class MasterGroupCodes {
     position: 'MsPosition',
     carType: 'MSCarTypeCode',
     oilType: 'MSOliTypeCode',
+    jobPositionLevel: 'MsPositionLevel',
   };
 
   static String? variableNameOf(String code) => variableNames[code];

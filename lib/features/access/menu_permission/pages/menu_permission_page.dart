@@ -33,6 +33,7 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
   final _profile = UserProfileRepository();
   List<RoleGroup> _roleGroups = const [];
   List<MenuPermissionRow> _rows = const [];
+  List<MenuPermissionRow> _savedRows = const [];
   int? _selectedGroup;
   String? _selectedSystemLevel;
   String? _selectedMenuGroup;
@@ -95,7 +96,10 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
   Future<void> _loadRows() async {
     final id = _selectedGroup;
     if (id == null) {
-      setState(() => _rows = const []);
+      setState(() {
+        _rows = const [];
+        _savedRows = const [];
+      });
       return;
     }
     setState(() => _loading = true);
@@ -104,6 +108,7 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
       if (mounted) {
         setState(() {
           _rows = rows;
+          _savedRows = List.of(rows);
           _selectedSystemLevel = null;
           _selectedMenuGroup = null;
           _collapsedMenuGroups
@@ -120,14 +125,146 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
   Future<void> _save() async {
     final id = _selectedGroup;
     if (id == null) return;
+    final submitted = List<MenuPermissionRow>.of(_rows);
     setState(() => _saving = true);
     try {
-      await _permissions.save(widget.scope, id, _rows);
+      await _permissions.save(widget.scope, id, submitted);
+      if (mounted && _selectedGroup == id) {
+        setState(() => _savedRows = submitted);
+      }
       _show('บันทึกสิทธิ์เมนูสำเร็จ');
     } catch (e) {
       _showError(_thai(e));
     }
     if (mounted) setState(() => _saving = false);
+  }
+
+  Future<void> _grantAll() async {
+    final id = _selectedGroup;
+    if (widget.scope != 'customer' ||
+        !_canEdit ||
+        id == null ||
+        _saving ||
+        _loading) {
+      return;
+    }
+    if (!MenuPermissionSelection.samePermissions(_rows, _savedRows)) {
+      _showError(
+        'มีการแก้ไขสิทธิ์ที่ยังไม่บันทึก กรุณาบันทึกหรือโหลดรายการใหม่ก่อน',
+      );
+      return;
+    }
+    if (_rows.isEmpty) {
+      _showError('ไม่พบเมนูที่บริษัทเปิดใช้งาน');
+      return;
+    }
+    final group = _roleGroups.where((item) => item.id == id).firstOrNull;
+    final count = _rows.length;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
+        ),
+        title: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.admin_panel_settings_outlined,
+                  color: workspaceThemeController.value.primary,
+                ),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text(
+                    'ยืนยันให้สิทธิ์ทุกเมนู',
+                    style: LaooTypography.popupTitleStyle,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Divider(
+              height: .6,
+              thickness: .6,
+              color: workspaceThemeController.value.border,
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('กลุ่มสิทธิ์: ${group?.name ?? '-'}\nจำนวน $count เมนู'),
+            const SizedBox(height: 12),
+            Divider(
+              height: .6,
+              thickness: .6,
+              color: workspaceThemeController.value.border,
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'กำหนดสิทธิ์ทุกระบบที่บริษัทเปิดใช้งาน รวมเมนูที่ถูกกรองอยู่ โดยสิทธิ์ระดับย่อยยังคงเดิม',
+            ),
+          ],
+        ),
+        actions: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Divider(
+                height: .6,
+                thickness: .6,
+                color: workspaceThemeController.value.border,
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                alignment: WrapAlignment.end,
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  OutlinedButton(
+                    onPressed: () => Navigator.pop(dialogContext, false),
+                    child: const Text('ยกเลิก'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(dialogContext, true),
+                    child: const Text('ยืนยัน'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted || _selectedGroup != id) return;
+    setState(() => _saving = true);
+    try {
+      final latest = await _permissions.list(widget.scope, id);
+      if (!mounted || _selectedGroup != id) return;
+      if (!MenuPermissionSelection.samePermissions(_rows, _savedRows) ||
+          !MenuPermissionSelection.samePermissions(latest, _savedRows)) {
+        _showError('ข้อมูลสิทธิ์เปลี่ยนแปลง กรุณาโหลดรายการใหม่ก่อนดำเนินการ');
+        return;
+      }
+      final granted = MenuPermissionSelection.grantAll(latest);
+      await _permissions.save(widget.scope, id, granted);
+      if (!mounted || _selectedGroup != id) return;
+      setState(() {
+        _rows = granted;
+        _savedRows = List.of(granted);
+      });
+      _show('ให้สิทธิ์ทุกเมนูเรียบร้อยแล้ว');
+    } catch (e) {
+      if (mounted) _showError(_thai(e));
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   Future<void> _clearAll() async {
@@ -243,6 +380,7 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
               )
               .toList(),
         );
+        _savedRows = List.of(_rows);
       }
       _notice('ลบสิทธิ์ทั้งหมดสำเร็จ');
     } catch (e) {
@@ -306,7 +444,7 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
             all.any((e) => e.groupKey == row.groupKey) ? all : [...all, row],
       );
   void _change(MenuPermissionRow row, String action, bool value) {
-    if (!_canEdit) return;
+    if (!_canEdit || _saving) return;
     setState(
       () => _rows = _rows
           .map(
@@ -320,7 +458,7 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
   }
 
   void _changeGroup(String menuGroupCode, String action, bool value) {
-    if (!_canEdit) return;
+    if (!_canEdit || _saving) return;
     setState(
       () => _rows = MenuPermissionSelection.applyToGroup(
         _rows,
@@ -336,6 +474,141 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
 
   bool _groupHasAction(String menuGroupCode, String action) =>
       MenuPermissionSelection.hasAction(_rows, menuGroupCode, action);
+
+  Future<void> _bulkMenu(
+    MenuPermissionRow row, {
+    required bool group,
+    required bool grant,
+  }) async {
+    final roleId = _selectedGroup;
+    if (widget.scope != 'customer' ||
+        !_canEdit ||
+        _saving ||
+        roleId == null ||
+        row.projectId == null) {
+      return;
+    }
+    if (!MenuPermissionSelection.samePermissions(_rows, _savedRows)) {
+      _showError(
+        'มีการแก้ไขสิทธิ์ที่ยังไม่บันทึก กรุณาบันทึกหรือโหลดรายการใหม่ก่อน',
+      );
+      return;
+    }
+    final label = group ? row.groupLabel : row.menuName;
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(LaooRadius.xs),
+        ),
+        title: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.admin_panel_settings_outlined,
+                  color: workspaceThemeController.value.primary,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    grant
+                        ? 'ยืนยันให้สิทธิ์ทุกกลุ่ม'
+                        : 'ยืนยันยกเลิกสิทธิ์ทุกกลุ่ม',
+                    style: LaooTypography.popupTitleStyle,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Divider(
+              height: .6,
+              thickness: .6,
+              color: workspaceThemeController.value.border,
+            ),
+          ],
+        ),
+        content: Text(
+          '${grant ? 'ให้สิทธิ์ทุก Action ที่หน้าจอรองรับ' : 'ยกเลิกสิทธิ์ทุก Action'} สำหรับ $label กับกลุ่มสิทธิ์ที่ใช้งานอยู่ทุกกลุ่มในบริษัท\n\nสิทธิ์ระดับย่อยและสถานะ Company Admin ไม่เปลี่ยนแปลง',
+        ),
+        actions: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Divider(
+                height: .6,
+                thickness: .6,
+                color: workspaceThemeController.value.border,
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                alignment: WrapAlignment.end,
+                spacing: 8,
+                children: [
+                  OutlinedButton(
+                    onPressed: () => Navigator.pop(dialog, false),
+                    child: const Text('ยกเลิก'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(dialog, true),
+                    child: const Text('ยืนยัน'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+    if (accepted != true || !mounted) return;
+    if (!MenuPermissionSelection.samePermissions(_rows, _savedRows) ||
+        _selectedGroup != roleId) {
+      _showError('ข้อมูลสิทธิ์เปลี่ยนระหว่างยืนยัน กรุณาตรวจสอบแล้วลองใหม่');
+      return;
+    }
+    setState(() => _saving = true);
+    try {
+      await _permissions.bulkMenu(
+        roleGroupId: roleId,
+        projectId: row.projectId!,
+        menuGroupCode: row.menuGroupCode,
+        menuCode: group ? null : row.menuCode,
+        grant: grant,
+      );
+      await _loadRows();
+      if (mounted) {
+        _show(
+          grant
+              ? 'ให้สิทธิ์ทุกกลุ่มเรียบร้อยแล้ว'
+              : 'ยกเลิกสิทธิ์ทุกกลุ่มเรียบร้อยแล้ว',
+        );
+      }
+    } catch (e) {
+      if (mounted) _showError(_thai(e));
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Widget _bulkMenuButtons(MenuPermissionRow row, {required bool group}) {
+    if (widget.scope != 'customer' || !_canEdit || row.projectId == null) {
+      return const SizedBox.shrink();
+    }
+    return PopupMenuButton<bool>(
+      enabled: !_saving && !_loading,
+      tooltip: 'กำหนดสิทธิ์ทุกกลุ่ม',
+      icon: const Icon(Icons.more_vert),
+      onSelected: (grant) => _bulkMenu(row, group: group, grant: grant),
+      itemBuilder: (_) => const [
+        PopupMenuItem(value: true, child: Text('ไม่จำกัดสิทธิ์ทุกกลุ่ม')),
+        PopupMenuItem(value: false, child: Text('ยกเลิกสิทธิ์ทุกกลุ่ม')),
+      ],
+    );
+  }
 
   bool _isGroupCollapsed(String menuGroupCode) =>
       _collapsedMenuGroups.contains(menuGroupCode);
@@ -415,6 +688,17 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
                                   ),
                                 ),
                               ),
+                              if (widget.scope == 'customer' && _canEdit)
+                                FilledButton.icon(
+                                  onPressed:
+                                      _saving ||
+                                          _loading ||
+                                          _selectedGroup == null
+                                      ? null
+                                      : _grantAll,
+                                  icon: const Icon(Icons.done_all),
+                                  label: const Text('ให้สิทธิ์ทุกเมนู'),
+                                ),
                               if (_canDelete)
                                 FilledButton.icon(
                                   style: FilledButton.styleFrom(
@@ -506,10 +790,12 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
                                         ),
                                       )
                                       .toList(),
-                                  onChanged: (v) {
-                                    setState(() => _selectedGroup = v);
-                                    _loadRows();
-                                  },
+                                  onChanged: _saving
+                                      ? null
+                                      : (v) {
+                                          setState(() => _selectedGroup = v);
+                                          _loadRows();
+                                        },
                                 ),
                               ),
                               SizedBox(
@@ -568,10 +854,11 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
                                                 1
                                         ? groups.first.groupKey
                                         : null;
-                                    if (_selectedMenuGroup != null)
+                                    if (_selectedMenuGroup != null) {
                                       _collapsedMenuGroups.remove(
                                         _selectedMenuGroup,
                                       );
+                                    }
                                   }),
                                 ),
                               ),
@@ -794,6 +1081,7 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
                             fontSize: LaooTypography.caption,
                           ),
                         ),
+                        _bulkMenuButtons(group, group: true),
                         IconButton(
                           tooltip: collapsed ? 'ขยายกลุ่มเมนู' : 'ยุบกลุ่มเมนู',
                           visualDensity: VisualDensity.compact,
@@ -873,15 +1161,22 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                row.menuName,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: LaooColors.textPrimary,
-                  fontSize: LaooTypography.tableBody,
-                  fontWeight: FontWeight.w600,
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      row.menuName,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: LaooColors.textPrimary,
+                        fontSize: LaooTypography.tableBody,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  _bulkMenuButtons(row, group: false),
+                ],
               ),
               const SizedBox(height: 6),
               Wrap(
@@ -953,6 +1248,7 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
                           ),
                         ),
                       ),
+                      _bulkMenuButtons(row, group: true),
                     ],
                   ),
                 ),
@@ -969,7 +1265,22 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
       result.add(
         DataRow(
           cells: [
-            DataCell(Text(row.menuName)),
+            DataCell(
+              SizedBox(
+                width: _menuColumnWidth,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        row.menuName,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    _bulkMenuButtons(row, group: false),
+                  ],
+                ),
+              ),
+            ),
             _cell(row, 'VIEW', row.canView),
             _cell(row, 'CREATE', row.canCreate),
             _cell(row, 'EDIT', row.canEdit),

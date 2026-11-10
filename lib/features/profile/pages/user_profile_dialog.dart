@@ -10,6 +10,7 @@ import '../../../core/auth/app_auth_controller.dart';
 import '../../../core/auth/auth_session.dart';
 import '../../../core/navigation/menu_style_preferences.dart';
 import '../../../core/widgets/auto_dismiss_message.dart';
+import '../../assistant/ai_chat_settings_card.dart' show aiChatSettingsRevision;
 import '../data/user_profile_repository.dart';
 import 'profile_image_picker.dart';
 import 'list_display_dialog.dart';
@@ -168,6 +169,8 @@ class _UserProfileDialogState extends State<_UserProfileDialog> {
   final _currentPassword = TextEditingController();
   final _newPassword = TextEditingController();
   final _intro = TextEditingController();
+  final _aiFrequentLimit = TextEditingController(text: '0');
+  final _aiRecentLimit = TextEditingController(text: '0');
   String? _themeCode;
   String? _avatarBase64;
   String? _avatarType;
@@ -197,6 +200,8 @@ class _UserProfileDialogState extends State<_UserProfileDialog> {
     _currentPassword.dispose();
     _newPassword.dispose();
     _intro.dispose();
+    _aiFrequentLimit.dispose();
+    _aiRecentLimit.dispose();
     super.dispose();
   }
 
@@ -209,6 +214,9 @@ class _UserProfileDialogState extends State<_UserProfileDialog> {
       setState(() {
         _username.text = item['username']?.toString() ?? _username.text;
         _intro.text = item['introduction']?.toString() ?? '';
+        _aiFrequentLimit.text =
+            item['aiFrequentCommandLimit']?.toString() ?? '0';
+        _aiRecentLimit.text = item['aiRecentCommandLimit']?.toString() ?? '0';
         _themeCode =
             item['themeCode']?.toString() ??
             workspaceThemeController.value.code;
@@ -280,6 +288,20 @@ class _UserProfileDialogState extends State<_UserProfileDialog> {
       setState(() => _error = 'กรุณาระบุ Username');
       return;
     }
+    final frequent = int.tryParse(_aiFrequentLimit.text.trim());
+    final recent = int.tryParse(_aiRecentLimit.text.trim());
+    if (appAuthController.isCompanyUser &&
+        (frequent == null ||
+            recent == null ||
+            frequent < 0 ||
+            recent < 0 ||
+            frequent > 10000 ||
+            recent > 10000)) {
+      setState(
+        () => _error = 'จำนวนคำสั่ง AI ต้องเป็นตัวเลขตั้งแต่ 0 ถึง 10000',
+      );
+      return;
+    }
     setState(() {
       _saving = true;
       _error = null;
@@ -300,6 +322,8 @@ class _UserProfileDialogState extends State<_UserProfileDialog> {
         'avatarContentType': _avatarType,
         'avatarFileName': _avatarName,
         'removeAvatar': _removeAvatar,
+        if (appAuthController.isCompanyUser) 'aiFrequentCommandLimit': frequent,
+        if (appAuthController.isCompanyUser) 'aiRecentCommandLimit': recent,
       });
       userProfileAvatarNotifier.value = _avatarBase64 == null
           ? null
@@ -311,6 +335,7 @@ class _UserProfileDialogState extends State<_UserProfileDialog> {
       workspaceButtonMenu.value =
           (_isPhone ? menuStyleButton : _menuStyleCode) == menuStyleButton;
       userDefaultViewModeNotifier.value = _defaultViewMode;
+      if (appAuthController.isCompanyUser) aiChatSettingsRevision.value++;
       await appAuthController.updateSessionProfile(
         result['username']?.toString() ?? _username.text.trim(),
       );
@@ -707,6 +732,50 @@ class _UserProfileDialogState extends State<_UserProfileDialog> {
                           counterText: '',
                         ),
                       ),
+                      if (appAuthController.isCompanyUser) ...[
+                        const SizedBox(height: 14),
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            Widget field(
+                              TextEditingController controller,
+                              String label,
+                            ) => TextField(
+                              controller: controller,
+                              keyboardType: TextInputType.number,
+                              maxLength: 5,
+                              decoration: InputDecoration(
+                                labelText: label,
+                                counterText: '',
+                                helperText: '0 = ใช้ค่าบริษัท',
+                              ),
+                            );
+                            final frequent = field(
+                              _aiFrequentLimit,
+                              'จำนวนคำสั่งใช้บ่อยสูงสุด',
+                            );
+                            final recent = field(
+                              _aiRecentLimit,
+                              'จำนวนคำสั่งใช้ล่าสุด',
+                            );
+                            if (constraints.maxWidth < 500) {
+                              return Column(
+                                children: [
+                                  frequent,
+                                  const SizedBox(height: 14),
+                                  recent,
+                                ],
+                              );
+                            }
+                            return Row(
+                              children: [
+                                Expanded(child: frequent),
+                                const SizedBox(width: 12),
+                                Expanded(child: recent),
+                              ],
+                            );
+                          },
+                        ),
+                      ],
                     ]),
                   ],
                 ),

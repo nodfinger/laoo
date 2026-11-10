@@ -19,7 +19,7 @@ public sealed class UserProfileController(IConfiguration configuration, Password
         await using var connection = new SqlConnection(configuration.GetConnectionString("LaooDatabase"));
         await connection.OpenAsync(token);
         await using var command = new SqlCommand($"""
-SELECT U.Username,U.DisplayName,P.ThemeCode,P.MenuStyleCode,P.DefaultViewMode,P.Introduction,P.AvatarContentType,P.AvatarFileName,P.AvatarData
+SELECT U.Username,U.DisplayName,P.ThemeCode,P.MenuStyleCode,P.DefaultViewMode,P.Introduction,P.AvatarContentType,P.AvatarFileName,P.AvatarData,P.AiFrequentCommandLimit,P.AiRecentCommandLimit
 FROM dbo.{owner.Value.Table} U
 LEFT JOIN dbo.TDADUserProfile P ON P.{owner.Value.ProfileKey}=@id
 WHERE U.{owner.Value.UserKey}=@id AND U.IsActive=1;
@@ -36,7 +36,9 @@ WHERE U.{owner.Value.UserKey}=@id AND U.IsActive=1;
             introduction = reader.IsDBNull(5) ? null : reader.GetString(5),
             avatarContentType = reader.IsDBNull(6) ? null : reader.GetString(6),
             avatarFileName = reader.IsDBNull(7) ? null : reader.GetString(7),
-            avatarDataBase64 = reader.IsDBNull(8) ? null : Convert.ToBase64String((byte[])reader[8])
+            avatarDataBase64 = reader.IsDBNull(8) ? null : Convert.ToBase64String((byte[])reader[8]),
+            aiFrequentCommandLimit = reader.IsDBNull(9) ? 0 : reader.GetInt32(9),
+            aiRecentCommandLimit = reader.IsDBNull(10) ? 0 : reader.GetInt32(10)
         });
     }
 
@@ -45,6 +47,8 @@ WHERE U.{owner.Value.UserKey}=@id AND U.IsActive=1;
     {
         var owner = ResolveOwner();
         if (owner is null) return Forbid();
+        if (request.AiFrequentCommandLimit is < 0 or > 10000 || request.AiRecentCommandLimit is < 0 or > 10000)
+            return BadRequest(new { message = "จำนวนคำสั่งต้องอยู่ระหว่าง 0 ถึง 10000" });
         var username = request.Username?.Trim() ?? string.Empty;
         if (username.Length is < 1 or > 100) return BadRequest(new { message = "เธเธฃเธธเธ“เธฒเธฃเธฐเธเธธ Username เนเธซเนเธ–เธนเธเธ•เนเธญเธ" });
         await using var connection = new SqlConnection(configuration.GetConnectionString("LaooDatabase"));
@@ -96,12 +100,14 @@ WHERE U.{owner.Value.UserKey}=@id AND U.IsActive=1;
             await update.ExecuteNonQueryAsync(token);
 
             await using var profile = new SqlCommand($"""
-UPDATE dbo.TDADUserProfile SET AvatarData=CASE WHEN @remove=1 THEN NULL ELSE COALESCE(@avatar,AvatarData) END,AvatarContentType=CASE WHEN @remove=1 THEN NULL ELSE COALESCE(@type,AvatarContentType) END,AvatarFileName=CASE WHEN @remove=1 THEN NULL ELSE COALESCE(@file,AvatarFileName) END,ThemeCode=@theme,MenuStyleCode=@menuStyle,DefaultViewMode=@viewMode,Introduction=@intro,UpdateDate=SYSUTCDATETIME()
+UPDATE dbo.TDADUserProfile SET AvatarData=CASE WHEN @remove=1 THEN NULL ELSE COALESCE(@avatar,AvatarData) END,AvatarContentType=CASE WHEN @remove=1 THEN NULL ELSE COALESCE(@type,AvatarContentType) END,AvatarFileName=CASE WHEN @remove=1 THEN NULL ELSE COALESCE(@file,AvatarFileName) END,ThemeCode=@theme,MenuStyleCode=@menuStyle,DefaultViewMode=@viewMode,Introduction=@intro,AiFrequentCommandLimit=COALESCE(@frequent,AiFrequentCommandLimit),AiRecentCommandLimit=COALESCE(@recent,AiRecentCommandLimit),UpdateDate=SYSUTCDATETIME()
 WHERE {owner.Value.ProfileKey}=@id;
-IF @@ROWCOUNT=0 INSERT dbo.TDADUserProfile(UserType,{owner.Value.ProfileKey},AvatarData,AvatarContentType,AvatarFileName,ThemeCode,MenuStyleCode,DefaultViewMode,Introduction) VALUES(@userType,@id,@avatar,@type,@file,@theme,@menuStyle,@viewMode,@intro);
+IF @@ROWCOUNT=0 INSERT dbo.TDADUserProfile(UserType,{owner.Value.ProfileKey},AvatarData,AvatarContentType,AvatarFileName,ThemeCode,MenuStyleCode,DefaultViewMode,Introduction,AiFrequentCommandLimit,AiRecentCommandLimit) VALUES(@userType,@id,@avatar,@type,@file,@theme,@menuStyle,@viewMode,@intro,COALESCE(@frequent,0),COALESCE(@recent,0));
 """, connection, transaction);
             profile.Parameters.Add("@userType", SqlDbType.Char, 1).Value = owner.Value.Type; profile.Parameters.Add("@id", SqlDbType.BigInt).Value = owner.Value.Id; profile.Parameters.Add("@remove", SqlDbType.Bit).Value = request.RemoveAvatar;
             profile.Parameters.Add("@avatar", SqlDbType.VarBinary, -1).Value = (object?)avatar ?? DBNull.Value; Add(profile, "@type", SqlDbType.NVarChar, request.AvatarContentType, 100); Add(profile, "@file", SqlDbType.NVarChar, request.AvatarFileName, 250); Add(profile, "@theme", SqlDbType.NVarChar, request.ThemeCode, 30); Add(profile, "@menuStyle", SqlDbType.NVarChar, menuStyle, 10); Add(profile, "@viewMode", SqlDbType.NVarChar, NormalizeViewMode(request.DefaultViewMode), 10); Add(profile, "@intro", SqlDbType.NVarChar, request.Introduction, 1000);
+            profile.Parameters.Add("@frequent", SqlDbType.Int).Value = (object?)request.AiFrequentCommandLimit ?? DBNull.Value;
+            profile.Parameters.Add("@recent", SqlDbType.Int).Value = (object?)request.AiRecentCommandLimit ?? DBNull.Value;
             await profile.ExecuteNonQueryAsync(token);
             await transaction.CommitAsync(token);
             return Ok(new { username, displayName = current.Value.DisplayName });
@@ -159,5 +165,5 @@ IF @@ROWCOUNT=0 INSERT dbo.TDADUserProfile(UserType,{owner.Value.ProfileKey},The
     private readonly record struct Owner(char Type, string Table, string UserKey, string ProfileKey, long Id);
 }
 
-public sealed record UserProfileUpdate(string? Username, string? CurrentPassword, string? NewPassword, string? ThemeCode, string? MenuStyleCode, string? Introduction, string? AvatarDataBase64, string? AvatarContentType, string? AvatarFileName, string? DefaultViewMode, bool RemoveAvatar = false);
+public sealed record UserProfileUpdate(string? Username, string? CurrentPassword, string? NewPassword, string? ThemeCode, string? MenuStyleCode, string? Introduction, string? AvatarDataBase64, string? AvatarContentType, string? AvatarFileName, string? DefaultViewMode, bool RemoveAvatar = false, int? AiFrequentCommandLimit = null, int? AiRecentCommandLimit = null);
 public sealed record UserProfileThemeUpdate(string? ThemeCode);

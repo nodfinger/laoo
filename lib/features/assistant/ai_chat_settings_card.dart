@@ -66,6 +66,8 @@ class AiChatSettingsCardState extends State<AiChatSettingsCard> {
         'name',
         'pronoun',
         'retentionDays',
+        'frequentCommandLimit',
+        'recentCommandLimit',
         for (final p in _periods) ...[
           '${p.$1}Start',
           '${p.$1}End',
@@ -152,8 +154,19 @@ class AiChatSettingsCardState extends State<AiChatSettingsCard> {
           '/api/company-setup/ai-chat',
           body: {
             for (final e in _fields.entries)
-              if (e.key != 'retentionDays') e.key: e.value.text.trim(),
+              if (!{
+                'retentionDays',
+                'frequentCommandLimit',
+                'recentCommandLimit',
+              }.contains(e.key))
+                e.key: e.value.text.trim(),
             'retentionDays': int.parse(_field('retentionDays').text.trim()),
+            'frequentCommandLimit': int.parse(
+              _field('frequentCommandLimit').text.trim(),
+            ),
+            'recentCommandLimit': int.parse(
+              _field('recentCommandLimit').text.trim(),
+            ),
             'greetingMode': _mode,
             'showUserImage': _showUser,
             'showAiImage': _showAi,
@@ -230,6 +243,14 @@ class AiChatSettingsCardState extends State<AiChatSettingsCard> {
         onChanged: (_) => _dirty = true,
         enabled: widget.canEdit && !_saving && !widget.busy,
         maxLength: max,
+        keyboardType:
+            {
+              'retentionDays',
+              'frequentCommandLimit',
+              'recentCommandLimit',
+            }.contains(key)
+            ? TextInputType.number
+            : null,
         decoration: InputDecoration(
           labelText: label,
           hintText: time ? 'HH:mm' : null,
@@ -249,6 +270,12 @@ class AiChatSettingsCardState extends State<AiChatSettingsCard> {
                   int.parse(text) < 1 ||
                   int.parse(text) > 3650)) {
             return 'กำหนดจำนวนวันตั้งแต่ 1 ถึง 3650';
+          }
+          if ((key == 'frequentCommandLimit' || key == 'recentCommandLimit') &&
+              (int.tryParse(text) == null ||
+                  int.parse(text) < 0 ||
+                  int.parse(text) > 10000)) {
+            return 'กำหนดจำนวนตั้งแต่ 0 ถึง 10000';
           }
           if (time &&
               text.isNotEmpty &&
@@ -283,7 +310,7 @@ class AiChatSettingsCardState extends State<AiChatSettingsCard> {
       ),
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: children,
@@ -318,6 +345,22 @@ class AiChatSettingsCardState extends State<AiChatSettingsCard> {
                       'retentionDays',
                       'จำนวนวันเก็บข้อความ Chat',
                       max: 4,
+                    ),
+                  ),
+                  SizedBox(
+                    width: width,
+                    child: _input(
+                      'frequentCommandLimit',
+                      'จำนวนคำสั่งใช้บ่อยสูงสุด',
+                      max: 5,
+                    ),
+                  ),
+                  SizedBox(
+                    width: width,
+                    child: _input(
+                      'recentCommandLimit',
+                      'จำนวนคำสั่งใช้ล่าสุด',
+                      max: 5,
                     ),
                   ),
                   SizedBox(

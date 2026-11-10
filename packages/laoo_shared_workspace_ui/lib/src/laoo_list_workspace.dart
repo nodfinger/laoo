@@ -401,6 +401,7 @@ class LaooActionDialog extends StatelessWidget {
     required this.content,
     required this.actions,
     this.width = 480,
+    this.headerDividerGap = 0,
     super.key,
   });
 
@@ -410,6 +411,7 @@ class LaooActionDialog extends StatelessWidget {
   final Widget content;
   final List<Widget> actions;
   final double width;
+  final double headerDividerGap;
 
   @override
   Widget build(BuildContext context) {
@@ -486,6 +488,7 @@ class LaooActionDialog extends StatelessWidget {
                   ),
                 ),
               ),
+              if (headerDividerGap > 0) SizedBox(height: headerDividerGap),
               Divider(height: 1, color: tokens.borderColor),
               Flexible(
                 child: SingleChildScrollView(
@@ -525,6 +528,7 @@ class LaooPaginationCard extends StatelessWidget {
     required this.total,
     required this.onPrevious,
     required this.onNext,
+    this.borderless = false,
     super.key,
   });
 
@@ -535,6 +539,7 @@ class LaooPaginationCard extends StatelessWidget {
   final int total;
   final VoidCallback? onPrevious;
   final VoidCallback? onNext;
+  final bool borderless;
 
   @override
   Widget build(BuildContext context) {
@@ -597,7 +602,7 @@ class LaooPaginationCard extends StatelessWidget {
     backgroundColor: tokens.primaryColor,
     disabledBackgroundColor: Colors.grey.shade300,
     disabledForegroundColor: Colors.grey.shade700,
-    side: BorderSide(color: tokens.primaryColor),
+    side: borderless ? BorderSide.none : BorderSide(color: tokens.primaryColor),
     shape: RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(tokens.radius),
     ),

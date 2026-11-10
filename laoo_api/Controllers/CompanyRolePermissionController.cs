@@ -12,6 +12,45 @@ namespace LaooApi.Controllers;
 [Route("api/company-role-permissions")]
 public sealed class CompanyRolePermissionController(IConfiguration configuration) : ControllerBase
 {
+    [HttpPost("bulk-menu")]
+    public async Task<IActionResult> BulkMenu([FromBody] CompanyBulkMenuPermissionRequest request, CancellationToken token)
+    {
+        if (request.ProjectId <= 0 || request.RoleGroupId <= 0 || string.IsNullOrWhiteSpace(request.MenuGroupCode) || request.MenuGroupCode.Length > 10 || (request.MenuCode != null && request.MenuCode.Length > 20))
+            return BadRequest(new { message = "ข้อมูลเมนูไม่ถูกต้อง", description = "กรุณาโหลดหน้าสิทธิ์เมนูใหม่แล้วลองอีกครั้ง" });
+        await using var connection = await Open(token);
+        if (!await CompanyProjectPermission.IsAllowedAsync(connection, User, "10004", "EDIT", token)) return Denied();
+        var matrix = await List(request.RoleGroupId, token);
+        if (matrix.Result is not OkObjectResult ok || ok.Value is not List<MenuPermissionMatrixResponse> available) return Denied();
+        var target = available.Where(x => x.ProjectId == request.ProjectId && x.MenuGroupCode == request.MenuGroupCode && (request.MenuCode == null || x.MenuCode == request.MenuCode)).ToList();
+        if (target.Count == 0) return BadRequest(new { message = "ไม่พบเมนูที่บริษัทเปิดใช้งาน", description = "กรุณาโหลดรายการสิทธิ์ใหม่ก่อนทำรายการ" });
+        await using var tx = (SqlTransaction)await connection.BeginTransactionAsync(IsolationLevel.Serializable, token);
+        try
+        {
+            var roles = new List<long>();
+            await using (var q = new SqlCommand("SELECT RG.RoleGroupID FROM dbo.TDADRoleGroup RG WITH (UPDLOCK,HOLDLOCK) JOIN dbo.TDADProject P ON P.ProjectID=RG.ProjectID AND P.ProjectCode=N'LAOO' AND P.IsActive=1 WHERE RG.ScopeType=N'C' AND RG.CompanyID=@Company AND RG.IsActive=1", connection, tx))
+            {
+                Add(q, "@Company", SqlDbType.BigInt, Claim("company_id"));
+                await using var reader = await q.ExecuteReaderAsync(token);
+                while (await reader.ReadAsync(token)) roles.Add(reader.GetInt64(0));
+            }
+            if (!roles.Contains(request.RoleGroupId)) { await tx.RollbackAsync(token); return NotFound(); }
+            foreach (var role in roles)
+            {
+                foreach (var row in target)
+                    await SaveRow(connection, tx, role, new MenuPermissionSaveRequest { ProjectId = row.ProjectId, MenuCode = row.MenuCode, CanView = request.Grant, CanCreate = request.Grant, CanEdit = request.Grant, CanDelete = request.Grant }, token);
+                if (request.Grant) await SyncRoleUsersToGrantedProjects(connection, tx, role, token);
+            }
+            await tx.CommitAsync(token);
+            return Ok(new { menus = target.Count, groups = roles.Count, granted = request.Grant });
+        }
+        catch (SqlException ex) when (ex.Number == 50010 || ex.Number == 50011)
+        {
+            await tx.RollbackAsync(token);
+            return Conflict(new { message = "ไม่สามารถเปลี่ยนสิทธิ์ได้", description = ex.Number == 50011 ? "จำนวนผู้ใช้เกินโควตาแพ็กเกจ ไม่มีการบันทึกสิทธิ์บางส่วน" : "เมนูหรือแพ็กเกจเปลี่ยนไป กรุณาโหลดข้อมูลใหม่" });
+        }
+        catch { await tx.RollbackAsync(token); throw; }
+    }
+
     [HttpGet]
     public async Task<ActionResult<List<MenuPermissionMatrixResponse>>> List([FromQuery] long roleGroupId, CancellationToken token)
     {
@@ -245,3 +284,5 @@ WHERE NOT EXISTS
     private void Bind(SqlCommand c,long role){Add(c,"@Role",SqlDbType.BigInt,role);Add(c,"@Company",SqlDbType.BigInt,Claim("company_id"));Add(c,"@Partner",SqlDbType.BigInt,Claim("partner_id"));Add(c,"@User",SqlDbType.BigInt,Claim("user_id"));}
     private static void Add(SqlCommand c,string name,SqlDbType type,object? value,int size=0){var p=size>0?c.Parameters.Add(name,type,size):c.Parameters.Add(name,type);p.Value=value??DBNull.Value;}
 }
+
+public sealed record CompanyBulkMenuPermissionRequest(long RoleGroupId, long ProjectId, string MenuGroupCode, string? MenuCode, bool Grant);

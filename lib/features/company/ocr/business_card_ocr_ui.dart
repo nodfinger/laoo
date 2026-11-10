@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:laoo_shared_workspace_ui/laoo_shared_workspace_ui.dart';
 import '../../../app/theme/laoo_design_tokens.dart';
 import '../../../app/theme/laoo_typography.dart';
+import '../../../app/theme/workspace_theme_presets.dart';
 
 LaooWorkspaceUiTokens businessCardOcrUi(BuildContext context) {
-  final colors = Theme.of(context).colorScheme;
   return LaooWorkspaceUiTokens(
     contentMargin: const EdgeInsets.all(LaooLayout.cardMargin),
     cardPadding: const EdgeInsets.all(LaooLayout.cardPadding),
@@ -26,7 +26,7 @@ LaooWorkspaceUiTokens businessCardOcrUi(BuildContext context) {
       fontWeight: FontWeight.w700,
     ),
     buttonHeight: LaooTypography.buttonHeight,
-    primaryColor: colors.primary,
+    primaryColor: workspaceThemeController.value.primary,
     borderColor: LaooColors.border,
     backgroundColor: LaooColors.background,
   );
@@ -49,7 +49,8 @@ InputDecoration ocrInput(BuildContext context, String label, {IconData? icon}) {
     focusedErrorBorder: border(Theme.of(context).colorScheme.error),
     labelStyle: t.inputStyle,
     floatingLabelStyle: t.inputStyle.copyWith(
-      fontSize: (t.inputStyle.fontSize ?? 14) / .75,
+      fontSize: LaooTypography.materialFloatingLabelSource,
+      color: t.primaryColor,
     ),
   );
 }

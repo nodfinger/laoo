@@ -2,6 +2,43 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:laoo/core/widgets/list_display_preferences.dart';
 
 void main() {
+  test('travel claim order and required document number are preserved', () {
+    const preferences = ListDisplayPreferences(
+      order: ['total', 'number', 'date'],
+      hidden: {'number', 'origin'},
+      actionOnRight: true,
+    );
+    final fields = preferences.resolve(travelClaimDisplayFields);
+    expect(fields.map((f) => f.key), [
+      'total',
+      'number',
+      'date',
+      'origin',
+      'destination',
+    ]);
+    expect(fields.where(preferences.isVisible).map((f) => f.key), [
+      'total',
+      'number',
+      'date',
+      'destination',
+    ]);
+    expect(preferences.actionOnRight, isTrue);
+  });
+  test('master data supports ordered fields and keeps its name visible', () {
+    const preferences = ListDisplayPreferences(
+      order: ['shortCode', 'name', 'sequence'],
+      hidden: {'name', 'sequence'},
+      actionOnRight: true,
+    );
+    final fields = preferences.resolve(masterDataDisplayFields);
+    expect(fields.map((field) => field.key), ['shortCode', 'name', 'sequence']);
+    expect(fields.where(preferences.isVisible).map((field) => field.key), [
+      'shortCode',
+      'name',
+    ]);
+    expect(preferences.actionOnRight, isTrue);
+  });
+
   const fields = [
     ListDisplayField(key: 'name', label: 'ชื่อ', requiredVisible: true),
     ListDisplayField(key: 'status', label: 'สถานะ'),

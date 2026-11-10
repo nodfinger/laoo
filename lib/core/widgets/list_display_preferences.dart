@@ -18,6 +18,32 @@ class ListDisplayField {
   final bool requiredVisible;
 }
 
+/// Fields that are safe to display on the AI capability registry screen.
+const aiCapabilityDisplayFields = <ListDisplayField>[
+  ListDisplayField(key: 'system', label: 'ระบบ'),
+  ListDisplayField(key: 'menu', label: 'เมนู'),
+  ListDisplayField(key: 'name', label: 'ชื่อ', requiredVisible: true),
+  ListDisplayField(key: 'description', label: 'คำอธิบาย'),
+  ListDisplayField(key: 'approvedBy', label: 'ผู้อนุมัติ'),
+  ListDisplayField(key: 'approvedAt', label: 'วันที่-เวลาอนุมัติ'),
+  ListDisplayField(key: 'status', label: 'สถานะ'),
+];
+
+/// Displayable master data fields; generated codes are intentionally hidden.
+const masterDataDisplayFields = <ListDisplayField>[
+  ListDisplayField(key: 'name', label: 'ชื่อ', requiredVisible: true),
+  ListDisplayField(key: 'sequence', label: 'เรียงลำดับแสดง'),
+  ListDisplayField(key: 'shortCode', label: 'รหัสย่อ'),
+];
+
+const travelClaimDisplayFields = <ListDisplayField>[
+  ListDisplayField(key: 'number', label: 'เลขที่เอกสาร', requiredVisible: true),
+  ListDisplayField(key: 'date', label: 'วันที่'),
+  ListDisplayField(key: 'origin', label: 'ต้นทาง'),
+  ListDisplayField(key: 'destination', label: 'ปลายทาง'),
+  ListDisplayField(key: 'total', label: 'ยอดเบิกรวม'),
+];
+
 /// Preferences contain presentation keys only; authorization stays server-side.
 class ListDisplayPreferences {
   const ListDisplayPreferences({

@@ -62,6 +62,20 @@ class AppMenuRouteSpec {
 
 abstract final class AppMenuRouteRegistry {
   static final Map<String, AppMenuRouteSpec> _byMenuCode = {
+    '67002': AppMenuRouteSpec(
+      menuCode: '67002',
+      databaseRouteName: 'travelRouteRates',
+      goRouteName: 'travelRouteRates',
+      path: '/company/my-system/travel-route-rates',
+      scope: AppMenuScope.company,
+    ),
+    '67001': AppMenuRouteSpec(
+      menuCode: '67001',
+      databaseRouteName: 'travelExpenseSettings',
+      goRouteName: 'travelExpenseSettings',
+      path: '/company/my-system/travel-settings',
+      scope: AppMenuScope.company,
+    ),
     '65001': AppMenuRouteSpec(
       menuCode: '65001',
       databaseRouteName: 'mySystemSettings',

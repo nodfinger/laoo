@@ -6,6 +6,8 @@ import '../../../../core/widgets/combo_box_text.dart';
 import '../../../../core/widgets/auto_dismiss_message.dart';
 import '../../../../core/widgets/timed_snack_bar.dart';
 import '../../../../core/widgets/pinned_data_table.dart';
+import '../../../../core/api/api_client.dart';
+import '../../../../core/widgets/list_display_preferences.dart';
 
 import '../../../../app/theme/laoo_typography.dart';
 import '../../../../app/theme/laoo_design_tokens.dart';
@@ -75,6 +77,8 @@ class _MasterDataPageState extends State<MasterDataPage> {
   final _searchController = TextEditingController();
   late final MasterDataApi _api;
   final _profile = UserProfileRepository();
+  final _displayApi = ApiClient();
+  ListDisplayPreferences? _displayPreferences;
   final List<_MasterGroup> _groups = [];
   final Map<String, List<_MasterRow>> _rows = {};
   bool _loading = true;
@@ -107,6 +111,26 @@ class _MasterDataPageState extends State<MasterDataPage> {
     _loadActions();
     _load();
     _loadDefaultViewMode();
+    if (widget.menuScope == WorkspaceMenuScope.company && !widget.embedded) {
+      listDisplayPreferencesRevision.addListener(_loadDisplayPreferences);
+      _loadDisplayPreferences();
+    }
+  }
+
+  Future<void> _loadDisplayPreferences() async {
+    try {
+      final result = await _displayApi.get('/api/user-list-display/05002');
+      if (mounted && result is Map) {
+        final value = Map<String, dynamic>.from(result);
+        setState(
+          () => _displayPreferences = value.isEmpty
+              ? null
+              : ListDisplayPreferences.fromJson(value),
+        );
+      }
+    } catch (_) {
+      if (mounted) setState(() => _displayPreferences = null);
+    }
   }
 
   Future<void> _loadDefaultViewMode() async {
@@ -200,6 +224,10 @@ class _MasterDataPageState extends State<MasterDataPage> {
 
   @override
   void dispose() {
+    if (widget.menuScope == WorkspaceMenuScope.company && !widget.embedded) {
+      listDisplayPreferencesRevision.removeListener(_loadDisplayPreferences);
+    }
+    _displayApi.dispose();
     _searchController.dispose();
     _api.dispose();
     super.dispose();
@@ -593,6 +621,20 @@ class _MasterDataPageState extends State<MasterDataPage> {
     final theme = Theme.of(context);
     final workspaceTheme = workspaceThemeController.value;
     final accent = workspaceTheme.primary;
+    final preferences = _displayPreferences ?? const ListDisplayPreferences();
+    final displayFields = preferences
+        .resolve(masterDataDisplayFields)
+        .where(preferences.isVisible)
+        .toList();
+    const actionColumn = DataColumn(
+      label: SizedBox(
+        width: 100,
+        child: Padding(
+          padding: EdgeInsets.only(left: 12),
+          child: Align(alignment: Alignment.centerLeft, child: Text('Action')),
+        ),
+      ),
+    );
     return ColoredBox(
       color: theme.scaffoldBackgroundColor,
       child: Padding(
@@ -714,8 +756,23 @@ class _MasterDataPageState extends State<MasterDataPage> {
                         controller: _searchController,
                         onSubmitted: (_) => _applySearch(),
                         decoration: InputDecoration(
-                          prefixIcon: const Icon(Icons.search),
+                          prefixIcon: Icon(Icons.search, color: accent),
                           labelText: 'ค้นหารหัสหรือชื่อ',
+                          floatingLabelStyle: TextStyle(
+                            color: accent,
+                            fontSize:
+                                LaooTypography.materialFloatingLabelSource,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(LaooRadius.xs),
+                            borderSide: BorderSide(
+                              color: workspaceTheme.border,
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(LaooRadius.xs),
+                            borderSide: BorderSide(color: accent, width: 1.5),
+                          ),
                         ),
                       );
                       final group = Semantics(
@@ -860,21 +917,10 @@ class _MasterDataPageState extends State<MasterDataPage> {
                         ),
                         columns: [
                           LaooTableColumns.id,
-                          const DataColumn(
-                            label: SizedBox(
-                              width: 100,
-                              child: Padding(
-                                padding: EdgeInsets.only(left: 12),
-                                child: Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: Text('Action'),
-                                ),
-                              ),
-                            ),
-                          ),
-                          const DataColumn(label: Text('ชื่อ')),
-                          const DataColumn(label: Text('เรียงลำดับแสดง')),
-                          const DataColumn(label: Text('รหัสย่อ')),
+                          if (!preferences.actionOnRight) actionColumn,
+                          for (final field in displayFields)
+                            DataColumn(label: Text(field.label)),
+                          if (preferences.actionOnRight) actionColumn,
                         ],
                         rows: _filteredRows.asMap().entries.map((entry) {
                           final row = entry.value;
@@ -888,49 +934,22 @@ class _MasterDataPageState extends State<MasterDataPage> {
                                   '${(_currentPage * _pageSize) + entry.key + 1}',
                                 ),
                               ),
-                              DataCell(
-                                SizedBox(
-                                  width: 100,
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.start,
-                                    children: [
-                                      if (_canEdit)
-                                        IconButton(
-                                          tooltip: 'แก้ไข',
-                                          onPressed: () => _startEdit(row),
-                                          icon: Icon(
-                                            Icons.edit_outlined,
-                                            color: accent,
-                                          ),
-                                        ),
-                                      if (widget.embedded && !_canEdit)
-                                        const IconButton(
-                                          onPressed: null,
-                                          tooltip: 'ไม่มีสิทธิ์แก้ไข',
-                                          icon: Icon(Icons.lock_outline),
-                                        ),
-                                      if (_canDelete)
-                                        IconButton(
-                                          tooltip: 'ลบ',
-                                          onPressed: () => _delete(row),
-                                          icon: Icon(
-                                            Icons.delete_outline,
-                                            color: theme.colorScheme.error,
-                                          ),
-                                        ),
-                                      if (widget.embedded && !_canDelete)
-                                        const IconButton(
-                                          onPressed: null,
-                                          tooltip: 'ไม่มีสิทธิ์ลบ',
-                                          icon: Icon(Icons.lock_outline),
-                                        ),
-                                    ],
+                              if (!preferences.actionOnRight)
+                                DataCell(
+                                  SizedBox(
+                                    width: 100,
+                                    child: _rowActions(context, row),
                                   ),
                                 ),
-                              ),
-                              DataCell(Text(row.name)),
-                              DataCell(Text('${row.seq}')),
-                              DataCell(Text(row.shortCode)),
+                              for (final field in displayFields)
+                                DataCell(Text(_fieldValue(field.key, row))),
+                              if (preferences.actionOnRight)
+                                DataCell(
+                                  SizedBox(
+                                    width: 100,
+                                    child: _rowActions(context, row),
+                                  ),
+                                ),
                             ],
                           );
                         }).toList(),
@@ -971,10 +990,59 @@ class _MasterDataPageState extends State<MasterDataPage> {
     );
   }
 
+  String _fieldValue(String key, _MasterRow row) => switch (key) {
+    'name' => row.name,
+    'sequence' => '${row.seq}',
+    'shortCode' => row.shortCode,
+    _ => '',
+  };
+
+  Widget _rowActions(BuildContext context, _MasterRow row) {
+    final accent = workspaceThemeController.value.primary;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.start,
+      children: [
+        if (_canEdit)
+          IconButton(
+            tooltip: 'แก้ไข',
+            onPressed: () => _startEdit(row),
+            icon: Icon(Icons.edit_outlined, color: accent),
+          ),
+        if (widget.embedded && !_canEdit)
+          const IconButton(
+            onPressed: null,
+            tooltip: 'ไม่มีสิทธิ์แก้ไข',
+            icon: Icon(Icons.lock_outline),
+          ),
+        if (_canDelete)
+          IconButton(
+            tooltip: 'ลบ',
+            onPressed: () => _delete(row),
+            icon: Icon(
+              Icons.delete_outline,
+              color: Theme.of(context).colorScheme.error,
+            ),
+          ),
+        if (widget.embedded && !_canDelete)
+          const IconButton(
+            onPressed: null,
+            tooltip: 'ไม่มีสิทธิ์ลบ',
+            icon: Icon(Icons.lock_outline),
+          ),
+      ],
+    );
+  }
+
   Widget _buildMobileCards(BuildContext context) {
     final theme = Theme.of(context);
     final workspaceTheme = workspaceThemeController.value;
-    final accent = workspaceTheme.primary;
+    final preferences = _displayPreferences ?? const ListDisplayPreferences();
+    final fields = preferences
+        .resolve(masterDataDisplayFields)
+        .where(preferences.isVisible)
+        .toList();
+    final actionsRight = _displayPreferences?.actionOnRight ?? true;
     final rows = _filteredRows;
     if (rows.isEmpty) {
       return Card(
@@ -1019,77 +1087,41 @@ class _MasterDataPageState extends State<MasterDataPage> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (!actionsRight) _rowActions(context, row),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          row.name,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: theme.colorScheme.primary,
-                            fontSize: LaooTypography.tableBody,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'ลำดับแสดง: ${row.seq}  |  ID $number',
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: LaooTypography.tableBody,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        if (row.shortCode.isNotEmpty) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            'รหัสย่อ: ${row.shortCode}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: LaooTypography.tableBody,
+                        for (final field in fields)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: Text(
+                              field.key == 'name'
+                                  ? _fieldValue(field.key, row)
+                                  : '${field.label}: ${_fieldValue(field.key, row)}',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: field.key == 'name'
+                                    ? workspaceTheme.primary
+                                    : theme.colorScheme.onSurface,
+                                fontSize: LaooTypography.tableBody,
+                                fontWeight: field.key == 'name'
+                                    ? FontWeight.w700
+                                    : FontWeight.normal,
+                              ),
                             ),
                           ),
-                        ],
+                        Text(
+                          'ID $number',
+                          style: const TextStyle(
+                            fontSize: LaooTypography.tableBody,
+                          ),
+                        ),
                       ],
                     ),
                   ),
-                  if (_canEdit || _canDelete || widget.embedded)
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (_canEdit)
-                          IconButton(
-                            tooltip: 'แก้ไข',
-                            onPressed: () => _startEdit(row),
-                            icon: Icon(Icons.edit_outlined, color: accent),
-                          ),
-                        if (widget.embedded && !_canEdit)
-                          const IconButton(
-                            onPressed: null,
-                            tooltip: 'ไม่มีสิทธิ์แก้ไข',
-                            icon: Icon(Icons.lock_outline),
-                          ),
-                        if (_canDelete)
-                          IconButton(
-                            tooltip: 'ลบ',
-                            onPressed: () => _delete(row),
-                            icon: Icon(
-                              Icons.delete_outline,
-                              color: theme.colorScheme.error,
-                            ),
-                          ),
-                        if (widget.embedded && !_canDelete)
-                          const IconButton(
-                            onPressed: null,
-                            tooltip: 'ไม่มีสิทธิ์ลบ',
-                            icon: Icon(Icons.lock_outline),
-                          ),
-                      ],
-                    ),
+                  if (actionsRight) _rowActions(context, row),
                 ],
               ),
             ),
@@ -1419,7 +1451,9 @@ class _MasterDataFormState extends State<_MasterDataForm> {
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     OutlinedButton.icon(
-                      style: actionStyle,
+                      style: actionStyle.merge(
+                        OutlinedButton.styleFrom(foregroundColor: primary),
+                      ),
                       onPressed: _saving ? null : widget.onCancel,
                       icon: const Icon(Icons.close),
                       label: const Text('ยกเลิก'),
@@ -1427,7 +1461,12 @@ class _MasterDataFormState extends State<_MasterDataForm> {
                     const SizedBox(width: 8),
                     if (widget.canSave)
                       FilledButton.icon(
-                        style: actionStyle,
+                        style: actionStyle.merge(
+                          FilledButton.styleFrom(
+                            backgroundColor: primary,
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
                         onPressed: _saving ? null : _sync,
                         icon: const Icon(Icons.save_outlined),
                         label: Text(_saving ? 'กำลังบันทึก...' : 'บันทึก'),

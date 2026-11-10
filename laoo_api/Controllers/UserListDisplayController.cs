@@ -16,7 +16,10 @@ public sealed class UserListDisplayController(IConfiguration configuration) : Co
     // database metadata, internal columns or permission-dependent fields here.
     private static readonly IReadOnlyDictionary<string, string[]> Fields = new Dictionary<string, string[]>
     {
-        ["10003"] = ["name", "status"]
+        ["10003"] = ["name", "status"],
+        ["05002"] = ["name", "sequence", "shortCode"],
+        ["66001"] = ["number", "date", "origin", "destination", "total"],
+        ["10008"] = ["system", "menu", "name", "description", "approvedBy", "approvedAt", "status"]
     };
 
     private async Task<(SqlConnection? Db, long UserId)> OpenAuthorizedAsync(string menu, CancellationToken token)
@@ -27,6 +30,17 @@ public sealed class UserListDisplayController(IConfiguration configuration) : Co
         try
         {
             await db.OpenAsync(token);
+            await using (var setting = new SqlCommand(
+                "SELECT AllowListDisplaySettings FROM dbo.TDADMainMenu WHERE MenuCode=@menu AND IsActive=1", db))
+            {
+                setting.Parameters.Add("@menu", SqlDbType.NVarChar, 20).Value = menu;
+                var enabled = await setting.ExecuteScalarAsync(token);
+                if (enabled is not bool allowed || !allowed)
+                {
+                    await db.DisposeAsync();
+                    return (null, 0);
+                }
+            }
             if (!await CompanyMenuAccess.IsAllowedAsync(db, User, menu, "VIEW", token))
             {
                 await db.DisposeAsync();
@@ -35,6 +49,21 @@ public sealed class UserListDisplayController(IConfiguration configuration) : Co
             return (db, userId);
         }
         catch { await db.DisposeAsync(); throw; }
+    }
+
+    [HttpGet("available-menus")]
+    public async Task<IActionResult> AvailableMenus(CancellationToken token)
+    {
+        if (User.FindFirstValue("user_type") != "COMPANY_USER" ||
+            !long.TryParse(User.FindFirstValue("user_id"), out _)) return Forbid();
+        await using var db = new SqlConnection(configuration.GetConnectionString("LaooDatabase"));
+        await db.OpenAsync(token);
+        await using var cmd = new SqlCommand(
+            "SELECT MenuCode FROM dbo.TDADMainMenu WHERE IsActive=1 AND AllowListDisplaySettings=1", db);
+        var codes = new List<string>();
+        await using var reader = await cmd.ExecuteReaderAsync(token);
+        while (await reader.ReadAsync(token)) codes.Add(reader.GetString(0));
+        return Ok(codes);
     }
 
     [HttpGet("{menu}")]
@@ -64,7 +93,7 @@ public sealed class UserListDisplayController(IConfiguration configuration) : Co
             var valid = Fields[menu].ToHashSet(StringComparer.Ordinal);
             var order = input.Order ?? [];
             var hidden = input.Hidden ?? [];
-            if (hidden.Contains("name", StringComparer.Ordinal) || order.Length > valid.Count || hidden.Length > valid.Count ||
+            if ((hidden.Contains("name", StringComparer.Ordinal) || menu == "66001" && hidden.Contains("number", StringComparer.Ordinal)) || order.Length > valid.Count || hidden.Length > valid.Count ||
                 order.Distinct(StringComparer.Ordinal).Count() != order.Length ||
                 hidden.Distinct(StringComparer.Ordinal).Count() != hidden.Length ||
                 order.Any(key => !valid.Contains(key)) || hidden.Any(key => !valid.Contains(key)))

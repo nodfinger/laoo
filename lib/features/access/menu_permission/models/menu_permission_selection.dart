@@ -9,6 +9,41 @@ class MenuPermissionSelection {
           {'CREATE', 'EDIT', 'DELETE'}.contains(action)) ||
       (screenType == 2 && action == 'EDIT');
 
+  static List<MenuPermissionRow> grantAll(Iterable<MenuPermissionRow> rows) =>
+      rows
+          .map(
+            (row) => row.copy(
+              view: true,
+              create: isActionVisible(row.screenType, 'CREATE'),
+              edit: isActionVisible(row.screenType, 'EDIT'),
+              delete: isActionVisible(row.screenType, 'DELETE'),
+            ),
+          )
+          .toList();
+
+  static bool samePermissions(
+    Iterable<MenuPermissionRow> first,
+    Iterable<MenuPermissionRow> second,
+  ) {
+    final left = {
+      for (final row in first) '${row.projectId}:${row.menuCode}': row,
+    };
+    final right = {
+      for (final row in second) '${row.projectId}:${row.menuCode}': row,
+    };
+    if (left.length != right.length) return false;
+    return left.entries.every((entry) {
+      final other = right[entry.key];
+      final row = entry.value;
+      return other != null &&
+          row.screenType == other.screenType &&
+          row.canView == other.canView &&
+          row.canCreate == other.canCreate &&
+          row.canEdit == other.canEdit &&
+          row.canDelete == other.canDelete;
+    });
+  }
+
   static MenuPermissionRow applyToRow(
     MenuPermissionRow row,
     String action,

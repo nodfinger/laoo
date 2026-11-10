@@ -3,18 +3,30 @@ import 'package:laoo/features/access/menu_permission/models/menu_permission_row.
 import 'package:laoo/features/access/menu_permission/models/menu_permission_selection.dart';
 
 void main() {
-  test('permission changes preserve group metadata without sending it to save API', () {
-    final source = MenuPermissionRow.fromJson({
-      'projectId': 10, 'projectName': 'Sales', 'configuredMenuGroupCount': 1,
-      'menuCode': '09001', 'menuName': 'Customers', 'menuGroupCode': '09',
-      'menuGroupName': 'Sales', 'screenType': 1,
-    });
-    final changed = MenuPermissionSelection.applyToRow(source, 'CREATE', true);
-    expect(changed.configuredMenuGroupCount, 1);
-    expect(changed.canView, isTrue);
-    expect(changed.canCreate, isTrue);
-    expect(changed.toJson().containsKey('configuredMenuGroupCount'), isFalse);
-  });
+  test(
+    'permission changes preserve group metadata without sending it to save API',
+    () {
+      final source = MenuPermissionRow.fromJson({
+        'projectId': 10,
+        'projectName': 'Sales',
+        'configuredMenuGroupCount': 1,
+        'menuCode': '09001',
+        'menuName': 'Customers',
+        'menuGroupCode': '09',
+        'menuGroupName': 'Sales',
+        'screenType': 1,
+      });
+      final changed = MenuPermissionSelection.applyToRow(
+        source,
+        'CREATE',
+        true,
+      );
+      expect(changed.configuredMenuGroupCount, 1);
+      expect(changed.canView, isTrue);
+      expect(changed.canCreate, isTrue);
+      expect(changed.toJson().containsKey('configuredMenuGroupCount'), isFalse);
+    },
+  );
   MenuPermissionRow row(String code, int screenType) => MenuPermissionRow(
     menuCode: code,
     menuName: code,
@@ -25,6 +37,57 @@ void main() {
     canCreate: false,
     canEdit: false,
     canDelete: false,
+  );
+
+  test('grant all gives only actions supported by each screen type', () {
+    final source = [
+      row('CRUD', 1),
+      row('UPDATE', 2),
+      row('SHOW', 3),
+      row('DOC', 4),
+    ];
+    final granted = MenuPermissionSelection.grantAll(source);
+    expect(
+      granted.map(
+        (item) => [item.canView, item.canCreate, item.canEdit, item.canDelete],
+      ),
+      [
+        [true, true, true, true],
+        [true, false, true, false],
+        [true, false, false, false],
+        [true, true, true, true],
+      ],
+    );
+    expect(source.every((item) => !item.canView), isTrue);
+  });
+
+  test(
+    'permission comparison detects unsaved edits and changed menu scope',
+    () {
+      final original = [row('A', 1), row('B', 2)];
+      expect(
+        MenuPermissionSelection.samePermissions(original, original.reversed),
+        isTrue,
+      );
+      expect(
+        MenuPermissionSelection.samePermissions(original, [
+          row('A', 1).copy(view: true),
+          row('B', 2),
+        ]),
+        isFalse,
+      );
+      expect(
+        MenuPermissionSelection.samePermissions(original, [row('A', 1)]),
+        isFalse,
+      );
+      expect(
+        MenuPermissionSelection.samePermissions(original, [
+          row('A', 3),
+          row('B', 2),
+        ]),
+        isFalse,
+      );
+    },
   );
 
   test('group CREATE selects only supported child menus and enables VIEW', () {

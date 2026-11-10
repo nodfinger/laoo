@@ -76,7 +76,7 @@ WHERE C.IsActive=1 ORDER BY C.CapabilityCode
         return Ok(new { caption = Convert.ToString(await caption.ExecuteScalarAsync(token)) ?? "", rows = result, canEdit = await Allowed(db, "EDIT", token), canManageAccess = await AiCapabilityRoleAccess.CanManage(db, User, token) });
     }
 
-    public sealed record RoleAccessRequest(List<long>? RoleGroupIds);
+    public sealed record RoleAccessRequest(List<long>? RoleGroupIds, bool UseMenuPermissions = false);
 
     [HttpGet("{code}/role-access")]
     public async Task<IActionResult> GetRoleAccess(string code, CancellationToken token)
@@ -100,7 +100,12 @@ ORDER BY RG.RoleNameTH, RG.RoleGroupID
         var roles=new List<object>();
         await using var reader=await cmd.ExecuteReaderAsync(token);
         while(await reader.ReadAsync(token)) roles.Add(new { id=reader.GetInt64(0), name=reader.GetString(1), allowed=reader.GetBoolean(2), configured=reader.GetBoolean(3) });
-        return Ok(roles);
+        await reader.DisposeAsync();
+        await using var mode = new SqlCommand("SELECT UseMenuPermissions FROM dbo.TDADAiCapabilityRolePolicy WHERE CompanyID=@company AND CapabilityCode=@code",db);
+        mode.Parameters.Add("@company",SqlDbType.BigInt).Value=AiChatSettingsStore.CompanyId(User)!.Value;
+        mode.Parameters.Add("@code",SqlDbType.NVarChar,100).Value=code;
+        var useMenuPermissions = await mode.ExecuteScalarAsync(token);
+        return Ok(new { roles, useMenuPermissions = useMenuPermissions is null or DBNull || Convert.ToBoolean(useMenuPermissions) });
     }
 
     [HttpPut("{code}/role-access")]
@@ -123,14 +128,15 @@ ORDER BY RG.RoleNameTH, RG.RoleGroupID
         }
         await using (var policy=new SqlCommand("""
 IF NOT EXISTS(SELECT 1 FROM dbo.TDADAiCapabilityRolePolicy WITH(UPDLOCK,HOLDLOCK) WHERE CompanyID=@company AND CapabilityCode=@code)
- INSERT dbo.TDADAiCapabilityRolePolicy(CompanyID,CapabilityCode,UpdatedBy) VALUES(@company,@code,@user);
-ELSE UPDATE dbo.TDADAiCapabilityRolePolicy SET UpdatedBy=@user,UpdatedAt=SYSUTCDATETIME() WHERE CompanyID=@company AND CapabilityCode=@code;
+ INSERT dbo.TDADAiCapabilityRolePolicy(CompanyID,CapabilityCode,UpdatedBy,UseMenuPermissions) VALUES(@company,@code,@user,@useMenu);
+ELSE UPDATE dbo.TDADAiCapabilityRolePolicy SET UpdatedBy=@user,UpdatedAt=SYSUTCDATETIME(),UseMenuPermissions=@useMenu WHERE CompanyID=@company AND CapabilityCode=@code;
 DELETE FROM dbo.TDADAiCapabilityRoleAccess WHERE CompanyID=@company AND CapabilityCode=@code;
 """,db,tx))
         {
             policy.Parameters.Add("@company",SqlDbType.BigInt).Value=company;
             policy.Parameters.Add("@code",SqlDbType.NVarChar,100).Value=code;
             policy.Parameters.Add("@user",SqlDbType.BigInt).Value=long.TryParse(User.FindFirstValue("user_id"),out var userId) ? userId : DBNull.Value;
+            policy.Parameters.Add("@useMenu",SqlDbType.Bit).Value=request.UseMenuPermissions;
             await policy.ExecuteNonQueryAsync(token);
         }
         foreach(var role in roles)

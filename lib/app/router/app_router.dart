@@ -67,6 +67,9 @@ import '../../features/access/role_group/pages/role_group_page.dart';
 import '../../features/assistant/ai_capabilities_page.dart';
 import '../../features/assistant/ai_intent_test_page.dart';
 import '../../features/my_system/my_system_placeholder_page.dart';
+import '../../features/my_system/travel_expense_settings_page.dart';
+import '../../features/my_system/travel_claim_page.dart';
+import '../../features/my_system/travel_route_rates_page.dart';
 import '../../features/assistant/ai_system_settings_page.dart';
 import '../../features/assistant/ai_agents_page.dart';
 import '../../features/access/menu_permission/pages/menu_permission_page.dart';
@@ -496,6 +499,16 @@ Future<void> refreshNavigationRoutePermissions() async {
 
 final List<GoRoute> _placeholderRoutes = [
   GoRoute(
+    path: '/company/my-system/travel-route-rates',
+    name: 'travelRouteRates',
+    builder: (context, state) => const TravelRouteRatesPage(),
+  ),
+  GoRoute(
+    path: '/company/my-system/travel-settings',
+    name: 'travelExpenseSettings',
+    builder: (context, state) => const TravelExpenseSettingsPage(),
+  ),
+  GoRoute(
     path: '/company/my-system/settings',
     name: 'mySystemSettings',
     builder: (context, state) =>
@@ -510,8 +523,7 @@ final List<GoRoute> _placeholderRoutes = [
   GoRoute(
     path: '/company/my-system/travel',
     name: 'mySystemTravel',
-    builder: (context, state) =>
-        const MySystemPlaceholderPage(menuCode: '66001'),
+    builder: (context, state) => const TravelClaimPage(),
   ),
   GoRoute(
     path: '/company/my-system/purchase',

@@ -28,6 +28,7 @@ class _KnowledgePageState extends State<KnowledgePage> {
   Map<String, dynamic> options = {};
   dynamic data;
   final search = TextEditingController();
+  String _filterQuery = '';
   int page = 1;
   bool cards = false;
 
@@ -93,7 +94,7 @@ class _KnowledgePageState extends State<KnowledgePage> {
     title: title,
     menu: title,
     child: Padding(
-      padding: const EdgeInsets.all(8),
+      padding: knowledgeTokens.contentMargin,
       child: Column(
         children: [
           LayoutBuilder(
@@ -172,9 +173,12 @@ class _KnowledgePageState extends State<KnowledgePage> {
     ),
   );
   Widget _button(String text, IconData icon, VoidCallback tap) => SizedBox(
-    height: 48,
+    height: knowledgeTokens.buttonHeight,
     child: FilledButton.icon(
       style: FilledButton.styleFrom(
+        backgroundColor: knowledgeTokens.primaryColor,
+        foregroundColor: Colors.white,
+        textStyle: knowledgeTokens.buttonStyle,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
       ),
       onPressed: tap,
@@ -244,6 +248,7 @@ class _KnowledgePageState extends State<KnowledgePage> {
       if (actions['edit'] == true)
         IconButton(
           tooltip: 'แก้ไข',
+          color: knowledgeTokens.primaryColor,
           onPressed: () => _taxonomyDialog(row),
           icon: const Icon(Icons.edit_outlined),
         ),
@@ -262,101 +267,179 @@ class _KnowledgePageState extends State<KnowledgePage> {
     List<String> Function(Map<String, dynamic>) values,
     List<String> headers, {
     List<Widget> Function(Map<String, dynamic>)? rowActions,
-  }) => Column(
-    children: [
-      Expanded(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            if (rows.isEmpty) {
-              return LaooTableCard(
-                tokens: knowledgeTokens,
-                child: const Center(child: Text('ไม่พบข้อมูล')),
-              );
-            }
-            if (cards ||
-                constraints.maxWidth < knowledgeTokens.compactBreakpoint) {
-              return ListView.separated(
-                itemCount: rows.length,
-                separatorBuilder: (_, _) =>
-                    SizedBox(height: knowledgeTokens.itemSpacing),
-                itemBuilder: (_, index) {
-                  final row = rows[index];
-                  final rowValues = values(row);
-                  return LaooSurfaceCard(
-                    tokens: knowledgeTokens,
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'ID ${index + 1}',
-                                style: knowledgeTokens.tableStyle.copyWith(
-                                  color: knowledgeTokens.primaryColor,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              for (var i = 0; i < headers.length; i++)
-                                Text('${headers[i]}: ${rowValues[i]}'),
-                            ],
-                          ),
-                        ),
-                        if (rowActions != null)
-                          Wrap(spacing: 2, children: rowActions(row)),
-                      ],
-                    ),
-                  );
-                },
-              );
-            }
-            return LaooTableCard(
-              tokens: knowledgeTokens,
-              child: LaooWorkspaceDataTable(
-                tokens: knowledgeTokens,
-                columns: [
-                  LaooWorkspaceTableColumns.id,
-                  const DataColumn(
-                    label: Center(child: Text('Action')),
-                    columnWidth: FixedColumnWidth(100),
-                  ),
-                  ...headers.map((header) => DataColumn(label: Text(header))),
-                ],
-                rows: List<DataRow>.generate(rows.length, (index) {
-                  final row = rows[index];
-                  return DataRow(
-                    cells: [
-                      DataCell(Text('${index + 1}')),
-                      DataCell(
-                        Center(
-                          child: Wrap(
-                            spacing: 2,
-                            children: rowActions?.call(row) ?? const [],
-                          ),
-                        ),
-                      ),
-                      ...values(row).map((value) => DataCell(Text(value))),
-                    ],
-                  );
+  }) {
+    final filtered = rows
+        .where(
+          (row) => values(
+            row,
+          ).join(' ').toLowerCase().contains(_filterQuery.toLowerCase()),
+        )
+        .toList();
+    const pageSize = 20;
+    final pages = filtered.isEmpty ? 1 : (filtered.length / pageSize).ceil();
+    final current = page.clamp(1, pages);
+    final offset = (current - 1) * pageSize;
+    final pageRows = filtered.skip(offset).take(pageSize).toList();
+    return Column(
+      children: [
+        LaooFilterCard(
+          tokens: knowledgeTokens,
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              SizedBox(
+                width: 280,
+                child: TextField(
+                  controller: search,
+                  style: knowledgeTokens.inputStyle,
+                  decoration: _input(
+                    'ค้นหา',
+                  ).copyWith(prefixIcon: const Icon(Icons.search)),
+                  onSubmitted: (value) => setState(() {
+                    _filterQuery = value.trim();
+                    page = 1;
+                  }),
+                ),
+              ),
+              _button(
+                'ค้นหา',
+                Icons.search,
+                () => setState(() {
+                  _filterQuery = search.text.trim();
+                  page = 1;
                 }),
               ),
-            );
-          },
+              SizedBox(
+                height: knowledgeTokens.buttonHeight,
+                child: OutlinedButton.icon(
+                  onPressed: () => setState(() {
+                    search.clear();
+                    _filterQuery = '';
+                    page = 1;
+                  }),
+                  icon: const Icon(Icons.filter_alt_off_outlined),
+                  label: const Text('ล้าง Filter'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: knowledgeTokens.primaryColor,
+                    textStyle: knowledgeTokens.buttonStyle,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(
+                        knowledgeTokens.radius,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
-      SizedBox(height: knowledgeTokens.sectionSpacing),
-      LaooPaginationCard(
-        tokens: knowledgeTokens,
-        page: 1,
-        pageCount: 1,
-        pageSize: rows.isEmpty ? 20 : rows.length,
-        total: rows.length,
-        onPrevious: null,
-        onNext: null,
-      ),
-    ],
-  );
+        SizedBox(height: knowledgeTokens.sectionSpacing),
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              if (pageRows.isEmpty) {
+                return LaooTableCard(
+                  tokens: knowledgeTokens,
+                  child: const Center(child: Text('ไม่พบข้อมูล')),
+                );
+              }
+              if (cards ||
+                  constraints.maxWidth < knowledgeTokens.compactBreakpoint) {
+                return ListView.separated(
+                  itemCount: pageRows.length,
+                  separatorBuilder: (_, _) =>
+                      SizedBox(height: knowledgeTokens.itemSpacing),
+                  itemBuilder: (_, index) {
+                    final row = pageRows[index];
+                    final rowValues = values(row);
+                    return LaooSurfaceCard(
+                      tokens: knowledgeTokens,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'ID ${offset + index + 1}',
+                                  style: knowledgeTokens.tableStyle.copyWith(
+                                    color: knowledgeTokens.primaryColor,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                for (var i = 0; i < headers.length; i++)
+                                  Text('${headers[i]}: ${rowValues[i]}'),
+                              ],
+                            ),
+                          ),
+                          if (rowActions != null)
+                            Wrap(spacing: 2, children: rowActions(row)),
+                        ],
+                      ),
+                    );
+                  },
+                );
+              }
+              return LaooTableCard(
+                tokens: knowledgeTokens,
+                child: Padding(
+                  padding: knowledgeTokens.cardPadding,
+                  child: LaooWorkspaceDataTable(
+                    tokens: knowledgeTokens,
+                    columns: [
+                      LaooWorkspaceTableColumns.id,
+                      const DataColumn(
+                        label: Text('Action'),
+                        columnWidth: FixedColumnWidth(100),
+                      ),
+                      ...headers.map(
+                        (header) => DataColumn(label: Text(header)),
+                      ),
+                    ],
+                    rows: List<DataRow>.generate(pageRows.length, (index) {
+                      final row = pageRows[index];
+                      return DataRow(
+                        cells: [
+                          DataCell(Text('${offset + index + 1}')),
+                          DataCell(
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: Wrap(
+                                spacing: 2,
+                                children: rowActions?.call(row) ?? const [],
+                              ),
+                            ),
+                          ),
+                          ...values(row).map((value) => DataCell(Text(value))),
+                        ],
+                      );
+                    }),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        SizedBox(height: knowledgeTokens.sectionSpacing),
+        LaooPaginationCard(
+          tokens: knowledgeTokens,
+          page: current,
+          pageCount: pages,
+          pageSize: pageSize,
+          total: filtered.length,
+          onPrevious: current > 1
+              ? () => setState(() => page = current - 1)
+              : null,
+          onNext: current < pages
+              ? () => setState(() => page = current + 1)
+              : null,
+        ),
+      ],
+    );
+  }
 
   Widget _articles(bool library) {
     final rows = _items(data);
@@ -373,6 +456,7 @@ class _KnowledgePageState extends State<KnowledgePage> {
                 width: 280,
                 child: TextField(
                   controller: search,
+                  style: knowledgeTokens.inputStyle,
                   onSubmitted: (_) {
                     setState(() => page = 1);
                     load();
@@ -382,22 +466,30 @@ class _KnowledgePageState extends State<KnowledgePage> {
                   ).copyWith(prefixIcon: const Icon(Icons.search)),
                 ),
               ),
-              FilledButton.icon(
-                onPressed: () {
-                  setState(() => page = 1);
-                  load();
-                },
-                icon: const Icon(Icons.search),
-                label: const Text('ค้นหา'),
-              ),
-              OutlinedButton.icon(
-                onPressed: () {
-                  search.clear();
-                  setState(() => page = 1);
-                  load();
-                },
-                icon: const Icon(Icons.filter_alt_off_outlined),
-                label: const Text('ล้าง Filter'),
+              _button('ค้นหา', Icons.search, () {
+                setState(() => page = 1);
+                load();
+              }),
+              SizedBox(
+                height: knowledgeTokens.buttonHeight,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    search.clear();
+                    setState(() => page = 1);
+                    load();
+                  },
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: knowledgeTokens.primaryColor,
+                    textStyle: knowledgeTokens.buttonStyle,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(
+                        knowledgeTokens.radius,
+                      ),
+                    ),
+                  ),
+                  icon: const Icon(Icons.filter_alt_off_outlined),
+                  label: const Text('ล้าง Filter'),
+                ),
               ),
             ],
           ),
@@ -456,15 +548,14 @@ class _KnowledgePageState extends State<KnowledgePage> {
           children: [
             Icon(
               _sourceIcon(_text(r['contentType'])),
-              color: Theme.of(context).colorScheme.primary,
+              color: knowledgeTokens.primaryColor,
             ),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
                 _text(r['title']),
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
+                style: knowledgeTokens.sectionStyle.copyWith(
+                  color: knowledgeTokens.primaryColor,
                 ),
               ),
             ),
@@ -489,47 +580,51 @@ class _KnowledgePageState extends State<KnowledgePage> {
   Widget _articleTable(List<Map<String, dynamic>> rows, bool library) =>
       LaooTableCard(
         tokens: knowledgeTokens,
-        child: LaooWorkspaceDataTable(
-          tokens: knowledgeTokens,
-          columns: const [
-            LaooWorkspaceTableColumns.id,
-            DataColumn(
-              label: Center(child: Text('Action')),
-              columnWidth: FixedColumnWidth(100),
-            ),
-            DataColumn(label: Text('รหัส')),
-            DataColumn(label: Text('ชื่อองค์ความรู้')),
-            DataColumn(label: Text('ประเภท')),
-            DataColumn(label: Text('สถานะ')),
-          ],
-          rows: List<DataRow>.generate(rows.length, (index) {
-            final row = rows[index];
-            return DataRow(
-              cells: [
-                DataCell(Text('${(page - 1) * 20 + index + 1}')),
-                DataCell(
-                  Center(
-                    child: Wrap(
-                      spacing: 2,
-                      children: _articleActions(row, library),
+        child: Padding(
+          padding: knowledgeTokens.cardPadding,
+          child: LaooWorkspaceDataTable(
+            tokens: knowledgeTokens,
+            columns: const [
+              LaooWorkspaceTableColumns.id,
+              DataColumn(
+                label: Text('Action'),
+                columnWidth: FixedColumnWidth(100),
+              ),
+              DataColumn(label: Text('รหัส')),
+              DataColumn(label: Text('ชื่อองค์ความรู้')),
+              DataColumn(label: Text('ประเภท')),
+              DataColumn(label: Text('สถานะ')),
+            ],
+            rows: List<DataRow>.generate(rows.length, (index) {
+              final row = rows[index];
+              return DataRow(
+                cells: [
+                  DataCell(Text('${(page - 1) * 20 + index + 1}')),
+                  DataCell(
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Wrap(
+                        spacing: 2,
+                        children: _articleActions(row, library),
+                      ),
                     ),
                   ),
-                ),
-                DataCell(Text(_text(row['code']))),
-                DataCell(
-                  SizedBox(
-                    width: 360,
-                    child: Text(
-                      _text(row['title']),
-                      overflow: TextOverflow.ellipsis,
+                  DataCell(Text(_text(row['code']))),
+                  DataCell(
+                    SizedBox(
+                      width: 360,
+                      child: Text(
+                        _text(row['title']),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ),
-                ),
-                DataCell(Text(_text(row['contentType']))),
-                DataCell(Text(_text(row['status']))),
-              ],
-            );
-          }),
+                  DataCell(Text(_text(row['contentType']))),
+                  DataCell(Text(_text(row['status']))),
+                ],
+              );
+            }),
+          ),
         ),
       );
   List<Widget> _articleActions(Map<String, dynamic> row, bool library) {
@@ -539,18 +634,21 @@ class _KnowledgePageState extends State<KnowledgePage> {
     return [
       IconButton(
         tooltip: 'เปิดดู',
+        color: knowledgeTokens.primaryColor,
         onPressed: () => _view(row),
         icon: const Icon(Icons.visibility_outlined),
       ),
       if (!library && editable && actions['edit'] == true)
         IconButton(
           tooltip: 'แก้ไข',
+          color: knowledgeTokens.primaryColor,
           onPressed: () => _articleDialog(row),
           icon: const Icon(Icons.edit_outlined),
         ),
       if (!library && editable && actions['submit'] == true)
         IconButton(
           tooltip: 'ส่งตรวจทาน',
+          color: knowledgeTokens.primaryColor,
           onPressed: () async {
             await api.post('/api/company/knowledge/articles/$id/submit');
             if (mounted) knowledgeMessage(context, 'ส่งตรวจทานแล้ว');
@@ -563,6 +661,7 @@ class _KnowledgePageState extends State<KnowledgePage> {
           actions['edit'] == true)
         IconButton(
           tooltip: 'สร้าง Revision ใหม่',
+          color: knowledgeTokens.primaryColor,
           onPressed: () async {
             await api.post('/api/company/knowledge/articles/$id/revisions');
             if (mounted) {
@@ -586,56 +685,51 @@ class _KnowledgePageState extends State<KnowledgePage> {
   }
 
   Widget _reviews() => _simple(_rows(data), 'รายการรอตรวจทาน', review: true);
-  Widget _questions() => _card(
-    ListView.separated(
-      itemCount: _rows(data).length,
-      separatorBuilder: (_, __) => const Divider(),
-      itemBuilder: (_, index) {
-        final row = _rows(data)[index];
-        return ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.question_answer_outlined),
-          title: Text(_text(row['title'])),
-          subtitle: Text(
-            '${_text(row['categoryName'])} • ${_text(row['status'])} • ${_text(row['answerCount'])} คำตอบ',
+  Widget _questions() => _pagedItems(_rows(data), (row) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: const Icon(Icons.question_answer_outlined),
+      title: Text(_text(row['title'])),
+      subtitle: Text(
+        '${_text(row['categoryName'])} • ${_text(row['status'])} • ${_text(row['answerCount'])} คำตอบ',
+      ),
+      trailing: Wrap(
+        spacing: 2,
+        children: [
+          IconButton(
+            tooltip: 'เปิดดู',
+            color: knowledgeTokens.primaryColor,
+            onPressed: () => _questionDetail((row['id'] as num).toInt()),
+            icon: const Icon(Icons.visibility_outlined),
           ),
-          trailing: Wrap(
-            spacing: 2,
-            children: [
-              IconButton(
-                tooltip: 'เปิดดู',
-                onPressed: () => _questionDetail((row['id'] as num).toInt()),
-                icon: const Icon(Icons.visibility_outlined),
-              ),
-              if (row['canEdit'] == true && actions['edit'] == true)
-                IconButton(
-                  tooltip: 'แก้ไข',
-                  onPressed: () async {
-                    final detail = _map(
-                      await api.get(
-                        '/api/company/knowledge/questions/${(row['id'] as num).toInt()}',
-                      ),
-                    );
-                    if (mounted) {
-                      _questionDialog(_map(detail['question']));
-                    }
-                  },
-                  icon: const Icon(Icons.edit_outlined),
-                ),
-              if (row['canDelete'] == true && actions['delete'] == true)
-                IconButton(
-                  tooltip: 'ลบ',
-                  color: Theme.of(context).colorScheme.error,
-                  onPressed: () => _deleteQuestion(row),
-                  icon: const Icon(Icons.delete_outline),
-                ),
-            ],
-          ),
-          onTap: () => _questionDetail((row['id'] as num).toInt()),
-        );
-      },
-    ),
-  );
+          if (row['canEdit'] == true && actions['edit'] == true)
+            IconButton(
+              tooltip: 'แก้ไข',
+              color: knowledgeTokens.primaryColor,
+              onPressed: () async {
+                final detail = _map(
+                  await api.get(
+                    '/api/company/knowledge/questions/${(row['id'] as num).toInt()}',
+                  ),
+                );
+                if (mounted) {
+                  _questionDialog(_map(detail['question']));
+                }
+              },
+              icon: const Icon(Icons.edit_outlined),
+            ),
+          if (row['canDelete'] == true && actions['delete'] == true)
+            IconButton(
+              tooltip: 'ลบ',
+              color: Theme.of(context).colorScheme.error,
+              onPressed: () => _deleteQuestion(row),
+              icon: const Icon(Icons.delete_outline),
+            ),
+        ],
+      ),
+      onTap: () => _questionDetail((row['id'] as num).toInt()),
+    );
+  });
   Widget _mine() {
     final value = _map(data);
     return ListView(
@@ -739,51 +833,95 @@ class _KnowledgePageState extends State<KnowledgePage> {
     List<Map<String, dynamic>> rows,
     String heading, {
     bool review = false,
-  }) => _card(
-    ListView.separated(
-      itemCount: rows.length,
-      separatorBuilder: (_, __) => const Divider(),
-      itemBuilder: (_, i) {
-        final r = rows[i];
-        return ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: Icon(
-            review ? Icons.fact_check_outlined : Icons.auto_stories_outlined,
-          ),
-          title: Text(_text(r['title'] ?? r['question'])),
-          subtitle: Text(_text(r['status'])),
-          trailing: review
-              ? Wrap(
-                  spacing: 4,
-                  children: [
-                    IconButton(
-                      tooltip: 'ส่งกลับ',
-                      onPressed: actions['return'] == true
-                          ? () => _returnDialog((r['id'] as num).toInt())
-                          : null,
-                      icon: const Icon(Icons.undo_outlined),
-                    ),
-                    IconButton(
-                      tooltip: 'เผยแพร่',
-                      onPressed: actions['publish'] == true
-                          ? () => _publish((r['id'] as num).toInt())
-                          : null,
-                      icon: const Icon(Icons.publish_outlined),
-                    ),
-                    IconButton(
-                      onPressed: () => _view(r),
-                      icon: const Icon(Icons.visibility_outlined),
-                    ),
-                  ],
-                )
-              : IconButton(
-                  onPressed: () => _view(r),
-                  icon: const Icon(Icons.chevron_right),
+  }) => _pagedItems(rows, (r) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(
+        review ? Icons.fact_check_outlined : Icons.auto_stories_outlined,
+      ),
+      title: Text(_text(r['title'] ?? r['question'])),
+      subtitle: Text(_text(r['status'])),
+      trailing: review
+          ? Wrap(
+              spacing: 4,
+              children: [
+                IconButton(
+                  tooltip: 'ส่งกลับ',
+                  color: knowledgeTokens.primaryColor,
+                  onPressed: actions['return'] == true
+                      ? () => _returnDialog((r['id'] as num).toInt())
+                      : null,
+                  icon: const Icon(Icons.undo_outlined),
                 ),
-        );
-      },
-    ),
-  );
+                IconButton(
+                  tooltip: 'เผยแพร่',
+                  color: knowledgeTokens.primaryColor,
+                  onPressed: actions['publish'] == true
+                      ? () => _publish((r['id'] as num).toInt())
+                      : null,
+                  icon: const Icon(Icons.publish_outlined),
+                ),
+                IconButton(
+                  color: knowledgeTokens.primaryColor,
+                  onPressed: () => _view(r),
+                  icon: const Icon(Icons.visibility_outlined),
+                ),
+              ],
+            )
+          : IconButton(
+              color: knowledgeTokens.primaryColor,
+              onPressed: () => _view(r),
+              icon: const Icon(Icons.chevron_right),
+            ),
+    );
+  });
+
+  Widget _pagedItems(
+    List<Map<String, dynamic>> rows,
+    Widget Function(Map<String, dynamic>) itemBuilder,
+  ) {
+    const pageSize = 20;
+    final totalPages = ((rows.length + pageSize - 1) ~/ pageSize).clamp(
+      1,
+      1 << 30,
+    );
+    final currentPage = page.clamp(1, totalPages);
+    final visible = rows
+        .skip((currentPage - 1) * pageSize)
+        .take(pageSize)
+        .toList();
+    return Column(
+      children: [
+        Expanded(
+          child: LaooSurfaceCard(
+            tokens: knowledgeTokens,
+            padding: knowledgeTokens.cardPadding,
+            child: ListView.separated(
+              itemCount: visible.length,
+              separatorBuilder: (_, __) =>
+                  Divider(color: knowledgeTokens.borderColor, thickness: .6),
+              itemBuilder: (_, index) => itemBuilder(visible[index]),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        LaooPaginationCard(
+          tokens: knowledgeTokens,
+          page: currentPage,
+          pageCount: totalPages,
+          total: rows.length,
+          pageSize: pageSize,
+          onPrevious: currentPage > 1
+              ? () => setState(() => page = currentPage - 1)
+              : null,
+          onNext: currentPage < totalPages
+              ? () => setState(() => page = currentPage + 1)
+              : null,
+        ),
+      ],
+    );
+  }
+
   Future<void> _publish(int id) async {
     await api.post(
       '/api/company/knowledge/reviews/$id/publish',
@@ -800,6 +938,7 @@ class _KnowledgePageState extends State<KnowledgePage> {
       Icons.undo_outlined,
       TextField(
         controller: note,
+        style: knowledgeTokens.inputStyle,
         maxLines: 4,
         decoration: _input('เหตุผลที่ส่งกลับ *'),
       ),
@@ -819,7 +958,7 @@ class _KnowledgePageState extends State<KnowledgePage> {
     child: _card(
       Row(
         children: [
-          Icon(icon, size: 30, color: Theme.of(context).colorScheme.primary),
+          Icon(icon, size: 30, color: knowledgeTokens.primaryColor),
           const SizedBox(width: 12),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -850,14 +989,26 @@ class _KnowledgePageState extends State<KnowledgePage> {
   );
   InputDecoration _input(String label) => InputDecoration(
     labelText: label,
+    labelStyle: knowledgeTokens.inputStyle,
+    floatingLabelStyle: knowledgeTokens.inputStyle.copyWith(
+      fontSize: 14 / .75,
+      color: knowledgeTokens.primaryColor,
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(knowledgeTokens.radius),
+      borderSide: BorderSide(color: knowledgeTokens.primaryColor, width: 2),
+    ),
     border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
     enabledBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(4),
-      borderSide: BorderSide(color: Theme.of(context).dividerColor),
+      borderSide: BorderSide(color: knowledgeTokens.borderColor),
     ),
   );
-  Widget _field(TextEditingController c, String label) =>
-      TextField(controller: c, decoration: _input(label));
+  Widget _field(TextEditingController c, String label) => TextField(
+    controller: c,
+    style: knowledgeTokens.inputStyle,
+    decoration: _input(label),
+  );
   Future<void> _deleteArticle(Map<String, dynamic> row) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -960,6 +1111,7 @@ class _KnowledgePageState extends State<KnowledgePage> {
             _field(titleC, 'ชื่อเรื่อง *'),
             const SizedBox(height: 16),
             DropdownButtonFormField<int>(
+              style: knowledgeTokens.tableStyle,
               initialValue: categoryId,
               decoration: _input('หมวดความรู้ *'),
               items: categories
@@ -974,6 +1126,7 @@ class _KnowledgePageState extends State<KnowledgePage> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
+              style: knowledgeTokens.tableStyle,
               initialValue: type,
               decoration: _input('ประเภทเนื้อหา *'),
               items: const [
@@ -993,6 +1146,7 @@ class _KnowledgePageState extends State<KnowledgePage> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
+              style: knowledgeTokens.tableStyle,
               initialValue: audienceMode,
               decoration: _input('ผู้มีสิทธิ์เข้าถึง *'),
               items: const [
@@ -1007,6 +1161,7 @@ class _KnowledgePageState extends State<KnowledgePage> {
             if (audienceMode == 'RESTRICTED') ...[
               const SizedBox(height: 16),
               DropdownButtonFormField<int?>(
+                style: knowledgeTokens.tableStyle,
                 initialValue: departmentId,
                 decoration: _input('แผนกที่เข้าถึงได้'),
                 items: [
@@ -1025,6 +1180,7 @@ class _KnowledgePageState extends State<KnowledgePage> {
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<int?>(
+                style: knowledgeTokens.tableStyle,
                 initialValue: audienceUserId,
                 decoration: _input('บุคคลที่เข้าถึงได้'),
                 items: [
@@ -1047,6 +1203,7 @@ class _KnowledgePageState extends State<KnowledgePage> {
             const SizedBox(height: 16),
             TextField(
               controller: body,
+              style: knowledgeTokens.inputStyle,
               maxLines: 5,
               decoration: _input('รายละเอียด'),
             ),
@@ -1144,6 +1301,7 @@ class _KnowledgePageState extends State<KnowledgePage> {
             _field(name, 'ชื่อหมวด *'),
             const SizedBox(height: 16),
             DropdownButtonFormField<int?>(
+              style: knowledgeTokens.tableStyle,
               initialValue: ownerId,
               decoration: _input('เจ้าของหมวด'),
               items: [
@@ -1166,6 +1324,7 @@ class _KnowledgePageState extends State<KnowledgePage> {
             const SizedBox(height: 16),
             TextField(
               controller: sort,
+              style: knowledgeTokens.inputStyle,
               keyboardType: TextInputType.number,
               decoration: _input('ลำดับ'),
             ),
@@ -1265,7 +1424,7 @@ class _KnowledgePageState extends State<KnowledgePage> {
                     ? Icons.check_circle
                     : Icons.chat_bubble_outline,
                 color: item['accepted'] == true
-                    ? Theme.of(context).colorScheme.primary
+                    ? knowledgeTokens.primaryColor
                     : null,
               ),
               title: Text(_text(item['answer'])),
@@ -1284,6 +1443,7 @@ class _KnowledgePageState extends State<KnowledgePage> {
             const SizedBox(height: 8),
             TextField(
               controller: answer,
+              style: knowledgeTokens.inputStyle,
               maxLines: 4,
               decoration: _input('เพิ่มคำตอบ *'),
             ),
@@ -1404,6 +1564,7 @@ class _KnowledgePageState extends State<KnowledgePage> {
         builder: (context, setLocal) => Column(
           children: [
             DropdownButtonFormField<int>(
+              style: knowledgeTokens.tableStyle,
               initialValue: categoryId,
               decoration: _input('หมวดความรู้ *'),
               items: categories
@@ -1421,6 +1582,7 @@ class _KnowledgePageState extends State<KnowledgePage> {
             const SizedBox(height: 16),
             TextField(
               controller: detail,
+              style: knowledgeTokens.inputStyle,
               maxLines: 5,
               decoration: _input('รายละเอียด *'),
             ),
@@ -1536,19 +1698,12 @@ class _KnowledgePageState extends State<KnowledgePage> {
                   padding: const EdgeInsets.all(10),
                   child: Row(
                     children: [
-                      Icon(
-                        icon,
-                        size: 24,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
+                      Icon(icon, size: 24, color: knowledgeTokens.primaryColor),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
                           caption,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                          ),
+                          style: knowledgeTokens.captionStyle,
                         ),
                       ),
                     ],
@@ -1572,6 +1727,8 @@ class _KnowledgePageState extends State<KnowledgePage> {
                         height: 48,
                         child: OutlinedButton(
                           style: OutlinedButton.styleFrom(
+                            foregroundColor: knowledgeTokens.primaryColor,
+                            textStyle: knowledgeTokens.buttonStyle,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(4),
                             ),
@@ -1589,6 +1746,9 @@ class _KnowledgePageState extends State<KnowledgePage> {
                           height: 48,
                           child: FilledButton.icon(
                             style: FilledButton.styleFrom(
+                              backgroundColor: knowledgeTokens.primaryColor,
+                              foregroundColor: Colors.white,
+                              textStyle: knowledgeTokens.buttonStyle,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(4),
                               ),

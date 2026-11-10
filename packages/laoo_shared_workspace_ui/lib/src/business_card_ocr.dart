@@ -482,7 +482,8 @@ class _BusinessCardOcrPageState extends State<BusinessCardOcrPage> {
       labelText: label,
       labelStyle: t.inputStyle,
       floatingLabelStyle: t.inputStyle.copyWith(
-        fontSize: (t.inputStyle.fontSize ?? 14) / .75,
+        fontSize: (t.tableStyle.fontSize ?? 14) / .75,
+        color: t.primaryColor,
       ),
       border: border(t.borderColor),
       enabledBorder: border(t.borderColor),
@@ -506,6 +507,12 @@ class _BusinessCardOcrPageState extends State<BusinessCardOcrPage> {
               ChoiceChip(
                 label: Text(i == 0 ? 'ด้านหน้า' : 'ด้านหลัง'),
                 selected: _side == i,
+                selectedColor: t.primaryColor.withValues(alpha: .12),
+                checkmarkColor: t.primaryColor,
+                labelStyle: TextStyle(color: t.primaryColor),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(t.radius),
+                ),
                 onSelected: _busy ? null : (_) => setState(() => _side = i),
               ),
           ],
@@ -584,6 +591,7 @@ class _BusinessCardOcrPageState extends State<BusinessCardOcrPage> {
           const SizedBox(height: 16),
           Text('ข้อความต้นฉบับ → เลือกช่องที่จะใส่', style: t.sectionStyle),
           DropdownButtonFormField<String>(
+            style: t.tableStyle,
             initialValue: _assign,
             isExpanded: true,
             decoration: _input('ช่องปลายทาง'),
@@ -618,6 +626,7 @@ class _BusinessCardOcrPageState extends State<BusinessCardOcrPage> {
         if (widget.target == 'customers') ...[
           const SizedBox(height: 16),
           DropdownButtonFormField<int>(
+            style: t.tableStyle,
             initialValue: _slot,
             isExpanded: true,
             decoration: _input('ผู้ติดต่อที่จะรับข้อมูล'),
@@ -721,6 +730,9 @@ class _BusinessCardOcrPageState extends State<BusinessCardOcrPage> {
     );
     return Theme(
       data: Theme.of(context).copyWith(
+        colorScheme: Theme.of(
+          context,
+        ).colorScheme.copyWith(primary: t.primaryColor),
         filledButtonTheme: FilledButtonThemeData(
           style: FilledButton.styleFrom(
             shape: shape,

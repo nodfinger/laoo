@@ -17,8 +17,9 @@ import 'assistant_report.dart';
 
 /// Local, session-only assistant. All data operations still use authorized APIs.
 class AssistantLauncher extends StatefulWidget {
-  const AssistantLauncher({super.key, required this.child});
+  const AssistantLauncher({super.key, required this.child, this.navigatorKey});
   final Widget child;
+  final GlobalKey<NavigatorState>? navigatorKey;
 
   @override
   State<AssistantLauncher> createState() => _AssistantLauncherState();
@@ -32,17 +33,21 @@ class _AssistantLauncherState extends State<AssistantLauncher> {
         workspaceThemeController,
         userProfileAvatarNotifier,
       ]),
-      builder: (context, _) => Stack(
-        children: [
-          widget.child,
-          if (appAuthController.isAuthenticated &&
-              appAuthController.isCompanyUser)
-            _AssistantOverlay(
-              key: ValueKey(
-                '${appAuthController.session?.companyId}:${appAuthController.session?.userId}',
+      builder: (context, _) => _AssistantDialogScope(
+        navigatorKey:
+            widget.navigatorKey ?? appRouter.routerDelegate.navigatorKey,
+        child: Stack(
+          children: [
+            widget.child,
+            if (appAuthController.isAuthenticated &&
+                appAuthController.isCompanyUser)
+              _AssistantOverlay(
+                key: ValueKey(
+                  '${appAuthController.session?.companyId}:${appAuthController.session?.userId}',
+                ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     ),
   );
@@ -55,6 +60,32 @@ class _AssistantLauncherState extends State<AssistantLauncher> {
 
   @override
   Widget build(BuildContext context) => Overlay(initialEntries: [_entry]);
+}
+
+class _AssistantDialogScope extends InheritedWidget {
+  const _AssistantDialogScope({
+    required this.navigatorKey,
+    required super.child,
+  });
+  final GlobalKey<NavigatorState> navigatorKey;
+
+  @override
+  bool updateShouldNotify(_AssistantDialogScope oldWidget) =>
+      navigatorKey != oldWidget.navigatorKey;
+}
+
+/// Opens dialogs on the app navigator, even when the assistant is in an overlay.
+Future<T?> showAssistantDialog<T>({
+  required BuildContext context,
+  required WidgetBuilder builder,
+}) {
+  final scope = context
+      .dependOnInheritedWidgetOfExactType<_AssistantDialogScope>();
+  final navigatorContext = scope?.navigatorKey.currentContext;
+  if (navigatorContext == null) {
+    return Future.error(StateError('Assistant navigator is not available'));
+  }
+  return showDialog<T>(context: navigatorContext, builder: builder);
 }
 
 class _AssistantOverlay extends StatefulWidget {
@@ -104,6 +135,126 @@ class _AssistantOverlayState extends State<_AssistantOverlay> {
   Uint8List? _aiImage;
   Timer? _settingsTimer;
   int _settingsRequest = 0;
+  List<Map<String, dynamic>> _favoriteCommands = [];
+  List<Map<String, dynamic>> _recentCommands = [];
+  int _favoriteLimit = 0;
+  int _recentLimit = 0;
+  bool? _commandListFavorites;
+  String? _deleteFavoriteId;
+  final Map<int, Map<String, String>> _favoritePrompts = {};
+
+  Future<void> _loadCommands() async {
+    try {
+      final result = await _api.get('/api/assistant/user-commands');
+      if (!mounted || result is! Map) return;
+      setState(() {
+        _favoriteCommands = (result['favorite'] as List? ?? [])
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
+        _recentCommands = (result['recent'] as List? ?? [])
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
+        _favoriteLimit = (result['favoriteLimit'] as num?)?.toInt() ?? 0;
+        _recentLimit = (result['recentLimit'] as num?)?.toInt() ?? 0;
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _favoriteCommands = [];
+          _recentCommands = [];
+        });
+      }
+    }
+  }
+
+  Future<void> _recordCommand(String text, String capability) async {
+    try {
+      await _api.post(
+        '/api/assistant/user-commands/recent',
+        body: {'text': text, 'capability': capability},
+      );
+      await _loadCommands();
+      if (!mounted) return;
+      final normalized = text.toLowerCase().replaceAll(RegExp(r'\s+'), '');
+      if (_favoriteLimit <= 0 ||
+          _favoriteCommands.length >= _favoriteLimit ||
+          _favoriteCommands.any(
+            (item) =>
+                '${item['text']}'.toLowerCase().replaceAll(
+                  RegExp(r'\s+'),
+                  '',
+                ) ==
+                normalized,
+          )) {
+        return;
+      }
+      if (_favoritePrompts.values.any(
+        (item) =>
+            item['text']!.toLowerCase().replaceAll(RegExp(r'\s+'), '') ==
+            normalized,
+      )) {
+        return;
+      }
+      setState(() {
+        final index = _messages.length;
+        _messages.add(
+          'ต้องการเก็บคำสั่ง “$text” ไว้ใช้บ่อยหรือไม่? (${_favoriteCommands.length}/$_favoriteLimit)',
+        );
+        _favoritePrompts[index] = {'text': text, 'capability': capability};
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() => _messages.add('ไม่สามารถบันทึกคำสั่งได้ กรุณาลองใหม่'));
+      }
+    }
+  }
+
+  void _showCommands(bool favorites) {
+    setState(() {
+      _commandListFavorites = _commandListFavorites == favorites
+          ? null
+          : favorites;
+      _deleteFavoriteId = null;
+    });
+  }
+
+  Future<void> _answerFavoritePrompt(int index, bool save) async {
+    final item = _favoritePrompts.remove(index);
+    if (item == null) return;
+    setState(() {});
+    if (!save) {
+      setState(() => _messages.add('ไม่เก็บคำสั่งนี้เป็นคำสั่งใช้บ่อย'));
+      return;
+    }
+    try {
+      await _api.post('/api/assistant/user-commands/favorite', body: item);
+      await _loadCommands();
+      if (mounted) setState(() => _messages.add('บันทึกคำสั่งใช้บ่อยแล้ว'));
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => _messages.add(
+            'บันทึกคำสั่งใช้บ่อยไม่สำเร็จ กรุณาตรวจสอบจำนวนที่เก็บและลองใหม่',
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteFavorite(String id) async {
+    setState(() => _deleteFavoriteId = null);
+    try {
+      await _api.delete('/api/assistant/user-commands/favorite/$id');
+      await _loadCommands();
+      if (mounted) setState(() => _messages.add('ลบคำสั่งใช้บ่อยแล้ว'));
+    } catch (_) {
+      if (mounted) {
+        setState(() => _messages.add('ลบคำสั่งไม่สำเร็จ กรุณาลองใหม่'));
+      }
+    }
+  }
 
   List<String> _matchingSubjects(String text) {
     final query = text.toLowerCase().trim();
@@ -647,6 +798,17 @@ class _AssistantOverlayState extends State<_AssistantOverlay> {
           return;
         }
       }
+      if (intent is String &&
+          !{
+            'unknown',
+            'none',
+            'denied',
+            'ambiguous',
+            'unavailable',
+          }.contains(intent)) {
+        await _recordCommand(text, intent);
+        if (!mounted) return;
+      }
       final agent = response is Map ? response['agent'] : null;
       if (agent is Map &&
           agent['id'] is String &&
@@ -1034,7 +1196,7 @@ class _AssistantOverlayState extends State<_AssistantOverlay> {
 
   Future<void> _emailReport() async {
     final input = TextEditingController();
-    final address = await showDialog<String>(
+    final address = await showAssistantDialog<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('ส่งรายงานทางอีเมล'),
@@ -1057,7 +1219,7 @@ class _AssistantOverlayState extends State<_AssistantOverlay> {
     );
     input.dispose();
     if (!mounted || address == null || address.isEmpty) return;
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAssistantDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('ยืนยันส่งอีเมล'),
@@ -1286,6 +1448,124 @@ class _AssistantOverlayState extends State<_AssistantOverlay> {
                         ),
                       ),
                       const Divider(height: 1),
+                      if (_favoriteCommands.isNotEmpty ||
+                          _recentCommands.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 4,
+                          ),
+                          child: Wrap(
+                            children: [
+                              if (_favoriteCommands.isNotEmpty)
+                                TextButton.icon(
+                                  onPressed:
+                                      _busy ||
+                                          _draftKey != null ||
+                                          _waitingForSerial ||
+                                          _waitingMeetingAvailability ||
+                                          _pendingCapabilityQuestion != null
+                                      ? null
+                                      : () => _showCommands(true),
+                                  icon: const Icon(Icons.star_outline),
+                                  label: Text(
+                                    'ใช้บ่อย ${_favoriteCommands.length}/$_favoriteLimit',
+                                  ),
+                                ),
+                              if (_recentCommands.isNotEmpty)
+                                TextButton.icon(
+                                  onPressed:
+                                      _busy ||
+                                          _draftKey != null ||
+                                          _waitingForSerial ||
+                                          _waitingMeetingAvailability ||
+                                          _pendingCapabilityQuestion != null
+                                      ? null
+                                      : () => _showCommands(false),
+                                  icon: const Icon(Icons.history),
+                                  label: Text(
+                                    'ล่าสุด ${_recentCommands.length}/$_recentLimit',
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      if (_commandListFavorites != null)
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxHeight: 180),
+                          child: ListView(
+                            shrinkWrap: true,
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            children: [
+                              for (final item
+                                  in (_commandListFavorites!
+                                      ? _favoriteCommands
+                                      : _recentCommands))
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: TextButton(
+                                            onPressed: _busy
+                                                ? null
+                                                : () {
+                                                    setState(
+                                                      () =>
+                                                          _commandListFavorites =
+                                                              null,
+                                                    );
+                                                    _text.text =
+                                                        '${item['text']}';
+                                                    _send();
+                                                  },
+                                            style: TextButton.styleFrom(
+                                              alignment: Alignment.centerLeft,
+                                            ),
+                                            child: Text('${item['text']}'),
+                                          ),
+                                        ),
+                                        if (_commandListFavorites!)
+                                          IconButton(
+                                            tooltip: 'ลบคำสั่งใช้บ่อย',
+                                            icon: const Icon(
+                                              Icons.delete_outline,
+                                            ),
+                                            onPressed: () => setState(
+                                              () => _deleteFavoriteId =
+                                                  '${item['id']}',
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                    if (_deleteFavoriteId == '${item['id']}' &&
+                                        _commandListFavorites!)
+                                      Wrap(
+                                        crossAxisAlignment:
+                                            WrapCrossAlignment.center,
+                                        children: [
+                                          const Text('ลบคำสั่งนี้หรือไม่?'),
+                                          TextButton(
+                                            onPressed: () => setState(
+                                              () => _deleteFavoriteId = null,
+                                            ),
+                                            child: const Text('ยกเลิก'),
+                                          ),
+                                          TextButton(
+                                            onPressed: () => _deleteFavorite(
+                                              '${item['id']}',
+                                            ),
+                                            child: const Text('ยืนยันลบ'),
+                                          ),
+                                        ],
+                                      ),
+                                    const Divider(height: 1),
+                                  ],
+                                ),
+                            ],
+                          ),
+                        ),
                       Expanded(
                         child: ListView.builder(
                           reverse: true,
@@ -1421,6 +1701,27 @@ class _AssistantOverlayState extends State<_AssistantOverlay> {
                                                       : FontWeight.normal,
                                                 ),
                                           ),
+                                        if (_favoritePrompts.containsKey(index))
+                                          Wrap(
+                                            children: [
+                                              TextButton(
+                                                onPressed: () =>
+                                                    _answerFavoritePrompt(
+                                                      index,
+                                                      true,
+                                                    ),
+                                                child: const Text('เก็บคำสั่ง'),
+                                              ),
+                                              TextButton(
+                                                onPressed: () =>
+                                                    _answerFavoritePrompt(
+                                                      index,
+                                                      false,
+                                                    ),
+                                                child: const Text('ไม่เก็บ'),
+                                              ),
+                                            ],
+                                          ),
                                         if (isChoiceMessage)
                                           for (
                                             var option = 0;
@@ -1533,7 +1834,7 @@ class _AssistantOverlayState extends State<_AssistantOverlay> {
                                 Stack(
                                   children: [
                                     InkWell(
-                                      onTap: () => showDialog<void>(
+                                      onTap: () => showAssistantDialog<void>(
                                         context: context,
                                         builder: (context) => Dialog(
                                           child: Column(
@@ -1585,8 +1886,9 @@ class _AssistantOverlayState extends State<_AssistantOverlay> {
                                               : () => setState(() {
                                                   _draftImages.remove(file);
                                                   if (_requirePhoto &&
-                                                      _draftImages.isEmpty)
+                                                      _draftImages.isEmpty) {
                                                     _photoAnswered = false;
+                                                  }
                                                 }),
                                         ),
                                       ),
@@ -1670,7 +1972,10 @@ class _AssistantOverlayState extends State<_AssistantOverlay> {
                 backgroundColor: Colors.white,
                 foregroundColor: primary,
                 tooltip: 'ผู้ช่วย AI',
-                onPressed: () => setState(() => _open = !_open),
+                onPressed: () {
+                  setState(() => _open = !_open);
+                  if (_open) _loadCommands();
+                },
                 child: _open
                     ? const Icon(Icons.close)
                     : _aiImage == null

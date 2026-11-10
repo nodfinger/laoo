@@ -209,37 +209,61 @@ class _GatePassPageState extends State<GatePassPage> {
     final tokens = gatePassUiTokens;
     final shared = _sharedTokens(context);
     return LayoutBuilder(
-      builder: (context, constraints) => LaooCaptionCard(
-        tokens: shared,
-        caption: _title,
-        leading: Icon(_menuIcon, color: tokens.primaryColor),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (constraints.maxWidth >= tokens.compactBreakpoint)
-              LaooListCardToggle(
-                tokens: shared,
-                cards: _cards,
-                onChanged: (value) => setState(() => _cards = value),
-              ),
-            if ((_isPurposes || _isRequests) && _canCreate) ...[
-              SizedBox(width: tokens.itemSpacing),
-              FilledButton.icon(
-                onPressed: _isPurposes ? () => _editPurpose() : _createRequest,
-                style: FilledButton.styleFrom(
-                  minimumSize: Size(100, tokens.buttonHeight),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(tokens.radius),
+      builder: (context, constraints) {
+        final showToggle = constraints.maxWidth >= tokens.compactBreakpoint;
+        final showAdd = (_isPurposes || _isRequests) && _canCreate;
+        return LaooCaptionCard(
+          tokens: shared,
+          caption: _title,
+          leading: Icon(_menuIcon, color: tokens.primaryColor),
+          trailing: !showToggle && !showAdd
+              ? null
+              : SizedBox(
+                  width:
+                      (showToggle ? tokens.buttonHeight : 0) +
+                      (showToggle && showAdd ? 8 : 0) +
+                      (showAdd ? 100 : 0),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (showToggle)
+                        LaooListCardToggle(
+                          tokens: shared,
+                          cards: _cards,
+                          onChanged: (value) => setState(() => _cards = value),
+                        ),
+                      if (showAdd) ...[
+                        if (showToggle) const SizedBox(width: 8),
+                        SizedBox(
+                          width: 100,
+                          height: tokens.buttonHeight,
+                          child: FilledButton.icon(
+                            onPressed: _isPurposes
+                                ? () => _editPurpose()
+                                : _createRequest,
+                            style: FilledButton.styleFrom(
+                              minimumSize: Size(100, tokens.buttonHeight),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                              ),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(
+                                  tokens.radius,
+                                ),
+                              ),
+                              textStyle: tokens.buttonStyle,
+                            ),
+                            icon: const Icon(Icons.add),
+                            label: const Text('เพิ่ม'),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
-                  textStyle: tokens.buttonStyle,
                 ),
-                icon: const Icon(Icons.add),
-                label: const Text('เพิ่ม'),
-              ),
-            ],
-          ],
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -1767,6 +1791,7 @@ class _GatePassPageState extends State<GatePassPage> {
       total: total,
       onPrevious: _page > 1 ? () => setState(() => _page--) : null,
       onNext: _page < pages ? () => setState(() => _page++) : null,
+      borderless: _isPurposes,
     );
   }
 

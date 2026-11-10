@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:laoo_shared_admin_ui/laoo_shared_admin_ui.dart'
+    show FilterHeightSync, filterActionHeightStyle;
 import 'package:laoo_shared_workspace_ui/laoo_shared_workspace_ui.dart';
+import '../../../app/theme/laoo_design_tokens.dart';
+import '../../../app/theme/workspace_theme_presets.dart';
 import '../../../core/api/api_exception.dart';
 import '../../../core/navigation/navigation_menu_repository.dart';
 import '../../../core/widgets/timed_snack_bar.dart';
@@ -236,7 +240,10 @@ class _ContactPageState extends State<ContactPage> {
                     children: [
                       Text(
                         (row['name'] ?? '').toString(),
-                        style: const TextStyle(fontWeight: FontWeight.w700),
+                        style: TextStyle(
+                          color: businessCardOcrUi(context).primaryColor,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                       Text(
                         [
@@ -261,147 +268,188 @@ class _ContactPageState extends State<ContactPage> {
         },
       );
     }
-    return LaooWorkspaceDataTable(
-      tokens: businessCardOcrUi(context),
-      columns: const [
-        LaooWorkspaceTableColumns.id,
-        DataColumn(label: Text('Action')),
-        DataColumn(label: Text('ชื่อผู้ติดต่อ')),
-        DataColumn(label: Text('บริษัท')),
-        DataColumn(label: Text('ตำแหน่ง')),
-        DataColumn(label: Text('โทรศัพท์')),
-        DataColumn(label: Text('อีเมล')),
-        DataColumn(label: Text('สถานะ')),
-      ],
-      rows: [
-        for (var i = 0; i < _rows.length; i++)
-          DataRow(
-            cells: [
-              DataCell(Text(((_page - 1) * _pageSize + i + 1).toString())),
-              DataCell(_rowActions(_rows[i])),
-              DataCell(Text((_rows[i]['name'] ?? '').toString())),
-              DataCell(Text((_rows[i]['company'] ?? '').toString())),
-              DataCell(Text((_rows[i]['position'] ?? '').toString())),
-              DataCell(Text((_rows[i]['phone'] ?? '').toString())),
-              DataCell(Text((_rows[i]['email'] ?? '').toString())),
-              DataCell(_status(_rows[i])),
-            ],
-          ),
-      ],
+    return Padding(
+      padding: businessCardOcrUi(context).cardPadding,
+      child: LaooWorkspaceDataTable(
+        tokens: businessCardOcrUi(context),
+        columns: const [
+          LaooWorkspaceTableColumns.id,
+          DataColumn(label: Text('Action')),
+          DataColumn(label: Text('ชื่อผู้ติดต่อ')),
+          DataColumn(label: Text('บริษัท')),
+          DataColumn(label: Text('ตำแหน่ง')),
+          DataColumn(label: Text('โทรศัพท์')),
+          DataColumn(label: Text('อีเมล')),
+          DataColumn(label: Text('สถานะ')),
+        ],
+        rows: [
+          for (var i = 0; i < _rows.length; i++)
+            DataRow(
+              cells: [
+                DataCell(Text(((_page - 1) * _pageSize + i + 1).toString())),
+                DataCell(_rowActions(_rows[i])),
+                DataCell(Text((_rows[i]['name'] ?? '').toString())),
+                DataCell(Text((_rows[i]['company'] ?? '').toString())),
+                DataCell(Text((_rows[i]['position'] ?? '').toString())),
+                DataCell(Text((_rows[i]['phone'] ?? '').toString())),
+                DataCell(Text((_rows[i]['email'] ?? '').toString())),
+                DataCell(_status(_rows[i])),
+              ],
+            ),
+        ],
+      ),
     );
   }
 
   @override
-  Widget build(BuildContext context) => SupportWorkspaceShell(
-    pageTitle: _caption,
-    activeMenu: 'companyContacts',
-    menuScope: WorkspaceMenuScope.company,
-    child: LayoutBuilder(
-      builder: (context, box) {
-        final compact = box.maxWidth < 1100, t = businessCardOcrUi(context);
-        final pages = _total == 0 ? 1 : (_total / _pageSize).ceil();
-        return ColoredBox(
-          color: t.backgroundColor,
-          child: LaooListWorkspace(
-            tokens: t,
-            caption: LaooCaptionCard(
+  Widget build(
+    BuildContext context,
+  ) => ValueListenableBuilder<WorkspaceThemePreset>(
+    valueListenable: workspaceThemeController,
+    builder: (context, _, __) => SupportWorkspaceShell(
+      pageTitle: _caption,
+      activeMenu: 'companyContacts',
+      menuScope: WorkspaceMenuScope.company,
+      child: LayoutBuilder(
+        builder: (context, box) {
+          final compact = box.maxWidth < 1100, t = businessCardOcrUi(context);
+          final pages = _total == 0 ? 1 : (_total / _pageSize).ceil();
+          return ColoredBox(
+            color: t.backgroundColor,
+            child: LaooListWorkspace(
               tokens: t,
-              caption: _caption,
-              favoriteKey: '55002',
-              leading: Icon(Icons.contacts_outlined, color: t.primaryColor),
-              trailing: Wrap(
-                spacing: 8,
-                children: [
-                  if (!compact)
-                    LaooListCardToggle(
-                      tokens: t,
-                      cards: _cards,
-                      onChanged: (v) => setState(() => _cards = v),
-                    ),
-                  if (_actions['create'] == true)
-                    FilledButton.icon(
-                      onPressed: () => _open(),
-                      icon: const Icon(Icons.add),
-                      label: const Text('เพิ่ม'),
-                    ),
-                ],
-              ),
-            ),
-            filter: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                SizedBox(
-                  width: compact ? box.maxWidth - 40 : 280,
-                  child: TextField(
-                    controller: _search,
-                    decoration: ocrInput(
-                      context,
-                      'ค้นหาชื่อ บริษัท โทรศัพท์ หรืออีเมล',
-                      icon: Icons.search,
-                    ),
-                    onSubmitted: (_) {
-                      _query = _search.text.trim();
-                      _page = 1;
-                      _load();
-                    },
-                  ),
+              caption: LaooCaptionCard(
+                tokens: t,
+                caption: _caption,
+                favoriteKey: '55002',
+                leading: Icon(Icons.contacts_outlined, color: t.primaryColor),
+                trailing: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  alignment: WrapAlignment.end,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    if (!compact)
+                      LaooListCardToggle(
+                        tokens: t,
+                        cards: _cards,
+                        onChanged: (v) => setState(() => _cards = v),
+                      ),
+                    if (_actions['create'] == true)
+                      SizedBox(
+                        height: t.buttonHeight,
+                        child: FilledButton.icon(
+                          onPressed: () => _open(),
+                          style: FilledButton.styleFrom(
+                            minimumSize: Size(0, t.buttonHeight),
+                            maximumSize: Size(double.infinity, t.buttonHeight),
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            backgroundColor: t.primaryColor,
+                            foregroundColor: Colors.white,
+                            textStyle: t.buttonStyle,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(t.radius),
+                            ),
+                          ),
+                          icon: const Icon(Icons.add),
+                          label: const Text('เพิ่ม'),
+                        ),
+                      ),
+                  ],
                 ),
-                FilledButton.icon(
-                  onPressed: _loading
-                      ? null
-                      : () {
+              ),
+              filter: FilterHeightSync(
+                builder: (context, searchKey, height) => Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: compact ? box.maxWidth - 40 : 280,
+                      child: TextField(
+                        key: searchKey,
+                        controller: _search,
+                        style: t.inputStyle,
+                        decoration: ocrInput(
+                          context,
+                          'ค้นหาชื่อ บริษัท โทรศัพท์ หรืออีเมล',
+                          icon: Icons.search,
+                        ),
+                        onSubmitted: (_) {
                           _query = _search.text.trim();
                           _page = 1;
                           _load();
                         },
-                  style: FilledButton.styleFrom(
-                    minimumSize: Size(0, t.buttonHeight),
-                    maximumSize: Size(double.infinity, t.buttonHeight),
-                  ),
-                  icon: const Icon(Icons.search),
-                  label: const Text('ค้นหา'),
+                      ),
+                    ),
+                    FilledButton.icon(
+                      onPressed: _loading
+                          ? null
+                          : () {
+                              _query = _search.text.trim();
+                              _page = 1;
+                              _load();
+                            },
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        backgroundColor: t.primaryColor,
+                        foregroundColor: Colors.white,
+                        textStyle: t.buttonStyle,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(t.radius),
+                        ),
+                      ).merge(filterActionHeightStyle(height)),
+                      icon: const Icon(Icons.search),
+                      label: const Text('ค้นหา'),
+                    ),
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        foregroundColor: t.primaryColor,
+                        textStyle: t.buttonStyle,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(t.radius),
+                        ),
+                      ).merge(filterActionHeightStyle(height)),
+                      onPressed: _loading
+                          ? null
+                          : () {
+                              _search.clear();
+                              _query = '';
+                              _page = 1;
+                              _load();
+                            },
+                      icon: const Icon(Icons.filter_alt_off_outlined),
+                      label: const Text('ล้าง Filter'),
+                    ),
+                  ],
                 ),
-                OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: Size(0, t.buttonHeight),
-                    maximumSize: Size(double.infinity, t.buttonHeight),
-                  ),
-                  onPressed: _loading
-                      ? null
-                      : () {
-                          _search.clear();
-                          _query = '';
-                          _page = 1;
-                          _load();
-                        },
-                  child: const Text('ล้าง Filter'),
-                ),
-              ],
+              ),
+              table: _result(compact || _cards),
+              pagination: LaooPaginationCard(
+                tokens: t,
+                page: _page,
+                pageCount: pages,
+                pageSize: _pageSize,
+                total: _total,
+                onPrevious: _page > 1
+                    ? () {
+                        setState(() => _page--);
+                        _load();
+                      }
+                    : null,
+                onNext: _page < pages
+                    ? () {
+                        setState(() => _page++);
+                        _load();
+                      }
+                    : null,
+              ),
             ),
-            table: _result(compact || _cards),
-            pagination: LaooPaginationCard(
-              tokens: t,
-              page: _page,
-              pageCount: pages,
-              pageSize: _pageSize,
-              total: _total,
-              onPrevious: _page > 1
-                  ? () {
-                      setState(() => _page--);
-                      _load();
-                    }
-                  : null,
-              onNext: _page < pages
-                  ? () {
-                      setState(() => _page++);
-                      _load();
-                    }
-                  : null,
-            ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     ),
   );
 }
@@ -610,6 +658,7 @@ class _ContactFormState extends State<ContactForm> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<int?>(
+              style: t.tableStyle,
               initialValue: _personId,
               isExpanded: true,
               decoration: ocrInput(context, 'เชื่อมบุคคลเดิม'),
@@ -641,6 +690,7 @@ class _ContactFormState extends State<ContactForm> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<int?>(
+              style: t.tableStyle,
               initialValue: _customerId,
               isExpanded: true,
               decoration: ocrInput(context, 'เชื่อมลูกค้า'),
@@ -663,6 +713,7 @@ class _ContactFormState extends State<ContactForm> {
               const SizedBox(height: 16),
               TextFormField(
                 controller: e.value,
+                style: t.inputStyle,
                 maxLines: e.key == 'address' ? 3 : 1,
                 maxLength: e.key == 'address'
                     ? 1000
@@ -684,7 +735,7 @@ class _ContactFormState extends State<ContactForm> {
                   context,
                   (businessCardFields[e.key] ?? e.key) +
                       (e.key == 'name' ? ' *' : ''),
-                ),
+                ).copyWith(counterText: ''),
                 validator: e.key == 'name'
                     ? (v) => v == null || v.trim().isEmpty
                           ? 'กรุณาระบุชื่อผู้ติดต่อ'

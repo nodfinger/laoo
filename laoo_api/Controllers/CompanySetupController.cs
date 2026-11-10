@@ -54,7 +54,7 @@ public sealed class CompanySetupController : ControllerBase
         var company = AiChatSettingsStore.CompanyId(User);
         if (company is null) return Forbid();
         var texts = new[] { settings.Name, settings.Pronoun, settings.MorningText, settings.LateMorningText, settings.AfternoonText, settings.EveningText, settings.NightText };
-        if (settings.RetentionDays is <= 0 or > 3650 || string.IsNullOrWhiteSpace(settings.Name) || string.IsNullOrWhiteSpace(settings.Pronoun) ||
+        if (settings.FrequentCommandLimit is < 0 or > 10000 || settings.RecentCommandLimit is < 0 or > 10000 || settings.RetentionDays is <= 0 or > 3650 || string.IsNullOrWhiteSpace(settings.Name) || string.IsNullOrWhiteSpace(settings.Pronoun) ||
             settings.Name.Length > 100 || settings.Pronoun.Length > 50 || texts.Any(x => x is null || x.Length > 200) || settings.GreetingMode is not (1 or 2))
             return BadRequest(new { message = "กรุณาตรวจสอบชื่อ คำเรียก และข้อความทักทาย" });
         var raw = new[] { settings.MorningStart, settings.MorningEnd, settings.LateMorningStart, settings.LateMorningEnd,
@@ -89,7 +89,8 @@ AiChatLateMorningStart=@t2,AiChatLateMorningEnd=@t3,AiChatLateMorningText=@m1,
 AiChatAfternoonStart=@t4,AiChatAfternoonEnd=@t5,AiChatAfternoonText=@m2,
 AiChatEveningStart=@t6,AiChatEveningEnd=@t7,AiChatEveningText=@m3,
 AiChatNightStart=@t8,AiChatNightEnd=@t9,AiChatNightText=@m4,
-AiChatShowUserImage=@userImage,AiChatShowAiImage=@aiImage,AiChatRetentionDays=COALESCE(@retention,AiChatRetentionDays)
+AiChatShowUserImage=@userImage,AiChatShowAiImage=@aiImage,AiChatRetentionDays=COALESCE(@retention,AiChatRetentionDays),
+AiFrequentCommandLimit=COALESCE(@frequent,AiFrequentCommandLimit),AiRecentCommandLimit=COALESCE(@recent,AiRecentCommandLimit)
 WHERE OwnerType='C' AND CompanyID=@company AND IsActive=1
 """;
         await using var cmd = new SqlCommand(sql, db);
@@ -101,6 +102,8 @@ WHERE OwnerType='C' AND CompanyID=@company AND IsActive=1
         cmd.Parameters.Add("@userImage",SqlDbType.Bit).Value=settings.ShowUserImage;
         cmd.Parameters.Add("@aiImage",SqlDbType.Bit).Value=settings.ShowAiImage;
         cmd.Parameters.Add("@retention",SqlDbType.Int).Value=(object?)settings.RetentionDays ?? DBNull.Value;
+        cmd.Parameters.Add("@frequent",SqlDbType.Int).Value=(object?)settings.FrequentCommandLimit ?? DBNull.Value;
+        cmd.Parameters.Add("@recent",SqlDbType.Int).Value=(object?)settings.RecentCommandLimit ?? DBNull.Value;
         cmd.Parameters.Add("@company",SqlDbType.BigInt).Value=company.Value;
         return await cmd.ExecuteNonQueryAsync(token)==1 ? NoContent() : NotFound();
     }

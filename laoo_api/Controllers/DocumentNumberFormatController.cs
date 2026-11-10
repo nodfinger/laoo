@@ -11,7 +11,7 @@ namespace LaooApi.Controllers;
 public sealed class DocumentNumberFormatController(IConfiguration configuration) : ControllerBase
 {
     private long CompanyId => long.TryParse(User.FindFirstValue("company_id"), out var id) ? id : 0;
-    private static readonly HashSet<string> Supported = ["08003", "08005", "09003", "09004", "09005", "09006", "09007", "09009", "09010", "09015", "20001"];
+    private static readonly HashSet<string> Supported = ["08003", "08005", "09003", "09004", "09005", "09006", "09007", "09009", "09010", "09015", "20001", "66001"];
     private static readonly HashSet<string> DateFormats = ["NONE", "yy", "yyyy", "MM", "dd", "MMdd", "yyMM", "yydd", "yyMMdd", "yyyyMM", "yyyydd", "yyyyMMdd"];
     public sealed record FormatUpdate(string MenuCode, string Prefix, string DateFormat, int Digits, string? AfterPrefix, string? BeforeSequence);
 
@@ -27,7 +27,7 @@ public sealed class DocumentNumberFormatController(IConfiguration configuration)
         {
             if (!await CanViewDocument(db, code, token)) continue;
             await using var cmd = new SqlCommand("""
-SELECT M.MenuCode,M.MenuName,G.MenuGroupName,COALESCE(F.Prefix,CASE M.MenuCode WHEN N'20001' THEN N'SR' WHEN N'08003' THEN N'IS' WHEN N'08005' THEN N'SR' WHEN N'09004' THEN N'PO' WHEN N'09005' THEN N'TR' WHEN N'09006' THEN N'DN' WHEN N'09007' THEN N'TI' WHEN N'09009' THEN N'PD' WHEN N'09010' THEN N'PI' WHEN N'09015' THEN N'PP' ELSE N'QT' END),COALESCE(F.DateFormat,CASE WHEN M.MenuCode=N'20001' THEN 'yyyyMMdd' ELSE 'NONE' END),COALESCE(F.Digits,3),COALESCE(F.AfterPrefix,N''),COALESCE(F.BeforeSequence,N''),CAST(CASE WHEN F.CompanyID IS NULL THEN 0 ELSE 1 END AS bit)
+SELECT M.MenuCode,M.MenuName,G.MenuGroupName,COALESCE(F.Prefix,CASE M.MenuCode WHEN N'66001' THEN N'OI' WHEN N'20001' THEN N'SR' WHEN N'08003' THEN N'IS' WHEN N'08005' THEN N'SR' WHEN N'09004' THEN N'PO' WHEN N'09005' THEN N'TR' WHEN N'09006' THEN N'DN' WHEN N'09007' THEN N'TI' WHEN N'09009' THEN N'PD' WHEN N'09010' THEN N'PI' WHEN N'09015' THEN N'PP' ELSE N'QT' END),COALESCE(F.DateFormat,CASE WHEN M.MenuCode=N'20001' THEN 'yyyyMMdd' WHEN M.MenuCode=N'66001' THEN 'yyyy' ELSE 'NONE' END),COALESCE(F.Digits,CASE WHEN M.MenuCode=N'66001' THEN 4 ELSE 3 END),COALESCE(F.AfterPrefix,N''),COALESCE(F.BeforeSequence,N''),CAST(CASE WHEN F.CompanyID IS NULL THEN 0 ELSE 1 END AS bit)
 FROM dbo.TDADMainMenu M JOIN dbo.TDADMenuGroup G ON G.MenuGroupCode=M.MenuGroupCode AND G.IsActive=1
 LEFT JOIN dbo.TDADDocumentNumberFormat F ON F.CompanyID=@company AND F.MenuCode=M.MenuCode
 WHERE M.MenuCode=@menu AND (M.ScreenType=4 OR (M.MenuCode=N'20001' AND M.ScreenType=1)) AND M.RunData=1 AND M.IsActive=1

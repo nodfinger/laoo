@@ -6,6 +6,7 @@ import '../../app/theme/laoo_design_tokens.dart';
 import '../../app/theme/laoo_typography.dart';
 import '../../app/theme/workspace_theme_presets.dart';
 import '../../core/api/api_client.dart';
+import '../../core/widgets/list_display_preferences.dart';
 import '../../core/widgets/timed_snack_bar.dart';
 import '../company/shared/registry_ui.dart';
 import '../support/presentation/widgets/support_workspace_shell.dart';
@@ -46,21 +47,70 @@ class _AiCapabilitiesPageState extends State<AiCapabilitiesPage> {
   bool _loading = true, _canEdit = false, _canManageAccess = false;
   bool _cards = false;
   bool _reviewTab = false;
+  ListDisplayPreferences _displayPreferences = const ListDisplayPreferences();
   int _page = 1;
   static const _pageSize = 30;
 
   @override
   void initState() {
     super.initState();
+    listDisplayPreferencesRevision.addListener(_loadDisplayPreferences);
+    _loadDisplayPreferences();
     _load();
   }
 
   @override
   void dispose() {
+    listDisplayPreferencesRevision.removeListener(_loadDisplayPreferences);
     _api.dispose();
     _search.dispose();
     super.dispose();
   }
+
+  Future<void> _loadDisplayPreferences() async {
+    try {
+      final value = await _api.get('/api/user-list-display/10008');
+      if (mounted && value is Map) {
+        setState(
+          () => _displayPreferences = ListDisplayPreferences.fromJson(
+            Map<String, dynamic>.from(value),
+          ),
+        );
+      }
+    } catch (_) {
+      // The standard layout remains available if preferences cannot be loaded.
+    }
+  }
+
+  Widget _displayValue(String key, Map<String, dynamic> row, Color primary) {
+    return switch (key) {
+      'system' => Text(_projectName(row)),
+      'menu' => Text(_systemName(row)),
+      'name' => Text('${row['name'] ?? '-'}'),
+      'description' => Text('${row['description'] ?? '-'}'),
+      'approvedBy' => Text('${row['lastApprovedByUsername'] ?? '-'}'),
+      'approvedAt' => Text(_approvalDate(row)),
+      'status' => _statusBadge(row['isEnabled'] == true, primary),
+      _ => const SizedBox.shrink(),
+    };
+  }
+
+  Widget _displayActions(Map<String, dynamic> row, Color primary) => Wrap(
+    children: [
+      if (_canEdit)
+        IconButton(
+          tooltip: 'แก้ไข',
+          icon: Icon(Icons.edit_outlined, color: primary),
+          onPressed: () => _edit(row),
+        ),
+      if (_canManageAccess)
+        IconButton(
+          tooltip: 'กำหนดสิทธิ',
+          icon: Icon(Icons.manage_accounts_outlined, color: primary),
+          onPressed: () => _manageAccess(row),
+        ),
+    ],
+  );
 
   Future<void> _load() async {
     try {
@@ -110,7 +160,8 @@ class _AiCapabilitiesPageState extends State<AiCapabilitiesPage> {
         '/api/assistant/registry/$code/role-access',
       );
       if (!mounted) return;
-      final roles = (result as List)
+      final access = Map<String, dynamic>.from(result as Map);
+      final roles = (access['roles'] as List)
           .map((e) => Map<String, dynamic>.from(e as Map))
           .toList();
       final selected = <int>{
@@ -119,6 +170,8 @@ class _AiCapabilitiesPageState extends State<AiCapabilitiesPage> {
       };
       var query = '';
       var page = 0;
+      var selectedOnly = false;
+      var useMenuPermissions = access['useMenuPermissions'] == true;
       var saving = false;
       String? error;
       await showDialog<void>(
@@ -128,12 +181,17 @@ class _AiCapabilitiesPageState extends State<AiCapabilitiesPage> {
             final primary = workspaceThemeController.value.primary;
             final filtered = roles
                 .where(
-                  (r) => '${r['name']}'.toLowerCase().contains(
-                    query.toLowerCase(),
-                  ),
+                  (r) =>
+                      (!selectedOnly ||
+                          selected.contains((r['id'] as num).toInt())) &&
+                      '${r['name']}'.toLowerCase().contains(
+                        query.toLowerCase(),
+                      ),
                 )
                 .toList();
-            final start = page * 10;
+            final lastPage = filtered.isEmpty ? 0 : (filtered.length - 1) ~/ 10;
+            final currentPage = page.clamp(0, lastPage);
+            final start = currentPage * 10;
             final shown = filtered.skip(start).take(10).toList();
             return AlertDialog(
               backgroundColor: Colors.white,
@@ -162,18 +220,66 @@ class _AiCapabilitiesPageState extends State<AiCapabilitiesPage> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     TextField(
-                      decoration: registryInput(
-                        context,
-                        label: 'ค้นหากลุ่มสิทธิ์',
-                      ).copyWith(prefixIcon: const Icon(Icons.search)),
+                      style: const TextStyle(
+                        fontSize: LaooTypography.inputText,
+                      ),
+                      decoration:
+                          registryInput(
+                            context,
+                            label: 'ค้นหากลุ่มสิทธิ์',
+                          ).copyWith(
+                            prefixIcon: const Icon(Icons.search),
+                            floatingLabelStyle: TextStyle(
+                              color: primary,
+                              fontSize:
+                                  LaooTypography.materialFloatingLabelSource,
+                            ),
+                          ),
                       onChanged: (value) => update(() {
                         query = value.trim();
                         page = 0;
                       }),
                     ),
                     const SizedBox(height: 8),
-                    const Text(
-                      'เลือกกลุ่มที่อนุญาตให้ใช้ความสามารถนี้ โดยยังต้องมีสิทธิ์เมนูและแพ็กเกจที่เกี่ยวข้อง',
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                      visualDensity: VisualDensity.compact,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      activeColor: primary,
+                      title: const Text(
+                        'ใช้งานได้ทั้งหมดตามกลุ่มสิทธิ์ของเมนู',
+                      ),
+                      value: useMenuPermissions,
+                      onChanged: saving
+                          ? null
+                          : (value) => update(() {
+                              useMenuPermissions = value == true;
+                              if (useMenuPermissions) selectedOnly = false;
+                              page = 0;
+                            }),
+                    ),
+                    Text(
+                      useMenuPermissions
+                          ? 'ใช้สิทธิ์ตามเมนูและแพ็กเกจของผู้ใช้ โดยเก็บการเลือกกลุ่มเดิมไว้'
+                          : 'เลือกกลุ่มที่อนุญาตให้ใช้ความสามารถนี้ โดยยังต้องมีสิทธิ์เมนูและแพ็กเกจที่เกี่ยวข้อง',
+                    ),
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                      visualDensity: VisualDensity.compact,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      activeColor: primary,
+                      title: Text(
+                        'แสดงเฉพาะรายการที่เลือก (${selected.length})',
+                      ),
+                      value: selectedOnly,
+                      onChanged: saving || useMenuPermissions
+                          ? null
+                          : (value) => update(() {
+                              selectedOnly = value == true;
+                              page = 0;
+                            }),
                     ),
                     if (error != null)
                       Text(
@@ -183,30 +289,33 @@ class _AiCapabilitiesPageState extends State<AiCapabilitiesPage> {
                         ),
                       ),
                     Expanded(
-                      child: ListView.separated(
-                        itemCount: shown.length,
-                        separatorBuilder: (_, _) =>
-                            const Divider(height: .6, thickness: .6),
-                        itemBuilder: (context, i) {
-                          final role = shown[i];
-                          final id = (role['id'] as num).toInt();
-                          return CheckboxListTile(
-                            controlAffinity: ListTileControlAffinity.leading,
-                            activeColor: primary,
-                            title: Text('${role['name']}'),
-                            value: selected.contains(id),
-                            onChanged: saving
-                                ? null
-                                : (checked) => update(() {
-                                    if (checked == true) {
-                                      selected.add(id);
-                                    } else {
-                                      selected.remove(id);
-                                    }
-                                  }),
-                          );
-                        },
-                      ),
+                      child: shown.isEmpty
+                          ? const Center(child: Text('ไม่พบกลุ่มสิทธิ์'))
+                          : ListView.separated(
+                              itemCount: shown.length,
+                              separatorBuilder: (_, _) =>
+                                  const Divider(height: .6, thickness: .6),
+                              itemBuilder: (context, i) {
+                                final role = shown[i];
+                                final id = (role['id'] as num).toInt();
+                                return CheckboxListTile(
+                                  controlAffinity:
+                                      ListTileControlAffinity.leading,
+                                  activeColor: primary,
+                                  title: Text('${role['name']}'),
+                                  value: selected.contains(id),
+                                  onChanged: saving || useMenuPermissions
+                                      ? null
+                                      : (checked) => update(() {
+                                          if (checked == true) {
+                                            selected.add(id);
+                                          } else {
+                                            selected.remove(id);
+                                          }
+                                        }),
+                                );
+                              },
+                            ),
                     ),
                     const SizedBox(height: 8),
                     Row(
@@ -215,8 +324,8 @@ class _AiCapabilitiesPageState extends State<AiCapabilitiesPage> {
                           width: LaooLayout.paginationButtonSize,
                           height: LaooLayout.paginationButtonSize,
                           child: FilledButton(
-                            onPressed: page > 0
-                                ? () => update(() => page--)
+                            onPressed: currentPage > 0
+                                ? () => update(() => page = currentPage - 1)
                                 : null,
                             style: FilledButton.styleFrom(
                               padding: EdgeInsets.zero,
@@ -249,7 +358,7 @@ class _AiCapabilitiesPageState extends State<AiCapabilitiesPage> {
                                 ),
                               ),
                             ),
-                            child: Text('${page + 1}'),
+                            child: Text('${currentPage + 1}'),
                           ),
                         ),
                         const SizedBox(width: 6),
@@ -258,7 +367,7 @@ class _AiCapabilitiesPageState extends State<AiCapabilitiesPage> {
                           height: LaooLayout.paginationButtonSize,
                           child: FilledButton(
                             onPressed: start + shown.length < filtered.length
-                                ? () => update(() => page++)
+                                ? () => update(() => page = currentPage + 1)
                                 : null,
                             style: FilledButton.styleFrom(
                               padding: EdgeInsets.zero,
@@ -285,47 +394,68 @@ class _AiCapabilitiesPageState extends State<AiCapabilitiesPage> {
                 ),
               ),
               actions: [
-                OutlinedButton(
-                  onPressed: saving ? null : () => Navigator.pop(dialogContext),
-                  child: const Text('ยกเลิก'),
-                ),
-                FilledButton(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: primary,
-                    foregroundColor: Colors.white,
-                  ),
-                  onPressed: saving
-                      ? null
-                      : () async {
-                          update(() {
-                            saving = true;
-                            error = null;
-                          });
-                          try {
-                            await _api.put(
-                              '/api/assistant/registry/$code/role-access',
-                              body: {'roleGroupIds': selected.toList()},
-                            );
-                            if (dialogContext.mounted) {
-                              Navigator.pop(dialogContext);
-                            }
-                            if (mounted) {
-                              showTimedSnackBar(
-                                this.context,
-                                message: 'บันทึกสิทธิ์เรียบร้อย',
-                              );
-                            }
-                          } catch (_) {
-                            if (dialogContext.mounted) {
-                              update(() {
-                                saving = false;
-                                error =
-                                    'บันทึกไม่สำเร็จ กรุณาตรวจสอบสิทธิ์และลองใหม่';
-                              });
-                            }
-                          }
-                        },
-                  child: const Text('บันทึก'),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Divider(color: LaooColors.border, thickness: .6),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      alignment: WrapAlignment.end,
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        OutlinedButton.icon(
+                          style: registryButton(primary),
+                          onPressed: saving
+                              ? null
+                              : () => Navigator.pop(dialogContext),
+                          icon: const Icon(Icons.close),
+                          label: const Text('ยกเลิก'),
+                        ),
+                        FilledButton.icon(
+                          style: registryButton(primary, filled: true),
+                          onPressed: saving
+                              ? null
+                              : () async {
+                                  update(() {
+                                    saving = true;
+                                    error = null;
+                                  });
+                                  try {
+                                    await _api.put(
+                                      '/api/assistant/registry/$code/role-access',
+                                      body: {
+                                        'roleGroupIds': selected.toList(),
+                                        'useMenuPermissions':
+                                            useMenuPermissions,
+                                      },
+                                    );
+                                    if (dialogContext.mounted) {
+                                      Navigator.pop(dialogContext);
+                                    }
+                                    if (mounted) {
+                                      showTimedSnackBar(
+                                        this.context,
+                                        message: 'บันทึกสิทธิ์เรียบร้อย',
+                                      );
+                                    }
+                                  } catch (_) {
+                                    if (dialogContext.mounted) {
+                                      update(() {
+                                        saving = false;
+                                        error =
+                                            'บันทึกไม่สำเร็จ กรุณาตรวจสอบสิทธิ์และลองใหม่';
+                                      });
+                                    }
+                                  }
+                                },
+                          icon: const Icon(Icons.save_outlined),
+                          label: const Text('บันทึก'),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ],
             );
@@ -788,6 +918,10 @@ class _AiCapabilitiesPageState extends State<AiCapabilitiesPage> {
     final page = _page.clamp(1, pages);
     final start = (page - 1) * _pageSize;
     final pageRows = visible.skip(start).take(_pageSize).toList();
+    final displayFields = _displayPreferences
+        .resolve(aiCapabilityDisplayFields)
+        .where(_displayPreferences.isVisible)
+        .toList();
     return SupportWorkspaceShell(
       pageTitle: _caption,
       activeMenu: 'companyAiCapabilities',
@@ -1095,17 +1229,6 @@ class _AiCapabilitiesPageState extends State<AiCapabilitiesPage> {
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
                                   Table(
-                                    columnWidths: const {
-                                      0: FixedColumnWidth(45),
-                                      1: FixedColumnWidth(110),
-                                      2: FlexColumnWidth(1.3),
-                                      3: FlexColumnWidth(1.3),
-                                      4: FlexColumnWidth(2),
-                                      5: FlexColumnWidth(3),
-                                      6: FlexColumnWidth(1.1),
-                                      7: FlexColumnWidth(1.3),
-                                      8: FlexColumnWidth(1.2),
-                                    },
                                     defaultVerticalAlignment:
                                         TableCellVerticalAlignment.middle,
                                     border: const TableBorder(
@@ -1114,6 +1237,14 @@ class _AiCapabilitiesPageState extends State<AiCapabilitiesPage> {
                                         width: .6,
                                       ),
                                     ),
+                                    columnWidths: {
+                                      0: const FixedColumnWidth(45),
+                                      if (!_displayPreferences.actionOnRight)
+                                        1: const FixedColumnWidth(110),
+                                      if (_displayPreferences.actionOnRight)
+                                        displayFields.length + 1:
+                                            const FixedColumnWidth(110),
+                                    },
                                     children: [
                                       TableRow(
                                         decoration: BoxDecoration(
@@ -1122,14 +1253,15 @@ class _AiCapabilitiesPageState extends State<AiCapabilitiesPage> {
                                         children: [
                                           for (final label in [
                                             'ID',
-                                            'Action',
-                                            'ระบบ',
-                                            'เมนู',
-                                            'ชื่อ',
-                                            'คำอธิบาย',
-                                            'ผู้อนุมัติ',
-                                            'วันที่-เวลาอนุมัติ',
-                                            'สถานะ',
+                                            if (!_displayPreferences
+                                                .actionOnRight)
+                                              'Action',
+                                            ...displayFields.map(
+                                              (f) => f.label,
+                                            ),
+                                            if (_displayPreferences
+                                                .actionOnRight)
+                                              'Action',
                                           ])
                                             Padding(
                                               padding:
@@ -1156,80 +1288,35 @@ class _AiCapabilitiesPageState extends State<AiCapabilitiesPage> {
                                               padding: const EdgeInsets.all(6),
                                               child: Text('${start + i + 1}'),
                                             ),
-                                            Align(
-                                              alignment: Alignment.centerLeft,
-                                              child: Wrap(
-                                                children: [
-                                                  if (_canEdit)
-                                                    IconButton(
-                                                      tooltip: 'แก้ไข',
-                                                      icon: Icon(
-                                                        Icons.edit_outlined,
-                                                        color: primary,
-                                                      ),
-                                                      onPressed: () =>
-                                                          _edit(pageRows[i]),
-                                                    ),
-                                                  if (_canManageAccess)
-                                                    IconButton(
-                                                      tooltip: 'กำหนดสิทธิ',
-                                                      icon: Icon(
-                                                        Icons
-                                                            .manage_accounts_outlined,
-                                                        color: primary,
-                                                      ),
-                                                      onPressed: () =>
-                                                          _manageAccess(
-                                                            pageRows[i],
-                                                          ),
-                                                    ),
-                                                ],
+                                            if (!_displayPreferences
+                                                .actionOnRight)
+                                              Align(
+                                                alignment: Alignment.centerLeft,
+                                                child: _displayActions(
+                                                  pageRows[i],
+                                                  primary,
+                                                ),
                                               ),
-                                            ),
-                                            Padding(
-                                              padding: const EdgeInsets.all(6),
-                                              child: Text(
-                                                _projectName(pageRows[i]),
+                                            for (final field in displayFields)
+                                              Padding(
+                                                padding: const EdgeInsets.all(
+                                                  6,
+                                                ),
+                                                child: _displayValue(
+                                                  field.key,
+                                                  pageRows[i],
+                                                  primary,
+                                                ),
                                               ),
-                                            ),
-                                            Padding(
-                                              padding: const EdgeInsets.all(6),
-                                              child: Text(
-                                                _systemName(pageRows[i]),
+                                            if (_displayPreferences
+                                                .actionOnRight)
+                                              Align(
+                                                alignment: Alignment.centerLeft,
+                                                child: _displayActions(
+                                                  pageRows[i],
+                                                  primary,
+                                                ),
                                               ),
-                                            ),
-                                            Padding(
-                                              padding: const EdgeInsets.all(6),
-                                              child: Text(
-                                                '${pageRows[i]['name']}',
-                                              ),
-                                            ),
-                                            Padding(
-                                              padding: const EdgeInsets.all(6),
-                                              child: Text(
-                                                '${pageRows[i]['description']}',
-                                              ),
-                                            ),
-                                            Padding(
-                                              padding: const EdgeInsets.all(6),
-                                              child: Text(
-                                                '${pageRows[i]['lastApprovedByUsername'] ?? '-'}',
-                                              ),
-                                            ),
-                                            Padding(
-                                              padding: const EdgeInsets.all(6),
-                                              child: Text(
-                                                _approvalDate(pageRows[i]),
-                                              ),
-                                            ),
-                                            Padding(
-                                              padding: const EdgeInsets.all(6),
-                                              child: _statusBadge(
-                                                pageRows[i]['isEnabled'] ==
-                                                    true,
-                                                primary,
-                                              ),
-                                            ),
                                           ],
                                         ),
                                     ],
@@ -1260,34 +1347,61 @@ class _AiCapabilitiesPageState extends State<AiCapabilitiesPage> {
                                   LaooRadius.xs,
                                 ),
                               ),
-                              child: ListTile(
-                                title: Text('${row['name']}'),
-                                subtitle: Text(
-                                  '${row['description']}\n${_projectName(row)} > ${_systemName(row)}\nผู้อนุมัติ: ${row['lastApprovedByUsername'] ?? '-'}\nวันที่-เวลาอนุมัติ: ${_approvalDate(row)}',
+                              child: Padding(
+                                padding: const EdgeInsets.all(
+                                  LaooLayout.cardPadding,
                                 ),
-                                isThreeLine: true,
-                                trailing: Wrap(
-                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    _statusBadge(
-                                      row['isEnabled'] == true,
-                                      primary,
+                                    if (!_displayPreferences.actionOnRight)
+                                      _displayActions(row, primary),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          for (final field in displayFields)
+                                            Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    vertical: 3,
+                                                  ),
+                                              child: field.key == 'name'
+                                                  ? DefaultTextStyle.merge(
+                                                      style: TextStyle(
+                                                        color: primary,
+                                                        fontWeight:
+                                                            FontWeight.w700,
+                                                      ),
+                                                      child: _displayValue(
+                                                        field.key,
+                                                        row,
+                                                        primary,
+                                                      ),
+                                                    )
+                                                  : Wrap(
+                                                      crossAxisAlignment:
+                                                          WrapCrossAlignment
+                                                              .center,
+                                                      spacing: 4,
+                                                      children: [
+                                                        Text(
+                                                          '${field.label}: ',
+                                                        ),
+                                                        _displayValue(
+                                                          field.key,
+                                                          row,
+                                                          primary,
+                                                        ),
+                                                      ],
+                                                    ),
+                                            ),
+                                        ],
+                                      ),
                                     ),
-                                    if (_canEdit)
-                                      IconButton(
-                                        tooltip: 'แก้ไข',
-                                        icon: Icon(Icons.edit, color: primary),
-                                        onPressed: () => _edit(row),
-                                      ),
-                                    if (_canManageAccess)
-                                      IconButton(
-                                        tooltip: 'กำหนดสิทธิ',
-                                        icon: Icon(
-                                          Icons.manage_accounts_outlined,
-                                          color: primary,
-                                        ),
-                                        onPressed: () => _manageAccess(row),
-                                      ),
+                                    if (_displayPreferences.actionOnRight)
+                                      _displayActions(row, primary),
                                   ],
                                 ),
                               ),

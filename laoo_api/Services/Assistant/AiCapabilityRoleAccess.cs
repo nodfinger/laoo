@@ -34,6 +34,7 @@ SELECT CASE WHEN EXISTS (SELECT 1 FROM dbo.TDADUser U WHERE U.UserID=@user AND U
         if (Convert.ToInt32(await schema.ExecuteScalarAsync(token)) == 0) return true;
         await using var cmd = new SqlCommand("""
 SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM dbo.TDADAiCapabilityRolePolicy WHERE CompanyID=@company AND CapabilityCode=@code)
+ OR EXISTS(SELECT 1 FROM dbo.TDADAiCapabilityRolePolicy WHERE CompanyID=@company AND CapabilityCode=@code AND UseMenuPermissions=1)
  OR EXISTS(SELECT 1 FROM dbo.TDADUser WHERE UserID=@user AND CompanyID=@company AND IsActive=1 AND IsCompanyAdmin=1)
  OR EXISTS(SELECT 1 FROM dbo.TDADAiCapabilityRoleAccess A
  JOIN dbo.TDADRoleGroup RG ON RG.RoleGroupID=A.RoleGroupID AND RG.CompanyID=A.CompanyID AND RG.ScopeType='C' AND RG.IsActive=1

@@ -5,6 +5,25 @@ class MenuPermissionRepository {
   MenuPermissionRepository({ApiClient? client})
     : _client = client ?? ApiClient();
   final ApiClient _client;
+  Future<void> bulkMenu({
+    required int roleGroupId,
+    required int projectId,
+    required String menuGroupCode,
+    String? menuCode,
+    required bool grant,
+  }) async {
+    await _client.post(
+      '/api/company-role-permissions/bulk-menu',
+      body: {
+        'roleGroupId': roleGroupId,
+        'projectId': projectId,
+        'menuGroupCode': menuGroupCode,
+        'menuCode': menuCode,
+        'grant': grant,
+      },
+    );
+  }
+
   Future<Map<String, bool>> actions(String scope) async {
     final data = await _client.get(
       '/api/menu-permissions/actions',

@@ -30,6 +30,10 @@ public sealed class AiChatSettings
     public string? ImagePath { get; set; }
     public string? Nickname { get; set; }
     public int? RetentionDays { get; set; }
+    public int? FrequentCommandLimit { get; set; }
+    public int? RecentCommandLimit { get; set; }
+    public int EffectiveFrequentCommandLimit { get; set; } = 10;
+    public int EffectiveRecentCommandLimit { get; set; } = 10;
 }
 
 public static class AiChatSettingsStore
@@ -72,7 +76,10 @@ CONVERT(varchar(5),AiChatAfternoonStart,108),CONVERT(varchar(5),AiChatAfternoonE
 CONVERT(varchar(5),AiChatEveningStart,108),CONVERT(varchar(5),AiChatEveningEnd,108),AiChatEveningText,
 AiChatShowUserImage,AiChatShowAiImage,AiChatImagePath,
 (SELECT TOP(1) E.NickName FROM dbo.TDADUserEmployee UE JOIN dbo.TDADEmployee E ON E.EmployeeID=UE.EmployeeID AND E.CompanyID=@company WHERE UE.UserID=@user AND UE.CompanyID=@company AND UE.IsActive=1 AND E.IsActive=1),
-CONVERT(varchar(5),AiChatNightStart,108),CONVERT(varchar(5),AiChatNightEnd,108),AiChatNightText,AiChatRetentionDays
+CONVERT(varchar(5),AiChatNightStart,108),CONVERT(varchar(5),AiChatNightEnd,108),AiChatNightText,AiChatRetentionDays,
+AiFrequentCommandLimit,AiRecentCommandLimit,
+(SELECT TOP(1) P.AiFrequentCommandLimit FROM dbo.TDADUserProfile P JOIN dbo.TDADUser U ON U.UserID=P.UserID AND U.CompanyID=@company AND U.IsActive=1 WHERE P.UserType='C' AND U.UserID=@user),
+(SELECT TOP(1) P.AiRecentCommandLimit FROM dbo.TDADUserProfile P JOIN dbo.TDADUser U ON U.UserID=P.UserID AND U.CompanyID=@company AND U.IsActive=1 WHERE P.UserType='C' AND U.UserID=@user)
 FROM dbo.TDSTCompanySetUp WHERE OwnerType='C' AND CompanyID=@company AND IsActive=1
 """;
         await using var cmd = new SqlCommand(sql, db);
@@ -91,6 +98,9 @@ FROM dbo.TDSTCompanySetUp WHERE OwnerType='C' AND CompanyID=@company AND IsActiv
         s.ImagePath=r.IsDBNull(18)?null:r.GetString(18); s.Nickname=r.IsDBNull(19)?null:r.GetString(19);
         s.NightStart=S(20,""); s.NightEnd=S(21,""); s.NightText=S(22,"");
         s.RetentionDays = r.IsDBNull(23) ? 90 : r.GetInt32(23);
+        s.FrequentCommandLimit = r.GetInt32(24); s.RecentCommandLimit = r.GetInt32(25);
+        s.EffectiveFrequentCommandLimit = r.IsDBNull(26) || r.GetInt32(26) == 0 ? s.FrequentCommandLimit.Value : r.GetInt32(26);
+        s.EffectiveRecentCommandLimit = r.IsDBNull(27) || r.GetInt32(27) == 0 ? s.RecentCommandLimit.Value : r.GetInt32(27);
         await r.DisposeAsync();
         s.Enabled = await IsCompanyEnabledAsync(db, companyId, ct);
         return s;

@@ -6,6 +6,7 @@ import '../../../app/theme/workspace_theme_presets.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/navigation/navigation_menu_repository.dart';
 import '../../../core/widgets/list_display_preferences.dart';
+import '../../../core/widgets/timed_snack_bar.dart';
 
 /// Only registered screens expose configurable fields. More screens must add
 /// matching adapters and server-side registrations before being enabled here.
@@ -14,6 +15,9 @@ const _fields = <String, List<ListDisplayField>>{
     ListDisplayField(key: 'name', label: 'ชื่อกลุ่ม', requiredVisible: true),
     ListDisplayField(key: 'status', label: 'สถานะ'),
   ],
+  '10008': aiCapabilityDisplayFields,
+  '05002': masterDataDisplayFields,
+  '66001': travelClaimDisplayFields,
 };
 
 Future<bool> _confirmReset(BuildContext context, String? screenName) async {
@@ -55,18 +59,37 @@ Future<bool> _confirmReset(BuildContext context, String? screenName) async {
 }
 
 Future<void> showListDisplayDialog(BuildContext context) async {
+  final api = ApiClient();
+  late final Set<String> enabledCodes;
+  try {
+    final response = await api.get('/api/user-list-display/available-menus');
+    if (response is! List) throw StateError('Invalid menu response');
+    enabledCodes = response.map((item) => item.toString()).toSet();
+  } catch (_) {
+    if (context.mounted) {
+      showTimedSnackBar(
+        context,
+        message: 'โหลดหน้าจอที่กำหนดคอลัมน์ได้ไม่สำเร็จ กรุณาลองใหม่',
+        error: true,
+      );
+    }
+    return;
+  } finally {
+    api.dispose();
+  }
   final projects = await NavigationMenuRepository().getProjects(refresh: true);
   if (!context.mounted) return;
   final menus = [
     for (final project in projects)
       for (final group in project.menuGroups)
         for (final item in group.items)
-          (
-            project: project.name,
-            group: group.name,
-            code: item.code,
-            name: item.name,
-          ),
+          if (enabledCodes.contains(item.code))
+            (
+              project: project.name,
+              group: group.name,
+              code: item.code,
+              name: item.name,
+            ),
   ];
   var query = '';
   var page = 0;
@@ -214,6 +237,11 @@ Future<void> showListDisplayDialog(BuildContext context) async {
                                           listDisplayPreferencesRevision
                                               .value++;
                                           if (context.mounted) {
+                                            showTimedSnackBar(
+                                              context,
+                                              message:
+                                                  'คืนค่ามาตรฐานเรียบร้อยแล้ว',
+                                            );
                                             update(() {
                                               resetting = false;
                                               resetDone = true;
@@ -238,6 +266,7 @@ Future<void> showListDisplayDialog(BuildContext context) async {
                     },
                   ),
                 ),
+                Divider(height: 0.6, thickness: 0.6, color: border),
                 const SizedBox(height: 12),
                 Align(
                   alignment: Alignment.centerLeft,
@@ -295,6 +324,11 @@ Future<void> showListDisplayDialog(BuildContext context) async {
                                 await api.delete('/api/user-list-display');
                                 listDisplayPreferencesRevision.value++;
                                 if (context.mounted) {
+                                  showTimedSnackBar(
+                                    context,
+                                    message:
+                                        'คืนค่ามาตรฐานทุกหน้าจอเรียบร้อยแล้ว',
+                                  );
                                   update(() {
                                     resetting = false;
                                     resetDone = true;
@@ -368,7 +402,19 @@ Future<void> _edit(BuildContext context, String menu, String name) async {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, update) => AlertDialog(
-          title: Text('กำหนดคอลัมน์ > $name'),
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('กำหนดคอลัมน์ > $name'),
+              const SizedBox(height: 16),
+              Divider(
+                height: 0.6,
+                thickness: 0.6,
+                color: workspaceThemeController.value.border,
+              ),
+            ],
+          ),
           content: SizedBox(
             width: 560,
             child: SingleChildScrollView(
@@ -387,7 +433,12 @@ Future<void> _edit(BuildContext context, String menu, String name) async {
                     value: right,
                     onChanged: (value) => update(() => right = value),
                   ),
-                  for (var i = 0; i < fields.length; i++)
+                  Divider(
+                    height: 0.6,
+                    thickness: 0.6,
+                    color: workspaceThemeController.value.border,
+                  ),
+                  for (var i = 0; i < fields.length; i++) ...[
                     ListTile(
                       leading: Checkbox(
                         value: !hidden.contains(fields[i].key),
@@ -427,6 +478,19 @@ Future<void> _edit(BuildContext context, String menu, String name) async {
                         ],
                       ),
                     ),
+                    if (i < fields.length - 1)
+                      Divider(
+                        height: 0.6,
+                        thickness: 0.6,
+                        color: workspaceThemeController.value.border,
+                      ),
+                  ],
+                  const SizedBox(height: 16),
+                  Divider(
+                    height: 0.6,
+                    thickness: 0.6,
+                    color: workspaceThemeController.value.border,
+                  ),
                 ],
               ),
             ),
@@ -447,7 +511,13 @@ Future<void> _edit(BuildContext context, String menu, String name) async {
                       try {
                         await api.delete('/api/user-list-display/$menu');
                         listDisplayPreferencesRevision.value++;
-                        if (context.mounted) Navigator.pop(context);
+                        if (context.mounted) {
+                          showTimedSnackBar(
+                            context,
+                            message: 'คืนค่ามาตรฐานเรียบร้อยแล้ว',
+                          );
+                          Navigator.pop(context);
+                        }
                       } catch (_) {
                         if (context.mounted) {
                           update(() {
@@ -482,7 +552,14 @@ Future<void> _edit(BuildContext context, String menu, String name) async {
                           ).toJson(),
                         );
                         listDisplayPreferencesRevision.value++;
-                        if (context.mounted) Navigator.pop(context);
+                        if (context.mounted) {
+                          showTimedSnackBar(
+                            context,
+                            message:
+                                'บันทึกการแสดงและจัดเรียงข้อมูลเรียบร้อยแล้ว',
+                          );
+                          Navigator.pop(context);
+                        }
                       } catch (_) {
                         if (context.mounted) {
                           update(() {
