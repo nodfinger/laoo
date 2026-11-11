@@ -408,8 +408,6 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
 
   String _thai(Object e) =>
       e is ApiException ? e.message : 'โหลดข้อมูลสิทธิ์ไม่สำเร็จ';
-  bool _visible(int type, String action) =>
-      MenuPermissionSelection.isActionVisible(type, action);
   String _systemKey(MenuPermissionRow row) =>
       row.projectId?.toString() ?? '_CORE';
 
@@ -955,7 +953,7 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
   Widget _table(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        if (_card || constraints.maxWidth < 900) {
+        if (_card || constraints.maxWidth < 1100) {
           return _mobileCards(context);
         }
         final columns = _tableColumns(context);
@@ -1016,6 +1014,8 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
     DataColumn(label: _headerCell(context, 'เพิ่ม')),
     DataColumn(label: _headerCell(context, 'แก้ไข')),
     DataColumn(label: _headerCell(context, 'ลบ')),
+    DataColumn(label: _headerCell(context, 'พิมพ์')),
+    DataColumn(label: _headerCell(context, 'ส่งออก')),
   ];
 
   Widget _mobileCards(BuildContext context) {
@@ -1105,6 +1105,8 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
                             ('เพิ่ม', 'CREATE'),
                             ('แก้ไข', 'EDIT'),
                             ('ลบ', 'DELETE'),
+                            ('พิมพ์', 'PRINT'),
+                            ('ส่งออก', 'EXPORT'),
                           ].map((action) {
                             if (!_groupHasAction(group.groupKey, action.$2)) {
                               return const SizedBox.shrink();
@@ -1151,6 +1153,8 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
       ('เพิ่ม', 'CREATE', row.canCreate),
       ('แก้ไข', 'EDIT', row.canEdit),
       ('ลบ', 'DELETE', row.canDelete),
+      ('พิมพ์', 'PRINT', row.canPrint),
+      ('ส่งออก', 'EXPORT', row.canExport),
     ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1183,7 +1187,10 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
                 spacing: 8,
                 runSpacing: 4,
                 children: actions.map((action) {
-                  final visible = _visible(row.screenType, action.$2);
+                  final visible = MenuPermissionSelection.supports(
+                    row,
+                    action.$2,
+                  );
                   if (!visible) return const SizedBox.shrink();
                   final enabled =
                       _canEdit && (action.$2 == 'VIEW' || row.canView);
@@ -1257,6 +1264,8 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
               _groupCell(tableContext, row.groupKey, 'CREATE'),
               _groupCell(tableContext, row.groupKey, 'EDIT'),
               _groupCell(tableContext, row.groupKey, 'DELETE'),
+              _groupCell(tableContext, row.groupKey, 'PRINT'),
+              _groupCell(tableContext, row.groupKey, 'EXPORT'),
             ],
           ),
         );
@@ -1285,6 +1294,8 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
             _cell(row, 'CREATE', row.canCreate),
             _cell(row, 'EDIT', row.canEdit),
             _cell(row, 'DELETE', row.canDelete),
+            _cell(row, 'PRINT', row.canPrint),
+            _cell(row, 'EXPORT', row.canExport),
           ],
         ),
       );
@@ -1325,7 +1336,7 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
       width: _permissionColumnWidth,
       child: Center(
         child:
-            _visible(row.screenType, action) &&
+            MenuPermissionSelection.supports(row, action) &&
                 (action == 'VIEW' || row.canView)
             ? _permissionCheckbox(
                 value: value,

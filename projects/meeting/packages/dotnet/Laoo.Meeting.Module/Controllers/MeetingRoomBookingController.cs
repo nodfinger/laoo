@@ -36,13 +36,25 @@ public sealed class MeetingRoomBookingController(IConfiguration configuration) :
     {
         await using var db = await Open(token);
         if (!TryCompany(out var companyId) || !TryUser(out var userId)) return false;
+        if (screen == ScreenCode)
+        {
+            if (!await Allowed(db, action, token, screen)) return false;
+            return await BookingRowAllowed(db, null, bookingId, companyId, userId, action, token);
+        }
         var companyAdmin = await IsCompanyAdmin(db, companyId, userId, token);
         var roomAdmin = await BookingAdmin(db, bookingId, token);
-        var owner = await BookingOwner(db, bookingId, companyId, userId, token);
         if (companyAdmin || roomAdmin) return true;
-        if (screen == ScreenCode) return owner;
         if (screen == ApprovalScreenCode && action != "VIEW") return false;
         return await Allowed(db, action, token, screen);
+    }
+
+    private static async Task<bool> BookingRowAllowed(SqlConnection db, SqlTransaction? tx, long bookingId,
+        long companyId, long userId, string action, CancellationToken token)
+    {
+        var hint = tx is null ? "" : " WITH (UPDLOCK,HOLDLOCK)";
+        await using var cmd = new SqlCommand($"SELECT dbo.LaooMenuDataAccessAllowed(B.CompanyID,@user,B.RequesterUserID,N'21001',@action) FROM dbo.TDADMeetingRoomBooking B{hint} WHERE B.BookingID=@booking AND B.CompanyID=@company",db,tx);
+        Add(cmd,"@booking",bookingId); Add(cmd,"@company",companyId); Add(cmd,"@user",userId); Add(cmd,"@action",action);
+        return Convert.ToBoolean(await cmd.ExecuteScalarAsync(token) ?? false);
     }
     private static async Task<bool> BookingOwner(SqlConnection db, long bookingId, long companyId, long userId, CancellationToken token)
     {
@@ -53,17 +65,9 @@ public sealed class MeetingRoomBookingController(IConfiguration configuration) :
 
     private async Task<bool> CanManageParticipants(SqlConnection db, long bookingId, long companyId, long userId, CancellationToken token)
     {
-        if (await IsCompanyAdmin(db, companyId, userId, token) ||
-            await BookingAdmin(db, bookingId, token)) return true;
-        await using var cmd = new SqlCommand("""
-SELECT CASE WHEN EXISTS
-(
- SELECT 1 FROM dbo.TDADMeetingRoomBooking
- WHERE BookingID=@booking AND CompanyID=@company AND RequesterUserID=@user
-) THEN 1 ELSE 0 END;
-""", db);
-        Add(cmd, "@booking", bookingId); Add(cmd, "@company", companyId); Add(cmd, "@user", userId);
-        return Convert.ToBoolean(await cmd.ExecuteScalarAsync(token));
+        return await Allowed(db,"EDIT",token) &&
+            await BookingRowAllowed(db,null,bookingId,companyId,userId,"VIEW",token) &&
+            await BookingRowAllowed(db,null,bookingId,companyId,userId,"EDIT",token);
     }
 
     [HttpGet("actions")]
@@ -639,6 +643,7 @@ ORDER BY S.StartDateTime,R.RoomCode,B.BookingID;
         const string where = """
 WHERE B.CompanyID=@company
   AND (@viewAll=1 OR B.RequesterUserID=@user OR CHARINDEX(','+CONVERT(varchar(20),B.RoomID)+',',@adminRoomIds)>0)
+  AND dbo.LaooMenuDataAccessAllowed(B.CompanyID,@user,B.RequesterUserID,N'21001','VIEW')=1
   AND (@mine=0 OR (B.RequesterUserID=@user AND B.BookingStatus<>'CANCELLED'))
   AND (@room IS NULL OR B.RoomID=@room)
   AND EXISTS
@@ -651,6 +656,7 @@ WHERE B.CompanyID=@company
         await using var countCommand = new SqlCommand(countSql, connection);
         var adminRooms = await AdminRooms(connection, token);
         var viewAll = await Allowed(connection, "VIEW", token);
+        if (!viewAll) return Forbid();
         Add(countCommand, "@viewAll", viewAll);
         Add(countCommand, "@adminRoomIds", ","+string.Join(",",adminRooms)+",");
         BindList(countCommand, companyId, roomId, from, to);
@@ -675,7 +681,9 @@ SELECT B.BookingID,B.BookingNo,B.RoomID,R.RoomCode,R.RoomNameTH,B.Subject,B.Desc
        THEN 1 ELSE 0 END AS CanApprove,
        CASE WHEN B.BookingStatus IN ('APPROVED','REJECTED') AND
           (@companyAdmin=1 OR CHARINDEX(','+CONVERT(varchar(20),B.RoomID)+',',@adminRoomIds)>0)
-       THEN 1 ELSE 0 END AS CanRollback
+       THEN 1 ELSE 0 END AS CanRollback,
+       dbo.LaooMenuDataAccessAllowed(B.CompanyID,@user,B.RequesterUserID,N'21001','EDIT') AS CanEditScope,
+       dbo.LaooMenuDataAccessAllowed(B.CompanyID,@user,B.RequesterUserID,N'21001','DELETE') AS CanDeleteScope
 FROM dbo.TDADMeetingRoomBooking B
 INNER JOIN dbo.TDADMeetingRoom R ON R.RoomID=B.RoomID AND R.CompanyID=B.CompanyID
 INNER JOIN dbo.TDADMeetingRoomBookingSlot S ON S.BookingID=B.BookingID
@@ -741,12 +749,12 @@ OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY;
             branchName = Text(reader, 23),
             buildingName = Text(reader, 24),
             floorName = Text(reader, 25),
-            canEditBooking = (canManageAllParticipants || adminRooms.Contains(reader.GetInt64(2)) ||
-                             reader.GetInt64(11) == userId) &&
+            canEditBooking = bookingEdit &&
+                             reader.GetBoolean(31) &&
                              reader.GetString(8) is "PENDING" or "APPROVED" &&
                              reader.GetDateTime(20) > DateTime.Now,
-            canCancelBooking = (canManageAllParticipants || adminRooms.Contains(reader.GetInt64(2)) ||
-                               reader.GetInt64(11) == userId) &&
+            canCancelBooking = bookingDelete &&
+                               reader.GetBoolean(32) &&
                                reader.GetString(8) is "PENDING" or "APPROVED" &&
                                reader.GetDateTime(20) > DateTime.Now,
             canManageFoodPlan = MeetingFoodPlanAccess.CanManage(reader.GetString(8), reader.GetDateTime(20),
@@ -757,9 +765,7 @@ OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY;
                                      reader.GetInt32(26) == 1,
             canManageParticipants = reader.GetString(8) is "PENDING" or "APPROVED" &&
                                     reader.GetDateTime(21) > DateTime.Now &&
-                                    (reader.GetInt64(11) == userId ||
-                                     canManageAllParticipants ||
-                                     adminRooms.Contains(reader.GetInt64(2))),
+                                    bookingEdit && reader.GetBoolean(31),
             approvalId = reader.IsDBNull(28) ? (long?)null : reader.GetInt64(28),
             canApprove = reader.GetInt32(29) == 1,
             canRollback = reader.GetInt32(30) == 1 && reader.GetDateTime(20) > DateTime.Now,
@@ -840,9 +846,9 @@ ORDER BY E.EmployeeCode,E.FullName;
         await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(IsolationLevel.Serializable, token);
         try
         {
-            const string bookingSql = "SELECT BookingStatus,RequesterUserID FROM dbo.TDADMeetingRoomBooking WITH (UPDLOCK,HOLDLOCK) WHERE BookingID=@booking AND CompanyID=@company";
+            const string bookingSql = "SELECT BookingStatus,RequesterUserID FROM dbo.TDADMeetingRoomBooking WITH (UPDLOCK,HOLDLOCK) WHERE BookingID=@booking AND CompanyID=@company AND dbo.LaooMenuDataAccessAllowed(CompanyID,@user,RequesterUserID,N'21001','VIEW')=1 AND dbo.LaooMenuDataAccessAllowed(CompanyID,@user,RequesterUserID,N'21001','EDIT')=1";
             await using var bookingCommand = new SqlCommand(bookingSql, connection, transaction);
-            Add(bookingCommand, "@booking", bookingId); Add(bookingCommand, "@company", companyId);
+            Add(bookingCommand, "@booking", bookingId); Add(bookingCommand, "@company", companyId); Add(bookingCommand,"@user",userId);
             await using var bookingReader = await bookingCommand.ExecuteReaderAsync(token);
             if (!await bookingReader.ReadAsync(token)) return NotFound(Error("ไม่พบรายการจอง", $"BookingID {bookingId} ไม่อยู่ในบริษัทของผู้ใช้งาน"));
             var status = bookingReader.GetString(0); var requesterUserId = bookingReader.GetInt64(1);
@@ -980,12 +986,23 @@ ORDER BY A.ApprovalOrder,E.EmployeeCode;
         if (!allAvailability) rooms = rooms.Where(r => availabilityAdmins.Contains(r.RoomId)).ToList();
         if (rooms.Count == 0) return Ok(Array.Empty<object>());
         var conflicts = await LoadConflicts(connection, companyId, request.Slots!, request.ExcludeBookingId, token, wholeDays: true);
+        // Keep all conflicts for availability, but expose booking details only
+        // when the booking screen and its data policy permit the current user.
+        var accessByBooking = new Dictionary<long, (bool View, bool Edit, bool Delete)>();
+        foreach (var conflict in conflicts.Values.SelectMany(x => x).DistinctBy(x => x.BookingId))
+        {
+            var view = allAvailability && await BookingRowAllowed(connection,null,conflict.BookingId,companyId,userId,"VIEW",token);
+            var edit = view && bookingEdit && await BookingRowAllowed(connection,null,conflict.BookingId,companyId,userId,"EDIT",token);
+            var delete = view && bookingDelete && await BookingRowAllowed(connection,null,conflict.BookingId,companyId,userId,"DELETE",token);
+            accessByBooking[conflict.BookingId] = (view,edit,delete);
+        }
         var now = DateTime.Now;
         var result = rooms.Select(room =>
         {
             var reason = AvailabilityReason(room, request.Slots!, request.AttendeeCount, conflicts);
             var roomConflicts = conflicts.GetValueOrDefault(room.RoomId) ?? [];
             var matchingConflicts = roomConflicts
+                .Where(conflict => accessByBooking[conflict.BookingId].View)
                 .Where(conflict => request.Slots!.Any(slot =>
                 {
                     var start = Local(slot.StartDateTime);
@@ -1003,16 +1020,11 @@ ORDER BY A.ApprovalOrder,E.EmployeeCode;
                     startDateTime = conflict.Start,
                     endDateTime = conflict.End,
                     status = conflict.Status,
-                    canEditBooking = (companyAdmin || availabilityAdmins.Contains(room.RoomId) ||
-                                     conflict.RequesterUserId == userId) &&
+                    canEditBooking = accessByBooking[conflict.BookingId].Edit &&
                                      conflict.Start > now,
-                    canCancelBooking = (companyAdmin || availabilityAdmins.Contains(room.RoomId) ||
-                                       conflict.RequesterUserId == userId) &&
+                    canCancelBooking = accessByBooking[conflict.BookingId].Delete &&
                                        conflict.Start > now,
-                    canManageParticipants = conflict.End > now &&
-                                            (companyAdmin ||
-                                             availabilityAdmins.Contains(room.RoomId) ||
-                                             conflict.RequesterUserId == userId),
+                    canManageParticipants = conflict.End > now && accessByBooking[conflict.BookingId].Edit,
                     canManageFoodPlan = MeetingFoodPlanAccess.CanManage(
                         conflict.Status,
                         conflict.Start,
@@ -1030,6 +1042,7 @@ ORDER BY A.ApprovalOrder,E.EmployeeCode;
                 })
                 .ToList();
             var bookingsForSelectedDate = roomConflicts
+                .Where(conflict => accessByBooking[conflict.BookingId].View)
                 .Where(conflict => conflict.End > now)
                 .Where(conflict => request.Slots!.Any(slot =>
                     conflict.Start < Local(slot.StartDateTime).Date.AddDays(1) &&
@@ -1045,16 +1058,11 @@ ORDER BY A.ApprovalOrder,E.EmployeeCode;
                     startDateTime = conflict.Start,
                     endDateTime = conflict.End,
                     status = conflict.Status,
-                    canEditBooking = (companyAdmin || availabilityAdmins.Contains(room.RoomId) ||
-                                     conflict.RequesterUserId == userId) &&
+                    canEditBooking = accessByBooking[conflict.BookingId].Edit &&
                                      conflict.Start > now,
-                    canCancelBooking = (companyAdmin || availabilityAdmins.Contains(room.RoomId) ||
-                                       conflict.RequesterUserId == userId) &&
+                    canCancelBooking = accessByBooking[conflict.BookingId].Delete &&
                                        conflict.Start > now,
-                    canManageParticipants = conflict.End > now &&
-                                            (companyAdmin ||
-                                             availabilityAdmins.Contains(room.RoomId) ||
-                                             conflict.RequesterUserId == userId),
+                    canManageParticipants = conflict.End > now && accessByBooking[conflict.BookingId].Edit,
                     canManageFoodPlan = MeetingFoodPlanAccess.CanManage(
                         conflict.Status,
                         conflict.Start,
@@ -1107,6 +1115,7 @@ ORDER BY A.ApprovalOrder,E.EmployeeCode;
         var activity=await Scalar(db,"SELECT B.ActivityTypeCode FROM dbo.TDADMeetingRoomBooking B WHERE B.CompanyID=@company AND B.BookingID=@booking AND B.BookingStatus IN('PENDING','APPROVED') AND EXISTS(SELECT 1 FROM dbo.TDADMeetingRoomBookingSlot S WHERE S.CompanyID=B.CompanyID AND S.BookingID=B.BookingID AND S.StartDateTime>GETDATE())",token,("@company",(object?)company),("@booking",bookingId)) as string;
         if(activity is null)return Conflict(Error("แก้ไขการกำหนดแบบประเมินไม่ได้","รายการจองต้องยังไม่ถูกยกเลิก"));
         await using var tx=(SqlTransaction)await db.BeginTransactionAsync(token);
+        if (!await BookingRowAllowed(db,tx,bookingId,company,user,"EDIT",token)) return Forbid();
         if(activity!="TRAINING"&&values.Any(x=>x.SourceType.Trim().ToUpperInvariant()!="MEETING_ROOM")){await tx.RollbackAsync(token);return BadRequest(Error("ประเภทประเมินไม่ถูกต้อง","การจองห้องทั่วไปเลือกได้เฉพาะประเมินห้องประชุม"));}
         foreach(var item in values){var check=new SqlCommand("SELECT COUNT(1) FROM dbo.TDEVTemplate WHERE CompanyID=@company AND EvaluationTemplateID=@template AND IsActive=1 AND SourceType=@source",db,tx);Add(check,"@company",company);Add(check,"@template",item.TemplateId);Add(check,"@source",item.SourceType.Trim().ToUpperInvariant());if(Convert.ToInt32(await check.ExecuteScalarAsync(token))!=1){await tx.RollbackAsync(token);return BadRequest(Error("Template ไม่ถูกต้อง","Template ต้องตรงประเภทและอยู่ในบริษัทเดียวกัน"));}}
         await Execute(db,tx,"DELETE dbo.TDADMeetingRoomBookingEvaluation WHERE CompanyID=@company AND BookingID=@booking",token,("@company",(object?)company),("@booking",bookingId));
@@ -1135,6 +1144,7 @@ UPDATE dbo.TDADMeetingRoomBooking
 SET BookingStatus='CANCELLED',CancelRemark=@remark,CancelDate=SYSUTCDATETIME(),UpdateDate=SYSUTCDATETIME(),UpdateBy=@user
 OUTPUT DELETED.BookingStatus
 WHERE BookingID=@id AND CompanyID=@company AND BookingStatus IN ('PENDING','APPROVED')
+ AND dbo.LaooMenuDataAccessAllowed(CompanyID,@user,RequesterUserID,N'21001','DELETE')=1
  AND (SELECT MIN(S.StartDateTime) FROM dbo.TDADMeetingRoomBookingSlot S WHERE S.BookingID=@id AND S.CompanyID=@company)>GETDATE();
 """;
         await using var command = new SqlCommand(sql, connection, transaction);
@@ -1166,9 +1176,8 @@ WHERE BookingID=@id AND CompanyID=@company AND BookingStatus IN ('PENDING','APPR
             }
             else
             {
+                if (!actionAllowed || !await BookingRowAllowed(accessDb,null,id.Value,companyId,userId,"EDIT",token)) return Forbid();
                 var roomAdmin = await BookingAdmin(accessDb, id.Value, token);
-                var owner = await BookingOwner(accessDb, id.Value, companyId, userId, token);
-                if (!companyAdmin && !roomAdmin && !owner) return Forbid();
                 if (roomAdmin && !companyAdmin && !roomAdmins.Contains(request.RoomId)) return Forbid();
             }
             if (activityTypeCode == "TRAINING" && request.TrainingTypeId is not null)
@@ -1197,9 +1206,10 @@ WHERE BookingID=@id AND CompanyID=@company AND BookingStatus IN ('PENDING','APPR
             var training = await ResolveTrainingSelection(connection, transaction, companyId, activityTypeCode, request, canViewTrainingType, canViewTrainingInstructor, token);
             if (id is long originalBookingId)
             {
-                await using var original = new SqlCommand("SELECT RequesterEmployeeID FROM dbo.TDADMeetingRoomBooking WITH (UPDLOCK,HOLDLOCK) WHERE BookingID=@booking AND CompanyID=@company", connection, transaction);
-                Add(original,"@booking",originalBookingId); Add(original,"@company",companyId);
+                await using var original = new SqlCommand("SELECT RequesterEmployeeID FROM dbo.TDADMeetingRoomBooking WITH (UPDLOCK,HOLDLOCK) WHERE BookingID=@booking AND CompanyID=@company AND dbo.LaooMenuDataAccessAllowed(CompanyID,@user,RequesterUserID,N'21001','EDIT')=1", connection, transaction);
+                Add(original,"@booking",originalBookingId); Add(original,"@company",companyId); Add(original,"@user",userId);
                 var originalEmployee = await original.ExecuteScalarAsync(token);
+                if (originalEmployee is null) return Forbid();
                 requesterEmployeeId = originalEmployee is null or DBNull ? null : Convert.ToInt64(originalEmployee);
             }
             var approval = await ResolveApprovers(connection, transaction, companyId, request.RoomId, requesterEmployeeId, token);

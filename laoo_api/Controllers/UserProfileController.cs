@@ -26,7 +26,7 @@ WHERE U.{owner.Value.UserKey}=@id AND U.IsActive=1;
 """, connection);
         command.Parameters.Add("@id", SqlDbType.BigInt).Value = owner.Value.Id;
         await using var reader = await command.ExecuteReaderAsync(token);
-        if (!await reader.ReadAsync(token)) return NotFound(new { message = "เนเธกเนเธเธเธเนเธญเธกเธนเธฅเธเธนเนเนเธเนเธเธฒเธ" });
+        if (!await reader.ReadAsync(token)) return NotFound(new { message = "ไม่พบข้อมูลผู้ใช้งาน" });
         return Ok(new
         {
             username = reader.GetString(0), displayName = reader.GetString(1),
@@ -50,7 +50,7 @@ WHERE U.{owner.Value.UserKey}=@id AND U.IsActive=1;
         if (request.AiFrequentCommandLimit is < 0 or > 10000 || request.AiRecentCommandLimit is < 0 or > 10000)
             return BadRequest(new { message = "จำนวนคำสั่งต้องอยู่ระหว่าง 0 ถึง 10000" });
         var username = request.Username?.Trim() ?? string.Empty;
-        if (username.Length is < 1 or > 100) return BadRequest(new { message = "เธเธฃเธธเธ“เธฒเธฃเธฐเธเธธ Username เนเธซเนเธ–เธนเธเธ•เนเธญเธ" });
+        if (username.Length is < 1 or > 100) return BadRequest(new { message = "กรุณาระบุ Username ให้ถูกต้อง ความยาวไม่เกิน 100 ตัวอักษร" });
         await using var connection = new SqlConnection(configuration.GetConnectionString("LaooDatabase"));
         await connection.OpenAsync(token);
         long? partnerId = long.TryParse(User.FindFirstValue("partner_id"), out var partner) ? partner : null;
@@ -59,7 +59,7 @@ WHERE U.{owner.Value.UserKey}=@id AND U.IsActive=1;
         if (!string.IsNullOrWhiteSpace(request.NewPassword) &&
             !PasswordService.MeetsPolicy(username, request.NewPassword, policyCode))
             return BadRequest(new { message = PasswordService.GetReadablePolicyMessage(policyCode) });
-        if (request.Introduction?.Length > 1000) return BadRequest(new { message = "เธเนเธญเธเธงเธฒเธกเนเธเธฐเธเธณเธขเธฒเธงเน€เธเธดเธ 1,000 เธ•เธฑเธงเธญเธฑเธเธฉเธฃ" });
+        if (request.Introduction?.Length > 1000) return BadRequest(new { message = "ข้อความแนะนำตัวยาวเกิน 1,000 ตัวอักษร" });
         var menuStyle = string.Equals(request.MenuStyleCode?.Trim(), "BUTTON", StringComparison.OrdinalIgnoreCase)
             ? "BUTTON"
             : "SLIDE";
@@ -67,15 +67,15 @@ WHERE U.{owner.Value.UserKey}=@id AND U.IsActive=1;
         if (!request.RemoveAvatar && !string.IsNullOrWhiteSpace(request.AvatarDataBase64))
         {
             try { avatar = Convert.FromBase64String(request.AvatarDataBase64); }
-            catch (FormatException) { return BadRequest(new { message = "เธฃเธนเธเนเธเธฃเนเธเธฅเนเนเธกเนเธ–เธนเธเธ•เนเธญเธ" }); }
-            if (avatar.Length > 2 * 1024 * 1024) return BadRequest(new { message = "เธฃเธนเธเนเธเธฃเนเธเธฅเนเธ•เนเธญเธเธกเธตเธเธเธฒเธ”เนเธกเนเน€เธเธดเธ 2 MB" });
+            catch (FormatException) { return BadRequest(new { message = "รูปโปรไฟล์ไม่ถูกต้อง" }); }
+            if (avatar.Length > 2 * 1024 * 1024) return BadRequest(new { message = "รูปโปรไฟล์ต้องมีขนาดไม่เกิน 2 MB" });
         }
 
         await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(token);
         try
         {
             var current = await ReadCurrentAsync(connection, transaction, owner.Value, token);
-            if (current is null) return NotFound(new { message = "เนเธกเนเธเธเธเนเธญเธกเธนเธฅเธเธนเนเนเธเนเธเธฒเธ" });
+            if (current is null) return NotFound(new { message = "ไม่พบข้อมูลผู้ใช้งาน" });
             var loginChanged = !string.Equals(current.Value.Username, username, StringComparison.OrdinalIgnoreCase) || !string.IsNullOrWhiteSpace(request.NewPassword);
             if (loginChanged && string.IsNullOrWhiteSpace(request.CurrentPassword)) return BadRequest(new { message = "กรุณาระบุรหัสผ่านเดิมก่อนแก้ไขข้อมูล Login" });
             if (loginChanged && !passwordService.VerifyPassword(current.Value.Username, current.Value.PasswordHash, request.CurrentPassword!)) return BadRequest(new { message = "รหัสผ่านเดิมไม่ถูกต้อง" });
@@ -91,7 +91,7 @@ WHERE U.{owner.Value.UserKey}=@id AND U.IsActive=1;
                 await using var duplicate = new SqlCommand(duplicateSql, connection, transaction);
                 duplicate.Parameters.Add("@name", SqlDbType.NVarChar, 100).Value = normalized;
                 duplicate.Parameters.Add("@id", SqlDbType.BigInt).Value = owner.Value.Id;
-                if ((int)await duplicate.ExecuteScalarAsync(token)! > 0) return Conflict(new { message = "Username เธเธตเนเธ–เธนเธเนเธเนเธเธฒเธเนเธฅเนเธง" });
+                if ((int)await duplicate.ExecuteScalarAsync(token)! > 0) return Conflict(new { message = "Username นี้ถูกใช้งานแล้ว", description = "กรุณาใช้ Username อื่น หรือใช้ Username เดิมของคุณ" });
             }
 
             var passwordHash = string.IsNullOrWhiteSpace(request.NewPassword) ? current.Value.PasswordHash : passwordService.HashPassword(username, request.NewPassword!);
@@ -120,7 +120,7 @@ IF @@ROWCOUNT=0 INSERT dbo.TDADUserProfile(UserType,{owner.Value.ProfileKey},Ava
     {
         var owner = ResolveOwner();
         if (owner is null) return Forbid();
-        if (string.IsNullOrWhiteSpace(request.ThemeCode)) return BadRequest(new { message = "เธเธฃเธธเธ“เธฒเน€เธฅเธทเธญเธ Style" });
+        if (string.IsNullOrWhiteSpace(request.ThemeCode)) return BadRequest(new { message = "กรุณาเลือก Style" });
         await using var connection = new SqlConnection(configuration.GetConnectionString("LaooDatabase"));
         await connection.OpenAsync(token);
         await using var command = new SqlCommand($"""

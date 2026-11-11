@@ -379,76 +379,79 @@ class _QrTable extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Card(
     margin: EdgeInsets.zero,
-    child: SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: DataTable(
-        columns: const [
-          DataColumn(label: Text('ID')),
-          DataColumn(label: Text('Action')),
-          DataColumn(label: Text('QR Code')),
-          DataColumn(label: Text('อุปกรณ์ / Serial')),
-          DataColumn(label: Text('สถานที่')),
-          DataColumn(label: Text('สถานะ')),
-        ],
-        rows: [
-          for (final row in items)
-            DataRow(
-              cells: [
-                DataCell(Text('${row['qrPortalId']}')),
-                DataCell(
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        tooltip: 'แสดง QR Code',
-                        onPressed: () => onShow(row),
-                        icon: const Icon(Icons.qr_code_2),
+    child: Padding(
+      padding: const EdgeInsets.all(LaooLayout.cardPadding),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: DataTable(
+          columns: const [
+            DataColumn(label: Text('ID')),
+            DataColumn(label: Text('Action')),
+            DataColumn(label: Text('QR Code')),
+            DataColumn(label: Text('อุปกรณ์ / Serial')),
+            DataColumn(label: Text('สถานที่')),
+            DataColumn(label: Text('สถานะ')),
+          ],
+          rows: [
+            for (final row in items)
+              DataRow(
+                cells: [
+                  DataCell(Text('${row['qrPortalId']}')),
+                  DataCell(
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          tooltip: 'แสดง QR Code',
+                          onPressed: () => onShow(row),
+                          icon: const Icon(Icons.qr_code_2),
+                        ),
+                        if (canEdit)
+                          IconButton(
+                            tooltip: 'แก้ไข QR Code',
+                            onPressed: () => onEdit(row),
+                            icon: Icon(
+                              Icons.edit_outlined,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
+                        if (canDelete)
+                          IconButton(
+                            tooltip: 'ลบ QR Code',
+                            onPressed: () => onDelete(row),
+                            icon: Icon(
+                              Icons.delete_outline,
+                              color: Theme.of(context).colorScheme.error,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  DataCell(Text(_tokenLabel(row['qrToken']))),
+                  DataCell(
+                    SizedBox(
+                      width: 260,
+                      child: Text(
+                        '${row['itemCode'] ?? '-'} | ${row['itemName'] ?? '-'}\nSerial: ${row['serialNo'] ?? '-'}',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      if (canEdit)
-                        IconButton(
-                          tooltip: 'แก้ไข QR Code',
-                          onPressed: () => onEdit(row),
-                          icon: Icon(
-                            Icons.edit_outlined,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                        ),
-                      if (canDelete)
-                        IconButton(
-                          tooltip: 'ลบ QR Code',
-                          onPressed: () => onDelete(row),
-                          icon: Icon(
-                            Icons.delete_outline,
-                            color: Theme.of(context).colorScheme.error,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                DataCell(Text(_tokenLabel(row['qrToken']))),
-                DataCell(
-                  SizedBox(
-                    width: 260,
-                    child: Text(
-                      '${row['itemCode'] ?? '-'} | ${row['itemName'] ?? '-'}\nSerial: ${row['serialNo'] ?? '-'}',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                ),
-                DataCell(
-                  SizedBox(
-                    width: 220,
-                    child: Text(
-                      row['locationSnapshot']?.toString() ?? '-',
-                      softWrap: true,
+                  DataCell(
+                    SizedBox(
+                      width: 220,
+                      child: Text(
+                        row['locationSnapshot']?.toString() ?? '-',
+                        softWrap: true,
+                      ),
                     ),
                   ),
-                ),
-                DataCell(_StatusChip(active: row['isActive'] == true)),
-              ],
-            ),
-        ],
+                  DataCell(_StatusChip(active: row['isActive'] == true)),
+                ],
+              ),
+          ],
+        ),
       ),
     ),
   );

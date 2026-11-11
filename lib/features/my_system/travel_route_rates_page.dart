@@ -485,34 +485,57 @@ class _TravelRouteRatesPageState extends State<TravelRouteRatesPage> {
           color: t.backgroundColor,
           child: LaooListWorkspace(
             tokens: t,
-            caption: LaooCaptionCard(
+            caption: LaooSurfaceCard(
               tokens: t,
-              caption: _title,
-              favoriteKey: '67002',
-              leading: Icon(Icons.route_outlined, color: t.primaryColor),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  LaooListCardToggle(
-                    tokens: t,
-                    cards: _cards,
-                    onChanged: (v) => setState(() => _cards = v),
-                  ),
-                  if (_create) const SizedBox(width: 8),
-                  if (_create)
-                    SizedBox(
-                      height: t.buttonHeight,
-                      child: FilledButton.icon(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: t.primaryColor,
-                          foregroundColor: Colors.white,
-                        ),
-                        onPressed: () => _open(),
-                        icon: const Icon(Icons.add),
-                        label: const Text('เพิ่ม'),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final buttons = Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      LaooListCardToggle(
+                        tokens: t,
+                        cards: _cards,
+                        onChanged: (v) => setState(() => _cards = v),
                       ),
-                    ),
-                ],
+                      if (_create) const SizedBox(width: 8),
+                      if (_create)
+                        SizedBox(
+                          height: t.buttonHeight,
+                          child: FilledButton.icon(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: t.primaryColor,
+                              foregroundColor: Colors.white,
+                            ),
+                            onPressed: () => _open(),
+                            icon: const Icon(Icons.add),
+                            label: const Text('เพิ่ม'),
+                          ),
+                        ),
+                    ],
+                  );
+                  final title = WorkspacePageTitle(
+                    title: _title,
+                    favoriteKey: '67002',
+                  );
+                  if (constraints.maxWidth < 420) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        title,
+                        const SizedBox(height: 8),
+                        Align(alignment: Alignment.centerRight, child: buttons),
+                      ],
+                    );
+                  }
+                  return Row(
+                    children: [
+                      Expanded(child: title),
+                      const SizedBox(width: 8),
+                      buttons,
+                    ],
+                  );
+                },
               ),
             ),
             filter: FilterHeightSync(

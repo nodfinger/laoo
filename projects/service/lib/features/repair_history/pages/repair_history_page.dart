@@ -320,6 +320,7 @@ class _HistoryTable extends StatelessWidget {
   Widget build(BuildContext context) => Card(
     margin: EdgeInsets.zero,
     child: SingleChildScrollView(
+      padding: const EdgeInsets.all(LaooLayout.cardPadding),
       scrollDirection: Axis.horizontal,
       child: DataTable(
         columns: const [

@@ -27,6 +27,7 @@ class EmployeeListWorkspace extends StatefulWidget {
     required this.onEdit,
     required this.onDelete,
     this.onUser,
+    this.onSignature,
     this.thumbnailBuilder,
     this.canShowEmployeeImages = false,
   });
@@ -43,6 +44,7 @@ class EmployeeListWorkspace extends StatefulWidget {
   final EmployeeAction onEdit;
   final EmployeeAction onDelete;
   final EmployeeAction? onUser;
+  final EmployeeAction? onSignature;
   final EmployeeThumbnailBuilder? thumbnailBuilder;
   final bool canShowEmployeeImages;
 
@@ -453,7 +455,9 @@ class _EmployeeListWorkspaceState extends State<EmployeeListWorkspace> {
     return LayoutBuilder(
       builder: (_, constraints) {
         final available = constraints.maxWidth;
-        final remaining = available - 72 - 100 - (_showEmployeeImages ? 80 : 0);
+        final actionWidth = widget.onSignature == null ? 100.0 : 132.0;
+        final remaining =
+            available - 72 - actionWidth - (_showEmployeeImages ? 80 : 0);
         final unit = remaining / 8.7;
         return SizedBox(
           width: available,
@@ -491,9 +495,9 @@ class _EmployeeListWorkspaceState extends State<EmployeeListWorkspace> {
                         _sortAscending = ascending;
                       }),
                     ),
-                    const DataColumn(
-                      columnWidth: FixedColumnWidth(100),
-                      label: SizedBox(
+                    DataColumn(
+                      columnWidth: FixedColumnWidth(actionWidth),
+                      label: const SizedBox(
                         width: 80,
                         child: Align(
                           alignment: Alignment.centerLeft,
@@ -631,11 +635,23 @@ class _EmployeeListWorkspaceState extends State<EmployeeListWorkspace> {
   }
 
   Widget _actions(EmployeeRecord item) => SizedBox(
-    width: 80,
+    width: widget.onSignature == null ? 80 : 112,
     child: Row(
       mainAxisSize: MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.start,
       children: [
+        if (widget.onSignature != null)
+          IconButton(
+            tooltip: 'กำหนดลายเซ็น',
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            onPressed: () => widget.onSignature!(item),
+            icon: Icon(
+              Icons.draw_outlined,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
         if (controller.canEdit)
           IconButton(
             tooltip: 'แก้ไข',
@@ -658,7 +674,10 @@ class _EmployeeListWorkspaceState extends State<EmployeeListWorkspace> {
             color: Theme.of(context).colorScheme.error,
             icon: const Icon(Icons.delete_outline),
           ),
-        if (!controller.canEdit && !controller.canDelete) const Text('-'),
+        if (!controller.canEdit &&
+            !controller.canDelete &&
+            widget.onSignature == null)
+          const Text('-'),
       ],
     ),
   );

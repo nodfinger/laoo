@@ -25,7 +25,10 @@ public sealed class MenuPermissionController(IConfiguration configuration) : Con
               CAST(CASE WHEN MAX(CASE WHEN RP.ActionCode='VIEW' AND RP.IsAllowed=1 THEN 1 ELSE 0 END)=1 THEN 1 ELSE 0 END AS bit),
               CAST(CASE WHEN MAX(CASE WHEN RP.ActionCode='CREATE' AND RP.IsAllowed=1 THEN 1 ELSE 0 END)=1 THEN 1 ELSE 0 END AS bit),
               CAST(CASE WHEN MAX(CASE WHEN RP.ActionCode='EDIT' AND RP.IsAllowed=1 THEN 1 ELSE 0 END)=1 THEN 1 ELSE 0 END AS bit),
-              CAST(CASE WHEN MAX(CASE WHEN RP.ActionCode='DELETE' AND RP.IsAllowed=1 THEN 1 ELSE 0 END)=1 THEN 1 ELSE 0 END AS bit)
+              CAST(CASE WHEN MAX(CASE WHEN RP.ActionCode='DELETE' AND RP.IsAllowed=1 THEN 1 ELSE 0 END)=1 THEN 1 ELSE 0 END AS bit),
+              M.AllowPrint,M.AllowExport,
+              CAST(MAX(CASE WHEN RP.ActionCode='PRINT' AND RP.IsAllowed=1 THEN 1 ELSE 0 END) AS bit),
+              CAST(MAX(CASE WHEN RP.ActionCode='EXPORT' AND RP.IsAllowed=1 THEN 1 ELSE 0 END) AS bit)
             FROM dbo.TDADMainMenu M
             INNER JOIN dbo.TDADProjectMenu PM ON PM.ProjectID=@ProjectID AND PM.MenuCode=M.MenuCode AND PM.IsActive=1
             INNER JOIN dbo.TDADMenuGroup G ON G.MenuGroupCode=PM.MenuGroupCode AND G.IsActive=1
@@ -36,13 +39,13 @@ public sealed class MenuPermissionController(IConfiguration configuration) : Con
               AND UPPER(LTRIM(RTRIM(G.AudienceType))) IN (N'A',@AudienceType)
               AND UPPER(LTRIM(RTRIM(OwnerGroup.AudienceType))) IN (N'A',@AudienceType)
               AND (@AudienceType<>N'C' OR G.MenuGroupCode<>N'07')
-            GROUP BY M.MenuCode,M.MenuName,G.MenuGroupCode,G.MenuGroupName,PG.SortOrder,M.ScreenType,PM.SortOrder ORDER BY PG.SortOrder,PM.SortOrder,M.MenuCode;
+            GROUP BY M.MenuCode,M.MenuName,G.MenuGroupCode,G.MenuGroupName,PG.SortOrder,M.ScreenType,PM.SortOrder,M.AllowPrint,M.AllowExport ORDER BY PG.SortOrder,PM.SortOrder,M.MenuCode;
             """;
         await using var command = new SqlCommand(sql, connection);
         Add(command,"@RoleGroupID",SqlDbType.BigInt,roleGroupId); Add(command,"@ProjectID",SqlDbType.BigInt,targetScope.ProjectId); Add(command,"@AudienceType",SqlDbType.Char,prefix switch { "10" => "C", "12" => "L", _ => "P" });
         await using var reader = await command.ExecuteReaderAsync(token);
         var result = new List<MenuPermissionMatrixResponse>();
-        while (await reader.ReadAsync(token)) result.Add(new MenuPermissionMatrixResponse { MenuCode=reader.GetString(0), MenuName=reader.GetString(1), MenuGroupCode=reader.GetString(2).Trim(), MenuGroupName=reader.GetString(3), ScreenType=reader.IsDBNull(4) ? 1 : reader.GetInt32(4), CanView=reader.GetBoolean(5), CanCreate=reader.GetBoolean(6), CanEdit=reader.GetBoolean(7), CanDelete=reader.GetBoolean(8) });
+        while (await reader.ReadAsync(token)) result.Add(new MenuPermissionMatrixResponse { MenuCode=reader.GetString(0), MenuName=reader.GetString(1), MenuGroupCode=reader.GetString(2).Trim(), MenuGroupName=reader.GetString(3), ScreenType=reader.IsDBNull(4) ? 1 : reader.GetInt32(4), CanView=reader.GetBoolean(5), CanCreate=reader.GetBoolean(6), CanEdit=reader.GetBoolean(7), CanDelete=reader.GetBoolean(8), AllowPrint=reader.GetBoolean(9), AllowExport=reader.GetBoolean(10), CanPrint=reader.GetBoolean(11), CanExport=reader.GetBoolean(12) });
         return Ok(result);
     }
 
@@ -123,8 +126,8 @@ public sealed class MenuPermissionController(IConfiguration configuration) : Con
     private static async Task SaveRowAsync(SqlConnection connection, SqlTransaction transaction, long roleGroupId, RoleGroupScope targetScope, char audienceType, MenuPermissionSaveRequest request, CancellationToken token)
     {
         const string sql = """
-            DECLARE @ScreenType int;
-            SELECT @ScreenType=M.ScreenType
+            DECLARE @ScreenType int, @AllowPrint bit, @AllowExport bit;
+            SELECT @ScreenType=M.ScreenType,@AllowPrint=M.AllowPrint,@AllowExport=M.AllowExport
             FROM dbo.TDADMainMenu M
             INNER JOIN dbo.TDADProjectMenu PM ON PM.ProjectID=@ProjectID AND PM.MenuCode=M.MenuCode AND PM.IsActive=1
             INNER JOIN dbo.TDADMenuGroup G ON G.MenuGroupCode=PM.MenuGroupCode AND G.IsActive=1
@@ -144,13 +147,13 @@ public sealed class MenuPermissionController(IConfiguration configuration) : Con
                 OR (@ScopeType='L' AND RG.PartnerID IS NULL AND RG.CompanyID IS NULL));
             INSERT dbo.TDADRoleGroupPermission(RoleGroupID,ProjectID,MenuCode,ActionCode,IsAllowed,CreatedBy)
             SELECT @RoleGroupID,@ProjectID,@MenuCode,A.ActionCode,1,N'api'
-            FROM (VALUES (N'VIEW',@CanView),(N'CREATE',@CanCreate),(N'EDIT',@CanEdit),(N'DELETE',@CanDelete)) A(ActionCode,IsRequested)
+            FROM (VALUES (N'VIEW',@CanView),(N'CREATE',@CanCreate),(N'EDIT',@CanEdit),(N'DELETE',@CanDelete),(N'PRINT',@CanPrint),(N'EXPORT',@CanExport)) A(ActionCode,IsRequested)
             WHERE A.IsRequested=1
               AND (@CanView=1 OR A.ActionCode=N'VIEW')
-              AND ((@ScreenType IN (1,4) AND A.ActionCode IN (N'VIEW',N'CREATE',N'EDIT',N'DELETE')) OR (@ScreenType=2 AND A.ActionCode IN (N'VIEW',N'EDIT')) OR (@ScreenType=3 AND A.ActionCode=N'VIEW'));
+              AND ((A.ActionCode=N'PRINT' AND @AllowPrint=1) OR (A.ActionCode=N'EXPORT' AND @AllowExport=1) OR (@ScreenType IN (1,4) AND A.ActionCode IN (N'VIEW',N'CREATE',N'EDIT',N'DELETE')) OR (@ScreenType=2 AND A.ActionCode IN (N'VIEW',N'EDIT')) OR (@ScreenType=3 AND A.ActionCode=N'VIEW'));
             """;
         await using var command = new SqlCommand(sql,connection,transaction);
-        Add(command,"@RoleGroupID",SqlDbType.BigInt,roleGroupId); BindScope(command,targetScope.ProjectId,targetScope.ScopeType,targetScope.OwnerId); Add(command,"@AudienceType",SqlDbType.Char,audienceType); Add(command,"@MenuCode",SqlDbType.NVarChar,request.MenuCode,20); Add(command,"@CanView",SqlDbType.Bit,request.CanView); Add(command,"@CanCreate",SqlDbType.Bit,request.CanCreate); Add(command,"@CanEdit",SqlDbType.Bit,request.CanEdit); Add(command,"@CanDelete",SqlDbType.Bit,request.CanDelete); await command.ExecuteNonQueryAsync(token);
+        Add(command,"@RoleGroupID",SqlDbType.BigInt,roleGroupId); BindScope(command,targetScope.ProjectId,targetScope.ScopeType,targetScope.OwnerId); Add(command,"@AudienceType",SqlDbType.Char,audienceType); Add(command,"@MenuCode",SqlDbType.NVarChar,request.MenuCode,20); Add(command,"@CanView",SqlDbType.Bit,request.CanView); Add(command,"@CanCreate",SqlDbType.Bit,request.CanCreate); Add(command,"@CanEdit",SqlDbType.Bit,request.CanEdit); Add(command,"@CanDelete",SqlDbType.Bit,request.CanDelete); Add(command,"@CanPrint",SqlDbType.Bit,request.CanPrint); Add(command,"@CanExport",SqlDbType.Bit,request.CanExport); await command.ExecuteNonQueryAsync(token);
     }
 
     private static async Task<bool> RoleGroupBelongsToScopeAsync(SqlConnection connection, SqlTransaction? transaction, long roleGroupId, RoleGroupScope targetScope, CancellationToken token)

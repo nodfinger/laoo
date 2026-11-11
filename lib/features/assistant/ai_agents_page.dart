@@ -94,7 +94,9 @@ class AiAgentsPageState extends State<AiAgentsPage> {
       final picked = await pickAiImage();
       if (picked == null || picked.files.single.bytes == null) return;
       final file = picked.files.single;
-      if (file.bytes!.length > 1024 * 1024) throw StateError('image too large');
+      if (file.bytes!.length > maxAiImageBytes) {
+        throw StateError('image too large');
+      }
       if (mounted) {
         setState(() {
           row.image = file.bytes;
@@ -107,7 +109,7 @@ class AiAgentsPageState extends State<AiAgentsPage> {
         showTimedSnackBar(
           context,
           message:
-              'บันทึกรูปไม่สำเร็จ กรุณาเลือกรูป JPG, PNG หรือ WEBP ขนาดไม่เกิน 1 MB',
+              'บันทึกรูปไม่สำเร็จ กรุณาเลือกรูป JPG, PNG หรือ WEBP ขนาดไม่เกิน 3 MB',
           error: true,
         );
       }

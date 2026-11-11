@@ -9,6 +9,13 @@ class MenuPermissionSelection {
           {'CREATE', 'EDIT', 'DELETE'}.contains(action)) ||
       (screenType == 2 && action == 'EDIT');
 
+  static bool supports(MenuPermissionRow row, String action) =>
+      switch (action) {
+        'PRINT' => row.allowPrint,
+        'EXPORT' => row.allowExport,
+        _ => isActionVisible(row.screenType, action),
+      };
+
   static List<MenuPermissionRow> grantAll(Iterable<MenuPermissionRow> rows) =>
       rows
           .map(
@@ -17,6 +24,8 @@ class MenuPermissionSelection {
               create: isActionVisible(row.screenType, 'CREATE'),
               edit: isActionVisible(row.screenType, 'EDIT'),
               delete: isActionVisible(row.screenType, 'DELETE'),
+              print: row.allowPrint,
+              export: row.allowExport,
             ),
           )
           .toList();
@@ -40,7 +49,9 @@ class MenuPermissionSelection {
           row.canView == other.canView &&
           row.canCreate == other.canCreate &&
           row.canEdit == other.canEdit &&
-          row.canDelete == other.canDelete;
+          row.canDelete == other.canDelete &&
+          row.canPrint == other.canPrint &&
+          row.canExport == other.canExport;
     });
   }
 
@@ -49,15 +60,24 @@ class MenuPermissionSelection {
     String action,
     bool value,
   ) {
-    if (!isActionVisible(row.screenType, action)) return row;
+    if (!supports(row, action)) return row;
     if (action == 'VIEW' && !value) {
-      return row.copy(view: false, create: false, edit: false, delete: false);
+      return row.copy(
+        view: false,
+        create: false,
+        edit: false,
+        delete: false,
+        print: false,
+        export: false,
+      );
     }
     return row.copy(
       view: action == 'VIEW' ? value : (value ? true : null),
       create: action == 'CREATE' ? value : null,
       edit: action == 'EDIT' ? value : null,
       delete: action == 'DELETE' ? value : null,
+      print: action == 'PRINT' ? value : null,
+      export: action == 'EXPORT' ? value : null,
     );
   }
 
@@ -80,11 +100,7 @@ class MenuPermissionSelection {
     String action,
   ) {
     final applicable = rows
-        .where(
-          (row) =>
-              row.groupKey == menuGroupCode &&
-              isActionVisible(row.screenType, action),
-        )
+        .where((row) => row.groupKey == menuGroupCode && supports(row, action))
         .toList();
     if (applicable.isEmpty) return false;
     final selected = applicable.where((row) => valueOf(row, action)).length;
@@ -97,17 +113,16 @@ class MenuPermissionSelection {
     Iterable<MenuPermissionRow> rows,
     String menuGroupCode,
     String action,
-  ) => rows.any(
-    (row) =>
-        row.groupKey == menuGroupCode &&
-        isActionVisible(row.screenType, action),
-  );
+  ) =>
+      rows.any((row) => row.groupKey == menuGroupCode && supports(row, action));
 
   static bool valueOf(MenuPermissionRow row, String action) => switch (action) {
     'VIEW' => row.canView,
     'CREATE' => row.canCreate,
     'EDIT' => row.canEdit,
     'DELETE' => row.canDelete,
+    'PRINT' => row.canPrint,
+    'EXPORT' => row.canExport,
     _ => false,
   };
 }

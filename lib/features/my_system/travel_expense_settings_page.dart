@@ -21,13 +21,6 @@ class _TravelExpenseSettingsPageState extends State<TravelExpenseSettingsPage> {
   final _names = <String, String>{};
   final _lodgingRates = <String, TextEditingController>{};
   final _lodgingNames = <String, String>{};
-  final _positions = <String, String>{};
-  final _positionLevels = <String, String?>{};
-  final _levels = <String, String>{};
-  bool _positionsLoading = true,
-      _positionsSaving = false,
-      _canEditPositions = false;
-  String? _positionsError;
   String _title = '';
   bool _loading = true, _saving = false, _canEdit = false;
   bool _lodgingLoading = true, _lodgingSaving = false, _canEditLodging = false;
@@ -39,150 +32,6 @@ class _TravelExpenseSettingsPageState extends State<TravelExpenseSettingsPage> {
     super.initState();
     _load();
     _loadLodging();
-    _loadPositions();
-  }
-
-  Future<void> _loadPositions() async {
-    try {
-      final data = await _api.get(
-        '/api/company/travel-settings/position-levels',
-      );
-      if (data is! Map ||
-          data['positions'] is! List ||
-          data['levels'] is! List) {
-        throw StateError('Invalid response');
-      }
-      if (!mounted) return;
-      setState(() {
-        _positions.clear();
-        _positionLevels.clear();
-        _levels.clear();
-        for (final item in (data['positions'] as List).whereType<Map>()) {
-          final code = item['code'].toString();
-          _positions[code] = item['name'].toString();
-          _positionLevels[code] = item['level']?.toString();
-        }
-        for (final item in (data['levels'] as List).whereType<Map>()) {
-          _levels[item['code'].toString()] = item['name'].toString();
-        }
-        _canEditPositions = data['canEdit'] == true;
-        _positionsLoading = false;
-        _positionsError = null;
-      });
-    } catch (_) {
-      if (mounted) {
-        setState(() {
-          _positionsLoading = false;
-          _positionsError =
-              'โหลดระดับตำแหน่งงานไม่ได้ กรุณาตรวจสอบสิทธิ์และลองใหม่';
-        });
-      }
-    }
-  }
-
-  Future<void> _savePositions() async {
-    setState(() => _positionsSaving = true);
-    try {
-      await _api.put(
-        '/api/company/travel-settings/position-levels',
-        body: {
-          'items': _positions.keys
-              .map((code) => {'code': code, 'level': _positionLevels[code]})
-              .toList(),
-        },
-      );
-      if (mounted) {
-        showTimedSnackBar(
-          context,
-          message: 'บันทึกระดับตำแหน่งงานเรียบร้อยแล้ว',
-        );
-      }
-    } catch (_) {
-      if (mounted) {
-        showTimedSnackBar(
-          context,
-          message:
-              'บันทึกระดับตำแหน่งงานไม่สำเร็จ กรุณาตรวจสอบข้อมูลและลองใหม่',
-          error: true,
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _positionsSaving = false);
-    }
-  }
-
-  Widget _buildPositionTab(BuildContext context) {
-    if (_positionsLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    if (_positionsError != null) return Center(child: Text(_positionsError!));
-    final t = businessCardOcrUi(context);
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        if (_positions.isEmpty)
-          const Text('ไม่พบตำแหน่งงาน กรุณาเพิ่มข้อมูลในรหัสพื้นฐาน'),
-        if (_levels.isEmpty)
-          const Text('ไม่พบระดับตำแหน่งงาน กรุณาเพิ่มข้อมูลในรหัสพื้นฐาน'),
-        for (final position in _positions.entries)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 14),
-            child: LayoutBuilder(
-              builder: (context, constraints) => Wrap(
-                spacing: 16,
-                runSpacing: 8,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  SizedBox(
-                    width: constraints.maxWidth < 500
-                        ? constraints.maxWidth
-                        : constraints.maxWidth * .5,
-                    child: Text(position.value, style: t.tableStyle),
-                  ),
-                  SizedBox(
-                    width: constraints.maxWidth < 500
-                        ? constraints.maxWidth
-                        : 240,
-                    child: DropdownButtonFormField<String>(
-                      initialValue:
-                          _levels.containsKey(_positionLevels[position.key])
-                          ? _positionLevels[position.key]
-                          : null,
-                      decoration: ocrInput(context, 'ระดับตำแหน่งงาน'),
-                      items: [
-                        const DropdownMenuItem(
-                          value: '',
-                          child: Text('ไม่กำหนด'),
-                        ),
-                        for (final level in _levels.entries)
-                          DropdownMenuItem(
-                            value: level.key,
-                            child: Text(level.value),
-                          ),
-                      ],
-                      onChanged: !_canEditPositions || _positionsSaving
-                          ? null
-                          : (value) => setState(
-                              () => _positionLevels[position.key] =
-                                  value == null || value.isEmpty ? null : value,
-                            ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        if (_canEditPositions && _positions.isNotEmpty)
-          Align(
-            alignment: Alignment.centerRight,
-            child: FilledButton.icon(
-              onPressed: _positionsSaving ? null : _savePositions,
-              icon: const Icon(Icons.save_outlined),
-              label: const Text('บันทึก'),
-            ),
-          ),
-      ],
-    );
   }
 
   Future<void> _loadLodging() async {
@@ -269,61 +118,101 @@ class _TravelExpenseSettingsPageState extends State<TravelExpenseSettingsPage> {
     }
   }
 
-  Widget _buildLodgingTab(BuildContext context) {
-    if (_lodgingLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    if (_lodgingError != null) {
-      return Center(child: Text(_lodgingError!));
-    }
+  Widget _buildRateTable({
+    required Map<String, TextEditingController> rates,
+    required Map<String, String> names,
+    required String nameHeading,
+    required String rateHeading,
+    required String emptyMessage,
+    required bool canEdit,
+    required bool saving,
+    required VoidCallback onSave,
+  }) {
     final t = businessCardOcrUi(context);
+    final headingStyle = t.tableStyle.copyWith(
+      color: t.primaryColor,
+      fontWeight: FontWeight.w700,
+    );
+    Widget header(String text) => Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 18),
+      child: Text(text, style: headingStyle),
+    );
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(LaooLayout.cardPadding),
       children: [
-        if (_lodgingRates.isEmpty)
-          const Text('ไม่พบระดับตำแหน่งงาน กรุณาเพิ่มข้อมูลในรหัสพื้นฐาน'),
-        for (final entry in _lodgingRates.entries)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: LayoutBuilder(
-              builder: (context, constraints) => Wrap(
-                spacing: 16,
-                runSpacing: 8,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  SizedBox(
-                    width: constraints.maxWidth < 500
-                        ? constraints.maxWidth
-                        : constraints.maxWidth * .5,
-                    child: Text(
-                      _lodgingNames[entry.key] ?? '',
-                      style: t.tableStyle,
-                    ),
-                  ),
-                  SizedBox(
-                    width: constraints.maxWidth < 500
-                        ? constraints.maxWidth
-                        : 240,
-                    child: TextField(
-                      controller: entry.value,
-                      enabled: _canEditLodging && !_lodgingSaving,
-                      style: t.inputStyle,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
-                      ],
-                      decoration: ocrInput(context, 'เบิกได้ (บาท)'),
-                    ),
-                  ),
-                ],
+        LayoutBuilder(
+          builder: (context, constraints) => Table(
+            columnWidths: {
+              0: FixedColumnWidth(
+                constraints.maxWidth < 600
+                    ? constraints.maxWidth * 0.45
+                    : (constraints.maxWidth * 0.25).clamp(180.0, 320.0),
+              ),
+              1: const FlexColumnWidth(),
+            },
+            border: TableBorder(
+              horizontalInside: BorderSide(
+                color: Theme.of(context).dividerColor,
+                width: 0.6,
               ),
             ),
+            defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+            children: [
+              TableRow(
+                decoration: BoxDecoration(
+                  color: t.primaryColor.withValues(alpha: 0.12),
+                ),
+                children: [header(nameHeading), header(rateHeading)],
+              ),
+              for (final entry in rates.entries)
+                TableRow(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 14,
+                      ),
+                      child: Text(names[entry.key] ?? '', style: t.tableStyle),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 14,
+                      ),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 240),
+                          child: TextField(
+                            controller: entry.value,
+                            enabled: canEdit && !saving,
+                            style: t.inputStyle,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(
+                                RegExp(r'[0-9.]'),
+                              ),
+                            ],
+                            decoration: ocrInput(context, ''),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+            ],
           ),
-        if (_canEditLodging && _lodgingRates.isNotEmpty)
+        ),
+        if (rates.isEmpty)
+          Padding(padding: const EdgeInsets.all(16), child: Text(emptyMessage)),
+        if (canEdit && rates.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          Divider(thickness: 0.6, color: Theme.of(context).dividerColor),
+          const SizedBox(height: 12),
           Align(
-            alignment: Alignment.centerRight,
+            alignment: Alignment.centerLeft,
             child: FilledButton.icon(
               style: FilledButton.styleFrom(
                 backgroundColor: t.primaryColor,
@@ -333,12 +222,29 @@ class _TravelExpenseSettingsPageState extends State<TravelExpenseSettingsPage> {
                   borderRadius: BorderRadius.circular(LaooRadius.xs),
                 ),
               ),
-              onPressed: _lodgingSaving ? null : _saveLodging,
+              onPressed: saving ? null : onSave,
               icon: const Icon(Icons.save_outlined),
               label: const Text('บันทึก'),
             ),
           ),
+        ],
       ],
+    );
+  }
+
+  Widget _buildLodgingTab(BuildContext context) {
+    if (_lodgingLoading)
+      return const Center(child: CircularProgressIndicator());
+    if (_lodgingError != null) return Center(child: Text(_lodgingError!));
+    return _buildRateTable(
+      rates: _lodgingRates,
+      names: _lodgingNames,
+      nameHeading: 'ระดับตำแหน่งงาน',
+      rateHeading: 'เบิกได้ต่อคืน (บาท)',
+      emptyMessage: 'ไม่พบระดับตำแหน่งงาน กรุณาเพิ่มข้อมูลในรหัสพื้นฐาน',
+      canEdit: _canEditLodging,
+      saving: _lodgingSaving,
+      onSave: _saveLodging,
     );
   }
 
@@ -465,92 +371,33 @@ class _TravelExpenseSettingsPageState extends State<TravelExpenseSettingsPage> {
                   : _error != null
                   ? Center(child: Text(_error!))
                   : DefaultTabController(
-                      length: 3,
+                      length: 2,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           const TabBar(
                             isScrollable: true,
+                            tabAlignment: TabAlignment.start,
                             tabs: [
                               Tab(text: 'อัตราค่าน้ำมัน/กม./ประเภทรถ'),
                               Tab(text: 'อัตราค่าห้องพัก'),
-                              Tab(text: 'ระดับตำแหน่งงาน'),
                             ],
                           ),
                           Expanded(
                             child: TabBarView(
                               children: [
-                                ListView(
-                                  padding: const EdgeInsets.all(16),
-                                  children: [
-                                    if (_rates.isEmpty)
-                                      const Text(
-                                        'ไม่พบประเภทรถ กรุณาเพิ่มข้อมูลประเภทรถในรหัสพื้นฐาน',
-                                      ),
-                                    for (final entry in _rates.entries)
-                                      Padding(
-                                        padding: const EdgeInsets.only(
-                                          bottom: 12,
-                                        ),
-                                        child: LayoutBuilder(
-                                          builder: (context, constraints) => Wrap(
-                                            spacing: 16,
-                                            runSpacing: 8,
-                                            crossAxisAlignment:
-                                                WrapCrossAlignment.center,
-                                            children: [
-                                              SizedBox(
-                                                width:
-                                                    constraints.maxWidth < 500
-                                                    ? constraints.maxWidth
-                                                    : constraints.maxWidth * .5,
-                                                child: Text(
-                                                  _names[entry.key] ?? '',
-                                                ),
-                                              ),
-                                              SizedBox(
-                                                width:
-                                                    constraints.maxWidth < 500
-                                                    ? constraints.maxWidth
-                                                    : 240,
-                                                child: TextField(
-                                                  controller: entry.value,
-                                                  enabled: _canEdit && !_saving,
-                                                  keyboardType:
-                                                      const TextInputType.numberWithOptions(
-                                                        decimal: true,
-                                                      ),
-                                                  inputFormatters: [
-                                                    FilteringTextInputFormatter.allow(
-                                                      RegExp(r'[0-9.]'),
-                                                    ),
-                                                  ],
-                                                  decoration:
-                                                      const InputDecoration(
-                                                        labelText:
-                                                            'เบิกได้/กม. (บาท)',
-                                                        border:
-                                                            OutlineInputBorder(),
-                                                      ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    if (_canEdit && _rates.isNotEmpty)
-                                      Align(
-                                        alignment: Alignment.centerRight,
-                                        child: FilledButton.icon(
-                                          onPressed: _saving ? null : _save,
-                                          icon: const Icon(Icons.save_outlined),
-                                          label: const Text('บันทึก'),
-                                        ),
-                                      ),
-                                  ],
+                                _buildRateTable(
+                                  rates: _rates,
+                                  names: _names,
+                                  nameHeading: 'ประเภทรถ',
+                                  rateHeading: 'เบิกได้/กม. (บาท)',
+                                  emptyMessage:
+                                      'ไม่พบประเภทรถ กรุณาเพิ่มข้อมูลประเภทรถในรหัสพื้นฐาน',
+                                  canEdit: _canEdit,
+                                  saving: _saving,
+                                  onSave: _save,
                                 ),
                                 _buildLodgingTab(context),
-                                _buildPositionTab(context),
                               ],
                             ),
                           ),

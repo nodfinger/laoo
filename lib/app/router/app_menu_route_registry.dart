@@ -714,6 +714,27 @@ abstract final class AppMenuRouteRegistry {
       path: RoutePaths.meetingFoods,
       scope: AppMenuScope.company,
     ),
+    '10009': AppMenuRouteSpec(
+      menuCode: '10009',
+      databaseRouteName: 'companyPositionLevels',
+      goRouteName: 'companyPositionLevels',
+      path: '/company/position-levels',
+      scope: AppMenuScope.company,
+    ),
+    '10010': AppMenuRouteSpec(
+      menuCode: '10010',
+      databaseRouteName: 'companyMenuDataAccess',
+      goRouteName: 'companyMenuDataAccess',
+      path: '/company/menu-data-access',
+      scope: AppMenuScope.company,
+    ),
+    '10011': AppMenuRouteSpec(
+      menuCode: '10011',
+      databaseRouteName: 'companyApprovalPattern',
+      goRouteName: 'companyApprovalPattern',
+      path: '/company/approval-pattern',
+      scope: AppMenuScope.company,
+    ),
     '10007': AppMenuRouteSpec(
       menuCode: '10007',
       databaseRouteName: 'companySupervisors',

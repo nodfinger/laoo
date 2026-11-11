@@ -240,6 +240,10 @@ ORDER BY Seq,Name,SubjectCode;
         }
         page = Math.Max(1, page); pageSize = Math.Clamp(pageSize, 1, 100);
         var canViewSerial = await Laoo.Shared.Contracts.CompanyMenuAccess.IsAllowedForProjectAsync(c, User, "LAOO_STOCK", "08006", "VIEW", token);
+        var useMenuScope = menuCode == "20001" || (menuCode is null && self);
+        var selfView = useMenuScope ? MenuViewPredicate : SelfViewPredicate;
+        var selfEdit = useMenuScope ? MenuEditPredicate : SelfEditPredicate;
+        var selfDelete = useMenuScope ? MenuDeletePredicate : SelfDeletePredicate;
         var sql = $$"""
 SELECT COUNT_BIG(1) OVER(),RequestID,RequestNo,RequesterType,{{RequesterDisplaySql}},LocationSnapshot,
        EquipmentNameSnapshot,Subject,StatusCode,{{AssignedDisplaySql}},ReceivedDate,StartedDate,RequestDate,RowVersion,
@@ -247,7 +251,7 @@ SELECT COUNT_BIG(1) OVER(),RequestID,RequestNo,RequesterType,{{RequesterDisplayS
             WHERE A.CompanyID=R.CompanyID AND A.RequestID=R.RequestID AND A.IsActive=1
               AND A.ContentType LIKE N'image/%') THEN 1 ELSE 0 END AS bit) AS HasImages,
        R.PriorityCode, (SELECT TOP(1) C.Name FROM dbo.TDSTMasterCont C WHERE C.GroupCode=N'006' AND C.Code=R.PriorityCode ORDER BY C.Seq) AS PriorityName, R.IsQueueJump,
-       CAST(CASE WHEN {{SelfEditPredicate}} THEN 1 ELSE 0 END AS bit), CAST(CASE WHEN {{SelfDeletePredicate}} THEN 1 ELSE 0 END AS bit), E.SerialNo
+       CAST(CASE WHEN {{selfEdit}} THEN 1 ELSE 0 END AS bit), CAST(CASE WHEN {{selfDelete}} THEN 1 ELSE 0 END AS bit), E.SerialNo
 FROM dbo.TDADServiceRequest R
 OUTER APPLY (
     SELECT X.SerialNo FROM dbo.TDIVItemInstance X
@@ -259,7 +263,7 @@ OUTER APPLY (
       AND (X.WarehouseID IS NULL OR {{InventoryWarehouseAccess.WarehouseAliasPredicate}})
 ) E
 WHERE R.CompanyID=@company AND R.IsActive=1
-  AND (@self=0 OR {{SelfViewPredicate}})
+  AND (@self=0 OR {{selfView}})
   AND (@strictOwn=0 OR R.CreateBy=@user)
   AND (@queueJump IS NULL OR R.IsQueueJump=@queueJump)
   AND (@priority IS NULL OR R.PriorityCode=@priority)
@@ -549,7 +553,8 @@ ORDER BY R.CompletedDate DESC,R.RequestID DESC OFFSET @offset ROWS FETCH NEXT @t
             canHistoryView = await Allowed(c, "19002", "VIEW", token);
             if (!canManage && !canSelfView && !canHistoryView) return Forbid();
         }
-        var sql = $"SELECT RequestID,RequestNo,RequesterType,RequesterID,{RequesterDisplaySql},RequesterPhoneSnapshot,RequesterEmailSnapshot,LocationSnapshot,EquipmentItemID,EquipmentCodeSnapshot,EquipmentNameSnapshot,Subject,Detail,StatusCode,RequestDate,AssignedEmployeeID,{AssignedDisplaySql},ReceivedDate,StartedDate,CompletedDate,ResolutionDetail,CancellationReason,RowVersion,PriorityCode,RequestChannelCode,R.EquipmentInstanceID FROM dbo.TDADServiceRequest R WHERE CompanyID=@company AND RequestID=@id AND IsActive=1 AND (@manage=1 OR (@history=1 AND StatusCode=N'COMPLETED') OR (@owner=1 AND {SelfViewPredicate})) AND (@requiredStatus=N'' OR StatusCode=@requiredStatus)";
+        var detailScope = menuCode is null or "20001" ? MenuViewPredicate : SelfViewPredicate;
+        var sql = $"SELECT RequestID,RequestNo,RequesterType,RequesterID,{RequesterDisplaySql},RequesterPhoneSnapshot,RequesterEmailSnapshot,LocationSnapshot,EquipmentItemID,EquipmentCodeSnapshot,EquipmentNameSnapshot,Subject,Detail,StatusCode,RequestDate,AssignedEmployeeID,{AssignedDisplaySql},ReceivedDate,StartedDate,CompletedDate,ResolutionDetail,CancellationReason,RowVersion,PriorityCode,RequestChannelCode,R.EquipmentInstanceID FROM dbo.TDADServiceRequest R WHERE CompanyID=@company AND RequestID=@id AND IsActive=1 AND (@manage=1 OR (@history=1 AND StatusCode=N'COMPLETED') OR (@owner=1 AND {detailScope})) AND (@requiredStatus=N'' OR StatusCode=@requiredStatus)";
         await using var q = new SqlCommand(sql, c); Add(q, "@company", SqlDbType.BigInt, CompanyId); Add(q, "@id", SqlDbType.BigInt, id); Add(q, "@manage", SqlDbType.Bit, canManage); Add(q, "@history", SqlDbType.Bit, canHistoryView); Add(q, "@owner", SqlDbType.Bit, canSelfView); Add(q, "@user", SqlDbType.BigInt, UserId); Add(q, "@requiredStatus", SqlDbType.NVarChar, requiredStatus, 30);
         await using var r = await q.ExecuteReaderAsync(token);
         if (!await r.ReadAsync(token)) return NotFound();
@@ -680,7 +685,7 @@ ORDER BY R.CompletedDate DESC,R.RequestID DESC OFFSET @offset ROWS FETCH NEXT @t
         if (access.Status is "COMPLETED" or "CANCELLED") return Conflict(new { message = "ไม่สามารถเพิ่มรูปในใบแจ้งซ่อมที่ปิดแล้ว" });
         var canManage = !editSelf && await Allowed(c, "15001", "EDIT", token);
         var canOwner = editSelf
-            ? await ScreenType(c, "20001", token) == 1 && await Allowed(c, "20001", "EDIT", token) && await HasSelfScope(c, id, false, token) && await HasSelfScope(c, id, true, token)
+            ? await ScreenType(c, "20001", token) == 1 && await Allowed(c, "20001", "EDIT", token) && await HasMenuScope(c, id, "VIEW", token) && await HasMenuScope(c, id, "EDIT", token)
             : access.CreatedBy == UserId && await Allowed(c, "20001", "CREATE", token);
         if (!canManage && !canOwner) return Forbid();
         if ((editSelf || editNew || !canManage) && access.Status != "NEW") return Conflict(new { message = "เพิ่มรูปได้เฉพาะใบแจ้งซ่อมสถานะสร้างใหม่" });
@@ -721,7 +726,7 @@ ORDER BY R.CompletedDate DESC,R.RequestID DESC OFFSET @offset ROWS FETCH NEXT @t
         var menu = editSelf ? "20001" : "15001";
         if (!await InService(c, token) || await ScreenType(c, menu, token) != 1 || !await Allowed(c, menu, "EDIT", token)) return Forbid();
         var access = await RequestAccess(c, id, token); if (!access.Found) return NotFound();
-        if (editSelf && (!await HasSelfScope(c, id, false, token) || !await HasSelfScope(c, id, true, token))) return Forbid();
+        if (editSelf && (!await HasMenuScope(c, id, "VIEW", token) || !await HasMenuScope(c, id, "EDIT", token))) return Forbid();
         if ((editSelf || editNew) && access.Status != "NEW") return Conflict(new { message = "ลบรูปได้เฉพาะใบแจ้งซ่อมสถานะสร้างใหม่" });
         if (access.Status is "COMPLETED" or "CANCELLED") return Conflict(new { message = "ไม่สามารถลบรูปในใบแจ้งซ่อมที่ปิดแล้ว" });
         await using var tx = (SqlTransaction)await c.BeginTransactionAsync(token);
@@ -744,7 +749,7 @@ ORDER BY R.CompletedDate DESC,R.RequestID DESC OFFSET @offset ROWS FETCH NEXT @t
 
     private async Task<bool> LockNewRequest(SqlConnection c, SqlTransaction tx, long id, bool self, CancellationToken token)
     {
-        await using var q = new SqlCommand($"SELECT 1 FROM dbo.TDADServiceRequest R WITH (UPDLOCK, HOLDLOCK) WHERE CompanyID=@company AND RequestID=@request AND (@self=0 OR ({SelfViewPredicate} AND {SelfEditPredicate})) AND IsActive=1 AND StatusCode=N'NEW'", c, tx);
+        await using var q = new SqlCommand($"SELECT 1 FROM dbo.TDADServiceRequest R WITH (UPDLOCK, HOLDLOCK) WHERE CompanyID=@company AND RequestID=@request AND (@self=0 OR ({MenuViewPredicate} AND {MenuEditPredicate})) AND IsActive=1 AND StatusCode=N'NEW'", c, tx);
         Add(q, "@company", SqlDbType.BigInt, CompanyId);
         Add(q, "@request", SqlDbType.BigInt, id);
         Add(q, "@user", SqlDbType.BigInt, UserId);
@@ -1041,7 +1046,7 @@ UPDATE R SET Subject=@subject,Detail=@detail,PriorityCode=COALESCE(@priority,Pri
     EquipmentNameSnapshot=CASE WHEN @updateEquipment=1 THEN @equipmentName ELSE EquipmentNameSnapshot END,
     UpdateDate=SYSUTCDATETIME(),UpdateBy=@user
 FROM dbo.TDADServiceRequest R WHERE CompanyID=@company AND RequestID=@id AND IsActive=1 AND StatusCode=N'NEW'
-    AND RowVersion=@version AND (@self=0 OR ({{SelfViewPredicate}} AND {{SelfEditPredicate}}));
+    AND RowVersion=@version AND (@self=0 OR ({{MenuViewPredicate}} AND {{MenuEditPredicate}}));
 """, c);
         Add(q, "@subject", SqlDbType.NVarChar, subject, 200);
         Add(q, "@detail", SqlDbType.NVarChar, detail, 2000);
@@ -1084,7 +1089,7 @@ FROM dbo.TDADServiceRequest R WHERE CompanyID=@company AND RequestID=@id AND IsA
         await using (var q = new SqlCommand($$"""
 SELECT StatusCode,RowVersion FROM dbo.TDADServiceRequest R WITH(UPDLOCK,HOLDLOCK)
 WHERE CompanyID=@company AND RequestID=@id AND IsActive=1
-    AND (@self=0 OR ({{SelfViewPredicate}} AND {{SelfDeletePredicate}}));
+    AND (@self=0 OR ({{MenuViewPredicate}} AND {{MenuDeletePredicate}}));
 """, c, tx))
         {
             Add(q, "@company", SqlDbType.BigInt, CompanyId);
@@ -1120,7 +1125,7 @@ WHERE CompanyID=@company AND RequestID=@id;
 DELETE FROM dbo.TDADServiceRequestAttachment WHERE CompanyID=@company AND RequestID=@id;
 DELETE R FROM dbo.TDADServiceRequest R WHERE CompanyID=@company AND RequestID=@id
     AND StatusCode=N'NEW' AND RowVersion=@version
-    AND (@self=0 OR ({{SelfViewPredicate}} AND {{SelfDeletePredicate}}));
+    AND (@self=0 OR ({{MenuViewPredicate}} AND {{MenuDeletePredicate}}));
 IF @@ROWCOUNT <> 1 THROW 52973, 'REQUEST_DELETE_CONFLICT', 1;
 """, c, tx))
         {
@@ -1438,6 +1443,10 @@ WHERE C.CompanyID=@company AND (C.TenantContactID=@id OR C.PersonID=@id) AND C.I
     }
 
     // Scope is derived solely from the authenticated company/user and active employee relationships.
+    private const string MenuViewPredicate = "dbo.LaooMenuDataAccessAllowed(R.CompanyID,@user,R.CreateBy,N'20001','VIEW')=1";
+    private const string MenuEditPredicate = "dbo.LaooMenuDataAccessAllowed(R.CompanyID,@user,R.CreateBy,N'20001','EDIT')=1";
+    private const string MenuDeletePredicate = "dbo.LaooMenuDataAccessAllowed(R.CompanyID,@user,R.CreateBy,N'20001','DELETE')=1";
+
     private const string SelfViewPredicate = """
       (R.CreateBy=@user OR EXISTS (
         SELECT 1 FROM dbo.TDSTCompanySetupSystemService S
@@ -1484,11 +1493,19 @@ WHERE C.CompanyID=@company AND (C.TenantContactID=@id OR C.PersonID=@id) AND C.I
         return Convert.ToInt32(await q.ExecuteScalarAsync(token)) == 1;
     }
 
+    private async Task<bool> HasMenuScope(SqlConnection c, long id, string action, CancellationToken token)
+    {
+        await using var q = new SqlCommand("SELECT dbo.LaooMenuDataAccessAllowed(R.CompanyID,@user,R.CreateBy,N'20001',@action) FROM dbo.TDADServiceRequest R WHERE R.CompanyID=@company AND R.RequestID=@id AND R.IsActive=1", c);
+        Add(q, "@company", SqlDbType.BigInt, CompanyId); Add(q, "@id", SqlDbType.BigInt, id);
+        Add(q, "@user", SqlDbType.BigInt, UserId); Add(q, "@action", SqlDbType.VarChar, action, 6);
+        return Convert.ToBoolean(await q.ExecuteScalarAsync(token) ?? false);
+    }
+
     private async Task<bool> CanReadRequest(SqlConnection c, RequestAccessInfo access, string? menuCode, CancellationToken token)
     {
         if (menuCode is null)
             return await Allowed(c, "15001", "VIEW", token) ||
-                   await Allowed(c, "20001", "VIEW", token) && await HasSelfScope(c, access.RequestId, false, token) ||
+                   await Allowed(c, "20001", "VIEW", token) && await HasMenuScope(c, access.RequestId, "VIEW", token) ||
                    access.Status == "COMPLETED" && await Allowed(c, "19002", "VIEW", token);
         if (menuCode is not ("15001" or "17001" or "17002" or "19002" or "20001" or "20002" or "20003"))
             return false;
@@ -1499,7 +1516,8 @@ WHERE C.CompanyID=@company AND (C.TenantContactID=@id OR C.PersonID=@id) AND C.I
         {
             "17001" => access.Status == "NEW",
             "19002" => access.Status == "COMPLETED",
-            "20001" or "20002" => await HasSelfScope(c, access.RequestId, false, token),
+            "20001" => await HasMenuScope(c, access.RequestId, "VIEW", token),
+            "20002" => await HasSelfScope(c, access.RequestId, false, token),
             "20003" => access.Status == "COMPLETED" && await HasSelfScope(c, access.RequestId, false, token),
             _ => true
         };

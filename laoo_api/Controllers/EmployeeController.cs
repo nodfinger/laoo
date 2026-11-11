@@ -317,6 +317,81 @@ WHERE PersonID=@PersonID AND CompanyID=@company;
         }
     }
 
+    public sealed record SignatureInput(string FileName, string ImageDataBase64);
+
+    private async Task<bool> SignatureAllowed(SqlConnection c, long companyId, long userId, long projectId, CancellationToken token)
+    {
+        if (!Request.Path.StartsWithSegments("/api/company/employees") || !await Allowed(c, "VIEW", token)) return false;
+        await using var permission = new SqlCommand("""
+SELECT CASE WHEN EXISTS (SELECT 1 FROM dbo.TDADUser U WHERE U.UserID=@user AND U.CompanyID=@company AND U.IsActive=1 AND U.IsCompanyAdmin=1)
+ OR EXISTS (SELECT 1 FROM dbo.TDADUserPermissionPoint P
+ JOIN dbo.TDADUserEmployee UE ON UE.EmployeeID=P.EmployeeID AND UE.CompanyID=P.CompanyID AND UE.IsActive=1
+ JOIN dbo.TDADUser U ON U.UserID=UE.UserID AND U.CompanyID=UE.CompanyID AND U.IsActive=1
+ WHERE U.UserID=@user AND P.CompanyID=@company AND P.ProjectID=@project AND P.MenuCode=N'10001'
+ AND P.PermissionPointCode=N'MANAGE_EMPLOYEE_SIGNATURE' AND P.IsActive=1 AND P.IsAllowed=1) THEN 1 ELSE 0 END
+""", c);
+        permission.Parameters.AddWithValue("@user", userId); permission.Parameters.AddWithValue("@company", companyId); permission.Parameters.AddWithValue("@project", projectId);
+        return Convert.ToInt32(await permission.ExecuteScalarAsync(token)) == 1;
+    }
+
+    [HttpGet("{id:long}/signature")]
+    public async Task<IActionResult> GetSignature(long id, CancellationToken token)
+    {
+        var scope=ResolveScope(null);
+        if (scope is null || scope.Value.CompanyId is not long company || !long.TryParse(User.FindFirstValue("user_id"),out var user) || !long.TryParse(User.FindFirstValue("project_id"),out var project)) return Forbid();
+        await using var c=await Open(token);
+        if (!await SignatureAllowed(c,company,user,project,token)) return Forbid();
+        await using var q=new SqlCommand("SELECT S.ImageData,S.FileName FROM dbo.TDADEmployee E LEFT JOIN dbo.TDADEmployeeSignature S ON S.EmployeeID=E.EmployeeID AND S.CompanyID=E.CompanyID WHERE E.EmployeeID=@id AND E.CompanyID=@company AND E.PartnerID=@partner AND E.IsActive=1",c);
+        q.Parameters.AddWithValue("@id",id);q.Parameters.AddWithValue("@company",company);q.Parameters.AddWithValue("@partner",scope.Value.PartnerId);
+        await using var r=await q.ExecuteReaderAsync(token);
+        if (!await r.ReadAsync(token)) return NotFound();
+        return Ok(new { imageDataBase64=r.IsDBNull(0)?null:Convert.ToBase64String((byte[])r[0]), fileName=r.IsDBNull(1)?null:r.GetString(1) });
+    }
+
+    [HttpDelete("{id:long}/signature")]
+    public async Task<IActionResult> DeleteSignature(long id, CancellationToken token)
+    {
+        var scope=ResolveScope(null);
+        if (scope is null || scope.Value.CompanyId is not long company || !long.TryParse(User.FindFirstValue("user_id"),out var user) || !long.TryParse(User.FindFirstValue("project_id"),out var project)) return Forbid();
+        await using var c=await Open(token);
+        if (!await SignatureAllowed(c,company,user,project,token)) return Forbid();
+        await using var q=new SqlCommand("DELETE S FROM dbo.TDADEmployeeSignature S JOIN dbo.TDADEmployee E ON E.EmployeeID=S.EmployeeID AND E.CompanyID=S.CompanyID WHERE E.EmployeeID=@id AND E.CompanyID=@company AND E.PartnerID=@partner AND E.IsActive=1",c);
+        q.Parameters.AddWithValue("@id",id);q.Parameters.AddWithValue("@company",company);q.Parameters.AddWithValue("@partner",scope.Value.PartnerId);
+        await q.ExecuteNonQueryAsync(token);
+        return NoContent();
+    }
+
+    [HttpPut("{id:long}/signature")]
+    [RequestSizeLimit(3000000)]
+    public async Task<IActionResult> SaveSignature(long id, SignatureInput request, CancellationToken token)
+    {
+        if (!Request.Path.StartsWithSegments("/api/company/employees")) return Forbid();
+        var scope = ResolveScope(null);
+        if (scope is null || scope.Value.CompanyId is not long companyId ||
+            !long.TryParse(User.FindFirstValue("user_id"), out var userId) ||
+            !long.TryParse(User.FindFirstValue("project_id"), out var projectId)) return Forbid();
+        await using var c = await Open(token);
+        if (!await SignatureAllowed(c,companyId,userId,projectId,token)) return Forbid();
+        byte[] bytes;
+        try { bytes = Convert.FromBase64String(request.ImageDataBase64 ?? ""); }
+        catch (FormatException) { return BadRequest(new { message="ข้อมูลรูปไม่ถูกต้อง" }); }
+        if (bytes.Length == 0 || bytes.Length > 2_000_000) return BadRequest(new { message="รูปต้องมีขนาดไม่เกิน 2 MB" });
+        var contentType = bytes.Length >= 8 && bytes.AsSpan(0,8).SequenceEqual(new byte[] {137,80,78,71,13,10,26,10}) ? "image/png"
+            : bytes.Length >= 3 && bytes[0]==0xff && bytes[1]==0xd8 && bytes[2]==0xff ? "image/jpeg"
+            : bytes.Length >= 12 && System.Text.Encoding.ASCII.GetString(bytes,0,4)=="RIFF" && System.Text.Encoding.ASCII.GetString(bytes,8,4)=="WEBP" ? "image/webp" : null;
+        if (contentType is null) return BadRequest(new { message="รองรับรูป JPG, PNG และ WEBP" });
+        var fileName = Path.GetFileName(request.FileName ?? "");
+        if (string.IsNullOrWhiteSpace(fileName) || fileName.Length>250) return BadRequest(new { message="ชื่อไฟล์ไม่ถูกต้อง" });
+        await using var cmd = new SqlCommand("""
+IF NOT EXISTS (SELECT 1 FROM dbo.TDADEmployee WHERE EmployeeID=@id AND CompanyID=@company AND PartnerID=@partner AND IsActive=1) THROW 50006,'EMPLOYEE_NOT_FOUND',1;
+UPDATE dbo.TDADEmployeeSignature SET ImageData=@data,ContentType=@type,FileName=@name,UpdatedBy=@user,UpdateDate=SYSUTCDATETIME() WHERE EmployeeID=@id AND CompanyID=@company;
+IF @@ROWCOUNT=0 INSERT dbo.TDADEmployeeSignature(EmployeeID,CompanyID,ImageData,ContentType,FileName,UpdatedBy) VALUES(@id,@company,@data,@type,@name,@user);
+""", c);
+        cmd.Parameters.AddWithValue("@id",id); cmd.Parameters.AddWithValue("@company",companyId); cmd.Parameters.AddWithValue("@partner",scope.Value.PartnerId); cmd.Parameters.AddWithValue("@user",userId);
+        cmd.Parameters.Add("@data",SqlDbType.VarBinary,-1).Value=bytes; cmd.Parameters.AddWithValue("@type",contentType); cmd.Parameters.AddWithValue("@name",fileName);
+        try { await cmd.ExecuteNonQueryAsync(token); return NoContent(); } catch (SqlException ex) when (ex.Number==50006) { return NotFound(); }
+    }
+
     [HttpGet("{id:long}/image")]
     public async Task<IActionResult> GetImage(long id, [FromQuery] long? companyId, CancellationToken token)
     {

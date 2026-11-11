@@ -198,11 +198,11 @@ class AiChatSettingsCardState extends State<AiChatSettingsCard> {
       if (result == null || result.files.single.bytes == null) return;
       if (!mounted) return;
       final file = result.files.single;
-      if (file.bytes!.length > 1024 * 1024) {
+      if (file.bytes!.length > maxAiImageBytes) {
         if (mounted) {
           showTimedSnackBar(
             context,
-            message: 'รูปต้องมีขนาดไม่เกิน 1 MB',
+            message: 'รูปต้องมีขนาดไม่เกิน 3 MB',
             error: true,
           );
         }
@@ -488,7 +488,7 @@ class AiChatSettingsCardState extends State<AiChatSettingsCard> {
                 icon: const Icon(Icons.image_outlined),
                 label: const Text('เลือกรูป AI'),
               ),
-              const Text('JPG, PNG, WEBP ไม่เกิน 1 MB'),
+              const Text('JPG, PNG, WEBP ไม่เกิน 3 MB'),
             ],
           ),
         ]),
@@ -670,7 +670,7 @@ class AiChatSettingsCardState extends State<AiChatSettingsCard> {
                           icon: const Icon(Icons.image_outlined),
                           label: const Text('เลือกรูป AI'),
                         ),
-                        const Text('JPG, PNG, WEBP ไม่เกิน 1 MB'),
+                        const Text('JPG, PNG, WEBP ไม่เกิน 3 MB'),
                       ],
                     ),
                   ],

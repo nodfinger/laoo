@@ -31,31 +31,34 @@ class _CompanySubscriptionCardState extends State<CompanySubscriptionCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              Icon(
-                Icons.inventory_2_outlined,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              const SizedBox(width: 8),
-              const Expanded(
-                child: Text(
-                  'แพ็กเกจระบบที่ใช้งาน',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          InkWell(
+            onTap: () => setState(() => _expanded = !_expanded),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.inventory_2_outlined,
+                  color: Theme.of(context).colorScheme.primary,
                 ),
-              ),
-              const Text(
-                'อ่านอย่างเดียว',
-                style: TextStyle(fontSize: 12, color: Colors.black54),
-              ),
-              IconButton(
-                tooltip: _expanded
-                    ? 'ย่อแพ็กเกจระบบที่ใช้งาน'
-                    : 'ขยายแพ็กเกจระบบที่ใช้งาน',
-                onPressed: () => setState(() => _expanded = !_expanded),
-                icon: Icon(_expanded ? Icons.expand_less : Icons.expand_more),
-              ),
-            ],
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'แพ็กเกจระบบที่ใช้งาน',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                  ),
+                ),
+                const Text(
+                  'อ่านอย่างเดียว',
+                  style: TextStyle(fontSize: 12, color: Colors.black54),
+                ),
+                IconButton(
+                  tooltip: _expanded
+                      ? 'ย่อแพ็กเกจระบบที่ใช้งาน'
+                      : 'ขยายแพ็กเกจระบบที่ใช้งาน',
+                  onPressed: () => setState(() => _expanded = !_expanded),
+                  icon: Icon(_expanded ? Icons.expand_less : Icons.expand_more),
+                ),
+              ],
+            ),
           ),
           Visibility(
             visible: _expanded,

@@ -108,12 +108,12 @@ WHERE OwnerType='C' AND CompanyID=@company AND IsActive=1
         return await cmd.ExecuteNonQueryAsync(token)==1 ? NoContent() : NotFound();
     }
 
-    [HttpPost("ai-chat/image"), RequestSizeLimit(1024 * 1024 + 65536)]
+    [HttpPost("ai-chat/image"), RequestSizeLimit(3 * 1024 * 1024 + 65536)]
     public async Task<IActionResult> UploadAiChatImage(IFormFile file, CancellationToken token)
     {
         var company = AiChatSettingsStore.CompanyId(User);
         if (company is null) return Forbid();
-        if (file is null || file.Length <= 0 || file.Length > 1024*1024) return BadRequest(new { message="รูปต้องมีขนาดไม่เกิน 1 MB" });
+        if (file is null || file.Length <= 0 || file.Length > 3*1024*1024) return BadRequest(new { message="รูปต้องมีขนาดไม่เกิน 3 MB" });
         var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
         if (ext is not (".png" or ".jpg" or ".jpeg" or ".webp")) return BadRequest(new { message="รองรับ JPG, PNG, WEBP" });
         await using var input = file.OpenReadStream();
@@ -504,10 +504,12 @@ WHERE OwnerType='C' AND CompanyID=@CompanyID
 
     private async Task<bool> AllowedAsync(SqlConnection connection, string action, CancellationToken token)
     {
-        if (!long.TryParse(User.FindFirstValue("project_id"), out var projectId)) return false;
         var userType = User.FindFirstValue("user_type") ?? string.Empty;
         var isPartner = userType.Equals("PARTNER_USER", StringComparison.OrdinalIgnoreCase);
         var isLaoo = userType.Equals("LAOO_SUPPORT", StringComparison.OrdinalIgnoreCase);
+        if (!isPartner && !isLaoo)
+            return await CompanyProjectPermission.IsAllowedAsync(connection, User, "05001", action, token);
+        if (!long.TryParse(User.FindFirstValue("project_id"), out var projectId)) return false;
         const string menuCode = "COMPANY_SETUP";
         var sql = isPartner ? """
             SELECT CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADPartnerUser U WHERE U.PartnerID=@partner AND U.NormalizedUsername=@username AND U.IsPartnerAdmin=1 AND U.IsActive=1)

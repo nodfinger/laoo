@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'dart:convert';
 
 import 'employee_image_picker.dart';
 import 'package:flutter/material.dart';
@@ -64,6 +65,10 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
   bool _canChangeMasterData = false;
   bool _canOpenPositionLookup = false;
   bool _canShowEmployeeImages = false;
+  bool _canSetEmployeeSignature = false;
+  String? _signatureMessage;
+  bool _signatureMessageError = false;
+  int _signatureMessageId = 0;
   bool _loading = true;
   Object? _loadError;
   List<EmployeeCompanyOption> _companies = const [];
@@ -193,6 +198,9 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
         _canShowEmployeeImages =
             imagePermissions.contains('*') ||
             imagePermissions.contains('SHOW_EMPLOYEE_IMAGE');
+        _canSetEmployeeSignature =
+            imagePermissions.contains('*') ||
+            imagePermissions.contains('MANAGE_EMPLOYEE_SIGNATURE');
         _organizationCaption = (results[6] as String).trim();
         _canChangeMasterData =
             masterActions['view'] == true &&
@@ -443,6 +451,221 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
       .where((value) => value.code.isNotEmpty)
       .toList(growable: false);
 
+  Future<void> _setSignature(EmployeeRecord employee) async {
+    final path = '/api/company/employees/${employee.employeeId}/signature';
+    try {
+      final response = await _api.get(path);
+      if (!mounted) return;
+      final data = response is Map ? response : {};
+      final encoded = data['imageDataBase64'] as String?;
+      Uint8List? bytes = encoded == null ? null : base64Decode(encoded);
+      String? fileName = data['fileName'] as String?;
+      final hadImage = bytes != null;
+      bool changed = false, saving = false;
+      String? errorMessage;
+      final saved = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (dialogContext, update) => AlertDialog(
+            backgroundColor: Colors.white,
+            surfaceTintColor: Colors.transparent,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(LaooRadius.xs),
+            ),
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.draw_outlined,
+                      color: Theme.of(dialogContext).colorScheme.primary,
+                    ),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Text(
+                        'กำหนดลายเซ็น',
+                        style: LaooTypography.popupTitleStyle,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                const Divider(height: .6, thickness: .6),
+              ],
+            ),
+            content: SizedBox(
+              width: 440,
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(height: 12),
+                    Text(employee.fullName),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: saving
+                          ? null
+                          : () async {
+                              try {
+                                final picked = await pickEmployeeImage();
+                                if (picked == null || !dialogContext.mounted) {
+                                  return;
+                                }
+                                final file = picked.files.single;
+                                final selected = file.bytes;
+                                if (selected == null ||
+                                    selected.isEmpty ||
+                                    selected.length > 2000000) {
+                                  throw StateError(
+                                    'กรุณาเลือกรูปขนาดไม่เกิน 2 MB',
+                                  );
+                                }
+                                if (img.decodeImage(selected) == null) {
+                                  throw StateError('ไฟล์รูปภาพไม่ถูกต้อง');
+                                }
+                                update(() {
+                                  bytes = selected;
+                                  fileName = file.name;
+                                  changed = true;
+                                  errorMessage = null;
+                                });
+                              } catch (e) {
+                                if (dialogContext.mounted) {
+                                  update(() => errorMessage = _errorText(e));
+                                }
+                              }
+                            },
+                      icon: const Icon(Icons.image_outlined),
+                      label: const Text('เลือกรูปลายเซ็น'),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text('รองรับ JPG, PNG และ WEBP ไม่เกิน 2 MB'),
+                    const SizedBox(height: 12),
+                    if (bytes != null) ...[
+                      Container(
+                        height: 180,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: Theme.of(dialogContext).dividerColor,
+                          ),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Image.memory(bytes!, fit: BoxFit.contain),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(fileName ?? ''),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          onPressed: saving
+                              ? null
+                              : () => update(() {
+                                  bytes = null;
+                                  fileName = null;
+                                  changed = true;
+                                  errorMessage = null;
+                                }),
+                          icon: Icon(
+                            Icons.delete_outline,
+                            color: Theme.of(dialogContext).colorScheme.error,
+                          ),
+                          label: const Text('ลบรูป'),
+                        ),
+                      ),
+                    ] else
+                      const Text('ยังไม่มีรูปลายเซ็น'),
+                    if (errorMessage != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          errorMessage!,
+                          style: TextStyle(
+                            color: Theme.of(dialogContext).colorScheme.error,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              const Divider(height: .6, thickness: .6),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  OutlinedButton(
+                    onPressed: saving
+                        ? null
+                        : () => Navigator.pop(dialogContext, false),
+                    child: const Text('ยกเลิก'),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton.icon(
+                    onPressed: !changed || saving
+                        ? null
+                        : () async {
+                            update(() {
+                              saving = true;
+                              errorMessage = null;
+                            });
+                            try {
+                              if (bytes == null) {
+                                if (hadImage) await _api.delete(path);
+                              } else {
+                                await _api.put(
+                                  path,
+                                  body: {
+                                    'fileName': fileName,
+                                    'imageDataBase64': base64Encode(bytes!),
+                                  },
+                                );
+                              }
+                              if (dialogContext.mounted) {
+                                Navigator.pop(dialogContext, true);
+                              }
+                            } catch (e) {
+                              if (dialogContext.mounted) {
+                                update(() {
+                                  saving = false;
+                                  errorMessage = _errorText(e);
+                                });
+                              }
+                            }
+                          },
+                    icon: const Icon(Icons.save_outlined),
+                    label: const Text('บันทึก'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+      if (saved == true && mounted) {
+        _showSignatureMessage('บันทึกลายเซ็นเรียบร้อยแล้ว');
+      }
+    } catch (error) {
+      if (!mounted) return;
+      _showSignatureMessage(
+        'โหลดลายเซ็นไม่สำเร็จ: ${_errorText(error)}',
+        error: true,
+      );
+    }
+  }
+
+  void _showSignatureMessage(String message, {bool error = false}) {
+    setState(() {
+      _signatureMessage = message;
+      _signatureMessageError = error;
+      _signatureMessageId++;
+    });
+  }
+
   Future<EmployeeImageInput?> _pickImage() async {
     final picked = await pickEmployeeImage();
     final source = picked?.files.single.bytes;
@@ -575,66 +798,89 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
     pageTitle: _caption,
     activeMenu: _contract.menuCode,
     menuScope: widget.menuScope,
-    child: ColoredBox(
-      color: LaooColors.background,
-      child: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _loadError != null
-          ? _loadErrorView()
-          : EmployeeWorkspace(
-              caption: _caption,
-              repository: _repository,
-              organizationRepository: widget.customer && !widget.companyScoped
-                  ? null
-                  : _organizationRepository,
-              organizationCaption: _organizationCaption,
-              onOrganizationChanged: (units) {
-                if (mounted) setState(() => _organizationUnits = units);
+    child: Stack(
+      children: [
+        ColoredBox(
+          color: LaooColors.background,
+          child: _loading
+              ? const Center(child: CircularProgressIndicator())
+              : _loadError != null
+              ? _loadErrorView()
+              : EmployeeWorkspace(
+                  caption: _caption,
+                  repository: _repository,
+                  organizationRepository:
+                      widget.customer && !widget.companyScoped
+                      ? null
+                      : _organizationRepository,
+                  organizationCaption: _organizationCaption,
+                  onOrganizationChanged: (units) {
+                    if (mounted) setState(() => _organizationUnits = units);
+                  },
+                  screenType: _contract.screenType,
+                  pageSize: companySetupController.pageSize,
+                  companies: _companies,
+                  organizationUnits: _organizationUnits,
+                  organizationMode: _organizationMode,
+                  customerScope: widget.customer && !widget.companyScoped,
+                  roleGroups: _roleGroups,
+                  manageRoleGroups: _canManageRoleGroups
+                      ? _manageRoleGroups
+                      : null,
+                  carTypes: _carTypes,
+                  oilTypes: _oilTypes,
+                  positions: _positions,
+                  canChangeMasterData: _canChangeMasterData,
+                  managePositions: _canOpenPositionLookup
+                      ? () => _manageMasterGroup(MasterGroupCodes.position)
+                      : null,
+                  manageCarTypes: _canManageVehicleMaster
+                      ? () => _manageMasterGroup(MasterGroupCodes.carType)
+                      : null,
+                  manageOilTypes: _canManageVehicleMaster
+                      ? () => _manageMasterGroup(MasterGroupCodes.oilType)
+                      : null,
+                  titleBuilder: (context, title, showFavorite) =>
+                      WorkspacePageTitle(
+                        title: title,
+                        favoriteKey: showFavorite ? _contract.menuCode : null,
+                      ),
+                  messageBuilder: (context, message, error, onClose) =>
+                      AutoDismissMessage(
+                        key: ValueKey((message, error)),
+                        message: message,
+                        error: error,
+                        onClose: onClose,
+                      ),
+                  tokens: _tokens,
+                  formatDate: (value) =>
+                      CompanyDateFormatter.formatDateByYearFormat(
+                        value,
+                        companySetupController.current?.yearFormat ?? 'C',
+                      ),
+                  errorText: _errorText,
+                  confirmDelete: _confirmDelete,
+                  pickImage: _pickImage,
+                  canShowEmployeeImages: _canShowEmployeeImages,
+                  onSignature: widget.companyScoped && _canSetEmployeeSignature
+                      ? _setSignature
+                      : null,
+                ),
+        ),
+        if (_signatureMessage != null)
+          Positioned(
+            top: 10,
+            right: 10,
+            child: AutoDismissMessage(
+              key: ValueKey(_signatureMessageId),
+              message: _signatureMessage!,
+              error: _signatureMessageError,
+              onClose: () {
+                if (mounted) setState(() => _signatureMessage = null);
               },
-              screenType: _contract.screenType,
-              pageSize: companySetupController.pageSize,
-              companies: _companies,
-              organizationUnits: _organizationUnits,
-              organizationMode: _organizationMode,
-              customerScope: widget.customer && !widget.companyScoped,
-              roleGroups: _roleGroups,
-              manageRoleGroups: _canManageRoleGroups ? _manageRoleGroups : null,
-              carTypes: _carTypes,
-              oilTypes: _oilTypes,
-              positions: _positions,
-              canChangeMasterData: _canChangeMasterData,
-              managePositions: _canOpenPositionLookup
-                  ? () => _manageMasterGroup(MasterGroupCodes.position)
-                  : null,
-              manageCarTypes: _canManageVehicleMaster
-                  ? () => _manageMasterGroup(MasterGroupCodes.carType)
-                  : null,
-              manageOilTypes: _canManageVehicleMaster
-                  ? () => _manageMasterGroup(MasterGroupCodes.oilType)
-                  : null,
-              titleBuilder: (context, title, showFavorite) =>
-                  WorkspacePageTitle(
-                    title: title,
-                    favoriteKey: showFavorite ? _contract.menuCode : null,
-                  ),
-              messageBuilder: (context, message, error, onClose) =>
-                  AutoDismissMessage(
-                    key: ValueKey((message, error)),
-                    message: message,
-                    error: error,
-                    onClose: onClose,
-                  ),
-              tokens: _tokens,
-              formatDate: (value) =>
-                  CompanyDateFormatter.formatDateByYearFormat(
-                    value,
-                    companySetupController.current?.yearFormat ?? 'C',
-                  ),
-              errorText: _errorText,
-              confirmDelete: _confirmDelete,
-              pickImage: _pickImage,
-              canShowEmployeeImages: _canShowEmployeeImages,
             ),
+          ),
+      ],
     ),
   );
 

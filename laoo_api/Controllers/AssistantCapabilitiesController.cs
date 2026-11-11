@@ -92,7 +92,7 @@ public sealed class AssistantCapabilitiesController(IConfiguration configuration
         return mime is null ? NotFound() : File(bytes, mime);
     }
 
-    [HttpPost("/api/assistant/agents/{agent}/image"), RequestSizeLimit(1024 * 1024 + 65536)]
+    [HttpPost("/api/assistant/agents/{agent}/image"), RequestSizeLimit(3 * 1024 * 1024 + 65536)]
     public async Task<IActionResult> UploadAgentImage(string agent, IFormFile file, CancellationToken token)
     {
         var company = AiChatSettingsStore.CompanyId(User);
@@ -100,7 +100,7 @@ public sealed class AssistantCapabilitiesController(IConfiguration configuration
         await using var db = new SqlConnection(configuration.GetConnectionString("LaooDatabase"));
         await db.OpenAsync(token);
         if (!await AgentAdminAllowed(db, "EDIT", token)) return Forbid();
-        if (file is null || file.Length <= 0 || file.Length > 1024 * 1024) return BadRequest(new { message = "กรุณาเลือกรูปขนาดไม่เกิน 1 MB" });
+        if (file is null || file.Length <= 0 || file.Length > 3 * 1024 * 1024) return BadRequest(new { message = "กรุณาเลือกรูปขนาดไม่เกิน 3 MB" });
         await using var stream = new MemoryStream();
         await file.CopyToAsync(stream, token);
         var bytes = stream.ToArray();

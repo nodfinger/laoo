@@ -746,7 +746,12 @@ class _ServiceRequestPageState extends State<ServiceRequestPage> {
                               if (_cardView || constraints.maxWidth < 850) {
                                 return _requestCards(items);
                               }
-                              return _requestTable(items, context);
+                              return Padding(
+                                padding: const EdgeInsets.all(
+                                  LaooLayout.cardPadding,
+                                ),
+                                child: _requestTable(items, context),
+                              );
                             },
                           ),
                     padding: EdgeInsets.zero,

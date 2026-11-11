@@ -370,7 +370,7 @@ class _SubPermissionPageState extends State<SubPermissionPage> {
                                     controlAffinity:
                                         ListTileControlAffinity.leading,
                                     title: Text(
-                                      '${employee['employeeCode']} - ${employee['fullName']}',
+                                      '${employee['fullName'] ?? ''}',
                                     ),
                                     subtitle:
                                         '${employee['nickName'] ?? ''}'

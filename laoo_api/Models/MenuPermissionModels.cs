@@ -14,6 +14,10 @@ public sealed class MenuPermissionMatrixResponse
     public bool CanCreate { get; init; }
     public bool CanEdit { get; init; }
     public bool CanDelete { get; init; }
+    public bool AllowPrint { get; init; }
+    public bool AllowExport { get; init; }
+    public bool CanPrint { get; init; }
+    public bool CanExport { get; init; }
 }
 
 public sealed class MenuPermissionSaveRequest
@@ -24,4 +28,6 @@ public sealed class MenuPermissionSaveRequest
     public bool CanCreate { get; init; }
     public bool CanEdit { get; init; }
     public bool CanDelete { get; init; }
+    public bool CanPrint { get; init; }
+    public bool CanExport { get; init; }
 }

@@ -38,7 +38,9 @@ const masterDataDisplayFields = <ListDisplayField>[
 
 const travelClaimDisplayFields = <ListDisplayField>[
   ListDisplayField(key: 'number', label: 'เลขที่เอกสาร', requiredVisible: true),
-  ListDisplayField(key: 'date', label: 'วันที่'),
+  ListDisplayField(key: 'date', label: 'วันที่ทำรายการ'),
+  ListDisplayField(key: 'department', label: 'แผนก'),
+  ListDisplayField(key: 'claimant', label: 'ชื่อผู้ทำรายการ'),
   ListDisplayField(key: 'origin', label: 'ต้นทาง'),
   ListDisplayField(key: 'destination', label: 'ปลายทาง'),
   ListDisplayField(key: 'total', label: 'ยอดเบิกรวม'),
@@ -82,6 +84,20 @@ class ListDisplayPreferences {
     for (final key in [...order, ...registered.map((field) => field.key)]) {
       final field = fields[key];
       if (field != null && seen.add(key)) result.add(field);
+    }
+    if (identical(registered, travelClaimDisplayFields) && order.isNotEmpty) {
+      var anchor = result.indexWhere((field) => field.key == 'date');
+      for (final key in ['department', 'claimant']) {
+        final existing = result.indexWhere((field) => field.key == key);
+        if (existing < 0) continue;
+        if (!order.contains(key) && anchor >= 0) {
+          final field = result.removeAt(existing);
+          if (existing < anchor) anchor--;
+          result.insert(++anchor, field);
+        } else if (existing >= 0) {
+          anchor = existing;
+        }
+      }
     }
     return result;
   }

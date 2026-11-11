@@ -37,7 +37,7 @@ public sealed class CompanyRolePermissionController(IConfiguration configuration
             foreach (var role in roles)
             {
                 foreach (var row in target)
-                    await SaveRow(connection, tx, role, new MenuPermissionSaveRequest { ProjectId = row.ProjectId, MenuCode = row.MenuCode, CanView = request.Grant, CanCreate = request.Grant, CanEdit = request.Grant, CanDelete = request.Grant }, token);
+                    await SaveRow(connection, tx, role, new MenuPermissionSaveRequest { ProjectId = row.ProjectId, MenuCode = row.MenuCode, CanView = request.Grant, CanCreate = request.Grant, CanEdit = request.Grant, CanDelete = request.Grant, CanPrint = request.Grant && row.AllowPrint, CanExport = request.Grant && row.AllowExport }, token);
                 if (request.Grant) await SyncRoleUsersToGrantedProjects(connection, tx, role, token);
             }
             await tx.CommitAsync(token);
@@ -63,7 +63,10 @@ SELECT P.ProjectID,P.ProjectNameTH,M.MenuCode,M.MenuName,G.MenuGroupCode,G.MenuG
  CAST(MAX(CASE WHEN RP.ActionCode='CREATE' AND RP.IsAllowed=1 THEN 1 ELSE 0 END) AS bit),
  CAST(MAX(CASE WHEN RP.ActionCode='EDIT' AND RP.IsAllowed=1 THEN 1 ELSE 0 END) AS bit),
  CAST(MAX(CASE WHEN RP.ActionCode='DELETE' AND RP.IsAllowed=1 THEN 1 ELSE 0 END) AS bit),
- (SELECT COUNT(*) FROM dbo.TDADProjectMenuGroup CPG JOIN dbo.TDADMenuGroup CG ON CG.MenuGroupCode=CPG.MenuGroupCode AND CG.IsActive=1 WHERE CPG.ProjectID=P.ProjectID AND CPG.IsActive=1)
+ (SELECT COUNT(*) FROM dbo.TDADProjectMenuGroup CPG JOIN dbo.TDADMenuGroup CG ON CG.MenuGroupCode=CPG.MenuGroupCode AND CG.IsActive=1 WHERE CPG.ProjectID=P.ProjectID AND CPG.IsActive=1),
+ M.AllowPrint,M.AllowExport,
+ CAST(MAX(CASE WHEN RP.ActionCode='PRINT' AND RP.IsAllowed=1 THEN 1 ELSE 0 END) AS bit),
+ CAST(MAX(CASE WHEN RP.ActionCode='EXPORT' AND RP.IsAllowed=1 THEN 1 ELSE 0 END) AS bit)
 FROM dbo.TDADProject P
 JOIN dbo.TDSTCompanySetUp C ON C.CompanyID=@Company AND C.PartnerID=@Partner AND C.IsActive=1
 JOIN dbo.TDADProjectMenu PM ON PM.ProjectID=P.ProjectID AND PM.IsActive=1
@@ -88,7 +91,7 @@ WHERE P.IsActive=1 AND UPPER(LTRIM(RTRIM(G.AudienceType))) IN ('A','C') AND UPPE
          AND S.StatusCode IN(N'ACTIVE',N'TRIAL') AND S.StartDate<=CONVERT(date,SYSUTCDATETIME())
          AND (S.ExpireDate IS NULL OR S.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))
          AND (ISNULL(G.OpenOption,0)=0 OR NULLIF(LTRIM(RTRIM(M.FeatureCode)),N'') IS NULL OR EXISTS(SELECT 1 FROM dbo.TDADProjectPackageFeature PF WHERE PF.PackageID=PK.PackageID AND PF.FeatureCode=M.FeatureCode AND PF.IsEnabled=1)))))
-GROUP BY P.ProjectID,P.ProjectNameTH,M.MenuCode,M.MenuName,G.MenuGroupCode,G.MenuGroupName,M.ScreenType,PG.SortOrder,PM.SortOrder
+GROUP BY P.ProjectID,P.ProjectNameTH,M.MenuCode,M.MenuName,G.MenuGroupCode,G.MenuGroupName,M.ScreenType,PG.SortOrder,PM.SortOrder,M.AllowPrint,M.AllowExport
 ORDER BY P.ProjectID,PG.SortOrder,PM.SortOrder,M.MenuCode;
 """;
         await using var command = new SqlCommand(sql, connection); Bind(command, roleGroupId);
@@ -97,7 +100,7 @@ ORDER BY P.ProjectID,PG.SortOrder,PM.SortOrder,M.MenuCode;
         {
             ProjectId=reader.GetInt64(0), ProjectName=reader.GetString(1), MenuCode=reader.GetString(2), MenuName=reader.GetString(3),
             MenuGroupCode=reader.GetString(4).Trim(), MenuGroupName=reader.GetString(5), ScreenType=reader.IsDBNull(6)?1:reader.GetInt32(6),
-            CanView=reader.GetBoolean(7), CanCreate=reader.GetBoolean(8), CanEdit=reader.GetBoolean(9), CanDelete=reader.GetBoolean(10), ConfiguredMenuGroupCount=reader.GetInt32(11)
+            CanView=reader.GetBoolean(7), CanCreate=reader.GetBoolean(8), CanEdit=reader.GetBoolean(9), CanDelete=reader.GetBoolean(10), ConfiguredMenuGroupCount=reader.GetInt32(11), AllowPrint=reader.GetBoolean(12), AllowExport=reader.GetBoolean(13), CanPrint=reader.GetBoolean(14), CanExport=reader.GetBoolean(15)
         });
         return Ok(result);
     }
@@ -136,8 +139,8 @@ ORDER BY P.ProjectID,PG.SortOrder,PM.SortOrder,M.MenuCode;
     private async Task SaveRow(SqlConnection c,SqlTransaction tx,long role,MenuPermissionSaveRequest row,CancellationToken token)
     {
         const string sql="""
-DECLARE @Type int;
-SELECT @Type=M.ScreenType FROM dbo.TDADProject P
+DECLARE @Type int, @AllowPrint bit, @AllowExport bit;
+SELECT @Type=M.ScreenType,@AllowPrint=M.AllowPrint,@AllowExport=M.AllowExport FROM dbo.TDADProject P
 JOIN dbo.TDSTCompanySetUp C ON C.CompanyID=@Company AND C.PartnerID=@Partner AND C.IsActive=1
 JOIN dbo.TDADProjectMenu PM ON PM.ProjectID=P.ProjectID AND PM.MenuCode=@Menu AND PM.IsActive=1
 JOIN dbo.TDADMainMenu M ON M.MenuCode=PM.MenuCode AND M.IsActive=1 AND M.IsVisible=1
@@ -163,11 +166,11 @@ WHERE P.ProjectID=@Project AND P.IsActive=1 AND G.MenuGroupCode<>'07'
 IF @Type IS NULL THROW 50010,'MENU_SCOPE_INVALID',1;
 DELETE FROM dbo.TDADRoleGroupPermission WHERE RoleGroupID=@Role AND ProjectID=@Project AND MenuCode=@Menu;
 INSERT dbo.TDADRoleGroupPermission(RoleGroupID,ProjectID,MenuCode,ActionCode,IsAllowed,CreatedBy)
-SELECT @Role,@Project,@Menu,V.ActionCode,1,N'api' FROM (VALUES(N'VIEW',@View),(N'CREATE',@Create),(N'EDIT',@Edit),(N'DELETE',@Delete))V(ActionCode,Chosen)
-WHERE V.Chosen=1 AND (@View=1 OR V.ActionCode='VIEW') AND ((@Type IN(1,4)) OR (@Type=2 AND V.ActionCode IN('VIEW','EDIT')) OR (@Type=3 AND V.ActionCode='VIEW'));
+SELECT @Role,@Project,@Menu,V.ActionCode,1,N'api' FROM (VALUES(N'VIEW',@View),(N'CREATE',@Create),(N'EDIT',@Edit),(N'DELETE',@Delete),(N'PRINT',@Print),(N'EXPORT',@Export))V(ActionCode,Chosen)
+WHERE V.Chosen=1 AND (@View=1 OR V.ActionCode='VIEW') AND ((V.ActionCode='PRINT' AND @AllowPrint=1) OR (V.ActionCode='EXPORT' AND @AllowExport=1) OR (V.ActionCode IN('VIEW','CREATE','EDIT','DELETE') AND ((@Type IN(1,4)) OR (@Type=2 AND V.ActionCode IN('VIEW','EDIT')) OR (@Type=3 AND V.ActionCode='VIEW'))));
 """;
         await using var command=new SqlCommand(sql,c,tx); Bind(command,role); Add(command,"@Project",SqlDbType.BigInt,row.ProjectId); Add(command,"@Menu",SqlDbType.NVarChar,row.MenuCode,20);
-        Add(command,"@View",SqlDbType.Bit,row.CanView);Add(command,"@Create",SqlDbType.Bit,row.CanCreate);Add(command,"@Edit",SqlDbType.Bit,row.CanEdit);Add(command,"@Delete",SqlDbType.Bit,row.CanDelete);await command.ExecuteNonQueryAsync(token);
+        Add(command,"@View",SqlDbType.Bit,row.CanView);Add(command,"@Create",SqlDbType.Bit,row.CanCreate);Add(command,"@Edit",SqlDbType.Bit,row.CanEdit);Add(command,"@Delete",SqlDbType.Bit,row.CanDelete);Add(command,"@Print",SqlDbType.Bit,row.CanPrint);Add(command,"@Export",SqlDbType.Bit,row.CanExport);await command.ExecuteNonQueryAsync(token);
     }
 
     private async Task SyncRoleUsersToGrantedProjects(

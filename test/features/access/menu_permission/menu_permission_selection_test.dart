@@ -3,6 +3,26 @@ import 'package:laoo/features/access/menu_permission/models/menu_permission_row.
 import 'package:laoo/features/access/menu_permission/models/menu_permission_selection.dart';
 
 void main() {
+  test('print and export obey menu flags and view dependency', () {
+    final allowed = MenuPermissionRow.fromJson({
+      'menuCode': '66001', 'menuName': 'Test', 'menuGroupCode': '66',
+      'menuGroupName': 'Test', 'screenType': 3,
+      'allowPrint': true, 'allowExport': false,
+    });
+    expect(MenuPermissionSelection.supports(allowed, 'PRINT'), isTrue);
+    expect(MenuPermissionSelection.supports(allowed, 'EXPORT'), isFalse);
+    final selected = MenuPermissionSelection.applyToRow(allowed, 'PRINT', true);
+    expect(selected.canView, isTrue);
+    expect(selected.canPrint, isTrue);
+    expect(selected.toJson()['canPrint'], isTrue);
+    expect(MenuPermissionSelection.applyToRow(selected, 'EXPORT', true).canExport, isFalse);
+    final cleared = MenuPermissionSelection.applyToRow(selected, 'VIEW', false);
+    expect(cleared.canPrint, isFalse);
+    final granted = MenuPermissionSelection.grantAll([allowed]).single;
+    expect(granted.canPrint, isTrue);
+    expect(granted.canExport, isFalse);
+    expect(MenuPermissionSelection.samePermissions([allowed], [selected]), isFalse);
+  });
   test(
     'permission changes preserve group metadata without sending it to save API',
     () {

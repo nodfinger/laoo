@@ -75,6 +75,9 @@ import '../../features/assistant/ai_agents_page.dart';
 import '../../features/access/menu_permission/pages/menu_permission_page.dart';
 import '../../features/access/sub_permission/pages/sub_permission_page.dart';
 import '../../features/support/organization/pages/organization_supervisor_page.dart';
+import '../../features/my_system/position_levels_page.dart';
+import '../../features/my_system/menu_data_access_page.dart';
+import '../../features/my_system/approval_catalog_page.dart';
 import 'app_menu_route_registry.dart';
 import 'route_names.dart';
 import 'route_paths.dart';
@@ -276,6 +279,21 @@ final GoRouter appRouter = GoRouter(
       path: RoutePaths.partnerUsers,
       name: RouteNames.partnerUsers,
       builder: (context, state) => const PartnerCompanyUserPage(),
+    ),
+    GoRoute(
+      path: '/company/position-levels',
+      name: 'companyPositionLevels',
+      builder: (context, state) => const PositionLevelsPage(),
+    ),
+    GoRoute(
+      path: '/company/menu-data-access',
+      name: 'companyMenuDataAccess',
+      builder: (context, state) => const MenuDataAccessPage(),
+    ),
+    GoRoute(
+      path: '/company/approval-pattern',
+      name: 'companyApprovalPattern',
+      builder: (context, state) => const ApprovalCatalogPage(),
     ),
     GoRoute(
       path: RoutePaths.companySupervisors,

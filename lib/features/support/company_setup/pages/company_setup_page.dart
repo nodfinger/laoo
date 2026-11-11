@@ -17,6 +17,7 @@ import '../data/company_setup_api.dart';
 import '../models/company_setup_constants.dart';
 import '../models/company_setup_model.dart';
 import '../widgets/company_subscription_card.dart';
+import '../widgets/travel_access_settings_card.dart';
 import '../../presentation/widgets/support_workspace_shell.dart';
 
 class CompanySetupPage extends StatefulWidget {
@@ -31,6 +32,7 @@ class CompanySetupPage extends StatefulWidget {
 class _CompanySetupPageState extends State<CompanySetupPage> {
   final _formKey = GlobalKey<FormState>();
   final _basicSectionKey = GlobalKey<_CollapsibleSectionState>();
+  final _accessSettingsKey = GlobalKey<TravelAccessSettingsCardState>();
   final _ownerCode = TextEditingController(text: 'C000001');
   final _ownerName = TextEditingController(text: 'Laoo Foods');
   final _titleHeader = TextEditingController(text: 'Laoo Foods');
@@ -320,6 +322,19 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
         _itemDigit.text = savedSetup.itemDigit.toString();
         await companySetupController.load();
         WindowTitleService.setTitle(companySetupController.appTitle);
+        if (!mounted) return;
+        try {
+          await _accessSettingsKey.currentState?.saveIfChanged();
+        } catch (_) {
+          if (!mounted) return;
+          setState(() {
+            _saving = false;
+            _messageIsError = true;
+            _message =
+                'บันทึกข้อมูลระบบแล้ว แต่บันทึกเงื่อนไขการเข้าถึงไม่สำเร็จ กรุณาตรวจสอบสิทธิ์และลองบันทึกใหม่';
+          });
+          return;
+        }
         if (!mounted) return;
         _superUserName.clear();
         _passwordCry.clear();
@@ -779,6 +794,14 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
                           const SizedBox(height: 8),
                           if (_ownerType == 'C') ...[
                             _CollapsibleSection(
+                              title: 'การเข้าถึงข้อมูล',
+                              icon: Icons.security_outlined,
+                              child: TravelAccessSettingsCard(
+                                key: _accessSettingsKey,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            _CollapsibleSection(
                               title: 'รูปปกสมาชิก',
                               icon: Icons.image_outlined,
                               child: _memberCoverCard(preset.primary),
@@ -794,7 +817,6 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
                                 email: _partnerEmail,
                               ),
                             ),
-                            const SizedBox(height: 8),
                           ],
                         ],
                         if (widget.additionalOnly) ...[
@@ -1463,32 +1485,35 @@ class _CollapsibleSectionState extends State<_CollapsibleSection> {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(18, 8, 10, 8),
-          child: Row(
-            children: [
-              Icon(
-                widget.icon,
-                color: Theme.of(context).colorScheme.primary,
-                size: 20,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  widget.title,
-                  style: const TextStyle(
-                    color: Colors.black,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
+        InkWell(
+          onTap: () => setState(() => _expanded = !_expanded),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 8, 10, 8),
+            child: Row(
+              children: [
+                Icon(
+                  widget.icon,
+                  color: Theme.of(context).colorScheme.primary,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    widget.title,
+                    style: const TextStyle(
+                      color: Colors.black,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
-              ),
-              IconButton(
-                tooltip: '${_expanded ? 'ย่อ' : 'ขยาย'}${widget.title}',
-                onPressed: () => setState(() => _expanded = !_expanded),
-                icon: Icon(_expanded ? Icons.expand_less : Icons.expand_more),
-              ),
-            ],
+                IconButton(
+                  tooltip: '${_expanded ? 'ย่อ' : 'ขยาย'}${widget.title}',
+                  onPressed: () => setState(() => _expanded = !_expanded),
+                  icon: Icon(_expanded ? Icons.expand_less : Icons.expand_more),
+                ),
+              ],
+            ),
           ),
         ),
         Visibility(
@@ -1538,31 +1563,36 @@ class _SetupCardState extends State<_SetupCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              children: [
-                Icon(widget.icon, color: accent, size: 20),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    widget.title,
-                    style: TextStyle(
-                      color: Colors.black,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
+            InkWell(
+              onTap: widget.collapsible
+                  ? () => setState(() => _expanded = !_expanded)
+                  : null,
+              child: Row(
+                children: [
+                  Icon(widget.icon, color: accent, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      widget.title,
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
-                ),
-                if (widget.collapsible)
-                  IconButton(
-                    tooltip: _expanded
-                        ? 'ย่อ${widget.title}'
-                        : 'ขยาย${widget.title}',
-                    onPressed: () => setState(() => _expanded = !_expanded),
-                    icon: Icon(
-                      _expanded ? Icons.expand_less : Icons.expand_more,
+                  if (widget.collapsible)
+                    IconButton(
+                      tooltip: _expanded
+                          ? 'ย่อ${widget.title}'
+                          : 'ขยาย${widget.title}',
+                      onPressed: () => setState(() => _expanded = !_expanded),
+                      icon: Icon(
+                        _expanded ? Icons.expand_less : Icons.expand_more,
+                      ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
             Visibility(
               visible: _expanded,

@@ -42,6 +42,7 @@ class EmployeeWorkspace extends StatefulWidget {
     this.pickImage,
     this.thumbnailBuilder,
     this.canShowEmployeeImages = false,
+    this.onSignature,
   });
 
   final String caption;
@@ -73,6 +74,7 @@ class EmployeeWorkspace extends StatefulWidget {
   final EmployeeImagePicker? pickImage;
   final EmployeeThumbnailBuilder? thumbnailBuilder;
   final bool canShowEmployeeImages;
+  final EmployeeAction? onSignature;
 
   @override
   State<EmployeeWorkspace> createState() => _EmployeeWorkspaceState();
@@ -218,6 +220,7 @@ class _EmployeeWorkspaceState extends State<EmployeeWorkspace> {
                 onEdit: _openEdit,
                 onDelete: _delete,
                 onUser: _openEdit,
+                onSignature: widget.onSignature,
                 thumbnailBuilder: widget.thumbnailBuilder,
                 canShowEmployeeImages: widget.canShowEmployeeImages,
               ),

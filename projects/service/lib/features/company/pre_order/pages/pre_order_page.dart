@@ -588,7 +588,7 @@ class _PreOrderListPageState extends State<PreOrderListPage> {
                       _surface(
                         padding: cardMode
                             ? const EdgeInsets.all(8)
-                            : EdgeInsets.zero,
+                            : const EdgeInsets.all(LaooLayout.cardPadding),
                         child: cardMode ? _cardList(accent) : _table(accent),
                       ),
                       const SizedBox(height: 8),

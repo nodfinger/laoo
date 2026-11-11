@@ -72,6 +72,7 @@ IconData resolveNavigationIcon(
     'account_tree' || 'account_tree_outlined' => Icons.account_tree_outlined,
     'device_hub' || 'device_hub_outlined' => Icons.device_hub_outlined,
     'fact_check' || 'fact_check_outlined' => Icons.fact_check_outlined,
+    'approval' || 'approval_outlined' => Icons.approval_outlined,
     'login' || 'login_outlined' => Icons.login_outlined,
     'apartment' ||
     'apartment_outlined' ||

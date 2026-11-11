@@ -12,6 +12,10 @@ class MenuPermissionRow {
     required this.canCreate,
     required this.canEdit,
     required this.canDelete,
+    this.allowPrint = false,
+    this.allowExport = false,
+    this.canPrint = false,
+    this.canExport = false,
   });
   final int? projectId;
   final String? projectName;
@@ -24,11 +28,13 @@ class MenuPermissionRow {
   final String menuCode, menuName, menuGroupCode, menuGroupName;
   final int screenType;
   final bool canView, canCreate, canEdit, canDelete;
+  final bool allowPrint, allowExport, canPrint, canExport;
   factory MenuPermissionRow.fromJson(Map<String, dynamic> json) =>
       MenuPermissionRow(
         projectId: (json['projectId'] as num?)?.toInt(),
         projectName: json['projectName'] as String?,
-        configuredMenuGroupCount: (json['configuredMenuGroupCount'] as num?)?.toInt(),
+        configuredMenuGroupCount: (json['configuredMenuGroupCount'] as num?)
+            ?.toInt(),
         menuCode: json['menuCode'] as String? ?? '',
         menuName: json['menuName'] as String? ?? '',
         menuGroupCode: json['menuGroupCode'] as String? ?? '',
@@ -38,6 +44,10 @@ class MenuPermissionRow {
         canCreate: _bool(json['canCreate']),
         canEdit: _bool(json['canEdit']),
         canDelete: _bool(json['canDelete']),
+        allowPrint: _bool(json['allowPrint']),
+        allowExport: _bool(json['allowExport']),
+        canPrint: _bool(json['canPrint']),
+        canExport: _bool(json['canExport']),
       );
   Map<String, dynamic> toJson() => {
     if (projectId != null) 'projectId': projectId,
@@ -46,12 +56,16 @@ class MenuPermissionRow {
     'canCreate': canCreate,
     'canEdit': canEdit,
     'canDelete': canDelete,
+    'canPrint': canPrint,
+    'canExport': canExport,
   };
   MenuPermissionRow copy({
     bool? view,
     bool? create,
     bool? edit,
     bool? delete,
+    bool? print,
+    bool? export,
   }) => MenuPermissionRow(
     projectId: projectId,
     projectName: projectName,
@@ -65,6 +79,10 @@ class MenuPermissionRow {
     canCreate: create ?? canCreate,
     canEdit: edit ?? canEdit,
     canDelete: delete ?? canDelete,
+    allowPrint: allowPrint,
+    allowExport: allowExport,
+    canPrint: print ?? canPrint,
+    canExport: export ?? canExport,
   );
 }
 

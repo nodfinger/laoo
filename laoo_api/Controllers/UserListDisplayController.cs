@@ -18,7 +18,7 @@ public sealed class UserListDisplayController(IConfiguration configuration) : Co
     {
         ["10003"] = ["name", "status"],
         ["05002"] = ["name", "sequence", "shortCode"],
-        ["66001"] = ["number", "date", "origin", "destination", "total"],
+        ["66001"] = ["number", "date", "department", "claimant", "purpose", "workPlace", "origin", "destination", "total"],
         ["10008"] = ["system", "menu", "name", "description", "approvedBy", "approvedAt", "status"]
     };
 
