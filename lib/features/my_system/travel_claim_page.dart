@@ -1681,11 +1681,18 @@ class _TravelClaimPageState extends State<TravelClaimPage> {
           ? editor(context)
           : LayoutBuilder(
               builder: (context, constraints) {
-                // Include room for the visible columns, ID and action buttons.
-                final minimumTableWidth = 200.0 + cols.length * 150.0;
+                // Widths include cell padding and the visible action buttons.
+                final textScale = MediaQuery.textScalerOf(
+                  context,
+                ).scale(1).clamp(1.0, double.infinity);
+                final minimumTableWidth =
+                    (230.0 + cols.length * 150.0) * textScale;
+                final tableWidth =
+                    constraints.maxWidth -
+                    t.contentMargin.horizontal -
+                    2 * LaooLayout.cardPadding;
                 final forcedCard =
-                    constraints.maxWidth < 600 ||
-                    constraints.maxWidth < minimumTableWidth;
+                    tableWidth < 600 || tableWidth < minimumTableWidth;
                 return LaooListWorkspace(
                   tokens: t,
                   caption: LaooSurfaceCard(
@@ -1934,65 +1941,88 @@ class _TravelClaimPageState extends State<TravelClaimPage> {
                         )
                       : Padding(
                           padding: const EdgeInsets.all(LaooLayout.cardPadding),
-                          child: LayoutBuilder(
-                            builder: (context, constraints) =>
-                                SingleChildScrollView(
-                                  scrollDirection: Axis.horizontal,
-                                  child: ConstrainedBox(
-                                    constraints: BoxConstraints(
-                                      minWidth: constraints.maxWidth,
-                                    ),
-                                    child: SingleChildScrollView(
-                                      child: DataTable(
-                                        dividerThickness: .6,
-                                        headingTextStyle: t.tableStyle.copyWith(
-                                          color: t.primaryColor,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                        dataTextStyle: t.tableStyle,
-                                        headingRowColor: WidgetStatePropertyAll(
-                                          t.primaryColor.withValues(alpha: .12),
-                                        ),
-                                        columns: [
-                                          const DataColumn(label: Text('ID')),
-                                          if (!preferences.actionOnRight)
-                                            const DataColumn(
-                                              label: Text('Action'),
-                                            ),
-                                          for (final c in cols)
-                                            DataColumn(label: Text(c.label)),
-                                          if (preferences.actionOnRight)
-                                            const DataColumn(
-                                              label: Text('Action'),
-                                            ),
-                                        ],
-                                        rows: [
-                                          for (var i = 0; i < rows.length; i++)
-                                            DataRow(
-                                              cells: [
-                                                DataCell(
-                                                  Text('${startAt + i + 1}'),
-                                                ),
-                                                if (!preferences.actionOnRight)
-                                                  DataCell(rowActions(rows[i])),
-                                                for (final c in cols)
-                                                  DataCell(
-                                                    Text(
-                                                      displayField(
-                                                        rows[i],
-                                                        c.key,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                if (preferences.actionOnRight)
-                                                  DataCell(rowActions(rows[i])),
-                                              ],
-                                            ),
-                                        ],
-                                      ),
+                          child: SingleChildScrollView(
+                            child: DataTable(
+                              horizontalMargin: 8,
+                              columnSpacing: 20,
+                              dividerThickness: .6,
+                              headingTextStyle: t.tableStyle.copyWith(
+                                color: t.primaryColor,
+                                fontWeight: FontWeight.w700,
+                              ),
+                              dataTextStyle: t.tableStyle,
+                              headingRowColor: WidgetStatePropertyAll(
+                                t.primaryColor.withValues(alpha: .12),
+                              ),
+                              columns: [
+                                const DataColumn(
+                                  columnWidth: FlexColumnWidth(60),
+                                  label: Expanded(
+                                    child: Text(
+                                      'ID',
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
                                 ),
+                                if (!preferences.actionOnRight)
+                                  const DataColumn(
+                                    columnWidth: FlexColumnWidth(170),
+                                    label: Expanded(
+                                      child: Text(
+                                        'Action',
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ),
+                                for (final c in cols)
+                                  DataColumn(
+                                    columnWidth: const FlexColumnWidth(150),
+                                    label: Expanded(
+                                      child: Text(
+                                        c.label,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ),
+                                if (preferences.actionOnRight)
+                                  const DataColumn(
+                                    columnWidth: FlexColumnWidth(170),
+                                    label: Expanded(
+                                      child: Text(
+                                        'Action',
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                              rows: [
+                                for (var i = 0; i < rows.length; i++)
+                                  DataRow(
+                                    cells: [
+                                      DataCell(Text('${startAt + i + 1}')),
+                                      if (!preferences.actionOnRight)
+                                        DataCell(rowActions(rows[i])),
+                                      for (final c in cols)
+                                        DataCell(
+                                          Tooltip(
+                                            message: displayField(
+                                              rows[i],
+                                              c.key,
+                                            ),
+                                            child: Text(
+                                              displayField(rows[i], c.key),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ),
+                                      if (preferences.actionOnRight)
+                                        DataCell(rowActions(rows[i])),
+                                    ],
+                                  ),
+                              ],
+                            ),
                           ),
                         ),
                   pagination: LaooPaginationCard(

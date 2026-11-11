@@ -386,6 +386,11 @@ class _MenuDataAccessPageState extends State<MenuDataAccessPage> {
     return '${two(date.day)}/${two(date.month)}/${date.year} ${two(date.hour)}:${two(date.minute)}';
   }
 
+  Widget _tableText(String value) => Tooltip(
+    message: value,
+    child: Text(value, maxLines: 1, overflow: TextOverflow.ellipsis),
+  );
+
   @override
   Widget build(BuildContext context) {
     final filtered = _rows
@@ -409,9 +414,18 @@ class _MenuDataAccessPageState extends State<MenuDataAccessPage> {
         menuScope: WorkspaceMenuScope.company,
         child: LayoutBuilder(
           builder: (context, available) {
-            // Six columns need more than the 600px minimum to remain readable.
+            const columnWidths = <double>[90, 110, 150, 145, 160, 180];
+            final tableWidth =
+                available.maxWidth -
+                2 * LaooLayout.cardMargin -
+                2 * LaooLayout.cardPadding;
+            final textScale = MediaQuery.textScalerOf(
+              context,
+            ).scale(1).clamp(1.0, double.infinity);
+            final minimumTableWidth =
+                columnWidths.reduce((a, b) => a + b) * textScale;
             final forcedCard =
-                available.maxWidth - 2 * LaooLayout.cardMargin - 20 < 1200;
+                tableWidth < 600 || tableWidth < minimumTableWidth;
             final showCards = forcedCard || _card;
             return Padding(
               padding: const EdgeInsets.all(LaooLayout.cardMargin),
@@ -570,105 +584,94 @@ class _MenuDataAccessPageState extends State<MenuDataAccessPage> {
                                         );
                                       },
                                     )
-                                  : LayoutBuilder(
-                                      builder: (context, constraints) => SingleChildScrollView(
-                                        child: SingleChildScrollView(
-                                          scrollDirection: Axis.horizontal,
-                                          child: ConstrainedBox(
-                                            constraints: BoxConstraints(
-                                              minWidth: constraints.maxWidth,
-                                            ),
-                                            child: DataTable(
-                                              headingRowColor:
-                                                  WidgetStatePropertyAll(
-                                                    businessCardOcrUi(context)
-                                                        .primaryColor
-                                                        .withValues(alpha: .1),
-                                                  ),
-                                              headingTextStyle: TextStyle(
-                                                color: businessCardOcrUi(
-                                                  context,
-                                                ).primaryColor,
-                                                fontSize:
-                                                    LaooTypography.tableHeader,
-                                                fontWeight: FontWeight.w700,
-                                              ),
-                                              dividerThickness: .6,
-                                              columns: const [
-                                                DataColumn(
-                                                  label: Text('กำหนดค่า'),
-                                                ),
-                                                DataColumn(label: Text('ระบบ')),
-                                                DataColumn(label: Text('เมนู')),
-                                                DataColumn(
-                                                  label: Text('นโยบาย'),
-                                                ),
-                                                DataColumn(
-                                                  label: Text(
-                                                    'พนักงานแก้ไขล่าสุด',
-                                                  ),
-                                                ),
-                                                DataColumn(
-                                                  label: Text(
-                                                    'วันที่-เวลาแก้ไขล่าสุด',
-                                                  ),
-                                                ),
-                                              ],
-                                              rows: visible
-                                                  .map(
-                                                    (row) => DataRow(
-                                                      cells: [
-                                                        DataCell(
-                                                          TextButton(
-                                                            onPressed:
-                                                                _canManage
-                                                                ? () =>
-                                                                      _configure(
-                                                                        row,
-                                                                      )
-                                                                : null,
-                                                            child: const Text(
-                                                              'กำหนด',
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        DataCell(
-                                                          Text(
-                                                            '${row['project']}',
-                                                          ),
-                                                        ),
-                                                        DataCell(
-                                                          Text(
-                                                            '${row['name']}',
-                                                          ),
-                                                        ),
-                                                        DataCell(
-                                                          Text(
-                                                            row['hasOverride'] ==
-                                                                    true
-                                                                ? 'กำหนดเฉพาะเมนู'
-                                                                : 'ส่วนกลาง',
-                                                          ),
-                                                        ),
-                                                        DataCell(
-                                                          Text(
-                                                            '${row['updatedByName'] ?? '-'}',
-                                                          ),
-                                                        ),
-                                                        DataCell(
-                                                          Text(
-                                                            _updatedAt(
-                                                              row['updatedAt'],
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  )
-                                                  .toList(),
-                                            ),
-                                          ),
+                                  : SingleChildScrollView(
+                                      child: DataTable(
+                                        horizontalMargin: 8,
+                                        columnSpacing: 20,
+                                        headingRowColor: WidgetStatePropertyAll(
+                                          businessCardOcrUi(
+                                            context,
+                                          ).primaryColor.withValues(alpha: .12),
                                         ),
+                                        headingTextStyle: TextStyle(
+                                          color: businessCardOcrUi(
+                                            context,
+                                          ).primaryColor,
+                                          fontSize: LaooTypography.tableHeader,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                        dividerThickness: .6,
+                                        columns: [
+                                          for (final (index, label) in <String>[
+                                            'กำหนดค่า',
+                                            'ระบบ',
+                                            'เมนู',
+                                            'นโยบาย',
+                                            'พนักงานแก้ไขล่าสุด',
+                                            'วันที่-เวลาแก้ไขล่าสุด',
+                                          ].indexed)
+                                            DataColumn(
+                                              columnWidth: FlexColumnWidth(
+                                                columnWidths[index],
+                                              ),
+                                              label: Expanded(
+                                                child: Text(
+                                                  label,
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ),
+                                        ],
+                                        rows: visible
+                                            .map(
+                                              (row) => DataRow(
+                                                cells: [
+                                                  DataCell(
+                                                    TextButton(
+                                                      onPressed: _canManage
+                                                          ? () =>
+                                                                _configure(row)
+                                                          : null,
+                                                      child: const Text(
+                                                        'กำหนด',
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  DataCell(
+                                                    _tableText(
+                                                      '${row['project']}',
+                                                    ),
+                                                  ),
+                                                  DataCell(
+                                                    _tableText(
+                                                      '${row['name']}',
+                                                    ),
+                                                  ),
+                                                  DataCell(
+                                                    _tableText(
+                                                      row['hasOverride'] == true
+                                                          ? 'กำหนดเฉพาะเมนู'
+                                                          : 'ส่วนกลาง',
+                                                    ),
+                                                  ),
+                                                  DataCell(
+                                                    _tableText(
+                                                      '${row['updatedByName'] ?? '-'}',
+                                                    ),
+                                                  ),
+                                                  DataCell(
+                                                    _tableText(
+                                                      _updatedAt(
+                                                        row['updatedAt'],
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            )
+                                            .toList(),
                                       ),
                                     ),
                             ),

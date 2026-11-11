@@ -237,6 +237,11 @@ class _ApprovalAssignmentPageState extends State<ApprovalAssignmentPage> {
     );
   }
 
+  Widget _tableText(String value) => Tooltip(
+    message: value,
+    child: Text(value, maxLines: 1, overflow: TextOverflow.ellipsis),
+  );
+
   String _formatUpdatedAt(dynamic value) {
     final date = DateTime.tryParse(value?.toString() ?? '')?.toLocal();
     if (date == null) return '-';
@@ -270,7 +275,19 @@ class _ApprovalAssignmentPageState extends State<ApprovalAssignmentPage> {
         menuScope: WorkspaceMenuScope.company,
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final forceCards = constraints.maxWidth < 1200;
+            // Minimum widths include the column padding and both action controls.
+            const columnWidths = <double>[90, 160, 100, 130, 130, 145, 180];
+            final tableWidth =
+                constraints.maxWidth -
+                2 * LaooLayout.cardMargin -
+                2 * LaooLayout.cardPadding;
+            final textScale = MediaQuery.textScalerOf(
+              context,
+            ).scale(1).clamp(1.0, double.infinity);
+            final minimumTableWidth =
+                columnWidths.reduce((a, b) => a + b) * textScale;
+            final forceCards =
+                tableWidth < 600 || tableWidth < minimumTableWidth;
             final showCards = forceCards || cards;
             final tokens = businessCardOcrUi(context);
             return Padding(
@@ -456,104 +473,91 @@ class _ApprovalAssignmentPageState extends State<ApprovalAssignmentPage> {
                                         );
                                       },
                                     )
-                                  : LayoutBuilder(
-                                      builder: (context, c) => SingleChildScrollView(
-                                        child: SingleChildScrollView(
-                                          scrollDirection: Axis.horizontal,
-                                          child: ConstrainedBox(
-                                            constraints: BoxConstraints(
-                                              minWidth: c.maxWidth,
-                                            ),
-                                            child: DataTable(
-                                              headingRowColor:
-                                                  WidgetStatePropertyAll(
-                                                    tokens.primaryColor
-                                                        .withValues(alpha: .1),
-                                                  ),
-                                              headingTextStyle: TextStyle(
-                                                color: tokens.primaryColor,
-                                                fontSize:
-                                                    LaooTypography.tableHeader,
-                                                fontWeight: FontWeight.w700,
-                                              ),
-                                              dividerThickness: .6,
-                                              columns: const [
-                                                DataColumn(
-                                                  label: Text('กำหนดค่า'),
-                                                ),
-                                                DataColumn(
-                                                  label: Text('เฉพาะบุคคล'),
-                                                ),
-                                                DataColumn(label: Text('ระบบ')),
-                                                DataColumn(label: Text('เมนู')),
-                                                DataColumn(
-                                                  label: Text('เงื่อนไข'),
-                                                ),
-                                                DataColumn(
-                                                  label: Text(
-                                                    'ผู้กำหนดค่าล่าสุด',
-                                                  ),
-                                                ),
-                                                DataColumn(
-                                                  label: Text(
-                                                    'วันที่-เวลากำหนดล่าสุด',
-                                                  ),
-                                                ),
-                                              ],
-                                              rows: visible
-                                                  .map(
-                                                    (row) => DataRow(
-                                                      cells: [
-                                                        DataCell(
-                                                          TextButton(
-                                                            onPressed: canManage
-                                                                ? () =>
-                                                                      configure(
-                                                                        row,
-                                                                      )
-                                                                : null,
-                                                            child: const Text(
-                                                              'กำหนด',
-                                                            ),
-                                                          ),
-                                                        ),
-                                                        DataCell(
-                                                          personalAction(row),
-                                                        ),
-                                                        DataCell(
-                                                          Text(
-                                                            '${row['project']}',
-                                                          ),
-                                                        ),
-                                                        DataCell(
-                                                          Text(
-                                                            '${row['name']}',
-                                                          ),
-                                                        ),
-                                                        DataCell(
-                                                          Text(
-                                                            '${row['patternName'] ?? 'ยังไม่กำหนด'}',
-                                                          ),
-                                                        ),
-                                                        DataCell(
-                                                          Text(
-                                                            '${row['updatedByName'] ?? '-'}',
-                                                          ),
-                                                        ),
-                                                        DataCell(
-                                                          Text(
-                                                            _formatUpdatedAt(
-                                                              row['updatedAt'],
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  )
-                                                  .toList(),
-                                            ),
+                                  : SingleChildScrollView(
+                                      child: DataTable(
+                                        horizontalMargin: 8,
+                                        columnSpacing: 20,
+                                        headingRowColor: WidgetStatePropertyAll(
+                                          tokens.primaryColor.withValues(
+                                            alpha: .12,
                                           ),
                                         ),
+                                        headingTextStyle: TextStyle(
+                                          color: tokens.primaryColor,
+                                          fontSize: LaooTypography.tableHeader,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                        dividerThickness: .6,
+                                        columns: [
+                                          for (final (index, label) in <String>[
+                                            'กำหนดค่า',
+                                            'เฉพาะบุคคล',
+                                            'ระบบ',
+                                            'เมนู',
+                                            'เงื่อนไข',
+                                            'ผู้กำหนดค่าล่าสุด',
+                                            'วันที่-เวลากำหนดล่าสุด',
+                                          ].indexed)
+                                            DataColumn(
+                                              columnWidth: FlexColumnWidth(
+                                                columnWidths[index],
+                                              ),
+                                              label: Expanded(
+                                                child: Text(
+                                                  label,
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ),
+                                        ],
+                                        rows: visible
+                                            .map(
+                                              (row) => DataRow(
+                                                cells: [
+                                                  DataCell(
+                                                    TextButton(
+                                                      onPressed: canManage
+                                                          ? () => configure(row)
+                                                          : null,
+                                                      child: const Text(
+                                                        'กำหนด',
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  DataCell(personalAction(row)),
+                                                  DataCell(
+                                                    _tableText(
+                                                      '${row['project']}',
+                                                    ),
+                                                  ),
+                                                  DataCell(
+                                                    _tableText(
+                                                      '${row['name']}',
+                                                    ),
+                                                  ),
+                                                  DataCell(
+                                                    _tableText(
+                                                      '${row['patternName'] ?? 'ยังไม่กำหนด'}',
+                                                    ),
+                                                  ),
+                                                  DataCell(
+                                                    _tableText(
+                                                      '${row['updatedByName'] ?? '-'}',
+                                                    ),
+                                                  ),
+                                                  DataCell(
+                                                    _tableText(
+                                                      _formatUpdatedAt(
+                                                        row['updatedAt'],
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            )
+                                            .toList(),
                                       ),
                                     ),
                             ),

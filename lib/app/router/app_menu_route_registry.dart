@@ -118,6 +118,13 @@ abstract final class AppMenuRouteRegistry {
       path: '/company/my-system/purchase',
       scope: AppMenuScope.company,
     ),
+    '70002': AppMenuRouteSpec(
+      menuCode: '70002',
+      databaseRouteName: 'mySystemLegalDocumentRequest',
+      goRouteName: 'mySystemLegalDocumentRequest',
+      path: '/company/my-system/legal-document-request',
+      scope: AppMenuScope.company,
+    ),
     '55001': AppMenuRouteSpec(
       menuCode: '55001',
       databaseRouteName: 'companyBusinessCardOcrSettings',
