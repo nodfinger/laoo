@@ -45,6 +45,8 @@ class _TravelClaimPageState extends State<TravelClaimPage> {
       'toll',
       'parking',
       'transport',
+      'startTime',
+      'endTime',
     ])
       k: TextEditingController(),
   };
@@ -400,6 +402,17 @@ class _TravelClaimPageState extends State<TravelClaimPage> {
       );
       return;
     }
+    if (iso(start) == iso(end) &&
+        fields['startTime']!.text.isNotEmpty &&
+        fields['endTime']!.text.isNotEmpty &&
+        fields['endTime']!.text.compareTo(fields['startTime']!.text) < 0) {
+      showTimedSnackBar(
+        context,
+        message: 'เวลาสิ้นสุดต้องไม่ก่อนเวลาเริ่มเดินทาง',
+        error: true,
+      );
+      return;
+    }
     if (vehicle == null || (flat == null && rate == null)) {
       showTimedSnackBar(
         context,
@@ -429,6 +442,12 @@ class _TravelClaimPageState extends State<TravelClaimPage> {
         'distanceKm': amount('distance'),
         'startDate': iso(start),
         'endDate': iso(end),
+        'startTime': fields['startTime']!.text.isEmpty
+            ? null
+            : '${fields['startTime']!.text}:00',
+        'endTime': fields['endTime']!.text.isEmpty
+            ? null
+            : '${fields['endTime']!.text}:00',
         'vehicleTypeCode': vehicle,
         'vehicleRegistration': fields['registration']!.text.trim(),
         'nights': int.tryParse(fields['nights']!.text) ?? 0,
@@ -694,9 +713,10 @@ class _TravelClaimPageState extends State<TravelClaimPage> {
       );
       final font = pw.Font.ttf(fontData.buffer.asByteData());
       final doc = pw.Document(
-        theme: pw.ThemeData.withFont(base: font, bold: font).copyWith(
-          defaultTextStyle: const pw.TextStyle(fontSize: 9),
-        ),
+        theme: pw.ThemeData.withFont(
+          base: font,
+          bold: font,
+        ).copyWith(defaultTextStyle: const pw.TextStyle(fontSize: 9)),
       );
       String date(String key) {
         final d = DateTime.tryParse('${item[key] ?? ''}');
@@ -704,105 +724,243 @@ class _TravelClaimPageState extends State<TravelClaimPage> {
       }
 
       String money(String key) => (item[key] as num? ?? 0).toStringAsFixed(2);
-      final info = result['printInfo'] is Map ? Map<String, dynamic>.from(result['printInfo'] as Map) : <String, dynamic>{};
-      final vehicleInfo = vehicles.where((v) => v['code'] == item['vehicle']).firstOrNull;
+      final info = result['printInfo'] is Map
+          ? Map<String, dynamic>.from(result['printInfo'] as Map)
+          : <String, dynamic>{};
+      final vehicleInfo = vehicles
+          .where((v) => v['code'] == item['vehicle'])
+          .firstOrNull;
       String value(dynamic v) => v == null || '$v'.trim().isEmpty ? '-' : '$v';
       pw.Widget line(String text) => pw.Padding(
-        padding: const pw.EdgeInsets.only(bottom: 5), child: pw.Text(text),
+        padding: const pw.EdgeInsets.only(bottom: 5),
+        child: pw.Text(text),
       );
       pw.Widget pair(String left, String right) => pw.Padding(
         padding: const pw.EdgeInsets.only(bottom: 5),
-        child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-          pw.Expanded(child: pw.Text(left)), pw.SizedBox(width: 12), pw.Expanded(child: pw.Text(right)),
-        ]),
+        child: pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Expanded(child: pw.Text(left)),
+            pw.SizedBox(width: 12),
+            pw.Expanded(child: pw.Text(right)),
+          ],
+        ),
       );
-      pw.Widget travelPair(String leftLabel, String leftValue, String rightLabel, String rightValue) => pw.Padding(
+      pw.Widget travelPair(
+        String leftLabel,
+        String leftValue,
+        String rightLabel,
+        String rightValue,
+      ) => pw.Padding(
         padding: const pw.EdgeInsets.only(bottom: 8),
-        child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-          pw.Expanded(child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-            pw.SizedBox(width: 78, child: pw.Text(leftLabel)),
-            pw.Expanded(child: pw.Text(leftValue)),
-          ])),
-          pw.SizedBox(width: 16),
-          pw.Expanded(child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-            pw.SizedBox(width: 88, child: pw.Text(rightLabel)),
-            pw.Expanded(child: pw.Text(rightValue)),
-          ])),
-        ]),
+        child: pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Expanded(
+              child: pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.SizedBox(width: 78, child: pw.Text(leftLabel)),
+                  pw.Expanded(child: pw.Text(leftValue)),
+                ],
+              ),
+            ),
+            pw.SizedBox(width: 16),
+            pw.Expanded(
+              child: pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.SizedBox(width: 88, child: pw.Text(rightLabel)),
+                  pw.Expanded(child: pw.Text(rightValue)),
+                ],
+              ),
+            ),
+          ],
+        ),
       );
       final start = DateTime.tryParse('${item['start'] ?? ''}');
       final end = DateTime.tryParse('${item['end'] ?? ''}');
       final days = start != null && end != null && !end.isBefore(start)
-          ? end.difference(start).inDays + 1 : null;
-      pw.Widget signature(String label) => pw.Expanded(child: pw.Column(children: [
-        pw.SizedBox(height: 32), pw.Text('................................................'),
-        pw.Text(label), pw.Text('วันที่ ........../........../..........'),
-      ]));
-      doc.addPage(pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(32),
-        build: (_) => [
-          pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-            pw.SizedBox(width: 80, height: 48, child: logoBytes == null
-              ? pw.SizedBox() : pw.Image(pw.MemoryImage(logoBytes), fit: pw.BoxFit.contain)),
-            pw.Expanded(child: pw.Column(children: [
-              pw.Text(value(info['companyName']), textAlign: pw.TextAlign.center,
-                style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
-              pw.Text(value(info['address']), textAlign: pw.TextAlign.center,
-                style: const pw.TextStyle(fontSize: 8)),
-            ])),
-            pw.SizedBox(width: 80),
-          ]),
-          pw.SizedBox(height: 8),
-          pw.Center(child: pw.Text('ใบอนุมัติเบิก-จ่ายค่าใช้จ่ายในการเดินทาง',
-            style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold))),
-          pw.SizedBox(height: 10),
-          pw.Align(alignment: pw.Alignment.centerRight, child: pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.end,
-            children: [pw.Text('เลขที่เอกสาร: ${value(item['number'])}'), pw.Text('วันที่: ${date('date')}')],
-          )),
-          pw.SizedBox(height: 10),
-          line('เรื่อง ขออนุมัติเบิกค่าใช้จ่ายในการเดินทาง'),
-          line('เรียน ..............................................................'),
-          pw.SizedBox(height: 10),
-          pair('ข้าพเจ้า ${value(info['claimant'])}', 'ตำแหน่ง ${value(info['position'])}'),
-          pair('รหัสพนักงาน ${value(info['employeeCode'])}', 'ฝ่าย ${value(info['division'])}'),
-          pw.SizedBox(height: 10),
-          line('ข้าพเจ้าขอเบิกค่าใช้จ่ายในการเดินทางไปปฏิบัติงานนอกสถานที่ ดังนี้'),
-          pw.SizedBox(height: 4),
-          travelPair('สถานที่ต้นทาง', value(item['origin']), 'สถานที่ปฏิบัติงาน', value(item['workPlace'])),
-          travelPair('ระหว่างวันที่', date('start'), 'ถึงวันที่', date('end')),
-          line('รวมวันที่ไปปฏิบัติงานนอกสถานที่ จำนวน ${days ?? '-'} วัน'),
-          pw.SizedBox(height: 5),
-          line('วัตถุประสงค์ในการปฏิบัติงานครั้งนี้ เพื่อ'),
-          pw.Padding(padding: const pw.EdgeInsets.only(left: 20, bottom: 8), child: pw.Text(value(item['purpose']))),
-          pw.SizedBox(height: 8),
-          pw.Text('ค่าใช้จ่ายที่ขออนุมัติ', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-          pw.Divider(thickness: 0.6),
-          line('ประเภทรถ: ${value(vehicleInfo?['name'] ?? item['vehicle'])}     ทะเบียน: ${value(item['registration'])}'),
-          line('ระยะทาง: ${value(item['distance'])} กม.     อัตราต่อกิโลเมตร: ${value(item['rate'])} บาท'),
-          for (final entry in <MapEntry<String, String>>[
-            MapEntry('ค่าเดินทาง / ค่าน้ำมัน', money('fuel')),
-            MapEntry('ค่าทางด่วน', money('toll')),
-            MapEntry('ค่าที่จอดรถ', money('parking')),
-            MapEntry('ค่าที่พัก (${value(item['nights'])} คืน)', money('lodging')),
-            MapEntry('ค่ายานพาหนะสาธารณะ', money('transport')),
-          ]) pw.Padding(padding: const pw.EdgeInsets.symmetric(vertical: 3), child: pw.Row(children: [
-            pw.Expanded(child: pw.Text(entry.key)), pw.Text('${entry.value} บาท'),
-          ])),
-          pw.Divider(thickness: 0.6),
-          pw.Align(alignment: pw.Alignment.centerRight, child: pw.Text('รวมจำนวนเงินที่ขอเบิกทั้งสิ้น ${money('total')} บาท',
-            style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold))),
-          pw.SizedBox(height: 12),
-          line('หมายเหตุ: โปรดแนบเอกสารประกอบการพิจารณา'),
-          pw.Row(children: [signature('ผู้ขอเบิก'), signature('ผู้อนุมัติ')]),
-          pw.SizedBox(height: 18),
-          pw.Table(border: pw.TableBorder.all(width: 0.6), children: [pw.TableRow(children: [
-            for (final label in ['ผู้จ่ายเงิน', 'ผู้รับเงิน', 'ผู้ตรวจสอบบัญชี'])
-              pw.Container(height: 65, alignment: pw.Alignment.bottomCenter, padding: const pw.EdgeInsets.all(5), child: pw.Text(label)),
-          ])]),
-        ],
-      ));
+          ? end.difference(start).inDays + 1
+          : null;
+      pw.Widget signature(String label) => pw.Expanded(
+        child: pw.Column(
+          children: [
+            pw.SizedBox(height: 32),
+            pw.Text('................................................'),
+            pw.Text(label),
+            pw.Text('วันที่ ........../........../..........'),
+          ],
+        ),
+      );
+      doc.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(32),
+          build: (_) => [
+            pw.Row(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.SizedBox(
+                  width: 80,
+                  height: 48,
+                  child: logoBytes == null
+                      ? pw.SizedBox()
+                      : pw.Image(
+                          pw.MemoryImage(logoBytes),
+                          fit: pw.BoxFit.contain,
+                        ),
+                ),
+                pw.Expanded(
+                  child: pw.Column(
+                    children: [
+                      pw.Text(
+                        value(info['companyName']),
+                        textAlign: pw.TextAlign.center,
+                        style: pw.TextStyle(
+                          fontSize: 13,
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      ),
+                      pw.Text(
+                        value(info['address']),
+                        textAlign: pw.TextAlign.center,
+                        style: const pw.TextStyle(fontSize: 8),
+                      ),
+                    ],
+                  ),
+                ),
+                pw.SizedBox(width: 80),
+              ],
+            ),
+            pw.SizedBox(height: 8),
+            pw.Center(
+              child: pw.Text(
+                'ใบอนุมัติเบิก-จ่ายค่าใช้จ่ายในการเดินทาง',
+                style: pw.TextStyle(
+                  fontSize: 13,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+            ),
+            pw.SizedBox(height: 10),
+            pw.Align(
+              alignment: pw.Alignment.centerRight,
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.end,
+                children: [
+                  pw.Text('เลขที่เอกสาร: ${value(item['number'])}'),
+                  pw.Text('วันที่: ${date('date')}'),
+                ],
+              ),
+            ),
+            pw.SizedBox(height: 10),
+            line('เรื่อง ขออนุมัติเบิกค่าใช้จ่ายในการเดินทาง'),
+            line(
+              'เรียน ..............................................................',
+            ),
+            pw.SizedBox(height: 10),
+            pair(
+              'ข้าพเจ้า ${value(info['claimant'])}',
+              'ตำแหน่ง ${value(info['position'])}',
+            ),
+            pair(
+              'รหัสพนักงาน ${value(info['employeeCode'])}',
+              'ฝ่าย ${value(info['division'])}',
+            ),
+            pw.SizedBox(height: 10),
+            line(
+              'ข้าพเจ้าขอเบิกค่าใช้จ่ายในการเดินทางไปปฏิบัติงานนอกสถานที่ ดังนี้',
+            ),
+            pw.SizedBox(height: 4),
+            travelPair(
+              'สถานที่ต้นทาง',
+              value(item['origin']),
+              'สถานที่ปฏิบัติงาน',
+              value(item['workPlace']),
+            ),
+            travelPair(
+              'ระหว่างวันที่',
+              date('start'),
+              'ถึงวันที่',
+              date('end'),
+            ),
+            line('รวมวันที่ไปปฏิบัติงานนอกสถานที่ จำนวน ${days ?? '-'} วัน'),
+            pw.SizedBox(height: 5),
+            line('วัตถุประสงค์ในการปฏิบัติงานครั้งนี้ เพื่อ'),
+            pw.Padding(
+              padding: const pw.EdgeInsets.only(left: 20, bottom: 8),
+              child: pw.Text(value(item['purpose'])),
+            ),
+            pw.SizedBox(height: 8),
+            pw.Text(
+              'ค่าใช้จ่ายที่ขออนุมัติ',
+              style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+            ),
+            pw.Divider(thickness: 0.6),
+            line(
+              'ประเภทรถ: ${value(vehicleInfo?['name'] ?? item['vehicle'])}     ทะเบียน: ${value(item['registration'])}',
+            ),
+            line(
+              'ระยะทาง: ${value(item['distance'])} กม.     อัตราต่อกิโลเมตร: ${value(item['rate'])} บาท',
+            ),
+            for (final entry in <MapEntry<String, String>>[
+              MapEntry('ค่าเดินทาง / ค่าน้ำมัน', money('fuel')),
+              MapEntry('ค่าทางด่วน', money('toll')),
+              MapEntry('ค่าที่จอดรถ', money('parking')),
+              MapEntry(
+                'ค่าที่พัก (${value(item['nights'])} คืน)',
+                money('lodging'),
+              ),
+              MapEntry('ค่ายานพาหนะสาธารณะ', money('transport')),
+            ])
+              pw.Padding(
+                padding: const pw.EdgeInsets.symmetric(vertical: 3),
+                child: pw.Row(
+                  children: [
+                    pw.Expanded(child: pw.Text(entry.key)),
+                    pw.Text('${entry.value} บาท'),
+                  ],
+                ),
+              ),
+            pw.Divider(thickness: 0.6),
+            pw.Align(
+              alignment: pw.Alignment.centerRight,
+              child: pw.Text(
+                'รวมจำนวนเงินที่ขอเบิกทั้งสิ้น ${money('total')} บาท',
+                style: pw.TextStyle(
+                  fontSize: 13,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+            ),
+            pw.SizedBox(height: 12),
+            line('หมายเหตุ: โปรดแนบเอกสารประกอบการพิจารณา'),
+            pw.Row(children: [signature('ผู้ขอเบิก'), signature('ผู้อนุมัติ')]),
+            pw.SizedBox(height: 18),
+            pw.Table(
+              border: pw.TableBorder.all(width: 0.6),
+              children: [
+                pw.TableRow(
+                  children: [
+                    for (final label in [
+                      'ผู้จ่ายเงิน',
+                      'ผู้รับเงิน',
+                      'ผู้ตรวจสอบบัญชี',
+                    ])
+                      pw.Container(
+                        height: 65,
+                        alignment: pw.Alignment.bottomCenter,
+                        padding: const pw.EdgeInsets.all(5),
+                        child: pw.Text(label),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
       await Printing.layoutPdf(
         name: 'travel-claim-${item['number']}.pdf',
         onLayout: (_) => doc.save(),
@@ -918,6 +1076,50 @@ class _TravelClaimPageState extends State<TravelClaimPage> {
     icon: const Icon(Icons.calendar_today_outlined),
     label: Text('$label ${displayDate(value)}'),
   );
+  Widget timeInput(BuildContext context, String key, String label) {
+    final controller = fields[key]!;
+    final primary = businessCardOcrUi(context).primaryColor;
+    return TextFormField(
+      controller: controller,
+      keyboardType: TextInputType.datetime,
+      style: businessCardOcrUi(context).inputStyle,
+      inputFormatters: [
+        FilteringTextInputFormatter.allow(RegExp(r'[0-9:]')),
+        LengthLimitingTextInputFormatter(5),
+      ],
+      decoration: ocrInput(context, label).copyWith(
+        hintText: 'HH:mm',
+        suffixIcon: IconButton(
+          tooltip: 'เลือกเวลา',
+          icon: Icon(Icons.access_time, color: primary),
+          onPressed: () async {
+            final parts = controller.text.split(':');
+            final hour = parts.length == 2 ? int.tryParse(parts[0]) : null;
+            final minute = parts.length == 2 ? int.tryParse(parts[1]) : null;
+            final initial =
+                hour != null && hour < 24 && minute != null && minute < 60
+                ? TimeOfDay(hour: hour, minute: minute)
+                : TimeOfDay.now();
+            final value = await showTimePicker(
+              context: context,
+              initialTime: initial,
+            );
+            if (value != null && mounted) {
+              controller.text =
+                  '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
+            }
+          },
+        ),
+      ),
+      validator: (value) =>
+          value == null ||
+              value.isEmpty ||
+              RegExp(r'^(?:[01][0-9]|2[0-3]):[0-5][0-9]$').hasMatch(value)
+          ? null
+          : 'ระบุเวลาเป็น HH:mm',
+    );
+  }
+
   Widget fieldRow(List<Widget> children) => LayoutBuilder(
     builder: (context, constraints) {
       final columns = constraints.maxWidth < 600
@@ -1057,7 +1259,9 @@ class _TravelClaimPageState extends State<TravelClaimPage> {
                   start,
                   (d) => start = d,
                 ),
+                timeInput(context, 'startTime', 'เวลาเริ่ม'),
                 dateInput(context, 'วันที่สิ้นสุด', end, (d) => end = d),
+                timeInput(context, 'endTime', 'เวลาสิ้นสุด'),
                 Card(
                   margin: EdgeInsets.zero,
                   color: t.primaryColor.withValues(alpha: 0.10),

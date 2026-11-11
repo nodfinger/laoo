@@ -153,7 +153,7 @@ WHERE o.OwnerType='C' AND o.CompanyID=@company AND o.IsActive=1 AND o.UnitType I
 
     public sealed record ClaimAttachmentInput(string Name,string Base64);
     public sealed record ClaimInput(DateOnly ClaimDate, long? RouteId, string Origin, string Destination, string Purpose, string WorkPlace, string? MapUrl,
-        decimal DistanceKm, DateOnly StartDate, DateOnly EndDate, string VehicleTypeCode, string VehicleRegistration, int Nights, decimal Toll, decimal Parking, decimal PublicTransport, bool IsInterbranch, List<ClaimAttachmentInput>? Attachments, Guid? RequestKey);
+        decimal DistanceKm, DateOnly StartDate, DateOnly EndDate, string VehicleTypeCode, string VehicleRegistration, int Nights, decimal Toll, decimal Parking, decimal PublicTransport, bool IsInterbranch, List<ClaimAttachmentInput>? Attachments, Guid? RequestKey, TimeOnly? StartTime = null, TimeOnly? EndTime = null);
 
     [HttpGet("{id:long}")]
     public async Task<IActionResult> Detail(long id, CancellationToken token)
@@ -164,7 +164,7 @@ WHERE o.OwnerType='C' AND o.CompanyID=@company AND o.IsActive=1 AND o.UnitType I
         if (owner is null) return NotFound();
         if (!await RowAllowed(db, null, owner.Value, "VIEW", token)) return Forbid();
         const string sql="""
-SELECT ClaimNo,ClaimDate,RouteID,Origin,Destination,Purpose,WorkPlace,MapUrl,DistanceKm,StartDate,EndDate,VehicleTypeCode,VehicleRegistration,Nights,Toll,Parking,PublicTransport,FuelAmount,LodgingAmount,TotalAmount,IsInterbranch,RatePerKm,FlatFare,LodgingRate
+SELECT ClaimNo,ClaimDate,RouteID,Origin,Destination,Purpose,WorkPlace,MapUrl,DistanceKm,StartDate,EndDate,VehicleTypeCode,VehicleRegistration,Nights,Toll,Parking,PublicTransport,FuelAmount,LodgingAmount,TotalAmount,IsInterbranch,RatePerKm,FlatFare,LodgingRate,StartTime,EndTime
 FROM dbo.TDSTTravelClaim WHERE Id=@id AND CompanyID=@company;
 SELECT a.Id,a.FileName FROM dbo.TDSTTravelClaimAttachment a JOIN dbo.TDSTTravelClaim c ON c.Id=a.ClaimID AND c.CompanyID=a.CompanyID WHERE c.Id=@id AND c.CompanyID=@company ORDER BY a.Id;
 SELECT CASE WHEN COUNT(DISTINCT l.Amount)=1 THEN MAX(l.Amount) END FROM dbo.TDSTTravelClaim c
@@ -189,7 +189,7 @@ WHERE c.Id=@id AND c.CompanyID=@company;
 """;
         await using var q=new SqlCommand(sql,db);q.Parameters.AddWithValue("@id",id);q.Parameters.AddWithValue("@company",CompanyId);q.Parameters.AddWithValue("@user",UserId);
         await using var r=await q.ExecuteReaderAsync(token);if(!await r.ReadAsync(token)) return NotFound(new { message="ไม่พบเอกสารในบริษัทของคุณ" });
-        var item=new { id,number=r.GetString(0),date=r.GetDateTime(1).ToString("yyyy-MM-dd"),routeId=r.IsDBNull(2)?(long?)null:r.GetInt64(2),origin=r.GetString(3),destination=r.GetString(4),purpose=r.GetString(5),workPlace=r.GetString(6),mapUrl=r.IsDBNull(7)?null:r.GetString(7),distance=r.GetDecimal(8),start=r.GetDateTime(9).ToString("yyyy-MM-dd"),end=r.GetDateTime(10).ToString("yyyy-MM-dd"),vehicle=r.GetString(11),registration=r.GetString(12),nights=r.GetInt32(13),toll=r.GetDecimal(14),parking=r.GetDecimal(15),transport=r.GetDecimal(16),fuel=r.GetDecimal(17),lodging=r.GetDecimal(18),total=r.GetDecimal(19),isInterbranch=r.GetBoolean(20),rate=r.IsDBNull(21)?(decimal?)null:r.GetDecimal(21),flat=r.IsDBNull(22)?(decimal?)null:r.GetDecimal(22),lodgingRate=r.GetDecimal(23) };
+        var item=new { id,number=r.GetString(0),date=r.GetDateTime(1).ToString("yyyy-MM-dd"),routeId=r.IsDBNull(2)?(long?)null:r.GetInt64(2),origin=r.GetString(3),destination=r.GetString(4),purpose=r.GetString(5),workPlace=r.GetString(6),mapUrl=r.IsDBNull(7)?null:r.GetString(7),distance=r.GetDecimal(8),start=r.GetDateTime(9).ToString("yyyy-MM-dd"),end=r.GetDateTime(10).ToString("yyyy-MM-dd"),vehicle=r.GetString(11),registration=r.GetString(12),nights=r.GetInt32(13),toll=r.GetDecimal(14),parking=r.GetDecimal(15),transport=r.GetDecimal(16),fuel=r.GetDecimal(17),lodging=r.GetDecimal(18),total=r.GetDecimal(19),isInterbranch=r.GetBoolean(20),rate=r.IsDBNull(21)?(decimal?)null:r.GetDecimal(21),flat=r.IsDBNull(22)?(decimal?)null:r.GetDecimal(22),lodgingRate=r.GetDecimal(23),startTime=r.IsDBNull(24)?null:r.GetTimeSpan(24).ToString(@"hh\:mm"),endTime=r.IsDBNull(25)?null:r.GetTimeSpan(25).ToString(@"hh\:mm") };
         await r.NextResultAsync(token);var attachments=new List<object>();while(await r.ReadAsync(token))attachments.Add(new {id=r.GetInt64(0),name=r.GetString(1)});
         await r.NextResultAsync(token); decimal? ownerLodging=await r.ReadAsync(token) && !r.IsDBNull(0) ? r.GetDecimal(0) : null;
         await r.NextResultAsync(token);
@@ -286,6 +286,8 @@ DELETE FROM dbo.TDSTTravelClaim WHERE Id=@id AND CompanyID=@company; SELECT @@RO
             input.MapUrl?.Length>1000 || string.IsNullOrWhiteSpace(input.VehicleTypeCode) || input.VehicleTypeCode.Length>10 || string.IsNullOrWhiteSpace(input.VehicleRegistration) || input.VehicleRegistration.Length>50 ||
             new[] {input.DistanceKm,input.Toll,input.Parking,input.PublicTransport}.Any(x => x<0 || x>9999999999.99m || decimal.Round(x,2)!=x) || input.Nights<0 || input.Nights>366 || input.ClaimDate.Year is <2000 or >2100 || input.StartDate.Year is <2000 or >2100 || input.EndDate.Year is <2000 or >2100 || input.EndDate.DayNumber-input.StartDate.DayNumber>366 || (input.Attachments?.Count ?? 0)>50 || (id is null && (input.RequestKey is null || input.RequestKey==Guid.Empty)))
             return BadRequest(new { message="กรุณาระบุข้อมูลการเดินทางให้ครบถ้วน" });
+        if (input.StartDate == input.EndDate && input.StartTime.HasValue && input.EndTime.HasValue && input.EndTime.Value < input.StartTime.Value)
+            return BadRequest(new {message="เวลาสิ้นสุดต้องไม่ก่อนเวลาเริ่มเดินทาง"});
         var files=new List<(string Name,string Type,byte[] Data)>();
         try {
             long totalBytes=0;
@@ -365,11 +367,11 @@ SELECT @head+RIGHT(N'0000'+CONVERT(nvarchar(20),@next),4);
                 number=(await q.ExecuteScalarAsync(token)) as string; if(number is null) return NotFound(new { message="ไม่พบเอกสารในบริษัทของคุณ" });
             }
             const string insert="""
-INSERT dbo.TDSTTravelClaim(CompanyID,UserID,ClaimNo,RequestKey,RequestHash,ClaimDate,RouteID,IsInterbranch,Origin,Destination,Purpose,WorkPlace,MapUrl,DistanceKm,StartDate,EndDate,VehicleTypeCode,VehicleRegistration,RatePerKm,FlatFare,LodgingRate,Nights,Toll,Parking,PublicTransport,FuelAmount,LodgingAmount,TotalAmount)
-OUTPUT INSERTED.Id VALUES(@company,@user,@number,@requestKey,@requestHash,@date,@route,@interbranch,@origin,@destination,@purpose,@workplace,@map,@distance,@start,@end,@vehicle,@registration,@rate,@flat,@lodging,@nights,@toll,@parking,@transport,@fuel,@lodgingAmount,@total);
+INSERT dbo.TDSTTravelClaim(CompanyID,UserID,ClaimNo,RequestKey,RequestHash,ClaimDate,RouteID,IsInterbranch,Origin,Destination,Purpose,WorkPlace,MapUrl,DistanceKm,StartDate,EndDate,StartTime,EndTime,VehicleTypeCode,VehicleRegistration,RatePerKm,FlatFare,LodgingRate,Nights,Toll,Parking,PublicTransport,FuelAmount,LodgingAmount,TotalAmount)
+OUTPUT INSERTED.Id VALUES(@company,@user,@number,@requestKey,@requestHash,@date,@route,@interbranch,@origin,@destination,@purpose,@workplace,@map,@distance,@start,@end,@startTime,@endTime,@vehicle,@registration,@rate,@flat,@lodging,@nights,@toll,@parking,@transport,@fuel,@lodgingAmount,@total);
 """;
             const string update="""
-UPDATE dbo.TDSTTravelClaim SET ClaimDate=@date,RouteID=@route,IsInterbranch=@interbranch,Origin=@origin,Destination=@destination,Purpose=@purpose,WorkPlace=@workplace,MapUrl=@map,DistanceKm=@distance,StartDate=@start,EndDate=@end,VehicleTypeCode=@vehicle,VehicleRegistration=@registration,RatePerKm=@rate,FlatFare=@flat,LodgingRate=@lodging,Nights=@nights,Toll=@toll,Parking=@parking,PublicTransport=@transport,FuelAmount=@fuel,LodgingAmount=@lodgingAmount,TotalAmount=@total,UpdatedAt=SYSUTCDATETIME() OUTPUT INSERTED.Id WHERE Id=@id AND CompanyID=@company;
+UPDATE dbo.TDSTTravelClaim SET ClaimDate=@date,RouteID=@route,IsInterbranch=@interbranch,Origin=@origin,Destination=@destination,Purpose=@purpose,WorkPlace=@workplace,MapUrl=@map,DistanceKm=@distance,StartDate=@start,EndDate=@end,StartTime=@startTime,EndTime=@endTime,VehicleTypeCode=@vehicle,VehicleRegistration=@registration,RatePerKm=@rate,FlatFare=@flat,LodgingRate=@lodging,Nights=@nights,Toll=@toll,Parking=@parking,PublicTransport=@transport,FuelAmount=@fuel,LodgingAmount=@lodgingAmount,TotalAmount=@total,UpdatedAt=SYSUTCDATETIME() OUTPUT INSERTED.Id WHERE Id=@id AND CompanyID=@company;
 """;
             await using var cmd=new SqlCommand(id is null ? insert : update,db,tx);
             if(id is not null) cmd.Parameters.AddWithValue("@id",id.Value);
@@ -380,6 +382,8 @@ UPDATE dbo.TDSTTravelClaim SET ClaimDate=@date,RouteID=@route,IsInterbranch=@int
             cmd.Parameters.AddWithValue("@origin",input.Origin.Trim());cmd.Parameters.AddWithValue("@destination",input.Destination.Trim());cmd.Parameters.AddWithValue("@purpose",input.Purpose.Trim());cmd.Parameters.AddWithValue("@workplace",input.WorkPlace.Trim());
             cmd.Parameters.AddWithValue("@map",(object?)input.MapUrl?.Trim()??DBNull.Value);cmd.Parameters.AddWithValue("@distance",input.DistanceKm);
             cmd.Parameters.AddWithValue("@start",input.StartDate.ToDateTime(TimeOnly.MinValue));cmd.Parameters.AddWithValue("@end",input.EndDate.ToDateTime(TimeOnly.MinValue));
+            cmd.Parameters.Add("@startTime",SqlDbType.Time).Value=(object?)input.StartTime?.ToTimeSpan()??DBNull.Value;
+            cmd.Parameters.Add("@endTime",SqlDbType.Time).Value=(object?)input.EndTime?.ToTimeSpan()??DBNull.Value;
             cmd.Parameters.AddWithValue("@vehicle",input.VehicleTypeCode);cmd.Parameters.AddWithValue("@registration",input.VehicleRegistration.Trim());
             cmd.Parameters.AddWithValue("@rate",(object?)rate??DBNull.Value);cmd.Parameters.AddWithValue("@flat",(object?)flat??DBNull.Value);cmd.Parameters.AddWithValue("@lodging",lodging??0);
             cmd.Parameters.AddWithValue("@nights",input.Nights);cmd.Parameters.AddWithValue("@toll",input.Toll);cmd.Parameters.AddWithValue("@parking",input.Parking);cmd.Parameters.AddWithValue("@transport",input.PublicTransport);

@@ -271,7 +271,7 @@ class _PersonalApprovalDialogState extends State<PersonalApprovalDialog> {
                     : ListView.separated(
                         itemCount: approvers.length,
                         separatorBuilder: (_, _) =>
-                            const Divider(thickness: .6),
+                            const SizedBox(height: 12),
                         itemBuilder: (context, i) => Row(
                           children: [
                             Text('${i + 1}'),
@@ -366,14 +366,20 @@ class _PersonalApprovalDialogState extends State<PersonalApprovalDialog> {
     }
     return ListView.separated(
       itemCount: ids.length,
-      separatorBuilder: (_, _) => const Divider(height: 1, thickness: .6),
+      separatorBuilder: (_, _) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
         final id = ids[index];
         final count = saved.where((step) => step['requesterId'] == id).length;
+        final primary = businessCardOcrUi(context).primaryColor;
         return ListTile(
-          title: Text(employeeName(id)),
+          tileColor: primary.withValues(alpha: .08),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+          title: Text(
+            employeeName(id),
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
           subtitle: Text('ผู้อนุมัติ $count ลำดับ'),
-          trailing: const Icon(Icons.chevron_right),
+          trailing: Icon(Icons.chevron_right, color: primary),
           onTap: saving ? null : () => selectRequester(id),
         );
       },

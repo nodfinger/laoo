@@ -12,6 +12,7 @@ import '../data/menu_permission_repository.dart';
 import '../models/menu_permission_row.dart';
 import '../models/menu_permission_selection.dart';
 import '../../../profile/data/user_profile_repository.dart';
+import '../../../company/ocr/business_card_ocr_ui.dart';
 
 class MenuPermissionPage extends StatefulWidget {
   const MenuPermissionPage({
@@ -619,6 +620,87 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
     });
   }
 
+  Future<void> _chooseRoleGroup() async {
+    if (_saving || _loading) return;
+    var query = '';
+    final selected = await showDialog<int>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, update) {
+          final primary = Theme.of(context).colorScheme.primary;
+          final matches = _roleGroups
+              .where(
+                (group) =>
+                    group.name.toLowerCase().contains(query.toLowerCase()),
+              )
+              .toList();
+          return AlertDialog(
+            title: Row(
+              children: [
+                Icon(Icons.search, color: primary),
+                const SizedBox(width: 10),
+                const Expanded(child: Text('ค้นหากลุ่มสิทธิ์')),
+              ],
+            ),
+            content: SizedBox(
+              width: 500,
+              height: MediaQuery.sizeOf(context).height * .5,
+              child: Column(
+                children: [
+                  const Divider(thickness: .6),
+                  const SizedBox(height: 12),
+                  TextField(
+                    autofocus: true,
+                    style: businessCardOcrUi(context).inputStyle,
+                    decoration: ocrInput(
+                      context,
+                      'ค้นหากลุ่มสิทธิ์',
+                      icon: Icons.search,
+                    ),
+                    onChanged: (value) => update(() => query = value.trim()),
+                  ),
+                  const SizedBox(height: 10),
+                  Expanded(
+                    child: matches.isEmpty
+                        ? const Center(child: Text('ไม่พบกลุ่มสิทธิ์'))
+                        : ListView.separated(
+                            itemCount: matches.length,
+                            separatorBuilder: (_, _) =>
+                                const Divider(height: 1, thickness: .6),
+                            itemBuilder: (context, index) => ListTile(
+                              title: Text(matches[index].name),
+                              onTap: () => Navigator.pop(
+                                dialogContext,
+                                matches[index].id,
+                              ),
+                            ),
+                          ),
+                  ),
+                  const Divider(thickness: .6),
+                ],
+              ),
+            ),
+            actions: [
+              OutlinedButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('ยกเลิก'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    if (!mounted || selected == null || selected == _selectedGroup) return;
+    if (!MenuPermissionSelection.samePermissions(_rows, _savedRows)) {
+      _showError(
+        'มีการแก้ไขสิทธิ์ที่ยังไม่บันทึก กรุณาบันทึกก่อนเปลี่ยนกลุ่มสิทธิ์',
+      );
+      return;
+    }
+    setState(() => _selectedGroup = selected);
+    await _loadRows();
+  }
+
   @override
   Widget build(BuildContext context) => SupportWorkspaceShell(
     pageTitle: 'สิทธิ์เมนู',
@@ -751,49 +833,32 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
                             children: [
                               SizedBox(
                                 width: fieldWidth,
-                                child: DropdownButtonFormField<int>(
-                                  initialValue: _selectedGroup,
-                                  isExpanded: true,
+                                child: TextFormField(
+                                  key: ValueKey('role-group-$_selectedGroup'),
+                                  initialValue:
+                                      _roleGroups
+                                          .where((g) => g.id == _selectedGroup)
+                                          .map((g) => g.name)
+                                          .firstOrNull ??
+                                      '',
+                                  readOnly: true,
+                                  enabled: !_saving && !_loading,
                                   style: TextStyle(
-                                    fontSize: 14,
+                                    fontSize: LaooTypography.comboBox,
                                     color: Theme.of(
                                       context,
                                     ).colorScheme.onSurface,
                                   ),
-                                  decoration: InputDecoration(
-                                    labelText: 'กลุ่มสิทธิ์',
-                                    labelStyle: TextStyle(
-                                      fontSize: 16,
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.primary,
-                                    ),
-                                    floatingLabelStyle: TextStyle(
-                                      fontSize: 16,
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.primary,
-                                    ),
-                                  ),
-                                  items: _roleGroups
-                                      .map(
-                                        (g) => DropdownMenuItem(
-                                          value: g.id,
-                                          child: Text(
-                                            g.name,
-                                            style: const TextStyle(
-                                              fontSize: 14,
-                                            ),
-                                          ),
+                                  decoration: ocrInput(context, 'กลุ่มสิทธิ์')
+                                      .copyWith(
+                                        suffixIcon: Icon(
+                                          Icons.search,
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.primary,
                                         ),
-                                      )
-                                      .toList(),
-                                  onChanged: _saving
-                                      ? null
-                                      : (v) {
-                                          setState(() => _selectedGroup = v);
-                                          _loadRows();
-                                        },
+                                      ),
+                                  onTap: _chooseRoleGroup,
                                 ),
                               ),
                               SizedBox(
@@ -802,7 +867,7 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
                                   initialValue: _selectedSystemLevel,
                                   isExpanded: true,
                                   style: TextStyle(
-                                    fontSize: 14,
+                                    fontSize: LaooTypography.comboBox,
                                     color: Theme.of(
                                       context,
                                     ).colorScheme.onSurface,
@@ -810,13 +875,15 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
                                   decoration: InputDecoration(
                                     labelText: 'ระดับระบบ',
                                     labelStyle: TextStyle(
-                                      fontSize: 16,
+                                      fontSize: LaooTypography
+                                          .materialFloatingLabelSource,
                                       color: Theme.of(
                                         context,
                                       ).colorScheme.primary,
                                     ),
                                     floatingLabelStyle: TextStyle(
-                                      fontSize: 16,
+                                      fontSize: LaooTypography
+                                          .materialFloatingLabelSource,
                                       color: Theme.of(
                                         context,
                                       ).colorScheme.primary,
@@ -870,7 +937,7 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
                                     initialValue: _selectedMenuGroup,
                                     isExpanded: true,
                                     style: TextStyle(
-                                      fontSize: 14,
+                                      fontSize: LaooTypography.comboBox,
                                       color: Theme.of(
                                         context,
                                       ).colorScheme.onSurface,
@@ -878,13 +945,15 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
                                     decoration: InputDecoration(
                                       labelText: 'กลุ่มเมนู',
                                       labelStyle: TextStyle(
-                                        fontSize: 16,
+                                        fontSize: LaooTypography
+                                            .materialFloatingLabelSource,
                                         color: Theme.of(
                                           context,
                                         ).colorScheme.primary,
                                       ),
                                       floatingLabelStyle: TextStyle(
-                                        fontSize: 16,
+                                        fontSize: LaooTypography
+                                            .materialFloatingLabelSource,
                                         color: Theme.of(
                                           context,
                                         ).colorScheme.primary,
@@ -904,7 +973,7 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
                                           child: Text(
                                             g.menuGroupName,
                                             style: const TextStyle(
-                                              fontSize: 14,
+                                              fontSize: LaooTypography.comboBox,
                                             ),
                                           ),
                                         ),
