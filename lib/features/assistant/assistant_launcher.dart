@@ -98,6 +98,80 @@ class _AssistantOverlayState extends State<_AssistantOverlay> {
   final _api = ApiClient();
   final _text = TextEditingController();
   final _messages = <String>[];
+  final _menuGuideResults = <int, List<Map<String, dynamic>>>{};
+  String? _guideStage;
+  List<Map<String, dynamic>> _guideChoices = [];
+  String _pronoun = 'ผู้ช่วย';
+
+  Future<void> _askGuideSystems({bool notFound = false}) async {
+    final response = await _api.get('/api/assistant/menu-guide/systems');
+    if (!mounted) return;
+    final systems = response is Map && response['items'] is List
+        ? (response['items'] as List)
+              .whereType<Map>()
+              .map((x) => Map<String, dynamic>.from(x))
+              .toList()
+        : <Map<String, dynamic>>[];
+    setState(() {
+      _guideChoices = systems;
+      _guideStage = systems.isEmpty ? null : 'systems';
+      _choiceOptions = systems.map((x) => '${x['projectName']}').toList();
+      _messages.add(
+        systems.isEmpty
+            ? '$_pronoun ไม่พบระบบที่คุณมีสิทธิ์เข้าถึง กรุณาติดต่อผู้ดูแลระบบ'
+            : '${notFound ? '$_pronoun ไม่พบเมนูที่ตรงกับคำถาม\n' : ''}กรุณาเลือกระบบที่ต้องการให้ $_pronoun ช่วยแนะนำ หรือพิมพ์ ยกเลิก\n${_numbered(_choiceOptions)}',
+      );
+      _choiceMessageIndex = systems.isEmpty ? null : _messages.length - 1;
+    });
+  }
+
+  Future<void> _showGuideMenus(String projectCode) async {
+    final response = await _api.get(
+      '/api/assistant/menu-guide/systems/${Uri.encodeComponent(projectCode)}',
+    );
+    if (!mounted) return;
+    final menus = response is Map && response['items'] is List
+        ? (response['items'] as List)
+              .whereType<Map>()
+              .map((x) => Map<String, dynamic>.from(x))
+              .toList()
+        : <Map<String, dynamic>>[];
+    setState(() {
+      _guideChoices = menus;
+      _guideStage = menus.isEmpty ? null : 'menus';
+      _choiceOptions = menus
+          .map((x) => '${x['groupName']} → ${x['menuName']}')
+          .toList();
+      _messages.add(
+        menus.isEmpty
+            ? '$_pronoun ไม่พบเมนูที่คุณมีสิทธิ์ใช้งานในระบบนี้'
+            : 'กรุณาเลือกเมนูที่ต้องการให้ $_pronoun เปิด หรือพิมพ์ ยกเลิก\n${_numbered(_choiceOptions)}',
+      );
+      _choiceMessageIndex = menus.isEmpty ? null : _messages.length - 1;
+    });
+  }
+
+  Future<void> _openGuidedMenu(Map<String, dynamic> menu) async {
+    final project = Uri.encodeComponent('${menu['projectCode'] ?? ''}');
+    final code = Uri.encodeComponent('${menu['menuCode'] ?? ''}');
+    try {
+      final result = await _api.get('/api/assistant/menu-guide/$project/$code');
+      if (!mounted) return;
+      final path = result is Map ? result['routePath'] : null;
+      if (path is! String || !path.startsWith('/') || path.startsWith('//')) {
+        throw StateError('invalid route');
+      }
+      appRouter.go(path);
+    } catch (_) {
+      if (mounted)
+        setState(
+          () => _messages.add(
+            'ไม่สามารถเปิดเมนูนี้ได้ สิทธิ์หรือสถานะการใช้งานอาจเปลี่ยน กรุณาตรวจสอบแล้วลองใหม่',
+          ),
+        );
+    }
+  }
+
   String? _activeAgentId;
   final _userMessageIndices = <int>{};
   final _messageAgentImages = <int, Uint8List>{};
@@ -375,6 +449,9 @@ class _AssistantOverlayState extends State<_AssistantOverlay> {
       );
       setState(() {
         _enabled = s['enabled'] == true;
+        _pronoun = '${s['pronoun'] ?? ''}'.trim().isEmpty
+            ? 'ผู้ช่วย'
+            : '${s['pronoun']}'.trim();
         _nickname = '${s['nickname'] ?? ''}'.trim();
         _name = '${s['name'] ?? 'ผู้ช่วย AI'}';
         _showUserImage = s['showUserImage'] == true;
@@ -533,6 +610,55 @@ class _AssistantOverlayState extends State<_AssistantOverlay> {
     });
     final firstReplyIndex = _messages.length;
     try {
+      if (_guideStage != null) {
+        if (userText == 'ยกเลิก') {
+          setState(() {
+            _guideStage = null;
+            _guideChoices = [];
+            _choiceOptions = [];
+            _choiceMessageIndex = null;
+            _messages.add('ยกเลิกการแนะนำเมนูแล้ว');
+          });
+          return;
+        }
+        final number = int.tryParse(userText);
+        var chosen =
+            number != null && number > 0 && number <= _choiceOptions.length
+            ? number - 1
+            : _choiceOptions.indexOf(userText);
+        if (chosen < 0) {
+          final matching = <int>[
+            for (var i = 0; i < _choiceOptions.length; i++)
+              if (_choiceOptions[i].toLowerCase().contains(
+                userText.toLowerCase(),
+              ))
+                i,
+          ];
+          if (matching.length == 1) chosen = matching.first;
+        }
+        if (chosen < 0 || chosen >= _guideChoices.length) {
+          setState(() {
+            _messages.add(
+              '$_pronoun ไม่พบหรือไม่เข้าใจรายการที่พิมพ์\nกรุณาเลือกหรือพิมพ์หมายเลขอีกครั้ง หรือพิมพ์ ยกเลิก\n${_numbered(_choiceOptions)}',
+            );
+            _choiceMessageIndex = _messages.length - 1;
+          });
+          return;
+        }
+        final choice = _guideChoices[chosen];
+        if (_guideStage == 'systems') {
+          await _showGuideMenus('${choice['projectCode']}');
+        } else {
+          setState(() {
+            _guideStage = null;
+            _guideChoices = [];
+            _choiceOptions = [];
+            _choiceMessageIndex = null;
+          });
+          await _openGuidedMenu(choice);
+        }
+        return;
+      }
       if (_waitingMeetingAvailability) {
         if (userText == 'ยกเลิก') {
           setState(() {
@@ -827,6 +953,39 @@ class _AssistantOverlayState extends State<_AssistantOverlay> {
           if (image != null) _messageAgentImages[_messages.length] = image;
           _messages.add(agent['greeting'] as String);
         });
+      }
+      if (intent == 'core.menu_guide') {
+        if (RegExp(
+          r'^(จะใช้งาน|ใช้งาน|คีย์ข้อมูล|ทำงาน)$',
+        ).hasMatch(text.replaceAll(RegExp(r'\s+'), ''))) {
+          await _askGuideSystems();
+          return;
+        }
+        final result = await _api.get(
+          '/api/assistant/menu-guide',
+          query: {'query': text},
+        );
+        if (!mounted) return;
+        final menus = result is Map && result['items'] is List
+            ? (result['items'] as List)
+                  .whereType<Map>()
+                  .map((m) => Map<String, dynamic>.from(m))
+                  .toList()
+            : <Map<String, dynamic>>[];
+        if (menus.isEmpty) {
+          await _askGuideSystems(notFound: true);
+          return;
+        }
+        setState(() {
+          final index = _messages.length;
+          _messages.add(
+            menus.isEmpty
+                ? 'ไม่พบเมนูที่ตรงกับคำถามและสิทธิ์ของคุณ กรุณาระบุชื่อข้อมูลให้ชัดเจนอีกครั้ง'
+                : '$_pronoun พบเมนูที่คุณสามารถเข้าใช้งาน กดชื่อเมนูเพื่อเปิดหน้าจอได้เลย',
+          );
+          if (menus.isNotEmpty) _menuGuideResults[index] = menus;
+        });
+        return;
       }
       if (intent == 'meeting.availability') {
         setState(() {
@@ -1576,7 +1735,8 @@ class _AssistantOverlayState extends State<_AssistantOverlay> {
                             final isUser = _userMessageIndices.contains(index);
                             final agentImage = _messageAgentImages[index];
                             final isChoiceMessage =
-                                (_draftKey != null ||
+                                (_guideStage != null ||
+                                    _draftKey != null ||
                                     _pendingCapabilityQuestion != null) &&
                                 index == _choiceMessageIndex;
                             final messageText = isChoiceMessage
@@ -1595,7 +1755,8 @@ class _AssistantOverlayState extends State<_AssistantOverlay> {
                             final canCancel =
                                 !isUser &&
                                 index == _messages.length - 1 &&
-                                (_waitingForSerial ||
+                                (_guideStage != null ||
+                                    _waitingForSerial ||
                                     _pendingCapabilityQuestion != null) &&
                                 cancelPosition >= 0;
                             return Padding(
@@ -1701,6 +1862,29 @@ class _AssistantOverlayState extends State<_AssistantOverlay> {
                                                       : FontWeight.normal,
                                                 ),
                                           ),
+                                        if (_menuGuideResults.containsKey(
+                                          index,
+                                        ))
+                                          for (final entry
+                                              in _menuGuideResults[index]!
+                                                  .asMap()
+                                                  .entries)
+                                            Align(
+                                              alignment: Alignment.centerLeft,
+                                              child: TextButton.icon(
+                                                onPressed: () =>
+                                                    _openGuidedMenu(
+                                                      entry.value,
+                                                    ),
+                                                icon: const Icon(
+                                                  Icons.open_in_new,
+                                                  size: 18,
+                                                ),
+                                                label: Text(
+                                                  '${entry.key + 1}. ${entry.value['projectName']} → ${entry.value['groupName']} → ${entry.value['menuName']}${entry.value['canCreate'] == true ? ' (เพิ่มข้อมูลได้)' : ' (ไม่มีสิทธิ์เพิ่ม)'}',
+                                                ),
+                                              ),
+                                            ),
                                         if (_favoritePrompts.containsKey(index))
                                           Wrap(
                                             children: [

@@ -7,6 +7,19 @@ class CompanySetupApi {
 
   final ApiClient _client;
 
+  Future<dynamic> loadApprovalLevelOrder() =>
+      _client.get('/api/company/approval-level-order');
+
+  Future<dynamic> saveApprovalLevelOrder(String method) => _client.put(
+    '/api/company/approval-level-order',
+    body: {'method': method},
+  );
+
+  Future<dynamic> loadLogo() => _client.get('/api/company-setup/logo');
+
+  Future<dynamic> uploadLogo(String fileName, List<int> bytes) => _client
+      .upload('/api/company-setup/logo', fileName: fileName, bytes: bytes);
+
   Future<Map<String, bool>> actions() async {
     final data = await _client.get('/api/company-setup/actions');
     if (data is! Map) return const {};

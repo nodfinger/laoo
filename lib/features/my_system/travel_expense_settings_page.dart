@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../app/theme/laoo_design_tokens.dart';
 import '../../core/api/api_client.dart';
+import '../../core/api/api_exception.dart';
 import '../../core/navigation/navigation_menu_repository.dart';
 import '../../core/widgets/timed_snack_bar.dart';
 import '../company/ocr/business_card_ocr_ui.dart';
@@ -21,6 +22,11 @@ class _TravelExpenseSettingsPageState extends State<TravelExpenseSettingsPage> {
   final _names = <String, String>{};
   final _lodgingRates = <String, TextEditingController>{};
   final _lodgingNames = <String, String>{};
+  final _expiryDays = TextEditingController();
+  final _revision = TextEditingController();
+  final _remarks = List.generate(5, (_) => TextEditingController());
+  bool _generalLoading = true, _generalSaving = false, _canEditGeneral = false;
+  String? _generalError;
   String _title = '';
   bool _loading = true, _saving = false, _canEdit = false;
   bool _lodgingLoading = true, _lodgingSaving = false, _canEditLodging = false;
@@ -32,6 +38,192 @@ class _TravelExpenseSettingsPageState extends State<TravelExpenseSettingsPage> {
     super.initState();
     _load();
     _loadLodging();
+    _loadGeneral();
+  }
+
+  Future<void> _loadGeneral() async {
+    try {
+      final data = await _api.get('/api/company/travel-settings/general');
+      if (data is! Map || data['settings'] is! Map)
+        throw StateError('Invalid response');
+      final settings = data['settings'] as Map;
+      if (!mounted) return;
+      _expiryDays.text = settings['documentExpiryDays']?.toString() ?? '';
+      _revision.text = settings['documentRevision']?.toString() ?? '';
+      for (var i = 0; i < _remarks.length; i++) {
+        _remarks[i].text = settings['remark${i + 1}']?.toString() ?? '';
+      }
+      setState(() {
+        _canEditGeneral = data['canEdit'] == true;
+        _generalLoading = false;
+        _generalError = null;
+      });
+    } catch (error) {
+      if (mounted)
+        setState(() {
+          _generalLoading = false;
+          _generalError = error is ApiException
+              ? error.message
+              : 'โหลดข้อมูลทั่วไปไม่สำเร็จ กรุณาลองใหม่';
+        });
+    }
+  }
+
+  Future<void> _saveGeneral() async {
+    final raw = _expiryDays.text.trim();
+    final days = raw.isEmpty ? null : int.tryParse(raw);
+    if (raw.isNotEmpty && (days == null || days < 0 || days > 2147483647)) {
+      showTimedSnackBar(
+        context,
+        message: 'กรุณาระบุจำนวนวันเป็นจำนวนเต็มที่ไม่ติดลบ',
+        error: true,
+      );
+      return;
+    }
+    setState(() => _generalSaving = true);
+    try {
+      await _api.put(
+        '/api/company/travel-settings/general',
+        body: {
+          'documentExpiryDays': days,
+          'documentRevision': _revision.text,
+          for (var i = 0; i < _remarks.length; i++)
+            'remark${i + 1}': _remarks[i].text,
+        },
+      );
+      if (mounted)
+        showTimedSnackBar(context, message: 'บันทึกข้อมูลทั่วไปเรียบร้อยแล้ว');
+    } catch (error) {
+      if (mounted)
+        showTimedSnackBar(
+          context,
+          message: error is ApiException
+              ? error.message
+              : 'บันทึกข้อมูลทั่วไปไม่สำเร็จ กรุณาลองใหม่',
+          error: true,
+        );
+    } finally {
+      if (mounted) setState(() => _generalSaving = false);
+    }
+  }
+
+  Widget _generalCard() {
+    final t = businessCardOcrUi(context);
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(LaooLayout.cardPadding),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.info_outline, color: t.primaryColor),
+                const SizedBox(width: 10),
+                Text(
+                  'ข้อมูลทั่วไป',
+                  style: t.tableStyle.copyWith(fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Divider(thickness: 0.6, color: Theme.of(context).dividerColor),
+            const SizedBox(height: 12),
+            if (_generalLoading)
+              const Center(child: CircularProgressIndicator())
+            else if (_generalError != null)
+              Row(
+                children: [
+                  Expanded(child: Text(_generalError!)),
+                  TextButton(
+                    onPressed: _loadGeneral,
+                    child: const Text('ลองใหม่'),
+                  ),
+                ],
+              )
+            else ...[
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final wide = constraints.maxWidth >= 600;
+                  final width = wide
+                      ? (constraints.maxWidth - 14) / 2
+                      : constraints.maxWidth;
+                  return Wrap(
+                    spacing: 14,
+                    runSpacing: 14,
+                    children: [
+                      SizedBox(
+                        width: width,
+                        child: TextField(
+                          controller: _expiryDays,
+                          enabled: _canEditGeneral && !_generalSaving,
+                          style: t.inputStyle,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            LengthLimitingTextInputFormatter(10),
+                          ],
+                          decoration: ocrInput(
+                            context,
+                            'เอกสารหมดอายุ (วันนับจากวันที่บันทึก)',
+                          ),
+                        ),
+                      ),
+                      SizedBox(
+                        width: width,
+                        child: TextField(
+                          controller: _revision,
+                          enabled: _canEditGeneral && !_generalSaving,
+                          style: t.inputStyle,
+                          maxLength: 100,
+                          decoration: ocrInput(
+                            context,
+                            'Rev.เอกสาร',
+                          ).copyWith(counterText: ''),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+              for (var i = 0; i < _remarks.length; i++) ...[
+                const SizedBox(height: 14),
+                TextField(
+                  controller: _remarks[i],
+                  enabled: _canEditGeneral && !_generalSaving,
+                  style: t.inputStyle,
+                  maxLength: 1000,
+                  minLines: 1,
+                  maxLines: 3,
+                  decoration: ocrInput(
+                    context,
+                    'หมายเหตุ ${i + 1}',
+                  ).copyWith(counterText: ''),
+                ),
+              ],
+              if (_canEditGeneral) ...[
+                const SizedBox(height: 14),
+                Divider(thickness: 0.6, color: Theme.of(context).dividerColor),
+                const SizedBox(height: 10),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: t.primaryColor,
+                      foregroundColor: Colors.white,
+                      minimumSize: Size(0, t.buttonHeight),
+                    ),
+                    onPressed: _generalSaving ? null : _saveGeneral,
+                    icon: const Icon(Icons.save_outlined),
+                    label: const Text('บันทึกข้อมูลทั่วไป'),
+                  ),
+                ),
+              ],
+            ],
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _loadLodging() async {
@@ -332,6 +524,11 @@ class _TravelExpenseSettingsPageState extends State<TravelExpenseSettingsPage> {
 
   @override
   void dispose() {
+    _expiryDays.dispose();
+    _revision.dispose();
+    for (final c in _remarks) {
+      c.dispose();
+    }
     for (final c in _rates.values) {
       c.dispose();
     }
@@ -364,46 +561,65 @@ class _TravelExpenseSettingsPageState extends State<TravelExpenseSettingsPage> {
           ),
           const SizedBox(height: LaooLayout.cardSpacing),
           Expanded(
-            child: Card(
-              margin: EdgeInsets.zero,
-              child: _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _error != null
-                  ? Center(child: Text(_error!))
-                  : DefaultTabController(
-                      length: 2,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          const TabBar(
-                            isScrollable: true,
-                            tabAlignment: TabAlignment.start,
-                            tabs: [
-                              Tab(text: 'อัตราค่าน้ำมัน/กม./ประเภทรถ'),
-                              Tab(text: 'อัตราค่าห้องพัก'),
-                            ],
-                          ),
-                          Expanded(
-                            child: TabBarView(
-                              children: [
-                                _buildRateTable(
-                                  rates: _rates,
-                                  names: _names,
-                                  nameHeading: 'ประเภทรถ',
-                                  rateHeading: 'เบิกได้/กม. (บาท)',
-                                  emptyMessage:
-                                      'ไม่พบประเภทรถ กรุณาเพิ่มข้อมูลประเภทรถในรหัสพื้นฐาน',
-                                  canEdit: _canEdit,
-                                  saving: _saving,
-                                  onSave: _save,
+            child: LayoutBuilder(
+              builder: (context, constraints) => SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _generalCard(),
+                    const SizedBox(height: LaooLayout.cardSpacing),
+                    SizedBox(
+                      height: constraints.maxHeight < 500
+                          ? 500
+                          : constraints.maxHeight,
+                      child: Card(
+                        margin: EdgeInsets.zero,
+                        child: _loading
+                            ? const Center(child: CircularProgressIndicator())
+                            : _error != null
+                            ? Center(child: Text(_error!))
+                            : DefaultTabController(
+                                length: 2,
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    const TabBar(
+                                      isScrollable: true,
+                                      tabAlignment: TabAlignment.start,
+                                      tabs: [
+                                        Tab(
+                                          text: 'อัตราค่าน้ำมัน/กม./ประเภทรถ',
+                                        ),
+                                        Tab(text: 'อัตราค่าห้องพัก'),
+                                      ],
+                                    ),
+                                    Expanded(
+                                      child: TabBarView(
+                                        children: [
+                                          _buildRateTable(
+                                            rates: _rates,
+                                            names: _names,
+                                            nameHeading: 'ประเภทรถ',
+                                            rateHeading: 'เบิกได้/กม. (บาท)',
+                                            emptyMessage:
+                                                'ไม่พบประเภทรถ กรุณาเพิ่มข้อมูลประเภทรถในรหัสพื้นฐาน',
+                                            canEdit: _canEdit,
+                                            saving: _saving,
+                                            onSave: _save,
+                                          ),
+                                          _buildLodgingTab(context),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                _buildLodgingTab(context),
-                              ],
-                            ),
-                          ),
-                        ],
+                              ),
                       ),
                     ),
+                  ],
+                ),
+              ),
             ),
           ),
         ],

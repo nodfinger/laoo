@@ -68,17 +68,33 @@ public sealed class DocumentControlController(IConfiguration configuration, IWeb
 
     async Task<IActionResult> SaveType(long? id,TypeRequest request,string action,CancellationToken token)
     {
-        var code=Clean(request.Code)?.ToUpperInvariant(); var name=Clean(request.Name); var kind=Clean(request.DocumentClass)?.ToUpperInvariant();
-        if(code is null||name is null||kind is not ("CONTROLLED" or "GENERAL")||request.DefaultAudienceMode is not ("ALL" or "RESTRICTED")) return Bad("ข้อมูลประเภทเอกสารไม่ครบ","ระบุรหัส ชื่อ กลุ่มเอกสาร และผู้มีสิทธิ์เริ่มต้น");
+        var name=Clean(request.Name); var kind=Clean(request.DocumentClass)?.ToUpperInvariant();
+        if(name is null||name.Length>200||kind is not ("CONTROLLED" or "GENERAL")||request.DefaultAudienceMode is not ("ALL" or "RESTRICTED")) return Bad("ข้อมูลประเภทเอกสารไม่ครบ","ระบุชื่อ กลุ่มเอกสาร และผู้มีสิทธิ์เริ่มต้นให้ถูกต้อง");
         if(!Scope(out var company,out var user)) return Forbid();
         await using var db=await Open(token); if(!await Can(db,"48002",action,token)) return Forbid();
         try {
-            var sql=id is null
-                ?"INSERT dbo.TDDCDocumentType(CompanyID,TypeCode,TypeName,DocumentClass,RequireAcknowledgement,DefaultReviewerUserID,DefaultApproverUserID,DefaultAudienceMode,IsActive,CreateBy) OUTPUT INSERTED.DocumentTypeID VALUES(@company,@code,@name,@kind,@ack,@reviewer,@approver,@audience,@active,@user)"
-                :"UPDATE dbo.TDDCDocumentType SET TypeCode=@code,TypeName=@name,DocumentClass=@kind,RequireAcknowledgement=@ack,DefaultReviewerUserID=@reviewer,DefaultApproverUserID=@approver,DefaultAudienceMode=@audience,IsActive=@active,UpdateBy=@user,UpdateDate=SYSUTCDATETIME() OUTPUT INSERTED.DocumentTypeID WHERE CompanyID=@company AND DocumentTypeID=@id";
-            var saved=await Scalar<long>(db,sql,token,("@company",company),("@id",id),("@code",code),("@name",name),("@kind",kind),("@ack",request.RequireAcknowledgement),("@reviewer",request.DefaultReviewerUserId),("@approver",request.DefaultApproverUserId),("@audience",request.DefaultAudienceMode),("@active",request.Active),("@user",user));
+            await using var tx=(SqlTransaction)await db.BeginTransactionAsync(IsolationLevel.Serializable,token);
+            var sql=id is null ? """
+DECLARE @next int;
+SELECT @next=COALESCE(MAX(TRY_CONVERT(int,TypeCode)),0)+1
+FROM dbo.TDDCDocumentType WITH (UPDLOCK,HOLDLOCK)
+WHERE CompanyID=@company AND LEN(TypeCode) BETWEEN 1 AND 6 AND TypeCode NOT LIKE N'%[^0-9]%';
+IF @next>999999 THROW 56901,N'รหัสประเภทเอกสารครบจำนวนที่กำหนด',1;
+DECLARE @code nvarchar(6)=RIGHT(N'000000'+CONVERT(nvarchar(6),@next),6);
+INSERT dbo.TDDCDocumentType(CompanyID,TypeCode,TypeName,DocumentClass,RequireAcknowledgement,DefaultReviewerUserID,DefaultApproverUserID,DefaultAudienceMode,IsActive,CreateBy)
+OUTPUT INSERTED.DocumentTypeID VALUES(@company,@code,@name,@kind,@ack,@reviewer,@approver,@audience,@active,@user);
+""" : """
+UPDATE dbo.TDDCDocumentType SET TypeName=@name,DocumentClass=@kind,RequireAcknowledgement=@ack,DefaultReviewerUserID=@reviewer,DefaultApproverUserID=@approver,DefaultAudienceMode=@audience,IsActive=@active,UpdateBy=@user,UpdateDate=SYSUTCDATETIME() OUTPUT INSERTED.DocumentTypeID WHERE CompanyID=@company AND DocumentTypeID=@id;
+""";
+            await using var command=new SqlCommand(sql,db,tx);
+            command.Parameters.AddWithValue("@company",company);command.Parameters.AddWithValue("@id",(object?)id??DBNull.Value);
+            command.Parameters.AddWithValue("@name",name);command.Parameters.AddWithValue("@kind",kind);command.Parameters.AddWithValue("@ack",request.RequireAcknowledgement);
+            command.Parameters.AddWithValue("@reviewer",(object?)request.DefaultReviewerUserId??DBNull.Value);command.Parameters.AddWithValue("@approver",(object?)request.DefaultApproverUserId??DBNull.Value);
+            command.Parameters.AddWithValue("@audience",request.DefaultAudienceMode);command.Parameters.AddWithValue("@active",request.Active);command.Parameters.AddWithValue("@user",user);
+            var result=await command.ExecuteScalarAsync(token);var saved=result is null?0:Convert.ToInt64(result);
+            await tx.CommitAsync(token);
             return saved>0?Ok(new{id=saved}):NotFound();
-        } catch(SqlException e) when(e.Number is 2601 or 2627) { return Conflict(new{message="รหัสประเภทเอกสารซ้ำ",description="ใช้รหัสอื่นภายในบริษัทเดียวกัน"}); }
+        } catch(SqlException e) when(e.Number is 2601 or 2627 or 56901) { return Conflict(new{message="ไม่สามารถสร้างรหัสประเภทเอกสาร",description="รหัสเต็มหรือมีการบันทึกพร้อมกัน กรุณาลองใหม่หรือติดต่อผู้ดูแลระบบ"}); }
     }
 
     [HttpDelete("types/{id:long}")]
@@ -305,7 +321,7 @@ public sealed class DocumentControlController(IConfiguration configuration, IWeb
 }
 
 public sealed record SettingsRequest(int MaxPrimaryFileMb,int MaxAttachmentFileMb,string AllowedAttachmentExtensions,int ReminderDays);
-public sealed record TypeRequest(string Code,string Name,string DocumentClass,bool RequireAcknowledgement,long? DefaultReviewerUserId,long? DefaultApproverUserId,string DefaultAudienceMode,bool Active=true);
+public sealed record TypeRequest(string? Code,string Name,string DocumentClass,bool RequireAcknowledgement,long? DefaultReviewerUserId,long? DefaultApproverUserId,string DefaultAudienceMode,bool Active=true);
 public sealed record DocumentRequest(long DocumentTypeId,string DocumentNo,string Title,string DocumentClass,long? OwnerDepartmentId,string RevisionNo,string? ChangeSummary,DateTime? EffectiveDate,long? ReviewerUserId,long? ApproverUserId,string AudienceMode,List<long> DepartmentIds,List<long> UserIds,bool AllowDownload,bool RequireAcknowledgement,DateTime? PublishDate,DateTime? ExpireDate);
 public sealed record WorkflowRequest(string? Note);
 public sealed class FileUploadRequest

@@ -28,6 +28,9 @@ SELECT CASE WHEN EXISTS(
         setting.Parameters.Add("@code", SqlDbType.NVarChar,100).Value = code;
         if (Convert.ToInt32(await setting.ExecuteScalarAsync(token)) != 1) return false;
         if (!await AiCapabilityRoleAccess.CanUse(db, user, code, token)) return false;
+        // Menu guidance has no single destination menu: the actual destination
+        // is checked independently against the user's current menu permissions.
+        if (code == AssistantCapabilities.MenuGuide.Id) return true;
         if (await CanUseMenu(db, user, capability, token)) return true;
         if (code == AssistantCapabilities.SerialRepairHistory.Id && await CanUseMenu(db, user, capability with { MenuCode = "20002" }, token)) return true;
         return (code == AssistantCapabilities.RepairPartsCost.Id || code == AssistantCapabilities.SerialRepairHistory.Id) &&

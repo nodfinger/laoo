@@ -47,6 +47,11 @@ Expect(missingUnit.Count==1 && missingUnit[0].Order==2,true,"skip a step when al
 var allPositionsUnavailable=ApprovalPatternResolver.Resolve([new(1,"ALL",[new("VACANT","ANY")])],candidates,[],1,10,20);
 Expect(allPositionsUnavailable.Count==0,true,"skip a vacant step");
 Expect(ApprovalPatternResolver.HigherLevels(["R7","R6","R5","R4"],"R6",2).SequenceEqual(["R5","R4"]),true,"levels above requester");
+var levelsForOrder = new[] { new ApprovalLevel("B", "B", "02", 2), new ApprovalLevel("A", "A", "01", 1) };
+foreach (var method in new[] { "NAME", "SHORTCODE", "SEQUENCE" })
+    Expect(ApprovalPatternResolver.OrderLevels(levelsForOrder, method).SequenceEqual(["A", "B"]), true, $"level order {method}");
+try { ApprovalPatternResolver.OrderLevels([new("A", "A", null, 1)], "SHORTCODE"); throw new Exception("Missing short code accepted."); }
+catch (ArgumentException) { }
 try { ApprovalPatternResolver.Resolve([new(1,"ANY",[new("HEAD","ANY")]),new(2,"ALL",[new("head","ANY")])],candidates,[],1,10,20); throw new Exception("Duplicate position accepted."); }
 catch(ArgumentException) { }
 Console.WriteLine("Menu data access rule checks passed.");

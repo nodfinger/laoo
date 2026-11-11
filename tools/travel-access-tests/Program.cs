@@ -11,9 +11,29 @@ var root=Path.GetFullPath(args[0]);
 var config=new ConfigurationBuilder().AddJsonFile(Path.Combine(root,"laoo_api/appsettings.json"))
     .AddJsonFile(Path.Combine(root,"laoo_api/local.json")).Build();
 await using var db=new SqlConnection(config.GetConnectionString("LaooDatabase"));await db.OpenAsync();
-await using var q=new SqlCommand("SELECT TOP 1 U.UserID,U.CompanyID,C.PartnerID FROM dbo.TDADUser U JOIN dbo.TDSTCompanySetUp C ON C.CompanyID=U.CompanyID WHERE U.NormalizedUsername=N'IT#P' AND U.IsActive=1 AND C.IsActive=1",db);
+await using var q=new SqlCommand("SELECT TOP 1 U.UserID,U.CompanyID,C.PartnerID FROM dbo.TDADUser U JOIN dbo.TDSTCompanySetUp C ON C.CompanyID=U.CompanyID WHERE U.NormalizedUsername=@testUser AND U.IsActive=1 AND C.IsActive=1",db);
+q.Parameters.AddWithValue("@testUser",args.Contains("--user-p") ? "P" : "IT#P");
 await using var reader=await q.ExecuteReaderAsync();if(!await reader.ReadAsync()) throw new Exception("Test user not found.");
 var user=reader.GetInt64(0);var company=reader.GetInt64(1);var partner=reader.GetInt64(2);await reader.CloseAsync();
+if(args.Contains("--list-only")) {
+    TravelClaimController TestController(long actor, long targetCompany) {
+        var principal=new ClaimsPrincipal(new ClaimsIdentity([new Claim("user_type","COMPANY_USER"),new Claim("user_id",actor.ToString()),new Claim("company_id",targetCompany.ToString()),new Claim("partner_id",partner.ToString())],"test"));
+        return new TravelClaimController(config) { ControllerContext=new ControllerContext { HttpContext=new DefaultHttpContext { User=principal } } };
+    }
+    var listResult=await TestController(user,company).List(CancellationToken.None);
+    if(listResult is not OkObjectResult ok) throw new Exception($"Test account cannot view travel claims: {listResult.GetType().Name}");
+    var json=System.Text.Json.JsonSerializer.SerializeToElement(ok.Value);
+    var rule=await MenuDataAccessResolver.ReadRuleAsync(db,null,company,"66001","VIEW",CancellationToken.None);
+    foreach(var row in json.GetProperty("items").EnumerateArray()) {
+        var owner=row.GetProperty("claimantId").GetInt64();
+        var ctx=await MenuDataAccessResolver.ReadContextAsync(db,null,company,user,owner,CancellationToken.None);
+        if(!MenuDataAccessPolicy.Allows(rule,ctx)) throw new Exception("Inaccessible claim included in response.");
+    }
+    if(await TestController(long.MaxValue,company).List(CancellationToken.None) is not ForbidResult) throw new Exception("Unknown user was allowed.");
+    if(await TestController(user,long.MaxValue).List(CancellationToken.None) is not ForbidResult) throw new Exception("Cross-company access was allowed.");
+    Console.WriteLine("Travel list and view access verified for account p; unknown and cross-company users denied.");
+    return;
+}
 if(args.Contains("--global-access-only")) {
     var principal=new ClaimsPrincipal(new ClaimsIdentity([new Claim("user_type","COMPANY_USER"),new Claim("user_id",user.ToString()),new Claim("company_id",company.ToString()),new Claim("partner_id",partner.ToString())],"test"));
     var controller=new TravelExpenseSettingsController(config) { ControllerContext=new ControllerContext { HttpContext=new DefaultHttpContext { User=principal } } };

@@ -69,6 +69,7 @@ SELECT e.CarTypeCode1,e.CarID1,e.CarTypeCode2,e.CarID2
         await using var db = await RegistryControllerSupport.Open(configuration, token);
         if (CompanyId <= 0 || UserId <= 0 || !await Allowed(db, "VIEW", token)) return Forbid();
         var create = await Allowed(db, "CREATE", token); var edit = await Allowed(db, "EDIT", token); var delete = await Allowed(db, "DELETE", token);
+        var print = await PrintAllowed(db, token);
         const string sql = """
 SELECT c.Id,c.ClaimNo,c.ClaimDate,c.Origin,c.Destination,c.TotalAmount,c.Purpose,c.WorkPlace,
  COALESCE(emp.FullName,N''),COALESCE(emp.NickName,N''),COALESCE(emp.DepartmentName,N''),COALESCE(cs.EmployeeNameDisplay,'FULL'),c.UserID,emp.DivisionOrgUnitID,COALESCE(emp.DivisionName,N''),emp.DepartmentOrgUnitID
@@ -132,7 +133,22 @@ WHERE o.OwnerType='C' AND o.CompanyID=@company AND o.IsActive=1 AND o.UnitType I
                 purpose=row.Purpose, workPlace=row.WorkPlace, claimant=row.Claimant, department=row.Department, claimantId=row.OwnerId, divisionId=row.DivisionId, division=row.Division, departmentId=row.DepartmentId,
                 canEdit=edit && MenuDataAccessPolicy.Allows(editRule, context), canDelete=delete && MenuDataAccessPolicy.Allows(deleteRule, context) });
         }
-        return Ok(new { items, vehicles, routes, rates, fares, lodging, organizations, create, edit, delete });
+        return Ok(new { items, vehicles, routes, rates, fares, lodging, organizations, create, edit, delete, print });
+    }
+
+    private async Task<bool> PrintAllowed(SqlConnection db, CancellationToken token)
+    {
+        await using var cmd = new SqlCommand("SELECT CAST(CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADMainMenu WHERE MenuCode=N'66001' AND IsActive=1 AND AllowPrint=1) THEN 1 ELSE 0 END AS bit)",db);
+        return Convert.ToBoolean(await cmd.ExecuteScalarAsync(token)) && await Allowed(db,"PRINT",token);
+    }
+
+    [HttpGet("{id:long}/print")]
+    public async Task<IActionResult> Print(long id, CancellationToken token)
+    {
+        await using var db=await RegistryControllerSupport.Open(configuration,token);
+        if (CompanyId<=0 || UserId<=0 || !await PrintAllowed(db,token)) return Forbid();
+        // Detail also checks the VIEW action, company and record-level access.
+        return await Detail(id,token);
     }
 
     public sealed record ClaimAttachmentInput(string Name,string Base64);
@@ -157,13 +173,29 @@ JOIN dbo.TDADEmployee e ON e.EmployeeID=ue.EmployeeID AND e.CompanyID=ue.Company
 JOIN dbo.TDSTTravelPositionLevel p ON p.CompanyID=e.CompanyID AND p.PositionCode=e.PositionCode
 JOIN dbo.TDSTTravelLodgingRate l ON l.CompanyID=p.CompanyID AND l.PositionLevelCode=p.PositionLevelCode
 WHERE c.Id=@id AND c.CompanyID=@company;
+SELECT COALESCE(s.CustomerNameTH,N''),COALESCE(s.AddressText,N''),
+       COALESCE(emp.FullName,N''),COALESCE(emp.EmployeeCode,N''),
+       COALESCE(emp.PositionName,N''),COALESCE(emp.DivisionName,N'')
+FROM dbo.TDSTTravelClaim c
+OUTER APPLY (SELECT TOP (1) CustomerNameTH,AddressText FROM dbo.TDSTCompanySetUp
+ WHERE CompanyID=c.CompanyID AND OwnerType='C' AND IsActive=1 ORDER BY CompanyID) s
+OUTER APPLY (SELECT TOP (1) e.FullName,e.EmployeeCode,p.Name PositionName,d.NameTH DivisionName
+ FROM dbo.TDADUserEmployee ue
+ JOIN dbo.TDADEmployee e ON e.EmployeeID=ue.EmployeeID AND e.CompanyID=ue.CompanyID
+ LEFT JOIN dbo.TDSTMaster p ON p.OwnerType=N'C' AND ISNULL(p.OwnerPartnerID,0)=0 AND p.OwnerCompanyID=e.CompanyID AND p.MasterGroupCode=N'008' AND p.MasterCode=e.PositionCode
+ LEFT JOIN dbo.TDADOrganizationUnit d ON d.OrgUnitID=e.DivisionOrgUnitID AND d.CompanyID=e.CompanyID
+ WHERE ue.CompanyID=c.CompanyID AND ue.UserID=c.UserID ORDER BY ue.IsActive DESC,e.EmployeeID) emp
+WHERE c.Id=@id AND c.CompanyID=@company;
 """;
         await using var q=new SqlCommand(sql,db);q.Parameters.AddWithValue("@id",id);q.Parameters.AddWithValue("@company",CompanyId);q.Parameters.AddWithValue("@user",UserId);
         await using var r=await q.ExecuteReaderAsync(token);if(!await r.ReadAsync(token)) return NotFound(new { message="ไม่พบเอกสารในบริษัทของคุณ" });
         var item=new { id,number=r.GetString(0),date=r.GetDateTime(1).ToString("yyyy-MM-dd"),routeId=r.IsDBNull(2)?(long?)null:r.GetInt64(2),origin=r.GetString(3),destination=r.GetString(4),purpose=r.GetString(5),workPlace=r.GetString(6),mapUrl=r.IsDBNull(7)?null:r.GetString(7),distance=r.GetDecimal(8),start=r.GetDateTime(9).ToString("yyyy-MM-dd"),end=r.GetDateTime(10).ToString("yyyy-MM-dd"),vehicle=r.GetString(11),registration=r.GetString(12),nights=r.GetInt32(13),toll=r.GetDecimal(14),parking=r.GetDecimal(15),transport=r.GetDecimal(16),fuel=r.GetDecimal(17),lodging=r.GetDecimal(18),total=r.GetDecimal(19),isInterbranch=r.GetBoolean(20),rate=r.IsDBNull(21)?(decimal?)null:r.GetDecimal(21),flat=r.IsDBNull(22)?(decimal?)null:r.GetDecimal(22),lodgingRate=r.GetDecimal(23) };
         await r.NextResultAsync(token);var attachments=new List<object>();while(await r.ReadAsync(token))attachments.Add(new {id=r.GetInt64(0),name=r.GetString(1)});
         await r.NextResultAsync(token); decimal? ownerLodging=await r.ReadAsync(token) && !r.IsDBNull(0) ? r.GetDecimal(0) : null;
-        return Ok(new {item,attachments,ownerLodging});
+        await r.NextResultAsync(token);
+        object? printInfo = null;
+        if (await r.ReadAsync(token)) printInfo = new { companyName=r.GetString(0), address=r.GetString(1), claimant=r.GetString(2), employeeCode=r.GetString(3), position=r.GetString(4), division=r.GetString(5) };
+        return Ok(new {item,attachments,ownerLodging,printInfo});
     }
 
     [HttpPost("{id:long}/attachments")]

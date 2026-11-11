@@ -384,6 +384,47 @@ ELSE
         return Ok(new { view = await AllowedAsync(connection, "VIEW", cancellationToken), edit = await AllowedAsync(connection, "EDIT", cancellationToken) });
     }
 
+    [HttpGet("logo")]
+    public async Task<IActionResult> GetLogo(CancellationToken token)
+    {
+        var company = AiChatSettingsStore.CompanyId(User);
+        if (company is null) return Forbid();
+        await using var db = CreateConnection();
+        await db.OpenAsync(token);
+        await using var cmd = new SqlCommand("SELECT ImageData,ContentType FROM dbo.TDSTCompanyLogo WHERE CompanyID=@company", db);
+        cmd.Parameters.Add("@company", SqlDbType.BigInt).Value = company.Value;
+        await using var reader = await cmd.ExecuteReaderAsync(token);
+        if (!await reader.ReadAsync(token)) return Ok(new { image = (string?)null });
+        return Ok(new { image = Convert.ToBase64String((byte[])reader.GetValue(0)), contentType = reader.GetString(1) });
+    }
+
+    [HttpPost("logo"), RequestSizeLimit(3 * 1024 * 1024 + 65536)]
+    public async Task<IActionResult> UploadLogo(IFormFile? file, CancellationToken token)
+    {
+        var company = AiChatSettingsStore.CompanyId(User);
+        if (company is null) return Forbid();
+        if (file is null || file.Length <= 0 || file.Length > 3 * 1024 * 1024)
+            return BadRequest(new { message = "กรุณาเลือกรูปโลโก้ขนาดไม่เกิน 3 MB" });
+        await using var db = CreateConnection();
+        await db.OpenAsync(token);
+        if (!await AllowedAsync(db, "EDIT", token)) return Forbid();
+        await using var data = new MemoryStream();
+        await file.CopyToAsync(data, token);
+        var bytes = data.ToArray();
+        var jpeg = bytes.Length >= 3 && bytes[0] == 0xff && bytes[1] == 0xd8 && bytes[2] == 0xff;
+        var png = bytes.Length >= 8 && bytes.AsSpan(0, 8).SequenceEqual(new byte[] {137,80,78,71,13,10,26,10});
+        if (!jpeg && !png) return BadRequest(new { message = "รองรับโลโก้รูป JPG หรือ PNG เท่านั้น" });
+        await using var tx = (SqlTransaction)await db.BeginTransactionAsync(IsolationLevel.Serializable, token);
+        await using var cmd = new SqlCommand("UPDATE dbo.TDSTCompanyLogo SET ImageData=@image,ContentType=@type,UpdatedBy=@user,UpdatedAt=SYSUTCDATETIME() WHERE CompanyID=@company; IF @@ROWCOUNT=0 INSERT dbo.TDSTCompanyLogo(CompanyID,ImageData,ContentType,UpdatedBy) VALUES(@company,@image,@type,@user)", db, tx);
+        cmd.Parameters.Add("@company", SqlDbType.BigInt).Value = company.Value;
+        cmd.Parameters.Add("@user", SqlDbType.BigInt).Value = (object?)GetActorIdFromToken() ?? DBNull.Value;
+        cmd.Parameters.Add("@image", SqlDbType.VarBinary, -1).Value = bytes;
+        cmd.Parameters.Add("@type", SqlDbType.NVarChar, 50).Value = jpeg ? "image/jpeg" : "image/png";
+        await cmd.ExecuteNonQueryAsync(token);
+        await tx.CommitAsync(token);
+        return Ok(new { saved = true });
+    }
+
     [HttpPost("member-cover"), RequestSizeLimit(1024 * 1024 + 65536)]
     public async Task<ActionResult<object>> UploadMemberCover(
         IFormFile file,

@@ -325,6 +325,11 @@ VALUES(@company,@code,@name,@greeting,@user);
             }
             var exact = matches.FirstOrDefault();
             if (exact is not null) { await RecordQuestionIntent(reviewId, exact, token); return await IntentResult(exact, allowed, token); }
+            if (allowed.Contains(AssistantCapabilities.MenuGuide.Id) && AssistantIntentClassifier.IsMenuGuideRequest(text))
+            {
+                await RecordQuestionIntent(reviewId, AssistantCapabilities.MenuGuide.Id, token);
+                return await IntentResult(AssistantCapabilities.MenuGuide.Id, allowed, token);
+            }
             // Model text is never executable and cannot provide credentials, IDs, routes, or SQL.
             var prompt = AssistantIntentClassifier.BuildPrompt(text, examples.Select(x => (object)new { code = x.Code, examples = x.Examples }));
             var result = await new LocalAssistantModel(configuration).InterpretAsync(prompt, token);

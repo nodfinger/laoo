@@ -78,6 +78,7 @@ import '../../features/support/organization/pages/organization_supervisor_page.d
 import '../../features/my_system/position_levels_page.dart';
 import '../../features/my_system/menu_data_access_page.dart';
 import '../../features/my_system/approval_catalog_page.dart';
+import '../../features/my_system/approval_assignment_page.dart';
 import 'app_menu_route_registry.dart';
 import 'route_names.dart';
 import 'route_paths.dart';
@@ -289,6 +290,17 @@ final GoRouter appRouter = GoRouter(
       path: '/company/menu-data-access',
       name: 'companyMenuDataAccess',
       builder: (context, state) => const MenuDataAccessPage(),
+    ),
+    GoRoute(
+      path: '/company/approval-assignment',
+      name: 'companyApprovalAssignment',
+      builder: (context, state) => const ApprovalAssignmentPage(),
+    ),
+    GoRoute(
+      path: '/company/approval-settings',
+      name: 'companyApprovalSettings',
+      builder: (context, state) =>
+          const MySystemPlaceholderPage(menuCode: '68001'),
     ),
     GoRoute(
       path: '/company/approval-pattern',

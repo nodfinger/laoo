@@ -14,6 +14,7 @@ class MySystemPlaceholderPage extends StatelessWidget {
     builder: (context, snapshot) {
       final title = snapshot.data?.name ?? '';
       final activeMenu = switch (menuCode) {
+        '68001' => 'companyApprovalSettings',
         '65001' => 'mySystemSettings',
         '65002' => 'mySystemSapPms',
         '66001' => 'mySystemTravel',

@@ -14,7 +14,8 @@ static void Check(bool condition, string message)
     if (!condition) throw new InvalidOperationException(message);
 }
 
-Check(AssistantCapabilities.All.Count == 6, "Only the six registered service and stock capabilities are available.");
+Check(AssistantCapabilities.All.Select(x => x.Id).Distinct().Count() == AssistantCapabilities.All.Count, "Registered capability identifiers must be unique.");
+Check(AssistantCapabilities.Find("core.menu_guide") is not null, "Menu guidance must be registered by the server.");
 Check(AssistantCapabilities.Find("repair.create_own")?.MenuCode == "20001", "Create must use self-service permission.");
 Check(AssistantCapabilities.Find("repair.track_own")?.MenuCode == "20002", "Track must use self-service permission.");
 Check(AssistantCapabilities.Find("repair.parts_cost")?.MenuCode == "19002", "Cost summary requires repair history permission.");
@@ -25,6 +26,10 @@ Check(AssistantAgentRegistry.AvailableTo(new[] { "repair.track_own" }).Count() =
 var visibleAgent = System.Text.Json.JsonSerializer.Serialize(AssistantAgentRegistry.AvailableTo(new[] { "repair.track_own" }));
 Check(visibleAgent.Contains("repair.track_own") && !visibleAgent.Contains("repair.create_own") && !visibleAgent.Contains("repair.parts_cost"), "Agent discovery must not reveal or grant unavailable capabilities.");
 Check(AssistantIntentClassifier.Parse(" CREATE ") == "repair.create_own", "Create intent must map to the approved capability.");
+Check(AssistantIntentClassifier.Parse("GUIDE") == "core.menu_guide", "Menu guidance intent must map to its registered capability.");
+Check(AssistantIntentClassifier.IsMenuGuideRequest("จะใช้งาน") && AssistantIntentClassifier.IsMenuGuideRequest("คีย์ข้อมูล") && AssistantIntentClassifier.IsMenuGuideRequest("ทำงาน"), "Common general phrases must request menu guidance.");
+Check(!AssistantIntentClassifier.IsMenuGuideRequest("ติดตามงานซ่อมของฉัน"), "Tracking must not be mistaken for menu guidance.");
+Check(AssistantIntentClassifier.ResolveAuthorizedIntent("core.menu_guide", Array.Empty<string>()) == "denied", "Menu guidance must not bypass capability access.");
 Check(AssistantIntentClassifier.Parse("track") == "repair.track_own", "Track intent must map to the approved capability.");
 Check(AssistantIntentClassifier.Parse("COST") == "repair.parts_cost", "Cost intent must map to the approved capability.");
 Check(AssistantIntentClassifier.Parse("CREATE; DROP TABLE") == "unknown", "Unexpected model output must not execute an action.");

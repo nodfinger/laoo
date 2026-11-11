@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:pdf/pdf.dart';
 import 'package:printing/printing.dart';
 import 'package:laoo_shared_admin_ui/laoo_shared_admin_ui.dart'
     show FilterHeightSync, filterActionHeightStyle;
@@ -60,7 +61,7 @@ class _TravelClaimPageState extends State<TravelClaimPage> {
   String? attachmentPreviewName;
   int attachmentPreviewRevision = 0;
   ListDisplayPreferences preferences = const ListDisplayPreferences();
-  String title = '', query = '';
+  String title = 'เบิกค่าเดินทาง', query = '';
   String? filterDivision, filterDepartment, filterClaimant, filterDate;
   bool loading = true,
       cards = false,
@@ -68,7 +69,8 @@ class _TravelClaimPageState extends State<TravelClaimPage> {
       saving = false,
       canCreate = false,
       canEdit = false,
-      canDelete = false;
+      canDelete = false,
+      canPrint = false;
   int page = 1;
   int? claimId, routeId;
   String? vehicle;
@@ -129,11 +131,17 @@ class _TravelClaimPageState extends State<TravelClaimPage> {
   Future<void> load() async {
     try {
       final menu = await NavigationMenuRepository().findMenu(menuCode: '66001');
+      if (mounted && menu != null && menu.name.trim().isNotEmpty) {
+        setState(() => title = menu.name);
+      }
+    } catch (_) {
+      // Keep the screen caption even if navigation metadata is unavailable.
+    }
+    try {
       final data = await api.get('/api/company/travel-claims');
       if (data is! Map) throw StateError('response');
       if (!mounted) return;
       setState(() {
-        title = menu?.name ?? '';
         items = maps(data['items']);
         organizations = maps(data['organizations']);
         if (filterDivision != null &&
@@ -175,17 +183,23 @@ class _TravelClaimPageState extends State<TravelClaimPage> {
         canCreate = data['create'] == true;
         canEdit = data['edit'] == true;
         canDelete = data['delete'] == true;
+        canPrint = data['print'] == true;
         loading = false;
       });
       await loadPreferences();
-    } catch (_) {
+    } catch (error) {
       if (mounted) {
         setState(() => loading = false);
-        showTimedSnackBar(
-          context,
-          message: 'โหลดใบเบิกค่าเดินทางไม่สำเร็จ กรุณาตรวจสอบสิทธิ์และลองใหม่',
-          error: true,
-        );
+        final message = error is ApiException
+            ? switch (error.statusCode) {
+                401 => 'หมดเวลาการเข้าสู่ระบบ กรุณาเข้าสู่ระบบใหม่',
+                403 => 'ไม่มีสิทธิ์ดูใบเบิกค่าเดินทาง กรุณาติดต่อผู้ดูแลระบบ',
+                int code when code >= 500 =>
+                  'ระบบไม่สามารถโหลดใบเบิกค่าเดินทางได้ กรุณาติดต่อผู้ดูแลระบบ',
+                _ => error.message,
+              }
+            : 'ไม่สามารถโหลดใบเบิกค่าเดินทางได้ กรุณาตรวจสอบการเชื่อมต่อแล้วลองใหม่';
+        showTimedSnackBar(context, message: message, error: true);
       }
     }
   }
@@ -657,19 +671,32 @@ class _TravelClaimPageState extends State<TravelClaimPage> {
     }
   }
 
-  Future<void> printClaim() async {
-    if (claimId == null) return;
+  Future<void> printClaim([int? targetId]) async {
+    final id = targetId ?? claimId;
+    if (id == null) return;
     try {
-      final result = await api.get('/api/company/travel-claims/$claimId');
-      if (result is! Map || result['item'] is! Map)
+      final result = await api.get('/api/company/travel-claims/$id/print');
+      if (result is! Map || result['item'] is! Map) {
         throw StateError('missing claim');
+      }
       final item = Map<String, dynamic>.from(result['item'] as Map);
+      Uint8List? logoBytes;
+      try {
+        final logo = await api.get('/api/company-setup/logo');
+        if (logo is Map && logo['image'] is String) {
+          logoBytes = base64Decode(logo['image'] as String);
+        }
+      } catch (_) {
+        // Printing remains available before a company logo has been configured.
+      }
       final fontData = await rootBundle.load(
         'assets/fonts/NotoSansThai-Variable.ttf',
       );
       final font = pw.Font.ttf(fontData.buffer.asByteData());
       final doc = pw.Document(
-        theme: pw.ThemeData.withFont(base: font, bold: font),
+        theme: pw.ThemeData.withFont(base: font, bold: font).copyWith(
+          defaultTextStyle: const pw.TextStyle(fontSize: 9),
+        ),
       );
       String date(String key) {
         final d = DateTime.tryParse('${item[key] ?? ''}');
@@ -677,51 +704,134 @@ class _TravelClaimPageState extends State<TravelClaimPage> {
       }
 
       String money(String key) => (item[key] as num? ?? 0).toStringAsFixed(2);
-      doc.addPage(
-        pw.MultiPage(
-          build: (_) => [
-            pw.Text(
-              '????????????????',
-              style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
-            ),
-            pw.Divider(),
-            for (final line in <String>[
-              '????????????: ${item['number']}',
-              '????????????: ${date('date')}',
-              '??????: ${item['origin']}   ???????: ${item['destination']}',
-              '????????????: ${item['purpose']}',
-              '?????????????????: ${item['workPlace']}',
-              '?????????????: ${date('start')} - ${date('end')}',
-              '?????????: ${item['registration']}   ???????: ${item['distance']} ??.',
-              '?????????: ${money('fuel')} ???   ?????????: ${money('lodging')} ???',
-              '??????????: ${money('toll')} ???   ???????????: ${money('parking')} ???',
-              '??????????????????: ${money('transport')} ???',
-              '??????????: ${money('total')} ???',
-            ])
-              pw.Padding(
-                padding: const pw.EdgeInsets.only(bottom: 8),
-                child: pw.Text(line),
-              ),
-          ],
-        ),
+      final info = result['printInfo'] is Map ? Map<String, dynamic>.from(result['printInfo'] as Map) : <String, dynamic>{};
+      final vehicleInfo = vehicles.where((v) => v['code'] == item['vehicle']).firstOrNull;
+      String value(dynamic v) => v == null || '$v'.trim().isEmpty ? '-' : '$v';
+      pw.Widget line(String text) => pw.Padding(
+        padding: const pw.EdgeInsets.only(bottom: 5), child: pw.Text(text),
       );
+      pw.Widget pair(String left, String right) => pw.Padding(
+        padding: const pw.EdgeInsets.only(bottom: 5),
+        child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+          pw.Expanded(child: pw.Text(left)), pw.SizedBox(width: 12), pw.Expanded(child: pw.Text(right)),
+        ]),
+      );
+      pw.Widget travelPair(String leftLabel, String leftValue, String rightLabel, String rightValue) => pw.Padding(
+        padding: const pw.EdgeInsets.only(bottom: 8),
+        child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+          pw.Expanded(child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+            pw.SizedBox(width: 78, child: pw.Text(leftLabel)),
+            pw.Expanded(child: pw.Text(leftValue)),
+          ])),
+          pw.SizedBox(width: 16),
+          pw.Expanded(child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+            pw.SizedBox(width: 88, child: pw.Text(rightLabel)),
+            pw.Expanded(child: pw.Text(rightValue)),
+          ])),
+        ]),
+      );
+      final start = DateTime.tryParse('${item['start'] ?? ''}');
+      final end = DateTime.tryParse('${item['end'] ?? ''}');
+      final days = start != null && end != null && !end.isBefore(start)
+          ? end.difference(start).inDays + 1 : null;
+      pw.Widget signature(String label) => pw.Expanded(child: pw.Column(children: [
+        pw.SizedBox(height: 32), pw.Text('................................................'),
+        pw.Text(label), pw.Text('วันที่ ........../........../..........'),
+      ]));
+      doc.addPage(pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(32),
+        build: (_) => [
+          pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+            pw.SizedBox(width: 80, height: 48, child: logoBytes == null
+              ? pw.SizedBox() : pw.Image(pw.MemoryImage(logoBytes), fit: pw.BoxFit.contain)),
+            pw.Expanded(child: pw.Column(children: [
+              pw.Text(value(info['companyName']), textAlign: pw.TextAlign.center,
+                style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
+              pw.Text(value(info['address']), textAlign: pw.TextAlign.center,
+                style: const pw.TextStyle(fontSize: 8)),
+            ])),
+            pw.SizedBox(width: 80),
+          ]),
+          pw.SizedBox(height: 8),
+          pw.Center(child: pw.Text('ใบอนุมัติเบิก-จ่ายค่าใช้จ่ายในการเดินทาง',
+            style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold))),
+          pw.SizedBox(height: 10),
+          pw.Align(alignment: pw.Alignment.centerRight, child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.end,
+            children: [pw.Text('เลขที่เอกสาร: ${value(item['number'])}'), pw.Text('วันที่: ${date('date')}')],
+          )),
+          pw.SizedBox(height: 10),
+          line('เรื่อง ขออนุมัติเบิกค่าใช้จ่ายในการเดินทาง'),
+          line('เรียน ..............................................................'),
+          pw.SizedBox(height: 10),
+          pair('ข้าพเจ้า ${value(info['claimant'])}', 'ตำแหน่ง ${value(info['position'])}'),
+          pair('รหัสพนักงาน ${value(info['employeeCode'])}', 'ฝ่าย ${value(info['division'])}'),
+          pw.SizedBox(height: 10),
+          line('ข้าพเจ้าขอเบิกค่าใช้จ่ายในการเดินทางไปปฏิบัติงานนอกสถานที่ ดังนี้'),
+          pw.SizedBox(height: 4),
+          travelPair('สถานที่ต้นทาง', value(item['origin']), 'สถานที่ปฏิบัติงาน', value(item['workPlace'])),
+          travelPair('ระหว่างวันที่', date('start'), 'ถึงวันที่', date('end')),
+          line('รวมวันที่ไปปฏิบัติงานนอกสถานที่ จำนวน ${days ?? '-'} วัน'),
+          pw.SizedBox(height: 5),
+          line('วัตถุประสงค์ในการปฏิบัติงานครั้งนี้ เพื่อ'),
+          pw.Padding(padding: const pw.EdgeInsets.only(left: 20, bottom: 8), child: pw.Text(value(item['purpose']))),
+          pw.SizedBox(height: 8),
+          pw.Text('ค่าใช้จ่ายที่ขออนุมัติ', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+          pw.Divider(thickness: 0.6),
+          line('ประเภทรถ: ${value(vehicleInfo?['name'] ?? item['vehicle'])}     ทะเบียน: ${value(item['registration'])}'),
+          line('ระยะทาง: ${value(item['distance'])} กม.     อัตราต่อกิโลเมตร: ${value(item['rate'])} บาท'),
+          for (final entry in <MapEntry<String, String>>[
+            MapEntry('ค่าเดินทาง / ค่าน้ำมัน', money('fuel')),
+            MapEntry('ค่าทางด่วน', money('toll')),
+            MapEntry('ค่าที่จอดรถ', money('parking')),
+            MapEntry('ค่าที่พัก (${value(item['nights'])} คืน)', money('lodging')),
+            MapEntry('ค่ายานพาหนะสาธารณะ', money('transport')),
+          ]) pw.Padding(padding: const pw.EdgeInsets.symmetric(vertical: 3), child: pw.Row(children: [
+            pw.Expanded(child: pw.Text(entry.key)), pw.Text('${entry.value} บาท'),
+          ])),
+          pw.Divider(thickness: 0.6),
+          pw.Align(alignment: pw.Alignment.centerRight, child: pw.Text('รวมจำนวนเงินที่ขอเบิกทั้งสิ้น ${money('total')} บาท',
+            style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold))),
+          pw.SizedBox(height: 12),
+          line('หมายเหตุ: โปรดแนบเอกสารประกอบการพิจารณา'),
+          pw.Row(children: [signature('ผู้ขอเบิก'), signature('ผู้อนุมัติ')]),
+          pw.SizedBox(height: 18),
+          pw.Table(border: pw.TableBorder.all(width: 0.6), children: [pw.TableRow(children: [
+            for (final label in ['ผู้จ่ายเงิน', 'ผู้รับเงิน', 'ผู้ตรวจสอบบัญชี'])
+              pw.Container(height: 65, alignment: pw.Alignment.bottomCenter, padding: const pw.EdgeInsets.all(5), child: pw.Text(label)),
+          ])]),
+        ],
+      ));
       await Printing.layoutPdf(
         name: 'travel-claim-${item['number']}.pdf',
         onLayout: (_) => doc.save(),
       );
-    } catch (_) {
-      if (mounted)
+    } catch (error) {
+      if (mounted) {
         showTimedSnackBar(
           context,
-          message: '??????????????????????? ????????????????????????????',
+          message: error is ApiException
+              ? error.message
+              : 'ไม่สามารถพิมพ์ใบเบิกค่าเดินทางได้ กรุณาลองใหม่',
           error: true,
         );
+      }
     }
   }
 
   Widget rowActions(Map<String, dynamic> row) => Row(
     mainAxisSize: MainAxisSize.min,
     children: [
+      if (canPrint && row['id'] is num)
+        IconButton(
+          onPressed: () => printClaim((row['id'] as num).toInt()),
+          icon: Icon(
+            Icons.print_outlined,
+            color: businessCardOcrUi(context).primaryColor,
+          ),
+          tooltip: 'พิมพ์',
+        ),
       if (row['canEdit'] != true)
         IconButton(
           onPressed: () => open(row),
@@ -885,6 +995,12 @@ class _TravelClaimPageState extends State<TravelClaimPage> {
                         onPressed: saving ? null : save,
                         icon: const Icon(Icons.save_outlined),
                         label: const Text('บันทึก'),
+                      ),
+                    if (claimId != null && canPrint)
+                      OutlinedButton.icon(
+                        onPressed: saving ? null : printClaim,
+                        icon: const Icon(Icons.print_outlined),
+                        label: const Text('พิมพ์'),
                       ),
                   ],
                 );

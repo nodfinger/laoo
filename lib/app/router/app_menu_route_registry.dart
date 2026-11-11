@@ -62,6 +62,20 @@ class AppMenuRouteSpec {
 
 abstract final class AppMenuRouteRegistry {
   static final Map<String, AppMenuRouteSpec> _byMenuCode = {
+    '68002': AppMenuRouteSpec(
+      menuCode: '68002',
+      databaseRouteName: 'companyApprovalAssignment',
+      goRouteName: 'companyApprovalAssignment',
+      path: '/company/approval-assignment',
+      scope: AppMenuScope.company,
+    ),
+    '68001': AppMenuRouteSpec(
+      menuCode: '68001',
+      databaseRouteName: 'companyApprovalSettings',
+      goRouteName: 'companyApprovalSettings',
+      path: '/company/approval-settings',
+      scope: AppMenuScope.company,
+    ),
     '67002': AppMenuRouteSpec(
       menuCode: '67002',
       databaseRouteName: 'travelRouteRates',

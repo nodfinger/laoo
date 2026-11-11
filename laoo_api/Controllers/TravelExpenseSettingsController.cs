@@ -12,6 +12,46 @@ public sealed class TravelExpenseSettingsController(IConfiguration configuration
     private long CompanyId => RegistryControllerSupport.ClaimLong(User, "company_id");
     private long UserId => RegistryControllerSupport.ClaimLong(User, "user_id");
 
+    public sealed record GeneralSettingsRequest(int? DocumentExpiryDays, string? DocumentRevision, string? Remark1, string? Remark2, string? Remark3, string? Remark4, string? Remark5);
+
+    [HttpGet("general")]
+    public async Task<IActionResult> General(CancellationToken token)
+    {
+        await using var db = await RegistryControllerSupport.Open(configuration, token);
+        if (CompanyId <= 0 || UserId <= 0 || !await CompanyProjectPermission.IsAllowedAsync(db, User, "67001", "VIEW", token)) return Forbid();
+        var canEdit = await CompanyProjectPermission.IsAllowedAsync(db, User, "67001", "EDIT", token);
+        await using var q = new SqlCommand("SELECT DocumentExpiryDays,DocumentRevision,Remark1,Remark2,Remark3,Remark4,Remark5 FROM dbo.TDSTTravelGeneralSettings WHERE CompanyID=@company", db);
+        q.Parameters.Add("@company", SqlDbType.BigInt).Value = CompanyId;
+        await using var r = await q.ExecuteReaderAsync(token);
+        if (!await r.ReadAsync(token)) return Ok(new { canEdit, settings = new GeneralSettingsRequest(null, "", "", "", "", "", "") });
+        return Ok(new { canEdit, settings = new GeneralSettingsRequest(r.IsDBNull(0) ? null : r.GetInt32(0), r.GetString(1), r.GetString(2), r.GetString(3), r.GetString(4), r.GetString(5), r.GetString(6)) });
+    }
+
+    [HttpPut("general")]
+    public async Task<IActionResult> SaveGeneral(GeneralSettingsRequest? input, CancellationToken token)
+    {
+        if (input is null || input.DocumentExpiryDays < 0 || (input.DocumentRevision?.Length ?? 0) > 100 ||
+            new[] { input.Remark1, input.Remark2, input.Remark3, input.Remark4, input.Remark5 }.Any(x => (x?.Length ?? 0) > 1000))
+            return BadRequest(new { message = "กรุณาตรวจสอบจำนวนวันและความยาวข้อความ โดย Rev. ไม่เกิน 100 อักษร และหมายเหตุแต่ละช่องไม่เกิน 1,000 อักษร" });
+        await using var db = await RegistryControllerSupport.Open(configuration, token);
+        if (CompanyId <= 0 || UserId <= 0 || !await CompanyProjectPermission.IsAllowedAsync(db, User, "67001", "EDIT", token)) return Forbid();
+        await using var tx = (SqlTransaction)await db.BeginTransactionAsync(IsolationLevel.Serializable, token);
+        const string sql = """
+UPDATE dbo.TDSTTravelGeneralSettings SET DocumentExpiryDays=@days,DocumentRevision=@rev,Remark1=@r1,Remark2=@r2,Remark3=@r3,Remark4=@r4,Remark5=@r5,UpdateBy=@user,UpdateDate=SYSUTCDATETIME() WHERE CompanyID=@company;
+IF @@ROWCOUNT=0 INSERT dbo.TDSTTravelGeneralSettings(CompanyID,DocumentExpiryDays,DocumentRevision,Remark1,Remark2,Remark3,Remark4,Remark5,UpdateBy) VALUES(@company,@days,@rev,@r1,@r2,@r3,@r4,@r5,@user);
+""";
+        await using var q = new SqlCommand(sql, db, tx);
+        q.Parameters.Add("@company", SqlDbType.BigInt).Value = CompanyId;
+        q.Parameters.Add("@user", SqlDbType.BigInt).Value = UserId;
+        q.Parameters.Add("@days", SqlDbType.Int).Value = (object?)input.DocumentExpiryDays ?? DBNull.Value;
+        q.Parameters.Add("@rev", SqlDbType.NVarChar, 100).Value = input.DocumentRevision ?? "";
+        var remarks = new[] { input.Remark1, input.Remark2, input.Remark3, input.Remark4, input.Remark5 };
+        for (var i = 0; i < remarks.Length; i++) q.Parameters.Add("@r" + (i + 1), SqlDbType.NVarChar, 1000).Value = remarks[i] ?? "";
+        await q.ExecuteNonQueryAsync(token);
+        await tx.CommitAsync(token);
+        return Ok(new { saved = true });
+    }
+
     private static readonly HashSet<string> AccessScopes = ["SELF", "DEPARTMENT", "DIVISION"];
     private static readonly HashSet<string> AccessModes = ["ALL", "HEAD"];
     public sealed record TravelAccessRequest(string Scope, string EditMode, string DeleteMode);

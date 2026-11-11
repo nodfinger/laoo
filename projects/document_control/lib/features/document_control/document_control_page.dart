@@ -36,6 +36,7 @@ class _DocumentControlPageState extends State<DocumentControlPage> {
   final search = TextEditingController();
   String title = '';
   int page = 1;
+  bool typeCards = false;
   @override
   void initState() {
     super.initState();
@@ -148,15 +149,18 @@ class _DocumentControlPageState extends State<DocumentControlPage> {
       ),
     ),
   );
-  Widget _caption({Widget? trailing}) => LaooCaptionCard(
-    tokens: documentControlUiTokens,
-    leading: Icon(
-      Icons.folder_copy_outlined,
-      color: documentControlUiTokens.primaryColor,
+  Widget _caption({Widget? trailing}) => SizedBox(
+    width: double.infinity,
+    child: LaooCaptionCard(
+      tokens: documentControlUiTokens,
+      leading: Icon(
+        Icons.folder_copy_outlined,
+        color: documentControlUiTokens.primaryColor,
+      ),
+      caption: title,
+      favoriteKey: widget.menuCode,
+      trailing: trailing,
     ),
-    caption: title,
-    favoriteKey: widget.menuCode,
-    trailing: trailing,
   );
   Widget _state(Widget child) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -192,7 +196,12 @@ class _DocumentControlPageState extends State<DocumentControlPage> {
         width: 320,
         child: TextField(
           controller: search,
-          decoration: _input('ค้นหาเลขที่หรือชื่อเอกสาร', Icons.search),
+          decoration: _input(
+            widget.mode == DocumentControlPageMode.types
+                ? 'ค้นหาชื่อประเภทเอกสาร'
+                : 'ค้นหาเลขที่หรือชื่อเอกสาร',
+            Icons.search,
+          ),
         ),
       ),
       FilledButton.icon(
@@ -223,6 +232,29 @@ class _DocumentControlPageState extends State<DocumentControlPage> {
         ),
         r = TextEditingController(text: _text(data['reminderDays']));
     return _layout(
+      trailing: actions['edit'] == true
+          ? FilledButton.icon(
+              onPressed: () async {
+                await api.put(
+                  '/api/company/document-control/settings',
+                  body: {
+                    'maxPrimaryFileMb': int.tryParse(p.text),
+                    'maxAttachmentFileMb': int.tryParse(x.text),
+                    'allowedAttachmentExtensions': e.text,
+                    'reminderDays': int.tryParse(r.text),
+                  },
+                );
+                if (mounted)
+                  showDocumentControlMessage(
+                    context,
+                    message: 'บันทึกการตั้งค่าแล้ว',
+                  );
+                reload();
+              },
+              icon: const Icon(Icons.save_outlined),
+              label: const Text('บันทึก'),
+            )
+          : null,
       body: LaooSurfaceCard(
         tokens: documentControlUiTokens,
         child: SingleChildScrollView(
@@ -243,32 +275,6 @@ class _DocumentControlPageState extends State<DocumentControlPage> {
                 _field(e, 'นามสกุลไฟล์แนบที่อนุญาต'),
                 const SizedBox(height: 16),
                 _field(r, 'แจ้งเตือนก่อนครบกำหนด (วัน)'),
-                const SizedBox(height: 20),
-                if (actions['edit'] == true)
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: FilledButton.icon(
-                      onPressed: () async {
-                        await api.put(
-                          '/api/company/document-control/settings',
-                          body: {
-                            'maxPrimaryFileMb': int.tryParse(p.text),
-                            'maxAttachmentFileMb': int.tryParse(x.text),
-                            'allowedAttachmentExtensions': e.text,
-                            'reminderDays': int.tryParse(r.text),
-                          },
-                        );
-                        if (mounted)
-                          showDocumentControlMessage(
-                            context,
-                            message: 'บันทึกการตั้งค่าแล้ว',
-                          );
-                        reload();
-                      },
-                      icon: const Icon(Icons.save_outlined),
-                      label: const Text('บันทึก'),
-                    ),
-                  ),
               ],
             ),
           ),
@@ -281,20 +287,83 @@ class _DocumentControlPageState extends State<DocumentControlPage> {
     List<Map<String, dynamic>> items,
     Map<String, dynamic> actions,
     Map<String, dynamic> options,
-  ) => _layout(
-    trailing: actions['create'] == true
-        ? FilledButton.icon(
-            onPressed: () => _typeDialog(null, options),
-            icon: const Icon(Icons.add),
-            label: const Text('เพิ่ม'),
-          )
-        : null,
-    filter: _search(),
-    body: _listWithPagination(
-      _table(items, actions, options, false, true),
-      items.length,
-    ),
-  );
+  ) {
+    final query = search.text.trim().toLowerCase();
+    final filtered = items
+        .where(
+          (row) =>
+              query.isEmpty || _text(row['name']).toLowerCase().contains(query),
+        )
+        .toList();
+    final pages = ((filtered.length + 9) ~/ 10).clamp(1, 999999);
+    final current = page.clamp(1, pages);
+    final start = (current - 1) * 10;
+    final shown = filtered.skip(start).take(10).toList();
+    return _layout(
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton.filledTonal(
+            tooltip: typeCards ? 'แสดงแบบรายการ' : 'แสดงแบบการ์ด',
+            onPressed: () => setState(() => typeCards = !typeCards),
+            style: IconButton.styleFrom(
+              foregroundColor: documentControlUiTokens.primaryColor,
+              backgroundColor: documentControlUiTokens.primaryColor.withValues(
+                alpha: .1,
+              ),
+              fixedSize: Size.square(documentControlUiTokens.buttonHeight),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+            icon: Icon(
+              typeCards ? Icons.view_list_outlined : Icons.grid_view_outlined,
+            ),
+          ),
+          if (actions['create'] == true) ...[
+            const SizedBox(width: 8),
+            FilledButton.icon(
+              onPressed: () => _typeDialog(null, options),
+              icon: const Icon(Icons.add),
+              label: const Text('เพิ่ม'),
+            ),
+          ],
+        ],
+      ),
+      filter: _search(),
+      body: Column(
+        children: [
+          Expanded(
+            child: _table(
+              shown,
+              actions,
+              options,
+              false,
+              true,
+              forceCards: typeCards,
+              startIndex: start,
+            ),
+          ),
+          SizedBox(height: documentControlUiTokens.sectionSpacing),
+          LaooPaginationCard(
+            tokens: documentControlUiTokens,
+            page: current,
+            pageCount: pages,
+            pageSize: 10,
+            total: filtered.length,
+            borderless: true,
+            onPrevious: current > 1
+                ? () => setState(() => page = current - 1)
+                : null,
+            onNext: current < pages
+                ? () => setState(() => page = current + 1)
+                : null,
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _documents(
     Map<String, dynamic> result,
     Map<String, dynamic> actions,
@@ -427,15 +496,18 @@ class _DocumentControlPageState extends State<DocumentControlPage> {
     Map<String, dynamic> actions,
     Map<String, dynamic> options,
     bool general,
-    bool types,
-  ) => LayoutBuilder(
+    bool types, {
+    bool forceCards = false,
+    int startIndex = 0,
+  }) => LayoutBuilder(
     builder: (context, box) {
       if (items.isEmpty)
         return LaooSurfaceCard(
           tokens: documentControlUiTokens,
           child: const Center(child: Text('ไม่พบข้อมูล')),
         );
-      if (box.maxWidth < 900)
+      if (forceCards ||
+          box.maxWidth < documentControlUiTokens.compactBreakpoint)
         return ListView.separated(
           itemCount: items.length,
           separatorBuilder: (_, __) =>
@@ -452,12 +524,25 @@ class _DocumentControlPageState extends State<DocumentControlPage> {
                       children: [
                         Text(
                           types
-                              ? _text(row['code']) + ' · ' + _text(row['name'])
+                              ? _text(row['name'])
                               : _text(row['documentNo']) +
                                     ' · Rev. ' +
                                     _text(row['revisionNo']),
                           style: documentControlUiTokens.sectionStyle,
                         ),
+                        if (types) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            row['requireAcknowledgement'] == true
+                                ? 'รับทราบ: กำหนด'
+                                : 'รับทราบ: ไม่กำหนด',
+                          ),
+                          Text(
+                            row['active'] == true
+                                ? 'สถานะ: ใช้งาน'
+                                : 'สถานะ: ปิดใช้งาน',
+                          ),
+                        ],
                         const SizedBox(height: 4),
                         Text(
                           types
@@ -485,8 +570,7 @@ class _DocumentControlPageState extends State<DocumentControlPage> {
       final columns = types
           ? const [
               DataColumn(label: Text('ID')),
-              DataColumn(label: Center(child: Text('Action'))),
-              DataColumn(label: Text('รหัส')),
+              DataColumn(label: Text('Action')),
               DataColumn(label: Text('ชื่อประเภท')),
               DataColumn(label: Text('กลุ่ม')),
               DataColumn(label: Text('รับทราบ')),
@@ -503,58 +587,60 @@ class _DocumentControlPageState extends State<DocumentControlPage> {
             ];
       return LaooTableCard(
         tokens: documentControlUiTokens,
-        child: LaooWorkspaceDataTable(
-          tokens: documentControlUiTokens,
-          columns: columns,
-          rows: List.generate(items.length, (i) {
-            final row = items[i];
-            return DataRow(
-              cells: types
-                  ? [
-                      DataCell(Text((i + 1).toString())),
-                      DataCell(
-                        _rowActions(
-                          row,
-                          actions,
-                          () => _typeDialog(row, options),
-                          () => _deleteType(row),
-                        ),
-                      ),
-                      DataCell(Text(_text(row['code']))),
-                      DataCell(Text(_text(row['name']))),
-                      DataCell(Text(_className(row['documentClass']))),
-                      DataCell(
-                        Text(
-                          row['requireAcknowledgement'] == true
-                              ? 'กำหนด'
-                              : 'ไม่กำหนด',
-                        ),
-                      ),
-                      DataCell(
-                        Text(row['active'] == true ? 'ใช้งาน' : 'ปิดใช้งาน'),
-                      ),
-                    ]
-                  : [
-                      DataCell(Text(((page - 1) * 10 + i + 1).toString())),
-                      DataCell(
-                        _documentActions(row, actions, options, general),
-                      ),
-                      DataCell(Text(_text(row['documentNo']))),
-                      DataCell(
-                        SizedBox(
-                          width: 280,
-                          child: Text(
-                            _text(row['title']),
-                            overflow: TextOverflow.ellipsis,
+        child: Padding(
+          padding: types ? const EdgeInsets.all(10) : EdgeInsets.zero,
+          child: LaooWorkspaceDataTable(
+            tokens: documentControlUiTokens,
+            columns: columns,
+            rows: List.generate(items.length, (i) {
+              final row = items[i];
+              return DataRow(
+                cells: types
+                    ? [
+                        DataCell(Text((startIndex + i + 1).toString())),
+                        DataCell(
+                          _rowActions(
+                            row,
+                            actions,
+                            () => _typeDialog(row, options),
+                            () => _deleteType(row),
                           ),
                         ),
-                      ),
-                      DataCell(Text(_text(row['typeName']))),
-                      DataCell(Text(_text(row['revisionNo']))),
-                      DataCell(_statusChip(_text(row['status']))),
-                    ],
-            );
-          }),
+                        DataCell(Text(_text(row['name']))),
+                        DataCell(Text(_className(row['documentClass']))),
+                        DataCell(
+                          Text(
+                            row['requireAcknowledgement'] == true
+                                ? 'กำหนด'
+                                : 'ไม่กำหนด',
+                          ),
+                        ),
+                        DataCell(
+                          Text(row['active'] == true ? 'ใช้งาน' : 'ปิดใช้งาน'),
+                        ),
+                      ]
+                    : [
+                        DataCell(Text(((page - 1) * 10 + i + 1).toString())),
+                        DataCell(
+                          _documentActions(row, actions, options, general),
+                        ),
+                        DataCell(Text(_text(row['documentNo']))),
+                        DataCell(
+                          SizedBox(
+                            width: 280,
+                            child: Text(
+                              _text(row['title']),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                        DataCell(Text(_text(row['typeName']))),
+                        DataCell(Text(_text(row['revisionNo']))),
+                        DataCell(_statusChip(_text(row['status']))),
+                      ],
+              );
+            }),
+          ),
         ),
       );
     },
@@ -620,6 +706,7 @@ class _DocumentControlPageState extends State<DocumentControlPage> {
         IconButton(
           tooltip: 'แก้ไข',
           onPressed: edit,
+          color: documentControlUiTokens.primaryColor,
           icon: const Icon(Icons.edit_outlined),
         ),
       if (actions['delete'] == true)
@@ -720,12 +807,164 @@ class _DocumentControlPageState extends State<DocumentControlPage> {
     ],
   );
 
+  Widget _typeUserField(
+    String label,
+    int? selected,
+    List<Map<String, dynamic>> users,
+    ValueChanged<int?> onChanged,
+  ) {
+    final match = users
+        .where((u) => u['id'] is num && (u['id'] as num).toInt() == selected)
+        .firstOrNull;
+    final primary = documentControlUiTokens.primaryColor;
+    return InkWell(
+      onTap: () async {
+        final result = await _selectTypeUser(label, users);
+        if (result != null && mounted) onChanged(result);
+      },
+      child: InputDecorator(
+        isEmpty: selected == null,
+        decoration: _input(label).copyWith(
+          suffixIcon: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (selected != null)
+                IconButton(
+                  tooltip: 'ล้างค่า',
+                  onPressed: () => onChanged(null),
+                  icon: const Icon(Icons.close),
+                ),
+              Icon(Icons.search, color: primary),
+              const SizedBox(width: 12),
+            ],
+          ),
+        ),
+        child: Text(
+          match == null ? '' : _text(match['name']),
+          style: documentControlUiTokens.inputStyle,
+        ),
+      ),
+    );
+  }
+
+  Future<int?> _selectTypeUser(
+    String label,
+    List<Map<String, dynamic>> users,
+  ) async {
+    final searchController = TextEditingController();
+    final primary = documentControlUiTokens.primaryColor;
+    final selected = await showDialog<int>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setLocal) {
+          final query = searchController.text.trim().toLowerCase();
+          final visible = users
+              .where(
+                (u) =>
+                    u['id'] is num &&
+                    _text(u['name']).toLowerCase().contains(query),
+              )
+              .toList();
+          return Dialog(
+            backgroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(4),
+            ),
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 24,
+              vertical: 20,
+            ),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 600, maxHeight: 620),
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.person_search_outlined, color: primary),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'ค้นหา $label',
+                            style: documentControlUiTokens.captionStyle,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Divider(
+                      thickness: 0.6,
+                      color: documentControlUiTokens.borderColor,
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: searchController,
+                      autofocus: true,
+                      style: documentControlUiTokens.inputStyle,
+                      decoration: _input('ค้นหาชื่อ', Icons.search),
+                      onChanged: (_) => setLocal(() {}),
+                    ),
+                    const SizedBox(height: 12),
+                    Flexible(
+                      child: visible.isEmpty
+                          ? const Center(child: Text('ไม่พบข้อมูล'))
+                          : ListView.separated(
+                              shrinkWrap: true,
+                              itemCount: visible.length,
+                              separatorBuilder: (_, __) => Divider(
+                                height: 1,
+                                thickness: 0.6,
+                                color: documentControlUiTokens.borderColor,
+                              ),
+                              itemBuilder: (_, i) => ListTile(
+                                title: Text(
+                                  _text(visible[i]['name']),
+                                  style: documentControlUiTokens.inputStyle,
+                                ),
+                                onTap: () => Navigator.pop(
+                                  dialogContext,
+                                  (visible[i]['id'] as num).toInt(),
+                                ),
+                              ),
+                            ),
+                    ),
+                    const SizedBox(height: 12),
+                    Divider(
+                      thickness: 0.6,
+                      color: documentControlUiTokens.borderColor,
+                    ),
+                    const SizedBox(height: 10),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: primary,
+                        ),
+                        onPressed: () => Navigator.pop(dialogContext),
+                        icon: const Icon(Icons.close),
+                        label: const Text('ปิด'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+    searchController.dispose();
+    return selected;
+  }
+
   Future<void> _typeDialog(
     Map<String, dynamic>? row,
     Map<String, dynamic> options,
   ) async {
-    final code = TextEditingController(text: _text(row?['code'])),
-        name = TextEditingController(text: _text(row?['name']));
+    final name = TextEditingController(text: _text(row?['name']));
     var kind = _text(row?['documentClass']).isEmpty
         ? 'CONTROLLED'
         : _text(row?['documentClass']);
@@ -744,14 +983,14 @@ class _DocumentControlPageState extends State<DocumentControlPage> {
         builder: (context, setLocal) => _popup(
           caption: 'ประเภทเอกสาร > ' + (row == null ? 'เพิ่ม' : 'แก้ไข'),
           icon: Icons.category_outlined,
+          typeLayout: true,
           content: Column(
             children: [
-              _field(code, 'รหัสประเภท *'),
-              const SizedBox(height: 16),
               _field(name, 'ชื่อประเภท *'),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
                 initialValue: kind,
+                style: documentControlUiTokens.inputStyle,
                 decoration: _input('กลุ่มเอกสาร *'),
                 items: const [
                   DropdownMenuItem(
@@ -766,22 +1005,23 @@ class _DocumentControlPageState extends State<DocumentControlPage> {
                 onChanged: (v) => setLocal(() => kind = v!),
               ),
               const SizedBox(height: 16),
-              DropdownButtonFormField<int>(
-                initialValue: reviewer,
-                decoration: _input('ผู้ตรวจทานเริ่มต้น'),
-                items: _userItems(users),
-                onChanged: (value) => setLocal(() => reviewer = value),
+              _typeUserField(
+                'ผู้ตรวจทานเริ่มต้น',
+                reviewer,
+                users,
+                (value) => setLocal(() => reviewer = value),
               ),
               const SizedBox(height: 16),
-              DropdownButtonFormField<int>(
-                initialValue: approver,
-                decoration: _input('ผู้อนุมัติเริ่มต้น'),
-                items: _userItems(users),
-                onChanged: (value) => setLocal(() => approver = value),
+              _typeUserField(
+                'ผู้อนุมัติเริ่มต้น',
+                approver,
+                users,
+                (value) => setLocal(() => approver = value),
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
                 initialValue: audience,
+                style: documentControlUiTokens.inputStyle,
                 decoration: _input('สิทธิ์เริ่มต้น *'),
                 items: const [
                   DropdownMenuItem(value: 'ALL', child: Text('ทุกคนในบริษัท')),
@@ -808,7 +1048,7 @@ class _DocumentControlPageState extends State<DocumentControlPage> {
           ),
           onSave: () async {
             final body = {
-              'code': code.text,
+              'code': row?['code'],
               'name': name.text,
               'documentClass': kind,
               'requireAcknowledgement': ack,
@@ -1374,18 +1614,22 @@ class _DocumentControlPageState extends State<DocumentControlPage> {
     required Future<void> Function() onSave,
     String saveText = 'บันทึก',
     bool cancelVisible = true,
+    bool typeLayout = false,
   }) => Dialog(
     backgroundColor: Colors.white,
     insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
     child: ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 480, maxHeight: 760),
+      constraints: BoxConstraints(
+        maxWidth: typeLayout ? 600 : 480,
+        maxHeight: 760,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
             constraints: const BoxConstraints(minHeight: 48),
-            padding: const EdgeInsets.all(10),
+            padding: EdgeInsets.all(typeLayout ? 20 : 10),
             child: Row(
               children: [
                 Icon(
@@ -1409,31 +1653,34 @@ class _DocumentControlPageState extends State<DocumentControlPage> {
           ),
           Divider(
             height: 1,
-            thickness: 1,
+            thickness: typeLayout ? 0.6 : 1,
             color: documentControlUiTokens.borderColor,
           ),
           Flexible(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.all(10),
+              padding: EdgeInsets.all(typeLayout ? 20 : 10),
               child: content,
             ),
           ),
           Divider(
             height: 1,
-            thickness: 1,
+            thickness: typeLayout ? 0.6 : 1,
             color: documentControlUiTokens.borderColor,
           ),
           Padding(
-            padding: const EdgeInsets.all(10),
+            padding: EdgeInsets.all(typeLayout ? 16 : 10),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 if (cancelVisible)
                   SizedBox(
                     height: 48,
-                    width: 84,
+                    width: typeLayout ? 112 : 84,
                     child: OutlinedButton(
                       style: OutlinedButton.styleFrom(
+                        foregroundColor: typeLayout
+                            ? documentControlUiTokens.primaryColor
+                            : null,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(4),
                         ),
@@ -1445,9 +1692,13 @@ class _DocumentControlPageState extends State<DocumentControlPage> {
                 if (cancelVisible) const SizedBox(width: 8),
                 SizedBox(
                   height: 48,
-                  width: 100,
+                  width: typeLayout ? 112 : 100,
                   child: FilledButton.icon(
                     style: FilledButton.styleFrom(
+                      backgroundColor: typeLayout
+                          ? documentControlUiTokens.primaryColor
+                          : null,
+                      foregroundColor: typeLayout ? Colors.white : null,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(4),
                       ),
@@ -1524,6 +1775,10 @@ class _DocumentControlPageState extends State<DocumentControlPage> {
   );
   InputDecoration _input(String label, [IconData? icon]) => InputDecoration(
     labelText: label,
+    labelStyle: documentControlUiTokens.inputStyle,
+    floatingLabelStyle: documentControlUiTokens.inputStyle.copyWith(
+      color: documentControlUiTokens.primaryColor,
+    ),
     prefixIcon: icon == null ? null : Icon(icon),
     filled: false,
     border: OutlineInputBorder(

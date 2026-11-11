@@ -5,6 +5,7 @@ import 'package:laoo_shared_admin_ui/laoo_shared_admin_ui.dart'
     show FilterHeightSync, filterActionHeightStyle;
 import 'package:laoo_shared_workspace_ui/laoo_shared_workspace_ui.dart';
 import '../../app/theme/laoo_design_tokens.dart';
+import '../../app/theme/laoo_typography.dart';
 import '../../app/theme/workspace_theme_presets.dart';
 import '../../core/api/api_client.dart';
 import '../../core/widgets/timed_snack_bar.dart';
@@ -630,6 +631,7 @@ class _ConfigurationDialog extends StatefulWidget {
 
 class _ConfigurationDialogState extends State<_ConfigurationDialog> {
   late String type;
+  late String levelOrderMethod;
   late TextEditingController levels;
   final positions = <String, String>{};
   final steps = <Map<String, dynamic>>[];
@@ -638,6 +640,7 @@ class _ConfigurationDialogState extends State<_ConfigurationDialog> {
   void initState() {
     super.initState();
     type = '${widget.data['type'] ?? 'MANUAL'}';
+    levelOrderMethod = '${widget.data['levelOrderMethod'] ?? 'SEQUENCE'}';
     levels = TextEditingController(text: '${widget.data['levelsUp'] ?? 1}');
     for (final p in (widget.data['positions'] as List).whereType<Map>()) {
       positions['${p['code']}'] = '${p['name']}';
@@ -691,6 +694,7 @@ class _ConfigurationDialogState extends State<_ConfigurationDialog> {
         body: {
           'type': type,
           'levelsUp': type == 'LEVEL' ? n : null,
+          'levelOrderMethod': type == 'LEVEL' ? levelOrderMethod : null,
           'steps': type == 'POSITION'
               ? steps
               : type == 'SPECIFIC'
@@ -722,6 +726,76 @@ class _ConfigurationDialogState extends State<_ConfigurationDialog> {
     }
   }
 
+  Future<void> _selectPosition(Map<String, dynamic> position) async {
+    var query = '';
+    final chosen = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, update) {
+          final matches = positions.entries
+              .where(
+                (entry) =>
+                    entry.value.toLowerCase().contains(query.toLowerCase()),
+              )
+              .toList();
+          return AlertDialog(
+            title: Row(
+              children: [
+                Icon(
+                  Icons.search,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(width: 10),
+                const Expanded(child: Text('ค้นหาตำแหน่งงาน')),
+              ],
+            ),
+            content: SizedBox(
+              width: 520,
+              height: MediaQuery.sizeOf(context).height * .55,
+              child: Column(
+                children: [
+                  const Divider(thickness: .6),
+                  const SizedBox(height: 12),
+                  TextField(
+                    autofocus: true,
+                    style: businessCardOcrUi(context).inputStyle,
+                    decoration: ocrInput(context, 'ค้นหา', icon: Icons.search),
+                    onChanged: (value) => update(() => query = value.trim()),
+                  ),
+                  const SizedBox(height: 10),
+                  Expanded(
+                    child: matches.isEmpty
+                        ? const Center(child: Text('ไม่พบตำแหน่งงาน'))
+                        : ListView.separated(
+                            itemCount: matches.length,
+                            separatorBuilder: (_, _) =>
+                                const Divider(height: 1, thickness: .6),
+                            itemBuilder: (context, index) => ListTile(
+                              title: Text(matches[index].value),
+                              onTap: () => Navigator.pop(
+                                dialogContext,
+                                matches[index].key,
+                              ),
+                            ),
+                          ),
+                  ),
+                  const Divider(thickness: .6),
+                ],
+              ),
+            ),
+            actions: [
+              OutlinedButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('ยกเลิก'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    if (mounted && chosen != null) setState(() => position['code'] = chosen);
+  }
+
   @override
   Widget build(BuildContext context) => AlertDialog(
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
@@ -751,6 +825,7 @@ class _ConfigurationDialogState extends State<_ConfigurationDialog> {
                     initialValue: type,
                     isExpanded: true,
                     style: businessCardOcrUi(context).inputStyle.copyWith(
+                      fontSize: LaooTypography.comboBox,
                       color: Theme.of(context).colorScheme.onSurface,
                     ),
                     decoration: ocrInput(context, 'รูปแบบการอนุมัติ'),
@@ -786,13 +861,49 @@ class _ConfigurationDialogState extends State<_ConfigurationDialog> {
                     _ => '',
                   }),
                   const SizedBox(height: 14),
-                  if (type == 'LEVEL')
+                  if (type == 'LEVEL') ...[
                     TextField(
                       controller: levels,
                       style: businessCardOcrUi(context).inputStyle,
                       keyboardType: TextInputType.number,
                       decoration: ocrInput(context, 'จำนวนระดับขึ้นไป'),
                     ),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      initialValue: levelOrderMethod,
+                      isExpanded: true,
+                      style: businessCardOcrUi(context).inputStyle.copyWith(
+                        fontSize: LaooTypography.comboBox,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
+                      decoration: ocrInput(
+                        context,
+                        'วิธีการจัดระดับของตำแหน่งงาน',
+                      ),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'NAME',
+                          child: Text('จัดตามชื่อ'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'SHORTCODE',
+                          child: Text('จัดตามรหัสย่อ'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'SEQUENCE',
+                          child: Text('จัดตามลำดับ'),
+                        ),
+                      ],
+                      onChanged: busy
+                          ? null
+                          : (value) =>
+                                setState(() => levelOrderMethod = value!),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'วิธีจัดระดับใช้ข้อมูลชื่อ รหัสย่อ หรือลำดับจากรหัสพื้นฐานกลุ่มระดับตำแหน่งงาน โดยเรียงจากน้อยไปมากและรายการที่อยู่หลังเป็นระดับสูงกว่า',
+                    ),
+                  ],
                   if (type == 'POSITION' || type == 'SPECIFIC') ...[
                     for (var i = 0; i < steps.length; i++) ...[
                       if (i > 0) const Divider(thickness: .6),
@@ -845,6 +956,7 @@ class _ConfigurationDialogState extends State<_ConfigurationDialog> {
     final list = (step['positions'] as List).cast<Map<String, dynamic>>();
     final t = businessCardOcrUi(context);
     final textStyle = t.inputStyle.copyWith(
+      fontSize: LaooTypography.comboBox,
       color: Theme.of(context).colorScheme.onSurface,
     );
     return Padding(
@@ -868,32 +980,23 @@ class _ConfigurationDialogState extends State<_ConfigurationDialog> {
                     ),
                     SizedBox(
                       width: constraints.maxWidth.clamp(0.0, 240.0),
-                      child: DropdownButtonFormField<String>(
-                        key: ObjectKey(list[j]),
-                        initialValue: positions.containsKey(list[j]['code'])
-                            ? list[j]['code'] as String
-                            : null,
-                        isExpanded: true,
+                      child: TextFormField(
+                        key: ValueKey(
+                          'position-${identityHashCode(list[j])}-${list[j]['code']}',
+                        ),
+                        initialValue: positions[list[j]['code']] ?? '',
+                        readOnly: true,
+                        enabled: !busy,
                         style: textStyle,
-                        decoration: ocrInput(context, 'ตำแหน่งงาน'),
-                        items: [
-                          for (final p in positions.entries)
-                            DropdownMenuItem(
-                              value: p.key,
-                              child: Text(
-                                p.value,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                        ],
-                        onChanged: busy
-                            ? null
-                            : (v) => setState(() => list[j]['code'] = v),
+                        decoration: ocrInput(context, 'ตำแหน่งงาน').copyWith(
+                          suffixIcon: Icon(Icons.search, color: t.primaryColor),
+                        ),
+                        onTap: busy ? null : () => _selectPosition(list[j]),
                       ),
                     ),
                     if (type == 'POSITION')
                       SizedBox(
-                        width: constraints.maxWidth.clamp(0.0, 180.0),
+                        width: constraints.maxWidth.clamp(0.0, 270.0),
                         child: DropdownButtonFormField<String>(
                           key: ValueKey('scope-${identityHashCode(list[j])}'),
                           initialValue:
@@ -904,7 +1007,10 @@ class _ConfigurationDialogState extends State<_ConfigurationDialog> {
                           items: const [
                             DropdownMenuItem(
                               value: 'ANY',
-                              child: Text('ทุกหน่วยงาน'),
+                              child: Text(
+                                'เจาะจงตำแหน่งงานนี้เท่านั้น',
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                             DropdownMenuItem(
                               value: 'DEPARTMENT',
@@ -934,6 +1040,17 @@ class _ConfigurationDialogState extends State<_ConfigurationDialog> {
                 ),
               ),
             ),
+            if (type == 'POSITION')
+              Padding(
+                padding: const EdgeInsets.only(left: 80, bottom: 8),
+                child: Text(switch (list[j]['unitScope']) {
+                  'DEPARTMENT' =>
+                    'ระบบจะส่งไปที่ตำแหน่งงานนี้ที่อยู่แผนกเดียวกับผู้บันทึก เช่น ผู้บันทึกอยู่แผนกบัญชี ระบบส่งไปขออนุมัติที่หัวหน้าแผนกบัญชี',
+                  'DIVISION' =>
+                    'ระบบจะส่งไปที่ตำแหน่งงานนี้ที่อยู่ฝ่ายเดียวกับผู้บันทึก เช่น ผู้บันทึกอยู่แผนกบัญชี ระบบส่งไปขออนุมัติที่ผู้จัดการฝ่ายบัญชี',
+                  _ => 'ระบบจะส่งอนุมัติไปที่ตำแหน่งงานนี้โดยตรง',
+                }),
+              ),
           ],
           if (list.isEmpty) Text('ลำดับ ${i + 1}', style: t.inputStyle),
           Padding(

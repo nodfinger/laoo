@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:laoo_provider/provider_feature.dart';
@@ -19,6 +20,7 @@ import '../models/company_setup_model.dart';
 import '../widgets/company_subscription_card.dart';
 import '../widgets/travel_access_settings_card.dart';
 import '../../presentation/widgets/support_workspace_shell.dart';
+import '../../../company/ocr/business_card_ocr_ui.dart';
 
 class CompanySetupPage extends StatefulWidget {
   const CompanySetupPage({super.key, this.additionalOnly = false});
@@ -99,14 +101,120 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
   String? _memberCoverImagePath;
   int? _companyId;
   bool _uploadingMemberCover = false;
+  Uint8List? _companyLogo;
+  bool _uploadingLogo = false;
+  String _approvalLevelOrder = 'SEQUENCE';
+  bool _approvalLevelOrderLoaded = false;
+  bool _approvalLevelOrderDirty = false;
 
   @override
   void initState() {
     super.initState();
     _loadActions();
     _load();
+    if (!widget.additionalOnly) {
+      _loadLogo();
+    }
     if (widget.additionalOnly) _loadTrainingSettings();
   }
+
+  Future<void> _loadApprovalLevelOrder() async {
+    try {
+      final result = await _api.loadApprovalLevelOrder();
+      if (!mounted || result is! Map) return;
+      final method = result['method'];
+      if (method is! String ||
+          !['NAME', 'SHORTCODE', 'SEQUENCE'].contains(method))
+        return;
+      setState(() {
+        _approvalLevelOrder = method;
+        _approvalLevelOrderLoaded = true;
+      });
+    } catch (_) {
+      if (mounted)
+        setState(() {
+          _messageIsError = true;
+          _message =
+              'โหลดวิธีจัดระดับตำแหน่งไม่สำเร็จ กรุณาตรวจสอบสิทธิ์และลองใหม่';
+        });
+    }
+  }
+
+  Future<void> _loadLogo() async {
+    try {
+      final response = await _api.loadLogo();
+      if (!mounted || response is! Map) return;
+      final value = response['image'];
+      setState(
+        () => _companyLogo = value is String && value.isNotEmpty
+            ? base64Decode(value)
+            : null,
+      );
+    } catch (_) {
+      // The logo is optional; company settings remain available if it cannot load.
+    }
+  }
+
+  Future<void> _pickLogo() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['jpg', 'jpeg', 'png'],
+      withData: true,
+    );
+    if (result == null || !mounted) return;
+    final file = result.files.single;
+    final bytes = file.bytes;
+    if (bytes == null || bytes.isEmpty || bytes.length > 3 * 1024 * 1024) {
+      setState(() {
+        _message = 'กรุณาเลือกรูป JPG หรือ PNG ขนาดไม่เกิน 3 MB';
+        _messageIsError = true;
+      });
+      return;
+    }
+    setState(() => _uploadingLogo = true);
+    try {
+      await _api.uploadLogo(file.name, bytes);
+      if (!mounted) return;
+      setState(() {
+        _companyLogo = bytes;
+        _message = 'บันทึกโลโก้เรียบร้อยแล้ว';
+        _messageIsError = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _message = error is ApiException
+            ? error.message
+            : 'บันทึกโลโก้ไม่สำเร็จ กรุณาลองใหม่';
+        _messageIsError = true;
+      });
+    } finally {
+      if (mounted) setState(() => _uploadingLogo = false);
+    }
+  }
+
+  Widget _logoField() => Column(
+    crossAxisAlignment: CrossAxisAlignment.center,
+    children: [
+      const Text('โลโก้บริษัท'),
+      const SizedBox(height: 8),
+      SizedBox(
+        width: 150,
+        height: 110,
+        child: _companyLogo == null
+            ? const Icon(Icons.image_outlined, size: 48)
+            : Image.memory(_companyLogo!, fit: BoxFit.contain),
+      ),
+      const SizedBox(height: 8),
+      OutlinedButton.icon(
+        onPressed: _canEdit && !_uploadingLogo ? _pickLogo : null,
+        icon: const Icon(Icons.image_outlined),
+        label: const Text('เลือกโลโก้'),
+      ),
+      const SizedBox(height: 4),
+      const Text('JPG, PNG ไม่เกิน 3 MB'),
+    ],
+  );
 
   Future<void> _loadActions() async {
     try {
@@ -132,6 +240,9 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
       if (!mounted) return;
       _ownerCode.text = setup.ownerCode;
       _ownerType = setup.ownerType;
+      if (!widget.additionalOnly && _ownerType == 'C') {
+        _loadApprovalLevelOrder();
+      }
       _partnerNameTh = setup.partnerNameTh;
       _partnerAddress = setup.partnerAddress;
       _partnerTelephone = setup.partnerTelephone;
@@ -325,13 +436,17 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
         if (!mounted) return;
         try {
           await _accessSettingsKey.currentState?.saveIfChanged();
+          if (_approvalLevelOrderDirty) {
+            await _api.saveApprovalLevelOrder(_approvalLevelOrder);
+            _approvalLevelOrderDirty = false;
+          }
         } catch (_) {
           if (!mounted) return;
           setState(() {
             _saving = false;
             _messageIsError = true;
             _message =
-                'บันทึกข้อมูลระบบแล้ว แต่บันทึกเงื่อนไขการเข้าถึงไม่สำเร็จ กรุณาตรวจสอบสิทธิ์และลองบันทึกใหม่';
+                'บันทึกข้อมูลระบบแล้ว แต่บันทึกเงื่อนไขส่วนกลางไม่สำเร็จ กรุณาตรวจสอบสิทธิ์และลองบันทึกใหม่';
           });
           return;
         }
@@ -770,6 +885,7 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
                               telephone: _telephone,
                               taxId: _taxId,
                               email: _email,
+                              logo: _ownerType == 'C' ? _logoField() : null,
                               businessType: _ownerType == 'C'
                                   ? _CompanyBusinessTypeField(
                                       value: _businessTypeCode,
@@ -798,6 +914,45 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
                               icon: Icons.security_outlined,
                               child: TravelAccessSettingsCard(
                                 key: _accessSettingsKey,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            _CollapsibleSection(
+                              title: 'การอนุมัติข้อมูลและเอกสาร',
+                              icon: Icons.fact_check_outlined,
+                              child: DropdownButtonFormField<String>(
+                                initialValue: _approvalLevelOrder,
+                                isExpanded: true,
+                                decoration: ocrInput(
+                                  context,
+                                  'การจัดระดับตำแหน่งงาน',
+                                ),
+                                style: businessCardOcrUi(context).inputStyle
+                                    .copyWith(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurface,
+                                    ),
+                                items: const [
+                                  DropdownMenuItem(
+                                    value: 'NAME',
+                                    child: Text('จัดตามชื่อ'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'SHORTCODE',
+                                    child: Text('จัดตามรหัสย่อ'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'SEQUENCE',
+                                    child: Text('จัดตามลำดับ'),
+                                  ),
+                                ],
+                                onChanged: _canEdit && _approvalLevelOrderLoaded
+                                    ? (value) => setState(() {
+                                        _approvalLevelOrder = value!;
+                                        _approvalLevelOrderDirty = true;
+                                      })
+                                    : null,
                               ),
                             ),
                             const SizedBox(height: 8),
@@ -1789,6 +1944,7 @@ class _CompanySetupUxForm extends StatelessWidget {
     required this.taxId,
     required this.email,
     this.businessType,
+    this.logo,
   });
 
   final TextEditingController ownerCode;
@@ -1801,6 +1957,7 @@ class _CompanySetupUxForm extends StatelessWidget {
   final TextEditingController taxId;
   final TextEditingController email;
   final Widget? businessType;
+  final Widget? logo;
 
   @override
   Widget build(BuildContext context) {
@@ -1816,6 +1973,29 @@ class _CompanySetupUxForm extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         child: LayoutBuilder(
           builder: (context, constraints) {
+            if (logo != null && constraints.maxWidth >= 850) {
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: _CompanySetupUxForm(
+                      ownerCode: ownerCode,
+                      ownerName: ownerName,
+                      titleHeader: titleHeader,
+                      customerNameTh: customerNameTh,
+                      customerNameEn: customerNameEn,
+                      address: address,
+                      telephone: telephone,
+                      taxId: taxId,
+                      email: email,
+                      businessType: businessType,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  SizedBox(width: 190, child: logo!),
+                ],
+              );
+            }
             const gap = 14.0;
             final threeColumns = constraints.maxWidth >= 900;
             final twoColumns = constraints.maxWidth >= 620;
@@ -1832,6 +2012,7 @@ class _CompanySetupUxForm extends StatelessWidget {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                if (logo != null) ...[logo!, const SizedBox(height: 16)],
                 Wrap(
                   spacing: gap,
                   runSpacing: 14,
