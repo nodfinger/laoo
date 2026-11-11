@@ -28,6 +28,13 @@ Check(visibleAgent.Contains("repair.track_own") && !visibleAgent.Contains("repai
 Check(AssistantIntentClassifier.Parse(" CREATE ") == "repair.create_own", "Create intent must map to the approved capability.");
 Check(AssistantIntentClassifier.Parse("GUIDE") == "core.menu_guide", "Menu guidance intent must map to its registered capability.");
 Check(AssistantIntentClassifier.IsMenuGuideRequest("จะใช้งาน") && AssistantIntentClassifier.IsMenuGuideRequest("คีย์ข้อมูล") && AssistantIntentClassifier.IsMenuGuideRequest("ทำงาน"), "Common general phrases must request menu guidance.");
+Check(AssistantIntentClassifier.IsSmartHelpRequest("ช่วยหน่อย") && AssistantIntentClassifier.IsSmartHelpRequest("จำ ไม่ได้") && AssistantIntentClassifier.IsSmartHelpRequest("เข้าไม่ได้"), "Short help requests work without a model.");
+Check(AssistantIntentClassifier.IsGreeting("สวัสดี") && AssistantIntentClassifier.IsGreeting("Hi AI") && AssistantIntentClassifier.IsGreeting("พร้อมยัง"), "Common greetings are handled centrally.");
+Check(!AssistantIntentClassifier.IsGreeting("สวัสดี ช่วยแจ้งซ่อมคอม") && AssistantIntentClassifier.StripGreetingPrefix("สวัสดี ช่วยแจ้งซ่อมคอม") == "ช่วยแจ้งซ่อมคอม", "Greeting with a task keeps the task for routing.");
+Check(AssistantIntentClassifier.StripGreetingPrefix("Hello ขอเช็ค PO") == "ขอเช็ค PO" && AssistantIntentClassifier.StripGreetingPrefix("ช่วยแจ้งซ่อม") == "ช่วยแจ้งซ่อม", "Prefix removal preserves task requests.");
+Check(MenuGuideSearch.Score("จะเพิ่มคนใหม่", "พนักงาน") > 0 && MenuGuideSearch.Score("หา PR", "คำขอจัดซื้อ") > 0, "Known synonyms match actual menu names.");
+Check(MenuGuideSearch.Score("หา PO", "คำขอจัดซื้อ") == 0 && MenuGuideSearch.Score("report", "คำขอจัดซื้อ") == 0, "Aliases do not match unrelated or partial English words.");
+Check(!AssistantIntentClassifier.IsSmartHelpRequest("ช่วยซ่อมเครื่องพิมพ์") && !AssistantIntentClassifier.IsSmartHelpRequest("ลบรายการนี้"), "Concrete requests must not be captured as generic help.");
 Check(!AssistantIntentClassifier.IsMenuGuideRequest("ติดตามงานซ่อมของฉัน"), "Tracking must not be mistaken for menu guidance.");
 Check(AssistantIntentClassifier.ResolveAuthorizedIntent("core.menu_guide", Array.Empty<string>()) == "denied", "Menu guidance must not bypass capability access.");
 Check(AssistantIntentClassifier.Parse("track") == "repair.track_own", "Track intent must map to the approved capability.");

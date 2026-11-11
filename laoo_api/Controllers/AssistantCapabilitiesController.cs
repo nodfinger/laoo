@@ -289,7 +289,14 @@ VALUES(@company,@code,@name,@greeting,@user);
         if (User.FindFirst("user_type")?.Value != "COMPANY_USER") return Forbid();
         var text = request.Text?.Trim();
         if (string.IsNullOrEmpty(text) || text.Length > 1000) return BadRequest(new { message = "กรุณากรอกข้อความไม่เกิน 1,000 ตัวอักษร" });
+        if (AssistantIntentClassifier.IsGreeting(text)) {
+            await using var greetingDb = new SqlConnection(configuration.GetConnectionString("LaooDatabase"));
+            await greetingDb.OpenAsync(token);
+            if (!await AiChatSettingsStore.IsEnabledAsync(greetingDb, User, token)) return Forbid();
+            return Ok(new { intent = "greeting" });
+        }
         var reviewId = capture && request.SelectedCapability is null ? await CaptureQuestion(text, token) : null;
+        text = AssistantIntentClassifier.StripGreetingPrefix(text);
         var allowed = await AllowedCapabilities(token);
         if (allowed.Count == 0) { await RecordQuestionIntent(reviewId, "none", token); return Ok(new { intent = "none" }); }
         try
@@ -324,7 +331,17 @@ VALUES(@company,@code,@name,@greeting,@user);
                 return Ok(new { intent = "ambiguous", choices = matches.Select(code => new { code, name = names[code] }) });
             }
             var exact = matches.FirstOrDefault();
-            if (exact is not null) { await RecordQuestionIntent(reviewId, exact, token); return await IntentResult(exact, allowed, token); }
+            if (exact is not null) {
+                await RecordQuestionIntent(reviewId, exact, token);
+                if (exact == AssistantCapabilities.MenuGuide.Id && AssistantIntentClassifier.IsSmartHelpRequest(text))
+                    return Ok(new { intent = exact, smartHelp = true });
+                return await IntentResult(exact, allowed, token);
+            }
+            if (allowed.Contains(AssistantCapabilities.MenuGuide.Id) && AssistantIntentClassifier.IsSmartHelpRequest(text))
+            {
+                await RecordQuestionIntent(reviewId, AssistantCapabilities.MenuGuide.Id, token);
+                return Ok(new { intent = AssistantCapabilities.MenuGuide.Id, smartHelp = true });
+            }
             if (allowed.Contains(AssistantCapabilities.MenuGuide.Id) && AssistantIntentClassifier.IsMenuGuideRequest(text))
             {
                 await RecordQuestionIntent(reviewId, AssistantCapabilities.MenuGuide.Id, token);

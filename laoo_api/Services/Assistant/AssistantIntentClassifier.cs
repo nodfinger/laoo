@@ -8,15 +8,38 @@ namespace LaooApi.Services.Assistant;
 /// <summary>Shared classification rules; no actions, database mutations or external endpoints.</summary>
 public static class AssistantIntentClassifier
 {
+    private static readonly HashSet<string> Greetings = new(StringComparer.OrdinalIgnoreCase) {
+        "สวัสดี", "สวัสดีครับ", "สวัสดีค่ะ", "สวัสดีจ้า", "หวัดดี", "หวัดดีจ้า", "ดีจ้า", "ดีครับ", "ดีงับ", "ฮัลโหล", "ฮาย", "โหล", "hello", "hi", "hi ai", "hey", "good morning", "อยู่ไหม", "อยู่ปะ", "มีใครอยู่ไหม", "ai อยู่หรือเปล่า", "พร้อมไหม", "พร้อมยัง", "คุยด้วยหน่อย", "เริ่มกันเลย", "วันนี้เริ่มงานกัน", "กลับมาแล้ว", "มาแล้ว", "มาละ", "พร้อมทำงาน", "สวัสดีอีกครั้ง"
+    };
+    public static bool IsGreeting(string text) => Greetings.Contains(Normalize(text).TrimEnd('ๆ', '!', '.', ' '));
+    public static string StripGreetingPrefix(string text)
+    {
+        var normalized = Normalize(text);
+        foreach (var greeting in Greetings.OrderByDescending(x => x.Length)) {
+            if (normalized.Length > greeting.Length && normalized.StartsWith(greeting, StringComparison.OrdinalIgnoreCase)
+                && (char.IsWhiteSpace(normalized[greeting.Length]) || normalized[greeting.Length] is ',' or '!' or 'ๆ')) {
+                var rest = normalized[greeting.Length..].TrimStart(' ', ',', '!', 'ๆ');
+                if (rest.Length > 0) return rest;
+            }
+        }
+        return normalized;
+    }
+    public static bool IsSmartHelpRequest(string text)
+    {
+        var normalized = Regex.Replace(Normalize(text), @"\s+", "");
+        return normalized is "จำไม่ได้" or "ลืมแล้ว" or "นึกไม่ออก" or "ช่วยหน่อย" or "ช่วยด้วย" or "ขอความช่วยเหลือ" or "แนะนำหน่อย" or "ทำไม่เป็น" or "ไม่รู้ทำยังไง" or "สอนหน่อย" or "เริ่มตรงไหน" or "หาไม่เจอ" or "อยู่ไหน" or "เมนูหาย" or "หาเมนูให้หน่อย" or "ทำต่อ" or "งานเมื่อวาน" or "เปิดงานเดิม" or "กลับหน้าเก่า" or "เข้าไม่ได้" or "กดไม่ได้" or "ใช้ไม่ได้" or "มีปัญหา";
+    }
     public static bool IsMenuGuideRequest(string text)
     {
         var normalized = Normalize(text);
         return normalized.Contains("คีย์", StringComparison.Ordinal) ||
             normalized.StartsWith("จะใช้งาน", StringComparison.Ordinal) ||
             normalized.StartsWith("ใช้งานระบบ", StringComparison.Ordinal) ||
+            Regex.IsMatch(normalized, @"(?:เข้า|เปิด|หา|เช็ค|ตรวจ).{0,20}(?<![A-Za-z])(?:PR|PO|GR)(?![A-Za-z])", RegexOptions.IgnoreCase) ||
+            normalized.Contains("เพิ่มคน", StringComparison.Ordinal) ||
             normalized == "ทำงาน" || normalized.StartsWith("ทำงานระบบ", StringComparison.Ordinal) ||
             ((normalized.Contains("เมนู", StringComparison.Ordinal) || normalized.Contains("ไปที่ไหน", StringComparison.Ordinal)) &&
-             (normalized.Contains("เพิ่ม", StringComparison.Ordinal) || normalized.Contains("บันทึก", StringComparison.Ordinal) || normalized.Contains("ไป", StringComparison.Ordinal)));
+             (normalized.Contains("เพิ่ม", StringComparison.Ordinal) || normalized.Contains("บันทึก", StringComparison.Ordinal) || normalized.Contains("เปิด", StringComparison.Ordinal) || normalized.Contains("ไป", StringComparison.Ordinal)));
     }
     private static readonly JsonSerializerOptions PromptJson = new()
     {

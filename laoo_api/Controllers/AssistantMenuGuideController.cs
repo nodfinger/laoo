@@ -46,13 +46,10 @@ public sealed class AssistantMenuGuideController(IConfiguration configuration) :
     {
         if (string.IsNullOrWhiteSpace(query) || query.Length > 1000) return BadRequest(new { message = "กรุณาระบุข้อมูลที่ต้องการค้นหา" });
         var input = query.Trim();
-        var items = await AllowedMenus(token, (_, _, name) => {
-            var subject = Subject(name);
-            return name.Length >= 2 && input.Contains(name, StringComparison.OrdinalIgnoreCase)
-                || subject.Length >= 2 && input.Contains(subject, StringComparison.OrdinalIgnoreCase);
-        });
+        var items = await AllowedMenus(token, (_, _, name) => MenuGuideSearch.Score(input, name) > 0);
         if (items is null) return Forbid();
-        var matches = items.GroupBy(x => (x.ProjectCode, x.MenuCode)).Select(g => g.First()).Take(20).ToArray();
+        var matches = items.GroupBy(x => (x.ProjectCode, x.MenuCode)).Select(g => g.First())
+            .OrderByDescending(x => MenuGuideSearch.Score(input, x.MenuName)).ThenBy(x => x.MenuName).Take(20).ToArray();
         return Ok(new { items = matches });
     }
 

@@ -27,10 +27,14 @@ class LoginPage extends StatefulWidget {
   State<LoginPage> createState() => _LoginPageState();
 }
 
-class _LoginPageState extends State<LoginPage> {
+class _LoginPageState extends State<LoginPage>
+    with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
+  late final AnimationController _cardAnimationController;
+  late final Animation<double> _cardFadeAnimation;
+  late final Animation<Offset> _cardSlideAnimation;
 
   HomePageConfig? _homePageConfig;
   bool _obscurePassword = true;
@@ -42,6 +46,21 @@ class _LoginPageState extends State<LoginPage> {
   @override
   void initState() {
     super.initState();
+    _cardAnimationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+    _cardFadeAnimation = CurvedAnimation(
+      parent: _cardAnimationController,
+      curve: Curves.easeOutCubic,
+    );
+    _cardSlideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.08),
+      end: Offset.zero,
+    ).chain(CurveTween(curve: Curves.easeOutCubic)).animate(
+      _cardAnimationController,
+    );
+    _cardAnimationController.forward();
     _restoreRememberedUsername();
     _loadHomePageConfig();
   }
@@ -64,6 +83,7 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   void dispose() {
+    _cardAnimationController.dispose();
     _usernameController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -279,37 +299,117 @@ class _LoginPageState extends State<LoginPage> {
         child: SafeArea(
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final isMobile = constraints.maxWidth < 600;
-              final horizontalPadding = isMobile ? 16.0 : 24.0;
-              final verticalPadding = isMobile ? 16.0 : 24.0;
+              final isMobile = constraints.maxWidth < 720;
+              final horizontalPadding = isMobile ? 16.0 : 32.0;
+              final verticalPadding = isMobile ? 18.0 : 32.0;
 
               return SingleChildScrollView(
                 padding: EdgeInsets.symmetric(
                   horizontal: horizontalPadding,
                   vertical: verticalPadding,
                 ),
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    minHeight: constraints.maxHeight - (verticalPadding * 2),
-                  ),
-                  child: Align(
-                    alignment: isMobile
-                        ? Alignment.topCenter
-                        : Alignment.center,
-                    child: Container(
-                      width: double.infinity,
-                      constraints: const BoxConstraints(maxWidth: 430),
-                      decoration: BoxDecoration(
-                        color: LaooColors.white,
-                        borderRadius: BorderRadius.circular(LaooRadius.md),
-                        boxShadow: LaooShadows.soft,
-                      ),
-                      child: _buildLoginPanel(compact: isMobile),
-                    ),
+                child: Center(
+                  child: AnimatedBuilder(
+                    animation: _cardAnimationController,
+                    builder: (context, child) {
+                      return SlideTransition(
+                        position: _cardSlideAnimation,
+                        child: FadeTransition(
+                          opacity: _cardFadeAnimation,
+                          child: Container(
+                            width: double.infinity,
+                            constraints: BoxConstraints(
+                              maxWidth: isMobile ? 480 : 1080,
+                            ),
+                            decoration: BoxDecoration(
+                              color: LaooColors.white,
+                              borderRadius: BorderRadius.circular(LaooRadius.xl),
+                              border: Border.all(
+                                color: const Color(0xFFE7F1EB),
+                                width: 1,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFF2E4E3B).withOpacity(0.12),
+                                  blurRadius: 30,
+                                  offset: const Offset(0, 18),
+                                ),
+                              ],
+                            ),
+                            child: isMobile
+                                ? Column(
+                                    children: [
+                                      _buildBrandPanel(compact: true),
+                                      _buildLoginPanel(compact: true),
+                                    ],
+                                  )
+                                : Row(
+                                    children: [
+                                      Expanded(
+                                        flex: 1,
+                                        child: _buildBrandPanel(
+                                          compact: false,
+                                        ),
+                                      ),
+                                      Expanded(
+                                        flex: 1,
+                                        child: _buildLoginPanel(
+                                          compact: false,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
               );
             },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBrandPanel({required bool compact}) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(
+        compact ? 20 : 40,
+        compact ? 20 : 36,
+        compact ? 20 : 40,
+        compact ? 20 : 36,
+      ),
+      decoration: const BoxDecoration(
+        color: LaooColors.surfaceSoft,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(LaooRadius.xl),
+          bottomLeft: Radius.circular(LaooRadius.xl),
+          topRight: Radius.circular(LaooRadius.xl),
+          bottomRight: Radius.circular(LaooRadius.xl),
+        ),
+      ),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 400),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const _LoginBrandMark(),
+              if (!compact) const SizedBox(height: 18),
+              if (!compact)
+                const Text(
+                  'Creative workspace for intelligent operations',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: LaooTypography.body,
+                    color: LaooColors.textSecondary,
+                    height: 1.5,
+                  ),
+                ),
+            ],
           ),
         ),
       ),

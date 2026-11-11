@@ -103,6 +103,48 @@ class _AssistantOverlayState extends State<_AssistantOverlay> {
   List<Map<String, dynamic>> _guideChoices = [];
   String _pronoun = 'ผู้ช่วย';
 
+  void _showSmartHelp() {
+    const options = ['หาเมนู', 'วิธีใช้งาน', 'ทำงานต่อ', 'มีปัญหาในการใช้งาน'];
+    setState(() {
+      _guideStage = 'help';
+      _guideChoices = options
+          .map((label) => <String, dynamic>{'label': label})
+          .toList();
+      _choiceOptions = List.of(options);
+      _messages.add(
+        'ได้เลย มีเรื่องไหนให้ $_pronoun ช่วย? เลือกหรือพิมพ์บอกได้เลย\n${_numbered(_choiceOptions)}',
+      );
+      _choiceMessageIndex = _messages.length - 1;
+    });
+  }
+
+  Future<void> _searchGuide(String text) async {
+    final result = await _api.get(
+      '/api/assistant/menu-guide',
+      query: {'query': text},
+    );
+    if (!mounted) return;
+    final menus = result is Map && result['items'] is List
+        ? (result['items'] as List)
+              .whereType<Map>()
+              .map((m) => Map<String, dynamic>.from(m))
+              .toList()
+        : <Map<String, dynamic>>[];
+    if (menus.isEmpty) {
+      await _askGuideSystems(notFound: true);
+      return;
+    }
+    setState(() {
+      final index = _messages.length;
+      _messages.add(
+        menus.length > 3
+            ? '$_pronoun พบหลายเมนู แสดง 3 เมนูแรกที่คุณเข้าใช้งานได้ กดชื่อเมนูหรือระบุงานให้ชัดขึ้น'
+            : '$_pronoun พบเมนูที่คุณสามารถเข้าใช้งาน กดชื่อเมนูเพื่อเปิดหน้าจอได้เลย',
+      );
+      _menuGuideResults[index] = menus.take(3).toList();
+    });
+  }
+
   Future<void> _askGuideSystems({bool notFound = false}) async {
     final response = await _api.get('/api/assistant/menu-guide/systems');
     if (!mounted) return;
@@ -621,6 +663,15 @@ class _AssistantOverlayState extends State<_AssistantOverlay> {
           });
           return;
         }
+        if (_guideStage == 'help_query') {
+          setState(() {
+            _guideStage = null;
+            _choiceOptions = [];
+            _choiceMessageIndex = null;
+          });
+          await _searchGuide(userText);
+          return;
+        }
         final number = int.tryParse(userText);
         var chosen =
             number != null && number > 0 && number <= _choiceOptions.length
@@ -636,6 +687,15 @@ class _AssistantOverlayState extends State<_AssistantOverlay> {
           ];
           if (matching.length == 1) chosen = matching.first;
         }
+        if (chosen < 0 && _guideStage == 'help') {
+          setState(() {
+            _guideStage = null;
+            _choiceOptions = [];
+            _choiceMessageIndex = null;
+          });
+          await _searchGuide(userText);
+          return;
+        }
         if (chosen < 0 || chosen >= _guideChoices.length) {
           setState(() {
             _messages.add(
@@ -646,7 +706,21 @@ class _AssistantOverlayState extends State<_AssistantOverlay> {
           return;
         }
         final choice = _guideChoices[chosen];
-        if (_guideStage == 'systems') {
+        if (_guideStage == 'help') {
+          setState(() {
+            _guideStage = 'help_query';
+            _guideChoices = [];
+            _choiceOptions = [];
+            _choiceMessageIndex = null;
+            _messages.add(
+              chosen == 2
+                  ? '$_pronoun ยังไม่มีข้อมูลรายการงานค้าง กรุณาบอกว่างานเกี่ยวกับเรื่องอะไร?'
+                  : chosen == 3
+                  ? 'กรุณาบอกชื่อเมนูหรือเรื่องที่มีปัญหา แล้ว $_pronoun จะช่วยหาเมนูที่เกี่ยวข้อง'
+                  : 'กรุณาบอกงานหรือข้อมูลที่ต้องการ แล้ว $_pronoun จะช่วยหาเมนูให้',
+            );
+          });
+        } else if (_guideStage == 'systems') {
           await _showGuideMenus('${choice['projectCode']}');
         } else {
           setState(() {
@@ -898,6 +972,14 @@ class _AssistantOverlayState extends State<_AssistantOverlay> {
       );
       if (!mounted) return;
       final intent = response is Map ? response['intent'] : null;
+      if (intent == 'greeting') {
+        setState(() {
+          _activeAgentId = null;
+          _activeAgentImage = null;
+          _messages.add('สวัสดี มีอะไรให้ $_pronoun ช่วยไหม');
+        });
+        return;
+      }
       if (intent == 'ambiguous' &&
           response is Map &&
           response['choices'] is List) {
@@ -955,36 +1037,17 @@ class _AssistantOverlayState extends State<_AssistantOverlay> {
         });
       }
       if (intent == 'core.menu_guide') {
+        if (response is Map && response['smartHelp'] == true) {
+          _showSmartHelp();
+          return;
+        }
         if (RegExp(
           r'^(จะใช้งาน|ใช้งาน|คีย์ข้อมูล|ทำงาน)$',
         ).hasMatch(text.replaceAll(RegExp(r'\s+'), ''))) {
           await _askGuideSystems();
           return;
         }
-        final result = await _api.get(
-          '/api/assistant/menu-guide',
-          query: {'query': text},
-        );
-        if (!mounted) return;
-        final menus = result is Map && result['items'] is List
-            ? (result['items'] as List)
-                  .whereType<Map>()
-                  .map((m) => Map<String, dynamic>.from(m))
-                  .toList()
-            : <Map<String, dynamic>>[];
-        if (menus.isEmpty) {
-          await _askGuideSystems(notFound: true);
-          return;
-        }
-        setState(() {
-          final index = _messages.length;
-          _messages.add(
-            menus.isEmpty
-                ? 'ไม่พบเมนูที่ตรงกับคำถามและสิทธิ์ของคุณ กรุณาระบุชื่อข้อมูลให้ชัดเจนอีกครั้ง'
-                : '$_pronoun พบเมนูที่คุณสามารถเข้าใช้งาน กดชื่อเมนูเพื่อเปิดหน้าจอได้เลย',
-          );
-          if (menus.isNotEmpty) _menuGuideResults[index] = menus;
-        });
+        await _searchGuide(text);
         return;
       }
       if (intent == 'meeting.availability') {
