@@ -298,7 +298,14 @@ VALUES(@company,@code,@name,@greeting,@user);
         var reviewId = capture && request.SelectedCapability is null ? await CaptureQuestion(text, token) : null;
         text = AssistantIntentClassifier.StripGreetingPrefix(text);
         var allowed = await AllowedCapabilities(token);
-        if (allowed.Count == 0) { await RecordQuestionIntent(reviewId, "none", token); return Ok(new { intent = "none" }); }
+        if (allowed.Count == 0)
+        {
+            var intent = AssistantIntentClassifier.IsSmartHelpRequest(text) || AssistantIntentClassifier.IsMenuGuideRequest(text)
+                ? "guide_unavailable"
+                : "none";
+            await RecordQuestionIntent(reviewId, intent, token);
+            return Ok(new { intent });
+        }
         try
         {
             var examples = new List<(string Code, IReadOnlyList<string> Examples)>();
@@ -337,15 +344,17 @@ VALUES(@company,@code,@name,@greeting,@user);
                     return Ok(new { intent = exact, smartHelp = true });
                 return await IntentResult(exact, allowed, token);
             }
-            if (allowed.Contains(AssistantCapabilities.MenuGuide.Id) && AssistantIntentClassifier.IsSmartHelpRequest(text))
+            if (AssistantIntentClassifier.IsSmartHelpRequest(text) || AssistantIntentClassifier.IsMenuGuideRequest(text))
             {
+                if (!allowed.Contains(AssistantCapabilities.MenuGuide.Id))
+                {
+                    await RecordQuestionIntent(reviewId, "guide_unavailable", token);
+                    return Ok(new { intent = "guide_unavailable" });
+                }
                 await RecordQuestionIntent(reviewId, AssistantCapabilities.MenuGuide.Id, token);
-                return Ok(new { intent = AssistantCapabilities.MenuGuide.Id, smartHelp = true });
-            }
-            if (allowed.Contains(AssistantCapabilities.MenuGuide.Id) && AssistantIntentClassifier.IsMenuGuideRequest(text))
-            {
-                await RecordQuestionIntent(reviewId, AssistantCapabilities.MenuGuide.Id, token);
-                return await IntentResult(AssistantCapabilities.MenuGuide.Id, allowed, token);
+                return AssistantIntentClassifier.IsSmartHelpRequest(text)
+                    ? Ok(new { intent = AssistantCapabilities.MenuGuide.Id, smartHelp = true })
+                    : await IntentResult(AssistantCapabilities.MenuGuide.Id, allowed, token);
             }
             // Model text is never executable and cannot provide credentials, IDs, routes, or SQL.
             var prompt = AssistantIntentClassifier.BuildPrompt(text, examples.Select(x => (object)new { code = x.Code, examples = x.Examples }));

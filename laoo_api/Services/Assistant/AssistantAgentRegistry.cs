@@ -8,8 +8,9 @@ public static class AssistantAgentRegistry
     public static readonly AssistantAgent Service = ServiceAssistantAgent.Definition;
     public static readonly AssistantAgent Stock = StockAssistantAgent.Definition;
     public static readonly AssistantAgent Meeting = MeetingAssistantAgent.Definition;
+    public static readonly AssistantAgent Travel = TravelAssistantAgent.Definition;
 
-    public static IReadOnlyList<AssistantAgent> All { get; } = Array.AsReadOnly(new[] { Service, Stock, Meeting });
+    public static IReadOnlyList<AssistantAgent> All { get; } = Array.AsReadOnly(new[] { Service, Stock, Meeting, Travel });
 
     public static IEnumerable<object> AvailableTo(IReadOnlyCollection<string> allowedCapabilities) =>
         All.Select(agent => new

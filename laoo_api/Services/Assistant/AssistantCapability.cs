@@ -15,8 +15,9 @@ public static class AssistantCapabilities
     public static readonly AssistantCapability MeetingAvailability = new("meeting.availability", "LAOO_MEETING", "21001", 1, "VIEW");
     public static readonly AssistantCapability MeetingOwnBookings = new("meeting.own_bookings", "LAOO_MEETING", "21001", 1, "VIEW");
     public static readonly AssistantCapability MeetingInvitations = new("meeting.invitations", "LAOO_MEETING", "21003", 2, "VIEW");
+    public static readonly AssistantCapability TravelClaimSummary = new("travel.claim_summary", "LAOO_MY", "66001", 4, "VIEW");
     public static readonly AssistantCapability MenuGuide = new("core.menu_guide", "LAOO_AI", "10008", 1, "VIEW");
-    public static IReadOnlyList<AssistantCapability> All { get; } = Array.AsReadOnly([CreateOwnRepair, TrackOwnRepair, RepairPartsCost, PendingRepair, SerialLookup, SerialRepairHistory, MeetingAvailability, MeetingOwnBookings, MeetingInvitations, MenuGuide]);
+    public static IReadOnlyList<AssistantCapability> All { get; } = Array.AsReadOnly([CreateOwnRepair, TrackOwnRepair, RepairPartsCost, PendingRepair, SerialLookup, SerialRepairHistory, MeetingAvailability, MeetingOwnBookings, MeetingInvitations, TravelClaimSummary, MenuGuide]);
 
     public static AssistantCapability? Find(string? id) => All.FirstOrDefault(x => x.Id == id);
 }

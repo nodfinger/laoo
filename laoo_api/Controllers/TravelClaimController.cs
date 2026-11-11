@@ -2,6 +2,7 @@ using System.Data;
 using Laoo.Shared.Contracts;
 using LaooApi.Security;
 using LaooApi.Services;
+using LaooApi.Services.Assistant;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
@@ -14,6 +15,23 @@ public sealed class TravelClaimController(IConfiguration configuration) : Contro
     private long CompanyId => RegistryControllerSupport.ClaimLong(User, "company_id");
     private long UserId => RegistryControllerSupport.ClaimLong(User, "user_id");
     private Task<bool> Allowed(SqlConnection db, string action, CancellationToken token) => CompanyProjectPermission.IsAllowedAsync(db, User, "66001", action, token);
+
+    public sealed record TravelAssistantSummaryRequest(DateOnly From, DateOnly To, string Scope, long? OrgUnitId = null, string? Category = null, bool BreakdownByCategory = true);
+    private sealed record TravelAssistantClaim(long OwnerId, long? DepartmentId, string Department,
+        long? DivisionId, string Division, decimal Fuel, decimal Lodging, decimal Toll,
+        decimal Parking, decimal Transport, decimal Total);
+    private sealed class TravelAssistantAggregate(string? unitName = null, long? unitId = null)
+    {
+        public string? UnitName { get; } = unitName;
+        public long? UnitId { get; } = unitId;
+        public int ClaimCount { get; set; }
+        public decimal Fuel { get; set; }
+        public decimal Lodging { get; set; }
+        public decimal Toll { get; set; }
+        public decimal Parking { get; set; }
+        public decimal Transport { get; set; }
+        public decimal Total { get; set; }
+    }
 
     private sealed record ClaimListRow(long Id, string Number, string Date, string Origin,
         string Destination, decimal Total, string Purpose, string WorkPlace,
@@ -134,6 +152,174 @@ WHERE o.OwnerType='C' AND o.CompanyID=@company AND o.IsActive=1 AND o.UnitType I
                 canEdit=edit && MenuDataAccessPolicy.Allows(editRule, context), canDelete=delete && MenuDataAccessPolicy.Allows(deleteRule, context) });
         }
         return Ok(new { items, vehicles, routes, rates, fares, lodging, organizations, create, edit, delete, print });
+    }
+
+    [HttpGet("assistant/options")]
+    public async Task<IActionResult> TravelAssistantOptions(CancellationToken token)
+    {
+        await using var db = await RegistryControllerSupport.Open(configuration, token);
+        if (CompanyId <= 0 || UserId <= 0 || !await AssistantCapabilityAccess.IsAllowed(db, User, AssistantCapabilities.TravelClaimSummary.Id, token) || !await Allowed(db, "VIEW", token)) return Forbid();
+        const string sql = """
+SELECT o.OrgUnitID,o.UnitType,o.NameTH
+FROM dbo.TDADOrganizationUnit o
+WHERE o.OwnerType='C' AND o.CompanyID=@company AND o.IsActive=1 AND o.UnitType IN ('DIV','DEP')
+ AND (dbo.LaooMenuDataAccessAllowed(@company,@user,0,N'66001','VIEW')=1 OR EXISTS (
+    SELECT 1 FROM dbo.TDSTTravelClaim c
+    OUTER APPLY (SELECT TOP(1) e.DepartmentOrgUnitID,e.DivisionOrgUnitID FROM dbo.TDADUserEmployee ue
+      JOIN dbo.TDADEmployee e ON e.EmployeeID=ue.EmployeeID AND e.CompanyID=ue.CompanyID AND e.IsActive=1
+      WHERE ue.UserID=c.UserID AND ue.CompanyID=c.CompanyID AND ue.IsActive=1 ORDER BY e.EmployeeID) e
+    WHERE c.CompanyID=@company AND c.UserID<>@user
+      AND ((o.UnitType='DEP' AND o.OrgUnitID=e.DepartmentOrgUnitID)
+        OR (o.UnitType='DIV' AND o.OrgUnitID=e.DivisionOrgUnitID))
+      AND dbo.LaooMenuDataAccessAllowed(@company,@user,c.UserID,N'66001','VIEW')=1
+ )) ORDER BY o.UnitType,o.NameTH,o.OrgUnitID;
+""";
+        await using var q = new SqlCommand(sql, db);
+        q.Parameters.AddWithValue("@company", CompanyId);
+        q.Parameters.AddWithValue("@user", UserId);
+        await using var reader = await q.ExecuteReaderAsync(token);
+        var departments = new List<object>();
+        var divisions = new List<object>();
+        while (await reader.ReadAsync(token))
+        {
+            var item = new { id = Convert.ToInt64(reader.GetValue(0)), name = reader.GetString(2) };
+            if (reader.GetString(1) == "DEP") departments.Add(item); else divisions.Add(item);
+        }
+        return Ok(new { departments, divisions });
+    }
+
+    [HttpPost("assistant/summary")]
+    public async Task<IActionResult> TravelAssistantSummary([FromBody] TravelAssistantSummaryRequest request, CancellationToken token)
+    {
+        if (request.From > request.To || request.To.DayNumber - request.From.DayNumber > 366)
+            return BadRequest(new { message = "กรุณาเลือกช่วงวันที่ไม่เกิน 12 เดือน" });
+        var scope = request.Scope?.Trim().ToLowerInvariant();
+        if (scope is not ("self" or "department" or "division"))
+            return BadRequest(new { message = "ไม่รู้จักขอบเขตการสรุปที่เลือก" });
+        var category = request.Category?.Trim().ToLowerInvariant();
+        if (category is not null && category is not ("fuel" or "lodging" or "toll" or "parking" or "transport"))
+            return BadRequest(new { message = "ไม่รู้จักประเภทค่าใช้จ่ายที่เลือก" });
+        if (scope == "self" && request.OrgUnitId is not null)
+            return BadRequest(new { message = "การสรุปของฉันไม่ต้องระบุหน่วยงาน" });
+
+        await using var db = await RegistryControllerSupport.Open(configuration, token);
+        if (CompanyId <= 0 || UserId <= 0 || !await AssistantCapabilityAccess.IsAllowed(db, User, AssistantCapabilities.TravelClaimSummary.Id, token) || !await Allowed(db, "VIEW", token)) return Forbid();
+        if (scope != "self" && request.OrgUnitId is not null)
+        {
+            var unitType = scope == "department" ? "DEP" : "DIV";
+            await using var unit = new SqlCommand("SELECT COUNT_BIG(*) FROM dbo.TDADOrganizationUnit o WHERE o.OrgUnitID=@id AND o.CompanyID=@company AND o.OwnerType='C' AND o.UnitType=@type AND o.IsActive=1 AND (dbo.LaooMenuDataAccessAllowed(@company,@user,0,N'66001','VIEW')=1 OR EXISTS (SELECT 1 FROM dbo.TDSTTravelClaim c OUTER APPLY (SELECT TOP(1) e.DepartmentOrgUnitID,e.DivisionOrgUnitID FROM dbo.TDADUserEmployee ue JOIN dbo.TDADEmployee e ON e.EmployeeID=ue.EmployeeID AND e.CompanyID=ue.CompanyID AND e.IsActive=1 WHERE ue.UserID=c.UserID AND ue.CompanyID=c.CompanyID AND ue.IsActive=1 ORDER BY e.EmployeeID) e WHERE c.CompanyID=@company AND c.UserID<>@user AND ((@type='DEP' AND o.OrgUnitID=e.DepartmentOrgUnitID) OR (@type='DIV' AND o.OrgUnitID=e.DivisionOrgUnitID)) AND dbo.LaooMenuDataAccessAllowed(@company,@user,c.UserID,N'66001','VIEW')=1))", db);
+            unit.Parameters.AddWithValue("@id", request.OrgUnitId!.Value);
+            unit.Parameters.AddWithValue("@company", CompanyId);
+            unit.Parameters.AddWithValue("@user", UserId);
+            unit.Parameters.AddWithValue("@type", unitType);
+            if (Convert.ToInt64(await unit.ExecuteScalarAsync(token)) == 0) return Forbid();
+        }
+
+        const string sql = """
+SELECT c.UserID,dep.OrgUnitID,COALESCE(dep.NameTH,N''),div.OrgUnitID,COALESCE(div.NameTH,N''),
+       c.FuelAmount,c.LodgingAmount,c.Toll,c.Parking,c.PublicTransport,c.TotalAmount
+FROM dbo.TDSTTravelClaim c
+OUTER APPLY (
+ SELECT TOP(1) e.DepartmentOrgUnitID,e.DivisionOrgUnitID
+ FROM dbo.TDADUserEmployee ue JOIN dbo.TDADEmployee e ON e.EmployeeID=ue.EmployeeID AND e.CompanyID=ue.CompanyID AND e.IsActive=1
+ WHERE ue.UserID=c.UserID AND ue.CompanyID=c.CompanyID AND ue.IsActive=1
+ ORDER BY ue.IsActive DESC,e.EmployeeID
+) e
+LEFT JOIN dbo.TDADOrganizationUnit dep ON dep.OrgUnitID=e.DepartmentOrgUnitID AND dep.CompanyID=c.CompanyID
+LEFT JOIN dbo.TDADOrganizationUnit div ON div.OrgUnitID=e.DivisionOrgUnitID AND div.CompanyID=c.CompanyID
+WHERE c.CompanyID=@company AND c.ClaimDate>=@from AND c.ClaimDate<DATEADD(day,1,@to)
+ AND (@self=0 OR c.UserID=@user)
+ AND (@unit IS NULL OR (@scope='department' AND e.DepartmentOrgUnitID=@unit) OR (@scope='division' AND e.DivisionOrgUnitID=@unit))
+ORDER BY c.ClaimDate,c.Id;
+""";
+        var claims = new List<TravelAssistantClaim>();
+        await using (var q = new SqlCommand(sql, db))
+        {
+            q.Parameters.AddWithValue("@company", CompanyId);
+            q.Parameters.AddWithValue("@user", UserId);
+            q.Parameters.Add("@from", SqlDbType.Date).Value = request.From.ToDateTime(TimeOnly.MinValue);
+            q.Parameters.Add("@to", SqlDbType.Date).Value = request.To.ToDateTime(TimeOnly.MinValue);
+            q.Parameters.Add("@self", SqlDbType.Bit).Value = scope == "self";
+            q.Parameters.Add("@unit", SqlDbType.BigInt).Value = (object?)request.OrgUnitId ?? DBNull.Value;
+            q.Parameters.Add("@scope", SqlDbType.NVarChar, 20).Value = scope;
+            await using var reader = await q.ExecuteReaderAsync(token);
+            while (await reader.ReadAsync(token)) claims.Add(new(
+                reader.GetInt64(0), reader.IsDBNull(1) ? null : Convert.ToInt64(reader.GetValue(1)), reader.GetString(2),
+                reader.IsDBNull(3) ? null : Convert.ToInt64(reader.GetValue(3)), reader.GetString(4),
+                reader.GetDecimal(5), reader.GetDecimal(6), reader.GetDecimal(7), reader.GetDecimal(8), reader.GetDecimal(9), reader.GetDecimal(10)));
+        }
+
+        var accessByOwner = new Dictionary<long, bool>();
+        var grand = new TravelAssistantAggregate();
+        var groups = new Dictionary<long, TravelAssistantAggregate>();
+        foreach (var claim in claims)
+        {
+            if (!accessByOwner.TryGetValue(claim.OwnerId, out var canView))
+            {
+                canView = await RowAllowed(db, null, claim.OwnerId, "VIEW", token);
+                accessByOwner[claim.OwnerId] = canView;
+            }
+            if (!canView) continue;
+            Add(claim, grand, category);
+            if (scope != "self")
+            {
+                var unitId = scope == "department" ? claim.DepartmentId : claim.DivisionId;
+                var unitName = scope == "department" ? claim.Department : claim.Division;
+                if (unitId is not null)
+                {
+                    if (!groups.TryGetValue(unitId.Value, out var group))
+                        groups[unitId.Value] = group = new TravelAssistantAggregate(unitName, unitId);
+                    Add(claim, group, category);
+                }
+            }
+        }
+        var categories = Categories(grand, category, request.BreakdownByCategory);
+        var groupResults = groups.Values.OrderByDescending(x => x.Total).Select(x => new
+        {
+            id = x.UnitId, name = x.UnitName, claimCount = x.ClaimCount, total = x.Total,
+            categories = Categories(x, category, request.BreakdownByCategory)
+        }).ToArray();
+        var selectedUnit = groupResults.FirstOrDefault(x => x.id == request.OrgUnitId);
+        return Ok(new
+        {
+            from = request.From.ToString("yyyy-MM-dd"), to = request.To.ToString("yyyy-MM-dd"), scope,
+            scopeName = scope == "self" ? "ของฉัน" : scope == "department" ? "แผนก" : "ฝ่าย",
+            unitName = selectedUnit?.name, claimCount = grand.ClaimCount, total = grand.Total,
+            categories, groups = groupResults
+        });
+
+        static void Add(TravelAssistantClaim claim, TravelAssistantAggregate aggregate, string? selectedCategory)
+        {
+            aggregate.ClaimCount++;
+            var amount = selectedCategory switch
+            {
+                "fuel" => claim.Fuel,
+                "lodging" => claim.Lodging,
+                "toll" => claim.Toll,
+                "parking" => claim.Parking,
+                "transport" => claim.Transport,
+                _ => claim.Total
+            };
+            aggregate.Total += amount;
+            if (selectedCategory is null or "fuel") aggregate.Fuel += claim.Fuel;
+            if (selectedCategory is null or "lodging") aggregate.Lodging += claim.Lodging;
+            if (selectedCategory is null or "toll") aggregate.Toll += claim.Toll;
+            if (selectedCategory is null or "parking") aggregate.Parking += claim.Parking;
+            if (selectedCategory is null or "transport") aggregate.Transport += claim.Transport;
+        }
+
+        static object[] Categories(TravelAssistantAggregate aggregate, string? selectedCategory, bool showBreakdown)
+        {
+            if (!showBreakdown && selectedCategory is null) return [];
+            var items = new (string Code, string Name, decimal Amount)[]
+            {
+                ("fuel", "ค่าน้ำมัน/ค่าเดินทาง", aggregate.Fuel), ("lodging", "ค่าที่พัก", aggregate.Lodging),
+                ("toll", "ค่าทางด่วน", aggregate.Toll), ("parking", "ค่าจอดรถ", aggregate.Parking),
+                ("transport", "ค่าขนส่งสาธารณะ", aggregate.Transport)
+            };
+            return items.Where(x => (selectedCategory is null || x.Code == selectedCategory) && x.Amount != 0)
+                .Select(x => (object)new { code = x.Code, name = x.Name, amount = x.Amount }).ToArray();
+        }
     }
 
     private async Task<bool> PrintAllowed(SqlConnection db, CancellationToken token)

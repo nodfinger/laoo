@@ -104,7 +104,14 @@ class _AssistantOverlayState extends State<_AssistantOverlay> {
   String _pronoun = 'ผู้ช่วย';
 
   void _showSmartHelp() {
-    const options = ['หาเมนู', 'วิธีใช้งาน', 'ทำงานต่อ', 'มีปัญหาในการใช้งาน'];
+    const options = [
+      'หาเมนู',
+      'เริ่มใช้งาน',
+      'เช็คสิทธิ์เมนู',
+      'จำวิธีใช้ไม่ได้',
+      'ทำงานต่อ',
+      'แจ้งปัญหา',
+    ];
     setState(() {
       _guideStage = 'help';
       _guideChoices = options
@@ -112,7 +119,7 @@ class _AssistantOverlayState extends State<_AssistantOverlay> {
           .toList();
       _choiceOptions = List.of(options);
       _messages.add(
-        'ได้เลย มีเรื่องไหนให้ $_pronoun ช่วย? เลือกหรือพิมพ์บอกได้เลย\n${_numbered(_choiceOptions)}',
+        'เลือกเรื่องที่ต้องการ หรือพิมพ์สั้น ๆ ได้เลย\n${_numbered(_choiceOptions)}',
       );
       _choiceMessageIndex = _messages.length - 1;
     });
@@ -160,8 +167,8 @@ class _AssistantOverlayState extends State<_AssistantOverlay> {
       _choiceOptions = systems.map((x) => '${x['projectName']}').toList();
       _messages.add(
         systems.isEmpty
-            ? '$_pronoun ไม่พบระบบที่คุณมีสิทธิ์เข้าถึง กรุณาติดต่อผู้ดูแลระบบ'
-            : '${notFound ? '$_pronoun ไม่พบเมนูที่ตรงกับคำถาม\n' : ''}กรุณาเลือกระบบที่ต้องการให้ $_pronoun ช่วยแนะนำ หรือพิมพ์ ยกเลิก\n${_numbered(_choiceOptions)}',
+            ? 'ยังไม่พบระบบที่คุณมีสิทธิ์เข้าใช้ กรุณาให้ผู้ดูแลตรวจสิทธิ์เมนู'
+            : '${notFound ? '$_pronoun ไม่พบเมนูนี้ในรายการที่คุณมีสิทธิ์เข้าใช้ ถ้าควรเห็นเมนูนี้ ให้ผู้ดูแลตรวจสิทธิ์ให้\n' : ''}เลือกระบบที่ต้องการ หรือพิมพ์ ยกเลิก\n${_numbered(_choiceOptions)}',
       );
       _choiceMessageIndex = systems.isEmpty ? null : _messages.length - 1;
     });
@@ -225,6 +232,13 @@ class _AssistantOverlayState extends State<_AssistantOverlay> {
   bool _serialCombined = false;
   bool _showCreateLink = false;
   bool _waitingMeetingAvailability = false;
+  String? _travelSummaryStage;
+  List<Map<String, dynamic>> _travelSummaryChoices = [];
+  Map<String, dynamic> _travelSummaryOptions = {};
+  DateTime? _travelSummaryFrom, _travelSummaryTo;
+  String _travelSummaryScope = 'self';
+  int? _travelSummaryOrgUnitId;
+  String? _travelSummaryOrgUnitName;
   String? _draftSubject, _draftDetail, _draftKey;
   List<String> _subjectOptions = [];
   List<String> _choiceOptions = [];
@@ -428,6 +442,293 @@ class _AssistantOverlayState extends State<_AssistantOverlay> {
         .where((option) => _choiceLabel(option) == text)
         .toList();
     return matches.length == 1 ? matches.single : null;
+  }
+
+  String _travelMonthLabel(DateTime date) {
+    const months = [
+      'ม.ค.',
+      'ก.พ.',
+      'มี.ค.',
+      'เม.ย.',
+      'พ.ค.',
+      'มิ.ย.',
+      'ก.ค.',
+      'ส.ค.',
+      'ก.ย.',
+      'ต.ค.',
+      'พ.ย.',
+      'ธ.ค.',
+    ];
+    return '${months[date.month - 1]} ${date.year + 543}';
+  }
+
+  List<Map<String, dynamic>> _travelMonths() {
+    final now = DateTime.now();
+    return List.generate(12, (index) {
+      final date = DateTime(now.year, now.month - index, 1);
+      return <String, dynamic>{
+        'label': _travelMonthLabel(date),
+        'value': 'month:${date.year}-${date.month.toString().padLeft(2, '0')}',
+      };
+    });
+  }
+
+  void _showTravelChoices(
+    String stage,
+    String prompt,
+    List<Map<String, dynamic>> choices,
+  ) {
+    setState(() {
+      _travelSummaryStage = stage;
+      _travelSummaryChoices = choices;
+      _choiceOptions = choices.map((choice) => '${choice['label']}').toList();
+      _messages.add(
+        '$prompt\n${_numbered(_choiceOptions)}\nพิมพ์ ยกเลิก เพื่อออก',
+      );
+      _choiceMessageIndex = _messages.length - 1;
+    });
+  }
+
+  Future<void> _startTravelSummary() async {
+    dynamic options;
+    try {
+      options = await _api.get('/api/company/travel-claims/assistant/options');
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => _messages.add(
+            'ไม่สามารถตรวจสิทธิ์หรือโหลดขอบเขตข้อมูลเบิกเดินทางได้ กรุณาลองใหม่หรือติดต่อผู้ดูแลระบบ',
+          ),
+        );
+      }
+      return;
+    }
+    if (!mounted || options is! Map) return;
+    _travelSummaryOptions = Map<String, dynamic>.from(options);
+    _travelSummaryFrom = null;
+    _travelSummaryTo = null;
+    _travelSummaryScope = 'self';
+    _travelSummaryOrgUnitId = null;
+    _travelSummaryOrgUnitName = null;
+    _showTravelChoices('period', 'เลือกช่วงเวลาที่ต้องการสรุปค่าเบิกเดินทาง', [
+      {'label': 'เดือนนี้', 'value': 'current_month'},
+      {'label': 'เดือนก่อน', 'value': 'previous_month'},
+      {'label': '3 เดือนล่าสุด', 'value': 'last_3_months'},
+      {'label': 'ปีนี้', 'value': 'current_year'},
+      {'label': 'เลือกเดือนอื่น', 'value': 'choose_month'},
+    ]);
+  }
+
+  Future<void> _handleTravelSummaryChoice(String userText) async {
+    if (userText == 'ยกเลิก') {
+      setState(() {
+        _travelSummaryStage = null;
+        _travelSummaryChoices = [];
+        _choiceOptions = [];
+        _choiceMessageIndex = null;
+        _messages.add('ยกเลิกการสรุปค่าเบิกเดินทางแล้ว');
+      });
+      return;
+    }
+    final selected = _selectedChoice(userText);
+    final index = selected == null ? -1 : _choiceOptions.indexOf(selected);
+    if (index < 0 || index >= _travelSummaryChoices.length) {
+      _showTravelChoices(
+        _travelSummaryStage!,
+        'ไม่พบตัวเลือกที่ระบุ กรุณากดรายการหรือพิมพ์หมายเลขอีกครั้ง',
+        _travelSummaryChoices,
+      );
+      return;
+    }
+    final choice = _travelSummaryChoices[index];
+    final value = '${choice['value']}';
+    switch (_travelSummaryStage) {
+      case 'period':
+        if (value == 'choose_month') {
+          _showTravelChoices(
+            'month',
+            'เลือกเดือนที่ต้องการสรุป',
+            _travelMonths(),
+          );
+          return;
+        }
+        final now = DateTime.now();
+        if (value.startsWith('month:')) {
+          final parts = value.substring(6).split('-');
+          final month = DateTime(int.parse(parts[0]), int.parse(parts[1]), 1);
+          _travelSummaryFrom = month;
+          _travelSummaryTo = DateTime(month.year, month.month + 1, 0);
+        } else if (value == 'previous_month') {
+          final month = DateTime(now.year, now.month - 1, 1);
+          _travelSummaryFrom = month;
+          _travelSummaryTo = DateTime(month.year, month.month + 1, 0);
+        } else if (value == 'last_3_months') {
+          _travelSummaryFrom = DateTime(now.year, now.month - 2, 1);
+          _travelSummaryTo = DateTime(now.year, now.month + 1, 0);
+        } else if (value == 'current_year') {
+          _travelSummaryFrom = DateTime(now.year, 1, 1);
+          _travelSummaryTo = DateTime(now.year, 12, 31);
+        } else {
+          _travelSummaryFrom = DateTime(now.year, now.month, 1);
+          _travelSummaryTo = DateTime(now.year, now.month + 1, 0);
+        }
+        _askTravelScope();
+        return;
+      case 'month':
+        final parts = value.substring(6).split('-');
+        final month = DateTime(int.parse(parts[0]), int.parse(parts[1]), 1);
+        _travelSummaryFrom = month;
+        _travelSummaryTo = DateTime(month.year, month.month + 1, 0);
+        _askTravelScope();
+        return;
+      case 'scope':
+        _travelSummaryScope = value;
+        if (value == 'self') {
+          _travelSummaryOrgUnitId = null;
+          _travelSummaryOrgUnitName = null;
+          _askTravelBreakdown();
+          return;
+        }
+        final units =
+            (value == 'department'
+                    ? _travelSummaryOptions['departments']
+                    : _travelSummaryOptions['divisions'])
+                as List? ??
+            [];
+        final rows = units.whereType<Map>().toList();
+        if (rows.isEmpty) {
+          setState(() => _messages.add('ไม่พบแผนกหรือฝ่ายที่คุณมีสิทธิ์ดู'));
+          return;
+        }
+        _showTravelChoices(
+          'unit',
+          value == 'department'
+              ? 'เลือกแผนกที่ต้องการสรุป'
+              : 'เลือกฝ่ายที่ต้องการสรุป',
+          [
+            {
+              'label': value == 'department'
+                  ? 'รวมทุกแผนกที่ฉันมีสิทธิ์ดู'
+                  : 'รวมทุกฝ่ายที่ฉันมีสิทธิ์ดู',
+              'value': 'all',
+            },
+            ...rows.map(
+              (unit) => <String, dynamic>{
+                'label': '${unit['name']}',
+                'value': '${unit['id']}',
+              },
+            ),
+          ],
+        );
+        return;
+      case 'unit':
+        _travelSummaryOrgUnitId = value == 'all' ? null : int.tryParse(value);
+        _travelSummaryOrgUnitName = value == 'all'
+            ? null
+            : '${choice['label']}';
+        _askTravelBreakdown();
+        return;
+      case 'breakdown':
+        await _loadTravelSummary(
+          category: value.startsWith('category:') ? value.substring(9) : null,
+          byCategory: value == 'breakdown' || value == 'all',
+        );
+        return;
+    }
+  }
+
+  void _askTravelScope() {
+    final choices = <Map<String, dynamic>>[
+      {'label': 'ของฉัน', 'value': 'self'},
+      if ((_travelSummaryOptions['departments'] as List? ?? []).isNotEmpty)
+        {'label': 'แผนก', 'value': 'department'},
+      if ((_travelSummaryOptions['divisions'] as List? ?? []).isNotEmpty)
+        {'label': 'ฝ่าย', 'value': 'division'},
+    ];
+    _showTravelChoices('scope', 'ต้องการดูยอดของใครหรือหน่วยงานใด?', choices);
+  }
+
+  void _askTravelBreakdown() {
+    _showTravelChoices('breakdown', 'เลือกวิธีแสดงยอดเบิก', [
+      {'label': 'ยอดรวมทั้งหมด', 'value': 'total'},
+      {'label': 'แยกตามประเภทค่าใช้จ่าย', 'value': 'breakdown'},
+      {'label': 'ค่าน้ำมัน/ค่าเดินทาง', 'value': 'category:fuel'},
+      {'label': 'ค่าห้องพัก', 'value': 'category:lodging'},
+      {'label': 'ค่าทางด่วน', 'value': 'category:toll'},
+      {'label': 'ค่าจอดรถ', 'value': 'category:parking'},
+      {'label': 'ค่าขนส่งสาธารณะ', 'value': 'category:transport'},
+    ]);
+  }
+
+  Future<void> _loadTravelSummary({
+    required String? category,
+    required bool byCategory,
+  }) async {
+    final from = _travelSummaryFrom!;
+    final to = _travelSummaryTo!;
+    dynamic result;
+    try {
+      result = await _api.post(
+        '/api/company/travel-claims/assistant/summary',
+        body: {
+          'from':
+              '${from.year.toString().padLeft(4, '0')}-${from.month.toString().padLeft(2, '0')}-${from.day.toString().padLeft(2, '0')}',
+          'to':
+              '${to.year.toString().padLeft(4, '0')}-${to.month.toString().padLeft(2, '0')}-${to.day.toString().padLeft(2, '0')}',
+          'scope': _travelSummaryScope,
+          'orgUnitId': _travelSummaryOrgUnitId,
+          'category': category,
+          'breakdownByCategory': byCategory,
+        },
+      );
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => _messages.add(
+            'สรุปยอดเบิกเดินทางไม่ได้ กรุณาลองเลือกวิธีสรุปอีกครั้ง',
+          ),
+        );
+      }
+      return;
+    }
+    if (!mounted || result is! Map) return;
+    final categories = (result['categories'] as List? ?? []).whereType<Map>();
+    final groups = (result['groups'] as List? ?? []).whereType<Map>().toList();
+    final monthText =
+        '${from.day.toString().padLeft(2, '0')}/${from.month.toString().padLeft(2, '0')}/${from.year + 543}–${to.day.toString().padLeft(2, '0')}/${to.month.toString().padLeft(2, '0')}/${to.year + 543}';
+    final scopeText = switch (_travelSummaryScope) {
+      'department' =>
+        _travelSummaryOrgUnitName == null
+            ? 'ทุกแผนกที่คุณมีสิทธิ์ดู'
+            : 'แผนก $_travelSummaryOrgUnitName',
+      'division' =>
+        _travelSummaryOrgUnitName == null
+            ? 'ทุกฝ่ายที่คุณมีสิทธิ์ดู'
+            : 'ฝ่าย $_travelSummaryOrgUnitName',
+      _ => 'ของฉัน',
+    };
+    String money(Object? amount) =>
+        (amount is num ? amount : num.tryParse('$amount') ?? 0).toStringAsFixed(
+          2,
+        );
+    final lines = <String>[
+      'สรุปเบิกค่าเดินทาง $scopeText ($monthText)',
+      'ยอดรวม ${money(result['total'])} บาท จาก ${result['claimCount'] ?? 0} รายการ',
+      for (final item in categories)
+        '• ${item['name']}: ${money(item['amount'])} บาท',
+      if (_travelSummaryScope != 'self')
+        for (final group in groups)
+          '• ${group['name']}: ${money(group['total'])} บาท (${group['claimCount']} รายการ)',
+      if ((result['claimCount'] as num? ?? 0) == 0)
+        'ไม่พบรายการเบิกในช่วงเวลานี้',
+    ];
+    setState(() {
+      _travelSummaryStage = null;
+      _travelSummaryChoices = [];
+      _choiceOptions = [];
+      _choiceMessageIndex = null;
+      _messages.add(lines.join('\n'));
+    });
   }
 
   @override
@@ -707,18 +1008,22 @@ class _AssistantOverlayState extends State<_AssistantOverlay> {
         }
         final choice = _guideChoices[chosen];
         if (_guideStage == 'help') {
+          if (chosen == 1) {
+            await _askGuideSystems();
+            return;
+          }
           setState(() {
             _guideStage = 'help_query';
             _guideChoices = [];
             _choiceOptions = [];
             _choiceMessageIndex = null;
-            _messages.add(
-              chosen == 2
-                  ? '$_pronoun ยังไม่มีข้อมูลรายการงานค้าง กรุณาบอกว่างานเกี่ยวกับเรื่องอะไร?'
-                  : chosen == 3
-                  ? 'กรุณาบอกชื่อเมนูหรือเรื่องที่มีปัญหา แล้ว $_pronoun จะช่วยหาเมนูที่เกี่ยวข้อง'
-                  : 'กรุณาบอกงานหรือข้อมูลที่ต้องการ แล้ว $_pronoun จะช่วยหาเมนูให้',
-            );
+            _messages.add(switch (chosen) {
+              2 => 'พิมพ์ชื่อเมนูที่ต้องการเข้า เช่น เบิกค่าเดินทาง',
+              3 => 'พิมพ์ชื่อเมนูหรืองานที่ต้องการทำได้เลย',
+              4 => 'บอกสั้น ๆ ว่าต้องการทำงานเรื่องอะไร',
+              5 => 'บอกชื่อเมนูหรือปัญหาที่พบ แล้วผู้ช่วยจะช่วยหาให้',
+              _ => 'พิมพ์ชื่อเมนูหรืองานที่ต้องการทำได้เลย',
+            });
           });
         } else if (_guideStage == 'systems') {
           await _showGuideMenus('${choice['projectCode']}');
@@ -731,6 +1036,10 @@ class _AssistantOverlayState extends State<_AssistantOverlay> {
           });
           await _openGuidedMenu(choice);
         }
+        return;
+      }
+      if (_travelSummaryStage != null) {
+        await _handleTravelSummaryChoice(userText);
         return;
       }
       if (_waitingMeetingAvailability) {
@@ -1059,6 +1368,10 @@ class _AssistantOverlayState extends State<_AssistantOverlay> {
         });
         return;
       }
+      if (intent == 'travel.claim_summary') {
+        await _startTravelSummary();
+        return;
+      }
       if (intent == 'meeting.own_bookings' || intent == 'meeting.invitations') {
         final result = await _api.get(
           intent == 'meeting.own_bookings'
@@ -1309,6 +1622,8 @@ class _AssistantOverlayState extends State<_AssistantOverlay> {
                   : 'เลือกหัวข้อที่ใกล้เคียง โดยกดรายการหรือพิมพ์หมายเลข:\n${_numbered(_choiceOptions)}',
             'denied' || 'none' =>
               'บัญชีหรือแพ็กเกจของคุณไม่มีสิทธิ์ใช้งานส่วนนี้ กรุณาติดต่อผู้ดูแลระบบ',
+            'guide_unavailable' =>
+              'ผู้ช่วยค้นหาเมนูยังไม่เปิดให้บัญชีนี้ กรุณาให้ผู้ดูแลเปิด “แนะนำเมนู” ในตั้งค่า AI',
             'ambiguous' =>
               'คำถามนี้ตรงกับหลายความสามารถ กรุณาระบุว่าต้องการแจ้งซ่อม ติดตามงาน หรือสอบถามต้นทุนอะไหล่',
             _ =>
@@ -1686,6 +2001,7 @@ class _AssistantOverlayState extends State<_AssistantOverlay> {
                                           _draftKey != null ||
                                           _waitingForSerial ||
                                           _waitingMeetingAvailability ||
+                                          _travelSummaryStage != null ||
                                           _pendingCapabilityQuestion != null
                                       ? null
                                       : () => _showCommands(true),
@@ -1701,6 +2017,7 @@ class _AssistantOverlayState extends State<_AssistantOverlay> {
                                           _draftKey != null ||
                                           _waitingForSerial ||
                                           _waitingMeetingAvailability ||
+                                          _travelSummaryStage != null ||
                                           _pendingCapabilityQuestion != null
                                       ? null
                                       : () => _showCommands(false),
@@ -1800,7 +2117,8 @@ class _AssistantOverlayState extends State<_AssistantOverlay> {
                             final isChoiceMessage =
                                 (_guideStage != null ||
                                     _draftKey != null ||
-                                    _pendingCapabilityQuestion != null) &&
+                                    _pendingCapabilityQuestion != null ||
+                                    _travelSummaryStage != null) &&
                                 index == _choiceMessageIndex;
                             final messageText = isChoiceMessage
                                 ? _messages[index]
@@ -1820,7 +2138,8 @@ class _AssistantOverlayState extends State<_AssistantOverlay> {
                                 index == _messages.length - 1 &&
                                 (_guideStage != null ||
                                     _waitingForSerial ||
-                                    _pendingCapabilityQuestion != null) &&
+                                    _pendingCapabilityQuestion != null ||
+                                    _travelSummaryStage != null) &&
                                 cancelPosition >= 0;
                             return Padding(
                               padding: const EdgeInsets.only(bottom: 12),
@@ -1944,10 +2263,33 @@ class _AssistantOverlayState extends State<_AssistantOverlay> {
                                                   size: 18,
                                                 ),
                                                 label: Text(
-                                                  '${entry.key + 1}. ${entry.value['projectName']} → ${entry.value['groupName']} → ${entry.value['menuName']}${entry.value['canCreate'] == true ? ' (เพิ่มข้อมูลได้)' : ' (ไม่มีสิทธิ์เพิ่ม)'}',
+                                                  '${entry.key + 1}. ${entry.value['projectName']} → ${entry.value['groupName']} → ${entry.value['menuName']} (เข้าได้ · ${entry.value['canCreate'] == true ? 'เพิ่มข้อมูลได้' : 'เพิ่มข้อมูลไม่ได้'})',
                                                 ),
                                               ),
                                             ),
+                                        if (!isUser &&
+                                            index == 0 &&
+                                            _messages.length == 1)
+                                          Wrap(
+                                            spacing: 4,
+                                            children: [
+                                              for (final prompt in const [
+                                                'เริ่มใช้',
+                                                'หาเมนู',
+                                                'เช็คสิทธิ์',
+                                                'ช่วยด้วย',
+                                              ])
+                                                ActionChip(
+                                                  label: Text(prompt),
+                                                  onPressed: _busy
+                                                      ? null
+                                                      : () {
+                                                          _text.text = prompt;
+                                                          _send();
+                                                        },
+                                                ),
+                                            ],
+                                          ),
                                         if (_favoritePrompts.containsKey(index))
                                           Wrap(
                                             children: [

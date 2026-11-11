@@ -26,18 +26,27 @@ public static class AssistantIntentClassifier
     }
     public static bool IsSmartHelpRequest(string text)
     {
-        var normalized = Regex.Replace(Normalize(text), @"\s+", "");
-        return normalized is "จำไม่ได้" or "ลืมแล้ว" or "นึกไม่ออก" or "ช่วยหน่อย" or "ช่วยด้วย" or "ขอความช่วยเหลือ" or "แนะนำหน่อย" or "ทำไม่เป็น" or "ไม่รู้ทำยังไง" or "สอนหน่อย" or "เริ่มตรงไหน" or "หาไม่เจอ" or "อยู่ไหน" or "เมนูหาย" or "หาเมนูให้หน่อย" or "ทำต่อ" or "งานเมื่อวาน" or "เปิดงานเดิม" or "กลับหน้าเก่า" or "เข้าไม่ได้" or "กดไม่ได้" or "ใช้ไม่ได้" or "มีปัญหา";
+        var normalized = Regex.Replace(Normalize(text), @"[\s\p{P}\p{S}]+", "");
+        string[] phrases = [
+            "จำไม่ได้", "ลืมแล้ว", "ลืมวิธีใช้", "นึกไม่ออก", "ช่วยหน่อย", "ช่วยด้วย", "ช่วยที", "ขอความช่วยเหลือ",
+            "แนะนำหน่อย", "ทำไม่เป็น", "ไม่รู้ทำยังไง", "สอนหน่อย", "สอนใช้", "วิธีใช้", "วิธีใช้งาน", "ใช้อย่างไร", "เริ่มตรงไหน", "เริ่มใช้งาน", "เริ่มใช้",
+            "จะใช้งาน", "อยากใช้งาน", "ขอใช้งาน", "เข้าใช้งาน", "เข้าเมนู", "เปิดเมนู", "สิทธิ์ใช้งาน", "สิทธิ์เข้าใช้", "สิทธิ์เมนู", "เช็คสิทธิ์", "ตรวจสิทธิ์", "หาเมนู", "หาหน้าจอ", "หาไม่เจอ",
+            "อยู่ไหน", "เมนูหาย", "ทำต่อ", "งานเมื่อวาน", "เปิดงานเดิม", "กลับหน้าเก่า", "เข้าไม่ได้", "กดไม่ได้", "ใช้ไม่ได้", "มีปัญหา"
+        ];
+        return phrases.Any(normalized.Contains);
     }
     public static bool IsMenuGuideRequest(string text)
     {
-        var normalized = Normalize(text);
+        var normalized = Regex.Replace(Normalize(text), @"\s+", "");
+        if (IsSmartHelpRequest(text)) return true;
         return normalized.Contains("คีย์", StringComparison.Ordinal) ||
-            normalized.StartsWith("จะใช้งาน", StringComparison.Ordinal) ||
-            normalized.StartsWith("ใช้งานระบบ", StringComparison.Ordinal) ||
+            normalized.Contains("ใช้งาน", StringComparison.Ordinal) ||
+            normalized.Contains("สิทธิ์", StringComparison.Ordinal) ||
+            normalized.Contains("เริ่มใช้", StringComparison.Ordinal) ||
             Regex.IsMatch(normalized, @"(?:เข้า|เปิด|หา|เช็ค|ตรวจ).{0,20}(?<![A-Za-z])(?:PR|PO|GR)(?![A-Za-z])", RegexOptions.IgnoreCase) ||
             normalized.Contains("เพิ่มคน", StringComparison.Ordinal) ||
-            normalized == "ทำงาน" || normalized.StartsWith("ทำงานระบบ", StringComparison.Ordinal) ||
+            normalized.Contains("ทำงาน", StringComparison.Ordinal) ||
+            normalized.Contains("หาเมนู", StringComparison.Ordinal) ||
             ((normalized.Contains("เมนู", StringComparison.Ordinal) || normalized.Contains("ไปที่ไหน", StringComparison.Ordinal)) &&
              (normalized.Contains("เพิ่ม", StringComparison.Ordinal) || normalized.Contains("บันทึก", StringComparison.Ordinal) || normalized.Contains("เปิด", StringComparison.Ordinal) || normalized.Contains("ไป", StringComparison.Ordinal)));
     }
@@ -47,7 +56,7 @@ public static class AssistantIntentClassifier
     };
 
     public static string BuildPrompt(string text, IEnumerable<object> examples) =>
-        "Classify the user's Thai request. Return exactly one word: GUIDE for asking which menu to use to enter data, TRACK for checking their own repair status, PENDING for repair requests awaiting acceptance, COST for repair parts expenses, CREATE for submitting a repair request, COMBINED for asking both repair history and warranty of a serial, HISTORY for repair history of a serial, SERIAL for looking up an equipment serial number or its warranty, MEETING_AVAILABILITY for finding an available meeting room, MEETING_BOOKINGS for the user?s own meeting bookings, MEETING_INVITATIONS for their meeting invitations, or UNKNOWN for anything else. No explanation. Additional examples by capability code: "
+        "Classify the user's Thai request. Return exactly one word: GUIDE for help starting work, finding a menu, checking which menu the user can access, or asking for help after forgetting how to use it; TRACK for checking their own repair status, PENDING for repair requests awaiting acceptance, COST for repair parts expenses, CREATE for submitting a repair request, COMBINED for asking both repair history and warranty of a serial, HISTORY for repair history of a serial, SERIAL for looking up an equipment serial number or its warranty, MEETING_AVAILABILITY for finding an available meeting room, MEETING_BOOKINGS for the user?s own meeting bookings, MEETING_INVITATIONS for their meeting invitations, TRAVEL_SUMMARY for asking totals or breakdowns of travel expense claims, or UNKNOWN for anything else. No explanation. Additional examples by capability code: "
         + JsonSerializer.Serialize(examples, PromptJson) + ". User text: " + JsonSerializer.Serialize(text, PromptJson);
 
     public static string BuildMultiPrompt(string text, IEnumerable<object> capabilities) =>
@@ -113,6 +122,7 @@ public static class AssistantIntentClassifier
         "MEETING_AVAILABILITY" => "meeting.availability",
         "MEETING_BOOKINGS" => "meeting.own_bookings",
         "MEETING_INVITATIONS" => "meeting.invitations",
+        "TRAVEL_SUMMARY" => "travel.claim_summary",
         "TRACK" => "repair.track_own",
         "PENDING" => "repair.pending",
         "SERIAL" => "stock.serial_lookup",
