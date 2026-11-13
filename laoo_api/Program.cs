@@ -19,6 +19,7 @@ using LaooDocumentControlModule;
 using LaooKnowledgeModule;
 using LaooMemoModule;
 using LaooIntranetModule;
+using LaooPurchasingModule;
 using LaooVoteModule;
 using LaooPosModule;
 using LaooSalesModule;
@@ -80,6 +81,7 @@ builder.Services
     .AddApplicationPart(typeof(KnowledgeModuleMarker).Assembly)
     .AddApplicationPart(typeof(MemoModuleMarker).Assembly)
     .AddApplicationPart(typeof(IntranetModuleMarker).Assembly)
+    .AddApplicationPart(typeof(PurchasingModuleMarker).Assembly)
     .AddApplicationPart(typeof(VoteModuleMarker).Assembly)
     .AddApplicationPart(typeof(PosModuleMarker).Assembly)
     .AddApplicationPart(typeof(SalesModuleMarker).Assembly)

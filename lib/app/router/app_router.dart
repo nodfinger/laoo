@@ -1,5 +1,6 @@
 import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
+
 import '../../features/support/document_number_format/document_number_format_page.dart';
 import '../../features/company/vendor/data/vendor_api.dart';
 import '../../core/navigation/navigation_menu_repository.dart';
@@ -7,6 +8,7 @@ import '../../features/company/vendor/pages/vendor_page.dart';
 import '../../features/company/person/pages/person_registry_page.dart';
 import '../../features/company/contact/contact_page.dart';
 import '../../features/company/ocr/business_card_ocr_settings_page.dart';
+
 import 'package:laoo_meeting/meeting_feature.dart';
 import 'package:laoo_five_s/five_s_feature.dart';
 import 'package:laoo_survey/survey_feature.dart';
@@ -24,10 +26,13 @@ import 'package:laoo_rental/rental_feature.dart';
 import 'package:laoo_booking/booking_feature.dart';
 import 'package:laoo_pet/pet_feature.dart';
 import 'package:laoo_site/site_feature.dart';
+
 import '../../features/booking_member/booking_member_portal_page.dart';
+
 import 'package:laoo_patrol/patrol_feature.dart';
 import 'package:laoo_digital_checklist/digital_checklist_feature.dart';
 import 'package:laoo_intranet/intranet_feature.dart';
+import 'package:laoo_purchasing/purchasing_feature.dart';
 import 'package:laoo_vote/vote_feature.dart';
 import 'package:laoo_pos/pos_feature.dart';
 import 'package:laoo_sales/sales_feature.dart';
@@ -227,9 +232,8 @@ final GoRouter appRouter = GoRouter(
       name: RouteNames.assetLocations,
       builder: (context, state) => const LocationPage(),
     ),
-    ...buildServiceFeatureRoutes(
-      onCreateReceiptVendor: _createReceiptVendor,
-    ).where((route) => route.path != RoutePaths.assetLocations),
+    ...buildServiceFeatureRoutes(onCreateReceiptVendor: _createReceiptVendor)
+        .where((route) => route.path != RoutePaths.assetLocations),
     ...buildVisitorFeatureRoutes(),
     ...buildTimeFeatureRoutes(),
     ...buildTrainingFeatureRoutes(),
@@ -254,6 +258,7 @@ final GoRouter appRouter = GoRouter(
     ...buildPatrolFeatureRoutes(),
     ...buildDigitalChecklistFeatureRoutes(),
     ...buildIntranetFeatureRoutes(),
+    ...buildPurchasingFeatureRoutes(),
     ...buildVoteFeatureRoutes(),
     ...buildPosFeatureRoutes(),
     ...buildSalesFeatureRoutes(),
@@ -560,12 +565,6 @@ final List<GoRoute> _placeholderRoutes = [
     name: 'mySystemPurchase',
     builder: (context, state) =>
         const MySystemPlaceholderPage(menuCode: '66002'),
-  ),
-  GoRoute(
-    path: '/company/my-system/purchase-sc-request',
-    name: 'mySystemPurchaseScRequest',
-    builder: (context, state) =>
-        const MySystemPlaceholderPage(menuCode: '69002'),
   ),
   GoRoute(
     path: '/company/my-system/legal-document-request',

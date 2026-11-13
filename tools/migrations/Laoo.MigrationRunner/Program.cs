@@ -71,6 +71,7 @@ static string ResolveMigrationDirectory(string root, string projectCode) =>
         "LAOO_PROJECT" => Path.Combine(root, "projects", "project", "database", "migrations"),
         "LAOO_DOCUMENT" => Path.Combine(root, "projects", "document_control", "database", "migrations"),
         "LAOO_INTRANET" => Path.Combine(root, "projects", "intranet", "database", "migrations"),
+        "LAOO_PURCHASING" => Path.Combine(root, "projects", "purchasing", "database", "migrations"),
         "LAOO_VOTE" => Path.Combine(root, "projects", "vote", "database", "migrations"),
         "LAOO_POS" => Path.Combine(root, "projects", "pos", "database", "migrations"),
         "LAOO_SALES" => Path.Combine(root, "projects", "sales", "database", "migrations"),

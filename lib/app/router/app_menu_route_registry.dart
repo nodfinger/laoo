@@ -27,6 +27,8 @@ import 'package:laoo_digital_checklist/digital_checklist_feature.dart'
     show DigitalChecklistRoutes;
 import 'package:laoo_intranet/intranet_feature.dart'
     show IntranetMenuCodes, IntranetRouteNames, IntranetRoutePaths;
+import 'package:laoo_purchasing/purchasing_feature.dart'
+    show PurchasingMenuCodes, PurchasingRouteNames, PurchasingRoutePaths;
 import 'package:laoo_vote/vote_feature.dart'
     show VoteMenuCodes, VoteRouteNames, VoteRoutePaths;
 import 'package:laoo_pos/pos_feature.dart' show PosRoutes;
@@ -118,11 +120,11 @@ abstract final class AppMenuRouteRegistry {
       path: '/company/my-system/purchase',
       scope: AppMenuScope.company,
     ),
-    '69002': AppMenuRouteSpec(
-      menuCode: '69002',
-      databaseRouteName: 'mySystemPurchaseScRequest',
-      goRouteName: 'mySystemPurchaseScRequest',
-      path: '/company/my-system/purchase-sc-request',
+    PurchasingMenuCodes.requests: AppMenuRouteSpec(
+      menuCode: PurchasingMenuCodes.requests,
+      databaseRouteName: PurchasingRouteNames.requests,
+      goRouteName: PurchasingRouteNames.requests,
+      path: PurchasingRoutePaths.requests,
       scope: AppMenuScope.company,
     ),
     '70002': AppMenuRouteSpec(
