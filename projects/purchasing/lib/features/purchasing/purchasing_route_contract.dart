@@ -9,11 +9,11 @@ abstract final class PurchasingMenuCodes {
 }
 
 abstract final class PurchasingRouteNames {
-  static const requests = 'purchasingRequests';
+  static const requests = 'mySystemPurchaseScRequest';
 }
 
 abstract final class PurchasingRoutePaths {
-  static const requests = '/company/purchasing-requests';
+  static const requests = '/company/my-system/purchase-sc-request';
 }
 
 abstract final class PurchasingRoutes {
