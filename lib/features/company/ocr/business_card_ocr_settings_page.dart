@@ -115,7 +115,7 @@ class _BusinessCardOcrSettingsPageState
   Widget build(BuildContext context) {
     return ValueListenableBuilder<WorkspaceThemePreset>(
       valueListenable: workspaceThemeController,
-      builder: (context, _, __) {
+      builder: (context, _, _) {
         final t = businessCardOcrUi(context);
         return SupportWorkspaceShell(
           pageTitle: _caption,

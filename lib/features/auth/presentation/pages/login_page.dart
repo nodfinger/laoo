@@ -329,7 +329,7 @@ class _LoginPageState extends State<LoginPage>
                                   BoxShadow(
                                     color: const Color(
                                       0xFF2E4E3B,
-                                    ).withOpacity(0.12),
+                                    ).withValues(alpha: 0.12),
                                     blurRadius: 30,
                                     offset: const Offset(0, 18),
                                   ),

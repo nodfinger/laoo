@@ -63,6 +63,7 @@ public sealed class EmployeeResponse
     public string? ContRelation2 { get; init; }
     public string? ContPhone2 { get; init; }
     public DateTime? StartWorkDate { get; init; }
+    public DateTime? BirthDate { get; init; }
     public bool HasImage { get; init; }
     public bool IsActive { get; init; }
     public bool IsServiceTechnician { get; init; }
@@ -112,6 +113,7 @@ public sealed class EmployeeUpsertRequest
     public string? ContRelation2 { get; init; }
     public string? ContPhone2 { get; init; }
     public DateTime? StartWorkDate { get; init; }
+    public DateTime? BirthDate { get; init; }
     public bool IsActive { get; init; } = true;
     public bool IsServiceTechnician { get; init; }
     public string? CarID1 { get; init; }

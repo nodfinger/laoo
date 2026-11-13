@@ -10,10 +10,12 @@ class IntentApi extends ApiClient {
   @override
   Future<dynamic> get(String path, {Map<String, String>? query, bool authenticated = true}) async {
     if (path == '/api/assistant/capabilities') return {'capabilities': ['repair.create_own', 'repair.serial_history']};
-    if (path == '/api/assistant/registry') return {'canEdit': true, 'rows': [
+    if (path == '/api/assistant/registry') {
+      return {'canEdit': true, 'rows': [
       {'code': 'repair.create_own', 'name': 'แจ้งงานซ่อมใหม่'},
       {'code': 'repair.serial_history', 'name': 'ประวัติซ่อมตาม Serial'},
     ]};
+    }
     throw StateError('Unexpected request');
   }
   @override

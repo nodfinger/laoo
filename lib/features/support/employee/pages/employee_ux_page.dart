@@ -96,6 +96,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
   int? filterDepartmentId;
   bool? filterIsActive;
   DateTime? startDate;
+  DateTime? birthDate;
   int? editingEmployeeId;
   final searchController = TextEditingController();
   final employeeCodeController = TextEditingController();
@@ -1876,6 +1877,10 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
                                   Expanded(child: _startDateField()),
                                 ],
                               ),
+                              if (widget.companyScoped) ...[
+                                const SizedBox(height: 12),
+                                _birthDateField(),
+                              ],
                               const SizedBox(height: 12),
                               _notificationChannelField(),
                               const SizedBox(height: 12),
@@ -2090,6 +2095,28 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
               ? 'เลือกวันที่'
               : CompanyDateFormatter.formatDateByYearFormat(
                   startDate!,
+                  companySetupController.current?.yearFormat ?? 'C',
+                ),
+        ),
+      ),
+    ),
+  );
+
+  Widget _birthDateField() => SizedBox(
+    width: double.infinity,
+    child: GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: _pickBirthDate,
+      child: InputDecorator(
+        decoration: const InputDecoration(
+          labelText: 'วันเกิด',
+          suffixIcon: Icon(Icons.cake_outlined),
+        ),
+        child: Text(
+          birthDate == null
+              ? 'เลือกวันเกิด'
+              : CompanyDateFormatter.formatDateByYearFormat(
+                  birthDate!,
                   companySetupController.current?.yearFormat ?? 'C',
                 ),
         ),
@@ -2433,6 +2460,8 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
       'carTypeCode2': carType2,
       'carOilType2': carOilType2,
       'startWorkDate': startDate?.toIso8601String().split('T').first,
+      if (widget.companyScoped)
+        'birthDate': birthDate?.toIso8601String().split('T').first,
       'isActive': isActive,
       'isServiceTechnician': _serviceEnabled && isServiceTechnician,
     };
@@ -2528,6 +2557,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
     _carImage2Name = null;
     setState(() {
       startDate = null;
+      birthDate = null;
       selectedDivisionId = null;
       selectedDepartmentId = null;
       isActive = true;
@@ -2582,6 +2612,7 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
     setState(() {
       editingEmployeeId = null;
       startDate = null;
+      birthDate = null;
       selectedDivisionId = null;
       selectedDepartmentId = null;
       isActive = true;
@@ -2663,6 +2694,10 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
       notifyInSystem = _isActive(item['notifyInSystem']);
       final rawDate = item['startWorkDate'];
       startDate = rawDate is String ? DateTime.tryParse(rawDate) : null;
+      final rawBirthDate = item['birthDate'];
+      birthDate = rawBirthDate is String
+          ? DateTime.tryParse(rawBirthDate)
+          : null;
       form = true;
     });
     try {
@@ -3133,6 +3168,22 @@ class _EmployeeUxPageState extends State<EmployeeUxPage> {
     );
     if (selected != null && mounted) {
       setState(() => startDate = selected);
+    }
+  }
+
+  Future<void> _pickBirthDate() async {
+    final selected = await showDatePicker(
+      context: context,
+      initialDate: birthDate ?? DateTime(1990, 1, 1),
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+      locale: _isBuddhistYear
+          ? const Locale('th', 'TH')
+          : const Locale('en', 'US'),
+      calendarDelegate: _EmployeeCalendarDelegate(_isBuddhistYear),
+    );
+    if (selected != null && mounted) {
+      setState(() => birthDate = selected);
     }
   }
 

@@ -14,6 +14,13 @@ class AppAuthController extends ChangeNotifier {
   AppAuthStatus _status = AppAuthStatus.checking;
   AuthSession? _session;
   String? _lastError;
+  bool _showLoginAnnouncements = false;
+
+  bool takeLoginAnnouncements() {
+    final pending = _showLoginAnnouncements;
+    _showLoginAnnouncements = false;
+    return pending;
+  }
 
   AppAuthStatus get status => _status;
   AuthSession? get session => _session;
@@ -69,6 +76,7 @@ class AppAuthController extends ChangeNotifier {
 
       _session = session;
       _status = AppAuthStatus.authenticated;
+      _showLoginAnnouncements = session.userType == 'COMPANY_USER';
       notifyListeners();
 
       return session;
@@ -111,6 +119,7 @@ class AppAuthController extends ChangeNotifier {
     await _authService.logout(preserveRememberedSession: true);
 
     _session = null;
+    _showLoginAnnouncements = false;
     _status = AppAuthStatus.unauthenticated;
     _lastError = null;
 

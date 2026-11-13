@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:laoo_shared_admin_ui/laoo_shared_admin_ui.dart'
     show FilterHeightSync, filterActionHeightStyle;
 import 'package:laoo_shared_workspace_ui/laoo_shared_workspace_ui.dart';
-import '../../../app/theme/laoo_design_tokens.dart';
 import '../../../app/theme/workspace_theme_presets.dart';
 import '../../../core/api/api_exception.dart';
 import '../../../core/navigation/navigation_menu_repository.dart';
@@ -306,7 +305,7 @@ class _ContactPageState extends State<ContactPage> {
     BuildContext context,
   ) => ValueListenableBuilder<WorkspaceThemePreset>(
     valueListenable: workspaceThemeController,
-    builder: (context, _, __) => SupportWorkspaceShell(
+    builder: (context, _, _) => SupportWorkspaceShell(
       pageTitle: _caption,
       activeMenu: 'companyContacts',
       menuScope: WorkspaceMenuScope.company,

@@ -1,0 +1,30 @@
+name: Project boundary
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  boundary:
+    name: Validate Project PR boundary
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate project ownership and migration names
+        shell: pwsh
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_REF: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: .\tools\scripts\check-project-pr-boundary.ps1 -BaseRef $env:BASE_REF -HeadRef $env:HEAD_REF
+
+      - name: Validate project bootstrap contracts
+        shell: pwsh
+        run: .\tools\scripts\test-project-bootstrap.ps1 -AllProjects

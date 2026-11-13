@@ -1,3 +1,5 @@
+> เอกสารประวัติ: ตรวจโครงสร้างและสถานะปัจจุบันจาก [README](../../README.md) และ [คู่มือโครงการ](../architecture/MONOREPO_WORKFLOW.md) ก่อนใช้
+
 # Meeting Extraction Plan
 
 สถานะเอกสาร: ดำเนิน Extraction แล้ว โดยไม่แก้ UX และไม่เปลี่ยนฐานข้อมูล

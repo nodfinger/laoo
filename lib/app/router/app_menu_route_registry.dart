@@ -125,6 +125,13 @@ abstract final class AppMenuRouteRegistry {
       path: '/company/my-system/legal-document-request',
       scope: AppMenuScope.company,
     ),
+    '70003': AppMenuRouteSpec(
+      menuCode: '70003',
+      databaseRouteName: 'mySystemLegalDocumentTypes',
+      goRouteName: 'mySystemLegalDocumentTypes',
+      path: '/company/my-system/legal-document-types',
+      scope: AppMenuScope.company,
+    ),
     '55001': AppMenuRouteSpec(
       menuCode: '55001',
       databaseRouteName: 'companyBusinessCardOcrSettings',
@@ -1013,6 +1020,13 @@ abstract final class AppMenuRouteRegistry {
       databaseRouteName: IntranetRouteNames.myIntranet,
       goRouteName: IntranetRouteNames.myIntranet,
       path: IntranetRoutePaths.myIntranet,
+      scope: AppMenuScope.company,
+    ),
+    IntranetMenuCodes.annualHolidays: AppMenuRouteSpec(
+      menuCode: IntranetMenuCodes.annualHolidays,
+      databaseRouteName: IntranetRouteNames.annualHolidays,
+      goRouteName: IntranetRouteNames.annualHolidays,
+      path: IntranetRoutePaths.annualHolidays,
       scope: AppMenuScope.company,
     ),
     IntranetMenuCodes.reports: AppMenuRouteSpec(

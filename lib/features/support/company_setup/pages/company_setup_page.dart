@@ -58,6 +58,7 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
   final _superUserName = TextEditingController();
   final _passwordCry = TextEditingController();
   final _passwordEmpDefault = TextEditingController();
+  final _homePageUrl = TextEditingController();
 
   final _api = CompanySetupApi();
   final _meetingSettingsApi = MeetingEquipmentRequestSettingsApi();
@@ -106,12 +107,18 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
   String _approvalLevelOrder = 'SEQUENCE';
   bool _approvalLevelOrderLoaded = false;
   bool _approvalLevelOrderDirty = false;
+  int _homePageDefaultMode = 1;
+  bool _homePageSettingsLoaded = false;
+  bool _homePageSettingsLoadFailed = false;
 
   @override
   void initState() {
     super.initState();
     _loadActions();
     _load();
+    if (!widget.additionalOnly && appAuthController.isLaooSupport) {
+      _loadHomePageSettings();
+    }
     if (!widget.additionalOnly) {
       _loadLogo();
     }
@@ -124,19 +131,21 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
       if (!mounted || result is! Map) return;
       final method = result['method'];
       if (method is! String ||
-          !['NAME', 'SHORTCODE', 'SEQUENCE'].contains(method))
+          !['NAME', 'SHORTCODE', 'SEQUENCE'].contains(method)) {
         return;
+      }
       setState(() {
         _approvalLevelOrder = method;
         _approvalLevelOrderLoaded = true;
       });
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _messageIsError = true;
           _message =
               'โหลดวิธีจัดระดับตำแหน่งไม่สำเร็จ กรุณาตรวจสอบสิทธิ์และลองใหม่';
         });
+      }
     }
   }
 
@@ -223,6 +232,37 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
         setState(() => _canEdit = permissions['edit'] == true);
       }
     } catch (_) {}
+  }
+
+  Future<void> _loadHomePageSettings() async {
+    try {
+      final settings = await _api.loadHomePageSettings();
+      if (!mounted) return;
+      final mode = settings['defaultMode'];
+      final parsedMode = mode is num
+          ? mode.toInt()
+          : int.tryParse('$mode') ?? 3;
+      setState(() {
+        _homePageDefaultMode = parsedMode.clamp(1, 4).toInt();
+        _homePageUrl.text = '${settings['externalUrl'] ?? ''}';
+        _homePageSettingsLoaded = true;
+      });
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _messageIsError = true;
+        _message = _apiMessage(error);
+        _homePageSettingsLoadFailed = true;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _messageIsError = true;
+        _message =
+            'ไม่สามารถอ่านรูปแบบการเริ่มต้นหน้าจอจาก appsettings.json ได้';
+        _homePageSettingsLoadFailed = true;
+      });
+    }
   }
 
   Future<void> _load() async {
@@ -340,6 +380,7 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
       _superUserName,
       _passwordCry,
       _passwordEmpDefault,
+      _homePageUrl,
     ]) {
       controller.dispose();
     }
@@ -387,6 +428,16 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
     }
     if (!(_formKey.currentState?.validate() ?? false)) {
       _basicSectionKey.currentState?.expand();
+      return;
+    }
+    if (!widget.additionalOnly &&
+        appAuthController.isLaooSupport &&
+        !_homePageSettingsLoaded) {
+      setState(() {
+        _messageIsError = true;
+        _message =
+            'ยังอ่านรูปแบบหน้าจอเริ่มต้นไม่สำเร็จ กรุณาโหลดหน้าใหม่ก่อนบันทึก';
+      });
       return;
     }
     setState(() => _saving = true);
@@ -440,13 +491,19 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
             await _api.saveApprovalLevelOrder(_approvalLevelOrder);
             _approvalLevelOrderDirty = false;
           }
+          if (!widget.additionalOnly && appAuthController.isLaooSupport) {
+            await _api.saveHomePageSettings(
+              defaultMode: _homePageDefaultMode,
+              externalUrl: _homePageUrl.text.trim(),
+            );
+          }
         } catch (_) {
           if (!mounted) return;
           setState(() {
             _saving = false;
             _messageIsError = true;
             _message =
-                'บันทึกข้อมูลระบบแล้ว แต่บันทึกเงื่อนไขส่วนกลางไม่สำเร็จ กรุณาตรวจสอบสิทธิ์และลองบันทึกใหม่';
+                'บันทึกข้อมูลระบบแล้ว แต่บันทึกรูปแบบหน้าจอเริ่มต้นหรือเงื่อนไขส่วนกลางไม่สำเร็จ กรุณาตรวจสอบสิทธิ์เขียนไฟล์ appsettings.json และลองบันทึกใหม่';
           });
           return;
         }
@@ -906,6 +963,8 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
                                 !appAuthController.isLaooSupport &&
                                 !appAuthController.isPartnerUser,
                             configurationOnly: true,
+                            startupSettingsVisible:
+                                appAuthController.isLaooSupport,
                           ),
                           const SizedBox(height: 8),
                           if (_ownerType == 'C') ...[
@@ -1032,9 +1091,18 @@ class _CompanySetupPageState extends State<CompanySetupPage> {
   Widget _legacySetupCards({
     required bool showCompanyCards,
     required bool configurationOnly,
+    bool startupSettingsVisible = false,
   }) => _LegacySetupCards(
     showCompanyCards: showCompanyCards,
     configurationOnly: configurationOnly,
+    startupSettingsVisible: startupSettingsVisible,
+    startupSettingsLoaded: _homePageSettingsLoaded,
+    startupSettingsLoadFailed: _homePageSettingsLoadFailed,
+    startupSettingsEditable: _canEdit,
+    startupMode: _homePageDefaultMode,
+    startupUrlController: _homePageUrl,
+    onStartupModeChanged: (value) =>
+        setState(() => _homePageDefaultMode = value),
     controllers: {
       'rowStd': _rowStd,
       'rowCardStd': _rowCardStd,
@@ -1400,6 +1468,13 @@ class _LegacySetupCards extends StatelessWidget {
   const _LegacySetupCards({
     required this.showCompanyCards,
     required this.configurationOnly,
+    required this.startupSettingsVisible,
+    required this.startupSettingsLoaded,
+    required this.startupSettingsLoadFailed,
+    required this.startupSettingsEditable,
+    required this.startupMode,
+    required this.startupUrlController,
+    required this.onStartupModeChanged,
     required this.controllers,
     required this.yearFormat,
     required this.onYearFormatChanged,
@@ -1414,6 +1489,13 @@ class _LegacySetupCards extends StatelessWidget {
   final Map<String, TextEditingController> controllers;
   final bool showCompanyCards;
   final bool configurationOnly;
+  final bool startupSettingsVisible;
+  final bool startupSettingsLoaded;
+  final bool startupSettingsLoadFailed;
+  final bool startupSettingsEditable;
+  final int startupMode;
+  final TextEditingController startupUrlController;
+  final ValueChanged<int> onStartupModeChanged;
   final String yearFormat;
   final ValueChanged<String> onYearFormatChanged;
   final int orgStructureType;
@@ -1465,6 +1547,51 @@ class _LegacySetupCards extends StatelessWidget {
                     value: passwordPolicyCode,
                     onChanged: onPasswordPolicyCodeChanged,
                   ),
+                  if (startupSettingsVisible && !startupSettingsLoaded)
+                    Text(
+                      startupSettingsLoadFailed
+                          ? 'อ่านรูปแบบการเริ่มต้นหน้าจอไม่สำเร็จ กรุณาตรวจสิทธิ์เข้าถึง appsettings.json'
+                          : 'กำลังอ่านรูปแบบการเริ่มต้นหน้าจอจาก appsettings.json…',
+                    ),
+                  if (startupSettingsVisible && startupSettingsLoaded) ...[
+                    DropdownButtonFormField<int>(
+                      initialValue: startupMode,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'รูปแบบการเริ่มต้นหน้าจอ',
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 1, child: Text('เข้าสู่ระบบ')),
+                        DropdownMenuItem(value: 2, child: Text('URL ภายนอก')),
+                        DropdownMenuItem(value: 3, child: Text('ค้นหาช่าง')),
+                        DropdownMenuItem(
+                          value: 4,
+                          child: Text('หน้า Intranet'),
+                        ),
+                      ],
+                      onChanged: startupSettingsEditable
+                          ? (value) {
+                              if (value != null) onStartupModeChanged(value);
+                            }
+                          : null,
+                    ),
+                    TextFormField(
+                      controller: startupUrlController,
+                      enabled: startupSettingsEditable,
+                      keyboardType: TextInputType.url,
+                      decoration: const InputDecoration(
+                        labelText: 'URL หน้าเริ่มต้น',
+                        helperText: 'ใช้เมื่อเลือกรูปแบบ URL ภายนอก',
+                      ),
+                      validator: (value) {
+                        if (startupMode != 2) return null;
+                        if (!_isValidHomePageUrl(value ?? '')) {
+                          return 'กรุณาระบุ URL แบบ HTTP หรือ HTTPS';
+                        }
+                        return null;
+                      },
+                    ),
+                  ],
                   _LegacyField(
                     label: 'จำนวนแถว List',
                     value: '30',
@@ -1674,7 +1801,10 @@ class _CollapsibleSectionState extends State<_CollapsibleSection> {
         Visibility(
           visible: _expanded,
           maintainState: true,
-          child: widget.child,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 8, 18, 12),
+            child: widget.child,
+          ),
         ),
       ],
     ),
@@ -1791,6 +1921,21 @@ class _LegacyField extends StatelessWidget {
       ),
     );
   }
+}
+
+bool _isValidHomePageUrl(String value) {
+  final raw = value.trim();
+  if (raw.isEmpty || raw.length > 2048 || raw.contains(RegExp(r'\s'))) {
+    return false;
+  }
+  final candidate = RegExp(r'^[a-zA-Z][a-zA-Z0-9+.-]*://').hasMatch(raw)
+      ? raw
+      : 'https://$raw';
+  final uri = Uri.tryParse(candidate);
+  return uri != null &&
+      const {'http', 'https'}.contains(uri.scheme.toLowerCase()) &&
+      uri.host.isNotEmpty &&
+      uri.userInfo.isEmpty;
 }
 
 class _SecretField extends StatefulWidget {

@@ -15,20 +15,24 @@ namespace LaooApi.Controllers;
 public sealed class MasterDataController : ControllerBase
 {
     private const string ScreenCode = "05002";
+    private const string LegalDocumentTypesScreenCode = "70003";
+    private const string LegalDocumentMasterGroupCode = "017";
     private const string LegacyScreenCode = "MASTER_DATA";
     private readonly IConfiguration _configuration;
 
     public MasterDataController(IConfiguration configuration) => _configuration = configuration;
 
     [HttpGet("groups")]
-    public async Task<ActionResult<List<MasterGroupResponse>>> Groups(CancellationToken cancellationToken, [FromQuery] string? lookup = null)
+    public async Task<ActionResult<List<MasterGroupResponse>>> Groups(CancellationToken cancellationToken, [FromQuery] string? lookup = null, [FromQuery] string menuCode = ScreenCode)
     {
+        if (!TryResolveScreenCode(menuCode, out var screenCode)) return Forbid();
         await using var connection = await OpenConnectionAsync(cancellationToken);
         var employeePosition = lookup == "employee-position";
         var employeeVehicle = lookup == "employee-vehicle";
         if (lookup is not null && !employeePosition && !employeeVehicle) return Forbid();
-        if (!await HasPermissionAsync(connection, "VIEW", cancellationToken) && !((employeePosition || employeeVehicle) && await CanReadEmployeePosition(connection, cancellationToken))) return Forbid();
-        var sql = employeePosition ? "SELECT Code, Name FROM dbo.TDSTMasterGroup WHERE Code=N'008' ORDER BY Name, Code;" : employeeVehicle ? "SELECT Code, Name FROM dbo.TDSTMasterGroup WHERE Code IN(N'009',N'010') ORDER BY Name, Code;" : "SELECT Code, Name FROM dbo.TDSTMasterGroup ORDER BY Name, Code;";
+        if (screenCode == LegalDocumentTypesScreenCode && lookup is not null) return Forbid();
+        if (!await HasPermissionAsync(connection, "VIEW", cancellationToken, screenCode) && !((employeePosition || employeeVehicle) && await CanReadEmployeePosition(connection, cancellationToken))) return Forbid();
+        var sql = screenCode == LegalDocumentTypesScreenCode ? "SELECT Code, Name FROM dbo.TDSTMasterGroup WHERE Code=N'017' ORDER BY Name, Code;" : employeePosition ? "SELECT Code, Name FROM dbo.TDSTMasterGroup WHERE Code=N'008' ORDER BY Name, Code;" : employeeVehicle ? "SELECT Code, Name FROM dbo.TDSTMasterGroup WHERE Code IN(N'009',N'010') ORDER BY Name, Code;" : "SELECT Code, Name FROM dbo.TDSTMasterGroup ORDER BY Name, Code;";
         await using var command = new SqlCommand(sql, connection);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         var result = new List<MasterGroupResponse>();
@@ -38,27 +42,30 @@ public sealed class MasterDataController : ControllerBase
     }
 
     [HttpGet("actions")]
-    public async Task<ActionResult<object>> Actions(CancellationToken cancellationToken)
+    public async Task<ActionResult<object>> Actions(CancellationToken cancellationToken, [FromQuery] string menuCode = ScreenCode)
     {
+        if (!TryResolveScreenCode(menuCode, out var screenCode)) return Forbid();
         await using var connection = await OpenConnectionAsync(cancellationToken);
         return Ok(new
         {
-            view = await HasPermissionAsync(connection, "VIEW", cancellationToken),
-            create = await HasPermissionAsync(connection, "CREATE", cancellationToken),
-            edit = await HasPermissionAsync(connection, "EDIT", cancellationToken),
-            delete = await HasPermissionAsync(connection, "DELETE", cancellationToken),
+            view = await HasPermissionAsync(connection, "VIEW", cancellationToken, screenCode),
+            create = await HasPermissionAsync(connection, "CREATE", cancellationToken, screenCode),
+            edit = await HasPermissionAsync(connection, "EDIT", cancellationToken, screenCode),
+            delete = await HasPermissionAsync(connection, "DELETE", cancellationToken, screenCode),
         });
     }
 
     [HttpGet]
-    public async Task<ActionResult<List<MasterDataResponse>>> List([FromQuery] string groupCode, [FromQuery] string? search, CancellationToken cancellationToken, [FromQuery] string? lookup = null)
+    public async Task<ActionResult<List<MasterDataResponse>>> List([FromQuery] string groupCode, [FromQuery] string? search, CancellationToken cancellationToken, [FromQuery] string? lookup = null, [FromQuery] string menuCode = ScreenCode)
     {
         if (string.IsNullOrWhiteSpace(groupCode)) return BadRequest(new { message = "กรุณาระบุกลุ่มข้อมูล" });
+        if (!TryResolveScreenCode(menuCode, out var screenCode)) return Forbid();
+        if (screenCode == LegalDocumentTypesScreenCode && groupCode.Trim() != LegalDocumentMasterGroupCode) return Forbid();
         await using var connection = await OpenConnectionAsync(cancellationToken);
         var employeePosition = lookup == "employee-position" && groupCode.Trim() == "008";
         var employeeVehicle = lookup == "employee-vehicle" && groupCode.Trim() is "009" or "010";
         if (lookup is not null && !employeePosition && !employeeVehicle) return Forbid();
-        if (!await HasPermissionAsync(connection, "VIEW", cancellationToken) && !((employeePosition || employeeVehicle) && await CanReadEmployeePosition(connection, cancellationToken))) return Forbid();
+        if (!await HasPermissionAsync(connection, "VIEW", cancellationToken, screenCode) && !((employeePosition || employeeVehicle) && await CanReadEmployeePosition(connection, cancellationToken))) return Forbid();
         var scope = ResolveOwner();
         const string sql = @"
 SELECT MasterCode, Name, ISNULL(Seq, 0), NULLIF(ShortCode, N'')
@@ -84,16 +91,18 @@ ORDER BY Seq, Name;";
             : Task.FromResult(false);
 
     [HttpPost("{groupCode}")]
-    public Task<ActionResult<MasterDataResponse>> Create(string groupCode, MasterDataRequest request, CancellationToken cancellationToken) => Save(groupCode, null, request, cancellationToken);
+    public Task<ActionResult<MasterDataResponse>> Create(string groupCode, MasterDataRequest request, CancellationToken cancellationToken, [FromQuery] string menuCode = ScreenCode) => Save(groupCode, null, request, cancellationToken, menuCode);
 
     [HttpPut("{groupCode}/{code}")]
-    public Task<ActionResult<MasterDataResponse>> Update(string groupCode, string code, MasterDataRequest request, CancellationToken cancellationToken) => Save(groupCode, code, request, cancellationToken);
+    public Task<ActionResult<MasterDataResponse>> Update(string groupCode, string code, MasterDataRequest request, CancellationToken cancellationToken, [FromQuery] string menuCode = ScreenCode) => Save(groupCode, code, request, cancellationToken, menuCode);
 
     [HttpDelete("{groupCode}/{code}")]
-    public async Task<IActionResult> Delete(string groupCode, string code, CancellationToken cancellationToken)
+    public async Task<IActionResult> Delete(string groupCode, string code, CancellationToken cancellationToken, [FromQuery] string menuCode = ScreenCode)
     {
+        if (!TryResolveScreenCode(menuCode, out var screenCode)) return Forbid();
+        if (screenCode == LegalDocumentTypesScreenCode && groupCode.Trim() != LegalDocumentMasterGroupCode) return Forbid();
         await using var connection = await OpenConnectionAsync(cancellationToken);
-        if (!await HasPermissionAsync(connection, "DELETE", cancellationToken)) return Forbid();
+        if (!await HasPermissionAsync(connection, "DELETE", cancellationToken, screenCode)) return Forbid();
         var scope = ResolveOwner();
         const string sql = "DELETE FROM dbo.TDSTMaster WHERE MasterGroupCode=@GroupCode AND MasterCode=@Code AND OwnerType=@OwnerType AND ISNULL(OwnerPartnerID,0)=ISNULL(@PartnerID,0) AND ISNULL(OwnerCompanyID,0)=ISNULL(@CompanyID,0);";
         await using var command = new SqlCommand(sql, connection);
@@ -104,12 +113,14 @@ ORDER BY Seq, Name;";
         return NoContent();
     }
 
-    private async Task<ActionResult<MasterDataResponse>> Save(string groupCode, string? existingCode, MasterDataRequest request, CancellationToken cancellationToken)
+    private async Task<ActionResult<MasterDataResponse>> Save(string groupCode, string? existingCode, MasterDataRequest request, CancellationToken cancellationToken, string menuCode)
     {
         if (string.IsNullOrWhiteSpace(request.Name)) return BadRequest(new { message = "กรุณาระบุชื่อ" });
+        if (!TryResolveScreenCode(menuCode, out var screenCode)) return Forbid();
+        if (screenCode == LegalDocumentTypesScreenCode && groupCode.Trim() != LegalDocumentMasterGroupCode) return Forbid();
         await using var connection = await OpenConnectionAsync(cancellationToken);
         var action = existingCode is null ? "CREATE" : "EDIT";
-        if (!await HasPermissionAsync(connection, action, cancellationToken)) return Forbid();
+        if (!await HasPermissionAsync(connection, action, cancellationToken, screenCode)) return Forbid();
         var scope = ResolveOwner();
         await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(cancellationToken);
         await using var lockCommand = new SqlCommand("DECLARE @result int; EXEC @result = sys.sp_getapplock @Resource=@resource, @LockMode='Exclusive', @LockOwner='Transaction', @LockTimeout=10000; SELECT @result;", connection, transaction);
@@ -154,8 +165,15 @@ ORDER BY Seq, Name;";
         command.Parameters.Add("@CompanyID", SqlDbType.BigInt).Value = scope.Company ?? (object)DBNull.Value;
     }
 
-    private async Task<bool> HasPermissionAsync(SqlConnection connection, string action, CancellationToken cancellationToken)
+    private static bool TryResolveScreenCode(string? menuCode, out string screenCode)
     {
+        screenCode = menuCode?.Trim() ?? string.Empty;
+        return screenCode is ScreenCode or LegalDocumentTypesScreenCode;
+    }
+
+    private async Task<bool> HasPermissionAsync(SqlConnection connection, string action, CancellationToken cancellationToken, string screenCode = ScreenCode)
+    {
+        var legacyScreenCode = screenCode == ScreenCode ? LegacyScreenCode : screenCode;
         if (string.Equals(User.FindFirstValue("user_type"), "PARTNER_USER", StringComparison.OrdinalIgnoreCase))
         {
             var partnerProject = User.FindFirstValue("project_id");
@@ -167,8 +185,8 @@ ORDER BY Seq, Name;";
             partnerCommand.Parameters.Add("@PartnerID", SqlDbType.BigInt).Value = partnerId;
             partnerCommand.Parameters.Add("@Username", SqlDbType.NVarChar, 100).Value = (User.Identity?.Name ?? User.FindFirstValue("username") ?? string.Empty).ToUpperInvariant();
             partnerCommand.Parameters.AddWithValue("@ProjectID", partnerProjectId);
-            partnerCommand.Parameters.AddWithValue("@ScreenCode", ScreenCode);
-            partnerCommand.Parameters.AddWithValue("@LegacyScreenCode", LegacyScreenCode);
+            partnerCommand.Parameters.AddWithValue("@ScreenCode", screenCode);
+            partnerCommand.Parameters.AddWithValue("@LegacyScreenCode", legacyScreenCode);
             partnerCommand.Parameters.AddWithValue("@Action", action);
             return Convert.ToBoolean(await partnerCommand.ExecuteScalarAsync(cancellationToken));
         }
@@ -180,7 +198,7 @@ ORDER BY Seq, Name;";
         var sql = User.FindFirstValue("laoo_user_id") is not null
             ? $"SELECT CASE WHEN EXISTS (SELECT 1 FROM dbo.{table} UP INNER JOIN dbo.TDADPermission P ON P.PermissionID=UP.PermissionID AND P.ProjectID=UP.ProjectID WHERE UP.{key}=@UserID AND UP.ProjectID=@ProjectID AND UP.IsAllowed=1 AND UP.IsActive=1 AND P.IsActive=1 AND P.ScreenCode IN (@ScreenCode,@LegacyScreenCode) AND P.ActionCode=@Action) THEN 1 ELSE 0 END"
             : $"SELECT CASE WHEN EXISTS (SELECT 1 FROM dbo.TDADUser U WHERE U.UserID=@UserID AND U.IsActive=1 AND U.IsCompanyAdmin=1) OR EXISTS (SELECT 1 FROM dbo.{table} UP INNER JOIN dbo.TDADPermission P ON P.PermissionID=UP.PermissionID AND P.ProjectID=UP.ProjectID WHERE UP.{key}=@UserID AND UP.ProjectID=@ProjectID AND UP.IsAllowed=1 AND UP.IsActive=1 AND P.IsActive=1 AND P.ScreenCode IN (@ScreenCode,@LegacyScreenCode) AND P.ActionCode=@Action) OR EXISTS (SELECT 1 FROM dbo.TDADUser U INNER JOIN dbo.TDADUserEmployee UE ON UE.UserID=U.UserID INNER JOIN dbo.TDADEmployeeRoleGroup ERG ON ERG.EmployeeID=UE.EmployeeID INNER JOIN dbo.TDADRoleGroup RG ON RG.RoleGroupID=ERG.RoleGroupID AND RG.ScopeType='C' AND RG.CompanyID=U.CompanyID AND RG.ProjectID=@ProjectID INNER JOIN dbo.TDADRoleGroupPermission RP ON RP.RoleGroupID=RG.RoleGroupID AND RP.ProjectID=@ProjectID AND RP.MenuCode IN (@ScreenCode,@LegacyScreenCode) AND RP.ActionCode=@Action AND RP.IsAllowed=1 WHERE U.UserID=@UserID AND U.IsActive=1 AND ERG.IsActive=1 AND ERG.EffectiveFrom<=CONVERT(date,SYSUTCDATETIME()) AND (ERG.EffectiveTo IS NULL OR ERG.EffectiveTo>=CONVERT(date,SYSUTCDATETIME()))) THEN 1 ELSE 0 END";
-        await using var command = new SqlCommand(sql, connection); command.Parameters.AddWithValue("@UserID", userId); command.Parameters.AddWithValue("@ProjectID", projectId); command.Parameters.AddWithValue("@ScreenCode", ScreenCode); command.Parameters.AddWithValue("@LegacyScreenCode", LegacyScreenCode); command.Parameters.AddWithValue("@Action", action);
+        await using var command = new SqlCommand(sql, connection); command.Parameters.AddWithValue("@UserID", userId); command.Parameters.AddWithValue("@ProjectID", projectId); command.Parameters.AddWithValue("@ScreenCode", screenCode); command.Parameters.AddWithValue("@LegacyScreenCode", legacyScreenCode); command.Parameters.AddWithValue("@Action", action);
         return Convert.ToBoolean(await command.ExecuteScalarAsync(cancellationToken));
     }
 

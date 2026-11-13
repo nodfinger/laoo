@@ -1,3 +1,5 @@
+> เอกสารประวัติ: ตรวจโครงสร้างและสถานะปัจจุบันจาก [README](../../README.md) และ [คู่มือโครงการ](../architecture/MONOREPO_WORKFLOW.md) ก่อนใช้
+
 # LAOO_TIME Approval and Self-Service Technical Plan
 
 เอกสารนี้แปลงมติใน ADR 0109–0114 เป็นแผนพัฒนา Database, API, Permission และ Integration สำหรับ `LAOO_TIME` โดยยังไม่อนุมัติให้เปลี่ยน Schema หรือกำหนด MenuCode/ScreenType แทนเจ้าของระบบ

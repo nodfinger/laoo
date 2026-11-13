@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'dart:convert';
 import 'dart:math';
 import 'package:file_picker/file_picker.dart';
@@ -1501,13 +1500,14 @@ class _TravelClaimPageState extends State<TravelClaimPage> {
                                       () async => f.bytes!,
                                     );
                                   } catch (_) {
-                                    if (mounted)
+                                    if (mounted) {
                                       showTimedSnackBar(
                                         context,
                                         message:
                                             'เปิดไฟล์ไม่สำเร็จ กรุณาลองใหม่',
                                         error: true,
                                       );
+                                    }
                                   }
                                 }
                               },
@@ -1919,22 +1919,127 @@ class _TravelClaimPageState extends State<TravelClaimPage> {
                             final r = rows[i];
                             return Card(
                               margin: EdgeInsets.zero,
-                              child: ListTile(
-                                title: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    for (final c in cols)
-                                      Text(
-                                        '${c.label}: ${displayField(r, c.key)}',
-                                      ),
-                                  ],
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: LayoutBuilder(
+                                  builder: (context, _) {
+                                    final textStyle = t.tableStyle;
+                                    Widget value(String label, String text) =>
+                                        Text.rich(
+                                          TextSpan(
+                                            style: textStyle,
+                                            children: [
+                                              TextSpan(
+                                                text: '$label: ',
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                              TextSpan(text: text),
+                                            ],
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        );
+                                    final actions = rowActions(r);
+                                    return Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              flex: 5,
+                                              child: value(
+                                                'เลขที่',
+                                                displayField(r, 'number'),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              flex: 4,
+                                              child: value(
+                                                'วันที่',
+                                                displayField(r, 'date'),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              flex: 3,
+                                              child: value(
+                                                'แผนก',
+                                                displayField(r, 'department'),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: value(
+                                                'ชื่อผู้ทำรายการ',
+                                                displayField(r, 'claimant'),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            DecoratedBox(
+                                              decoration: BoxDecoration(
+                                                color: t.primaryColor,
+                                                borderRadius:
+                                                    BorderRadius.circular(
+                                                      LaooRadius.xs,
+                                                    ),
+                                              ),
+                                              child: Padding(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 10,
+                                                      vertical: 6,
+                                                    ),
+                                                child: Text(
+                                                  'ยอดรวม ${displayField(r, 'total')}',
+                                                  style: textStyle.copyWith(
+                                                    color: Colors.white,
+                                                    fontWeight: FontWeight.w700,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: value(
+                                                'ต้นทาง',
+                                                displayField(r, 'origin'),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: value(
+                                                'ปลายทาง',
+                                                displayField(r, 'destination'),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 6),
+                                        value(
+                                          'วัตถุประสงค์',
+                                          displayField(r, 'purpose'),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Align(
+                                          alignment: Alignment.centerRight,
+                                          child: actions,
+                                        ),
+                                      ],
+                                    );
+                                  },
                                 ),
-                                leading: preferences.actionOnRight
-                                    ? null
-                                    : rowActions(r),
-                                trailing: preferences.actionOnRight
-                                    ? rowActions(r)
-                                    : null,
                               ),
                             );
                           },

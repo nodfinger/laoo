@@ -49,6 +49,7 @@ import 'core/company_setup/company_date_formatter.dart';
 import 'core/navigation/navigation_menu_repository.dart';
 import 'core/navigation/navigation_icon_resolver.dart';
 import 'core/widgets/auto_dismiss_message.dart';
+import 'core/widgets/list_display_preferences.dart';
 import 'core/widgets/timed_snack_bar.dart';
 import 'features/support/presentation/widgets/support_workspace_shell.dart';
 import 'features/visitor/visitor_slip_pdf_service.dart';
@@ -529,6 +530,7 @@ void main() {
     _buildMeetingWorkspaceShell,
     apiClientFactory: ApiClient.new,
     apiClientDisposer: (client) => (client as ApiClient).dispose(),
+    listDisplayRevision: listDisplayPreferencesRevision,
     menuTitleResolver: (menuCode, fallback) => NavigationMenuRepository()
         .resolveMenuName(menuCode: menuCode, fallback: fallback),
     messagePresenter: (context, {required message, required error}) =>

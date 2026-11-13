@@ -1,5 +1,7 @@
 # LAOO Multi-Machine Center-Host Runbook
 
+> บันทึกการทำงานหลายเครื่องเดิม: สถานะการมอบหมายเครื่องอาจเปลี่ยนตามคำสั่งล่าสุด ตรวจ `AGENTS.md` และผู้ใช้ก่อนนำชื่อเครื่องหรือขอบเขตเดิมมาใช้
+
 ## Ownership
 
 | Machine role | Owned source |
@@ -10,8 +12,7 @@
 
 Every machine clones `nodfinger/laoo` to `C:\laooplatform\laoo`. Never
 share a live working tree, `.git`, `.dart_tool`, `build`, `bin`, or `obj`.
-Copy the matching `local.machine.*.example.json` to ignored
-`local.machine.json`. The `mon` machine is the temporary integration owner for
+Create the ignored `local.machine.json` using the examples below and the current machine assignment. The `mon` machine is the temporary integration owner for
 all Projects. An `unassigned` machine cannot code or run Project verification
 until its role and ownership are explicitly assigned.
 
@@ -172,6 +173,35 @@ lock `LAOO_SCHEMA_MIGRATION`. New migration names use
 all machines to sync first. Use backward-compatible expansion before feature
 code and defer destructive contraction until every project is updated.
 
+## GitHub Project PR workflow
+
+The repository remains a single Monorepo. After a Project Bootstrap PR reaches
+`main`, the Project machine may open feature branches such as
+`expense/feature-travel-summary` and change only `projects/expense/**`.
+
+`.github/CODEOWNERS` assigns review ownership by Project. The Project boundary
+workflow rejects a PR that changes another Project, Root, Shared Package,
+Core API, or database path. Those changes must be split into a compatible Core
+Impact PR before the Project PR is reopened.
+
+Project PRs may add Project-owned pages, business rules, APIs, DTOs, tests and
+migrations without a new Core approval. A Project may activate only the
+MenuCode/Route contracts already declared by its Bootstrap. New public menu,
+route, permission, shared field or Core schema work remains a separate Core PR.
+
+The PR must declare Green/Yellow/Red impact, owned paths, consuming Projects,
+and the prerequisite Core commit when applicable. CI checks the boundary,
+Bootstrap contract, duplicate routes/MenuCodes, migration filename prefix and
+Project tests before review.
+
+## Project ownership after Bootstrap
+
+The Center machine owns Core, Root composition, shared packages, security and
+the Bootstrap contract. A Project machine owns its Project directory and its
+Project API/data modules. Core read data is consumed through the published
+contract; Project data is written through Project APIs. Project code must not
+modify Core tables directly.
+
 ## Visitor status
 
 Visitor is a package/module scaffold. Its 22 route contracts remain marked
@@ -190,5 +220,4 @@ Sales machine example:
 }
 ```
 
-Copy `local.machine.sales.example.json` to ignored `local.machine.json` on that
-machine. Never commit a real `local.machine.json`.
+Create the ignored `local.machine.json` using the example above on that machine. Never commit a real `local.machine.json`.

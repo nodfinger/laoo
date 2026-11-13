@@ -38,6 +38,11 @@ class MasterDataPage extends StatefulWidget {
     required this.menuScope,
     this.embedded = false,
     this.masterGroupCode,
+    this.menuCode = '05002',
+    this.pageTitle,
+    this.favoriteKey,
+    this.activeMenu = 'masterData',
+    this.showGroupFilter = false,
     this.api,
     this.onSelected,
     this.simpleWhenReadOnly = false,
@@ -46,6 +51,11 @@ class MasterDataPage extends StatefulWidget {
   final WorkspaceMenuScope menuScope;
   final bool embedded;
   final String? masterGroupCode;
+  final String menuCode;
+  final String? pageTitle;
+  final String? favoriteKey;
+  final String activeMenu;
+  final bool showGroupFilter;
   final MasterDataApi? api;
   final ValueChanged<String>? onSelected;
   final bool simpleWhenReadOnly;
@@ -106,7 +116,7 @@ class _MasterDataPageState extends State<MasterDataPage> {
   @override
   void initState() {
     super.initState();
-    _api = widget.api ?? MasterDataApi();
+    _api = widget.api ?? MasterDataApi(menuCode: widget.menuCode);
     _selectedGroup = widget.masterGroupCode ?? '001';
     _loadActions();
     _load();
@@ -119,7 +129,9 @@ class _MasterDataPageState extends State<MasterDataPage> {
 
   Future<void> _loadDisplayPreferences() async {
     try {
-      final result = await _displayApi.get('/api/user-list-display/05002');
+      final result = await _displayApi.get(
+        '/api/user-list-display/${widget.menuCode}',
+      );
       if (mounted && result is Map) {
         final value = Map<String, dynamic>.from(result);
         setState(
@@ -492,14 +504,14 @@ class _MasterDataPageState extends State<MasterDataPage> {
     if (_loading || (widget.simpleWhenReadOnly && !_actionsLoaded)) {
       return _wrapWorkspace(
         menuScope: widget.menuScope,
-        pageTitle: 'รหัสพื้นฐาน',
+        pageTitle: widget.pageTitle ?? 'รหัสพื้นฐาน',
         child: const Center(child: CircularProgressIndicator()),
       );
     }
     if (_groups.isEmpty) {
       return _wrapWorkspace(
         menuScope: widget.menuScope,
-        pageTitle: 'รหัสพื้นฐาน',
+        pageTitle: widget.pageTitle ?? 'รหัสพื้นฐาน',
         child: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -572,7 +584,7 @@ class _MasterDataPageState extends State<MasterDataPage> {
     final editing = _editing;
     return _wrapWorkspace(
       menuScope: widget.menuScope,
-      pageTitle: 'รหัสพื้นฐาน > ${_group.name}',
+      pageTitle: widget.pageTitle ?? 'รหัสพื้นฐาน > ${_group.name}',
       child: Stack(
         children: [
           _buildList(context),
@@ -612,7 +624,7 @@ class _MasterDataPageState extends State<MasterDataPage> {
     return SupportWorkspaceShell(
       menuScope: menuScope,
       pageTitle: pageTitle,
-      activeMenu: 'masterData',
+      activeMenu: widget.activeMenu,
       child: child,
     );
   }
@@ -658,8 +670,8 @@ class _MasterDataPageState extends State<MasterDataPage> {
                   builder: (context, constraints) {
                     final compact = constraints.maxWidth < 600;
                     final title = WorkspacePageTitle(
-                      title: 'รหัสพื้นฐาน > ${_group.name}',
-                      favoriteKey: '05002',
+                      title: widget.pageTitle ?? 'รหัสพื้นฐาน > ${_group.name}',
+                      favoriteKey: widget.favoriteKey ?? widget.menuCode,
                     );
                     final addButton = _canCreate
                         ? FilledButton.icon(
@@ -750,7 +762,10 @@ class _MasterDataPageState extends State<MasterDataPage> {
                     builder: (context, searchKey, height) {
                       final compact =
                           constraints.maxWidth <
-                          (widget.masterGroupCode == null ? 850 : 600);
+                          (widget.masterGroupCode == null ||
+                                  widget.showGroupFilter
+                              ? 850
+                              : 600);
                       final search = TextField(
                         key: searchKey,
                         controller: _searchController,
@@ -777,10 +792,14 @@ class _MasterDataPageState extends State<MasterDataPage> {
                       );
                       final group = Semantics(
                         button: true,
-                        enabled: widget.masterGroupCode == null,
+                        enabled:
+                            widget.masterGroupCode == null ||
+                            widget.showGroupFilter,
                         label: 'ค้นหากลุ่มข้อมูล',
                         child: InkWell(
-                          onTap: widget.masterGroupCode == null
+                          onTap:
+                              widget.masterGroupCode == null ||
+                                  widget.showGroupFilter
                               ? () async {
                                   final selected = await showDialog<String>(
                                     context: context,
@@ -804,7 +823,9 @@ class _MasterDataPageState extends State<MasterDataPage> {
                           child: InputDecorator(
                             decoration: InputDecoration(
                               labelText: 'กลุ่มข้อมูล',
-                              enabled: widget.masterGroupCode == null,
+                              enabled:
+                                  widget.masterGroupCode == null ||
+                                  widget.showGroupFilter,
                               suffixIcon: const Icon(Icons.search),
                             ),
                             child: LaooComboBoxText(_group.name),
@@ -833,6 +854,11 @@ class _MasterDataPageState extends State<MasterDataPage> {
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
+                            if (widget.masterGroupCode == null ||
+                                widget.showGroupFilter) ...[
+                              group,
+                              const SizedBox(height: 8),
+                            ],
                             search,
                             const SizedBox(height: 8),
                             Row(
@@ -842,25 +868,22 @@ class _MasterDataPageState extends State<MasterDataPage> {
                                 Expanded(child: clearButton),
                               ],
                             ),
-                            if (widget.masterGroupCode == null) ...[
-                              const SizedBox(height: 8),
-                              group,
-                            ],
                           ],
                         );
                       }
 
                       return Row(
                         children: [
+                          if (widget.masterGroupCode == null ||
+                              widget.showGroupFilter) ...[
+                            SizedBox(width: 280, child: group),
+                            const SizedBox(width: 8),
+                          ],
                           SizedBox(width: 280, child: search),
                           const SizedBox(width: 8),
                           searchButton,
                           const SizedBox(width: 8),
                           clearButton,
-                          if (widget.masterGroupCode == null) ...[
-                            const SizedBox(width: 8),
-                            SizedBox(width: 280, child: group),
-                          ],
                         ],
                       );
                     },
@@ -1134,6 +1157,7 @@ class _MasterDataPageState extends State<MasterDataPage> {
   Widget _buildForm(BuildContext context, _MasterRow row) {
     return _MasterDataForm(
       row: row,
+      pageTitle: widget.pageTitle ?? 'รหัสพื้นฐาน',
       groupName: _group.name,
       isAdding: _isAdding,
       message: _message,
@@ -1268,6 +1292,7 @@ class _PaginationBar extends StatelessWidget {
 class _MasterDataForm extends StatefulWidget {
   const _MasterDataForm({
     required this.row,
+    required this.pageTitle,
     required this.groupName,
     required this.isAdding,
     this.message,
@@ -1278,6 +1303,7 @@ class _MasterDataForm extends StatefulWidget {
     required this.canSave,
   });
   final _MasterRow row;
+  final String pageTitle;
   final String groupName;
   final bool isAdding;
   final String? message;
@@ -1394,7 +1420,7 @@ class _MasterDataFormState extends State<_MasterDataForm> {
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          'รหัสพื้นฐาน > ${widget.groupName} > ${widget.isAdding ? 'เพิ่ม' : 'แก้ไข'}',
+                          '${widget.pageTitle} > ${widget.groupName} > ${widget.isAdding ? 'เพิ่ม' : 'แก้ไข'}',
                           style: LaooTypography.popupTitleStyle,
                         ),
                       ),

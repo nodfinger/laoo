@@ -522,7 +522,7 @@ class _AiChatReviewPanelState extends State<AiChatReviewPanel> {
                                       '/api/assistant/chat-review/${row['id']}/test',
                                       timeout: const Duration(seconds: 100),
                                     );
-                                    if (ctx.mounted)
+                                    if (ctx.mounted) {
                                       refresh(() {
                                         final passed =
                                             result is Map &&
@@ -540,12 +540,14 @@ class _AiChatReviewPanelState extends State<AiChatReviewPanel> {
                                             : 'ทดลองไม่ผ่าน กรุณาปรับคำถามหรือความสามารถแล้วบันทึกอีกครั้ง';
                                         saving = false;
                                       });
+                                    }
                                   } catch (error) {
                                     if (ctx.mounted) {
                                       refresh(() {
                                         saving = false;
-                                        if (savedChanged)
+                                        if (savedChanged) {
                                           row['status'] = 'PREPARING';
+                                        }
                                         saveMessage = error is ApiException
                                             ? error.message
                                             : savedChanged

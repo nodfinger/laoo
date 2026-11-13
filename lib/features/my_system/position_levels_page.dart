@@ -236,13 +236,15 @@ class _PositionLevelsPageState extends State<PositionLevelsPage> {
       ),
     );
     search.dispose();
-    if (selected != null && mounted)
+    if (selected != null && mounted) {
       setState(() => _substitutes[positionCode] = selected);
+    }
   }
 
   Widget _buildPositionTab(BuildContext context) {
-    if (_positionsLoading)
+    if (_positionsLoading) {
       return const Center(child: CircularProgressIndicator());
+    }
     if (_positionsError != null) return Center(child: Text(_positionsError!));
     final t = businessCardOcrUi(context);
     final positions = _positions.entries
@@ -265,7 +267,7 @@ class _PositionLevelsPageState extends State<PositionLevelsPage> {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final narrow = constraints.maxWidth < 700;
-          if (narrow)
+          if (narrow) {
             return ListView.separated(
               itemCount: positions.length,
               separatorBuilder: (_, _) => const Divider(thickness: .6),
@@ -289,6 +291,7 @@ class _PositionLevelsPageState extends State<PositionLevelsPage> {
                 );
               },
             );
+          }
           return SingleChildScrollView(
             child: Table(
               columnWidths: const {
@@ -327,7 +330,7 @@ class _PositionLevelsPageState extends State<PositionLevelsPage> {
                         alignment: Alignment.centerLeft,
                         child: Switch(
                           value: _vacant[p.key] ?? false,
-                          activeColor: t.primaryColor,
+                          activeThumbColor: t.primaryColor,
                           onChanged: canEdit
                               ? (v) => setState(() => _vacant[p.key] = v)
                               : null,

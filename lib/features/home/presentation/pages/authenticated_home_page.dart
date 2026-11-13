@@ -2,12 +2,82 @@ import 'package:flutter/material.dart';
 import 'package:laoo_service/service_feature.dart';
 
 import '../../../../core/auth/app_auth_controller.dart';
+import '../../../../core/api/api_client.dart';
 import '../../../support/presentation/widgets/support_workspace_shell.dart';
 import '../../../partner/pages/partner_company_page.dart';
 import '../../../company/item/pages/item_page.dart';
 
-class AuthenticatedHomePage extends StatelessWidget {
+class AuthenticatedHomePage extends StatefulWidget {
   const AuthenticatedHomePage({super.key});
+
+  @override
+  State<AuthenticatedHomePage> createState() => _AuthenticatedHomePageState();
+}
+
+class _AuthenticatedHomePageState extends State<AuthenticatedHomePage> {
+  @override
+  void initState() {
+    super.initState();
+    if (appAuthController.takeLoginAnnouncements()) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _showAnnouncements());
+    }
+  }
+
+  Future<void> _showAnnouncements() async {
+    final api = ApiClient();
+    try {
+      final response = await api.get(
+        '/api/company/intranet/home',
+        query: {'type': 'ANNOUNCEMENT'},
+      );
+      if (!mounted ||
+          !appAuthController.isCompanyUser ||
+          response is! Map ||
+          response['items'] is! List) {
+        return;
+      }
+      final announcements = (response['items'] as List)
+          .whereType<Map>()
+          .toList();
+      if (announcements.isEmpty) return;
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('ประกาศ'),
+          content: SizedBox(
+            width: 600,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (final item in announcements) ...[
+                    Text(
+                      '${item['title'] ?? ''}',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    Text('${item['body'] ?? item['summary'] ?? ''}'),
+                    const Divider(height: 24),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('ปิด'),
+            ),
+          ],
+        ),
+      );
+    } catch (_) {
+      // Users without Intranet access can continue to their normal home page.
+    } finally {
+      api.dispose();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

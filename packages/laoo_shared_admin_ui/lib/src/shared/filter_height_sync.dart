@@ -26,8 +26,11 @@ class _FilterHeightSyncState extends State<FilterHeightSync> {
   }
 }
 
-ButtonStyle filterActionHeightStyle(double height) => ButtonStyle(
-  minimumSize: WidgetStatePropertyAll(Size(0, height)),
-  maximumSize: WidgetStatePropertyAll(Size(double.infinity, height)),
-  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-);
+ButtonStyle filterActionHeightStyle(double height) {
+  final actionHeight = height < 48 ? 48.0 : height;
+  return ButtonStyle(
+    minimumSize: WidgetStatePropertyAll(Size(0, actionHeight)),
+    maximumSize: WidgetStatePropertyAll(Size(double.infinity, actionHeight)),
+    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+  );
+}

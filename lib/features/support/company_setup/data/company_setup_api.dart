@@ -30,6 +30,22 @@ class CompanySetupApi {
     );
   }
 
+  Future<Map<String, dynamic>> loadHomePageSettings() async {
+    final data = await _client.get('/api/global-settings/home-page');
+    if (data is! Map) {
+      throw StateError('รูปแบบการตั้งค่าหน้าจอเริ่มต้นไม่ถูกต้อง');
+    }
+    return Map<String, dynamic>.from(data);
+  }
+
+  Future<void> saveHomePageSettings({
+    required int defaultMode,
+    required String externalUrl,
+  }) => _client.put(
+    '/api/global-settings/home-page',
+    body: {'defaultMode': defaultMode, 'externalUrl': externalUrl},
+  );
+
   Future<CompanySetupModel> load() async {
     final data = await _client.get('/api/company-setup');
 

@@ -16,6 +16,23 @@ Any later Root, shared-contract, Navigation, entitlement, permission,
 authentication, or schema dependency is a separate compatible Core PR to
 `main`. It must merge before the dependent Project PR.
 
+## Independence after Bootstrap
+
+The Bootstrap PR must declare the complete approved menu and route set for the
+Project, including ScreenType, Permission baseline, data ownership and Core
+read contracts. Once it is merged, the Project machine may implement screens,
+Project APIs, Project DTOs, Project migrations and tests under
+`projects/<project>/` without another Core approval.
+
+Project branches use `<project>/<feature|fix|chore>/<name>`. Project PRs are
+checked by the GitHub boundary workflow and CODEOWNERS. A Project PR must not
+change Root, Shared Packages, Core API, authentication, permission, navigation
+contracts or shared schema. Such work is a separate Core Impact PR.
+
+Bootstrap menus start with `TDADProjectMenu.IsActive = 0`. The Project PR that
+delivers a usable route, screen, API behavior and tests may set only its own
+approved menu to `IsActive = 1`; it must not add a new public MenuCode or route.
+
 ## Mandatory Bootstrap contents
 
 - ProjectCode and Company entitlement;

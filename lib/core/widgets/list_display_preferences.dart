@@ -46,6 +46,16 @@ const travelClaimDisplayFields = <ListDisplayField>[
   ListDisplayField(key: 'total', label: 'ยอดเบิกรวม'),
 ];
 
+const intranetContentDisplayFields = <ListDisplayField>[
+  ListDisplayField(key: 'code', label: 'รหัส'),
+  ListDisplayField(key: 'title', label: 'ชื่อเนื้อหา', requiredVisible: true),
+  ListDisplayField(key: 'type', label: 'ประเภท'),
+  ListDisplayField(key: 'status', label: 'สถานะ'),
+  ListDisplayField(key: 'publishAt', label: 'วันที่เผยแพร่'),
+  ListDisplayField(key: 'updatedByName', label: 'ชื่อผู้แก้ไข'),
+  ListDisplayField(key: 'updatedAt', label: 'วันที่เวลาแก้ไขล่าสุด'),
+];
+
 /// Preferences contain presentation keys only; authorization stays server-side.
 class ListDisplayPreferences {
   const ListDisplayPreferences({

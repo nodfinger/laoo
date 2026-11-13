@@ -19,7 +19,8 @@ public sealed class UserListDisplayController(IConfiguration configuration) : Co
         ["10003"] = ["name", "status"],
         ["05002"] = ["name", "sequence", "shortCode"],
         ["66001"] = ["number", "date", "department", "claimant", "purpose", "workPlace", "origin", "destination", "total"],
-        ["10008"] = ["system", "menu", "name", "description", "approvedBy", "approvedAt", "status"]
+        ["10008"] = ["system", "menu", "name", "description", "approvedBy", "approvedAt", "status"],
+        ["43002"] = ["code", "title", "type", "status", "publishAt", "updatedByName", "updatedAt"]
     };
 
     private async Task<(SqlConnection? Db, long UserId)> OpenAuthorizedAsync(string menu, CancellationToken token)
@@ -93,7 +94,7 @@ public sealed class UserListDisplayController(IConfiguration configuration) : Co
             var valid = Fields[menu].ToHashSet(StringComparer.Ordinal);
             var order = input.Order ?? [];
             var hidden = input.Hidden ?? [];
-            if ((hidden.Contains("name", StringComparer.Ordinal) || menu == "66001" && hidden.Contains("number", StringComparer.Ordinal)) || order.Length > valid.Count || hidden.Length > valid.Count ||
+            if ((hidden.Contains("name", StringComparer.Ordinal) || menu == "66001" && hidden.Contains("number", StringComparer.Ordinal) || menu == "43002" && hidden.Contains("title", StringComparer.Ordinal)) || order.Length > valid.Count || hidden.Length > valid.Count ||
                 order.Distinct(StringComparer.Ordinal).Count() != order.Length ||
                 hidden.Distinct(StringComparer.Ordinal).Count() != hidden.Length ||
                 order.Any(key => !valid.Contains(key)) || hidden.Any(key => !valid.Contains(key)))

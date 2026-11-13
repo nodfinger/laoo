@@ -1,5 +1,7 @@
 # LAOO Monorepo Workflow
 
+> โครงสร้างปัจจุบันอยู่ที่ `C:\RYPIT\laoo`; รายละเอียดบทบาทเครื่องและชื่อ path ในเนื้อหาดั้งเดิมด้านล่างเป็นประวัติ ต้องตรวจคำสั่งล่าสุดและ `AGENTS.md` ก่อนใช้งาน
+
 `C:\laooplatform\laoo` and GitHub `nodfinger/laoo` are the only source of
 truth for Core, Service, Meeting, Visitor, and Time.
 

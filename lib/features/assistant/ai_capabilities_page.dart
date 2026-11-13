@@ -38,6 +38,14 @@ class _AiCapabilitiesPageState extends State<AiCapabilitiesPage> {
     return name.isEmpty ? 'ไม่ระบุ' : name;
   }
 
+  InputDecoration _filterInput(BuildContext context, {required String label}) =>
+      registryInput(context, label: label).copyWith(
+        floatingLabelStyle: TextStyle(
+          fontSize: LaooTypography.materialFloatingLabelSource,
+          color: workspaceThemeController.value.primary,
+        ),
+      );
+
   final _api = ApiClient();
   final _search = TextEditingController();
   List<Map<String, dynamic>> _rows = [];
@@ -901,9 +909,9 @@ class _AiCapabilitiesPageState extends State<AiCapabilitiesPage> {
     final visible = _rows
         .where(
           (r) =>
-              '${r['name']} ${r['description']}'.toLowerCase().contains(
-                _query.toLowerCase(),
-              ) &&
+              '${r['name']} ${r['description']} ${_projectName(r)} ${_systemName(r)}'
+                  .toLowerCase()
+                  .contains(_query.toLowerCase()) &&
               (_project.isEmpty || r['projectCode'] == _project) &&
               (_menu.isEmpty || _systemName(r) == _menu) &&
               (_status.isEmpty ||
@@ -1072,7 +1080,7 @@ class _AiCapabilitiesPageState extends State<AiCapabilitiesPage> {
                                       }),
                                       decoration: registryInput(
                                         context,
-                                        hint: 'ค้นหาความสามารถ',
+                                        hint: 'ค้นหาความสามารถ ระบบ หรือเมนู',
                                         icon: Icons.search,
                                       ),
                                     ),
@@ -1109,7 +1117,7 @@ class _AiCapabilitiesPageState extends State<AiCapabilitiesPage> {
                                     child: DropdownButtonFormField<String>(
                                       key: ValueKey('project:$_project'),
                                       initialValue: _project,
-                                      decoration: registryInput(
+                                      decoration: _filterInput(
                                         context,
                                         label: 'ระบบ',
                                       ),
@@ -1141,7 +1149,7 @@ class _AiCapabilitiesPageState extends State<AiCapabilitiesPage> {
                                       key: ValueKey('menu:$_project:$_menu'),
                                       initialValue: _menu,
                                       isExpanded: true,
-                                      decoration: registryInput(
+                                      decoration: _filterInput(
                                         context,
                                         label: 'เมนู',
                                       ),
@@ -1180,7 +1188,7 @@ class _AiCapabilitiesPageState extends State<AiCapabilitiesPage> {
                                     child: DropdownButtonFormField<String>(
                                       key: ValueKey('status:$_status'),
                                       initialValue: _status,
-                                      decoration: registryInput(
+                                      decoration: _filterInput(
                                         context,
                                         label: 'สถานะ',
                                       ),

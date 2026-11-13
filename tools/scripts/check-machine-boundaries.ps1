@@ -3,7 +3,7 @@ param(
     [ValidateSet('service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense', 'project', 'intranet', 'vote', 'pos', 'sales', 'evaluation', 'patrol', 'digital_checklist', 'rental', 'booking', 'pet', 'site')]
     [string]$Module,
 
-    [ValidateSet('unassigned', 'core', 'business', 'center-service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense', 'project', 'intranet', 'vote', 'pos', 'sales', 'evaluation', 'rental', 'booking', 'pet')]
+    [ValidateSet('unassigned', 'core', 'business', 'center-service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense', 'project', 'intranet', 'vote', 'pos', 'sales', 'evaluation', 'rental', 'booking', 'pet', 'knowledge', 'memo', 'provider', 'market', 'patrol', 'school', 'school_food', 'site', 'sport', 'digital_checklist', 'document_control')]
     [string]$Role,
 
     [string]$BaseRef = 'origin/main'
@@ -19,7 +19,7 @@ if ([string]::IsNullOrWhiteSpace($Role)) {
             Write-Warning 'local.machine.json not found in CI; machine boundary check skipped. CI must rely on PR ownership review.'
             return
         }
-        throw 'local.machine.json not found. Copy local.machine.example.json and set the machine role before verification.'
+        throw 'local.machine.json not found. Create it using docs/architecture/MULTI_MACHINE_RUNBOOK.md and set the machine role before verification.'
     }
 
     $machineConfig = Get-Content $machineConfigPath -Raw | ConvertFrom-Json
@@ -27,7 +27,7 @@ if ([string]::IsNullOrWhiteSpace($Role)) {
     $ownedModules = @($machineConfig.ownedModules | ForEach-Object { [string]$_ } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
 }
 
-$validRoles = @('unassigned', 'core', 'business', 'center-service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense', 'project', 'intranet', 'vote', 'pos', 'sales', 'evaluation', 'digital_checklist', 'rental', 'booking', 'pet')
+$validRoles = @('unassigned', 'core', 'business', 'center-service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense', 'project', 'intranet', 'vote', 'pos', 'sales', 'evaluation', 'digital_checklist', 'document_control', 'rental', 'booking', 'pet', 'knowledge', 'memo', 'provider', 'market', 'patrol', 'school', 'school_food', 'site', 'sport')
 if ($Role -notin $validRoles) {
     throw "Invalid machine role '$Role'. Expected: $($validRoles -join ', ')."
 }
@@ -61,10 +61,20 @@ $ownedRoleByModule = @{
     pos = 'pos'
     sales = 'sales'
     evaluation = 'evaluation'
-    digital_checklist = 'digital_checklist'
     rental = 'rental'
     booking = 'booking'
     pet = 'pet'
+    knowledge = 'knowledge'
+    memo = 'memo'
+    provider = 'provider'
+    market = 'market'
+    patrol = 'patrol'
+    school = 'school'
+    school_food = 'school_food'
+    site = 'site'
+    sport = 'sport'
+    digital_checklist = 'digital_checklist'
+    document_control = 'document_control'
 }
 
 if ($Role -ne 'business' -and $Role -ne $ownedRoleByModule[$Module]) {

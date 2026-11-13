@@ -1,0 +1,43 @@
+# Core owns shared contracts, host composition, security and infrastructure.
+* @nodfinger
+
+# Project ownership: Project PRs may be reviewed by the owning team without a
+# Core approval when the change remains under the project boundary.
+/projects/expense/ @nodfinger
+/projects/meeting/ @nodfinger
+/projects/intranet/ @nodfinger
+/projects/service/ @nodfinger
+/projects/time/ @nodfinger
+/projects/visitor/ @nodfinger
+/projects/training/ @nodfinger
+/projects/gate_pass/ @nodfinger
+/projects/five_s/ @nodfinger
+/projects/survey/ @nodfinger
+/projects/project/ @nodfinger
+/projects/vote/ @nodfinger
+/projects/pos/ @nodfinger
+/projects/sales/ @nodfinger
+/projects/evaluation/ @nodfinger
+/projects/booking/ @nodfinger
+/projects/digital_checklist/ @nodfinger
+/projects/document_control/ @nodfinger
+/projects/knowledge/ @nodfinger
+/projects/memo/ @nodfinger
+/projects/market/ @nodfinger
+/projects/patrol/ @nodfinger
+/projects/pet/ @nodfinger
+/projects/provider/ @nodfinger
+/projects/rental/ @nodfinger
+/projects/school/ @nodfinger
+/projects/school_food/ @nodfinger
+/projects/site/ @nodfinger
+/projects/sport/ @nodfinger
+
+# Any change outside projects/<project> requires Core ownership.
+/packages/ @nodfinger
+/lib/app/ @nodfinger
+/lib/main.dart @nodfinger
+/laoo_api/ @nodfinger
+/database/ @nodfinger
+/.github/ @nodfinger
+/tools/ @nodfinger

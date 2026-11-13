@@ -568,6 +568,19 @@ final List<GoRoute> _placeholderRoutes = [
         const MySystemPlaceholderPage(menuCode: '70002'),
   ),
   GoRoute(
+    path: '/company/my-system/legal-document-types',
+    name: 'mySystemLegalDocumentTypes',
+    builder: (context, state) => MasterDataPage(
+      menuScope: WorkspaceMenuScope.company,
+      masterGroupCode: '017',
+      menuCode: '70003',
+      pageTitle: 'ประเภทเอกสาร',
+      favoriteKey: '70003',
+      activeMenu: 'mySystemLegalDocumentTypes',
+      showGroupFilter: true,
+    ),
+  ),
+  GoRoute(
     path: RoutePaths.companyDocumentNumberFormat,
     name: RouteNames.companyDocumentNumberFormat,
     builder: (context, state) => const DocumentNumberFormatPage(),

@@ -212,12 +212,13 @@ class _AssistantOverlayState extends State<_AssistantOverlay> {
       }
       appRouter.go(path);
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         setState(
           () => _messages.add(
             'ไม่สามารถเปิดเมนูนี้ได้ สิทธิ์หรือสถานะการใช้งานอาจเปลี่ยน กรุณาตรวจสอบแล้วลองใหม่',
           ),
         );
+      }
     }
   }
 

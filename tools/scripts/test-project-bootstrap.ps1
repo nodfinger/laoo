@@ -1,11 +1,35 @@
 param(
-    [Parameter(Mandatory = $true)]
-    [ValidateSet('service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense', 'project', 'intranet', 'vote', 'pos', 'sales', 'evaluation', 'knowledge', 'memo', 'provider')]
-    [string]$Project
+    [ValidateSet('service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense', 'project', 'intranet', 'vote', 'pos', 'sales', 'evaluation', 'knowledge', 'memo', 'provider', 'booking', 'digital_checklist', 'document_control', 'market', 'patrol', 'pet', 'rental', 'school', 'school_food', 'site', 'sport')]
+    [string]$Project,
+
+    [switch]$AllProjects
 )
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+
+if ($AllProjects) {
+    $projectsRoot = Join-Path $repoRoot 'projects'
+    $projects = Get-ChildItem $projectsRoot -Directory | Where-Object {
+        (Test-Path (Join-Path $_.FullName 'pubspec.yaml')) -and
+        (Test-Path (Join-Path $_.FullName ('lib\' + $_.Name + '_feature.dart'))) -and
+        (Test-Path (Join-Path $_.FullName ('lib\features\' + $_.Name + '\' + $_.Name + '_feature_host.dart'))) -and
+        (Test-Path (Join-Path $_.FullName ('lib\features\' + $_.Name + '\' + $_.Name + '_route_contract.dart'))) -and
+        (Test-Path (Join-Path $_.FullName ('lib\features\' + $_.Name + '\' + $_.Name + '_go_routes.dart')))
+    }
+    $failed = @()
+    foreach ($candidate in $projects) {
+        & $PSCommandPath -Project $candidate.Name
+        if ($LASTEXITCODE -ne 0) { $failed += $candidate.Name }
+    }
+    if ($failed.Count -gt 0) { throw "Project bootstrap validation failed: $($failed -join ', ')" }
+    Write-Host "PROJECT BOOTSTRAP PASSED: $($projects.Count) projects."
+    exit 0
+}
+
+if ([string]::IsNullOrWhiteSpace($Project)) {
+    throw 'Specify -Project <name> or use -AllProjects.'
+}
 $projectPascal = (($Project -split '[_-]' | ForEach-Object {
     (Get-Culture).TextInfo.ToTitleCase($_)
 }) -join '')

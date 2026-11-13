@@ -36,7 +36,7 @@ try {
                 Write-Warning 'local.machine.json not found in CI; Center host port check skipped.'
                 return
             }
-            throw 'local.machine.json not found. Copy the appropriate local.machine.*.example.json before verification.'
+            throw 'local.machine.json not found. Create it using docs/architecture/MULTI_MACHINE_RUNBOOK.md before verification.'
         }
 
         $machineConfig = Get-Content $machineConfigPath -Raw | ConvertFrom-Json

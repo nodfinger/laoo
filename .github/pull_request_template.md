@@ -1,16 +1,18 @@
 ## Summary
 
-- Project: Core / Service / Visitor / Meeting / Time / Integration
+- Project: Core / Service / Visitor / Meeting / Time / Other
 - Change:
+- Branch format: `<project>/<feature|fix|chore>/<short-name>`
 
 ## Ownership and Core Impact
 
-- Machine role: center-service / meeting / visitor / time
+- Machine role: core / `<project>` / center-service
 - Impact level: Green / Yellow / Red
 - Owned paths changed:
 - Consuming projects:
 - Core PR dependency and merge order: None / describe
 - Backward compatibility:
+- Bootstrap contract already merged: Yes / No / Not applicable
 
 ## Impact
 
@@ -33,6 +35,9 @@
 - [ ] Migration is transactional and idempotent
 - [ ] Machine boundary check passed
 - [ ] Dependent machines pulled the prerequisite Core PR, or not applicable
+- [ ] Project boundary check passed for a Project PR
+- [ ] Migration filename uses `yyyyMMddHHmmss_PROJECTCODE_description.sql`
+- [ ] Project API/DTO changes remain Project-owned or have a separate Core PR
 
 ## Test instructions
 

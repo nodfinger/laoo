@@ -1,3 +1,5 @@
+> เอกสารประวัติ: ตรวจโครงสร้างปัจจุบันจาก [README](../../README.md) และ [คู่มือโครงการ](../../docs/architecture/MONOREPO_WORKFLOW.md) ก่อนใช้
+
 # REPOSITORY_STANDARD
 
 Version: 1.0  

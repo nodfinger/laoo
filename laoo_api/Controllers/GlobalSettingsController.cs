@@ -1,5 +1,7 @@
 using System.Data;
 using System.Security.Claims;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
@@ -8,9 +10,130 @@ namespace LaooApi.Controllers;
 
 [ApiController, Authorize]
 [Route("api/global-settings")]
-public sealed class GlobalSettingsController(IConfiguration configuration) : ControllerBase
+public sealed class GlobalSettingsController(
+    IConfiguration configuration,
+    IWebHostEnvironment environment) : ControllerBase
 {
     private readonly IConfiguration _configuration = configuration;
+    private readonly IWebHostEnvironment _environment = environment;
+    private static readonly SemaphoreSlim AppSettingsWriteLock = new(1, 1);
+
+    [HttpGet("home-page")]
+    public async Task<IActionResult> GetHomePage(CancellationToken token)
+    {
+        if (!IsLaoo()) return Forbid();
+        try
+        {
+            var root = await ReadAppSettings(token);
+            var home = root["HomePage"] as JsonObject;
+            var mode = int.TryParse(home?["DefaultMode"]?.ToString(), out var parsedMode)
+                ? parsedMode
+                : 3;
+            if (mode is < 1 or > 4) mode = 3;
+            var url = home?["Options"]?["2"]?["Url"]?.ToString() ?? string.Empty;
+            return Ok(new { defaultMode = mode, externalUrl = url });
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+        {
+            return StatusCode(500, new
+            {
+                message = "อ่านรูปแบบหน้าจอเริ่มต้นจาก appsettings.json ไม่สำเร็จ",
+                description = "ตรวจสอบว่าไฟล์ appsettings.json มีรูปแบบ JSON ถูกต้องและมีสิทธิ์อ่านได้"
+            });
+        }
+    }
+
+    [HttpPut("home-page")]
+    public async Task<IActionResult> SaveHomePage(
+        HomePageSettingsRequest request,
+        CancellationToken token)
+    {
+        if (!IsLaoo()) return Forbid();
+        if (request.DefaultMode is < 1 or > 4)
+            return BadRequest(new { message = "กรุณาเลือกรูปแบบการเริ่มต้นหน้าจอ 1 ถึง 4" });
+
+        var url = request.ExternalUrl?.Trim() ?? string.Empty;
+        if (url.Length > 2048 || request.DefaultMode == 2 && !TryNormalizeUrl(url, out _))
+            return BadRequest(new
+            {
+                message = "URL หน้าเริ่มต้นไม่ถูกต้อง",
+                description = "รูปแบบ URL ภายนอกต้องเป็นที่อยู่ HTTP หรือ HTTPS ที่ใช้งานได้"
+            });
+        if (url.Length > 0 && !TryNormalizeUrl(url, out url))
+            return BadRequest(new { message = "URL หน้าเริ่มต้นไม่ถูกต้อง", description = "ใช้ได้เฉพาะ URL แบบ HTTP หรือ HTTPS" });
+
+        await AppSettingsWriteLock.WaitAsync(token);
+        var path = Path.Combine(_environment.ContentRootPath, "appsettings.json");
+        var temporaryPath = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            var root = await ReadAppSettings(token);
+            if (root["HomePage"] is not JsonObject home)
+            {
+                home = new JsonObject();
+                root["HomePage"] = home;
+            }
+            home["DefaultMode"] = request.DefaultMode;
+            if (home["Options"] is not JsonObject options)
+            {
+                options = new JsonObject();
+                home["Options"] = options;
+            }
+            if (options["2"] is not JsonObject external)
+            {
+                external = new JsonObject();
+                options["2"] = external;
+            }
+            external["Url"] = url;
+
+            var json = root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+            await System.IO.File.WriteAllTextAsync(temporaryPath, json, new System.Text.UTF8Encoding(false), token);
+            System.IO.File.Move(temporaryPath, path, true);
+            return NoContent();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+        {
+            return StatusCode(500, new
+            {
+                message = "บันทึกรูปแบบหน้าจอเริ่มต้นลง appsettings.json ไม่สำเร็จ",
+                description = "ตรวจสอบสิทธิ์เขียนไฟล์ของ API Server แล้วลองใหม่"
+            });
+        }
+        finally
+        {
+            try
+            {
+                if (System.IO.File.Exists(temporaryPath)) System.IO.File.Delete(temporaryPath);
+            }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+            finally { AppSettingsWriteLock.Release(); }
+        }
+    }
+
+    private async Task<JsonObject> ReadAppSettings(CancellationToken token)
+    {
+        var json = await System.IO.File.ReadAllTextAsync(
+            Path.Combine(_environment.ContentRootPath, "appsettings.json"), token);
+        return JsonNode.Parse(json) as JsonObject
+            ?? throw new JsonException("Invalid appsettings root");
+    }
+
+    private static bool TryNormalizeUrl(string value, out string normalized)
+    {
+        var candidate = value.Trim();
+        if (!System.Text.RegularExpressions.Regex.IsMatch(candidate, @"^[a-zA-Z][a-zA-Z0-9+.-]*://"))
+            candidate = "https://" + candidate;
+        if (Uri.TryCreate(candidate, UriKind.Absolute, out var uri) &&
+            uri.Scheme is "http" or "https" && uri.Host.Length > 0 &&
+            uri.UserInfo.Length == 0 && !candidate.Any(char.IsWhiteSpace))
+        {
+            normalized = uri.ToString();
+            return true;
+        }
+        normalized = string.Empty;
+        return false;
+    }
     [HttpGet]
     public async Task<IActionResult> Get(CancellationToken token)
     {
@@ -45,3 +168,4 @@ ELSE
     private static void Add(SqlCommand c, string name, SqlDbType type, object value, int size) { var p = c.Parameters.Add(name, type, size); p.Value = value; }
 }
 public sealed record GlobalSettingsRequest(decimal MaxItemImageSizeMB, decimal MaxBusinessCardImageSizeMB, string? DescriptionItemImage, string? DescriptionBusinessCardImage);
+public sealed record HomePageSettingsRequest(int DefaultMode, string? ExternalUrl);

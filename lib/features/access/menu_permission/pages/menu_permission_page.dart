@@ -742,32 +742,32 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
                                 ? '11004'
                                 : '10004',
                             actions: [
-                              DecoratedBox(
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(4),
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.primary.withValues(alpha: .10),
-                                ),
-                                child: SizedBox.square(
-                                  dimension: LaooTypography.buttonHeight,
-                                  child: IconButton(
-                                    tooltip: _card
-                                        ? 'แสดงแบบรายการ'
-                                        : 'แสดงแบบการ์ด',
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.primary,
-                                    onPressed: () =>
-                                        setState(() => _card = !_card),
-                                    icon: Icon(
-                                      _card
-                                          ? Icons.view_list_outlined
-                                          : Icons.grid_view_outlined,
+                              if (MediaQuery.sizeOf(context).width > 600)
+                                DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(4),
+                                    color: Theme.of(context).colorScheme.primary
+                                        .withValues(alpha: .10),
+                                  ),
+                                  child: SizedBox.square(
+                                    dimension: LaooTypography.buttonHeight,
+                                    child: IconButton(
+                                      tooltip: _card
+                                          ? 'แสดงแบบรายการ'
+                                          : 'แสดงแบบการ์ด',
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.primary,
+                                      onPressed: () =>
+                                          setState(() => _card = !_card),
+                                      icon: Icon(
+                                        _card
+                                            ? Icons.view_list_outlined
+                                            : Icons.grid_view_outlined,
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
                               if (widget.scope == 'customer' && _canEdit)
                                 FilledButton.icon(
                                   onPressed:
@@ -1022,7 +1022,7 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
   Widget _table(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        if (_card || constraints.maxWidth < 1100) {
+        if (_card || MediaQuery.sizeOf(context).width <= 600) {
           return _mobileCards(context);
         }
         final columns = _tableColumns(context);
@@ -1036,25 +1036,16 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
             color: Colors.white,
             borderRadius: BorderRadius.all(Radius.circular(4)),
           ),
-          child: Column(
-            children: [
-              ConstrainedBox(
-                constraints: BoxConstraints(
-                  minWidth: (constraints.maxWidth - 2 * LaooLayout.cardPadding)
-                      .clamp(0.0, double.infinity),
-                ),
-                child: DataTable(
-                  columnSpacing: 12,
-                  horizontalMargin: 16,
-                  headingRowColor: WidgetStatePropertyAll(headerColor),
-                  columns: columns,
-                  rows: const [],
-                ),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: SizedBox(
+              width: (constraints.maxWidth - 2 * LaooLayout.cardPadding).clamp(
+                966.0,
+                double.infinity,
               ),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.only(bottom: 24),
-                  child: ConstrainedBox(
+              child: Column(
+                children: [
+                  ConstrainedBox(
                     constraints: BoxConstraints(
                       minWidth:
                           (constraints.maxWidth - 2 * LaooLayout.cardPadding)
@@ -1063,14 +1054,34 @@ class _MenuPermissionPageState extends State<MenuPermissionPage> {
                     child: DataTable(
                       columnSpacing: 12,
                       horizontalMargin: 16,
-                      headingRowHeight: 0,
+                      headingRowColor: WidgetStatePropertyAll(headerColor),
                       columns: columns,
-                      rows: _tableRows(context),
+                      rows: const [],
                     ),
                   ),
-                ),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.only(bottom: 24),
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minWidth:
+                              (constraints.maxWidth -
+                                      2 * LaooLayout.cardPadding)
+                                  .clamp(0.0, double.infinity),
+                        ),
+                        child: DataTable(
+                          columnSpacing: 12,
+                          horizontalMargin: 16,
+                          headingRowHeight: 0,
+                          columns: columns,
+                          rows: _tableRows(context),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         );
       },

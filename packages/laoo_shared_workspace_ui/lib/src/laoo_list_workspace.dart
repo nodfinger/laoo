@@ -239,18 +239,22 @@ class LaooCaptionCard extends StatelessWidget {
                       captionIcon,
                       const SizedBox(width: 8),
                     ],
-                    Flexible(
-                      fit: FlexFit.loose,
-                      child: Text(
-                        caption,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: tokens.captionStyle,
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              caption,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: tokens.captionStyle,
+                            ),
+                          ),
+                          LaooPageFavoriteButton(menuKey: menuKey),
+                        ],
                       ),
                     ),
-                    LaooPageFavoriteButton(menuKey: menuKey),
                     if (trailing != null) ...[
-                      const Spacer(),
                       SizedBox(width: tokens.itemSpacing),
                       trailing!,
                     ],
@@ -401,6 +405,7 @@ class LaooActionDialog extends StatelessWidget {
     required this.content,
     required this.actions,
     this.width = 480,
+    this.maxWidth,
     this.headerDividerGap = 0,
     super.key,
   });
@@ -411,6 +416,7 @@ class LaooActionDialog extends StatelessWidget {
   final Widget content;
   final List<Widget> actions;
   final double width;
+  final double? maxWidth;
   final double headerDividerGap;
 
   @override
@@ -450,7 +456,9 @@ class LaooActionDialog extends StatelessWidget {
         media.viewInsets.vertical -
         media.viewPadding.vertical -
         (tokens.dialogInsetPadding * 2);
-    final effectiveWidth = width.clamp(0, tokens.popupMaxWidth).toDouble();
+    final effectiveWidth = width
+        .clamp(0, maxWidth ?? tokens.popupMaxWidth)
+        .toDouble();
     return Theme(
       data: popupTheme,
       child: Dialog(

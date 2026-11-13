@@ -44,8 +44,9 @@ class _TravelExpenseSettingsPageState extends State<TravelExpenseSettingsPage> {
   Future<void> _loadGeneral() async {
     try {
       final data = await _api.get('/api/company/travel-settings/general');
-      if (data is! Map || data['settings'] is! Map)
+      if (data is! Map || data['settings'] is! Map) {
         throw StateError('Invalid response');
+      }
       final settings = data['settings'] as Map;
       if (!mounted) return;
       _expiryDays.text = settings['documentExpiryDays']?.toString() ?? '';
@@ -59,13 +60,14 @@ class _TravelExpenseSettingsPageState extends State<TravelExpenseSettingsPage> {
         _generalError = null;
       });
     } catch (error) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _generalLoading = false;
           _generalError = error is ApiException
               ? error.message
               : 'โหลดข้อมูลทั่วไปไม่สำเร็จ กรุณาลองใหม่';
         });
+      }
     }
   }
 
@@ -91,10 +93,11 @@ class _TravelExpenseSettingsPageState extends State<TravelExpenseSettingsPage> {
             'remark${i + 1}': _remarks[i].text,
         },
       );
-      if (mounted)
+      if (mounted) {
         showTimedSnackBar(context, message: 'บันทึกข้อมูลทั่วไปเรียบร้อยแล้ว');
+      }
     } catch (error) {
-      if (mounted)
+      if (mounted) {
         showTimedSnackBar(
           context,
           message: error is ApiException
@@ -102,6 +105,7 @@ class _TravelExpenseSettingsPageState extends State<TravelExpenseSettingsPage> {
               : 'บันทึกข้อมูลทั่วไปไม่สำเร็จ กรุณาลองใหม่',
           error: true,
         );
+      }
     } finally {
       if (mounted) setState(() => _generalSaving = false);
     }
@@ -425,8 +429,9 @@ class _TravelExpenseSettingsPageState extends State<TravelExpenseSettingsPage> {
   }
 
   Widget _buildLodgingTab(BuildContext context) {
-    if (_lodgingLoading)
+    if (_lodgingLoading) {
       return const Center(child: CircularProgressIndicator());
+    }
     if (_lodgingError != null) return Center(child: Text(_lodgingError!));
     return _buildRateTable(
       rates: _lodgingRates,
