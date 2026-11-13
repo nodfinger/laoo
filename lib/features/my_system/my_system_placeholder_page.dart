@@ -19,6 +19,7 @@ class MySystemPlaceholderPage extends StatelessWidget {
         '65002' => 'mySystemSapPms',
         '66001' => 'mySystemTravel',
         '66002' => 'mySystemPurchase',
+        '69002' => 'mySystemPurchaseScRequest',
         '70002' => 'mySystemLegalDocumentRequest',
         '70003' => 'mySystemLegalDocumentTypes',
         _ => '',

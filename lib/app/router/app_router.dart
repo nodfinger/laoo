@@ -562,6 +562,12 @@ final List<GoRoute> _placeholderRoutes = [
         const MySystemPlaceholderPage(menuCode: '66002'),
   ),
   GoRoute(
+    path: '/company/my-system/purchase-sc-request',
+    name: 'mySystemPurchaseScRequest',
+    builder: (context, state) =>
+        const MySystemPlaceholderPage(menuCode: '69002'),
+  ),
+  GoRoute(
     path: '/company/my-system/legal-document-request',
     name: 'mySystemLegalDocumentRequest',
     builder: (context, state) =>

@@ -394,6 +394,7 @@
 | `68001` | [ระบบอนุมัติ](approval.md) | `/company/approval-settings` | พบ Route |
 | `68002` | [ระบบอนุมัติ](approval.md) | `/company/approval-assignment` | พบ Route |
 | `69001` | [ระบบจัดซื้อ](purchasing.md) | `/company/my-system/purchase-settings` | พบ Route |
+| `69002` | [ระบบจัดซื้อ](purchasing.md) | `/company/my-system/purchase-sc-request` | พบ Route |
 | `70001` | [ระบบกฎหมาย](legal.md) | `/company/my-system/legal-settings` | พบ Route |
 | `70002` | [ระบบกฎหมาย](legal.md) | `/company/my-system/legal-document-request` | พบ Route |
 | `70003` | [ระบบกฎหมาย](legal.md) | `/company/my-system/legal-document-types` | พบ Route |

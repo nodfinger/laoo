@@ -3,6 +3,7 @@
 ## ข้อกำหนดปัจจุบัน
 
 - `69001` กำหนดค่าระบบจัดซื้อเป็น ScreenType 2; คำสั่งเดิมให้เพิ่มเฉพาะทะเบียนเมนู ยังไม่ระบุช่องตั้งค่า
+- `69002` `SC Request` เป็น ScreenType 4; เพิ่มทะเบียนเมนูและ Route placeholder แล้ว ยังไม่มี Flow/API/หน้าจอธุรกิจยืนยัน
 - ทะเบียนผู้ขาย `08007` อยู่ใน [stock.md](stock.md) ตามกลุ่มเมนูและ migration ปัจจุบัน แต่เป็นข้อมูลที่ระบบจัดซื้ออาจอ้างอิง; ยังไม่พบสัญญาเชื่อมจัดซื้อที่ยืนยันแล้ว
 
 ## ยังไม่ยืนยัน
@@ -22,6 +23,7 @@
 | MenuCode | Route / หน้าที่เห็นจากชื่อ | ScreenType | ProjectCode ใน Route | โค้ด | หลักฐาน |
 |---|---|---:|---|---|---|
 | `69001` | `/company/my-system/purchase-settings` | 2 | `LAOO` | ไม่ระบุ | `database/migrations/20261111233000_LAOO_my_system_purchase_legal_menus.sql` (ไฟล์ migration ถูกลบหลังรันแล้ว; ตรวจประวัติ Git) |
+| `69002` | `/company/my-system/purchase-sc-request` | 4 | `LAOO` | VIEW, CREATE, EDIT, DELETE | [`lib/app/router/app_menu_route_registry.dart`](../../lib/app/router/app_menu_route_registry.dart) และ migration เพิ่มเมนู |
 
 ## ข้อกำหนด Function ปัจจุบัน
 
