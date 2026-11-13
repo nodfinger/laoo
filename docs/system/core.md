@@ -30,6 +30,8 @@
 | `64003` | `companyAiAgents` | ไม่พบ | `ไม่พบ` | ไม่ระบุ | [`lib/app/router/app_menu_route_registry.dart`](../../lib/app/router/app_menu_route_registry.dart) |
 | `65001` | `/company/my-system/settings` | ไม่พบ | `ไม่พบ` | ไม่ระบุ | [`lib/app/router/app_menu_route_registry.dart`](../../lib/app/router/app_menu_route_registry.dart) |
 | `65002` | `/company/my-system/sap-pms` | ไม่พบ | `ไม่พบ` | ไม่ระบุ | [`lib/app/router/app_menu_route_registry.dart`](../../lib/app/router/app_menu_route_registry.dart) |
+
+กลุ่มเมนู `65` ภายใต้ระบบของฉันใช้ชื่อ `ระบบ-IT` โดยมีเมนู `65001` กำหนดค่าระบบ (หน้าเปล่าชั่วคราว) และ `65002` ตรวจสอบข้อมูล API SAP-PMS อยู่ภายในกลุ่มเดียวกัน
 | `66001` | `/company/my-system/travel` | ไม่พบ | `ไม่พบ` | ไม่ระบุ | [`lib/app/router/app_menu_route_registry.dart`](../../lib/app/router/app_menu_route_registry.dart) |
 | `66002` | `/company/my-system/purchase` | ไม่พบ | `ไม่พบ` | ไม่ระบุ | [`lib/app/router/app_menu_route_registry.dart`](../../lib/app/router/app_menu_route_registry.dart) |
 
