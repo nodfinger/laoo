@@ -1,0 +1,58 @@
+IF OBJECT_ID(N'dbo.TDAPPurchaseRequest', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.TDAPPurchaseRequest
+    (
+        RequestID bigint IDENTITY(1,1) NOT NULL CONSTRAINT PK_TDAPPurchaseRequest PRIMARY KEY,
+        CompanyID bigint NOT NULL,
+        RequestNo nvarchar(50) NOT NULL,
+        RequestDate date NOT NULL,
+        RequesterUserID bigint NULL,
+        DivisionID bigint NULL,
+        DepartmentID bigint NULL,
+        StatusCode nvarchar(30) NOT NULL CONSTRAINT DF_TDAPPurchaseRequest_Status DEFAULT N'DRAFT',
+        ResponsibleUserID bigint NULL,
+        Remark nvarchar(2000) NULL,
+        CreateDate datetime2(3) NOT NULL CONSTRAINT DF_TDAPPurchaseRequest_CreateDate DEFAULT SYSUTCDATETIME(),
+        CreateBy bigint NULL,
+        UpdateDate datetime2(3) NULL,
+        UpdateBy bigint NULL,
+        CONSTRAINT UQ_TDAPPurchaseRequest_Company_No UNIQUE (CompanyID, RequestNo),
+        CONSTRAINT CK_TDAPPurchaseRequest_Status CHECK (StatusCode IN (N'DRAFT',N'SUBMITTED',N'IN_PROGRESS',N'COMPLETED',N'CANCELLED'))
+    );
+END;
+IF OBJECT_ID(N'dbo.TDAPPurchaseRequestDetail', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.TDAPPurchaseRequestDetail
+    (
+        DetailID bigint IDENTITY(1,1) NOT NULL CONSTRAINT PK_TDAPPurchaseRequestDetail PRIMARY KEY,
+        RequestID bigint NOT NULL,
+        ItemText nvarchar(2000) NOT NULL,
+        Quantity decimal(18,4) NULL,
+        EstimatedMin decimal(18,2) NULL,
+        EstimatedMax decimal(18,2) NULL,
+        Remark nvarchar(2000) NULL,
+        NeededDate date NULL,
+        UrgencyLevel tinyint NOT NULL CONSTRAINT DF_TDAPPurchaseRequestDetail_Urgency DEFAULT 0,
+        SortOrder int NOT NULL CONSTRAINT DF_TDAPPurchaseRequestDetail_Sort DEFAULT 1,
+        CONSTRAINT FK_TDAPPurchaseRequestDetail_Request FOREIGN KEY (RequestID) REFERENCES dbo.TDAPPurchaseRequest(RequestID),
+        CONSTRAINT CK_TDAPPurchaseRequestDetail_Urgency CHECK (UrgencyLevel IN (0,1,2)),
+        CONSTRAINT CK_TDAPPurchaseRequestDetail_Estimate CHECK (EstimatedMin IS NULL OR EstimatedMax IS NULL OR EstimatedMin <= EstimatedMax)
+    );
+END;
+IF OBJECT_ID(N'dbo.TDAPPurchaseRequestAttachment', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.TDAPPurchaseRequestAttachment
+    (
+        AttachmentID bigint IDENTITY(1,1) NOT NULL CONSTRAINT PK_TDAPPurchaseRequestAttachment PRIMARY KEY,
+        RequestID bigint NOT NULL,
+        DetailID bigint NOT NULL,
+        FileName nvarchar(255) NOT NULL,
+        StoredPath nvarchar(500) NOT NULL,
+        ContentType nvarchar(100) NOT NULL,
+        FileSize bigint NOT NULL,
+        CreateDate datetime2(3) NOT NULL CONSTRAINT DF_TDAPPurchaseRequestAttachment_CreateDate DEFAULT SYSUTCDATETIME(),
+        CreateBy bigint NULL,
+        CONSTRAINT FK_TDAPPurchaseRequestAttachment_Request FOREIGN KEY (RequestID) REFERENCES dbo.TDAPPurchaseRequest(RequestID),
+        CONSTRAINT FK_TDAPPurchaseRequestAttachment_Detail FOREIGN KEY (DetailID) REFERENCES dbo.TDAPPurchaseRequestDetail(DetailID)
+    );
+END;
