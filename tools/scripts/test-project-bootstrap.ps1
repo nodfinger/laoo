@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense', 'project', 'intranet', 'vote', 'pos', 'sales', 'evaluation', 'knowledge', 'memo', 'provider', 'booking', 'digital_checklist', 'document_control', 'market', 'patrol', 'pet', 'rental', 'school', 'school_food', 'site', 'sport')]
+    [ValidateSet('service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense', 'project', 'intranet', 'vote', 'pos', 'sales', 'evaluation', 'knowledge', 'memo', 'provider', 'booking', 'digital_checklist', 'document_control', 'market', 'patrol', 'pet', 'rental', 'school', 'school_food', 'site', 'sport', 'purchasing')]
     [string]$Project,
 
     [switch]$AllProjects

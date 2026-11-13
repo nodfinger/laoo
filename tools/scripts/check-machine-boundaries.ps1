@@ -1,9 +1,9 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense', 'project', 'intranet', 'vote', 'pos', 'sales', 'evaluation', 'patrol', 'digital_checklist', 'rental', 'booking', 'pet', 'site')]
+    [ValidateSet('service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense', 'project', 'intranet', 'vote', 'pos', 'sales', 'evaluation', 'patrol', 'digital_checklist', 'rental', 'booking', 'pet', 'site', 'purchasing')]
     [string]$Module,
 
-    [ValidateSet('unassigned', 'core', 'business', 'center-service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense', 'project', 'intranet', 'vote', 'pos', 'sales', 'evaluation', 'rental', 'booking', 'pet', 'knowledge', 'memo', 'provider', 'market', 'patrol', 'school', 'school_food', 'site', 'sport', 'digital_checklist', 'document_control')]
+    [ValidateSet('unassigned', 'core', 'business', 'center-service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense', 'project', 'intranet', 'vote', 'pos', 'sales', 'evaluation', 'rental', 'booking', 'pet', 'knowledge', 'memo', 'provider', 'market', 'patrol', 'school', 'school_food', 'site', 'sport', 'digital_checklist', 'document_control', 'purchasing')]
     [string]$Role,
 
     [string]$BaseRef = 'origin/main'
@@ -27,7 +27,7 @@ if ([string]::IsNullOrWhiteSpace($Role)) {
     $ownedModules = @($machineConfig.ownedModules | ForEach-Object { [string]$_ } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
 }
 
-$validRoles = @('unassigned', 'core', 'business', 'center-service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense', 'project', 'intranet', 'vote', 'pos', 'sales', 'evaluation', 'digital_checklist', 'document_control', 'rental', 'booking', 'pet', 'knowledge', 'memo', 'provider', 'market', 'patrol', 'school', 'school_food', 'site', 'sport')
+$validRoles = @('unassigned', 'core', 'business', 'center-service', 'meeting', 'visitor', 'time', 'training', 'gate_pass', 'five_s', 'survey', 'expense', 'project', 'intranet', 'vote', 'pos', 'sales', 'evaluation', 'digital_checklist', 'document_control', 'rental', 'booking', 'pet', 'knowledge', 'memo', 'provider', 'market', 'patrol', 'school', 'school_food', 'site', 'sport', 'purchasing')
 if ($Role -notin $validRoles) {
     throw "Invalid machine role '$Role'. Expected: $($validRoles -join ', ')."
 }
@@ -75,6 +75,7 @@ $ownedRoleByModule = @{
     sport = 'sport'
     digital_checklist = 'digital_checklist'
     document_control = 'document_control'
+    purchasing = 'purchasing'
 }
 
 if ($Role -ne 'business' -and $Role -ne $ownedRoleByModule[$Module]) {
