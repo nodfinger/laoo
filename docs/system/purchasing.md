@@ -23,7 +23,7 @@
 | MenuCode | Route / หน้าที่เห็นจากชื่อ | ScreenType | ProjectCode ใน Route | โค้ด | หลักฐาน |
 |---|---|---:|---|---|---|
 | `69001` | `/company/my-system/purchase-settings` | 2 | `LAOO` | ไม่ระบุ | `database/migrations/20261111233000_LAOO_my_system_purchase_legal_menus.sql` (ไฟล์ migration ถูกลบหลังรันแล้ว; ตรวจประวัติ Git) |
-| `69002` | `/company/my-system/purchase-sc-request` | 4 | `LAOO` | VIEW, CREATE, EDIT, DELETE | RunData=1, AllowPrint=0, AllowListDisplaySettings=1; [`lib/app/router/app_menu_route_registry.dart`](../../lib/app/router/app_menu_route_registry.dart) |
+| `69002` | `/company/my-system/purchase-sc-request` | 4 | `LAOO_MY` (รอ Feature Project จัดซื้อ) | VIEW, CREATE, EDIT, DELETE, UPLOAD | RunData=1, AllowPrint=0, AllowListDisplaySettings=1; Route placeholder อยู่ใน Core จนกว่า `projects/purchasing` จะพร้อม |
 
 ## ข้อกำหนด Function ปัจจุบัน
 
