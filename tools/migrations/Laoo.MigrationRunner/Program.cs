@@ -88,6 +88,7 @@ static string ResolveMigrationDirectory(string root, string projectCode) =>
         "LAOO_BOOKING" => Path.Combine(root, "projects", "booking", "database", "migrations"),
         "LAOO_PET" => Path.Combine(root, "projects", "pet", "database", "migrations"),
         "LAOO_SITE" => Path.Combine(root, "projects", "site", "database", "migrations"),
+        "LAOO_SAP_PMS" => Path.Combine(root, "projects", "sap_pms", "database", "migrations"),
         _ => throw new ArgumentOutOfRangeException(nameof(projectCode), projectCode, "Unsupported ProjectCode"),
     };
 

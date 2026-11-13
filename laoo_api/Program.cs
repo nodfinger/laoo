@@ -24,6 +24,7 @@ using LaooPosModule;
 using LaooSalesModule;
 using LaooEvaluationModule;
 using LaooEvaluationModule.Services;
+using LaooSapPmsModule;
 using LaooMeetingApi.Services;
 using Laoo.Shared.Contracts.Evaluations;
 using LaooTrainingModule;
@@ -84,7 +85,8 @@ builder.Services
     .AddApplicationPart(typeof(PosModuleMarker).Assembly)
     .AddApplicationPart(typeof(SalesModuleMarker).Assembly)
     .AddApplicationPart(typeof(EvaluationModuleMarker).Assembly)
-    .AddApplicationPart(typeof(TrainingModuleMarker).Assembly);
+    .AddApplicationPart(typeof(TrainingModuleMarker).Assembly)
+    .AddApplicationPart(typeof(SapPmsModuleMarker).Assembly);
 builder.Services.AddProblemDetails(options =>
 {
     options.CustomizeProblemDetails = context =>

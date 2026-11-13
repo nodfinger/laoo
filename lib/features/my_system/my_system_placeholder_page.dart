@@ -16,7 +16,6 @@ class MySystemPlaceholderPage extends StatelessWidget {
       final activeMenu = switch (menuCode) {
         '68001' => 'companyApprovalSettings',
         '65001' => 'mySystemSettings',
-        '65002' => 'mySystemSapPms',
         '66001' => 'mySystemTravel',
         '66002' => 'mySystemPurchase',
         '69002' => 'mySystemPurchaseScRequest',

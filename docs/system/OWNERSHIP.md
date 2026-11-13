@@ -10,6 +10,7 @@ Project may consume.
 | `projects/expense` | `LAOO_EXPENSE` | Expense Project | Expense Project | Company, Employee, Branch, Permission |
 | `projects/meeting` | `LAOO_MEETING` | Meeting Project | Meeting Project | Company, Employee, Branch, Permission |
 | `projects/intranet` | `LAOO_INTRANET` | Intranet Project | Intranet Project | Company, Employee, Organization, Permission |
+| `projects/sap_pms` | `LAOO_MY` entitlement (existing; not a new ProjectCode) | SAP-PMS Project (Green) | SAP-PMS Project (Green) | Company entitlement and `VIEW` permission from Core |
 | `projects/service` | `LAOO_SERVICE` | Service Project | Service Project | Company, Employee, Branch, Permission |
 | `projects/time` | `LAOO_TIME` | Time Project | Time Project | Company, Employee, Branch, Organization, Permission |
 | `projects/visitor` | `LAOO_VISITOR` | Visitor Project | Visitor Project | Company, Employee, Branch, Permission |

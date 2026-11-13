@@ -32,6 +32,7 @@
 /projects/school_food/ @nodfinger
 /projects/site/ @nodfinger
 /projects/sport/ @nodfinger
+/projects/sap_pms/ @nodfinger
 
 # Any change outside projects/<project> requires Core ownership.
 /packages/ @nodfinger

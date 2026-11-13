@@ -29,7 +29,7 @@
 | `64002` | `companyAiSettings` | ไม่พบ | `ไม่พบ` | ไม่ระบุ | [`lib/app/router/app_menu_route_registry.dart`](../../lib/app/router/app_menu_route_registry.dart) |
 | `64003` | `companyAiAgents` | ไม่พบ | `ไม่พบ` | ไม่ระบุ | [`lib/app/router/app_menu_route_registry.dart`](../../lib/app/router/app_menu_route_registry.dart) |
 | `65001` | `/company/my-system/settings` | ไม่พบ | `ไม่พบ` | ไม่ระบุ | [`lib/app/router/app_menu_route_registry.dart`](../../lib/app/router/app_menu_route_registry.dart) |
-| `65002` | `/company/my-system/sap-pms` | ไม่พบ | `ไม่พบ` | ไม่ระบุ | [`lib/app/router/app_menu_route_registry.dart`](../../lib/app/router/app_menu_route_registry.dart) |
+| `65002` | `/company/my-system/sap-pms` | 3 (ทะเบียนฐานข้อมูล) | `LAOO_MY` (ทะเบียนฐานข้อมูล) | VIEW (ทะเบียนฐานข้อมูล) | [SAP-PMS](sap_pms.md) |
 
 กลุ่มเมนู `65` ภายใต้ระบบของฉันใช้ชื่อ `ระบบ-IT` โดยมีเมนู `65001` กำหนดค่าระบบ (หน้าเปล่าชั่วคราว) และ `65002` ตรวจสอบข้อมูล API SAP-PMS อยู่ภายในกลุ่มเดียวกัน
 | `66001` | `/company/my-system/travel` | ไม่พบ | `ไม่พบ` | ไม่ระบุ | [`lib/app/router/app_menu_route_registry.dart`](../../lib/app/router/app_menu_route_registry.dart) |
@@ -41,7 +41,7 @@
 
 ## Input / Validation / Flow / สถานะ / Permission / API
 
-สำหรับเมนูที่ไม่มีสเปกเฉพาะ ยังไม่ยืนยันรายละเอียด Input, Validation, Flow, สถานะ, ActionCode, API และตารางข้อมูลจากการมี Route เพียงอย่างเดียว ต้องเปิด Controller, DTO, migration และสิทธิ์ของ MenuCode ก่อนพัฒนา
+สำหรับเมนูที่ไม่มีสเปกเฉพาะ ยังไม่ยืนยันรายละเอียด Input, Validation, Flow, สถานะ, ActionCode, API และตารางข้อมูลจากการมี Route เพียงอย่างเดียว ต้องเปิด Controller, DTO, migration และสิทธิ์ของ MenuCode ก่อนพัฒนา ส่วน API ธุรกิจและการเชื่อมต่อภายนอกของ SAP-PMS ให้ Green ออกแบบและทำภายในโมดูลของตน โดยไม่สร้าง Core Contract เพิ่ม ดูขอบเขตที่ [`docs/system/sap_pms.md`](sap_pms.md)
 
 ## ความเชื่อมโยงข้ามระบบและช่องว่าง
 
@@ -68,7 +68,7 @@
 | `64002` | ตรวจข้อกำหนดเฉพาะด้านบนและ Source | ตรวจข้อกำหนดเฉพาะด้านบนและ Source | ยังต้องตรวจ ActionCode | ยังต้องตรวจ API/DTO |
 | `64003` | ตรวจข้อกำหนดเฉพาะด้านบนและ Source | ตรวจข้อกำหนดเฉพาะด้านบนและ Source | ยังต้องตรวจ ActionCode | ยังต้องตรวจ API/DTO |
 | `65001` | ตรวจข้อกำหนดเฉพาะด้านบนและ Source | ตรวจข้อกำหนดเฉพาะด้านบนและ Source | ยังต้องตรวจ ActionCode | ยังต้องตรวจ API/DTO |
-| `65002` | ตรวจข้อกำหนดเฉพาะด้านบนและ Source | ตรวจข้อกำหนดเฉพาะด้านบนและ Source | ยังต้องตรวจ ActionCode | ยังต้องตรวจ API/DTO |
+| `65002` | ScreenType 3; VIEW ตามทะเบียน | Root ประกอบ Route ไปยัง Feature Package | ยืนยัน VIEW แล้ว | Green เป็นเจ้าของ API/DTO ภายในโมดูล; รายละเอียด SAP ตรวจสอบกับเจ้าของระบบ |
 | `66001` | ตรวจข้อกำหนดเฉพาะด้านบนและ Source | ตรวจข้อกำหนดเฉพาะด้านบนและ Source | ยังต้องตรวจ ActionCode | ยังต้องตรวจ API/DTO |
 | `66002` | ตรวจข้อกำหนดเฉพาะด้านบนและ Source | ตรวจข้อกำหนดเฉพาะด้านบนและ Source | ยังต้องตรวจ ActionCode | ยังต้องตรวจ API/DTO |
 

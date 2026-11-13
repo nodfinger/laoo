@@ -35,6 +35,7 @@
 | ระบบจัดซื้อ | 1 | [purchasing.md](purchasing.md) |
 | Rental | 10 | [rental.md](rental.md) |
 | ระบบขายและเอกสารการค้า | 13 | [sales.md](sales.md) |
+| SAP-PMS | 1 | [sap_pms.md](sap_pms.md) |
 | School | 1 | [school.md](school.md) |
 | School Food | 12 | [school_food.md](school_food.md) |
 | Service | 27 | [service.md](service.md) |
@@ -386,7 +387,7 @@
 | `64002` | [ระบบส่วนกลาง](core.md) | `companyAiSettings` | พบ Route |
 | `64003` | [ระบบส่วนกลาง](core.md) | `companyAiAgents` | พบ Route |
 | `65001` | [ระบบส่วนกลาง](core.md) | `/company/my-system/settings` | พบ Route |
-| `65002` | [ระบบส่วนกลาง](core.md) | `/company/my-system/sap-pms` | พบ Route |
+| `65002` | [SAP-PMS](sap_pms.md) | `/company/my-system/sap-pms` | Core contract ระบุแล้ว; Green เป็นเจ้าของ API และการเชื่อมต่อในโมดูล |
 | `66001` | [ระบบส่วนกลาง](core.md) | `/company/my-system/travel` | พบ Route |
 | `66002` | [ระบบส่วนกลาง](core.md) | `/company/my-system/purchase` | พบ Route |
 | `67001` | [ระบบค่าใช้จ่าย](expense.md) | `/company/my-system/travel-settings` | พบ Route |

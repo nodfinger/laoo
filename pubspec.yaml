@@ -70,6 +70,8 @@ dependencies:
     path: projects/digital_checklist
   laoo_intranet:
     path: projects/intranet
+  laoo_sap_pms:
+    path: projects/sap_pms
   laoo_vote:
     path: projects/vote
   laoo_pos:

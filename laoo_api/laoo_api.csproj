@@ -58,5 +58,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../projects/digital_checklist/packages/dotnet/Laoo.DigitalChecklist.Module/Laoo.DigitalChecklist.Module.csproj" />
+    <ProjectReference Include="../projects/sap_pms/packages/dotnet/Laoo.SapPms.Module/Laoo.SapPms.Module.csproj" />
   </ItemGroup>
 </Project>

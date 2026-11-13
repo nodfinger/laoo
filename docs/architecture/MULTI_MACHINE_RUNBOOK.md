@@ -40,6 +40,22 @@ Mon machine example:
 }
 ```
 
+SAP-PMS Project owner example (Green / NB086):
+
+```json
+{
+  "role": "sap_pms",
+  "ownedModules": ["sap_pms"],
+  "allowedProjects": ["LAOO_MY"],
+  "webPort": 8080,
+  "apiPort": 5080
+}
+```
+
+`LAOO_MY` is the existing company entitlement used by MenuCode `65002`; the
+feature's migration namespace is `LAOO_SAP_PMS`. Green owns the feature API and
+SAP-PMS integration inside `projects/sap_pms/**`.
+
 Never commit a real `local.machine.json`.
 
 Run `tools/scripts/check-machine-boundaries.ps1 -Module <module>` before full
