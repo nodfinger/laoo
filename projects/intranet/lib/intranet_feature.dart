@@ -14,6 +14,7 @@ abstract final class IntranetMenuCodes {
   static const approvalInbox = '43003';
   static const myIntranet = '43004';
   static const reports = '43005';
+  static const annualHolidays = '43006';
 }
 
 abstract final class IntranetRouteNames {
@@ -22,6 +23,7 @@ abstract final class IntranetRouteNames {
   static const approvalInbox = 'intranetApprovalInbox';
   static const myIntranet = 'myIntranet';
   static const reports = 'intranetReports';
+  static const annualHolidays = 'intranetAnnualHolidays';
 }
 
 abstract final class IntranetRoutePaths {
@@ -30,6 +32,7 @@ abstract final class IntranetRoutePaths {
   static const approvalInbox = '/company/intranet-approvals';
   static const myIntranet = '/company/my-intranet';
   static const reports = '/company/intranet-reports';
+  static const annualHolidays = '/company/intranet-annual-holidays';
 }
 
 abstract final class IntranetRoutes {

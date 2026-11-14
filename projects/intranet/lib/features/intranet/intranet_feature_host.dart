@@ -16,6 +16,7 @@ LaooWorkspaceUiTokens Function()? _tokens;
 Future<String> Function(String, String)? _title;
 void Function(BuildContext, {required String message, required bool error})?
 _message;
+Listenable? _displayRevision;
 
 void configureIntranetFeatureHost(
   IntranetWorkspaceShellBuilder builder, {
@@ -29,6 +30,7 @@ void configureIntranetFeatureHost(
     required bool error,
   })?
   messagePresenter,
+  Listenable? listDisplayRevision,
 }) {
   _workspaceShellBuilder = builder;
   _apiFactory = apiClientFactory;
@@ -36,7 +38,10 @@ void configureIntranetFeatureHost(
   _tokens = uiTokensProvider;
   _title = menuTitleResolver;
   _message = messagePresenter;
+  _displayRevision = listDisplayRevision;
 }
+
+Listenable? get intranetListDisplayRevision => _displayRevision;
 
 JsonApiClient createIntranetApiClient() =>
     _apiFactory?.call() ??
