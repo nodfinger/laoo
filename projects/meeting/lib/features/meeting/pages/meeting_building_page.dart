@@ -32,6 +32,15 @@ String _buildingImageUrl(String value) {
   return Uri.parse(ApiConfig.baseUrl).resolve(value.trim()).toString();
 }
 
+String _branchDisplayName(Map<String, dynamic> branch) {
+  final name = '${branch['branchNameTh'] ?? ''}'.trim();
+  final code = '${branch['branchCode'] ?? ''}'.trim();
+  if (code.isNotEmpty && name.startsWith('$code ')) {
+    return name.substring(code.length).trim();
+  }
+  return name.replaceFirst(RegExp(r'^\d+\s+'), '').trim();
+}
+
 class MeetingBuildingPage extends StatefulWidget {
   const MeetingBuildingPage({super.key});
 
@@ -115,7 +124,7 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
         _items = List<Map<String, dynamic>>.from(results[0] as List);
         _pageIndex = 0;
         _branches = List<Map<String, dynamic>>.from(
-          (results[1] as Map)['branches'] as List,
+          (results[1] as Map)['branches'] as List? ?? const [],
         );
         _actions = Map<String, bool>.from(results[2] as Map);
       });
@@ -187,7 +196,9 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
             contentPadding: const EdgeInsets.all(LaooLayout.cardPadding),
             titleTextStyle: LaooTypography.popupTitleStyle,
             title: Container(
-              width: double.infinity,
+              width: (MediaQuery.sizeOf(context).width - 48)
+                  .clamp(0.0, 480.0)
+                  .toDouble(),
               padding: const EdgeInsets.all(LaooLayout.cardPadding),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -207,7 +218,7 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 16),
                   const Divider(
                     color: LaooColors.border,
                     thickness: 1,
@@ -274,7 +285,7 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
                               (item) => DropdownMenuItem<int>(
                                 value: item['branchId'] as int,
                                 child: LaooComboBoxText(
-                                  '${item['branchCode']} ${item['branchNameTh']}',
+                                  _branchDisplayName(item),
                                 ),
                               ),
                             )
@@ -285,15 +296,19 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
                         }),
                       ),
                       const SizedBox(height: 12),
-                      LayoutBuilder(
-                        builder: (context, constraints) {
-                          final compact = constraints.maxWidth < 420;
+                      Builder(
+                        builder: (context) {
+                          final availableWidth =
+                              (MediaQuery.sizeOf(context).width - 68)
+                                  .clamp(0.0, 460.0)
+                                  .toDouble();
+                          final compact = availableWidth < 420;
                           return Wrap(
                             spacing: 12,
                             runSpacing: 12,
                             children: [
                               SizedBox(
-                                width: compact ? constraints.maxWidth : 170,
+                                width: compact ? availableWidth : 170,
                                 child: TextField(
                                   controller: code,
                                   onChanged: (_) =>
@@ -309,8 +324,8 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
                               ),
                               SizedBox(
                                 width: compact
-                                    ? constraints.maxWidth
-                                    : constraints.maxWidth - 182,
+                                    ? availableWidth
+                                    : availableWidth - 182,
                                 child: TextField(
                                   controller: name,
                                   onChanged: (_) =>
@@ -436,12 +451,16 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      LayoutBuilder(
-                        builder: (context, constraints) {
-                          final compact = constraints.maxWidth < 480;
+                      Builder(
+                        builder: (context) {
+                          final availableWidth =
+                              (MediaQuery.sizeOf(context).width - 68)
+                                  .clamp(0.0, 460.0)
+                                  .toDouble();
+                          final compact = availableWidth < 480;
                           final fieldWidth = compact
-                              ? constraints.maxWidth
-                              : (constraints.maxWidth - 24) / 3;
+                              ? availableWidth
+                              : (availableWidth - 24) / 3;
                           return Wrap(
                             spacing: 12,
                             runSpacing: 12,
@@ -485,7 +504,9 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
             ),
             actions: [
               Container(
-                width: double.infinity,
+                width: (MediaQuery.sizeOf(context).width - 48)
+                    .clamp(0.0, 480.0)
+                    .toDouble(),
                 padding: const EdgeInsets.all(LaooLayout.cardPadding),
                 decoration: const BoxDecoration(
                   border: Border(top: BorderSide(color: LaooColors.border)),
@@ -646,7 +667,7 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 16),
                   const Divider(
                     color: LaooColors.border,
                     thickness: 1,
@@ -714,8 +735,8 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
                         borderRadius: BorderRadius.circular(LaooRadius.xs),
                       ),
                       child: Text(
-                        'สถานที่: ${selectedBranch?['branchCode'] ?? '-'} ${selectedBranch?['branchNameTh'] ?? '-'}\n'
-                        'อาคาร: ${building['code'] ?? ''} ${building['nameTh'] ?? ''}',
+                        'สถานที่: ${selectedBranch == null ? '-' : _branchDisplayName(selectedBranch)}\n'
+                        'อาคาร: ${building['nameTh'] ?? '-'}',
                         style: TextStyle(
                           color: preset.primary,
                           fontWeight: FontWeight.w600,
@@ -955,9 +976,7 @@ class _MeetingBuildingPageState extends State<MeetingBuildingPage> {
                         ..._branches.map(
                           (item) => DropdownMenuItem<int?>(
                             value: item['branchId'] as int,
-                            child: LaooComboBoxText(
-                              '${item['branchCode']} ${item['branchNameTh']}',
-                            ),
+                            child: LaooComboBoxText(_branchDisplayName(item)),
                           ),
                         ),
                       ],

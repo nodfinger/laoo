@@ -129,14 +129,14 @@ ORDER BY ISNULL(Seq,0),Name";
     public Task<IActionResult> Update(long id, FoodRequest request, CancellationToken token) => Save(id, request, token);
 
     [HttpPost("{id:long}/image")]
-    [RequestSizeLimit(100 * 1024)]
+    [RequestSizeLimit(2 * 1024 * 1024)]
     public async Task<IActionResult> UploadImage(long id, IFormFile file, CancellationToken token)
     {
-        const int maximumBytes = 70 * 1024;
+        const int maximumBytes = 2 * 1024 * 1024;
         if (!IsCompany() || CompanyId() is not long company ||
             (!await Permission("EDIT", token) && !await Permission("CREATE", token))) return Forbid();
         if (file.Length == 0 || file.Length > maximumBytes)
-            return BadRequest(new { message = "ขนาดรูปอาหารไม่ถูกต้อง", description = "กรุณาเลือกรูปที่บีบอัดแล้วไม่เกิน 70 KB" });
+            return BadRequest(new { message = "ขนาดรูปอาหารไม่ถูกต้อง", description = "กรุณาเลือกรูปที่บีบอัดแล้วไม่เกิน 2 MB" });
         var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
         if (extension is not (".jpg" or ".jpeg" or ".png" or ".webp"))
             return BadRequest(new { message = "รูปแบบไฟล์ไม่รองรับ", description = "รองรับเฉพาะ JPG, PNG และ WebP" });
@@ -167,6 +167,21 @@ ORDER BY ISNULL(Seq,0),Name";
 
         DeletePreviousImage(webRoot, existingUrl, imageUrl);
         return Ok(new { imageUrl });
+    }
+
+    [HttpDelete("{id:long}/image")]
+    public async Task<IActionResult> DeleteImage(long id, CancellationToken token)
+    {
+        if (!IsCompany() || CompanyId() is not long company || !await Permission("EDIT", token)) return Forbid();
+        await using var connection = await Open(token);
+        await using var command = new SqlCommand("UPDATE dbo.TDADMeetingFood SET FoodImageUrl=NULL,UpdateDate=SYSUTCDATETIME() OUTPUT DELETED.FoodImageUrl WHERE FoodID=@id AND CompanyID=@company", connection);
+        Add(command, "@id", id);
+        Add(command, "@company", company);
+        var previous = await command.ExecuteScalarAsync(token);
+        if (previous is null) return NotFound();
+        var webRoot = environment.WebRootPath ?? Path.Combine(environment.ContentRootPath, "wwwroot");
+        DeletePreviousImage(webRoot, previous is DBNull ? null : Convert.ToString(previous), string.Empty);
+        return NoContent();
     }
 
     [HttpDelete("{id:long}")]

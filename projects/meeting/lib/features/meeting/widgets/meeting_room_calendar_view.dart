@@ -741,7 +741,7 @@ class _MeetingRoomCalendarViewState extends State<MeetingRoomCalendarView> {
                           : events
                                 .map(
                                   (event) =>
-                                      '${_eventTime(event)} | ${event['subject']}',
+                                      '${_eventTime(event)}${event['subject'] == null ? '' : " | ${event['subject']}"}',
                                 )
                                 .join('\n'),
                     ),
@@ -756,34 +756,33 @@ class _MeetingRoomCalendarViewState extends State<MeetingRoomCalendarView> {
     );
   }
 
-  Widget _eventChip(Map<String, dynamic> event, {bool compact = false}) =>
-      Padding(
-        padding: const EdgeInsets.only(bottom: 3),
-        child: InkWell(
-          onTap: () => _showEvent(event),
+  Widget _eventChip(
+    Map<String, dynamic> event, {
+    bool compact = false,
+  }) => Padding(
+    padding: const EdgeInsets.only(bottom: 3),
+    child: InkWell(
+      onTap: () => _showEvent(event),
+      borderRadius: BorderRadius.circular(LaooRadius.xs),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 5, vertical: compact ? 2 : 3),
+        decoration: BoxDecoration(
+          color: _eventBackground(event),
           borderRadius: BorderRadius.circular(LaooRadius.xs),
-          child: Container(
-            padding: EdgeInsets.symmetric(
-              horizontal: 5,
-              vertical: compact ? 2 : 3,
-            ),
-            decoration: BoxDecoration(
-              color: _eventBackground(event),
-              borderRadius: BorderRadius.circular(LaooRadius.xs),
-            ),
-            child: Text(
-              '${_eventTime(event)} ${event['roomCode']} | ${event['subject']}',
-              maxLines: compact ? 1 : 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: _eventForeground(event),
-                fontSize: LaooTypography.inputHint,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+        ),
+        child: Text(
+          '${_eventTime(event)} ${event['roomCode']}${event['subject'] == null ? '' : " | ${event['subject']}"}',
+          maxLines: compact ? 1 : 2,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: _eventForeground(event),
+            fontSize: LaooTypography.inputHint,
+            fontWeight: FontWeight.w600,
           ),
         ),
-      );
+      ),
+    ),
+  );
 
   Widget _agendaEvent(Map<String, dynamic> event) => InkWell(
     onTap: () => _showEvent(event),
@@ -794,7 +793,7 @@ class _MeetingRoomCalendarViewState extends State<MeetingRoomCalendarView> {
         borderRadius: BorderRadius.circular(LaooRadius.xs),
       ),
       child: Text(
-        '${_eventTime(event)}\n${event['roomCode']} | ${event['subject']}',
+        '${_eventTime(event)}\n${event['roomCode']}${event['subject'] == null ? '' : " | ${event['subject']}"}',
         style: TextStyle(color: _eventForeground(event)),
       ),
     ),
@@ -809,7 +808,7 @@ class _MeetingRoomCalendarViewState extends State<MeetingRoomCalendarView> {
         border: Border(bottom: BorderSide(color: LaooColors.border, width: .5)),
       ),
       child: Text(
-        '${_eventTime(event)}\n${event['roomCode']} | ${event['subject']}',
+        '${_eventTime(event)}\n${event['roomCode']}${event['subject'] == null ? '' : " | ${event['subject']}"}',
         style: const TextStyle(color: LaooColors.textPrimary),
       ),
     ),
@@ -884,8 +883,14 @@ class _MeetingRoomCalendarViewState extends State<MeetingRoomCalendarView> {
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              const SizedBox(height: 8),
-              Text('${event['subject']}'),
+              if (event['subject'] != null) ...[
+                const SizedBox(height: 8),
+                Text('${event['subject']}'),
+              ],
+              const SizedBox(height: 6),
+              Text('ผู้จอง: ${event['requesterName'] ?? '-'}'),
+              const SizedBox(height: 6),
+              Text('แผนก: ${event['requesterDepartment'] ?? '-'}'),
               const SizedBox(height: 6),
               Text('${_formatEventDate(event)} · ${_eventTime(event)}'),
               const SizedBox(height: 6),
@@ -912,6 +917,7 @@ class _MeetingRoomCalendarViewState extends State<MeetingRoomCalendarView> {
                       child: const Text('ปิด'),
                     ),
                     if (widget.canEdit &&
+                        event['subject'] != null &&
                         event['status'] != 'CANCELLED' &&
                         event['status'] != 'REJECTED')
                       FilledButton.icon(

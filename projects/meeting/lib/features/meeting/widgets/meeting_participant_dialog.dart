@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../app/theme/laoo_design_tokens.dart';
 import '../../../app/theme/laoo_typography.dart';
 import '../../../app/theme/workspace_theme_presets.dart';
+import '../../../core/api/api_client.dart';
 import '../../../core/widgets/combo_box_text.dart';
 import '../data/meeting_room_booking_repository.dart';
 import 'meeting_popup.dart';
@@ -14,6 +15,18 @@ Future<bool> showMeetingParticipantDialog(
 }) async {
   final preset = workspaceThemeController.value;
   final data = await repository.participants(bookingId);
+  final setupApi = ApiClient();
+  late final String nameDisplay;
+  try {
+    final setup = await setupApi.get('/api/system/company-setup/runtime');
+    nameDisplay =
+        (setup is Map ? setup['employeeNameDisplay'] : null)
+            ?.toString()
+            .toUpperCase() ??
+        'FULL';
+  } finally {
+    setupApi.dispose();
+  }
   if (!context.mounted) return false;
   final employees = _maps(data['employees']);
   final selected = employees
@@ -34,13 +47,18 @@ Future<bool> showMeetingParticipantDialog(
   }
   final departmentItems = departments.entries.toList()
     ..sort((a, b) => a.value.compareTo(b.value));
+  if (departmentItems.isNotEmpty) departmentId = departmentItems.first.key;
+  var selectedOnly = false;
   final screen = MediaQuery.sizeOf(context);
   final saved = await showDialog<bool>(
     context: context,
     builder: (dialogContext) => StatefulBuilder(
       builder: (context, refresh) {
         final filtered = employees.where((employee) {
-          if (departmentId != null &&
+          if (selectedOnly && !selected.contains(_int(employee['employeeId'])))
+            return false;
+          if (!selectedOnly &&
+              departmentId != null &&
               _int(employee['departmentOrgUnitId']) != departmentId) {
             return false;
           }
@@ -144,7 +162,23 @@ Future<bool> showMeetingParticipantDialog(
                   },
                 ),
                 const SizedBox(height: 8),
-                Text('เลือกแล้ว ${selected.length} คน'),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: () =>
+                        refresh(() => selectedOnly = !selectedOnly),
+                    icon: Icon(
+                      selectedOnly
+                          ? Icons.filter_alt_off_outlined
+                          : Icons.filter_alt_outlined,
+                    ),
+                    label: Text(
+                      selectedOnly
+                          ? 'แสดงทั้งหมด | เลือกแล้ว ${selected.length} คน'
+                          : 'เลือกแล้ว ${selected.length} คน',
+                    ),
+                  ),
+                ),
                 const Divider(color: LaooColors.border),
                 Expanded(
                   child: filtered.isEmpty
@@ -169,8 +203,6 @@ Future<bool> showMeetingParticipantDialog(
                                       .trim()
                                       .isNotEmpty)
                                 'เหตุผล: ${employee['lateResponseReason']}',
-                              if ('${employee['nickName'] ?? ''}'.isNotEmpty)
-                                'ชื่อเล่น: ${employee['nickName']}',
                               if ('${employee['departmentName'] ?? ''}'
                                   .isNotEmpty)
                                 'แผนก: ${employee['departmentName']}',
@@ -182,9 +214,7 @@ Future<bool> showMeetingParticipantDialog(
                               activeColor: preset.primary,
                               dense: true,
                               controlAffinity: ListTileControlAffinity.leading,
-                              title: Text(
-                                '${employee['employeeCode'] ?? '-'} | ${employee['employeeName'] ?? '-'}',
-                              ),
+                              title: Text(_employeeName(employee, nameDisplay)),
                               subtitle: details.isEmpty
                                   ? null
                                   : Text(details.join(' | ')),
@@ -246,6 +276,16 @@ List<Map<String, dynamic>> _maps(Object? value) => value is List
 
 int? _int(Object? value) =>
     value is num ? value.toInt() : int.tryParse(value?.toString() ?? '');
+
+String _employeeName(Map<String, dynamic> employee, String mode) {
+  final full = '${employee['employeeName'] ?? ''}'.trim();
+  final nick = '${employee['nickName'] ?? ''}'.trim();
+  if (mode == 'NICK')
+    return nick.isNotEmpty ? nick : (full.isNotEmpty ? full : '-');
+  if (mode == 'BOTH' && nick.isNotEmpty)
+    return full.isEmpty ? nick : '$full ($nick)';
+  return full.isNotEmpty ? full : (nick.isNotEmpty ? nick : '-');
+}
 
 String _bookingDateTime(Map<String, dynamic> item) {
   final start = DateTime.tryParse('${item['startDateTime'] ?? ''}');
