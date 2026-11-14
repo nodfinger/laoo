@@ -31,4 +31,5 @@ class MeetingFoodRepository {
           as String;
 
   Future<void> delete(int id) => _api.delete('$_path/$id');
+  Future<void> deleteImage(int id) => _api.delete('$_path/$id/image');
 }

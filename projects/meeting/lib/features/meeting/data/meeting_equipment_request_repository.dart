@@ -56,6 +56,27 @@ class MeetingEquipmentRequestRepository {
   Future<Map<String, dynamic>> settings() async =>
       Map<String, dynamic>.from(await _api.get('$_path/settings') as Map);
 
+  Future<Map<String, dynamic>> displayVisibility() async =>
+      Map<String, dynamic>.from(
+        await _api.get('/api/company/meeting-display-backgrounds/visibility')
+            as Map,
+      );
+  Future<void> saveDisplayVisibility(Map<String, bool> value) => _api.put(
+    '/api/company/meeting-display-backgrounds/visibility',
+    body: value,
+  );
+
+  Future<List<Map<String, dynamic>>> backgrounds() async =>
+      List<Map<String, dynamic>>.from(
+        await _api.get('/api/company/meeting-display-backgrounds') as List,
+      );
+
+  Future<void> saveBackground(int slot, String orientation, String? image) =>
+      _api.put(
+        '/api/company/meeting-display-backgrounds/$slot',
+        body: {'orientation': orientation, 'image': image},
+      );
+
   Future<void> saveSettings(bool requireReview) => _api.put(
     '$_path/settings',
     body: {'requireEquipmentRequestReview': requireReview},
