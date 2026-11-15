@@ -745,6 +745,13 @@ packages:
       relative: true
     source: path
     version: "1.0.0+1"
+  laoo_sap_pms:
+    dependency: "direct main"
+    description:
+      path: "projects/sap_pms"
+      relative: true
+    source: path
+    version: "1.0.0+1"
   laoo_school:
     dependency: "direct main"
     description:

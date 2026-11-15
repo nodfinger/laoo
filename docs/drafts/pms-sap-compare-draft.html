@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>แบบร่างเปรียบเทียบข้อมูล PMS - SAP</title>
+  <style>
+    :root { --primary:#16805d; --light:#e6f3ed; --border:#d9e2de; --text:#17231f; --muted:#64736d; --red:#c83030; --red-light:#fff0ef; --background:#f8f9fb; }
+    * { box-sizing:border-box; } body { margin:0; background:var(--background); color:var(--text); font-family:"Noto Sans Thai",Tahoma,Arial,sans-serif; font-size:14px; line-height:1.5; }
+    .top { background:white; border-bottom:1px solid var(--border); padding:14px 24px; color:var(--primary); font-weight:700; } .layout { max-width:1600px; margin:auto; padding:24px; }
+    .card { background:white; border-radius:4px; margin-bottom:8px; padding:16px; } .head { display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap; }
+    h1,h2,p { margin:0; } h1 { font-size:18px; } h2 { font-size:16px; } .muted { color:var(--muted); } .sub { margin-top:4px; } .draft { background:#fff6df; color:#805d00; border-radius:4px; padding:7px 12px; }
+    button,.file-button { border:1px solid var(--primary); border-radius:4px; background:white; color:var(--primary); padding:0 16px; height:48px; font:inherit; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:8px; }
+    button.primary { color:white; background:var(--primary); } button:focus-visible,.file-button:focus-within { outline:3px solid #9ed7bf; outline-offset:2px; }
+    .upload-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:12px; } .upload { border:1px solid var(--border); border-radius:4px; padding:14px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+    .upload-icon { width:40px;height:40px;display:grid;place-items:center;border-radius:4px;background:var(--light);color:var(--primary);font-weight:700; } .upload-info { flex:1; min-width:180px; } .upload-info strong { display:block; } .file-button input { position:absolute; width:1px;height:1px;opacity:0; }
+    .filter { display:flex; align-items:end; gap:8px; flex-wrap:wrap; } .field { display:grid; gap:5px; min-width:190px; } label { color:var(--primary); } input[type=date] { border:1px solid var(--border); border-radius:4px; height:48px; padding:0 12px; font:inherit; color:var(--text); background:white; }
+    .filter-actions { display:flex; gap:8px; flex-wrap:wrap; } .note { margin-top:10px; color:var(--muted); font-size:12px; }
+    .stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; } .stat { width:100%; height:auto; min-height:74px; justify-content:space-between; text-align:left; border-color:var(--border); color:var(--text); padding:12px 16px; } .stat span { display:grid; } .stat strong { font-size:22px; } .stat.active { border-color:var(--primary); background:var(--light); } .stat.problem strong { color:var(--red); }
+    .result-head { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; } .tabs { display:flex; gap:8px; flex-wrap:wrap; } .tab { height:40px; border-color:var(--border); color:var(--muted); } .tab.active { background:var(--light); color:var(--primary); border-color:var(--primary); }
+    .table-wrap { overflow:auto; margin-top:12px; } table { border-collapse:collapse; width:100%; min-width:900px; } th { height:56px; background:var(--light); color:var(--primary); text-align:left; font-weight:700; } td { padding:12px 8px; border-bottom:1px solid var(--border); vertical-align:top; } th { padding:0 8px; } tr.problem-row { background:#fffafa; } .badge { display:inline-block; border-radius:999px; padding:4px 10px; background:var(--light); color:var(--primary); white-space:nowrap; } .badge.problem { background:var(--red-light); color:var(--red); } .badge.wait { background:#f2f4f3; color:var(--muted); } .issue { color:var(--red); } .empty { padding:28px; text-align:center; color:var(--muted); } .legend { margin-top:12px; color:var(--muted); font-size:12px; } .notice { color:var(--primary); min-height:21px; margin-top:8px; }
+    @media(max-width:700px) { .layout { padding:10px; } .upload-grid { grid-template-columns:1fr; } .stats { grid-template-columns:1fr; } .stat { min-height:54px; } .field { width:100%; } .filter-actions { width:100%; } .filter-actions button { flex:1; } }
+  </style>
+</head>
+<body>
+  <div class="top">▦ &nbsp; ระบบของฉัน / ตรวจสอบข้อมูล PMS - SAP</div>
+  <main class="layout">
+    <section class="card head">
+      <div><h1>▤ &nbsp; เปรียบเทียบข้อมูล PMS - SAP</h1><p class="muted sub">ตรวจสอบความถูกต้องของเอกสารจากทั้งสองระบบ</p></div>
+      <span class="draft">แบบร่างหน้าจอ · ข้อมูลตัวอย่าง</span>
+    </section>
+    <section class="card">
+      <h2>1. เลือกไฟล์ข้อมูล</h2><p class="muted sub">นำเข้าไฟล์ Excel จากทั้งสองระบบ โดยคอลัมน์ตำแหน่งเดียวกันเป็นข้อมูลชนิดเดียวกัน</p>
+      <div class="upload-grid">
+        <div class="upload"><span class="upload-icon">P</span><div class="upload-info"><strong>ไฟล์ PMS</strong><span class="muted" id="pms-name">ยังไม่ได้เลือกไฟล์ · .xlsx</span></div><label class="file-button">เลือกไฟล์<input type="file" accept=".xlsx" data-name="pms-name"></label></div>
+        <div class="upload"><span class="upload-icon">S</span><div class="upload-info"><strong>ไฟล์ SAP</strong><span class="muted" id="sap-name">ยังไม่ได้เลือกไฟล์ · .xlsx</span></div><label class="file-button">เลือกไฟล์<input type="file" accept=".xlsx" data-name="sap-name"></label></div>
+      </div>
+    </section>
+    <section class="card">
+      <h2>2. กำหนดช่วงวันที่และเปรียบเทียบ</h2>
+      <div class="filter" style="margin-top:12px">
+        <div class="field"><label for="from-date">วันที่เอกสาร PMS ตั้งแต่</label><input type="date" id="from-date" value="2026-11-01"></div>
+        <div class="field"><label for="to-date">ถึงวันที่</label><input type="date" id="to-date" value="2026-11-30"></div>
+        <div class="filter-actions"><button class="primary" id="compare">⌕ &nbsp; เปรียบเทียบ</button><button id="reset">× &nbsp; ล้างตัวกรอง</button></div>
+      </div>
+      <p class="note">ใช้วันที่เอกสารจาก PMS สำหรับกรองรายการ PMS ส่วนรายการ SAP ที่ไม่พบคู่ PMS จะแสดงแยกไว้ทั้งหมด</p><div class="notice" id="notice" role="status"></div>
+    </section>
+    <section class="card"><div class="stats" aria-label="กรองสถานะ"><button class="stat active" data-filter="all"><span>ทั้งหมด<small class="muted">รายการตัวอย่าง</small></span><strong id="total">0</strong></button><button class="stat problem" data-filter="problem"><span>พบปัญหา<small class="muted">ตรวจสอบเพิ่มเติม</small></span><strong id="problems">0</strong></button><button class="stat" data-filter="normal"><span>ปกติ<small class="muted">ข้อมูลตรงกัน</small></span><strong id="normal">0</strong></button></div></section>
+    <section class="card">
+      <div class="result-head"><div><h2>3. ผลการตรวจสอบ</h2><p class="muted sub">แสดงรายการ PMS และปัญหาที่พบเฉพาะใน SAP ไว้ด้วยกัน</p></div><button id="export">⇩ &nbsp; ส่งออก Excel</button></div>
+      <div class="table-wrap"><table><thead><tr><th>สถานะ</th><th>เลขที่เอกสาร</th><th>วันที่เอกสาร</th><th>สถานะ PMS</th><th>ผลตรวจสอบ</th><th>รายละเอียด</th></tr></thead><tbody id="rows"></tbody></table><div class="empty" id="empty" hidden>ไม่พบรายการตามตัวกรอง</div></div>
+      <p class="legend">ตัวอย่าง: จับคู่ด้วยเลขที่เอกสาร · คอลัมน์ SAP ที่ไม่มีจะข้ามการตรวจ · เลขที่เอกสารซ้ำจะแจ้งเป็นปัญหา</p>
+    </section>
+  </main>
+  <script>
+    const examples = {
+      pms: [
+        {kind:'normal',number:'PMS-00001',date:'05/11/2026',status:'2 · ส่ง SAP',result:'ข้อมูลตรงกัน',detail:'วันที่เอกสารและจำนวนเงินตรงกัน'},
+        {kind:'problem',number:'PMS-00002',date:'06/11/2026',status:'2 · ส่ง SAP',result:'ข้อมูลไม่ตรงกัน',detail:'จำนวนเงิน · PMS 1,250.00 / SAP 1,200.00'},
+        {kind:'problem',number:'PMS-00003',date:'07/11/2026',status:'2 · ส่ง SAP',result:'ไม่พบใน SAP',detail:'ไม่พบเลขที่เอกสารที่ตรงกัน'},
+        {kind:'wait',number:'PMS-00004',date:'08/11/2026',status:'1 · ยังไม่ส่ง',result:'ยังไม่ส่ง SAP',detail:'ยังไม่ตรวจการพบคู่ใน SAP'},
+        {kind:'problem',number:'PMS-00005',date:'09/11/2026',status:'2 · ส่ง SAP',result:'เลขที่เอกสารซ้ำ',detail:'พบเลขที่ซ้ำในไฟล์ PMS · ไม่จับคู่โดยอัตโนมัติ'}
+      ],
+      sap: [
+        {kind:'normal',number:'PMS-00001',date:'05/11/2026',status:'2 · ส่ง SAP',result:'พบคู่ใน PMS',detail:'ข้อมูลตรงกัน'},
+        {kind:'problem',number:'PMS-00002',date:'06/11/2026',status:'2 · ส่ง SAP',result:'ข้อมูลไม่ตรงกัน',detail:'จำนวนเงิน · PMS 1,250.00 / SAP 1,200.00'},
+        {kind:'problem',number:'SAP-00006',date:'—',status:'ไม่พบ PMS',result:'ไม่พบใน PMS',detail:'แสดงแยกโดยไม่ใช้ช่วงวันที่ PMS'},
+        {kind:'problem',number:'SAP-00007',date:'—',status:'ไม่พบ PMS',result:'เลขที่เอกสารซ้ำ',detail:'พบเลขที่ซ้ำในไฟล์ SAP · ไม่จับคู่โดยอัตโนมัติ'}
+      ]
+    };
+    let filter='all';
+    function render() {
+      const data=[...examples.pms, ...examples.sap.filter(x => x.status === 'ไม่พบ PMS')];
+      document.getElementById('total').textContent=data.length;
+      document.getElementById('problems').textContent=data.filter(x=>x.kind==='problem').length;
+      document.getElementById('normal').textContent=data.filter(x=>x.kind==='normal').length;
+      const visible=data.filter(x=>filter==='all'||x.kind===filter);
+      document.getElementById('rows').innerHTML=visible.map(x=>`<tr class="${x.kind==='problem'?'problem-row':''}"><td><span class="badge ${x.kind==='problem'?'problem':x.kind==='wait'?'wait':''}">${x.kind==='problem'?'พบปัญหา':x.kind==='wait'?'ยังไม่ส่ง':'ปกติ'}</span></td><td>${x.number}</td><td>${x.date}</td><td>${x.status}</td><td class="${x.kind==='problem'?'issue':''}">${x.result}</td><td>${x.detail}</td></tr>`).join('');
+      document.getElementById('empty').hidden=visible.length!==0;
+    }
+    document.querySelectorAll('[data-filter]').forEach(button=>button.addEventListener('click',()=>{filter=button.dataset.filter;document.querySelectorAll('[data-filter]').forEach(x=>x.classList.toggle('active',x===button));render()}));
+    document.querySelectorAll('input[type=file]').forEach(input=>input.addEventListener('change',()=>{document.getElementById(input.dataset.name).textContent=input.files[0]?.name||'ยังไม่ได้เลือกไฟล์ · .xlsx'}));
+    document.getElementById('compare').addEventListener('click',()=>document.getElementById('notice').textContent='ตัวอย่างหน้าจอ: ยังไม่ได้อ่านหรือเปรียบเทียบข้อมูลจากไฟล์จริง');
+    document.getElementById('export').addEventListener('click',()=>document.getElementById('notice').textContent='ตัวอย่างหน้าจอ: การส่งออก Excel จะพัฒนาในขั้นตอนถัดไป');
+    document.getElementById('reset').addEventListener('click',()=>{document.getElementById('from-date').value='';document.getElementById('to-date').value='';filter='all';document.querySelectorAll('[data-filter]').forEach(x=>x.classList.toggle('active',x.dataset.filter==='all'));document.getElementById('notice').textContent='';render()});
+    render();
+  </script>
+</body>
+</html>

@@ -23,6 +23,7 @@ import 'package:laoo_patrol/patrol_feature.dart';
 import 'package:laoo_digital_checklist/digital_checklist_feature.dart';
 import 'package:laoo_intranet/intranet_feature.dart';
 import 'package:laoo_purchasing/purchasing_feature.dart';
+import 'package:laoo_sap_pms/sap_pms_feature.dart';
 import 'package:laoo_vote/vote_feature.dart';
 import 'package:laoo_pos/pos_feature.dart';
 import 'package:laoo_sales/sales_feature.dart';
@@ -553,6 +554,16 @@ void main() {
           .upload(path, fileName: fileName, bytes: bytes, fields: fields)
           .whenComplete(client.dispose);
     },
+  );
+  configureSapPmsFeatureHost(
+    _buildMeetingWorkspaceShell,
+    apiClientFactory: ApiClient.new,
+    apiClientDisposer: (client) => (client as ApiClient).dispose(),
+    menuTitleResolver: (menuCode, fallback) => NavigationMenuRepository()
+        .resolveMenuName(menuCode: menuCode, fallback: fallback),
+    uiTokensProvider: _surveyWorkspaceTokens,
+    messagePresenter: (context, {required message, required error}) =>
+        showTimedSnackBar(context, message: message, error: error),
   );
   configureVoteFeatureHost(
     _buildMeetingWorkspaceShell,
