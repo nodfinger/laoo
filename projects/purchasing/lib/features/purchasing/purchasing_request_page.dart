@@ -80,12 +80,32 @@ class _PurchasingRequestPageState extends State<PurchasingRequestPage> {
   int _page = 1;
   int _total = 0;
   bool _cardView = false;
+  String _yearFormat = 'AD';
+  List<String> _displayOrder = [];
+  Set<String> _hidden = {};
+  bool _actionOnRight = false;
+  static const _labels = <String, String>{
+    'requestNo': 'เลขที่ขอ',
+    'requestDate': 'วันที่ขอ',
+    'divisionName': 'ฝ่าย',
+    'departmentName': 'แผนก',
+    'requesterName': 'ผู้ขอ',
+    'status': 'สถานะ',
+    'responsibleName': 'ผู้รับผิดชอบ',
+  };
+  List<String> get _visibleFields => [
+    ..._displayOrder.where(_labels.containsKey),
+    ..._labels.keys.where((key) => !_displayOrder.contains(key)),
+  ].where((key) => key == 'requestNo' || !_hidden.contains(key)).toList();
 
   @override
   void initState() {
     super.initState();
     _client = createPurchasingApiClient();
     _repo = PurchasingRequestRepository(_client);
+    purchasingListDisplayRevision?.addListener(_loadPreferences);
+    _loadPreferences();
+    _loadYearFormat();
     resolvePurchasingMenuTitle(PurchasingMenuCodes.requests, _caption).then((
       value,
     ) {
@@ -96,9 +116,41 @@ class _PurchasingRequestPageState extends State<PurchasingRequestPage> {
 
   @override
   void dispose() {
+    purchasingListDisplayRevision?.removeListener(_loadPreferences);
     _search.dispose();
     disposePurchasingApiClient(_client);
     super.dispose();
+  }
+
+  Future<void> _loadPreferences() async {
+    try {
+      final value = await _client.get('/api/user-list-display/69002');
+      if (!mounted || value is! Map) return;
+      setState(() {
+        _displayOrder =
+            (value['order'] is List ? value['order'] as List : const [])
+                .whereType<String>()
+                .where(_labels.containsKey)
+                .toSet()
+                .toList();
+        _hidden = (value['hidden'] is List ? value['hidden'] as List : const [])
+            .whereType<String>()
+            .toSet();
+        _actionOnRight = value['actionOnRight'] == true;
+      });
+    } catch (_) {
+      /* Use standard display when settings are unavailable. */
+    }
+  }
+
+  Future<void> _loadYearFormat() async {
+    try {
+      final data = await _client.get('/api/system/company-setup/runtime');
+      if (mounted && data is Map)
+        setState(() => _yearFormat = '${data['yearFormat'] ?? 'AD'}');
+    } catch (_) {
+      /* Use the default year format. */
+    }
   }
 
   Future<void> _load() async {
@@ -400,7 +452,10 @@ class _PurchasingRequestPageState extends State<PurchasingRequestPage> {
                                   child: TextField(
                                     key: _searchKey,
                                     controller: _search,
-                                    onSubmitted: (_) => _load(),
+                                    onSubmitted: (_) {
+                                      _page = 1;
+                                      _load();
+                                    },
                                     decoration: const InputDecoration(
                                       labelText: 'ค้นหาเลขที่ขอ/รายการ',
                                       prefixIcon: Icon(Icons.search),
@@ -412,6 +467,7 @@ class _PurchasingRequestPageState extends State<PurchasingRequestPage> {
                                     _divisionId = v;
                                     _departmentId = null;
                                     _requesterId = null;
+                                    _page = 1;
                                   });
                                   _load();
                                 }),
@@ -421,19 +477,26 @@ class _PurchasingRequestPageState extends State<PurchasingRequestPage> {
                                   setState(() {
                                     _departmentId = v;
                                     _requesterId = null;
+                                    _page = 1;
                                   });
                                   _load();
                                 }),
                                 _filter('ผู้ขอ', _requesterId, _requesters, (
                                   v,
                                 ) {
-                                  setState(() => _requesterId = v);
+                                  setState(() {
+                                    _requesterId = v;
+                                    _page = 1;
+                                  });
                                   _load();
                                 }),
                                 SizedBox(
                                   height: _searchHeight,
                                   child: FilledButton.icon(
-                                    onPressed: _load,
+                                    onPressed: () {
+                                      _page = 1;
+                                      _load();
+                                    },
                                     icon: const Icon(Icons.search),
                                     label: const Text('ค้นหา'),
                                   ),
@@ -477,8 +540,14 @@ class _PurchasingRequestPageState extends State<PurchasingRequestPage> {
     final date = DateTime.tryParse(text);
     return date == null
         ? (text.isEmpty ? '-' : text)
-        : '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+        : formatPurchasingDate(date, _yearFormat);
   }
+
+  String _fieldValue(String key, Map<String, dynamic> row) => switch (key) {
+    'requestDate' => _date(row[key]),
+    'status' => _status(row),
+    _ => '${row[key] ?? '-'}',
+  };
 
   String _status(Map<String, dynamic> row) =>
       row['statusCode'] == 'DRAFT' ? 'แบบร่าง' : '${row['statusCode'] ?? '-'}';
@@ -523,15 +592,15 @@ class _PurchasingRequestPageState extends State<PurchasingRequestPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _actions(_rows[i], card: true),
+                  if (!_actionOnRight) _actions(_rows[i], card: true),
                   const SizedBox(height: 8),
-                  Text('เลขที่ขอ: ${_rows[i]['requestNo'] ?? '-'}'),
-                  Text('วันที่ขอ: ${_date(_rows[i]['requestDate'])}'),
-                  Text('ฝ่าย: ${_rows[i]['divisionName'] ?? '-'}'),
-                  Text('แผนก: ${_rows[i]['departmentName'] ?? '-'}'),
-                  Text('ผู้ขอ: ${_rows[i]['requesterName'] ?? '-'}'),
-                  Text('สถานะ: ${_status(_rows[i])}'),
-                  Text('ผู้รับผิดชอบ: ${_rows[i]['responsibleName'] ?? '-'}'),
+                  for (final key in _visibleFields)
+                    Text('${_labels[key]}: ${_fieldValue(key, _rows[i])}'),
+                  if (_actionOnRight)
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: _actions(_rows[i], card: true),
+                    ),
                 ],
               ),
             ),
@@ -565,30 +634,22 @@ class _PurchasingRequestPageState extends State<PurchasingRequestPage> {
               fontSize: 14,
               fontWeight: FontWeight.w700,
             ),
-            columns: const [
-              DataColumn(label: Text('ID')),
-              DataColumn(label: Text('Action')),
-              DataColumn(label: Text('เลขที่ขอ')),
-              DataColumn(label: Text('วันที่ขอ')),
-              DataColumn(label: Text('ฝ่าย')),
-              DataColumn(label: Text('แผนก')),
-              DataColumn(label: Text('ผู้ขอ')),
-              DataColumn(label: Text('สถานะ')),
-              DataColumn(label: Text('ผู้รับผิดชอบ')),
+            columns: [
+              const DataColumn(label: Text('ID')),
+              if (!_actionOnRight) const DataColumn(label: Text('Action')),
+              for (final key in _visibleFields)
+                DataColumn(label: Text(_labels[key]!)),
+              if (_actionOnRight) const DataColumn(label: Text('Action')),
             ],
             rows: [
               for (var i = 0; i < _rows.length; i++)
                 DataRow(
                   cells: [
                     DataCell(Text('${(_page - 1) * 20 + i + 1}')),
-                    DataCell(_actions(_rows[i])),
-                    DataCell(Text('${_rows[i]['requestNo'] ?? '-'}')),
-                    DataCell(Text(_date(_rows[i]['requestDate']))),
-                    DataCell(Text('${_rows[i]['divisionName'] ?? '-'}')),
-                    DataCell(Text('${_rows[i]['departmentName'] ?? '-'}')),
-                    DataCell(Text('${_rows[i]['requesterName'] ?? '-'}')),
-                    DataCell(Text(_status(_rows[i]))),
-                    DataCell(Text('${_rows[i]['responsibleName'] ?? '-'}')),
+                    if (!_actionOnRight) DataCell(_actions(_rows[i])),
+                    for (final key in _visibleFields)
+                      DataCell(Text(_fieldValue(key, _rows[i]))),
+                    if (_actionOnRight) DataCell(_actions(_rows[i])),
                   ],
                 ),
             ],
@@ -817,17 +878,7 @@ class _PurchasingRequestDialogState extends State<_PurchasingRequestDialog> {
   String _displayDate(String value) {
     final date = DateTime.tryParse(value);
     if (date == null) return value;
-    final buddhist = {
-      'B',
-      'BE',
-      'T',
-      'TH',
-      'THAI',
-    }.contains((_yearFormat ?? '').trim().toUpperCase());
-    final year =
-        date.year +
-        (buddhist && date.year >= 1900 && date.year <= 2100 ? 543 : 0);
-    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/$year';
+    return formatPurchasingDate(date, _yearFormat ?? 'AD');
   }
 
   Future<DateTime?> _pickDate(String value) => showDatePicker(
