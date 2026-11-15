@@ -2279,6 +2279,7 @@ class _GatePassPageState extends State<GatePassPage> {
                                             await _api.post(
                                               '/api/company/gate-pass/requests/$requestId/request-files',
                                               body: {
+                                                'uploadToken': response['uploadToken'],
                                                 'fileName': photo.name,
                                                 'base64': base64Encode(
                                                   photo.bytes!,
@@ -2308,6 +2309,7 @@ class _GatePassPageState extends State<GatePassPage> {
                                               await _api.post(
                                                 '/api/company/gate-pass/requests/$requestId/request-files',
                                                 body: {
+                                                  'uploadToken': response['uploadToken'],
                                                   'fileName': file.name,
                                                   'base64': base64Encode(
                                                     file.bytes!,

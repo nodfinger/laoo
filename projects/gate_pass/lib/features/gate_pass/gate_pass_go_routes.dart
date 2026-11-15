@@ -58,22 +58,4 @@ List<GoRoute> buildGatePassFeatureRoutes() => <GoRoute>[
       endpoint: 'returns',
     ),
   ),
-  GoRoute(
-    path: GatePassRoutePaths.myGatePasses,
-    name: GatePassRouteNames.myGatePasses,
-    builder: (context, state) => const GatePassPage(
-      menuCode: '38007',
-      title: 'ใบขอนำทรัพย์สินออกของฉัน',
-      endpoint: 'mine',
-    ),
-  ),
-  GoRoute(
-    path: GatePassRoutePaths.reports,
-    name: GatePassRouteNames.reports,
-    builder: (context, state) => const GatePassPage(
-      menuCode: '38008',
-      title: 'รายงานการนำทรัพย์สินออก',
-      endpoint: 'dashboard',
-    ),
-  ),
 ];

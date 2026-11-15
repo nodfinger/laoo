@@ -2,6 +2,7 @@ using System.Data;
 using System.Security.Claims;
 using Laoo.Shared.Contracts;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
@@ -10,7 +11,7 @@ using Microsoft.Extensions.Configuration;
 namespace LaooGatePassModule.Controllers;
 
 [ApiController, Authorize, Route("api/company/gate-pass")]
-public sealed class GatePassDataController(IConfiguration config,IWebHostEnvironment environment) : ControllerBase
+public sealed class GatePassDataController(IConfiguration config,IWebHostEnvironment environment,IDataProtectionProvider protection) : ControllerBase
 {
     [HttpGet("settings")]
     public Task<IActionResult> Settings(CancellationToken t) => Read("38001", "SELECT s.IsEnabled,s.DefaultReturnDays,s.DefaultApproverUserID,u.DisplayName DefaultApproverName,s.MaxAttachmentSizeMB,s.MaxAttachmentsPerStage,s.DefaultQrExpiryDays FROM dbo.TDGPSetting s LEFT JOIN dbo.TDADUser u ON u.CompanyID=s.CompanyID AND u.UserID=s.DefaultApproverUserID WHERE s.CompanyID=@company", t);
@@ -100,12 +101,6 @@ WHERE g.CompanyID=@company AND g.StatusCode=N'HANDED_OVER' AND g.IsReturnRequire
 ORDER BY g.ExpectedReturnDate
 """, t);
 
-    [HttpGet("mine")]
-    public Task<IActionResult> Mine(CancellationToken t) => Read("38007", "SELECT GatePassID Id,GatePassNo Number,StatusCode Status,CarrierName Carrier,DestinationName Destination,ExitCheckedAt FROM dbo.TDGPGatePass WHERE CompanyID=@company AND RequesterUserID=@user ORDER BY CreateDate DESC", t);
-
-    [HttpGet("dashboard")]
-    public Task<IActionResult> Dashboard(CancellationToken t) => Read("38008", "SELECT COUNT(*) Total,SUM(CASE WHEN StatusCode=N'HANDED_OVER' THEN 1 ELSE 0 END) HandedOver,SUM(CASE WHEN ExitCheckedAt IS NOT NULL THEN 1 ELSE 0 END) ExitChecked,SUM(CASE WHEN StatusCode=N'RETURNED' THEN 1 ELSE 0 END) Returned FROM dbo.TDGPGatePass WHERE CompanyID=@company", t);
-
     [HttpPost("purposes")]
     public async Task<IActionResult> CreatePurpose(PurposeInput input,CancellationToken t)
     {
@@ -161,7 +156,7 @@ COMMIT TRANSACTION;
     [HttpGet("actions/{menuCode}")]
     public async Task<IActionResult> Actions(string menuCode,CancellationToken t)
     {
-        var known=new[]{"38001","38002","38003","38004","38005","38006","38007","38008"};
+        var known=new[]{"38001","38002","38003","38004","38005","38006"};
         if(!known.Contains(menuCode,StringComparer.Ordinal))return NotFound();
         if(!Scope(out _,out _))return Forbid();await using var db=await Open(t);
         if(!await CompanyMenuAccess.IsAllowedAsync(db,User,menuCode,"VIEW",t))return Forbid();
@@ -234,7 +229,9 @@ COMMIT TRANSACTION;
           var id=Convert.ToInt64(await header.ExecuteScalarAsync(t));
           var itemIds=await SaveItems(db,tx,id,company,input.Items!,input.IsReturnRequired,t);
           await UpdateReturnSummary(db,tx,id,company,t);
-          await tx.CommitAsync(t);return Ok(new{id,itemIds});
+          var uploadToken=protection.CreateProtector("Laoo.GatePass.InitialUpload.v1").ToTimeLimitedDataProtector().Protect($"{company}:{user}:{id}",TimeSpan.FromMinutes(15));
+          await tx.CommitAsync(t);
+          return Ok(new{id,itemIds,uploadToken});
         }catch{await tx.RollbackAsync(t);throw;}
     }
 
@@ -242,11 +239,11 @@ COMMIT TRANSACTION;
     public async Task<IActionResult> GetRequest(long id,[FromQuery] string? menu,CancellationToken t)
     {
         if(!Scope(out var company,out var user))return Forbid();await using var db=await Open(t);
-        var viewMenus=new[]{"38003","38004","38005","38006","38007","38008"};var allowedMenus=new List<string>();
+        var viewMenus=new[]{"38003","38004","38005","38006"};var allowedMenus=new List<string>();
         if(!string.IsNullOrEmpty(menu)){if(!viewMenus.Contains(menu,StringComparer.Ordinal))return Forbid();viewMenus=[menu];}
         foreach(var viewMenu in viewMenus)if(await CompanyMenuAccess.IsAllowedAsync(db,User,viewMenu,"VIEW",t))allowedMenus.Add(viewMenu);
         if(allowedMenus.Count==0)return Forbid();
-        var checks=string.Join(" OR ",allowedMenus.Select((viewMenu,i)=>viewMenu=="38007" ? $"(g.RequesterUserID=@user AND dbo.LaooMenuDataAccessAllowed(@company,@user,g.RequesterUserID,@viewMenu{i},'VIEW')=1)" : $"dbo.LaooMenuDataAccessAllowed(@company,@user,g.RequesterUserID,@viewMenu{i},'VIEW')=1"));
+        var checks=string.Join(" OR ",allowedMenus.Select((viewMenu,i)=>$"dbo.LaooMenuDataAccessAllowed(@company,@user,g.RequesterUserID,@viewMenu{i},'VIEW')=1"));
         await using var header=new SqlCommand($"SELECT g.GatePassID Id,g.GatePassNo Number,g.PurposeID,g.CarrierName Carrier,g.CarrierPhone,g.DestinationName Destination,g.DocumentDateTime,g.PlannedExitDate,g.ExpectedReturnDate,g.IsReturnRequired,g.Remark,g.StatusCode Status,p.PurposeName Purpose FROM dbo.TDGPGatePass g LEFT JOIN dbo.TDGPPurpose p ON p.CompanyID=g.CompanyID AND p.PurposeID=g.PurposeID WHERE g.GatePassID=@id AND g.CompanyID=@company AND (g.RequesterUserID=@user OR g.StatusCode<>N'DRAFT') AND ({checks})",db);
         for(var i=0;i<allowedMenus.Count;i++)header.Parameters.Add($"@viewMenu{i}",SqlDbType.NVarChar,20).Value=allowedMenus[i];
         header.Parameters.Add("@id",SqlDbType.BigInt).Value=id;header.Parameters.Add("@company",SqlDbType.BigInt).Value=company;header.Parameters.Add("@user",SqlDbType.BigInt).Value=user;
@@ -370,7 +367,7 @@ COMMIT TRANSACTION;
 
     async Task<bool> HasAnyRequestView(SqlConnection db,CancellationToken t)
     {
-        foreach(var menu in new[]{"38003","38004","38005","38006","38007","38008"})
+        foreach(var menu in new[]{"38003","38004","38005","38006"})
             if(await CompanyMenuAccess.IsAllowedAsync(db,User,menu,"VIEW",t))return true;
         return false;
     }
