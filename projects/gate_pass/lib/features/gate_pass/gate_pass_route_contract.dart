@@ -11,8 +11,6 @@ abstract final class GatePassMenuCodes {
   static const approvalInbox = '38004';
   static const exitCheck = '38005';
   static const returnTracking = '38006';
-  static const myGatePasses = '38007';
-  static const reports = '38008';
 }
 
 abstract final class GatePassRouteNames {
@@ -22,8 +20,6 @@ abstract final class GatePassRouteNames {
   static const approvalInbox = 'gatePassApprovalInbox';
   static const exitCheck = 'gatePassExitCheck';
   static const returnTracking = 'gatePassReturnTracking';
-  static const myGatePasses = 'myGatePasses';
-  static const reports = 'gatePassReports';
 }
 
 abstract final class GatePassRoutePaths {
@@ -33,8 +29,6 @@ abstract final class GatePassRoutePaths {
   static const approvalInbox = '/company/gate-pass-approvals';
   static const exitCheck = '/company/gate-pass-exit-check';
   static const returnTracking = '/company/gate-pass-returns';
-  static const myGatePasses = '/company/my-gate-passes';
-  static const reports = '/company/gate-pass-reports';
 }
 
 abstract final class GatePassRoutes {
@@ -85,22 +79,6 @@ abstract final class GatePassRoutes {
       screenType: 2,
       routeName: GatePassRouteNames.returnTracking,
       routePath: GatePassRoutePaths.returnTracking,
-      isImplemented: true,
-    ),
-    FeatureRouteContract(
-      projectCode: GatePassProject.code,
-      menuCode: GatePassMenuCodes.myGatePasses,
-      screenType: 4,
-      routeName: GatePassRouteNames.myGatePasses,
-      routePath: GatePassRoutePaths.myGatePasses,
-      isImplemented: true,
-    ),
-    FeatureRouteContract(
-      projectCode: GatePassProject.code,
-      menuCode: GatePassMenuCodes.reports,
-      screenType: 3,
-      routeName: GatePassRouteNames.reports,
-      routePath: GatePassRoutePaths.reports,
       isImplemented: true,
     ),
   ];

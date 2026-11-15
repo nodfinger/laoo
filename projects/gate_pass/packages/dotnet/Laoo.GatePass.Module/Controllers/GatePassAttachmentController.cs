@@ -24,11 +24,20 @@ public sealed class GatePassAttachmentController(
             ["RETURN"]=("38006","CONFIRM_RETURN","HANDED_OVER")};
 
     [HttpGet]
-    public async Task<IActionResult> List(long id,CancellationToken token)
+    public async Task<IActionResult> List(long id,[FromQuery] string? menu,CancellationToken token)
     {
-        if(!Scope(out var company,out _))return Forbid();
+        if(!Scope(out var company,out var user))return Forbid();
         await using var db=await Open(token);
-        if(!await HasAnyView(db,token))return Forbid();
+        var viewMenus=new[]{"38003","38004","38005","38006"};
+        if(!string.IsNullOrEmpty(menu)){if(!viewMenus.Contains(menu,StringComparer.Ordinal))return Forbid();viewMenus=[menu];}
+        var allowedMenus=new List<string>();foreach(var viewMenu in viewMenus)if(await CompanyMenuAccess.IsAllowedAsync(db,User,viewMenu,"VIEW",token))allowedMenus.Add(viewMenu);
+        if(allowedMenus.Count==0)return Forbid();
+        var checks=string.Join(" OR ",allowedMenus.Select((viewMenu,i)=>$"dbo.LaooMenuDataAccessAllowed(@company,@user,g.RequesterUserID,@viewMenu{i},'VIEW')=1"));
+        await using(var access=new SqlCommand($"SELECT COUNT(*) FROM dbo.TDGPGatePass g WHERE g.CompanyID=@company AND g.GatePassID=@id AND (g.RequesterUserID=@user OR g.StatusCode<>N'DRAFT') AND ({checks})",db)){
+            access.Parameters.Add("@company",SqlDbType.BigInt).Value=company;access.Parameters.Add("@id",SqlDbType.BigInt).Value=id;access.Parameters.Add("@user",SqlDbType.BigInt).Value=user;
+            for(var i=0;i<allowedMenus.Count;i++)access.Parameters.Add($"@viewMenu{i}",SqlDbType.NVarChar,20).Value=allowedMenus[i];
+            if(Convert.ToInt32(await access.ExecuteScalarAsync(token))==0)return NotFound(Problem("ไม่พบเอกสาร","ไม่พบใบขอในขอบเขตข้อมูลของคุณ"));
+        }
         await using var cmd=new SqlCommand("SELECT GatePassAttachmentID Id,StageCode Stage,OriginalFileName FileName,StoredPath Path,ContentType,FileSizeBytes,Width,Height,CreateDate FROM dbo.TDGPGatePassAttachment WHERE CompanyID=@company AND GatePassID=@id ORDER BY CreateDate",db);
         cmd.Parameters.Add("@company",SqlDbType.BigInt).Value=company;cmd.Parameters.Add("@id",SqlDbType.BigInt).Value=id;
         await using var reader=await cmd.ExecuteReaderAsync(token);var items=new List<object>();
@@ -107,7 +116,7 @@ public sealed class GatePassAttachmentController(
     private string? SafePath(string relative){var root=environment.WebRootPath;if(string.IsNullOrWhiteSpace(root))root=Path.Combine(environment.ContentRootPath,"wwwroot");var prefix=Path.GetFullPath(root)+Path.DirectorySeparatorChar;var full=Path.GetFullPath(Path.Combine(root,relative.Replace('/',Path.DirectorySeparatorChar)));return full.StartsWith(prefix,StringComparison.OrdinalIgnoreCase)?full:null;}
     private async Task<bool> HasAnyView(SqlConnection db,CancellationToken token)
     {
-        foreach(var menu in new[]{"38003","38004","38005","38006","38007","38008"})
+        foreach(var menu in new[]{"38003","38004","38005","38006"})
             if(await CompanyMenuAccess.IsAllowedAsync(db,User,menu,"VIEW",token))return true;
         return false;
     }
