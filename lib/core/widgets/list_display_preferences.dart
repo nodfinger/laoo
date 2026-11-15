@@ -56,6 +56,16 @@ const intranetContentDisplayFields = <ListDisplayField>[
   ListDisplayField(key: 'updatedAt', label: 'วันที่เวลาแก้ไขล่าสุด'),
 ];
 
+const purchasingRequestDisplayFields = <ListDisplayField>[
+  ListDisplayField(key: 'requestNo', label: 'เลขที่ขอ', requiredVisible: true),
+  ListDisplayField(key: 'requestDate', label: 'วันที่ขอ'),
+  ListDisplayField(key: 'divisionName', label: 'ฝ่าย'),
+  ListDisplayField(key: 'departmentName', label: 'แผนก'),
+  ListDisplayField(key: 'requesterName', label: 'ผู้ขอ'),
+  ListDisplayField(key: 'status', label: 'สถานะ'),
+  ListDisplayField(key: 'responsibleName', label: 'ผู้รับผิดชอบ'),
+];
+
 /// Preferences contain presentation keys only; authorization stays server-side.
 class ListDisplayPreferences {
   const ListDisplayPreferences({
