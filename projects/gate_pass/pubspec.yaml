@@ -11,6 +11,8 @@ dependencies:
     sdk: flutter
   go_router: ^17.4.0
   file_picker: ^10.3.10
+  printing: ^5.15.0
+  pdf: ^3.13.0
   laoo_shared_core:
     path: ../../packages/laoo_shared_core
   laoo_shared_workspace_ui:
