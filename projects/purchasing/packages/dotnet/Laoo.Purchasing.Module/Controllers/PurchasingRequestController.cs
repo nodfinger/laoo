@@ -28,9 +28,10 @@ public sealed class PurchasingRequestController(IConfiguration configuration, IW
         const string sql = """
             SELECT h.RequestID, h.RequestNo, h.RequestDate, h.StatusCode, h.ResponsibleUserID, h.Remark,
                    div.NameTH, dep.NameTH, emp.FullName, emp.NickName, setup.EmployeeNameDisplay, usr.DisplayName, usr.Username,
-                   dbo.LaooMenuDataAccessAllowed(@company,@user,h.RequesterUserID,N'69002',N'DELETE')
+                   dbo.LaooMenuDataAccessAllowed(@company,@user,h.RequesterUserID,N'69002',N'DELETE'),ru.DisplayName,ru.Username
             FROM dbo.TDAPPurchaseRequest h
             LEFT JOIN dbo.TDADUser usr ON usr.CompanyID=h.CompanyID AND usr.UserID=h.RequesterUserID
+            LEFT JOIN dbo.TDADUser ru ON ru.CompanyID=h.CompanyID AND ru.UserID=h.ResponsibleUserID
             OUTER APPLY (SELECT TOP(1) e.FullName,e.NickName,e.DivisionOrgUnitID,e.DepartmentOrgUnitID FROM dbo.TDADUserEmployee ue JOIN dbo.TDADEmployee e ON e.CompanyID=ue.CompanyID AND e.EmployeeID=ue.EmployeeID WHERE ue.CompanyID=h.CompanyID AND ue.UserID=h.RequesterUserID ORDER BY ue.IsActive DESC,e.IsActive DESC,e.EmployeeID) emp
             LEFT JOIN dbo.TDADOrganizationUnit div ON div.CompanyID=h.CompanyID AND div.OrgUnitID=COALESCE(h.DivisionID,emp.DivisionOrgUnitID)
             LEFT JOIN dbo.TDADOrganizationUnit dep ON dep.CompanyID=h.CompanyID AND dep.OrgUnitID=COALESCE(h.DepartmentID,emp.DepartmentOrgUnitID)
@@ -43,14 +44,26 @@ public sealed class PurchasingRequestController(IConfiguration configuration, IW
               AND (@search IS NULL OR RequestNo LIKE @likeSearch OR Remark LIKE @likeSearch)
               AND (@division IS NULL OR DivisionID=@division) AND (@department IS NULL OR DepartmentID=@department)
               AND (@requester IS NULL OR RequesterUserID=@requester);
+            SELECT DISTINCT h.DivisionID, div.NameTH FROM dbo.TDAPPurchaseRequest h
+            JOIN dbo.TDADOrganizationUnit div ON div.CompanyID=h.CompanyID AND div.OrgUnitID=h.DivisionID
+            WHERE h.CompanyID=@company AND div.NameTH IS NOT NULL AND dbo.LaooMenuDataAccessAllowed(@company,@user,h.RequesterUserID,N'69002',N'VIEW')=1 ORDER BY div.NameTH;
+            SELECT DISTINCT h.DepartmentID, dep.NameTH FROM dbo.TDAPPurchaseRequest h
+            JOIN dbo.TDADOrganizationUnit dep ON dep.CompanyID=h.CompanyID AND dep.OrgUnitID=h.DepartmentID
+            WHERE h.CompanyID=@company AND dep.NameTH IS NOT NULL AND (@division IS NULL OR h.DivisionID=@division) AND dbo.LaooMenuDataAccessAllowed(@company,@user,h.RequesterUserID,N'69002',N'VIEW')=1 ORDER BY dep.NameTH;
+            SELECT DISTINCT h.RequesterUserID,COALESCE(NULLIF(usr.DisplayName,N''),usr.Username,N'-') FROM dbo.TDAPPurchaseRequest h
+            JOIN dbo.TDADUser usr ON usr.CompanyID=h.CompanyID AND usr.UserID=h.RequesterUserID
+            WHERE h.CompanyID=@company AND (@division IS NULL OR h.DivisionID=@division) AND (@department IS NULL OR h.DepartmentID=@department) AND dbo.LaooMenuDataAccessAllowed(@company,@user,h.RequesterUserID,N'69002',N'VIEW')=1 ORDER BY 2;
             """;
         await using var q = new SqlCommand(sql, db); Add(q, "@company", SqlDbType.BigInt, company); Add(q, "@user", SqlDbType.BigInt, user); Add(q, "@search", SqlDbType.NVarChar, string.IsNullOrWhiteSpace(search) ? DBNull.Value : search); Add(q, "@likeSearch", SqlDbType.NVarChar, $"%{search}%"); Add(q, "@division", SqlDbType.BigInt, divisionId is null ? DBNull.Value : divisionId); Add(q, "@department", SqlDbType.BigInt, departmentId is null ? DBNull.Value : departmentId); Add(q, "@requester", SqlDbType.BigInt, requesterId is null ? DBNull.Value : requesterId); Add(q, "@skip", SqlDbType.Int, (page - 1) * pageSize); Add(q, "@take", SqlDbType.Int, pageSize);
         var items = new List<object>(); long total = 0; await using var reader = await q.ExecuteReaderAsync(token); while (await reader.ReadAsync(token)) {
             var full = reader.IsDBNull(8) ? "" : reader.GetString(8).Trim(); var nick = reader.IsDBNull(9) ? "" : reader.GetString(9).Trim(); var mode = reader.IsDBNull(10) ? "FULL" : reader.GetString(10).Trim().ToUpperInvariant();
             var requester = mode == "NICK" && nick.Length > 0 ? nick : mode == "BOTH" && full.Length > 0 && nick.Length > 0 ? $"{full} ({nick})" : full.Length > 0 ? full : nick.Length > 0 ? nick : !reader.IsDBNull(11) && !string.IsNullOrWhiteSpace(reader.GetString(11)) ? reader.GetString(11) : !reader.IsDBNull(12) ? reader.GetString(12) : "-";
-            items.Add(new { requestId = reader.GetInt64(0), requestNo = reader.GetString(1), requestDate = reader.GetDateTime(2).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), statusCode = reader.GetString(3), responsibleUserId = reader.IsDBNull(4) ? (long?)null : reader.GetInt64(4), remark = reader.IsDBNull(5) ? null : reader.GetString(5), divisionName = reader.IsDBNull(6) ? null : reader.GetString(6), departmentName = reader.IsDBNull(7) ? null : reader.GetString(7), requesterName = requester, canDelete = canDelete && reader.GetString(3)=="DRAFT" && !reader.IsDBNull(13) && Convert.ToBoolean(reader.GetValue(13)) });
+            items.Add(new { requestId = reader.GetInt64(0), requestNo = reader.GetString(1), requestDate = reader.GetDateTime(2).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), statusCode = reader.GetString(3), responsibleUserId = reader.IsDBNull(4) ? (long?)null : reader.GetInt64(4), responsibleName = !reader.IsDBNull(14) && !string.IsNullOrWhiteSpace(reader.GetString(14)) ? reader.GetString(14) : !reader.IsDBNull(15) ? reader.GetString(15) : null, remark = reader.IsDBNull(5) ? null : reader.GetString(5), divisionName = reader.IsDBNull(6) ? null : reader.GetString(6), departmentName = reader.IsDBNull(7) ? null : reader.GetString(7), requesterName = requester, canDelete = canDelete && reader.GetString(3)=="DRAFT" && !reader.IsDBNull(13) && Convert.ToBoolean(reader.GetValue(13)) });
         } if (await reader.NextResultAsync(token) && await reader.ReadAsync(token)) total = reader.GetInt64(0);
-        return Ok(new { items, total, page, pageSize, divisions = Array.Empty<object>(), departments = Array.Empty<object>(), requesters = Array.Empty<object>() });
+        var divisions=new List<object>(); if(await reader.NextResultAsync(token)) while(await reader.ReadAsync(token)) divisions.Add(new {id=reader.GetInt64(0),name=reader.GetString(1)});
+        var departments=new List<object>(); if(await reader.NextResultAsync(token)) while(await reader.ReadAsync(token)) departments.Add(new {id=reader.GetInt64(0),name=reader.GetString(1)});
+        var requesters=new List<object>(); if(await reader.NextResultAsync(token)) while(await reader.ReadAsync(token)) requesters.Add(new {id=reader.GetInt64(0),name=reader.GetString(1)});
+        return Ok(new { items, total, page, pageSize, divisions, departments, requesters });
     }
 
     [HttpGet("{id:long}")]

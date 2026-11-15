@@ -18,13 +18,11 @@
 
 ## ตัวแสดงวันที่ของบริษัท
 
-- `my-ui` กำหนดให้ใช้ `CompanyDateFormatter` แต่ตัว formatter อยู่ใต้ Root `lib/core/company_setup/` และไม่ได้เปิดผ่าน Project host หรือ shared package
-- ขอ Core เปิด read contract สำหรับรูปแบบวันที่ให้ Project ใช้ร่วมกัน ปัจจุบันหน้าจัดซื้ออ่าน `yearFormat` จาก runtime และแสดง `dd/MM/yyyy` ตามค่าบริษัทโดยคงค่า ISO สำหรับ API ระหว่างรอ contract กลาง
+- Core ส่ง `CompanyDateFormatter` ผ่าน Feature Host แล้ว หน้ารายการและหน้าเอกสารใช้รูปแบบปีตามบริษัท โดย API ยังคงรับส่งวันที่แบบ ISO
 
 ## การตั้งค่าคอลัมน์ 69002
 
-- Core ต้องเพิ่มเมนู 69002 และทะเบียนคอลัมน์ที่อนุญาตใน laoo_api/Controllers/UserListDisplayController.cs และหน้าตั้งค่าผู้ใช้ เพื่อเชื่อมการแสดงและจัดเรียงคอลัมน์ของ Project รวม divisionName, departmentName และ requesterName โดยรักษาค่าตั้งเดิมของผู้ใช้
-- หลัง Core เปิด contract แล้ว Project ต้องเชื่อมการอ่านค่าจริงทั้ง List และ Card ปัจจุบันแสดงคอลัมน์ตามค่าเริ่มต้น
+- Core ลงทะเบียนคอลัมน์ของเมนู 69002 และ Project อ่านค่าจัดลำดับ การซ่อน และตำแหน่ง Action ทั้ง List และ Card แล้ว
 
 ## การแนบไฟล์ 69002
 
