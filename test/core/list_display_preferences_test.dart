@@ -2,6 +2,27 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:laoo/core/widgets/list_display_preferences.dart';
 
 void main() {
+  test(
+    'purchasing fields keep required number and apply order and visibility',
+    () {
+      const preferences = ListDisplayPreferences(
+        order: ['departmentName', 'requestNo'],
+        hidden: {'requestNo', 'divisionName'},
+        actionOnRight: true,
+      );
+      final fields = preferences.resolve(purchasingRequestDisplayFields);
+      expect(fields.first.key, 'departmentName');
+      expect(
+        fields.where(preferences.isVisible).map((f) => f.key),
+        contains('requestNo'),
+      );
+      expect(
+        fields.where(preferences.isVisible).map((f) => f.key),
+        isNot(contains('divisionName')),
+      );
+      expect(preferences.actionOnRight, isTrue);
+    },
+  );
   test('travel claim order and required document number are preserved', () {
     const preferences = ListDisplayPreferences(
       order: ['total', 'number', 'date'],
@@ -13,6 +34,8 @@ void main() {
       'total',
       'number',
       'date',
+      'department',
+      'claimant',
       'origin',
       'destination',
     ]);
@@ -20,6 +43,8 @@ void main() {
       'total',
       'number',
       'date',
+      'department',
+      'claimant',
       'destination',
     ]);
     expect(preferences.actionOnRight, isTrue);
