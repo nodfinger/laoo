@@ -17,7 +17,7 @@ try {
     }
 
     if ([string]::IsNullOrWhiteSpace($Project)) {
-        $branch = (git symbolic-ref --short HEAD 2>$null)
+        $branch = (git symbolic-ref --quiet --short HEAD)
         if ($branch -match '^(?<name>[A-Za-z0-9-]+)/(feature|fix|bugfix|chore|refactor|docs)/') {
             $Project = $Matches.name
         }
@@ -56,6 +56,7 @@ try {
     }
 
     Write-Host "PROJECT BOUNDARY PASSED: $Project ($($changed.Count) files)."
+    exit 0
 }
 finally {
     Pop-Location
