@@ -19,6 +19,7 @@ const _fields = <String, List<ListDisplayField>>{
   '05002': masterDataDisplayFields,
   '66001': travelClaimDisplayFields,
   '43002': intranetContentDisplayFields,
+  '69002': purchasingRequestDisplayFields,
 };
 
 Future<bool> _confirmReset(BuildContext context, String? screenName) async {

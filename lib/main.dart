@@ -542,6 +542,8 @@ void main() {
     _buildMeetingWorkspaceShell,
     apiClientFactory: ApiClient.new,
     apiClientDisposer: (client) => (client as ApiClient).dispose(),
+    listDisplayRevision: listDisplayPreferencesRevision,
+    dateFormatter: CompanyDateFormatter.formatDateByYearFormat,
     menuTitleResolver: (menuCode, fallback) => NavigationMenuRepository()
         .resolveMenuName(menuCode: menuCode, fallback: fallback),
     messagePresenter: (context, {required message, required error}) =>
