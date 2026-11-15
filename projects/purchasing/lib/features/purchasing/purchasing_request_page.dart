@@ -283,7 +283,9 @@ class _PurchasingRequestPageState extends State<PurchasingRequestPage> {
                 child: Text('${row['requestNo'] ?? '-'}'),
               ),
               const SizedBox(height: 12),
-              const Text('เมื่อลบข้อมูลแล้วจะไม่สามารถเรียกคืนได้'),
+              const Text(
+                'เมื่อลบข้อมูลแล้วจะไม่สามารถเรียกคืนได้ รวมถึงไฟล์แนบทั้งหมด',
+              ),
               const SizedBox(height: 12),
               const Divider(),
             ],
@@ -307,12 +309,14 @@ class _PurchasingRequestPageState extends State<PurchasingRequestPage> {
     );
     if (confirmed != true) return;
     try {
-      await _repo.delete(id);
+      final result = await _repo.delete(id);
       if (!mounted) return;
       showPurchasingMessage(
         context,
-        message: 'ลบคำขอจัดซื้อสำเร็จ',
-        error: false,
+        message: result is Map && result['attachmentCleanupFailed'] == true
+            ? 'ลบคำขอแล้ว แต่ลบไฟล์แนบบางไฟล์ไม่สำเร็จ กรุณาติดต่อผู้ดูแลระบบ'
+            : 'ลบคำขอจัดซื้อสำเร็จ',
+        error: result is Map && result['attachmentCleanupFailed'] == true,
       );
       if (_rows.length == 1 && _page > 1) _page--;
       await _load();

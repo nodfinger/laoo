@@ -187,11 +187,24 @@ public sealed class PurchasingRequestController(IConfiguration configuration, IW
             var status = await check.ExecuteScalarAsync(token);
             if (status is null) { await tx.RollbackAsync(token); return NotFound(); }
             if (!string.Equals(Convert.ToString(status),"DRAFT",StringComparison.Ordinal)) { await tx.RollbackAsync(token); return Conflict(new {message="ลบได้เฉพาะแบบร่าง"}); }
-            await using var attachments = new SqlCommand("SELECT COUNT_BIG(1) FROM dbo.TDAPPurchaseRequestAttachment WHERE RequestID=@id",db,tx); Add(attachments,"@id",SqlDbType.BigInt,id);
-            if (Convert.ToInt64(await attachments.ExecuteScalarAsync(token)) > 0) { await tx.RollbackAsync(token); return Conflict(new {message="ลบไม่ได้",description="ใบขอนี้มีไฟล์แนบ ระบบยังไม่รองรับการลบไฟล์แนบอย่างปลอดภัย"}); }
-            await using var delete = new SqlCommand("DELETE FROM dbo.TDAPPurchaseRequestDetail WHERE RequestID=@id; DELETE FROM dbo.TDAPPurchaseRequest WHERE RequestID=@id AND CompanyID=@company",db,tx);
+            var files = new List<string>();
+            await using (var attachments = new SqlCommand("SELECT StoredPath FROM dbo.TDAPPurchaseRequestAttachment WHERE RequestID=@id",db,tx))
+            {
+                Add(attachments,"@id",SqlDbType.BigInt,id);
+                await using var reader = await attachments.ExecuteReaderAsync(token);
+                while(await reader.ReadAsync(token))
+                {
+                    var path = SafeAttachmentPath(company,id,reader.GetString(0));
+                    if(path is null) { await reader.DisposeAsync(); await tx.RollbackAsync(token); return Conflict(new {message="ตำแหน่งไฟล์แนบไม่ถูกต้อง"}); }
+                    files.Add(path);
+                }
+            }
+            await using var delete = new SqlCommand("DELETE FROM dbo.TDAPPurchaseRequestAttachment WHERE RequestID=@id; DELETE FROM dbo.TDAPPurchaseRequestDetail WHERE RequestID=@id; DELETE FROM dbo.TDAPPurchaseRequest WHERE RequestID=@id AND CompanyID=@company",db,tx);
             Add(delete,"@id",SqlDbType.BigInt,id); Add(delete,"@company",SqlDbType.BigInt,company); await delete.ExecuteNonQueryAsync(token);
-            await tx.CommitAsync(token); return NoContent();
+            await tx.CommitAsync(token);
+            var cleanupFailed=false;
+            foreach(var path in files) { try { System.IO.File.Delete(path); } catch(IOException) { cleanupFailed=true; } catch(UnauthorizedAccessException) { cleanupFailed=true; } }
+            return Ok(new { attachmentCleanupFailed=cleanupFailed });
         } catch { await tx.RollbackAsync(token); throw; }
     }
 
