@@ -870,20 +870,6 @@ abstract final class AppMenuRouteRegistry {
       path: GatePassRoutePaths.returnTracking,
       scope: AppMenuScope.company,
     ),
-    GatePassMenuCodes.myGatePasses: AppMenuRouteSpec(
-      menuCode: GatePassMenuCodes.myGatePasses,
-      databaseRouteName: GatePassRouteNames.myGatePasses,
-      goRouteName: GatePassRouteNames.myGatePasses,
-      path: GatePassRoutePaths.myGatePasses,
-      scope: AppMenuScope.company,
-    ),
-    GatePassMenuCodes.reports: AppMenuRouteSpec(
-      menuCode: GatePassMenuCodes.reports,
-      databaseRouteName: GatePassRouteNames.reports,
-      goRouteName: GatePassRouteNames.reports,
-      path: GatePassRoutePaths.reports,
-      scope: AppMenuScope.company,
-    ),
     FiveSMenuCodes.settings: AppMenuRouteSpec(
       menuCode: FiveSMenuCodes.settings,
       databaseRouteName: FiveSRouteNames.settings,

@@ -18,8 +18,6 @@
 | `38004` | `/company/gate-pass-approvals` | 3 | `LAOO_GATE_PASS` | true | [`projects/gate_pass/lib/features/gate_pass/gate_pass_route_contract.dart`](../../projects/gate_pass/lib/features/gate_pass/gate_pass_route_contract.dart) |
 | `38005` | `/company/gate-pass-exit-check` | 2 | `LAOO_GATE_PASS` | true | [`projects/gate_pass/lib/features/gate_pass/gate_pass_route_contract.dart`](../../projects/gate_pass/lib/features/gate_pass/gate_pass_route_contract.dart) |
 | `38006` | `/company/gate-pass-returns` | 2 | `LAOO_GATE_PASS` | true | [`projects/gate_pass/lib/features/gate_pass/gate_pass_route_contract.dart`](../../projects/gate_pass/lib/features/gate_pass/gate_pass_route_contract.dart) |
-| `38007` | `/company/my-gate-passes` | 4 | `LAOO_GATE_PASS` | true | [`projects/gate_pass/lib/features/gate_pass/gate_pass_route_contract.dart`](../../projects/gate_pass/lib/features/gate_pass/gate_pass_route_contract.dart) |
-| `38008` | `/company/gate-pass-reports` | 3 | `LAOO_GATE_PASS` | true | [`projects/gate_pass/lib/features/gate_pass/gate_pass_route_contract.dart`](../../projects/gate_pass/lib/features/gate_pass/gate_pass_route_contract.dart) |
 
 ## ข้อกำหนด Function ปัจจุบัน
 
@@ -43,5 +41,3 @@
 | `38004` | ตรวจข้อกำหนดเฉพาะด้านบนและ Source | ตรวจข้อกำหนดเฉพาะด้านบนและ Source | ยังต้องตรวจ ActionCode | ยังต้องตรวจ API/DTO |
 | `38005` | ตรวจข้อกำหนดเฉพาะด้านบนและ Source | ตรวจข้อกำหนดเฉพาะด้านบนและ Source | ยังต้องตรวจ ActionCode | ยังต้องตรวจ API/DTO |
 | `38006` | ตรวจข้อกำหนดเฉพาะด้านบนและ Source | ตรวจข้อกำหนดเฉพาะด้านบนและ Source | ยังต้องตรวจ ActionCode | ยังต้องตรวจ API/DTO |
-| `38007` | ตรวจข้อกำหนดเฉพาะด้านบนและ Source | ตรวจข้อกำหนดเฉพาะด้านบนและ Source | ยังต้องตรวจ ActionCode | ยังต้องตรวจ API/DTO |
-| `38008` | ตรวจข้อกำหนดเฉพาะด้านบนและ Source | ตรวจข้อกำหนดเฉพาะด้านบนและ Source | ยังต้องตรวจ ActionCode | ยังต้องตรวจ API/DTO |

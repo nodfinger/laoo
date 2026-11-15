@@ -226,8 +226,6 @@
 | `38004` | [gate_pass](gate_pass.md) | `/company/gate-pass-approvals` | พบ Route |
 | `38005` | [gate_pass](gate_pass.md) | `/company/gate-pass-exit-check` | พบ Route |
 | `38006` | [gate_pass](gate_pass.md) | `/company/gate-pass-returns` | พบ Route |
-| `38007` | [gate_pass](gate_pass.md) | `/company/my-gate-passes` | พบ Route |
-| `38008` | [gate_pass](gate_pass.md) | `/company/gate-pass-reports` | พบ Route |
 | `39001` | [five_s](five_s.md) | `/company/five-s/inspection-areas` | พบ Route |
 | `39002` | [five_s](five_s.md) | `/company/five-s/templates` | พบ Route |
 | `39003` | [five_s](five_s.md) | `/company/five-s/inspection-teams` | พบ Route |
