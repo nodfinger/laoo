@@ -33,6 +33,7 @@ import 'package:laoo_patrol/patrol_feature.dart';
 import 'package:laoo_digital_checklist/digital_checklist_feature.dart';
 import 'package:laoo_intranet/intranet_feature.dart';
 import 'package:laoo_purchasing/purchasing_feature.dart';
+import 'package:laoo_sap_pms/sap_pms_feature.dart';
 import 'package:laoo_vote/vote_feature.dart';
 import 'package:laoo_pos/pos_feature.dart';
 import 'package:laoo_sales/sales_feature.dart';
@@ -553,7 +554,7 @@ final List<GoRoute> _placeholderRoutes = [
     path: '/company/my-system/sap-pms',
     name: 'mySystemSapPms',
     builder: (context, state) =>
-        const MySystemPlaceholderPage(menuCode: '65002'),
+        const SapPmsComparisonPage(),
   ),
   GoRoute(
     path: '/company/my-system/travel',
