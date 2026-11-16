@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:laoo_shared_admin_ui/laoo_shared_admin_ui.dart'
-    show FilterHeightSync, filterActionHeightStyle;
+import 'dart:convert';
 import 'package:laoo_shared_workspace_ui/laoo_shared_workspace_ui.dart';
 import '../../../app/theme/workspace_theme_presets.dart';
 import '../../../core/api/api_exception.dart';
@@ -10,31 +9,44 @@ import '../../support/presentation/widgets/support_workspace_shell.dart';
 import '../ocr/business_card_ocr_api.dart';
 import '../ocr/business_card_ocr_ui.dart';
 import 'contact_api.dart';
+import 'contact_ocr_customer_selection.dart';
 
 String _contactError(Object error, String fallback) {
   if (error is ApiException) {
-    return '${error.message}\nรายละเอียดเพิ่มเติม: ${error.description ?? fallback}';
+    final detail = error.description;
+    return detail == null
+        ? error.message
+        : '${error.message}\nรายละเอียดเพิ่มเติม: $detail';
   }
-  return '$fallback\nรายละเอียดเพิ่มเติม: $error';
+  return '$fallback\nรายละเอียดเพิ่มเติม: กรุณาตรวจสอบการเชื่อมต่อและลองใหม่';
 }
 
 class ContactPage extends StatefulWidget {
-  const ContactPage({super.key});
+  const ContactPage({super.key, this.supplier = false});
+  final bool supplier;
   @override
   State<ContactPage> createState() => _ContactPageState();
 }
 
 class _ContactPageState extends State<ContactPage> {
-  final _api = ContactApi(), _search = TextEditingController();
+  late final ContactApi _api;
+  final _ocr = BusinessCardOcrApi(), _search = TextEditingController();
+  String get _menuCode => widget.supplier ? '55003' : '55002';
+  String get _route =>
+      widget.supplier ? 'companySupplierContacts' : 'companyContacts';
+  String get _target => widget.supplier ? 'suppliers' : 'contacts';
+  final _customerSelection = GlobalKey<ContactOcrCustomerSelectionState>();
   String _caption = '', _query = '';
   Map<String, dynamic> _actions = {};
+  Map<String, dynamic>? _capabilities;
   List<Map<String, dynamic>> _rows = [];
-  int _page = 1, _total = 0;
-  static const _pageSize = 20;
-  bool _loading = true, _cards = false;
+  int _total = 0;
+  bool _loading = true;
+  int _workspaceTab = 0;
   @override
   void initState() {
     super.initState();
+    _api = ContactApi(supplier: widget.supplier);
     _loadCaption();
     _load();
   }
@@ -42,14 +54,15 @@ class _ContactPageState extends State<ContactPage> {
   @override
   void dispose() {
     _api.dispose();
+    _ocr.dispose();
     _search.dispose();
     super.dispose();
   }
 
   Future<void> _loadCaption() async {
     final value = await NavigationMenuRepository().resolveMenuName(
-      menuCode: '55002',
-      routeName: 'companyContacts',
+      menuCode: _menuCode,
+      routeName: _route,
     );
     if (mounted) setState(() => _caption = value);
   }
@@ -59,14 +72,29 @@ class _ContactPageState extends State<ContactPage> {
     try {
       final results = await Future.wait([
         _api.actions(),
-        _api.list(search: _query, page: _page, pageSize: _pageSize),
+        _api.reviewQueue(_query),
       ]);
+      Map<String, dynamic>? capabilities;
+      if (results[0]['create'] == true) {
+        try {
+          capabilities = Map<String, dynamic>.from(
+            await _ocr.get('/api/company/ocr/business-cards/capabilities', {
+                  'target': _target,
+                  'action': 'CREATE',
+                })
+                as Map,
+          );
+        } catch (_) {
+          capabilities = null;
+        }
+      }
       if (!mounted) return;
       final data = results[1];
       setState(() {
         _actions = results[0];
         _rows = List<Map<String, dynamic>>.from(data['items'] as List);
-        _total = (data['total'] as num).toInt();
+        _total = _rows.length;
+        _capabilities = capabilities;
         _loading = false;
       });
     } catch (error) {
@@ -81,376 +109,479 @@ class _ContactPageState extends State<ContactPage> {
     }
   }
 
-  Future<void> _open([Map<String, dynamic>? row]) async {
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => ContactForm(
-        api: _api,
-        caption: _caption,
-        initial: row,
-        onSaved: () {
-          showTimedSnackBar(context, message: 'บันทึกทะเบียนผู้ติดต่อแล้ว');
-          _load();
-        },
-      ),
-    );
-  }
-
-  Future<void> _delete(Map<String, dynamic> row) async {
-    final danger = Theme.of(context).colorScheme.error;
-    final ok =
-        await showDialog<bool>(
-          context: context,
-          builder: (dialog) => AlertDialog(
-            backgroundColor: Colors.white,
-            surfaceTintColor: Colors.transparent,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(4),
-              side: BorderSide(color: danger),
-            ),
-            title: Row(
-              children: [
-                Icon(Icons.delete_outline, color: danger),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'ยืนยันการลบข้อมูล',
-                    style: TextStyle(
-                      color: danger,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(10),
-                  color: danger.withValues(alpha: .1),
-                  child: Text((row['name'] ?? '').toString()),
-                ),
-                const SizedBox(height: 12),
-                const Text('เมื่อลบแล้วจะไม่สามารถเรียกคืนได้'),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialog, false),
-                child: const Text('ยกเลิก'),
-              ),
-              FilledButton.icon(
-                style: FilledButton.styleFrom(
-                  backgroundColor: danger,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-                onPressed: () => Navigator.pop(dialog, true),
-                icon: const Icon(Icons.delete_outline),
-                label: const Text('ลบ'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
-    if (!ok) return;
-    try {
-      await _api.delete(
-        (row['contactId'] as num).toInt(),
-        row['rowVersion'].toString(),
-      );
-      if (mounted) {
-        showTimedSnackBar(context, message: 'ลบผู้ติดต่อแล้ว');
-        await _load();
-      }
-    } catch (error) {
-      if (mounted) {
+  Future<BusinessCardSaveOutcome> _saveBusinessCard(
+    BusinessCardImport result,
+  ) async {
+    final selection = _customerSelection.currentState;
+    final validation =
+        selection?.validate(result.values) ??
+        (selection == null
+            ? (widget.supplier
+                  ? 'กรุณารอให้โหลดข้อมูลผู้ขายสำเร็จ'
+                  : 'กรุณารอให้โหลดข้อมูลลูกค้าสำเร็จ')
+            : null);
+    if (validation != null) {
+      if (mounted)
         showTimedSnackBar(
           context,
-          message: _contactError(error, 'ลบผู้ติดต่อไม่สำเร็จ'),
+          message: 'บันทึกข้อมูลไม่สำเร็จ\nรายละเอียดเพิ่มเติม: $validation',
           error: true,
         );
-      }
+      return BusinessCardSaveOutcome.failure;
+    }
+    try {
+      await _api.saveDraft(
+        {
+          'name': result.values['name']?.trim() ?? '',
+          'phone': result.values['phone'],
+          'email': result.values['email'],
+          'company': result.values['company'],
+          'position': result.values['position'],
+          'address': result.values['address'],
+          'website': result.values['website'],
+          'line': result.values['line'],
+          'isActive': true,
+          'customerId': selection!.mode == 'existing'
+              ? selection.customerId
+              : null,
+          'createCustomer': selection.mode == 'new',
+          'fromOcr': true,
+        },
+        result.images
+            .map((e) => BusinessCardImageValue(e.bytes, e.name))
+            .toList(),
+      );
+      return BusinessCardSaveOutcome.saved;
+    } catch (error) {
+      if (mounted)
+        showTimedSnackBar(
+          context,
+          message: _contactError(error, 'บันทึกแบบร่างไม่สำเร็จ'),
+          error: true,
+        );
+      return BusinessCardSaveOutcome.failure;
     }
   }
 
-  Widget _rowActions(Map<String, dynamic> row) => Row(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      if (_actions['edit'] == true)
-        IconButton(
-          tooltip: 'แก้ไข',
-          color: businessCardOcrUi(context).primaryColor,
-          onPressed: () => _open(row),
-          icon: const Icon(Icons.edit_outlined),
+  Future<void> _removeDraft(Map<String, dynamic> row) async {
+    final errorColor = Theme.of(context).colorScheme.error;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(4),
+          side: BorderSide(color: errorColor),
         ),
-      if (_actions['delete'] == true)
-        IconButton(
-          tooltip: 'ลบ',
-          color: Theme.of(context).colorScheme.error,
-          onPressed: () => _delete(row),
-          icon: const Icon(Icons.delete_outline),
+        title: Row(
+          children: [
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: errorColor.withValues(alpha: .10),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Icon(Icons.delete_outline, color: errorColor),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'ยืนยันการลบข้อมูล',
+                style: TextStyle(
+                  color: errorColor,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
         ),
-    ],
-  );
-  Widget _status(Map<String, dynamic> row) {
-    final active = row['isActive'] == true;
-    final color = active
-        ? businessCardOcrUi(context).primaryColor
-        : Theme.of(context).colorScheme.error;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: .12),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        child: Text(
-          active ? 'ใช้งาน' : 'ไม่ใช้งาน',
-          style: TextStyle(color: color),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: errorColor.withValues(alpha: .10),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(10),
+                child: Text('${row['name'] ?? ''}'),
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text('ต้องการลบแบบร่างนี้หรือไม่ เมื่อลบแล้วเรียกคืนไม่ได้'),
+            const SizedBox(height: 12),
+            const Divider(height: 1),
+          ],
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialog, false),
+            child: const Text('ยกเลิก'),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(dialog, true),
+            style: FilledButton.styleFrom(backgroundColor: errorColor),
+            icon: const Icon(Icons.delete_outline),
+            label: const Text('ลบ'),
+          ),
+        ],
       ),
     );
+    if (confirmed != true) return;
+    try {
+      await _api.deleteDraft((row['reviewId'] as num).toInt());
+      if (!mounted) return;
+      showTimedSnackBar(context, message: 'ลบแบบร่างแล้ว');
+      await _load();
+    } catch (error) {
+      if (mounted)
+        showTimedSnackBar(
+          context,
+          message: _contactError(error, 'ลบแบบร่างไม่สำเร็จ'),
+          error: true,
+        );
+    }
   }
 
-  Widget _result(bool cards) {
-    if (_loading) return const Center(child: CircularProgressIndicator());
-    if (_rows.isEmpty) return const Center(child: Text('ไม่พบข้อมูลผู้ติดต่อ'));
-    if (cards) {
-      return ListView.separated(
-        itemCount: _rows.length,
-        separatorBuilder: (_, _) => const SizedBox(height: 8),
-        itemBuilder: (_, i) {
-          final row = _rows[i];
-          return LaooSurfaceCard(
-            tokens: businessCardOcrUi(context),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+  Future<void> _showDraft(Map<String, dynamic> row) async {
+    try {
+      final data = await _api.draftDetails((row['reviewId'] as num).toInt());
+      if (!mounted) return;
+      final contact = Map<String, dynamic>.from(data['contact'] as Map);
+      final images = (data['images'] as List).cast<Map>();
+      await showDialog<void>(
+        context: context,
+        builder: (dialog) => AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+          title: const Text('ข้อมูลนามบัตร'),
+          content: SizedBox(
+            width: 700,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
                     children: [
-                      Text(
-                        (row['name'] ?? '').toString(),
-                        style: TextStyle(
-                          color: businessCardOcrUi(context).primaryColor,
-                          fontWeight: FontWeight.w700,
+                      for (final image in images)
+                        Image.memory(
+                          base64Decode('${image['data']}'),
+                          height: 180,
+                          fit: BoxFit.contain,
                         ),
-                      ),
-                      Text(
-                        [
-                          (row['company'] ?? ''),
-                          (row['position'] ?? ''),
-                        ].where((e) => e.toString().isNotEmpty).join(' • '),
-                      ),
-                      Text(
-                        [
-                          (row['phone'] ?? ''),
-                          (row['email'] ?? ''),
-                        ].where((e) => e.toString().isNotEmpty).join(' • '),
-                      ),
-                      _status(row),
                     ],
                   ),
-                ),
-                _rowActions(row),
-              ],
+                  const SizedBox(height: 12),
+                  for (final entry in {
+                    'name': 'ชื่อผู้ติดต่อ',
+                    'company': 'บริษัท',
+                    'position': 'ตำแหน่ง',
+                    'phone': 'โทรศัพท์',
+                    'email': 'อีเมล',
+                    'address': 'ที่อยู่',
+                    'website': 'เว็บไซต์',
+                    'line': 'LINE ID',
+                  }.entries)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Text(
+                        '${entry.value}: ${contact[entry.key] ?? '-'}',
+                      ),
+                    ),
+                ],
+              ),
             ),
-          );
-        },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialog),
+              child: const Text('ปิด'),
+            ),
+          ],
+        ),
       );
+    } catch (error) {
+      if (mounted)
+        showTimedSnackBar(
+          context,
+          message: _contactError(error, 'โหลดข้อมูลนามบัตรไม่สำเร็จ'),
+          error: true,
+        );
     }
-    return Padding(
-      padding: businessCardOcrUi(context).cardPadding,
-      child: LaooWorkspaceDataTable(
-        tokens: businessCardOcrUi(context),
-        columns: const [
-          LaooWorkspaceTableColumns.id,
-          DataColumn(label: Text('Action')),
-          DataColumn(label: Text('ชื่อผู้ติดต่อ')),
-          DataColumn(label: Text('บริษัท')),
-          DataColumn(label: Text('ตำแหน่ง')),
-          DataColumn(label: Text('โทรศัพท์')),
-          DataColumn(label: Text('อีเมล')),
-          DataColumn(label: Text('สถานะ')),
-        ],
-        rows: [
-          for (var i = 0; i < _rows.length; i++)
-            DataRow(
-              cells: [
-                DataCell(Text(((_page - 1) * _pageSize + i + 1).toString())),
-                DataCell(_rowActions(_rows[i])),
-                DataCell(Text((_rows[i]['name'] ?? '').toString())),
-                DataCell(Text((_rows[i]['company'] ?? '').toString())),
-                DataCell(Text((_rows[i]['position'] ?? '').toString())),
-                DataCell(Text((_rows[i]['phone'] ?? '').toString())),
-                DataCell(Text((_rows[i]['email'] ?? '').toString())),
-                DataCell(_status(_rows[i])),
-              ],
-            ),
-        ],
-      ),
-    );
   }
 
   @override
-  Widget build(
-    BuildContext context,
-  ) => ValueListenableBuilder<WorkspaceThemePreset>(
-    valueListenable: workspaceThemeController,
-    builder: (context, _, _) => SupportWorkspaceShell(
-      pageTitle: _caption,
-      activeMenu: 'companyContacts',
-      menuScope: WorkspaceMenuScope.company,
-      child: LayoutBuilder(
-        builder: (context, box) {
-          final compact = box.maxWidth < 1100, t = businessCardOcrUi(context);
-          final pages = _total == 0 ? 1 : (_total / _pageSize).ceil();
-          return ColoredBox(
-            color: t.backgroundColor,
-            child: LaooListWorkspace(
-              tokens: t,
-              caption: LaooCaptionCard(
-                tokens: t,
-                caption: _caption,
-                favoriteKey: '55002',
-                leading: Icon(Icons.contacts_outlined, color: t.primaryColor),
-                trailing: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  alignment: WrapAlignment.end,
-                  crossAxisAlignment: WrapCrossAlignment.center,
+  Widget build(BuildContext context) =>
+      ValueListenableBuilder<WorkspaceThemePreset>(
+        valueListenable: workspaceThemeController,
+        builder: (context, _, _) => SupportWorkspaceShell(
+          pageTitle: _caption,
+          activeMenu: _route,
+          menuScope: WorkspaceMenuScope.company,
+          child: LayoutBuilder(
+            builder: (context, box) => _reviewWorkspace(
+              businessCardOcrUi(context),
+              box.maxWidth < 1100,
+            ),
+          ),
+        ),
+      );
+  Widget _reviewWorkspace(LaooWorkspaceUiTokens t, bool compact) {
+    final list = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        LaooSurfaceCard(
+          tokens: t,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('รายการนามบัตร ($_total)', style: t.sectionStyle),
+              const Text('แบบร่างและรายการที่ส่งตรวจสอบ'),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _search,
+                style: t.inputStyle,
+                decoration: ocrInput(
+                  context,
+                  'ค้นหาชื่อ บริษัท โทรศัพท์ หรืออีเมล',
+                  icon: Icons.search,
+                ),
+                onSubmitted: (_) {
+                  _query = _search.text.trim();
+                  _load();
+                },
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                children: [
+                  FilledButton.icon(
+                    onPressed: _loading
+                        ? null
+                        : () {
+                            _query = _search.text.trim();
+                            _load();
+                          },
+                    icon: const Icon(Icons.search),
+                    label: const Text('ค้นหา'),
+                  ),
+                  OutlinedButton(
+                    onPressed: _loading
+                        ? null
+                        : () {
+                            _search.clear();
+                            _query = '';
+                            _load();
+                          },
+                    child: const Text('ล้าง Filter'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        LaooSurfaceCard(
+          tokens: t,
+          child: _loading
+              ? const Center(child: CircularProgressIndicator())
+              : _rows.isEmpty
+              ? const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Text('ไม่มีรายการนามบัตร'),
+                  ),
+                )
+              : Column(
                   children: [
-                    if (!compact)
-                      LaooListCardToggle(
-                        tokens: t,
-                        cards: _cards,
-                        onChanged: (v) => setState(() => _cards = v),
-                      ),
-                    if (_actions['create'] == true)
-                      SizedBox(
-                        height: t.buttonHeight,
-                        child: FilledButton.icon(
-                          onPressed: () => _open(),
-                          style: FilledButton.styleFrom(
-                            minimumSize: Size(0, t.buttonHeight),
-                            maximumSize: Size(double.infinity, t.buttonHeight),
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            backgroundColor: t.primaryColor,
-                            foregroundColor: Colors.white,
-                            textStyle: t.buttonStyle,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(t.radius),
+                    for (final row in _rows)
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          ListTile(
+                            title: Text('${row['company'] ?? '-'}'),
+                            onTap: () => _showDraft(row),
+                            subtitle: Text(
+                              [row['name'], row['phone'], row['email']]
+                                  .where((v) => v != null && '$v'.isNotEmpty)
+                                  .join(' • '),
+                            ),
+                            trailing: Text(
+                              row['status'] == 'DRAFT'
+                                  ? 'แบบร่าง'
+                                  : 'รอตรวจสอบ',
                             ),
                           ),
-                          icon: const Icon(Icons.add),
-                          label: const Text('เพิ่ม'),
-                        ),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              if (row['canSend'] == true)
+                                OutlinedButton(
+                                  onPressed: () async {
+                                    try {
+                                      await _api.sendDraft(
+                                        (row['reviewId'] as num).toInt(),
+                                      );
+                                      if (!mounted) return;
+                                      showTimedSnackBar(
+                                        context,
+                                        message: 'ส่งตรวจสอบแล้ว',
+                                      );
+                                      await _load();
+                                    } catch (error) {
+                                      if (mounted)
+                                        showTimedSnackBar(
+                                          context,
+                                          message: _contactError(
+                                            error,
+                                            'ส่งตรวจสอบไม่สำเร็จ',
+                                          ),
+                                          error: true,
+                                        );
+                                    }
+                                  },
+                                  child: const Text('ส่งตรวจสอบ'),
+                                ),
+                              if (row['canDelete'] == true)
+                                OutlinedButton.icon(
+                                  onPressed: () => _removeDraft(row),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: Theme.of(
+                                      context,
+                                    ).colorScheme.error,
+                                    side: BorderSide(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.error,
+                                    ),
+                                  ),
+                                  icon: Icon(
+                                    Icons.delete_outline,
+                                    color: Theme.of(context).colorScheme.error,
+                                  ),
+                                  label: const Text('ลบ'),
+                                ),
+                              if (row['canReview'] == true)
+                                OutlinedButton(
+                                  onPressed: () async {
+                                    try {
+                                      await _api.completeReview(
+                                        (row['reviewId'] as num).toInt(),
+                                      );
+                                      if (!mounted) return;
+                                      showTimedSnackBar(
+                                        context,
+                                        message: 'ตรวจสอบเรียบร้อยแล้ว',
+                                      );
+                                      await _load();
+                                    } catch (error) {
+                                      if (mounted)
+                                        showTimedSnackBar(
+                                          context,
+                                          message: _contactError(
+                                            error,
+                                            'ตรวจสอบไม่สำเร็จ',
+                                          ),
+                                          error: true,
+                                        );
+                                    }
+                                  },
+                                  child: const Text('ตรวจสอบเสร็จ'),
+                                ),
+                            ],
+                          ),
+                          Divider(color: t.borderColor),
+                        ],
                       ),
                   ],
                 ),
-              ),
-              filter: FilterHeightSync(
-                builder: (context, searchKey, height) => Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    SizedBox(
-                      width: compact ? box.maxWidth - 40 : 280,
-                      child: TextField(
-                        key: searchKey,
-                        controller: _search,
-                        style: t.inputStyle,
-                        decoration: ocrInput(
-                          context,
-                          'ค้นหาชื่อ บริษัท โทรศัพท์ หรืออีเมล',
-                          icon: Icons.search,
-                        ),
-                        onSubmitted: (_) {
-                          _query = _search.text.trim();
-                          _page = 1;
-                          _load();
-                        },
-                      ),
-                    ),
-                    FilledButton.icon(
-                      onPressed: _loading
-                          ? null
-                          : () {
-                              _query = _search.text.trim();
-                              _page = 1;
-                              _load();
-                            },
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        backgroundColor: t.primaryColor,
-                        foregroundColor: Colors.white,
-                        textStyle: t.buttonStyle,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(t.radius),
-                        ),
-                      ).merge(filterActionHeightStyle(height)),
-                      icon: const Icon(Icons.search),
-                      label: const Text('ค้นหา'),
-                    ),
-                    OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        foregroundColor: t.primaryColor,
-                        textStyle: t.buttonStyle,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(t.radius),
-                        ),
-                      ).merge(filterActionHeightStyle(height)),
-                      onPressed: _loading
-                          ? null
-                          : () {
-                              _search.clear();
-                              _query = '';
-                              _page = 1;
-                              _load();
-                            },
-                      icon: const Icon(Icons.filter_alt_off_outlined),
-                      label: const Text('ล้าง Filter'),
-                    ),
-                  ],
-                ),
-              ),
-              table: _result(compact || _cards),
-              pagination: LaooPaginationCard(
-                tokens: t,
-                page: _page,
-                pageCount: pages,
-                pageSize: _pageSize,
-                total: _total,
-                onPrevious: _page > 1
-                    ? () {
-                        setState(() => _page--);
-                        _load();
-                      }
-                    : null,
-                onNext: _page < pages
-                    ? () {
-                        setState(() => _page++);
-                        _load();
-                      }
-                    : null,
-              ),
+        ),
+      ],
+    );
+    final caps = _capabilities;
+    final ocr = _actions['create'] == true && caps?['isEnabled'] == true
+        ? BusinessCardOcrPage(
+            key: const ValueKey('contact-inline-ocr'),
+            tokens: t,
+            target: _target,
+            get: _ocr.get,
+            upload: _ocr.upload,
+            notify: (ctx, message, error) =>
+                showTimedSnackBar(ctx, message: message, error: error),
+            maxImageSizeMB: (caps?['maxImageSizeMB'] as num?)?.toInt() ?? 10,
+            engineAvailable: caps?['engineAvailable'] == true,
+            embedded: true,
+            extraReview: ContactOcrCustomerSelection(
+              key: _customerSelection,
+              api: _api,
+              supplier: widget.supplier,
             ),
+            onSave: _saveBusinessCard,
+            onCompleted: (_) async {
+              if (mounted) {
+                showTimedSnackBar(context, message: 'บันทึกแบบร่างแล้ว');
+                await _load();
+                if (mounted) setState(() => _workspaceTab = 1);
+              }
+            },
+          )
+        : const Center(
+            child: Text('ไม่มีสิทธิ์เพิ่มข้อมูล หรือ OCR ยังไม่พร้อมใช้งาน'),
           );
-        },
-      ),
-    ),
-  );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        LaooCaptionCard(
+          tokens: t,
+          caption: _caption,
+          favoriteKey: _menuCode,
+          leading: Icon(Icons.contacts_outlined, color: t.primaryColor),
+        ),
+        const SizedBox(height: 8),
+        LaooSurfaceCard(
+          tokens: t,
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final tab in [
+                const MapEntry(0, 'ข้อมูลนามบัตรที่สแกน'),
+                const MapEntry(1, 'รายการนามบัตร'),
+              ])
+                ChoiceChip(
+                  label: Text(tab.value),
+                  selected: _workspaceTab == tab.key,
+                  selectedColor: t.primaryColor.withValues(alpha: .12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(t.radius),
+                  ),
+                  onSelected: (_) => setState(() => _workspaceTab = tab.key),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        Expanded(
+          child: IndexedStack(
+            index: _workspaceTab,
+            children: [
+              ocr,
+              SingleChildScrollView(child: list),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class ContactForm extends StatefulWidget {

@@ -12,6 +12,7 @@ abstract final class RoutePaths {
   static const String companyBusinessCardOcrSettings =
       '/company/business-card-ocr-settings';
   static const String companyContacts = '/company/contacts';
+  static const String companySupplierContacts = '/company/supplier-contacts';
   static const String companyQuotations = '/company/quotations';
   static const String companyPreOrders = '/company/pre-orders';
   static const String companyTemporaryReceipts = '/company/temporary-receipts';

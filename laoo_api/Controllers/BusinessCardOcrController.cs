@@ -17,7 +17,7 @@ public sealed class BusinessCardOcrController(IConfiguration configuration, IBus
     private long Actor => long.TryParse(User.FindFirst("user_id")?.Value, out var id) ? id : 0;
     private async Task<SqlConnection> Open(CancellationToken token)
     { var c = new SqlConnection(configuration.GetConnectionString("LaooDatabase")); await c.OpenAsync(token); return c; }
-    private static string? Menu(string target) => target switch { "customers" => "09001", "contacts" => "55002", "visitors" => "31002", _ => null };
+    private static string? Menu(string target) => target switch { "customers" => "09001", "contacts" => "55002", "suppliers" => "55003", "visitors" => "31002", _ => null };
     private async Task<bool> HasOcrPackage(SqlConnection c, CancellationToken token)
     {
         const string sql = """
@@ -172,6 +172,12 @@ WHERE C.CompanyID=@company AND C.IsDeleted=0 AND
 ((@name<>N'' AND P.FullName=@name) OR (@email<>N'' AND P.Email=@email)
  OR (@phone<>N'' AND REPLACE(REPLACE(P.Mobile,N'-',N''),N' ',N'')=@phone))
 ORDER BY C.ContactID;
+""",
+        "suppliers"=>"""
+SELECT TOP(20) C.VendorContactID,V.VendorName,C.FullName,COALESCE(C.Phone,N''),COALESCE(C.Email,N'')
+FROM dbo.TDAPVendorContact C JOIN dbo.TDAPVendor V ON V.CompanyID=C.CompanyID AND V.VendorID=C.VendorID
+WHERE C.CompanyID=@company AND ((@name<>N'' AND C.FullName=@name) OR (@email<>N'' AND C.Email=@email)
+ OR (@phone<>N'' AND REPLACE(REPLACE(C.Phone,N'-',N''),N' ',N'')=@phone)) ORDER BY C.VendorContactID;
 """,
         _=>"""
 SELECT TOP(20) V.VisitorVisitID,N'',V.VisitorName,COALESCE(V.Phone,N''),N''

@@ -59,7 +59,17 @@ SELECT OrgUnitID,NameTH FROM dbo.TDADOrganizationUnit WHERE CompanyID=@company A
     }
 
     [HttpPut]
-    public async Task<IActionResult> Save([FromBody] ReviewSettingsRequest input, CancellationToken token)
+    public Task<IActionResult> Save([FromBody] ReviewSettingsRequest input, CancellationToken token) => SaveCore(input, null, token);
+
+    [HttpPut("combined")]
+    public Task<IActionResult> SaveCombined([FromBody] CombinedOcrReviewSettingsRequest input, CancellationToken token)
+    {
+        if (input.Ocr is null || input.Review is null || input.Ocr.MaxImageSizeMB is < 1 or > 10 || input.Ocr.TimeoutSeconds is < 5 or > 120)
+            return Task.FromResult<IActionResult>(BadRequest(new { message="ค่าตั้งค่า OCR ไม่ถูกต้อง", description="ขนาดภาพ 1–10 MB และเวลาประมวลผล 5–120 วินาที" }));
+        return SaveCore(input.Review, input.Ocr, token);
+    }
+
+    private async Task<IActionResult> SaveCore(ReviewSettingsRequest input, OcrSettings? ocr, CancellationToken token)
     {
         await using var db = await Open(token);
         if (!await Allowed(db, "EDIT", token)) return Forbid();
@@ -86,6 +96,16 @@ DELETE dbo.TDSTBusinessCardReviewer WHERE CompanyID=@company AND TargetType=@tar
             update.Parameters.AddWithValue("@company", Company); update.Parameters.AddWithValue("@target", target); update.Parameters.AddWithValue("@mode", value.Mode); update.Parameters.AddWithValue("@level", value.Level); update.Parameters.AddWithValue("@actor", Actor); await update.ExecuteNonQueryAsync(token);
             foreach (var id in ids) { await using var add = new SqlCommand("INSERT dbo.TDSTBusinessCardReviewer(CompanyID,TargetType,EmployeeID) VALUES(@company,@target,@id)",db,tx); add.Parameters.AddWithValue("@company",Company);add.Parameters.AddWithValue("@target",target);add.Parameters.AddWithValue("@id",id);await add.ExecuteNonQueryAsync(token); }
         }
+        if (ocr is not null) {
+            await using var updateOcr = new SqlCommand("""
+UPDATE dbo.TDSTBusinessCardOcrSetting WITH(UPDLOCK,HOLDLOCK)
+SET IsEnabled=@enabled,MaxImageSizeMB=@size,TimeoutSeconds=@timeout,UpdateDate=SYSUTCDATETIME(),UpdateBy=@actor WHERE CompanyID=@company;
+IF @@ROWCOUNT=0 INSERT dbo.TDSTBusinessCardOcrSetting(CompanyID,IsEnabled,MaxImageSizeMB,TimeoutSeconds,UpdateBy)
+VALUES(@company,@enabled,@size,@timeout,@actor);
+""", db, tx);
+            updateOcr.Parameters.AddWithValue("@company",Company);updateOcr.Parameters.AddWithValue("@actor",Actor);updateOcr.Parameters.AddWithValue("@enabled",ocr.IsEnabled);updateOcr.Parameters.AddWithValue("@size",ocr.MaxImageSizeMB);updateOcr.Parameters.AddWithValue("@timeout",ocr.TimeoutSeconds);
+            await updateOcr.ExecuteNonQueryAsync(token);
+        }
         await tx.CommitAsync(token); return Ok(new { message="บันทึกการตั้งค่าแล้ว" });
     }
 }
@@ -93,3 +113,4 @@ DELETE dbo.TDSTBusinessCardReviewer WHERE CompanyID=@company AND TargetType=@tar
 public sealed record ReviewSettingResponse(string Mode, string Level, List<long> EmployeeIds);
 public sealed record ReviewSettingInput(string Mode, string Level, List<long>? EmployeeIds);
 public sealed record ReviewSettingsRequest(ReviewSettingInput? Customer, ReviewSettingInput? Supplier);
+public sealed record CombinedOcrReviewSettingsRequest(OcrSettings? Ocr, ReviewSettingsRequest? Review);

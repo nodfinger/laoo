@@ -28,6 +28,22 @@ class BusinessCardOcrApi {
     '/api/company/ocr/business-cards/review-settings',
     body: settings,
   );
+  Future<void> saveCombinedSettings(
+    bool enabled,
+    int size,
+    int timeout,
+    Map<String, dynamic> review,
+  ) => _client.put(
+    '/api/company/ocr/business-cards/review-settings/combined',
+    body: {
+      'ocr': {
+        'isEnabled': enabled,
+        'maxImageSizeMB': size,
+        'timeoutSeconds': timeout,
+      },
+      'review': review,
+    },
+  );
   Future<void> saveSettings(bool enabled, int size, int timeout) => _client.put(
     '/api/company/ocr/business-cards/settings',
     body: {

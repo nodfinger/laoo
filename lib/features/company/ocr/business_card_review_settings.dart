@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:laoo_shared_workspace_ui/laoo_shared_workspace_ui.dart';
-import '../../../core/widgets/timed_snack_bar.dart';
 import 'business_card_ocr_api.dart';
 import 'business_card_ocr_ui.dart';
 
 class BusinessCardReviewSettings extends StatefulWidget {
-  const BusinessCardReviewSettings({super.key, required this.canEdit});
+  const BusinessCardReviewSettings({
+    super.key,
+    required this.canEdit,
+    required this.saving,
+  });
   final bool canEdit;
+  final bool saving;
   @override
-  State<BusinessCardReviewSettings> createState() =>
-      _BusinessCardReviewSettingsState();
+  BusinessCardReviewSettingsState createState() =>
+      BusinessCardReviewSettingsState();
 }
 
 class _Review {
@@ -32,12 +36,12 @@ class _Review {
   };
 }
 
-class _BusinessCardReviewSettingsState
+class BusinessCardReviewSettingsState
     extends State<BusinessCardReviewSettings> {
   final api = BusinessCardOcrApi();
   final customer = _Review(), supplier = _Review();
   List<Map<String, dynamic>> employees = [], departments = [];
-  bool loading = true, saving = false, hasDivision = false;
+  bool loading = true, hasDivision = false;
   String? error;
   @override
   void initState() {
@@ -82,40 +86,26 @@ class _BusinessCardReviewSettingsState
     }
   }
 
-  Future<void> save() async {
-    if ([
-      customer,
-      supplier,
-    ].any((r) => r.mode == 'EMPLOYEE' && r.employees.isEmpty)) {
-      showTimedSnackBar(
-        context,
-        message: 'กรุณาเลือกพนักงานผู้ตรวจสอบ',
-        error: true,
-      );
-      return;
-    }
-    setState(() => saving = true);
-    try {
-      await api.saveReviewSettings({
-        'customer': customer.json(),
-        'supplier': supplier.json(),
-      });
-      if (mounted)
-        showTimedSnackBar(context, message: 'บันทึกการตั้งค่าผู้ตรวจสอบแล้ว');
-    } catch (e) {
-      if (mounted)
-        showTimedSnackBar(
-          context,
-          message:
-              'บันทึกการตั้งค่าผู้ตรวจสอบไม่สำเร็จ\nรายละเอียดเพิ่มเติม: $e',
-          error: true,
-        );
-    } finally {
-      if (mounted) setState(() => saving = false);
-    }
+  String? validationError() {
+    if (loading || error != null)
+      return 'กรุณารอให้โหลดการตั้งค่าผู้ตรวจสอบสำเร็จ';
+    final missing = <String>[
+      if (customer.mode == 'EMPLOYEE' && customer.employees.isEmpty)
+        'ลูกค้า/ผู้ติดต่อ',
+      if (supplier.mode == 'EMPLOYEE' && supplier.employees.isEmpty)
+        'ผู้ขาย/ผู้ติดต่อ',
+    ];
+    return missing.isEmpty
+        ? null
+        : 'กรุณาเลือกพนักงานผู้ตรวจสอบสำหรับ ${missing.join(' และ ')}';
   }
 
-  Future<void> choose(_Review review) async {
+  Map<String, dynamic> settings() => {
+    'customer': customer.json(),
+    'supplier': supplier.json(),
+  };
+
+  Future<void> _choose(_Review review) async {
     final chosen = {...review.employees};
     String search = '';
     int? department;
@@ -137,13 +127,17 @@ class _BusinessCardReviewSettingsState
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(4),
             ),
-            title: const Text('เลือกพนักงานผู้ตรวจสอบ'),
+            title: Text(
+              'เลือกพนักงานผู้ตรวจสอบ',
+              style: businessCardOcrUi(context).captionStyle,
+            ),
             content: SizedBox(
-              width: 600,
+              width: 480,
               height: MediaQuery.sizeOf(context).height * .55,
               child: Column(
                 children: [
                   TextField(
+                    style: businessCardOcrUi(context).inputStyle,
                     decoration: ocrInput(
                       context,
                       'ค้นหาพนักงาน',
@@ -154,6 +148,7 @@ class _BusinessCardReviewSettingsState
                   const SizedBox(height: 12),
                   DropdownButtonFormField<int?>(
                     initialValue: department,
+                    style: businessCardOcrUi(context).tableStyle,
                     decoration: ocrInput(context, 'แผนก'),
                     items: [
                       const DropdownMenuItem<int?>(
@@ -172,7 +167,10 @@ class _BusinessCardReviewSettingsState
                   const SizedBox(height: 8),
                   Align(
                     alignment: Alignment.centerLeft,
-                    child: Text('เลือกแล้ว ${chosen.length} คน'),
+                    child: Text(
+                      'เลือกแล้ว ${chosen.length} คน',
+                      style: businessCardOcrUi(context).tableStyle,
+                    ),
                   ),
                   Expanded(
                     child: filtered.isEmpty
@@ -185,9 +183,18 @@ class _BusinessCardReviewSettingsState
                               final e = filtered[i];
                               final id = (e['id'] as num).toInt();
                               return CheckboxListTile(
+                                controlAffinity:
+                                    ListTileControlAffinity.leading,
+                                contentPadding: EdgeInsets.zero,
                                 value: chosen.contains(id),
-                                title: Text('${e['name']}'),
-                                subtitle: Text('${e['department']}'),
+                                title: Text(
+                                  '${e['name']}',
+                                  style: businessCardOcrUi(context).tableStyle,
+                                ),
+                                subtitle: Text(
+                                  '${e['department']}',
+                                  style: businessCardOcrUi(context).tableStyle,
+                                ),
                                 onChanged: (v) => update(() {
                                   if (v == true) {
                                     chosen.add(id);
@@ -219,8 +226,8 @@ class _BusinessCardReviewSettingsState
     if (result != null && mounted) setState(() => review.employees = result);
   }
 
-  Widget section(String title, _Review value) {
-    final canChange = widget.canEdit && !saving;
+  Widget _section(String title, _Review value) {
+    final canChange = widget.canEdit && !widget.saving;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -232,6 +239,11 @@ class _BusinessCardReviewSettingsState
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             ChoiceChip(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(
+                  businessCardOcrUi(context).radius,
+                ),
+              ),
               label: const Text('ตามสายงาน'),
               selected: value.mode == 'ORG',
               onSelected: canChange
@@ -239,6 +251,11 @@ class _BusinessCardReviewSettingsState
                   : null,
             ),
             ChoiceChip(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(
+                  businessCardOcrUi(context).radius,
+                ),
+              ),
               label: const Text('กำหนดชื่อผู้มีสิทธิตรวจสอบ'),
               selected: value.mode == 'EMPLOYEE',
               onSelected: canChange
@@ -254,6 +271,11 @@ class _BusinessCardReviewSettingsState
               spacing: 8,
               children: [
                 ChoiceChip(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(
+                      businessCardOcrUi(context).radius,
+                    ),
+                  ),
                   label: const Text('ตรวจจากระดับฝ่าย'),
                   selected: value.level == 'DIV',
                   onSelected: canChange
@@ -261,6 +283,11 @@ class _BusinessCardReviewSettingsState
                       : null,
                 ),
                 ChoiceChip(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(
+                      businessCardOcrUi(context).radius,
+                    ),
+                  ),
                   label: const Text('ตรวจจากระดับแผนก'),
                   selected: value.level == 'DEP',
                   onSelected: canChange
@@ -273,7 +300,7 @@ class _BusinessCardReviewSettingsState
             const Text('ตรวจจากระดับแผนก'),
         ] else ...[
           OutlinedButton.icon(
-            onPressed: canChange ? () => choose(value) : null,
+            onPressed: canChange ? () => _choose(value) : null,
             icon: const Icon(Icons.person_search),
             label: Text('เลือกพนักงาน (${value.employees.length} คน)'),
           ),
@@ -287,6 +314,11 @@ class _BusinessCardReviewSettingsState
                   ? 'พนักงานไม่พร้อมใช้งาน ($id)'
                   : '${matches.first['name']}';
               return InputChip(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(
+                    businessCardOcrUi(context).radius,
+                  ),
+                ),
                 label: Text(name),
                 onDeleted: canChange
                     ? () => setState(() => value.employees.remove(id))
@@ -317,25 +349,31 @@ class _BusinessCardReviewSettingsState
         else if (error != null)
           Text(error!)
         else ...[
-          section('ลูกค้า/ผู้ติดต่อ', customer),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 16),
-            child: Divider(height: 1, thickness: .6),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              if (constraints.maxWidth > 600) {
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: _section('ลูกค้า/ผู้ติดต่อ', customer)),
+                    const SizedBox(width: 24),
+                    Expanded(child: _section('ผู้ขาย/ผู้ติดต่อ', supplier)),
+                  ],
+                );
+              }
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _section('ลูกค้า/ผู้ติดต่อ', customer),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                    child: Divider(height: 1, thickness: .6),
+                  ),
+                  _section('ผู้ขาย/ผู้ติดต่อ', supplier),
+                ],
+              );
+            },
           ),
-          section('ผู้ขาย/ผู้ติดต่อ', supplier),
-          if (widget.canEdit) ...[
-            const SizedBox(height: 16),
-            Align(
-              alignment: Alignment.centerRight,
-              child: FilledButton.icon(
-                onPressed: saving ? null : save,
-                icon: const Icon(Icons.save_outlined),
-                label: Text(
-                  saving ? 'กำลังบันทึก…' : 'บันทึกการตั้งค่าผู้ตรวจสอบ',
-                ),
-              ),
-            ),
-          ],
         ],
       ],
     ),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
+import 'business_card_download.dart';
 import 'laoo_list_workspace.dart';
 
 typedef BusinessCardGet =
@@ -65,6 +66,8 @@ class BusinessCardImport {
       if (values[key]?.trim().isNotEmpty == true) key: values[key]!.trim(),
   };
 }
+
+enum BusinessCardSaveOutcome { saved, retryAttachments, failure }
 
 Future<bool> confirmBusinessCardChanges(
   BuildContext context,
@@ -130,6 +133,10 @@ class BusinessCardOcrButton extends StatefulWidget {
     required this.onImported,
     this.recordId,
     this.enabled = true,
+    this.extraReview,
+    this.onSave,
+    this.onOpening,
+    this.showWhenUnavailable = false,
     super.key,
   });
   final LaooWorkspaceUiTokens tokens;
@@ -140,6 +147,11 @@ class BusinessCardOcrButton extends StatefulWidget {
   final BusinessCardUpload upload;
   final BusinessCardNotify notify;
   final Future<void> Function(BusinessCardImport result) onImported;
+  final Widget? extraReview;
+  final Future<BusinessCardSaveOutcome> Function(BusinessCardImport result)?
+  onSave;
+  final VoidCallback? onOpening;
+  final bool showWhenUnavailable;
   @override
   State<BusinessCardOcrButton> createState() => _BusinessCardOcrButtonState();
 }
@@ -175,6 +187,7 @@ class _BusinessCardOcrButtonState extends State<BusinessCardOcrButton> {
   }
 
   Future<void> _open() async {
+    widget.onOpening?.call();
     setState(() => _opening = true);
     try {
       final result = await Navigator.of(context).push<BusinessCardImport>(
@@ -188,6 +201,8 @@ class _BusinessCardOcrButtonState extends State<BusinessCardOcrButton> {
             notify: widget.notify,
             maxImageSizeMB: (_capabilities!['maxImageSizeMB'] as num).toInt(),
             engineAvailable: _capabilities!['engineAvailable'] == true,
+            extraReview: widget.extraReview,
+            onSave: widget.onSave,
           ),
         ),
       );
@@ -199,19 +214,26 @@ class _BusinessCardOcrButtonState extends State<BusinessCardOcrButton> {
 
   @override
   Widget build(BuildContext context) {
-    if (_capabilities?['isEnabled'] != true) return const SizedBox.shrink();
-    return OutlinedButton.icon(
-      style: OutlinedButton.styleFrom(
-        minimumSize: Size(48, widget.tokens.buttonHeight),
-        textStyle: widget.tokens.buttonStyle,
-        foregroundColor: widget.tokens.primaryColor,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(widget.tokens.radius),
+    final available = _capabilities?['isEnabled'] == true;
+    if (!available && !widget.showWhenUnavailable)
+      return const SizedBox.shrink();
+    return Tooltip(
+      message: available
+          ? 'อ่านนามบัตร'
+          : 'OCR ยังไม่พร้อมหรือยังไม่ได้เปิดใช้งานสำหรับบริษัท',
+      child: OutlinedButton.icon(
+        style: OutlinedButton.styleFrom(
+          minimumSize: Size(48, widget.tokens.buttonHeight),
+          textStyle: widget.tokens.buttonStyle,
+          foregroundColor: widget.tokens.primaryColor,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(widget.tokens.radius),
+          ),
         ),
+        onPressed: widget.enabled && !_opening && available ? _open : null,
+        icon: const Icon(Icons.document_scanner_outlined),
+        label: const Text('อ่านนามบัตร'),
       ),
-      onPressed: widget.enabled && !_opening ? _open : null,
-      icon: const Icon(Icons.document_scanner_outlined),
-      label: const Text('อ่านนามบัตร'),
     );
   }
 }
@@ -226,6 +248,10 @@ class BusinessCardOcrPage extends StatefulWidget {
     required this.maxImageSizeMB,
     required this.engineAvailable,
     this.recordId,
+    this.extraReview,
+    this.onSave,
+    this.embedded = false,
+    this.onCompleted,
     super.key,
   });
   final LaooWorkspaceUiTokens tokens;
@@ -236,6 +262,11 @@ class BusinessCardOcrPage extends StatefulWidget {
   final BusinessCardNotify notify;
   final int maxImageSizeMB;
   final bool engineAvailable;
+  final Widget? extraReview;
+  final Future<BusinessCardSaveOutcome> Function(BusinessCardImport result)?
+  onSave;
+  final bool embedded;
+  final Future<void> Function(BusinessCardImport result)? onCompleted;
   @override
   State<BusinessCardOcrPage> createState() => _BusinessCardOcrPageState();
 }
@@ -249,7 +280,10 @@ class _BusinessCardOcrPageState extends State<BusinessCardOcrPage> {
   final _candidates = <String, List<String>>{};
   List<String> _lines = [];
   List<Map<String, dynamic>> _duplicates = [];
-  bool _busy = false, _reviewed = false, _analyzed = false;
+  bool _busy = false,
+      _reviewed = false,
+      _analyzed = false,
+      _editingLocked = false;
   int _side = 0, _slot = 1;
   String _assign = 'name';
   LaooWorkspaceUiTokens get t => widget.tokens;
@@ -280,6 +314,46 @@ class _BusinessCardOcrPageState extends State<BusinessCardOcrPage> {
         '$message\nรายละเอียดเพิ่มเติม: ตรวจภาพและการเชื่อมต่อแล้วลองใหม่ ข้อมูลทะเบียนยังไม่ถูกบันทึก',
         true,
       );
+    }
+  }
+
+  Future<void> _submit() async {
+    final result = BusinessCardImport(
+      values: {
+        for (final key in _selected)
+          if (_fields[key]!.text.trim().isNotEmpty)
+            key: _fields[key]!.text.trim(),
+      },
+      images: _images.whereType<BusinessCardImage>().toList(),
+      contactSlot: _slot,
+    );
+    if (widget.onSave == null) {
+      Navigator.pop(context, result);
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      final outcome = await widget.onSave!(result);
+      if (!mounted) return;
+      if (outcome == BusinessCardSaveOutcome.saved) {
+        if (widget.embedded) {
+          setState(() {
+            _images[0] = null;
+            _images[1] = null;
+            _editingLocked = false;
+            _invalidate();
+          });
+          await widget.onCompleted?.call(result);
+        } else {
+          Navigator.pop(context, result);
+        }
+      } else if (outcome == BusinessCardSaveOutcome.retryAttachments) {
+        setState(() => _editingLocked = true);
+      }
+    } catch (_) {
+      _error('บันทึกข้อมูลไม่สำเร็จ');
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
   }
 
@@ -394,6 +468,27 @@ class _BusinessCardOcrPageState extends State<BusinessCardOcrPage> {
     }
   }
 
+  Future<void> _saveImage() async {
+    final image = _images[_side];
+    if (image == null) return;
+    final lower = image.name.toLowerCase();
+    final mime = lower.endsWith('.png')
+        ? 'image/png'
+        : lower.endsWith('.webp')
+        ? 'image/webp'
+        : 'image/jpeg';
+    try {
+      await saveBusinessCardImage(image.name, mime, image.bytes);
+    } catch (_) {
+      if (mounted)
+        widget.notify(
+          context,
+          'บันทึกรูปไม่สำเร็จ\nรายละเอียดเพิ่มเติม: กรุณาลองใหม่',
+          true,
+        );
+    }
+  }
+
   Future<void> _read() async {
     setState(() {
       _busy = true;
@@ -496,126 +591,257 @@ class _BusinessCardOcrPageState extends State<BusinessCardOcrPage> {
 
   Widget _picture() => LaooSurfaceCard(
     tokens: t,
+    child: Theme(
+      data: widget.embedded
+          ? Theme.of(context).copyWith(
+              outlinedButtonTheme: OutlinedButtonThemeData(
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(0, 40),
+                  maximumSize: const Size(double.infinity, 40),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  foregroundColor: t.primaryColor,
+                  textStyle: t.buttonStyle,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(t.radius),
+                  ),
+                ),
+              ),
+              textButtonTheme: TextButtonThemeData(
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(0, 40),
+                  maximumSize: const Size(double.infinity, 40),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  foregroundColor: t.primaryColor,
+                  textStyle: t.buttonStyle,
+                ),
+              ),
+              filledButtonTheme: FilledButtonThemeData(
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(0, 40),
+                  maximumSize: const Size(double.infinity, 40),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  backgroundColor: t.primaryColor,
+                  textStyle: t.buttonStyle,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(t.radius),
+                  ),
+                ),
+              ),
+            )
+          : Theme.of(context),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('1. ภาพนามบัตร', style: t.sectionStyle),
+          Wrap(
+            spacing: 8,
+            children: [
+              for (var i = 0; i < 2; i++)
+                ChoiceChip(
+                  visualDensity: widget.embedded ? VisualDensity.compact : null,
+                  materialTapTargetSize: widget.embedded
+                      ? MaterialTapTargetSize.shrinkWrap
+                      : null,
+                  label: Text(i == 0 ? 'ด้านหน้า' : 'ด้านหลัง'),
+                  selected: _side == i,
+                  selectedColor: t.primaryColor.withValues(alpha: .12),
+                  checkmarkColor: t.primaryColor,
+                  labelStyle: TextStyle(color: t.primaryColor),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(t.radius),
+                  ),
+                  onSelected: _busy || _editingLocked
+                      ? null
+                      : (_) => setState(() => _side = i),
+                ),
+            ],
+          ),
+          if (widget.embedded) const SizedBox(height: 16),
+          SizedBox(
+            height: 240,
+            child: _images[_side] == null
+                ? Center(
+                    child: Text(
+                      'JPG / PNG / WebP ไม่เกิน ${widget.maxImageSizeMB} MB',
+                    ),
+                  )
+                : InteractiveViewer(
+                    child: Image.memory(
+                      _images[_side]!.bytes,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, error, stack) => const Center(
+                        child: Text('ภาพไม่ถูกต้อง กรุณาเลือกใหม่'),
+                      ),
+                    ),
+                  ),
+          ),
+          SizedBox(height: widget.embedded ? 24 : 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              OutlinedButton.icon(
+                onPressed: _busy || _editingLocked ? null : () => _pick(false),
+                icon: const Icon(Icons.upload_file),
+                label: const Text('เลือกภาพ'),
+              ),
+              OutlinedButton.icon(
+                onPressed: _busy || _editingLocked ? null : () => _pick(true),
+                icon: const Icon(Icons.camera_alt_outlined),
+                label: const Text('ถ่ายรูป'),
+              ),
+              OutlinedButton.icon(
+                onPressed: _busy || _editingLocked || _images[_side] == null
+                    ? null
+                    : () => _transform(true),
+                icon: const Icon(Icons.rotate_right),
+                label: const Text('หมุน'),
+              ),
+              OutlinedButton.icon(
+                onPressed: _busy || _editingLocked || _images[_side] == null
+                    ? null
+                    : () => _transform(false),
+                icon: const Icon(Icons.crop),
+                label: const Text('ครอบภาพ'),
+              ),
+              if (widget.embedded)
+                OutlinedButton.icon(
+                  onPressed: _busy || _images[_side] == null
+                      ? null
+                      : _saveImage,
+                  icon: const Icon(Icons.download_outlined),
+                  label: const Text('บันทึกรูป'),
+                ),
+              TextButton(
+                onPressed: _busy || _editingLocked
+                    ? null
+                    : () => setState(() {
+                        _images[_side] = null;
+                        _invalidate();
+                      }),
+                child: const Text('นำภาพออก'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed:
+                _busy ||
+                    _editingLocked ||
+                    !_images.any((e) => e != null) ||
+                    !widget.engineAvailable
+                ? null
+                : _read,
+            icon: const Icon(Icons.document_scanner_outlined),
+            label: Text(_busy ? 'กำลังประมวลผล…' : 'อ่านนามบัตร'),
+          ),
+          if (!widget.engineAvailable)
+            const Text(
+              'เครื่องมือ OCR ยังไม่พร้อม ให้ผู้ดูแลติดตั้ง Tesseract และภาษาไทย/อังกฤษ',
+            ),
+          if (!widget.embedded && _lines.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Text('ข้อความต้นฉบับ → เลือกช่องที่จะใส่', style: t.sectionStyle),
+            DropdownButtonFormField<String>(
+              style: t.tableStyle,
+              initialValue: _assign,
+              isExpanded: true,
+              decoration: _input('ช่องปลายทาง'),
+              items: [
+                for (final e in businessCardFields.entries)
+                  DropdownMenuItem(value: e.key, child: Text(e.value)),
+              ],
+              onChanged: _busy || _editingLocked
+                  ? null
+                  : (v) => setState(() => _assign = v!),
+            ),
+            for (final line in _lines)
+              TextButton(
+                onPressed: _busy || _editingLocked
+                    ? null
+                    : () => setState(() {
+                        _fields[_assign]!.text = line;
+                        _selected.add(_assign);
+                        _reviewed = false;
+                      }),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(line),
+                ),
+              ),
+          ],
+        ],
+      ),
+    ),
+  );
+  Widget _readText() => LaooSurfaceCard(
+    tokens: t,
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('1. ภาพนามบัตร', style: t.sectionStyle),
-        Wrap(
-          spacing: 8,
-          children: [
-            for (var i = 0; i < 2; i++)
-              ChoiceChip(
-                label: Text(i == 0 ? 'ด้านหน้า' : 'ด้านหลัง'),
-                selected: _side == i,
-                selectedColor: t.primaryColor.withValues(alpha: .12),
-                checkmarkColor: t.primaryColor,
-                labelStyle: TextStyle(color: t.primaryColor),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(t.radius),
+        Text('ข้อความที่อ่านได้', style: t.sectionStyle),
+        const SizedBox(height: 8),
+        if (_lines.isEmpty)
+          const Text('ยังไม่มีข้อความ กรุณาอ่านนามบัตรก่อน')
+        else ...[
+          Text(
+            'ช่องที่เลือก: ${businessCardFields[_assign]}',
+            style: TextStyle(color: t.primaryColor),
+          ),
+          const Text('กดข้อความหรือลากไปวางในช่องที่ต้องการ'),
+          const SizedBox(height: 8),
+          for (final line in _lines) ...[
+            Draggable<String>(
+              data: line,
+              maxSimultaneousDrags: _busy || _editingLocked ? 0 : 1,
+              feedback: Material(
+                elevation: 4,
+                color: t.surfaceColor,
+                borderRadius: BorderRadius.circular(t.radius),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 320),
+                  child: Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Text(line, style: TextStyle(color: t.primaryColor)),
+                  ),
                 ),
-                onSelected: _busy ? null : (_) => setState(() => _side = i),
               ),
-          ],
-        ),
-        SizedBox(
-          height: 240,
-          child: _images[_side] == null
-              ? Center(
-                  child: Text(
-                    'JPG / PNG / WebP ไม่เกิน ${widget.maxImageSizeMB} MB',
-                  ),
-                )
-              : InteractiveViewer(
-                  child: Image.memory(
-                    _images[_side]!.bytes,
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, error, stack) => const Center(
-                      child: Text('ภาพไม่ถูกต้อง กรุณาเลือกใหม่'),
-                    ),
-                  ),
+              child: TextButton(
+                onPressed: _busy || _editingLocked
+                    ? null
+                    : () => setState(() {
+                        _fields[_assign]!.text = line;
+                        _selected.add(_assign);
+                        _reviewed = false;
+                      }),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(line, style: TextStyle(color: t.primaryColor)),
                 ),
-        ),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            OutlinedButton.icon(
-              onPressed: _busy ? null : () => _pick(false),
-              icon: const Icon(Icons.upload_file),
-              label: const Text('เลือกภาพ'),
+              ),
             ),
-            OutlinedButton.icon(
-              onPressed: _busy ? null : () => _pick(true),
-              icon: const Icon(Icons.camera_alt_outlined),
-              label: const Text('ถ่ายรูป'),
-            ),
-            OutlinedButton.icon(
-              onPressed: _busy || _images[_side] == null
-                  ? null
-                  : () => _transform(true),
-              icon: const Icon(Icons.rotate_right),
-              label: const Text('หมุน'),
-            ),
-            OutlinedButton.icon(
-              onPressed: _busy || _images[_side] == null
-                  ? null
-                  : () => _transform(false),
-              icon: const Icon(Icons.crop),
-              label: const Text('ครอบภาพ'),
-            ),
-            TextButton(
-              onPressed: _busy
-                  ? null
-                  : () => setState(() {
-                      _images[_side] = null;
-                      _invalidate();
-                    }),
-              child: const Text('นำภาพออก'),
-            ),
+            Divider(height: 1, color: t.borderColor),
           ],
-        ),
-        const SizedBox(height: 16),
-        FilledButton.icon(
-          onPressed:
-              _busy || !_images.any((e) => e != null) || !widget.engineAvailable
-              ? null
-              : _read,
-          icon: const Icon(Icons.document_scanner_outlined),
-          label: Text(_busy ? 'กำลังประมวลผล…' : 'อ่านนามบัตร'),
-        ),
-        if (!widget.engineAvailable)
-          const Text(
-            'เครื่องมือ OCR ยังไม่พร้อม ให้ผู้ดูแลติดตั้ง Tesseract และภาษาไทย/อังกฤษ',
-          ),
-        if (_lines.isNotEmpty) ...[
-          const SizedBox(height: 16),
-          Text('ข้อความต้นฉบับ → เลือกช่องที่จะใส่', style: t.sectionStyle),
-          DropdownButtonFormField<String>(
-            style: t.tableStyle,
-            initialValue: _assign,
-            isExpanded: true,
-            decoration: _input('ช่องปลายทาง'),
-            items: [
-              for (final e in businessCardFields.entries)
-                DropdownMenuItem(value: e.key, child: Text(e.value)),
-            ],
-            onChanged: _busy ? null : (v) => setState(() => _assign = v!),
-          ),
-          for (final line in _lines)
-            TextButton(
-              onPressed: _busy
-                  ? null
-                  : () => setState(() {
-                      _fields[_assign]!.text = line;
-                      _selected.add(_assign);
-                      _reviewed = false;
-                    }),
-              child: Align(alignment: Alignment.centerLeft, child: Text(line)),
-            ),
         ],
       ],
     ),
   );
+  Widget _comparison(bool wide) => wide
+      ? Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: _review()),
+            SizedBox(width: t.sectionSpacing),
+            Expanded(child: _readText()),
+          ],
+        )
+      : Column(
+          children: [
+            _review(),
+            SizedBox(height: t.sectionSpacing),
+            _readText(),
+          ],
+        );
   Widget _review() => LaooSurfaceCard(
     tokens: t,
     child: Column(
@@ -634,7 +860,7 @@ class _BusinessCardOcrPageState extends State<BusinessCardOcrPage> {
               for (var i = 1; i <= 2; i++)
                 DropdownMenuItem(value: i, child: Text('ผู้ติดต่อคนที่ $i')),
             ],
-            onChanged: _busy
+            onChanged: _busy || _editingLocked
                 ? null
                 : (v) => setState(() {
                     _slot = v!;
@@ -653,34 +879,115 @@ class _BusinessCardOcrPageState extends State<BusinessCardOcrPage> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Checkbox(
-                  value: _selected.contains(e.key),
-                  onChanged: !_analyzed || _busy
-                      ? null
-                      : (v) => setState(() {
-                          v == true
-                              ? _selected.add(e.key)
-                              : _selected.remove(e.key);
-                          _reviewed = false;
-                        }),
-                ),
+                if (!widget.embedded)
+                  Checkbox(
+                    value: _selected.contains(e.key),
+                    onChanged: !_analyzed || _busy || _editingLocked
+                        ? null
+                        : (v) => setState(() {
+                            v == true
+                                ? _selected.add(e.key)
+                                : _selected.remove(e.key);
+                            _reviewed = false;
+                          }),
+                  ),
                 Expanded(
                   child: Column(
                     children: [
-                      TextField(
-                        controller: _fields[e.key],
-                        enabled: _analyzed && !_busy,
-                        style: t.inputStyle,
-                        maxLines: e.key == 'address' ? 3 : 1,
-                        decoration: _input(e.value),
-                        onChanged: (_) => setState(() => _reviewed = false),
+                      DragTarget<String>(
+                        onWillAcceptWithDetails: (_) =>
+                            widget.embedded &&
+                            _analyzed &&
+                            !_busy &&
+                            !_editingLocked,
+                        onAcceptWithDetails: (details) => setState(() {
+                          _assign = e.key;
+                          _fields[e.key]!.text = details.data;
+                          _selected.add(e.key);
+                          _reviewed = false;
+                        }),
+                        builder: (context, candidates, rejected) =>
+                            DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: candidates.isEmpty
+                                    ? null
+                                    : t.primaryColor.withValues(alpha: .12),
+                                borderRadius: BorderRadius.circular(t.radius),
+                              ),
+                              child: TextField(
+                                controller: _fields[e.key],
+                                onTap: widget.embedded
+                                    ? () => setState(() => _assign = e.key)
+                                    : null,
+                                enabled: _analyzed && !_busy && !_editingLocked,
+                                style: t.inputStyle,
+                                maxLines: e.key == 'address' ? 3 : 1,
+                                decoration: _input(e.value).copyWith(
+                                  suffixIcon:
+                                      widget.embedded &&
+                                          _analyzed &&
+                                          !_busy &&
+                                          !_editingLocked &&
+                                          _fields[e.key]!.text.isNotEmpty
+                                      ? Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            if (e.key == 'name' &&
+                                                RegExp(
+                                                  r'[\u0E00-\u0E7F]',
+                                                ).hasMatch(
+                                                  _fields[e.key]!.text,
+                                                ) &&
+                                                RegExp(r'\s').hasMatch(
+                                                  _fields[e.key]!.text,
+                                                ))
+                                              IconButton(
+                                                tooltip: 'ตัดช่องว่างทั้งหมด',
+                                                icon: const Icon(
+                                                  Icons.space_bar,
+                                                ),
+                                                onPressed: () => setState(() {
+                                                  final controller =
+                                                      _fields[e.key]!;
+                                                  final value = controller.text
+                                                      .replaceAll(
+                                                        RegExp(r'\s+'),
+                                                        '',
+                                                      );
+                                                  controller
+                                                      .value = TextEditingValue(
+                                                    text: value,
+                                                    selection:
+                                                        TextSelection.collapsed(
+                                                          offset: value.length,
+                                                        ),
+                                                  );
+                                                  _reviewed = false;
+                                                }),
+                                              ),
+                                            IconButton(
+                                              tooltip: 'ล้างข้อความ',
+                                              icon: const Icon(Icons.close),
+                                              onPressed: () => setState(() {
+                                                _fields[e.key]!.clear();
+                                                _reviewed = false;
+                                              }),
+                                            ),
+                                          ],
+                                        )
+                                      : null,
+                                ),
+                                onChanged: (_) =>
+                                    setState(() => _reviewed = false),
+                              ),
+                            ),
                       ),
                       if ((_candidates[e.key]?.length ?? 0) > 1)
                         Wrap(
                           children: [
                             for (final value in _candidates[e.key]!)
                               TextButton(
-                                onPressed: _busy
+                                onPressed: _busy || _editingLocked
                                     ? null
                                     : () => setState(() {
                                         _fields[e.key]!.text = value;
@@ -693,12 +1000,31 @@ class _BusinessCardOcrPageState extends State<BusinessCardOcrPage> {
                     ],
                   ),
                 ),
+                if (widget.embedded)
+                  Checkbox(
+                    value: _selected.contains(e.key),
+                    onChanged: !_analyzed || _busy || _editingLocked
+                        ? null
+                        : (v) => setState(() {
+                            v == true
+                                ? _selected.add(e.key)
+                                : _selected.remove(e.key);
+                            _reviewed = false;
+                          }),
+                  ),
               ],
             ),
           ),
         if (_analyzed) ...[
+          if (!widget.embedded && widget.extraReview != null) ...[
+            const SizedBox(height: 16),
+            IgnorePointer(
+              ignoring: _busy || _editingLocked,
+              child: widget.extraReview!,
+            ),
+          ],
           TextButton(
-            onPressed: _busy ? null : _checkDuplicates,
+            onPressed: _busy || _editingLocked ? null : _checkDuplicates,
             child: const Text('ตรวจข้อมูลซ้ำอีกครั้ง'),
           ),
           for (final row in _duplicates)
@@ -711,14 +1037,15 @@ class _BusinessCardOcrPageState extends State<BusinessCardOcrPage> {
             const Text(
               'พบข้อมูลคล้ายกัน ควรกลับไปเลือกรายการเดิมก่อนบันทึก เพื่อป้องกันทะเบียนซ้ำ',
             ),
-          CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            value: _reviewed,
-            title: const Text('ตรวจเทียบภาพและเลือกช่องแล้ว'),
-            onChanged: _busy
-                ? null
-                : (v) => setState(() => _reviewed = v == true),
-          ),
+          if (!widget.embedded)
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              value: _reviewed,
+              title: const Text('ตรวจเทียบภาพและเลือกช่องแล้ว'),
+              onChanged: _busy || _editingLocked
+                  ? null
+                  : (v) => setState(() => _reviewed = v == true),
+            ),
         ],
       ],
     ),
@@ -760,81 +1087,233 @@ class _BusinessCardOcrPageState extends State<BusinessCardOcrPage> {
       ),
       child: Scaffold(
         backgroundColor: t.backgroundColor,
-        appBar: AppBar(
-          title: Text('อ่านนามบัตร • ตรวจสอบก่อนนำเข้า', style: t.captionStyle),
-          backgroundColor: t.surfaceColor,
-          surfaceTintColor: Colors.transparent,
-        ),
+        appBar: widget.embedded
+            ? null
+            : AppBar(
+                title: Text(
+                  'อ่านนามบัตร • ตรวจสอบก่อนนำเข้า',
+                  style: t.captionStyle,
+                ),
+                backgroundColor: t.surfaceColor,
+                surfaceTintColor: Colors.transparent,
+              ),
         body: SafeArea(
           child: Column(
             children: [
               if (_busy) const LinearProgressIndicator(),
+              if (_editingLocked)
+                const Padding(
+                  padding: EdgeInsets.all(8),
+                  child: Text(
+                    'บันทึกข้อมูลแล้ว แต่แนบภาพยังไม่ครบ กดบันทึกเพื่อลองแนบภาพที่เหลืออีกครั้ง',
+                  ),
+                ),
               Expanded(
                 child: LayoutBuilder(
                   builder: (context, box) => SingleChildScrollView(
                     padding: t.contentMargin,
-                    child: box.maxWidth >= t.compactBreakpoint
+                    child: widget.embedded && box.maxWidth >= 1100
                         ? Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Expanded(child: _picture()),
+                              Expanded(flex: 4, child: _picture()),
                               SizedBox(width: t.sectionSpacing),
-                              Expanded(child: _review()),
+                              Expanded(
+                                flex: 6,
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    if (widget.extraReview != null) ...[
+                                      _customerReview(),
+                                      SizedBox(height: t.sectionSpacing),
+                                    ],
+                                    _comparison(true),
+                                  ],
+                                ),
+                              ),
                             ],
                           )
                         : Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              _picture(),
-                              SizedBox(height: t.sectionSpacing),
-                              _review(),
+                              if (widget.embedded) ...[
+                                _picture(),
+                                SizedBox(height: t.sectionSpacing),
+                              ],
+                              if (widget.embedded &&
+                                  widget.extraReview != null) ...[
+                                LaooSurfaceCard(
+                                  tokens: t,
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      DecoratedBox(
+                                        decoration: BoxDecoration(
+                                          color: t.primaryColor.withValues(
+                                            alpha: .12,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            t.radius,
+                                          ),
+                                        ),
+                                        child: Padding(
+                                          padding: t.cardPadding,
+                                          child: Row(
+                                            children: [
+                                              Expanded(
+                                                child: Text(
+                                                  widget.target == 'suppliers'
+                                                      ? 'ข้อมูลผู้ขาย'
+                                                      : 'ข้อมูลลูกค้า',
+                                                  style: t.sectionStyle,
+                                                ),
+                                              ),
+                                              FilledButton.icon(
+                                                onPressed:
+                                                    !_analyzed ||
+                                                        _busy ||
+                                                        _selected.isEmpty
+                                                    ? null
+                                                    : _submit,
+                                                icon: const Icon(
+                                                  Icons.save_outlined,
+                                                ),
+                                                label: const Text(
+                                                  'บันทึกแบบร่าง',
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      IgnorePointer(
+                                        ignoring: _busy || _editingLocked,
+                                        child: widget.extraReview!,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                SizedBox(height: t.sectionSpacing),
+                              ],
+                              widget.embedded
+                                  ? _comparison(box.maxWidth >= 900)
+                                  : box.maxWidth >= t.compactBreakpoint
+                                  ? Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Expanded(
+                                          flex: widget.embedded ? 35 : 1,
+                                          child: _picture(),
+                                        ),
+                                        SizedBox(width: t.sectionSpacing),
+                                        Expanded(
+                                          flex: widget.embedded ? 65 : 1,
+                                          child: widget.embedded
+                                              ? _comparison(
+                                                  box.maxWidth >= 1100,
+                                                )
+                                              : _review(),
+                                        ),
+                                      ],
+                                    )
+                                  : Column(
+                                      children: [
+                                        _picture(),
+                                        SizedBox(height: t.sectionSpacing),
+                                        widget.embedded
+                                            ? _comparison(false)
+                                            : _review(),
+                                      ],
+                                    ),
                             ],
                           ),
                   ),
                 ),
               ),
-              Divider(height: 1, color: t.borderColor),
-              Container(
-                color: t.surfaceColor,
-                width: double.infinity,
-                padding: t.cardPadding,
-                child: Wrap(
-                  alignment: WrapAlignment.end,
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    OutlinedButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('ยกเลิก'),
-                    ),
-                    FilledButton.icon(
-                      onPressed: !_reviewed || _busy || _selected.isEmpty
-                          ? null
-                          : () => Navigator.pop(
-                              context,
-                              BusinessCardImport(
-                                values: {
-                                  for (final key in _selected)
-                                    if (_fields[key]!.text.trim().isNotEmpty)
-                                      key: _fields[key]!.text.trim(),
-                                },
-                                images: _images
-                                    .whereType<BusinessCardImage>()
-                                    .toList(),
-                                contactSlot: _slot,
-                              ),
-                            ),
-                      icon: const Icon(Icons.input),
-                      label: const Text('นำเข้าแบบฟอร์ม'),
-                    ),
-                  ],
+              if (!widget.embedded) Divider(height: 1, color: t.borderColor),
+              if (!widget.embedded)
+                Container(
+                  color: t.surfaceColor,
+                  width: double.infinity,
+                  padding: t.cardPadding,
+                  child: Wrap(
+                    alignment: WrapAlignment.end,
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      if (!widget.embedded)
+                        OutlinedButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('ยกเลิก'),
+                        ),
+                      FilledButton.icon(
+                        onPressed: !_reviewed || _busy || _selected.isEmpty
+                            ? null
+                            : _submit,
+                        icon: Icon(
+                          widget.onSave == null
+                              ? Icons.input
+                              : Icons.save_outlined,
+                        ),
+                        label: Text(
+                          widget.onSave == null ? 'นำเข้าแบบฟอร์ม' : 'บันทึก',
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
             ],
           ),
         ),
       ),
     );
   }
+
+  Widget _customerReview() => LaooSurfaceCard(
+    tokens: t,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: t.primaryColor.withValues(alpha: .12),
+            borderRadius: BorderRadius.circular(t.radius),
+          ),
+          child: Padding(
+            padding: t.cardPadding,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    widget.target == 'suppliers'
+                        ? 'ข้อมูลผู้ขาย'
+                        : 'ข้อมูลลูกค้า',
+                    style: t.sectionStyle,
+                  ),
+                ),
+                FilledButton.icon(
+                  onPressed: !_analyzed || _busy || _selected.isEmpty
+                      ? null
+                      : _submit,
+                  icon: const Icon(Icons.save_outlined),
+                  label: const Text('บันทึกแบบร่าง'),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        IgnorePointer(
+          ignoring: _busy || _editingLocked,
+          child: widget.extraReview!,
+        ),
+      ],
+    ),
+  );
 }
 
 class _BusinessCardCrop extends StatefulWidget {

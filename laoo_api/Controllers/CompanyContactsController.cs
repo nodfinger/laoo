@@ -1,5 +1,6 @@
 using System.Data;
 using System.Security.Cryptography;
+using System.Text.Json;
 using Laoo.Shared.Contracts;
 using LaooApi.Ocr;
 using Microsoft.AspNetCore.Authorization;
@@ -19,6 +20,26 @@ public sealed class CompanyContactsController(IConfiguration configuration,IWebH
         if(!await CompanyMenuAccess.IsAllowedAsync(c,User,"55002",action,t))return false;
         using var q=new SqlCommand("SELECT ScreenType FROM dbo.TDADMainMenu WHERE MenuCode='55002' AND IsActive=1",c);
         return Convert.ToInt32(await q.ExecuteScalarAsync(t))==1;
+    }
+    private async Task<bool> CanCreateCustomer(SqlConnection c,CancellationToken t)
+    {
+        if(!long.TryParse(User.FindFirst("partner_id")?.Value,out var partner) ||
+           !long.TryParse(User.FindFirst("project_id")?.Value,out _) ||
+           !await CompanyMenuAccess.IsSalesEnabledAsync(c,User,t) ||
+           !await CompanyMenuAccess.IsAllowedAsync(c,User,"09001","CREATE",t) ||
+           !await CompanyMenuAccess.IsAllowedAsync(c,User,"09001","VIEW",t)) return false;
+        using var q=new SqlCommand($"""
+SELECT CAST(CASE WHEN EXISTS (
+ SELECT 1 FROM dbo.TDSTCompanySetUp C
+ JOIN dbo.TDADProject P ON P.ProjectCode=N'LAOO' AND P.IsActive=1
+ JOIN dbo.TDADCompanyProject CP ON CP.ProjectID=P.ProjectID AND CP.CompanyID=C.CompanyID AND CP.PartnerID=C.PartnerID AND CP.IsEnabled=1
+  AND (CP.StartDate IS NULL OR CP.StartDate<=CONVERT(date,SYSUTCDATETIME())) AND (CP.ExpireDate IS NULL OR CP.ExpireDate>=CONVERT(date,SYSUTCDATETIME()))
+ JOIN dbo.TDADUser AccessUser ON AccessUser.UserID=@user AND AccessUser.CompanyID=C.CompanyID
+ WHERE C.CompanyID=@company AND C.PartnerID=@partner AND C.IsActive=1 AND {CompanyProjectAccess.ForUser("AccessUser","P.ProjectID",allowCoreShell:true)}
+) THEN 1 ELSE 0 END AS bit)
+""",c);
+        P(q,"@company",SqlDbType.BigInt,Company);P(q,"@partner",SqlDbType.BigInt,partner);P(q,"@user",SqlDbType.BigInt,Actor);
+        return Convert.ToBoolean(await q.ExecuteScalarAsync(t));
     }
     private static void P(SqlCommand q,string name,SqlDbType type,object? value,int size=0)
     {var p=size>0?q.Parameters.Add(name,type,size):q.Parameters.Add(name,type);p.Value=value??DBNull.Value;}
@@ -59,24 +80,162 @@ ORDER BY C.ContactID DESC OFFSET @offset ROWS FETCH NEXT @size ROWS ONLY;
             P(q,"@company",SqlDbType.BigInt,Company);P(q,"@person",SqlDbType.BigInt,personId);P(q,"@search",SqlDbType.NVarChar,search?.Trim()??"",250);P(q,"@like",SqlDbType.NVarChar,"%"+(search?.Trim()??"")+"%",252);
             using var r=await q.ExecuteReaderAsync(t);while(await r.ReadAsync(t))persons.Add(new{id=r.GetInt64(0),name=S(r,1),phone=S(r,2),email=S(r,3),rowVersion=Convert.ToBase64String((byte[])r[4])});
         }
-        if(canCustomer){using var q=new SqlCommand("SELECT TOP(200) CustomerID,CusName FROM dbo.TDARCustomer WHERE CompanyID=@company AND IsActive=1 ORDER BY CASE WHEN CustomerID=@customer THEN 0 ELSE 1 END,CusName",c);P(q,"@company",SqlDbType.BigInt,Company);P(q,"@customer",SqlDbType.BigInt,customerId);using var r=await q.ExecuteReaderAsync(t);while(await r.ReadAsync(t))customers.Add(new{id=r.GetInt64(0),name=S(r,1)});}
-        return Ok(new{persons,customers,canEditPerson=await CompanyMenuAccess.IsAllowedAsync(c,User,"13002","EDIT",t)});
+        if(canCustomer){using var q=new SqlCommand("SELECT TOP(200) CustomerID,CusName FROM dbo.TDARCustomer WHERE CompanyID=@company AND IsActive=1 AND (CustomerID=@customer OR @search=N'' OR CusName LIKE @like OR CusCode LIKE @like) ORDER BY CASE WHEN CustomerID=@customer THEN 0 ELSE 1 END,CusName",c);P(q,"@company",SqlDbType.BigInt,Company);P(q,"@customer",SqlDbType.BigInt,customerId);P(q,"@search",SqlDbType.NVarChar,search?.Trim()??"",250);P(q,"@like",SqlDbType.NVarChar,"%"+(search?.Trim()??"")+"%",252);using var r=await q.ExecuteReaderAsync(t);while(await r.ReadAsync(t))customers.Add(new{id=r.GetInt64(0),name=S(r,1)});}
+        return Ok(new{persons,customers,canCreateCustomer=await CanCreateCustomer(c,t),canEditPerson=await CompanyMenuAccess.IsAllowedAsync(c,User,"13002","EDIT",t)});
+    }
+
+    // A reviewer must be configured by employee or share the configured
+    // organization unit with the submitting employee in the same company.
+    private const string ReviewerPredicate = """
+EXISTS (SELECT 1 FROM dbo.TDSTBusinessCardReviewSetting s
+ JOIN dbo.TDADUserEmployee me ON me.CompanyID=q.CompanyID AND me.UserID=@actor AND me.IsActive=1
+ JOIN dbo.TDADEmployee reviewer ON reviewer.CompanyID=me.CompanyID AND reviewer.EmployeeID=me.EmployeeID AND reviewer.IsActive=1
+ WHERE s.CompanyID=q.CompanyID AND s.TargetType=N'CUSTOMER' AND (
+  (s.ReviewMode=N'EMPLOYEE' AND EXISTS (SELECT 1 FROM dbo.TDSTBusinessCardReviewer r WHERE r.CompanyID=q.CompanyID AND r.TargetType=N'CUSTOMER' AND r.EmployeeID=reviewer.EmployeeID))
+  OR (s.ReviewMode=N'ORG' AND EXISTS (SELECT 1 FROM dbo.TDADUserEmployee su JOIN dbo.TDADEmployee sender ON sender.CompanyID=su.CompanyID AND sender.EmployeeID=su.EmployeeID AND sender.IsActive=1
+   WHERE su.CompanyID=q.CompanyID AND su.UserID=q.SubmittedBy AND su.IsActive=1 AND
+    ((s.OrgLevel=N'DEP' AND reviewer.DepartmentOrgUnitID IS NOT NULL AND reviewer.DepartmentOrgUnitID=sender.DepartmentOrgUnitID)
+     OR (s.OrgLevel=N'DIV' AND reviewer.DivisionOrgUnitID IS NOT NULL AND reviewer.DivisionOrgUnitID=sender.DivisionOrgUnitID))))))
+""";
+
+    [HttpGet("ocr-review-queue")]
+    public async Task<IActionResult> ReviewQueue(string? search,CancellationToken t)
+    {
+        using var c=await Open(t);if(!await Allowed(c,"VIEW",t))return Forbid();
+        var canEdit=await Allowed(c,"EDIT",t);var canDelete=await Allowed(c,"DELETE",t);var canCreate=await Allowed(c,"CREATE",t);
+        using var q=new SqlCommand($"""
+SELECT q.DraftID,JSON_VALUE(q.Payload,'$.company'),JSON_VALUE(q.Payload,'$.name'),JSON_VALUE(q.Payload,'$.phone'),JSON_VALUE(q.Payload,'$.email'),q.Status,
+ CASE WHEN q.Status='PENDING' AND {ReviewerPredicate} THEN CAST(1 AS bit) ELSE CAST(0 AS bit) END,
+ CASE WHEN q.Status='DRAFT' AND q.SubmittedBy=@actor THEN CAST(1 AS bit) ELSE CAST(0 AS bit) END
+FROM dbo.TDSTBusinessCardDraft q
+WHERE q.CompanyID=@company AND q.Status IN ('DRAFT','PENDING')
+ AND (q.SubmittedBy=@actor OR (q.Status='PENDING' AND {ReviewerPredicate}))
+ AND (@search=N'' OR JSON_VALUE(q.Payload,'$.company') LIKE @like OR JSON_VALUE(q.Payload,'$.name') LIKE @like OR JSON_VALUE(q.Payload,'$.phone') LIKE @like OR JSON_VALUE(q.Payload,'$.email') LIKE @like)
+ORDER BY q.DraftID DESC
+""",c);
+        P(q,"@company",SqlDbType.BigInt,Company);P(q,"@actor",SqlDbType.BigInt,Actor);P(q,"@search",SqlDbType.NVarChar,search?.Trim()??"",250);P(q,"@like",SqlDbType.NVarChar,"%"+(search?.Trim()??"")+"%",252);
+        var rows=new List<object>();using var r=await q.ExecuteReaderAsync(t);
+        while(await r.ReadAsync(t))rows.Add(new{reviewId=r.GetInt64(0),company=S(r,1),name=S(r,2),phone=S(r,3),email=S(r,4),status=S(r,5),canReview=canEdit&&canCreate&&r.GetBoolean(6),canSend=canCreate&&r.GetBoolean(7),canDelete=canDelete&&r.GetBoolean(7)});
+        return Ok(new{items=rows});
+    }
+
+    [HttpPost("ocr-review-queue/{id:long}/complete")]
+    public async Task<IActionResult> CompleteReview(long id,CancellationToken t)
+    {
+        using var c=await Open(t);if(!await Allowed(c,"EDIT",t))return Forbid();
+        using var q=new SqlCommand($"SELECT q.Payload FROM dbo.TDSTBusinessCardDraft q WHERE q.CompanyID=@company AND q.DraftID=@id AND q.Status='PENDING' AND {ReviewerPredicate}",c);
+        P(q,"@company",SqlDbType.BigInt,Company);P(q,"@actor",SqlDbType.BigInt,Actor);P(q,"@id",SqlDbType.BigInt,id);
+        var json=await q.ExecuteScalarAsync(t) as string;
+        if(json is null)return NotFound();
+        var data=JsonSerializer.Deserialize<ContactSave>(json,new JsonSerializerOptions{PropertyNameCaseInsensitive=true});
+        if(data is null)return BadRequest(Issue("ข้อมูลแบบร่างไม่ถูกต้อง","กรุณาติดต่อผู้ดูแลระบบ"));
+        return await Save(null,data,t,id);
+    }
+
+    [HttpPost("ocr-drafts"),RequestSizeLimit(32*1024*1024)]
+    public async Task<IActionResult> CreateDraft([FromBody] BusinessCardDraftRequest input,CancellationToken t)
+    {
+        using var c=await Open(t);if(!await Allowed(c,"CREATE",t))return Forbid();
+        var x=input.Contact;
+        if(x is null||string.IsNullOrWhiteSpace(x.Name)||x.Name.Length>200||(x.Phone?.Length??0)>50||(x.Email?.Length??0)>320||(x.Company?.Length??0)>200||(x.Position?.Length??0)>200||(x.Address?.Length??0)>1000||(x.Website?.Length??0)>320||(x.Line?.Length??0)>100||(!x.CreateCustomer&&!x.CustomerId.HasValue)||(x.CreateCustomer&&(x.CustomerId.HasValue||string.IsNullOrWhiteSpace(x.Company)))||(input.Images?.Count??0)>2)
+            return BadRequest(Issue("ข้อมูลแบบร่างไม่ถูกต้อง","ตรวจชื่อผู้ติดต่อ ลูกค้า และรูปนามบัตร"));
+        if(!string.IsNullOrWhiteSpace(x.Website)&&(!Uri.TryCreate(x.Website,UriKind.Absolute,out var website)||website.Scheme is not ("http" or "https")))return BadRequest(Issue("เว็บไซต์ไม่ถูกต้อง","ระบุลิงก์ที่ขึ้นต้นด้วย https:// หรือ http://"));
+        if(x.CreateCustomer&&!await CanCreateCustomer(c,t))return Forbid();
+        if(x.CustomerId.HasValue&&!await CompanyMenuAccess.IsAllowedAsync(c,User,"09001","VIEW",t))return Forbid();
+        using var sizeQuery=new SqlCommand("SELECT COALESCE((SELECT MaxImageSizeMB FROM dbo.TDSTBusinessCardOcrSetting WHERE CompanyID=@company),10)",c);
+        P(sizeQuery,"@company",SqlDbType.BigInt,Company);var max=Convert.ToInt32(await sizeQuery.ExecuteScalarAsync(t));
+        var images=new List<(string Name,byte[] Bytes)>();
+        foreach(var image in input.Images??[]){
+            if(string.IsNullOrWhiteSpace(image.Name)||string.IsNullOrEmpty(image.Data))return BadRequest(Issue("รูปนามบัตรไม่ถูกต้อง","กรุณาเลือกภาพใหม่"));
+            byte[] raw;try{raw=Convert.FromBase64String(image.Data);}catch(FormatException){return BadRequest(Issue("รูปนามบัตรไม่ถูกต้อง","กรุณาเลือกภาพใหม่"));}
+            if(raw.Length==0||raw.Length>max*1024L*1024)return BadRequest(Issue("รูปนามบัตรไม่ถูกต้อง",$"ขนาดภาพต้องไม่เกิน {max} MB"));
+            try{images.Add((Path.GetFileName(image.Name),BusinessCardImage.Normalize(raw)));}catch(OcrFailure e){return BadRequest(Issue(e.Message,e.Description));}
+        }
+        using var tx=c.BeginTransaction(IsolationLevel.Serializable);
+        if(x.CustomerId.HasValue){using var check=new SqlCommand("SELECT COUNT(1) FROM dbo.TDARCustomer WHERE CompanyID=@company AND CustomerID=@id AND IsActive=1",c,tx);P(check,"@company",SqlDbType.BigInt,Company);P(check,"@id",SqlDbType.BigInt,x.CustomerId);if(Convert.ToInt32(await check.ExecuteScalarAsync(t))!=1)return Forbid();}
+        using var q=new SqlCommand("INSERT dbo.TDSTBusinessCardDraft(CompanyID,SubmittedBy,Payload) OUTPUT INSERTED.DraftID VALUES(@company,@actor,@payload)",c,tx);
+        P(q,"@company",SqlDbType.BigInt,Company);P(q,"@actor",SqlDbType.BigInt,Actor);P(q,"@payload",SqlDbType.NVarChar,JsonSerializer.Serialize(x with {FromOcr=true},new JsonSerializerOptions{PropertyNamingPolicy=JsonNamingPolicy.CamelCase}),-1);
+        var id=Convert.ToInt64(await q.ExecuteScalarAsync(t));
+        foreach(var image in images){using var iq=new SqlCommand("INSERT dbo.TDSTBusinessCardDraftImage(CompanyID,DraftID,OriginalName,ImageData) VALUES(@company,@id,@name,@data)",c,tx);P(iq,"@company",SqlDbType.BigInt,Company);P(iq,"@id",SqlDbType.BigInt,id);P(iq,"@name",SqlDbType.NVarChar,image.Name,255);P(iq,"@data",SqlDbType.VarBinary,image.Bytes,-1);await iq.ExecuteNonQueryAsync(t);}
+        await tx.CommitAsync(t);return Ok(new{draftId=id});
+    }
+
+    [HttpPost("ocr-drafts/{id:long}/send")]
+    public async Task<IActionResult> SendDraft(long id,CancellationToken t)
+    {
+        using var c=await Open(t);if(!await Allowed(c,"CREATE",t))return Forbid();
+        using var q=new SqlCommand("UPDATE dbo.TDSTBusinessCardDraft SET Status='PENDING',SentAt=SYSUTCDATETIME() WHERE CompanyID=@company AND DraftID=@id AND SubmittedBy=@actor AND Status='DRAFT'",c);
+        P(q,"@company",SqlDbType.BigInt,Company);P(q,"@id",SqlDbType.BigInt,id);P(q,"@actor",SqlDbType.BigInt,Actor);
+        return await q.ExecuteNonQueryAsync(t)==1?NoContent():Conflict(Issue("ส่งตรวจไม่ได้","แบบร่างถูกเปลี่ยนสถานะหรือไม่มีสิทธิ์"));
+    }
+
+    [HttpGet("ocr-drafts/{id:long}")]
+    public async Task<IActionResult> DraftDetails(long id,CancellationToken t)
+    {
+        using var c=await Open(t);if(!await Allowed(c,"VIEW",t))return Forbid();
+        using var q=new SqlCommand($"SELECT q.Payload FROM dbo.TDSTBusinessCardDraft q WHERE q.CompanyID=@company AND q.DraftID=@id AND (q.SubmittedBy=@actor OR (q.Status='PENDING' AND {ReviewerPredicate})) AND q.Status IN ('DRAFT','PENDING')",c);
+        P(q,"@company",SqlDbType.BigInt,Company);P(q,"@id",SqlDbType.BigInt,id);P(q,"@actor",SqlDbType.BigInt,Actor);
+        var payload=await q.ExecuteScalarAsync(t) as string;if(payload is null)return NotFound();
+        using var iq=new SqlCommand("SELECT OriginalName,ImageData FROM dbo.TDSTBusinessCardDraftImage WHERE CompanyID=@company AND DraftID=@id ORDER BY DraftImageID",c);
+        P(iq,"@company",SqlDbType.BigInt,Company);P(iq,"@id",SqlDbType.BigInt,id);
+        using var reader=await iq.ExecuteReaderAsync(t);var images=new List<object>();while(await reader.ReadAsync(t))images.Add(new{name=S(reader,0),data=Convert.ToBase64String((byte[])reader[1])});
+        return Ok(new{contact=JsonSerializer.Deserialize<JsonElement>(payload),images});
+    }
+
+    [HttpDelete("ocr-drafts/{id:long}")]
+    public async Task<IActionResult> DeleteDraft(long id,CancellationToken t)
+    {
+        using var c=await Open(t);if(!await Allowed(c,"DELETE",t))return Forbid();
+        using var q=new SqlCommand("UPDATE dbo.TDSTBusinessCardDraft SET Status='DELETED' WHERE CompanyID=@company AND DraftID=@id AND SubmittedBy=@actor AND Status='DRAFT'",c);
+        P(q,"@company",SqlDbType.BigInt,Company);P(q,"@id",SqlDbType.BigInt,id);P(q,"@actor",SqlDbType.BigInt,Actor);
+        return await q.ExecuteNonQueryAsync(t)==1?NoContent():Conflict(Issue("ลบแบบร่างไม่ได้","แบบร่างถูกส่งตรวจแล้วหรือไม่มีสิทธิ์"));
     }
     [HttpPost]
     public Task<IActionResult> Create(ContactSave request,CancellationToken t)=>Save(null,request,t);
     [HttpPut("{id:long}")]
     public Task<IActionResult> Update(long id,ContactSave request,CancellationToken t)=>Save(id,request,t);
-    private async Task<IActionResult> Save(long? id,ContactSave x,CancellationToken t)
+    private async Task<IActionResult> Save(long? id,ContactSave x,CancellationToken t,long? draftId=null)
     {
         using var c=await Open(t);if(!await Allowed(c,id.HasValue?"EDIT":"CREATE",t))return Forbid();
         if(string.IsNullOrWhiteSpace(x.Name)||x.Name.Length>200||(x.Phone?.Length??0)>50||(x.Email?.Length??0)>320||(x.Company?.Length??0)>250||(x.Position?.Length??0)>200||(x.Address?.Length??0)>1000||(x.Website?.Length??0)>500||(x.Line?.Length??0)>100)
             return BadRequest(Issue("ข้อมูลผู้ติดต่อไม่ถูกต้อง","ระบุชื่อ และตรวจความยาวข้อมูลแต่ละช่อง"));
         if(!string.IsNullOrWhiteSpace(x.Website) && (!Uri.TryCreate(x.Website,UriKind.Absolute,out var uri)||uri.Scheme is not ("http" or "https")))
             return BadRequest(Issue("เว็บไซต์ไม่ถูกต้อง","ระบุลิงก์ที่ขึ้นต้นด้วย https:// หรือ http://"));
+        if(x.FromOcr && (id.HasValue || (!x.CreateCustomer && !x.CustomerId.HasValue)))
+            return BadRequest(Issue("ข้อมูลนำเข้านามบัตรไม่ถูกต้อง","กรุณาเลือกหรือสร้างลูกค้าสำหรับรายการตรวจสอบ"));
+        if(x.CreateCustomer && (id.HasValue || x.CustomerId.HasValue || string.IsNullOrWhiteSpace(x.Company) || x.Company.Trim().Length>200 || (x.Website?.Length??0)>320))
+            return BadRequest(Issue("ข้อมูลลูกค้าไม่ถูกต้อง","กรุณาระบุชื่อบริษัทไม่เกิน 200 ตัวอักษร และเลือกสร้างลูกค้าใหม่"));
+        if(x.CreateCustomer && !await CanCreateCustomer(c,t))
+            return StatusCode(403,Issue("ไม่มีสิทธิ์สร้างลูกค้า","ตรวจสิทธิ์ข้อมูลลูกค้าและแพ็กเกจระบบขายก่อนสร้างลูกค้าใหม่"));
         var personEdit=await CompanyMenuAccess.IsAllowedAsync(c,User,"13002","EDIT",t);
         if(x.CustomerId.HasValue && !await CompanyMenuAccess.IsAllowedAsync(c,User,"09001","VIEW",t))return Forbid();
         if(!id.HasValue && x.PersonId.HasValue && !await CompanyMenuAccess.IsAllowedAsync(c,User,"13002","VIEW",t))return Forbid();
         using var tx=c.BeginTransaction(IsolationLevel.Serializable);
+        if(draftId.HasValue){
+            using var locked=new SqlCommand($"SELECT COUNT(1) FROM dbo.TDSTBusinessCardDraft q WITH(UPDLOCK,HOLDLOCK) WHERE q.CompanyID=@company AND q.DraftID=@id AND q.Status='PENDING' AND {ReviewerPredicate}",c,tx);
+            P(locked,"@company",SqlDbType.BigInt,Company);P(locked,"@actor",SqlDbType.BigInt,Actor);P(locked,"@id",SqlDbType.BigInt,draftId);
+            if(Convert.ToInt32(await locked.ExecuteScalarAsync(t))!=1)return Conflict(Issue("ตรวจสอบไม่ได้","รายการถูกเปลี่ยนสถานะหรือไม่มีสิทธิ์"));
+        } else if(x.FromOcr) return BadRequest(Issue("กรุณาส่งนามบัตรตรวจสอบก่อน","ข้อมูลจาก OCR ต้องผ่านขั้นตอนตรวจสอบ"));
+        if(x.CreateCustomer){
+            using var q=new SqlCommand("""
+DECLARE @lockResult int, @lockResource nvarchar(255)=CONCAT(N'LAOO_OCR_CUSTOMER_CODE:',@company);
+EXEC @lockResult=sys.sp_getapplock @Resource=@lockResource,@LockMode='Exclusive',@LockOwner='Transaction',@LockTimeout=15000;
+IF @lockResult<0 THROW 51040,N'ไม่สามารถออกรหัสลูกค้า กรุณาลองใหม่',1;
+DECLARE @sequence bigint;
+SELECT @sequence=ISNULL(MAX(TRY_CONVERT(bigint,SUBSTRING(CusCode,4,7))),0)+1
+FROM dbo.TDARCustomer WITH(UPDLOCK,HOLDLOCK)
+WHERE CompanyID=@company AND LEN(CusCode)=10 AND CusCode LIKE N'OCR[0-9][0-9][0-9][0-9][0-9][0-9][0-9]';
+IF @sequence>9999999 THROW 51041,N'รหัสลูกค้าถึงจำนวนสูงสุดแล้ว',1;
+DECLARE @code nvarchar(10)=N'OCR'+RIGHT(N'0000000'+CONVERT(nvarchar(7),@sequence),7);
+IF EXISTS(SELECT 1 FROM dbo.TDARCustomer WITH(UPDLOCK,HOLDLOCK) WHERE CompanyID=@company AND CusCode=@code)
+ THROW 51042,N'รหัสลูกค้าซ้ำ กรุณาลองใหม่',1;
+INSERT dbo.TDARCustomer(CompanyID,CusCode,CusName,CusAddress,Website,IsActive,DataSource)
+OUTPUT INSERTED.CustomerID VALUES(@company,@code,@name,@address,@website,1,@source);
+""",c,tx);
+            P(q,"@company",SqlDbType.BigInt,Company);P(q,"@name",SqlDbType.NVarChar,x.Company!.Trim(),200);P(q,"@address",SqlDbType.NVarChar,x.Address?.Trim(),1000);P(q,"@website",SqlDbType.NVarChar,x.Website?.Trim(),320);
+            P(q,"@source",SqlDbType.TinyInt,x.FromOcr?1:0);
+            x=x with { CustomerId=Convert.ToInt64(await q.ExecuteScalarAsync(t)) };
+        }
         var person=x.PersonId;var owns=false;
         if(id.HasValue){
             using var q=new SqlCommand("SELECT PersonID,OwnsPerson,RowVersion FROM dbo.TDADContact WITH(UPDLOCK,HOLDLOCK) WHERE CompanyID=@company AND ContactID=@id AND IsDeleted=0",c,tx);
@@ -115,6 +274,10 @@ OUTPUT INSERTED.ContactID VALUES(@company,@person,@owns,@customer,@companyName,@
             Bind(q,x);P(q,"@id",SqlDbType.BigInt,id);P(q,"@person",SqlDbType.BigInt,person);P(q,"@owns",SqlDbType.Bit,owns);
             id=Convert.ToInt64(await q.ExecuteScalarAsync(t));
         }
+        if(draftId.HasValue){
+            using var q=new SqlCommand("UPDATE dbo.TDSTBusinessCardDraft SET Status='APPROVED',ReviewedAt=SYSUTCDATETIME(),ReviewedBy=@actor,ContactID=@contact,CustomerID=@customer WHERE CompanyID=@company AND DraftID=@draft AND Status='PENDING'",c,tx);
+            P(q,"@company",SqlDbType.BigInt,Company);P(q,"@contact",SqlDbType.BigInt,id);P(q,"@customer",SqlDbType.BigInt,x.CustomerId);P(q,"@actor",SqlDbType.BigInt,Actor);P(q,"@draft",SqlDbType.BigInt,draftId);await q.ExecuteNonQueryAsync(t);
+        }
         await tx.CommitAsync(t);return Ok(new{contactId=id,personId=person});
     }
     private async Task<bool> SharedPersonEditable(SqlConnection c,SqlTransaction tx,long person,CancellationToken t)
@@ -141,7 +304,7 @@ SELECT CAST(CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADEmployee WHERE PersonID=@pers
     {
         using var c=await Open(t);if(!await Allowed(c,"DELETE",t))return Forbid();
         byte[] version;try{version=Convert.FromBase64String(rowVersion);}catch(FormatException){return BadRequest();}
-        using var q=new SqlCommand("UPDATE dbo.TDADContact SET IsDeleted=1,IsActive=0,UpdateDate=SYSUTCDATETIME(),UpdateBy=@actor WHERE CompanyID=@company AND ContactID=@id AND RowVersion=@version AND IsDeleted=0",c);
+        using var q=new SqlCommand("UPDATE dbo.TDADContact SET IsDeleted=1,IsActive=0,UpdateDate=SYSUTCDATETIME(),UpdateBy=@actor WHERE CompanyID=@company AND ContactID=@id AND RowVersion=@version AND IsDeleted=0 AND NOT EXISTS (SELECT 1 FROM dbo.TDSTBusinessCardDraft d WHERE d.CompanyID=@company AND d.ContactID=@id AND d.Status='APPROVED')",c);
         P(q,"@company",SqlDbType.BigInt,Company);P(q,"@id",SqlDbType.BigInt,id);P(q,"@actor",SqlDbType.BigInt,Actor);P(q,"@version",SqlDbType.Timestamp,version);
         return await q.ExecuteNonQueryAsync(t)==1?NoContent():Conflict(Issue("ลบข้อมูลไม่ได้","รายการถูกเปลี่ยนหรือถูกลบแล้ว กรุณาโหลดข้อมูลใหม่"));
     }
@@ -150,7 +313,7 @@ SELECT CAST(CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADEmployee WHERE PersonID=@pers
     [HttpGet("{id:long}/files")]
     public async Task<IActionResult> Files(long id,CancellationToken t){
         using var c=await Open(t);if(!await Allowed(c,"VIEW",t)||!await Owns(c,id,t))return Forbid();
-        using var q=new SqlCommand("SELECT ContactFileID,OriginalName,FileSize FROM dbo.TDADContactFile WHERE CompanyID=@company AND ContactID=@id ORDER BY ContactFileID",c);P(q,"@company",SqlDbType.BigInt,Company);P(q,"@id",SqlDbType.BigInt,id);
+        using var q=new SqlCommand("SELECT ContactFileID,OriginalName,FileSize FROM dbo.TDADContactFile WHERE CompanyID=@company AND ContactID=@id UNION ALL SELECT -i.DraftImageID,i.OriginalName,CONVERT(bigint,DATALENGTH(i.ImageData)) FROM dbo.TDSTBusinessCardDraftImage i JOIN dbo.TDSTBusinessCardDraft d ON d.DraftID=i.DraftID AND d.CompanyID=i.CompanyID WHERE d.CompanyID=@company AND d.ContactID=@id AND d.Status='APPROVED' ORDER BY 1",c);P(q,"@company",SqlDbType.BigInt,Company);P(q,"@id",SqlDbType.BigInt,id);
         using var r=await q.ExecuteReaderAsync(t);var files=new List<object>();while(await r.ReadAsync(t))files.Add(new{id=r.GetInt64(0),name=S(r,1),size=r.GetInt64(2)});return Ok(files);
     }
     [HttpPost("{id:long}/files"),RequestSizeLimit(11*1024*1024)]
@@ -177,9 +340,12 @@ SELECT CAST(CASE WHEN EXISTS(SELECT 1 FROM dbo.TDADEmployee WHERE PersonID=@pers
     [HttpGet("{id:long}/files/{fileId:long}")]
     public async Task<IActionResult> Download(long id,long fileId,CancellationToken t){
         using var c=await Open(t);if(!await Allowed(c,"VIEW",t)||!await Owns(c,id,t))return Forbid();
+        if(fileId<0){using var image=new SqlCommand("SELECT i.ImageData FROM dbo.TDSTBusinessCardDraftImage i JOIN dbo.TDSTBusinessCardDraft d ON d.DraftID=i.DraftID AND d.CompanyID=i.CompanyID WHERE d.CompanyID=@company AND d.ContactID=@id AND d.Status='APPROVED' AND i.DraftImageID=@file",c);P(image,"@company",SqlDbType.BigInt,Company);P(image,"@id",SqlDbType.BigInt,id);P(image,"@file",SqlDbType.BigInt,-fileId);var bytes=await image.ExecuteScalarAsync(t) as byte[];return bytes is null?NotFound():File(bytes,"image/png");}
         using var q=new SqlCommand("SELECT StoredName FROM dbo.TDADContactFile WHERE CompanyID=@company AND ContactID=@id AND ContactFileID=@file",c);P(q,"@company",SqlDbType.BigInt,Company);P(q,"@id",SqlDbType.BigInt,id);P(q,"@file",SqlDbType.BigInt,fileId);
         var name=await q.ExecuteScalarAsync(t) as string;if(name is null||Path.GetFileName(name)!=name)return NotFound();
         var path=FilePath(name);return System.IO.File.Exists(path)?PhysicalFile(path,"image/png"):NotFound();
     }
 }
-public sealed record ContactSave(string Name,string? Phone,string? Email,string? Company,string? Position,string? Address,string? Website,string? Line,bool IsActive=true,long? PersonId=null,long? CustomerId=null,string? RowVersion=null,string? PersonRowVersion=null);
+public sealed record ContactSave(string Name,string? Phone,string? Email,string? Company,string? Position,string? Address,string? Website,string? Line,bool IsActive=true,long? PersonId=null,long? CustomerId=null,string? RowVersion=null,string? PersonRowVersion=null,bool CreateCustomer=false,bool FromOcr=false);
+public sealed record BusinessCardDraftImage(string Name,string Data);
+public sealed record BusinessCardDraftRequest(ContactSave? Contact,List<BusinessCardDraftImage>? Images);

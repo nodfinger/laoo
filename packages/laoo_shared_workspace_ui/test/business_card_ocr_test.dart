@@ -115,6 +115,60 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('อ่านนามบัตร'), findsNothing);
   });
+  testWidgets(
+    'contact action remains visible but disabled when OCR unavailable',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: BusinessCardOcrButton(
+              tokens: tokens,
+              target: 'contacts',
+              showWhenUnavailable: true,
+              get: (_, query) async => {'isEnabled': false},
+              upload: (_, bytes, name, fields) async => {},
+              notify: (_, message, error) {},
+              onImported: (_) async {},
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('อ่านนามบัตร'), findsOneWidget);
+      expect(
+        tester
+            .widget<OutlinedButton>(
+              find.widgetWithText(OutlinedButton, 'อ่านนามบัตร'),
+            )
+            .onPressed,
+        isNull,
+      );
+    },
+  );
+  testWidgets('integrated page offers save only after review', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: BusinessCardOcrPage(
+          tokens: tokens,
+          target: 'contacts',
+          maxImageSizeMB: 10,
+          engineAvailable: false,
+          get: (_, query) async => [],
+          upload: (_, bytes, name, fields) async => {},
+          notify: (_, message, error) {},
+          onSave: (_) async => BusinessCardSaveOutcome.saved,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('นำเข้าแบบฟอร์ม'), findsNothing);
+    expect(
+      tester
+          .widget<FilledButton>(find.widgetWithText(FilledButton, 'บันทึก'))
+          .onPressed,
+      isNull,
+    );
+  });
   testWidgets('cancel overwrite keeps old form unchanged', (tester) async {
     bool? accepted;
     await tester.pumpWidget(

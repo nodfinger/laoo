@@ -329,6 +329,7 @@
 | `54011` | [sport](sport.md) | `/company/sport-dashboard` | พบ Route |
 | `55001` | [ระบบส่วนกลาง](core.md) | `companyBusinessCardOcrSettings` | พบ Route |
 | `55002` | [ระบบส่วนกลาง](core.md) | `companyContacts` | พบ Route |
+| `55003` | [ระบบส่วนกลาง](core.md) | `companySupplierContacts` | พบ Route |
 | `56001` | [patrol](patrol.md) | `/company/patrol-settings` | พบ Route |
 | `56002` | [patrol](patrol.md) | `/company/patrol-checkpoints` | พบ Route |
 | `56003` | [patrol](patrol.md) | `/company/patrol-devices` | พบ Route |

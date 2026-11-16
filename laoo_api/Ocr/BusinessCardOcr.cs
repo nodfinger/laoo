@@ -163,9 +163,18 @@ public static class BusinessCardParser
         var company = Pattern(@"บริษัท|บ\s*ริ\s*ษั\s*ท|ห้างหุ้นส่วน|จำกัด|จำ\s*กัด|\b(?:co\.?|ltd\.?|limited|inc\.?|corporation|company)\b");
         var position = Pattern(@"ผู้จัดการ|กรรมการ|ฝ่ายขาย|วิศวกร|\b(?:manager|director|engineer|sales|chief|president|officer)\b");
         var address = Pattern(@"ถนน|แขวง|ตำบล|อำเภอ|จังหวัด|กรุงเทพ|ถ\.|ต\.|อ\.|\b(?:road|street|avenue|bangkok)\b|\b\d{5}\b");
-        var website = Pattern(@"(?:https?://|www\.)[a-z0-9.\-]+\.[a-z]{2,}(?:/[^\s]*)?");
+        var website = Pattern(@"(?<![a-z0-9@])(?:https?://|www\s*\.\s*)[a-z0-9](?:[a-z0-9\-]*\s*\.\s*)+[a-z]{2,}(?:/[^\s]*)?");
+        var websiteFromWww = Pattern(@"(?<![a-z0-9@])www\s*\.\s*[a-z0-9](?:[a-z0-9\-]*\s*\.\s*)+[a-z]{2,}(?:/[^\s]*)?");
+        var websiteDotSpacing = Pattern(@"\s*\.\s*");
         var line = Pattern(@"(?:LINE|ไลน์)\s*(?:ID)?\s*[:：]\s*(@?[a-z0-9._\-]+)");
         string[] Find(Regex regex) => regex.Matches(text).Select(m => m.Value.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        string NormalizeWebsite(string value) {
+            var compact=websiteDotSpacing.Replace(value.Trim(), ".");
+            return compact.StartsWith("www.",StringComparison.OrdinalIgnoreCase) ? "https://"+compact : compact;
+        }
+        var wwwCandidates=websiteFromWww.Matches(text).Select(m=>NormalizeWebsite(m.Value));
+        var websiteCandidates=wwwCandidates.Concat(website.Matches(text).Select(m=>NormalizeWebsite(m.Value)))
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         var companyLines = lines.Where(l => company.IsMatch(l)).ToArray();
         var positionLines = lines.Where(l => position.IsMatch(l) && !company.IsMatch(l)).ToArray();
         var addressLines = lines.Where(l => address.IsMatch(l) && !email.IsMatch(l) && !website.IsMatch(l) && !company.IsMatch(l)).ToArray();
@@ -178,7 +187,7 @@ public static class BusinessCardParser
         OcrSuggestion Suggest(string field, string[] candidates) => new(field, candidates.FirstOrDefault(), candidates);
         return new(text, words, new[] {
             Suggest("name", names), Suggest("company", companyLines), Suggest("position", positionLines),
-            Suggest("phone", Find(phone)), Suggest("email", Find(email)), Suggest("website", Find(website)),
+            Suggest("phone", Find(phone)), Suggest("email", Find(email)), Suggest("website", websiteCandidates),
             Suggest("line", lineIds), Suggest("address", addressLines.Length == 0 ? [] : [string.Join(" ", addressLines)])
         });
     }
