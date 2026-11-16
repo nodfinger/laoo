@@ -147,8 +147,22 @@ class PmsSapComparison {
       return (date1904 ? DateTime.utc(1904) : DateTime.utc(1899, 12, 30)).add(
         Duration(days: number.floor()),
       );
-    final iso = DateTime.tryParse(raw);
-    if (iso != null) return DateTime.utc(iso.year, iso.month, iso.day);
+    final isoParts = RegExp(
+      r'^(\d{4})-(\d{2})-(\d{2})(?:[T ].*)?$',
+    ).firstMatch(raw);
+    if (isoParts != null) {
+      final year = int.parse(isoParts[1]!);
+      final month = int.parse(isoParts[2]!);
+      final day = int.parse(isoParts[3]!);
+      final iso = DateTime.tryParse(raw);
+      if (iso == null) return null;
+      final original = DateTime.utc(year, month, day);
+      if (original.year != year ||
+          original.month != month ||
+          original.day != day)
+        return null;
+      return original;
+    }
     final parts = RegExp(r'^(\d{1,2})/(\d{1,2})/(\d{4})$').firstMatch(raw);
     if (parts == null) return null;
     final year = int.parse(parts[3]!);
@@ -199,7 +213,8 @@ class PmsSapComparison {
         'ไฟล์ PMS ต้องมีคอลัมน์เลขที่เอกสาร วันที่เอกสารหรือวันที่สร้างเอกสาร และ PmsStatus',
       );
     }
-    if (keyIndex >= sap.headers.length || _at(sap.headers, keyIndex).isEmpty) {
+    if (keyIndex >= sap.headers.length ||
+        _at(sap.headers, keyIndex) != 'เลขที่เอกสาร') {
       throw const FormatException(
         'ไฟล์ SAP ต้องมีคอลัมน์เลขที่เอกสารในตำแหน่งเดียวกับ PMS',
       );

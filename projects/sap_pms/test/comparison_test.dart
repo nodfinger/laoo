@@ -52,6 +52,26 @@ void main() {
     status,
     '1',
   ];
+  test('rejects an invalid ISO date instead of normalizing it', () {
+    final pmsRow = row('invalid-date', '2', '10');
+    pmsRow[2] = '2026-02-30';
+    final result = PmsSapComparison.compare(
+      SheetData(headers, [pmsRow], false),
+      SheetData(headers, [row('invalid-date', '2', '10')], false),
+    );
+    expect(result.single.status, 'problem');
+    expect(result.single.details, 'วันที่เอกสารไม่ถูกต้อง');
+  });
+  test('rejects a different SAP header at the document number position', () {
+    final sapHeaders = List<String>.from(headers)..[1] = 'รหัสอื่น';
+    expect(
+      () => PmsSapComparison.compare(
+        SheetData(headers, [row('a', '2', '10')], false),
+        SheetData(sapHeaders, [row('a', '2', '10')], false),
+      ),
+      throwsFormatException,
+    );
+  });
   test(
     'compares by key, skips absent columns and reports unmatched, waiting and duplicates',
     () {
