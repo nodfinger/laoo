@@ -1,0 +1,19 @@
+name: laoo_sap_pms
+description: PMS and SAP file comparison feature.
+publish_to: none
+version: 1.0.0+1
+environment:
+  sdk: ^3.12.2
+dependencies:
+  flutter:
+    sdk: flutter
+  archive: ^4.0.9
+  xml: ^7.0.1
+  file_picker: ^10.3.10
+  laoo_shared_core:
+    path: ../../packages/laoo_shared_core
+  laoo_shared_workspace_ui:
+    path: ../../packages/laoo_shared_workspace_ui
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
