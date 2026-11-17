@@ -732,13 +732,16 @@ class _ContactPageState extends State<ContactPage> {
 }
 
 class ContactRegistryPane extends StatefulWidget {
-  const ContactRegistryPane({super.key});
+  const ContactRegistryPane({super.key, this.api, this.caption});
+  final ContactApi? api;
+  final String? caption;
   @override
   State<ContactRegistryPane> createState() => _ContactRegistryPaneState();
 }
 
 class _ContactRegistryPaneState extends State<ContactRegistryPane> {
-  final _api = ContactApi(), _search = TextEditingController();
+  late final ContactApi _api;
+  final _search = TextEditingController();
   String _caption = '', _query = '';
   Map<String, dynamic> _actions = {};
   List<Map<String, dynamic>> _rows = [];
@@ -748,13 +751,14 @@ class _ContactRegistryPaneState extends State<ContactRegistryPane> {
   @override
   void initState() {
     super.initState();
-    _loadCaption();
+    _api = widget.api ?? ContactApi();
+    if (widget.caption != null) { _caption = widget.caption!; } else { _loadCaption(); }
     _load();
   }
 
   @override
   void dispose() {
-    _api.dispose();
+    if (widget.api == null) _api.dispose();
     _search.dispose();
     super.dispose();
   }
