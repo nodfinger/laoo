@@ -1,0 +1,2 @@
+﻿IF COL_LENGTH(N'dbo.TDKNArticle', N'ViewCount') IS NULL
+    ALTER TABLE dbo.TDKNArticle ADD ViewCount bigint NOT NULL CONSTRAINT DF_TDKNArticle_ViewCount DEFAULT(0) WITH VALUES;

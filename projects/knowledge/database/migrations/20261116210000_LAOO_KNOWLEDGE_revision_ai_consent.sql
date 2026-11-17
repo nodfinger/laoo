@@ -1,0 +1,4 @@
+SET XACT_ABORT ON;
+IF COL_LENGTH(N'dbo.TDKNArticleRevision',N'IncludeInAi') IS NULL
+ ALTER TABLE dbo.TDKNArticleRevision ADD IncludeInAi bit NOT NULL CONSTRAINT DF_TDKNArticleRevision_IncludeInAi DEFAULT(0) WITH VALUES;
+GO
