@@ -4720,7 +4720,7 @@ class _KnowledgePageState extends State<KnowledgePage> {
         ? (dialogContext) => Wrap(
             spacing: 8,
             children: [
-              if (actions['return'] == true || row['assignedReviewer'] == true)
+              if (actions['return'] == true)
                 OutlinedButton(
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Theme.of(context).colorScheme.error,
@@ -4737,7 +4737,7 @@ class _KnowledgePageState extends State<KnowledgePage> {
                   },
                   child: const Text('ตีกลับ'),
                 ),
-              if (actions['publish'] == true || row['assignedReviewer'] == true)
+              if (actions['publish'] == true)
                 FilledButton(
                   onPressed: () async {
                     Navigator.pop(dialogContext);
